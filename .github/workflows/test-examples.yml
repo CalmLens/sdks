@@ -91,3 +91,9 @@ jobs:
         working-directory: examples/calmgram
       - run: bun run test
         working-directory: examples/calmgram
+      - run: bun run sdk
+        working-directory: examples/feedback-form-static
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: examples/mobile-uploads-expo
+      - run: bun run check
+        working-directory: examples/mobile-uploads-expo
