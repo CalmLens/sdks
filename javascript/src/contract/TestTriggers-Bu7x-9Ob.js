@@ -1,3 +1,4 @@
+import { t as CLASSIFICATION_CATEGORIES } from "./Classification-DwmCqYzn.js";
 //#region packages/shared/src/TestTriggers.ts
 const TEST_IMAGE_PALETTES = {
 	sexual: [
@@ -159,18 +160,13 @@ const TEST_IMAGE_PALETTES = {
 };
 /** A project's test input key: eight hexadecimal characters only its members can see. */
 const TEST_INPUT_KEY_PATTERN = /^[a-f0-9]{8}$/;
-const TEXT_CODE_SIGNALS = [
-	"harassment",
-	"hate",
-	"criminal-activity",
-	"sexual.involving-minors"
-];
+const TEXT_CODE_SIGNALS = [...CLASSIFICATION_CATEGORIES, "sexual.involving-minors"];
 /**
 * The text code that CalmLens classifies as `category` for the project with this test input key.
 * @returns The code, or an empty string for a category without a text code
 */
 const generateTestTextCode = (category, testInputKey) => TEXT_CODE_SIGNALS.includes(category) ? `<!calmlens-test ${testInputKey} ${category}>` : "";
-const TEST_TRIGGER_PATTERN = /<!calmlens-test\s+([a-f0-9]{8})\s+(harassment|hate|criminal-activity|sexual\.involving-minors)\s*>/gi;
+const TEST_TRIGGER_PATTERN = /<!calmlens-test\s+([a-f0-9]{8})\s+(sexual|violence|self-harm|harassment|hate|criminal-activity|sexual\.involving-minors)\s*>/gi;
 /**
 * The test signals in `text` whose codes carry the project's test input key. Codes with another
 * key are ignored, so a code can only be used by the project it belongs to.
