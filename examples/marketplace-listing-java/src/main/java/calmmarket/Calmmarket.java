@@ -43,10 +43,7 @@ public final class Calmmarket {
   static final int SIGNED_URL_SECONDS = 60;
   static final int MAX_EXTRACTED_TEXT_SHOWN = 240;
   /** Category evidence below this does not contribute when CalmLens merges reports. */
-  static final double MIN_ATTRIBUTED_SCORE = 0.1;
 
-  /** The asset type of the text child CalmLens creates when OCR finds text in an image. */
-  static final String OCR_CHILD_TYPE = "plaintext-document";
 
   /** A named, versioned CDN transformation: listing photos are delivered as 4:3 WebP cards. */
   static final String CARD_LENS = "calmmarket-card";
@@ -119,33 +116,20 @@ public final class Calmmarket {
     State(String label) { this.label = label; }
   }
 
-  /** Whether the text OCR found in a photo has been looked up with {@code assets.listChildren}. */
-  enum Ocr { NOT_CHECKED, NO_TEXT, FOUND, LOOKUP_FAILED }
+  /** Whether extracted text is available on the retrieved image. */
+  enum Ocr { NOT_CHECKED, NO_TEXT, FOUND }
 
   /** Which part of a rejected photo led to the rejection. */
   enum Driver {
     NONE("Not rejected"),
-    TEXT_IN_PHOTO("The text in the photo: its OCR text was rejected on its own"),
-    VISUAL("The visual content: the text in the photo, if any, passed on its own"),
-    REVIEWER("A reviewer's decision, not the automated report"),
-    UNKNOWN("Unknown: the text found in the photo could not be loaded");
+    AUTOMATED("The combined image and text moderation report"),
+    REVIEWER("A reviewer's decision");
     final String label;
     Driver(String label) { this.label = label; }
   }
 
-  /** Where a category's combined score came from. */
-  enum Source {
-    TEXT_IN_PHOTO("Text in photo"), VISUAL("Visual"), NEGLIGIBLE("Below 0.10"), NO_RESULT("No result");
-    final String label;
-    Source(String label) { this.label = label; }
-  }
-
-  /**
-   * One category of a photo's combined report next to the same category of its OCR child's own
-   * report. A score is null unless the category was evaluated or partially evaluated: a
-   * not-evaluated category has no score and is never shown as zero.
-   */
-  record CategoryRow(String key, String status, Double score, String reason, String textStatus, Double textScore, Source source) {
+  /** A combined category result; unavailable categories have no score. */
+  record CategoryRow(String key, String status, Double score, String reason) {
     String label() { return CATEGORY_LABELS.getOrDefault(key, key); }
   }
 
@@ -164,9 +148,9 @@ public final class Calmmarket {
     /** The reviewer's note, or else automated moderation's reason for a rejection. */
     String rejectionNote;
     Ocr ocr = Ocr.NOT_CHECKED;
-    Asset textChild;
+    ExtractedText extractedText;
     String refreshError;
-    /** Asset IDs (photo and OCR child) whose stored content was removed, or that are under a safety hold. */
+    /** Photo asset IDs whose stored content was removed, or that are under a safety hold. */
     final Set<String> contentRemoved = new LinkedHashSet<>();
     final Set<String> safetyHeld = new LinkedHashSet<>();
     // Demo mode only: the selected outcome, when the photo was submitted, and its bytes.
@@ -187,15 +171,10 @@ public final class Calmmarket {
     boolean failed() { return moderation == AssetModerationStatus.REJECTED || processingFailed(); }
     /** The decision shown to the seller: {@code failed} when processing failed, else the moderation status. */
     String decision() { return processingFailed() ? "failed" : moderation == null ? "unknown" : moderation.value(); }
-    Driver driver() { return Calmmarket.driver(moderation, moderationAction != null, ocr, textChild); }
-    List<CategoryRow> categories() { return explain(report, textChild == null ? null : Calmmarket.report(textChild)); }
-    List<String> contentIds() {
-      List<String> ids = new ArrayList<>();
-      ids.add(assetId);
-      if (textChild != null && textChild.id() != null) ids.add(textChild.id());
-      return ids;
-    }
-    boolean owns(String id) { return id.equals(assetId) || textChild != null && id.equals(textChild.id()); }
+    Driver driver() { return Calmmarket.driver(moderation, moderationAction != null); }
+    List<CategoryRow> categories() { return explain(report); }
+    List<String> contentIds() { return List.of(assetId); }
+    boolean owns(String id) { return id.equals(assetId); }
   }
 
   static final class Listing {
@@ -271,7 +250,7 @@ public final class Calmmarket {
     /** Moderates the title and description. {@code demoChoice} is ignored in live mode. */
     CalmLensServerClient textModeration(String demoChoice);
     CalmLensServerClient photoUploads(int photos);
-    /** Retrieves a photo and lists its children. */
+    /** Retrieves a photo with its extracted text. */
     CalmLensServerClient photo(Photo photo);
     /** Retrieves a title or description asset. */
     CalmLensServerClient textAsset(String assetId, String externalId, boolean flagged);
@@ -395,7 +374,7 @@ public final class Calmmarket {
     // Poll undecided photos (and failed lookups) so the page shows the latest decision.
     for (Listing listing : listings()) {
       List<Photo> stale = listing.locked(() -> listing.withdrawn || listing.removed ? List.<Photo>of() : listing.photos.stream()
-          .filter(photo -> !photo.decided() && !photo.processingFailed() || photo.refreshError != null || photo.ocr == Ocr.LOOKUP_FAILED)
+          .filter(photo -> !photo.decided() && !photo.processingFailed() || photo.refreshError != null)
           .toList());
       for (Photo photo : stale) refreshPhoto(listing, photo);
     }
@@ -607,45 +586,25 @@ public final class Calmmarket {
 
   // ---------------------------------------------------------------- Explaining photo decisions
 
-  /**
-   * Which part of a photo led to its rejection. The OCR child has its own report and decision;
-   * its report is merged into the photo's, so a rejected child means the text alone was enough.
-   * A rejected photo whose child passed (or that has no child) was rejected for what it shows,
-   * unless the policy took no action on it ({@code policyActed} false), which means a reviewer
-   * rejected it.
-   */
-  static Driver driver(AssetModerationStatus status, boolean policyActed, Ocr ocr, Asset child) {
+  /** The combined report does not identify which moderation pass caused a rejection. */
+  static Driver driver(AssetModerationStatus status, boolean policyActed) {
     if (status != AssetModerationStatus.REJECTED) return Driver.NONE;
-    if (ocr == Ocr.FOUND && child != null && (moderationStatus(child) == AssetModerationStatus.REJECTED || flagged(child))) return Driver.TEXT_IN_PHOTO;
-    if (ocr == Ocr.NOT_CHECKED || ocr == Ocr.LOOKUP_FAILED) return Driver.UNKNOWN;
-    return policyActed ? Driver.VISUAL : Driver.REVIEWER;
+    return policyActed ? Driver.AUTOMATED : Driver.REVIEWER;
   }
 
-  /**
-   * Compares each category of the photo's combined report with the OCR child's own report. The
-   * combined report keeps the higher evaluated score per category, so a combined score that the
-   * text's score reaches came from the text in the photo; a higher one came from the image itself.
-   * A category that is not evaluated has no score and no source. Evidence below 0.1 does not
-   * contribute to merging, so such a score is not attributed to either part.
-   */
-  static List<CategoryRow> explain(ClassificationReport merged, ClassificationReport text) {
+  static List<CategoryRow> explain(ClassificationReport merged) {
     if (merged == null || merged.categories() == null) return List.of();
     LinkedHashSet<String> keys = new LinkedHashSet<>(CATEGORIES);
     keys.addAll(new TreeSet<>(merged.categories().keySet()));
     List<CategoryRow> rows = new ArrayList<>();
     for (String key : keys) {
-      CategoryResult combined = merged.categories().get(key);
-      CategoryResult fromText = text == null || text.categories() == null ? null : text.categories().get(key);
-      Double score = scoreOf(combined), textScore = scoreOf(fromText);
-      Source source = score == null ? Source.NO_RESULT : score < MIN_ATTRIBUTED_SCORE ? Source.NEGLIGIBLE
-          : textScore != null && textScore >= score ? Source.TEXT_IN_PHOTO : Source.VISUAL;
-      rows.add(new CategoryRow(key, combined == null || combined.status() == null ? "missing" : combined.status(), score,
-          combined == null ? null : combined.reason(), fromText == null ? null : fromText.status(), textScore, source));
+      CategoryResult result = merged.categories().get(key);
+      rows.add(new CategoryRow(key, result == null || result.status() == null ? "missing" : result.status(),
+          scoreOf(result), result == null ? null : result.reason()));
     }
     return rows;
   }
 
-  /** The score of an evaluated or partially evaluated result; null when there is no usable score. */
   static Double scoreOf(CategoryResult result) {
     if (result == null || result.score() == null) return null;
     return "evaluated".equals(result.status()) || "partial".equals(result.status()) ? result.score() : null;
@@ -660,41 +619,24 @@ public final class Calmmarket {
     photo.moderationAction = moderation == null ? null : moderation.action();
     photo.report = report(asset);
     photo.rejectionNote = moderation == null ? null : moderation.reviewerNote() != null ? moderation.reviewerNote() : moderation.note();
-    if (!photo.decided()) { photo.ocr = Ocr.NOT_CHECKED; photo.textChild = null; }
+    photo.extractedText = asset.content() == null ? null : asset.content().extractedText();
+    photo.ocr = !photo.decided() ? Ocr.NOT_CHECKED : photo.extractedText == null ? Ocr.NO_TEXT : Ocr.FOUND;
   }
 
-  /** The result of looking a photo up: its decision and, once decided, its OCR child. */
-  private record Lookup(Asset asset, Ocr ocr, Asset child) {}
+  /** Retrieves the authoritative image decision and extracted text in one request. */
+  private record Lookup(Asset asset) {}
 
-  /** Finds the OCR text child. A failed lookup only affects the explanation, never the decision. */
-  private static Lookup textChild(CalmLensServerClient client, Photo photo, Asset asset) {
-    try {
-      Asset child = client.assets.iterateChildren(new ListChildren(photo.assetId).pageSize(10)).stream()
-          .filter(item -> OCR_CHILD_TYPE.equals(item.type())).findFirst().orElse(null);
-      return new Lookup(asset, child == null ? Ocr.NO_TEXT : Ocr.FOUND, child);
-    } catch (CalmLensException error) {
-      log("Could not list the photo's text", error);
-      return new Lookup(asset, Ocr.LOOKUP_FAILED, null);
-    }
-  }
-
-  /**
-   * Retrieves the photo's authoritative decision, then its OCR child, without holding any lock.
-   * Throws when retrieval fails, or {@link NotOurs} when the asset's externalId does not point back
-   * to this photo.
-   */
   private Lookup lookUp(Photo photo) {
     CalmLensServerClient client = backend.photo(photo);
     Asset asset = client.assets.retrieve(new AssetId(photo.assetId));
     if (!photo.externalId.equals(asset.externalId())) throw new NotOurs();
-    return Photo.decided(moderationStatus(asset)) ? textChild(client, photo, asset) : new Lookup(asset, Ocr.NOT_CHECKED, null);
+    return new Lookup(asset);
   }
 
   private static void apply(Listing listing, Photo photo, Lookup lookup) {
     listing.locked(() -> {
       applyPhoto(photo, lookup.asset());
       photo.refreshError = null;
-      if (photo.decided()) { photo.ocr = lookup.ocr(); photo.textChild = lookup.child(); }
       return null;
     });
   }
@@ -790,12 +732,6 @@ public final class Calmmarket {
     int removed = 0, failed = 0, held = 0;
     try {
       for (Photo photo : listing.photos) {
-        // The OCR child holds its own copy of the text read from the photo, so find it first.
-        Ocr ocr = listing.locked(() -> photo.ocr);
-        if (!demo() && (ocr == Ocr.NOT_CHECKED || ocr == Ocr.LOOKUP_FAILED)) {
-          Lookup lookup = textChild(backend.photo(photo), photo, null);
-          listing.locked(() -> { photo.ocr = lookup.ocr(); photo.textChild = lookup.child(); return null; });
-        }
         List<String> pending = listing.locked(() -> photo.contentIds().stream()
             .filter(id -> !photo.contentRemoved.contains(id) && !photo.safetyHeld.contains(id)).toList());
         for (String assetId : pending) {
@@ -868,8 +804,7 @@ public final class Calmmarket {
 
   /**
    * Applies one event from the feed or a webhook. It retrieves the current decision instead of
-   * trusting the event's snapshot: an event about a photo or its OCR child refreshes the photo
-   * (the parent carries the combined decision) and its child. A retrieved asset whose externalId
+   * trusting the event's snapshot: an event about a photo refreshes its combined decision and text. A retrieved asset whose externalId
    * does not point back to the listing changes nothing.
    */
   private boolean apply(String eventId, String type, String assetId, List<EventFact> facts) {

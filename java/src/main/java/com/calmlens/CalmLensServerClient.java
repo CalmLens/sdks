@@ -932,7 +932,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       return decode(json("POST", "/assets/" + id(str(o, "assetId", null)) + "/move", null, body), Models.Asset.class);
     }
 
-    /** @param options the parent asset and page @return one page of child assets, such as OCR text */
+    /** @param options the parent asset and page @return one page of child assets, such as images extracted from documents */
     public Models.AssetPage listChildren(Models.ListChildren options) {
       JsonObject o = Models.encode(options);
       JsonObject query = new JsonObject();

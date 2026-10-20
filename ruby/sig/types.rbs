@@ -276,7 +276,7 @@ module CalmLens
     ?"faces" => Array[detected_face],
     ?"reason" => not_evaluated_reason
   }
-  # Results of the features requested in `processingOptions.features`. OCR produces a text child
+  # Results of the features requested in `processingOptions.features`. OCR stores extracted text on the image
   # asset instead of a result here.
   type processing_feature_results = {
     ?"personDetection" => person_detection_result,

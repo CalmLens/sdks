@@ -503,3 +503,5 @@ for the shared contract fixtures. The version lives only in `pyproject.toml`
 (`calmlens.__version__` reads it). Publishing is manual: build with `python -m build` in this
 package, inspect the wheel and sdist, then upload through the project's approved PyPI release
 process.
+
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.

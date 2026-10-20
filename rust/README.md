@@ -272,3 +272,5 @@ cargo check --no-default-features
 ```
 
 The tests enable the `blocking` and `testing` features through a dev-dependency on the crate itself. CI tests the minimum (1.88, matching `rust-version` and the locked dependencies) and current stable compilers. `bun packages/sdk-contract/generate.ts` regenerates the request, path and webhook fixtures in `testdata/` and the error-code list in `src/codes.rs`. Run `bun run test:sdk:e2e` from the repository root to test all six SDKs against the local backend.
+
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.

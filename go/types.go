@@ -263,7 +263,7 @@ type FlaggedContentPolicy struct {
 // ProcessingFeatures holds the optional analyses to run, keyed by feature. A nil feature is
 // not sent and stays off.
 type ProcessingFeatures struct {
-	// OCR extracts image text into a child asset and moderates it as text.
+	// OCR stores extracted text on the image asset and adds text moderation.
 	OCR *OCRFeatureOptions `json:"ocr,omitempty"`
 	// PersonDetection (beta) locates people; results are in Report.Features.
 	PersonDetection *PersonDetectionFeatureOptions `json:"personDetection,omitempty"`

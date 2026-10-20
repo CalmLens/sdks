@@ -558,3 +558,5 @@ App; no Go registry token is needed.
 
 
 `Text.Moderate` is a convenience wrapper around asset moderation: it supplies `text/plain` content and defaults the asset name to `text`, returning the same `*calmlens.Asset` described under [Moderation results](#moderation-results). `assets.create` queues processing; `assets.moderate` waits for classification. The old asset analyze method is removed.
+
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.

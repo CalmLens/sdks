@@ -170,18 +170,6 @@ class CalmmarketTest {
 
   static Map<String, Object> text(String id, String status, boolean flagged) { return asset(id, status, null, report(flagged, Map.of())); }
 
-  static Map<String, Object> ocrChild(String id, String parentId, String status, Map<String, Object> report) {
-    Map<String, Object> child = asset(id, status, null, report);
-    child.put("type", Calmmarket.OCR_CHILD_TYPE);
-    child.put("parentId", parentId);
-    child.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", "Call 555-0100 <now>")));
-    return child;
-  }
-
-  @SafeVarargs static Map<String, Object> children(Map<String, Object>... items) {
-    return Map.of("items", List.of(items), "hasMore", false);
-  }
-
   static Map<String, Object> removed(String id) {
     Map<String, Object> asset = asset(id, "approved", null, null);
     asset.put("content", Map.of("status", "removed", "removalReason", "requested"));
@@ -247,124 +235,37 @@ class CalmmarketTest {
   // ------------------------------------------------------------ explaining decisions
 
   @Test
-  void attributesRejectionsToTheTextInThePhotoOrToTheImage() {
-    Asset rejectedText = model(ocrChild("child-1", "photo-1", "rejected", report(true, Map.of("criminal-activity", evaluated(0.88)))), Asset.class);
-    Asset cleanText = model(ocrChild("child-1", "photo-1", "approved", CLEAN), Asset.class);
-    assertEquals(Calmmarket.Driver.TEXT_IN_PHOTO, Calmmarket.driver(AssetModerationStatus.REJECTED, true, Calmmarket.Ocr.FOUND, rejectedText));
-    assertEquals(Calmmarket.Driver.VISUAL, Calmmarket.driver(AssetModerationStatus.REJECTED, true, Calmmarket.Ocr.FOUND, cleanText));
-    assertEquals(Calmmarket.Driver.VISUAL, Calmmarket.driver(AssetModerationStatus.REJECTED, true, Calmmarket.Ocr.NO_TEXT, null));
-    assertEquals(Calmmarket.Driver.REVIEWER, Calmmarket.driver(AssetModerationStatus.REJECTED, false, Calmmarket.Ocr.NO_TEXT, null));
-    assertEquals(Calmmarket.Driver.UNKNOWN, Calmmarket.driver(AssetModerationStatus.REJECTED, true, Calmmarket.Ocr.LOOKUP_FAILED, null));
-    assertEquals(Calmmarket.Driver.NONE, Calmmarket.driver(AssetModerationStatus.APPROVED, false, Calmmarket.Ocr.FOUND, rejectedText));
-    assertEquals(Calmmarket.Driver.NONE, Calmmarket.driver(AssetModerationStatus.PENDING, false, Calmmarket.Ocr.NOT_CHECKED, null));
-  }
-
-  @Test
-  void categoriesCompareTheMergedReportWithTheTextReportAndNeverTreatNotEvaluatedAsZero() {
-    ClassificationReport merged = model(report(true, Map.of(
-        "criminal-activity", evaluated(0.88), "violence", evaluated(0.91), "hate", partial(0.4),
-        "self-harm", notEvaluated("not-supported"), "custom-category", evaluated(0.1), "harassment", evaluated(0.05))), ClassificationReport.class);
-    ClassificationReport text = model(report(true, Map.of(
-        "criminal-activity", evaluated(0.88), "violence", evaluated(0.02),
-        "hate", Map.of("status", "not-evaluated", "reason", "unavailable", "score", 0.0), "harassment", evaluated(0.05))), ClassificationReport.class);
-    Map<String, Calmmarket.CategoryRow> rows = new LinkedHashMap<>();
-    for (Calmmarket.CategoryRow row : Calmmarket.explain(merged, text)) rows.put(row.key(), row);
-    assertEquals(List.of("sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity", "custom-category"), List.copyOf(rows.keySet()));
-    assertEquals(Calmmarket.Source.TEXT_IN_PHOTO, rows.get("criminal-activity").source());
-    assertEquals(0.88, rows.get("criminal-activity").textScore());
-    assertEquals(Calmmarket.Source.VISUAL, rows.get("violence").source());
-    assertEquals(0.02, rows.get("violence").textScore());
-    // Partial is a usable score; the text's not-evaluated result is not a zero.
-    assertEquals(0.4, rows.get("hate").score());
-    assertEquals("partial", rows.get("hate").status());
-    assertNull(rows.get("hate").textScore());
-    assertEquals("not-evaluated", rows.get("hate").textStatus());
-    assertEquals(Calmmarket.Source.VISUAL, rows.get("hate").source());
-    // A merged category that was not evaluated has no score and no source.
-    assertNull(rows.get("self-harm").score());
-    assertEquals("not-supported", rows.get("self-harm").reason());
-    assertEquals(Calmmarket.Source.NO_RESULT, rows.get("self-harm").source());
-    // Evidence below 0.1 does not contribute to merging, so a tie there is not attributed.
-    assertEquals(Calmmarket.Source.NEGLIGIBLE, rows.get("harassment").source());
-    assertEquals(Calmmarket.Source.VISUAL, rows.get("custom-category").source(), "0.1 itself counts, and the text has no result for it");
-    assertEquals("missing", rows.get("sexual").status());
-    assertEquals(Calmmarket.Source.NO_RESULT, rows.get("sexual").source());
-    // Without an OCR child every evaluated score came from the image.
-    assertEquals(Calmmarket.Source.VISUAL, Calmmarket.explain(merged, null).stream()
-        .filter(row -> row.key().equals("criminal-activity")).findFirst().orElseThrow().source());
-    assertEquals(List.of(), Calmmarket.explain(null, text));
-  }
-
-  @Test
-  void liveRejectionByTextInThePhotoIsFoundThroughListChildren() {
+  void retrievesExtractedTextWithTheImageWithoutListingChildren() {
     MockCalmLensServerClient mock = liveSubmission(1);
     Calmmarket app = live(mock, "");
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    Map<String, Object> other = asset("preview-1", "approved", null, null);
-    other.put("type", "image");
-    Map<String, Object> child = ocrChild("child-1", "photo-1", "rejected", report(true, Map.of("criminal-activity", evaluated(0.88))));
-    mock.enqueue(200, photo(listing, 1, "rejected", report(true, Map.of("criminal-activity", evaluated(0.88), "violence", evaluated(0.05)))))
-        .enqueue(200, children(other, child));
-    String page = html(get(app, "/"));
-    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-1/children"), paths(mock, 3));
+    Map<String, Object> image = photo(listing, 1, "rejected", report(true, Map.of("criminal-activity", evaluated(0.88))));
+    image.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", "Call 555-0100 <now>")));
+    mock.enqueue(200, image);
+    get(app, "/");
+    assertEquals(List.of("GET /v1/assets/photo-1"), paths(mock, 3));
     Calmmarket.Photo photo = listing.photos.get(0);
+    assertEquals("Call 555-0100 <now>", photo.extractedText.content());
     assertEquals(Calmmarket.Ocr.FOUND, photo.ocr);
-    assertEquals("child-1", photo.textChild.id());
-    assertEquals(Calmmarket.Driver.TEXT_IN_PHOTO, photo.driver());
+    assertEquals(Calmmarket.Driver.AUTOMATED, photo.driver());
     assertEquals(Calmmarket.State.HELD, listing.state());
-    assertFalse(page.contains("Call 555-0100 <now>"), "extracted text is escaped");
-    assertTrue(page.contains("Call 555-0100 &lt;now&gt;"));
-    assertFalse(page.contains("/listings/" + listing.id + "/photos/1\""), "a rejected photo gets no preview link");
-    mock.enqueue(200, photo(listing, 1, "rejected", null)).enqueue(200, children(child));
-    assertEquals(403, get(app, "/listings/" + listing.id + "/photos/1").status());
-  }
-
-  @Test
-  void aPhotoWithoutTextHasNoChildAndAVisualRejection() {
-    MockCalmLensServerClient mock = liveSubmission(1);
-    Calmmarket app = live(mock, "");
-    live(app, 1);
-    Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "rejected", report(true, Map.of("violence", evaluated(0.91))))).enqueue(200, children());
-    get(app, "/");
-    Calmmarket.Photo photo = listing.photos.get(0);
-    assertEquals(Calmmarket.Ocr.NO_TEXT, photo.ocr);
-    assertNull(photo.textChild);
-    assertEquals(Calmmarket.Driver.VISUAL, photo.driver());
-    assertEquals(Calmmarket.Source.VISUAL, photo.categories().stream().filter(row -> row.key().equals("violence")).findFirst().orElseThrow().source());
-  }
-
-  @Test
-  void aFailedChildLookupLeavesTheCauseUnknownAndIsRetried() {
-    MockCalmLensServerClient mock = liveSubmission(1);
-    Calmmarket app = live(mock, "");
-    live(app, 1);
-    Calmmarket.Listing listing = app.listings().get(0);
-    Map<String, Object> merged = report(true, Map.of("criminal-activity", evaluated(0.88)));
-    mock.enqueue(200, photo(listing, 1, "rejected", merged)).enqueueTimeout();
-    get(app, "/");
-    Calmmarket.Photo photo = listing.photos.get(0);
-    assertEquals(Calmmarket.Ocr.LOOKUP_FAILED, photo.ocr);
-    assertEquals(Calmmarket.Driver.UNKNOWN, photo.driver());
-    mock.enqueue(200, photo(listing, 1, "rejected", merged)).enqueue(200, children(ocrChild("child-1", "photo-1", "rejected", merged)));
-    get(app, "/");
-    assertEquals(Calmmarket.Driver.TEXT_IN_PHOTO, photo.driver());
+    assertEquals(List.of("photo-1"), photo.contentIds());
     assertEquals(0, mock.remainingResponses());
   }
 
   @Test
-  void anAssetWhoseExternalIdIsNotThePhotosNeverCountsAsItsDecision() {
-    MockCalmLensServerClient mock = liveSubmission(1);
-    Calmmarket app = live(mock, "");
-    live(app, 1);
-    Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, asset("photo-1", "approved", "another-listing:photo-1", CLEAN));
-    get(app, "/");
-    Calmmarket.Photo photo = listing.photos.get(0);
-    assertNotNull(photo.refreshError);
-    assertFalse(listing.visible());
-    assertEquals(List.of("GET /v1/assets/photo-1"), paths(mock, 3), "no child lookup for an asset that is not ours");
+  void combinedCategoriesPreserveUnavailableResults() {
+    ClassificationReport report = model(report(true, Map.of("violence", evaluated(0.91),
+        "hate", partial(0.4), "self-harm", notEvaluated("not-supported"))), ClassificationReport.class);
+    Map<String, Calmmarket.CategoryRow> rows = new LinkedHashMap<>();
+    for (Calmmarket.CategoryRow row : Calmmarket.explain(report)) rows.put(row.key(), row);
+    assertEquals(0.91, rows.get("violence").score());
+    assertEquals(0.4, rows.get("hate").score());
+    assertEquals("partial", rows.get("hate").status());
+    assertNull(rows.get("self-harm").score());
+    assertEquals("not-supported", rows.get("self-harm").reason());
+    assertEquals(List.of(), Calmmarket.explain(null));
   }
 
   // ------------------------------------------------------------ listing decision
@@ -376,7 +277,7 @@ class CalmmarketTest {
     live(app, 2);
     Calmmarket.Listing listing = app.listings().get(0);
     String photoLink = "/listings/" + listing.id + "/photos/1";
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN)).enqueue(200, children())
+    mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
         .enqueue(200, photo(listing, 2, "pending", null));
     assertFalse(html(get(app, "/")).contains("<article class=\"card\">"));
     assertEquals(Calmmarket.State.IN_REVIEW, listing.state());
@@ -396,7 +297,7 @@ class CalmmarketTest {
     assertTrue(listing.visible());
     listing.photos.get(1).moderation = AssetModerationStatus.REJECTED;
     assertEquals(Calmmarket.State.HELD, listing.state());
-    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-1/children", "GET /v1/assets/photo-2",
+    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-2",
         "GET /v1/assets/photo-2", "GET /v1/assets/photo-2"), paths(mock, 4));
     assertTrue(html(get(app, "/")).contains(photoLink + "\""), "the approved photo itself can still be previewed by the seller");
   }
@@ -410,23 +311,23 @@ class CalmmarketTest {
     live(app, 2);
     Calmmarket.Listing listing = app.listings().get(0);
     mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
-        .enqueue(200, children(ocrChild("child-1", "photo-1", "approved", CLEAN)))
-        .enqueue(200, photo(listing, 2, "approved", CLEAN)).enqueue(200, children());
+
+        .enqueue(200, photo(listing, 2, "approved", CLEAN));
     get(app, "/");
     assertTrue(listing.visible());
     int before = mock.requests().size();
-    mock.enqueue(200, removed("photo-1")).enqueue(200, removed("child-1")).enqueue(200, removed("photo-2"));
+    mock.enqueue(200, removed("photo-1")).enqueue(200, removed("photo-2"));
     Calmmarket.Response withdrawn = post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf);
     assertEquals(303, withdrawn.status());
     assertEquals("/?notice=withdrawn", withdrawn.headers().get("location"));
-    assertEquals(List.of("DELETE /v1/assets/photo-1/content", "DELETE /v1/assets/child-1/content", "DELETE /v1/assets/photo-2/content"), paths(mock, before));
+    assertEquals(List.of("DELETE /v1/assets/photo-1/content", "DELETE /v1/assets/photo-2/content"), paths(mock, before));
     assertEquals(Calmmarket.State.WITHDRAWN, listing.state());
     assertFalse(listing.removalPending());
     assertEquals(410, get(app, "/listings/" + listing.id + "/photos/1").status());
     assertEquals(410, get(app, "/listings/" + listing.id + "/photos/2").status());
     // The page no longer links the photos, and nothing about them is requested again.
     assertFalse(html(get(app, "/")).contains("/listings/" + listing.id + "/photos/"));
-    assertEquals(before + 3, mock.requests().size());
+    assertEquals(before + 2, mock.requests().size());
     assertEquals(409, post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf).status());
   }
 
@@ -436,7 +337,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     live(app, 3);
     Calmmarket.Listing listing = app.listings().get(0);
-    for (int i = 1; i <= 3; i++) mock.enqueue(200, photo(listing, i, "approved", CLEAN)).enqueue(200, children());
+    for (int i = 1; i <= 3; i++) mock.enqueue(200, photo(listing, i, "approved", CLEAN));
     get(app, "/");
     int before = mock.requests().size();
     mock.enqueue(200, removed("photo-1")).enqueueTimeout().enqueueError(ErrorCodes.ASSET_SAFETY_HELD);
@@ -455,10 +356,10 @@ class CalmmarketTest {
     MockCalmLensServerClient unconfirmed = liveSubmission(1);
     Calmmarket other = live(unconfirmed, "");
     live(other, 1);
-    unconfirmed.enqueue(200, children()).enqueue(200, asset("photo-1", "approved", null, null));
+    unconfirmed.enqueue(200, asset("photo-1", "approved", null, null));
     post(other, "/listings/" + other.listings().get(0).id + "/withdraw", "csrf=" + other.csrf);
     assertTrue(other.listings().get(0).removalPending());
-    assertEquals(List.of("GET /v1/assets/photo-1/children", "DELETE /v1/assets/photo-1/content"), paths(unconfirmed, 3));
+    assertEquals(List.of("DELETE /v1/assets/photo-1/content"), paths(unconfirmed, 3));
   }
 
   @Test
@@ -472,7 +373,7 @@ class CalmmarketTest {
     assertArrayEquals(PNG, served.body());
     assertEquals(303, post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf).status());
     Calmmarket.Photo photo = listing.photos.get(0);
-    assertEquals(Set.of(photo.assetId, photo.textChild.id()), photo.contentRemoved);
+    assertEquals(Set.of(photo.assetId), photo.contentRemoved);
     assertNull(photo.demoBytes);
     assertEquals(410, get(app, "/listings/" + listing.id + "/photos/1").status());
   }
@@ -483,8 +384,8 @@ class CalmmarketTest {
   @CsvSource({
       "no-text,approved,NO_TEXT,NONE,LIVE",
       "clean-text,approved,FOUND,NONE,LIVE",
-      "text-rejected,rejected,FOUND,TEXT_IN_PHOTO,HELD",
-      "visual-rejected,rejected,FOUND,VISUAL,HELD",
+      "text-rejected,rejected,FOUND,AUTOMATED,HELD",
+      "visual-rejected,rejected,FOUND,AUTOMATED,HELD",
       "error,failed,NOT_CHECKED,NONE,HELD"})
   void demoOutcomesAreExplained(String choice, String status, Calmmarket.Ocr ocr, Calmmarket.Driver driver, Calmmarket.State state) {
     Calmmarket app = demoApp("");
@@ -504,7 +405,7 @@ class CalmmarketTest {
     assertEquals(state, listing.state());
     Calmmarket.Response preview = get(app, "/listings/" + listing.id + "/photos/1");
     assertEquals(status.equals("approved") ? 200 : 403, preview.status());
-    if (ocr == Calmmarket.Ocr.FOUND) assertEquals(photo.assetId, photo.textChild.parentId());
+    if (ocr == Calmmarket.Ocr.FOUND) assertEquals("string", photo.extractedText.type());
   }
 
   @Test
@@ -681,7 +582,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN)).enqueue(200, children())
+    mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
         .enqueue(200, Map.of("lenses", List.of(Map.of(
             "identifier", Calmmarket.CARD_LENS, "name", "Calmmarket listing card", "type", "image", "active", true, "version", 1))))
         .enqueue(200, Map.of("url", "https://cdn.calmlens.com/signed/photo-1", "expiresAt", 1760000060000L));
@@ -689,11 +590,11 @@ class CalmmarketTest {
     assertEquals(303, first.status());
     assertEquals("https://cdn.calmlens.com/signed/photo-1", first.headers().get("location"));
     List<MockCalmLensServerClient.Request> sent = mock.requests();
-    MockCalmLensServerClient.Request lens = sent.get(5);
+    MockCalmLensServerClient.Request lens = sent.get(4);
     assertEquals("PUT", lens.method());
     JsonObject definition = JsonParser.parseString(lens.bodyText()).getAsJsonObject().getAsJsonArray("lenses").get(0).getAsJsonObject();
     assertEquals(Calmmarket.CARD_LENS, definition.get("identifier").getAsString());
-    MockCalmLensServerClient.Request signing = sent.get(6);
+    MockCalmLensServerClient.Request signing = sent.get(5);
     assertEquals("/v1/assets/photo-1/signed-url", signing.path());
     JsonObject body = JsonParser.parseString(signing.bodyText()).getAsJsonObject();
     assertEquals(Calmmarket.CARD_LENS, body.get("lens").getAsString());
@@ -701,10 +602,10 @@ class CalmmarketTest {
     assertEquals("content", body.get("resource").getAsString());
 
     // The lens is ensured once; an unsafe signed URL is refused.
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN)).enqueue(200, children())
+    mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
         .enqueue(200, Map.of("url", "http://cdn.example.com/photo-1", "expiresAt", 1760000060000L));
     assertEquals(502, get(app, "/listings/" + listing.id + "/photos/1").status());
-    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-1/children", "POST /v1/assets/photo-1/signed-url"), paths(mock, 7));
+    assertEquals(List.of("GET /v1/assets/photo-1", "POST /v1/assets/photo-1/signed-url"), paths(mock, 6));
   }
 
   @Test
@@ -713,7 +614,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN)).enqueue(200, children());
+    mock.enqueue(200, photo(listing, 1, "approved", CLEAN));
     get(app, "/");
     assertTrue(listing.visible());
     mock.enqueueTimeout();
@@ -818,21 +719,21 @@ class CalmmarketTest {
   }
 
   @Test
-  void anEventAboutTheOcrChildRefreshesItsPhoto() {
+  void anEventAboutTheImageRefreshesItsCombinedDecision() {
     MockCalmLensServerClient mock = liveSubmission(1);
     Calmmarket app = live(mock, SECRET);
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN)).enqueue(200, children(ocrChild("child-1", "photo-1", "approved", CLEAN)));
+    mock.enqueue(200, photo(listing, 1, "approved", CLEAN));
     get(app, "/");
     assertTrue(listing.visible());
-    // A reviewer rejects the extracted text; the photo carries the combined decision.
+    // A new image decision includes the extra text moderation pass.
     Map<String, Object> merged = report(true, Map.of("criminal-activity", evaluated(0.7)));
-    mock.enqueue(200, photo(listing, 1, "rejected", merged)).enqueue(200, children(ocrChild("child-1", "photo-1", "rejected", merged)));
-    assertEquals(204, signedWebhook(app, event("event-1", "asset.rejected", "child-1", "[]")).status());
-    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-1/children"), paths(mock, 5));
+    mock.enqueue(200, photo(listing, 1, "rejected", merged));
+    assertEquals(204, signedWebhook(app, event("event-1", "asset.rejected", "photo-1", "[]")).status());
+    assertEquals(List.of("GET /v1/assets/photo-1"), paths(mock, 4));
     assertEquals(Calmmarket.State.HELD, listing.state());
-    assertEquals(Calmmarket.Driver.TEXT_IN_PHOTO, listing.photos.get(0).driver());
+    assertEquals(Calmmarket.Driver.AUTOMATED, listing.photos.get(0).driver());
   }
 
   @Test
@@ -873,14 +774,14 @@ class CalmmarketTest {
     String body = event("event-1", "asset.rejected", "photo-1", "[{\"key\":\"decided-by\",\"value\":\"automated\"}]");
     mock.enqueueTimeout();
     assertEquals(502, signedWebhook(app, body).status(), "a failed refresh asks CalmLens to retry");
-    mock.enqueue(200, photo(listing, 1, "rejected", report(true, Map.of("violence", evaluated(0.9))))).enqueue(200, children());
+    mock.enqueue(200, photo(listing, 1, "rejected", report(true, Map.of("violence", evaluated(0.9)))));
     assertEquals(204, signedWebhook(app, body).status());
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertEquals(204, signedWebhook(app, body).status());
-    assertEquals(6, mock.requests().size(), "a replayed event is not applied again");
+    assertEquals(5, mock.requests().size(), "a replayed event is not applied again");
     assertEquals(204, signedWebhook(app, event("event-2", "asset.approved", "unknown-asset", "[]")).status());
     assertEquals(204, signedWebhook(app, event("event-3", "asset.approved", "photo-1", "[{\"key\":\"test\",\"value\":true}]")).status());
-    assertEquals(6, mock.requests().size());
+    assertEquals(5, mock.requests().size());
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertEquals("test", app.activity().get(0).kind());
   }
@@ -892,7 +793,7 @@ class CalmmarketTest {
     Calmmarket.Listing listing = app.listings().get(0);
     expire(listing);
     assertEquals(204, signedWebhook(app, event("event-1", "asset.rejected", listing.photos.get(0).assetId, "[{\"key\":\"decided-by\",\"value\":\"automated\"}]")).status());
-    assertEquals(Calmmarket.Driver.VISUAL, listing.photos.get(0).driver());
+    assertEquals(Calmmarket.Driver.AUTOMATED, listing.photos.get(0).driver());
   }
 
   // ------------------------------------------------------------ server

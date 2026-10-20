@@ -14,7 +14,7 @@ import java.util.UUID;
 /**
  * Demo mode, used only when requested explicitly ({@code CALMLENS_DEMO=1} or {@code --demo}).
  * Each CalmLens call is answered by the SDK's offline mock with the outcome the seller selected,
- * after the real client's validation and encoding. Reports, OCR children and their text are
+ * after the real client's validation and encoding. Reports and extracted text are
  * synthetic and labelled as such; nothing is classified. Live mode never loads this class's mocks.
  */
 final class Demo implements Calmmarket.Backend {
@@ -49,29 +49,31 @@ final class Demo implements Calmmarket.Backend {
       return mock.enqueue(200, asset(photo.assetId, "pending", photo.externalId, null, null)).client;
     // Rejected demo photos are hidden by the simulated policy; clean ones matched nothing.
     String decision = "approved", action = null;
-    Map<String, Object> report = null, child = null;
+    Map<String, Object> report = null;
+    String extractedText = null;
     switch (photo.demoResult) {
       case "clean-text" -> {
         report = report(Map.of());
-        child = child(photo.assetId, "approved", null, "Hand-made oak · 25.00 · collection only", report(Map.of("self-harm", notEvaluated("unavailable"))));
+        extractedText = "Hand-made oak · 25.00 · collection only";
       }
       case "text-rejected" -> {
         decision = "rejected";
         action = "hide";
         report = report(Map.of("criminal-activity", evaluated(0.88)));
-        child = child(photo.assetId, "rejected", "hide", "Message me for prescription pills, no questions asked", report(Map.of("criminal-activity", evaluated(0.88))));
+        extractedText = "Message me for prescription pills, no questions asked";
       }
       case "visual-rejected" -> {
         decision = "rejected";
         action = "hide";
         report = report(Map.of("violence", evaluated(0.91)));
-        child = child(photo.assetId, "approved", null, "Collector's edition · 25.00", report(Map.of("self-harm", notEvaluated("unavailable"))));
+        extractedText = "Collector's edition · 25.00";
       }
       case "error" -> decision = "error";
       default -> report = report(Map.of());
     }
     Map<String, Object> asset = asset(photo.assetId, decision, photo.externalId, action, report);
     asset.put("type", "image");
+    if (extractedText != null) asset.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", extractedText)));
     if (photo.demoReviewerRejected) {
       // A reviewer's decision replaces the automated one; the policy action stays as it was.
       Map<String, Object> moderation = moderation(asset);
@@ -80,8 +82,7 @@ final class Demo implements Calmmarket.Backend {
       moderation.put("reviewerNote", "Simulated portal decision");
     }
     mock.enqueue(200, asset);
-    if (!decision.equals("error"))
-      mock.enqueue(200, Map.of("items", child == null ? List.of() : List.of(child), "pageSize", 10, "hasMore", false));
+
     return mock.client;
   }
 
@@ -164,13 +165,7 @@ final class Demo implements Calmmarket.Backend {
     return moderation;
   }
 
-  private static Map<String, Object> child(String parentId, String decision, String action, String text, Map<String, Object> report) {
-    Map<String, Object> child = asset(parentId + "-text", decision, null, action, report);
-    child.put("type", Calmmarket.OCR_CHILD_TYPE);
-    child.put("parentId", parentId);
-    child.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", text)));
-    return child;
-  }
+
 
   /** A synthetic report: every category evaluated at a low score unless overridden. */
   private static Map<String, Object> report(Map<String, Map<String, Object>> overrides) {

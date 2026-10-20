@@ -11,6 +11,169 @@ var __exportAll = (all, no_symbols) => {
 	return target;
 };
 //#endregion
+//#region packages/shared/src/ModerationCategoryDefinitions.ts
+const MODERATION_CATEGORY_DEFINITIONS = {
+	sexual: {
+		summary: "Sexual acts, explicit sexual anatomy, sexual services, sexual assault depictions and clearly erotic material.",
+		definition: "covers sexual acts, explicit sexual anatomy, sexual services and clearly erotic material. Descriptions of sexual assault can qualify without erotic intent. Fictional, illustrated and generated depictions can also qualify.",
+		exclusions: "Ordinary affection, swimwear, fitness, fashion, non-erotic medical diagrams and general sexual-health education do not qualify on their own. A person accepting money or wearing revealing clothing does not establish sexual content without a qualifying act, display or offer.",
+		docsHref: "/docs/guides/moderation-categories#sexual-content"
+	},
+	violence: {
+		summary: "Physical attacks, injury, death, threats against others, and planning or encouraging physical violence.",
+		definition: "covers physical attacks, bodily injury, death and threats against others. Accidental or medical injuries and natural death also count; an attacker or intent to harm is not required. It also includes planning, requesting, encouraging or praising physical violence. A depicted or described act can qualify in fiction or news reporting even when the author condemns it.",
+		exclusions: "Solely intentional self-injury or suicide belongs under self-harm. Property damage alone, figurative language, abstract discussion of violence, injury or death and merely possessing a weapon do not establish violence. Consensual sport or training without injury or abuse is excluded.",
+		docsHref: "/docs/guides/moderation-categories#violence"
+	},
+	"self-harm": {
+		summary: "Intentional self-injury, suicide, preparation, methods or encouragement; text also includes current or recurring self-harm thoughts.",
+		definition: "covers intentional self-injury, suicide, current self-harm risk, preparation, methods and encouragement. For text, it also includes current or recurring self-harm thoughts and an explicitly expressed desire to die. Asking for support does not cancel a separate disclosure of current risk or behavior.",
+		exclusions: "For images, require evidence of a self-directed act, preparation, harmful methods or encouragement. An injury or covered body does not establish that harm was self-inflicted. General sadness, neutral statistics, prevention, recovery and healed scars alone are excluded.",
+		docsHref: "/docs/guides/moderation-categories#self-harm"
+	},
+	harassment: {
+		summary: "Targeted personal abuse, humiliation, bullying or serious intimidation; dislike, ordinary criticism and neutral reporting alone are excluded.",
+		definition: "covers personal abuse, humiliation, bullying and serious intimidation directed at a person or identifiable group. The target can be named, implied or defined by an activity or affiliation. A protected identity is not required.",
+		exclusions: "Expressions of dislike or anger, such as \"I hate you\" or \"i hate u\", disagreement, ordinary criticism of conduct or competence, untargeted profanity and neutral reporting of abuse do not qualify on their own. Dislike can still qualify when accompanied by personal degradation, threats, serious intimidation or sustained bullying.",
+		docsHref: "/docs/guides/moderation-categories#harassment-and-bullying"
+	},
+	hate: {
+		summary: "Identity-based abuse, dehumanization, discriminatory exclusion or threats against people because of protected characteristics.",
+		definition: "covers attacks on people because of race, ethnicity, nationality, religion, caste, sex, gender identity, sexual orientation or disability. It includes dehumanization, asserted inferiority, discriminatory exclusion, identity-based abuse and threats.",
+		exclusions: "Both the protected target and the identity-based attack must be supported. Identity mentions, cultural clothing, religious imagery, criticism of beliefs or an unrelated threat do not establish hate. Neutral reporting, condemnation and opposition to hate are excluded unless a separate attack is expressed or endorsed.",
+		docsHref: "/docs/guides/moderation-categories#hate-and-identity-abuse"
+	},
+	"criminal-activity": {
+		summary: "Planning, assistance, instructions, encouragement or facilitation of a concrete criminal or seriously dangerous act, fraud and scams, and illegal drugs or contraband.",
+		definition: "covers planning, requests for assistance, instructions, encouragement or facilitation of a concrete criminal or seriously dangerous act. A request can qualify even when no act occurs and a later reply refuses it. Dangerous activity requires a concrete serious risk of physical harm. It also covers fraud, scams and phishing aimed at the reader, illegal drug use, dealing, production or trafficking, and contraband such as stolen goods, counterfeit money or documents and smuggled or illegally traded weapons.",
+		exclusions: "Neutral reporting, prevention, lawful safety advice, fiction without criminal assistance, and vague dangerous references do not qualify. Medical, pharmaceutical, clinical, research and educational content does not qualify, including prescriptions, dosages, side effects, controlled medicines used as prescribed, pharmacies, hospitals and drug manufacturing by pharmaceutical companies. Lawful alcohol and tobacco, harm reduction, addiction recovery and drug-policy discussion do not qualify either. Masks, computers, payment cards, detention or ordinary tools do not establish criminal facilitation by themselves. A clear visual demonstration of how to carry out a crime can qualify.",
+		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
+	}
+};
+//#endregion
+//#region packages/shared/src/ModerationPolicyDimensions.ts
+const MODERATION_QUALIFIERS = [
+	"sexual-nudity",
+	"sexual-activity",
+	"sexual-explicit-language",
+	"sexual-solicitation",
+	"sexual-historical",
+	"sexual-documentary",
+	"sexual-educational",
+	"sexual-fictional",
+	"sexual-support-prevention",
+	"violence-attack",
+	"violence-threat",
+	"violence-preparation",
+	"violence-encouragement",
+	"violence-injury",
+	"violence-violent-death",
+	"violence-natural-death",
+	"violence-graphic",
+	"violence-historical",
+	"violence-documentary",
+	"violence-educational",
+	"violence-fictional",
+	"violence-support-prevention",
+	"self-harm-thoughts",
+	"self-harm-preparation",
+	"self-harm-act",
+	"self-harm-methods",
+	"self-harm-encouragement",
+	"self-harm-documentary",
+	"self-harm-educational",
+	"self-harm-fictional",
+	"self-harm-support-prevention",
+	"harassment-abuse",
+	"harassment-intimidation",
+	"harassment-threat",
+	"harassment-sexual",
+	"harassment-encouragement",
+	"harassment-fictional",
+	"hate-abuse",
+	"hate-dehumanization",
+	"hate-inferiority",
+	"hate-exclusion",
+	"hate-threat",
+	"hate-historical",
+	"hate-fictional",
+	"criminal-activity-demonstration",
+	"criminal-activity-preparation",
+	"criminal-activity-request",
+	"criminal-activity-instructions",
+	"criminal-activity-promotion",
+	"criminal-activity-substances",
+	"criminal-activity-fraud",
+	"criminal-activity-fictional"
+];
+const MODERATION_QUALIFIERS_BY_CATEGORY = {
+	sexual: [
+		"sexual-nudity",
+		"sexual-activity",
+		"sexual-explicit-language",
+		"sexual-solicitation",
+		"sexual-historical",
+		"sexual-documentary",
+		"sexual-educational",
+		"sexual-fictional",
+		"sexual-support-prevention"
+	],
+	violence: [
+		"violence-attack",
+		"violence-threat",
+		"violence-preparation",
+		"violence-encouragement",
+		"violence-injury",
+		"violence-violent-death",
+		"violence-natural-death",
+		"violence-graphic",
+		"violence-historical",
+		"violence-documentary",
+		"violence-educational",
+		"violence-fictional",
+		"violence-support-prevention"
+	],
+	"self-harm": [
+		"self-harm-thoughts",
+		"self-harm-preparation",
+		"self-harm-act",
+		"self-harm-methods",
+		"self-harm-encouragement",
+		"self-harm-documentary",
+		"self-harm-educational",
+		"self-harm-fictional",
+		"self-harm-support-prevention"
+	],
+	harassment: [
+		"harassment-abuse",
+		"harassment-intimidation",
+		"harassment-threat",
+		"harassment-sexual",
+		"harassment-encouragement",
+		"harassment-fictional"
+	],
+	hate: [
+		"hate-abuse",
+		"hate-dehumanization",
+		"hate-inferiority",
+		"hate-exclusion",
+		"hate-threat",
+		"hate-historical",
+		"hate-fictional"
+	],
+	"criminal-activity": [
+		"criminal-activity-demonstration",
+		"criminal-activity-preparation",
+		"criminal-activity-request",
+		"criminal-activity-instructions",
+		"criminal-activity-promotion",
+		"criminal-activity-substances",
+		"criminal-activity-fraud",
+		"criminal-activity-fictional"
+	]
+};
+const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
+//#endregion
 //#region node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
 	const numericValues = Object.values(entries).filter((v) => typeof v === "number");
@@ -7821,169 +7984,6 @@ const metaStore = (meta) => {
 	} };
 };
 //#endregion
-//#region packages/shared/src/ModerationCategoryDefinitions.ts
-const MODERATION_CATEGORY_DEFINITIONS = {
-	sexual: {
-		summary: "Sexual acts, explicit sexual anatomy, sexual services, sexual assault depictions and clearly erotic material.",
-		definition: "covers sexual acts, explicit sexual anatomy, sexual services and clearly erotic material. Descriptions of sexual assault can qualify without erotic intent. Fictional, illustrated and generated depictions can also qualify.",
-		exclusions: "Ordinary affection, swimwear, fitness, fashion, non-erotic medical diagrams and general sexual-health education do not qualify on their own. A person accepting money or wearing revealing clothing does not establish sexual content without a qualifying act, display or offer.",
-		docsHref: "/docs/guides/moderation-categories#sexual-content"
-	},
-	violence: {
-		summary: "Physical attacks, injury, death, threats against others, and planning or encouraging physical violence.",
-		definition: "covers physical attacks, bodily injury, death and threats against others. Accidental or medical injuries and natural death also count; an attacker or intent to harm is not required. It also includes planning, requesting, encouraging or praising physical violence. A depicted or described act can qualify in fiction or news reporting even when the author condemns it.",
-		exclusions: "Solely intentional self-injury or suicide belongs under self-harm. Property damage alone, figurative language, abstract discussion of violence, injury or death and merely possessing a weapon do not establish violence. Consensual sport or training without injury or abuse is excluded.",
-		docsHref: "/docs/guides/moderation-categories#violence"
-	},
-	"self-harm": {
-		summary: "Intentional self-injury, suicide, preparation, methods or encouragement; text also includes current or recurring self-harm thoughts.",
-		definition: "covers intentional self-injury, suicide, current self-harm risk, preparation, methods and encouragement. For text, it also includes current or recurring self-harm thoughts and an explicitly expressed desire to die. Asking for support does not cancel a separate disclosure of current risk or behavior.",
-		exclusions: "For images, require evidence of a self-directed act, preparation, harmful methods or encouragement. An injury or covered body does not establish that harm was self-inflicted. General sadness, neutral statistics, prevention, recovery and healed scars alone are excluded.",
-		docsHref: "/docs/guides/moderation-categories#self-harm"
-	},
-	harassment: {
-		summary: "Targeted personal abuse, humiliation, bullying or serious intimidation; dislike, ordinary criticism and neutral reporting alone are excluded.",
-		definition: "covers personal abuse, humiliation, bullying and serious intimidation directed at a person or identifiable group. The target can be named, implied or defined by an activity or affiliation. A protected identity is not required.",
-		exclusions: "Expressions of dislike or anger, such as \"I hate you\" or \"i hate u\", disagreement, ordinary criticism of conduct or competence, untargeted profanity and neutral reporting of abuse do not qualify on their own. Dislike can still qualify when accompanied by personal degradation, threats, serious intimidation or sustained bullying.",
-		docsHref: "/docs/guides/moderation-categories#harassment-and-bullying"
-	},
-	hate: {
-		summary: "Identity-based abuse, dehumanization, discriminatory exclusion or threats against people because of protected characteristics.",
-		definition: "covers attacks on people because of race, ethnicity, nationality, religion, caste, sex, gender identity, sexual orientation or disability. It includes dehumanization, asserted inferiority, discriminatory exclusion, identity-based abuse and threats.",
-		exclusions: "Both the protected target and the identity-based attack must be supported. Identity mentions, cultural clothing, religious imagery, criticism of beliefs or an unrelated threat do not establish hate. Neutral reporting, condemnation and opposition to hate are excluded unless a separate attack is expressed or endorsed.",
-		docsHref: "/docs/guides/moderation-categories#hate-and-identity-abuse"
-	},
-	"criminal-activity": {
-		summary: "Planning, assistance, instructions, encouragement or facilitation of a concrete criminal or seriously dangerous act, fraud and scams, and illegal drugs or contraband.",
-		definition: "covers planning, requests for assistance, instructions, encouragement or facilitation of a concrete criminal or seriously dangerous act. A request can qualify even when no act occurs and a later reply refuses it. Dangerous activity requires a concrete serious risk of physical harm. It also covers fraud, scams and phishing aimed at the reader, illegal drug use, dealing, production or trafficking, and contraband such as stolen goods, counterfeit money or documents and smuggled or illegally traded weapons.",
-		exclusions: "Neutral reporting, prevention, lawful safety advice, fiction without criminal assistance, and vague dangerous references do not qualify. Medical, pharmaceutical, clinical, research and educational content does not qualify, including prescriptions, dosages, side effects, controlled medicines used as prescribed, pharmacies, hospitals and drug manufacturing by pharmaceutical companies. Lawful alcohol and tobacco, harm reduction, addiction recovery and drug-policy discussion do not qualify either. Masks, computers, payment cards, detention or ordinary tools do not establish criminal facilitation by themselves. A clear visual demonstration of how to carry out a crime can qualify.",
-		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
-	}
-};
-//#endregion
-//#region packages/shared/src/ModerationPolicyDimensions.ts
-const MODERATION_QUALIFIERS = [
-	"sexual-nudity",
-	"sexual-activity",
-	"sexual-explicit-language",
-	"sexual-solicitation",
-	"sexual-historical",
-	"sexual-documentary",
-	"sexual-educational",
-	"sexual-fictional",
-	"sexual-support-prevention",
-	"violence-attack",
-	"violence-threat",
-	"violence-preparation",
-	"violence-encouragement",
-	"violence-injury",
-	"violence-violent-death",
-	"violence-natural-death",
-	"violence-graphic",
-	"violence-historical",
-	"violence-documentary",
-	"violence-educational",
-	"violence-fictional",
-	"violence-support-prevention",
-	"self-harm-thoughts",
-	"self-harm-preparation",
-	"self-harm-act",
-	"self-harm-methods",
-	"self-harm-encouragement",
-	"self-harm-documentary",
-	"self-harm-educational",
-	"self-harm-fictional",
-	"self-harm-support-prevention",
-	"harassment-abuse",
-	"harassment-intimidation",
-	"harassment-threat",
-	"harassment-sexual",
-	"harassment-encouragement",
-	"harassment-fictional",
-	"hate-abuse",
-	"hate-dehumanization",
-	"hate-inferiority",
-	"hate-exclusion",
-	"hate-threat",
-	"hate-historical",
-	"hate-fictional",
-	"criminal-activity-demonstration",
-	"criminal-activity-preparation",
-	"criminal-activity-request",
-	"criminal-activity-instructions",
-	"criminal-activity-promotion",
-	"criminal-activity-substances",
-	"criminal-activity-fraud",
-	"criminal-activity-fictional"
-];
-const MODERATION_QUALIFIERS_BY_CATEGORY = {
-	sexual: [
-		"sexual-nudity",
-		"sexual-activity",
-		"sexual-explicit-language",
-		"sexual-solicitation",
-		"sexual-historical",
-		"sexual-documentary",
-		"sexual-educational",
-		"sexual-fictional",
-		"sexual-support-prevention"
-	],
-	violence: [
-		"violence-attack",
-		"violence-threat",
-		"violence-preparation",
-		"violence-encouragement",
-		"violence-injury",
-		"violence-violent-death",
-		"violence-natural-death",
-		"violence-graphic",
-		"violence-historical",
-		"violence-documentary",
-		"violence-educational",
-		"violence-fictional",
-		"violence-support-prevention"
-	],
-	"self-harm": [
-		"self-harm-thoughts",
-		"self-harm-preparation",
-		"self-harm-act",
-		"self-harm-methods",
-		"self-harm-encouragement",
-		"self-harm-documentary",
-		"self-harm-educational",
-		"self-harm-fictional",
-		"self-harm-support-prevention"
-	],
-	harassment: [
-		"harassment-abuse",
-		"harassment-intimidation",
-		"harassment-threat",
-		"harassment-sexual",
-		"harassment-encouragement",
-		"harassment-fictional"
-	],
-	hate: [
-		"hate-abuse",
-		"hate-dehumanization",
-		"hate-inferiority",
-		"hate-exclusion",
-		"hate-threat",
-		"hate-historical",
-		"hate-fictional"
-	],
-	"criminal-activity": [
-		"criminal-activity-demonstration",
-		"criminal-activity-preparation",
-		"criminal-activity-request",
-		"criminal-activity-instructions",
-		"criminal-activity-promotion",
-		"criminal-activity-substances",
-		"criminal-activity-fraud",
-		"criminal-activity-fictional"
-	]
-};
-const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
-//#endregion
 //#region packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
 //#endregion
@@ -7999,7 +7999,7 @@ const createFeatureOptionsSchemas = (booleanSchema) => {
 	const enabled = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. Every feature is off unless this is true." })]));
 	return {
 		ocr: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
-			description: "Extract image text into a child asset and run normal text moderation. Applies to images, including those extracted from multimedia documents and websites.",
+			description: "Extract text onto the image asset and run an additional text moderation pass. Applies to images, including those extracted from multimedia documents and websites.",
 			namedType: "OcrFeatureOptions"
 		})])),
 		personDetection: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
@@ -8288,4 +8288,4 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	policy: CLASSIFICATION_REPORT_POLICY_SCHEMA.optional().describe("What the project's moderation policy made of this report when the asset was decided. Absent until then.")
 }).strict();
 //#endregion
-export { MODERATION_POLICY_CATEGORY_SCHEMA as a, saneStringField as c, PROCESSING_FEATURES_SCHEMA as d, docPropertyInfo as f, metaStore as h, MODERATION_POLICY_CATEGORIES as i, updatedAtField as l, getModerationQualifiers as m, CLASSIFICATION_REPORT_SCHEMA as n, createdAtField as o, MODERATION_QUALIFIERS as p, FLAGGED_CONTENT_ACTION_SCHEMA as r, primaryUuidField as s, CLASSIFICATION_CATEGORIES as t, uuidField as u };
+export { MODERATION_POLICY_CATEGORY_SCHEMA as a, saneStringField as c, PROCESSING_FEATURES_SCHEMA as d, docPropertyInfo as f, getModerationQualifiers as h, MODERATION_POLICY_CATEGORIES as i, updatedAtField as l, MODERATION_QUALIFIERS as m, CLASSIFICATION_REPORT_SCHEMA as n, createdAtField as o, metaStore as p, FLAGGED_CONTENT_ACTION_SCHEMA as r, primaryUuidField as s, CLASSIFICATION_CATEGORIES as t, uuidField as u };

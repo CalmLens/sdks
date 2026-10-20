@@ -830,3 +830,5 @@ lossy compression; cropping, rotation, and severe colour changes are unsupported
 The entry also exports `generateTestTextCode` and `detectTestTrigger` for text
 test inputs. Use your project's test input key; another project's key does not
 activate its test signals.
+
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.

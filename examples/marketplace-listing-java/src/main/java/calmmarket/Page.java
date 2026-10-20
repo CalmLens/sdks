@@ -166,18 +166,15 @@ final class Page {
     html.append("<dt>Text in photo</dt><dd>");
     switch (photo.ocr) {
       case FOUND -> {
-        Models.Asset child = photo.textChild;
-        Models.AssetModerationStatus childStatus = Calmmarket.moderationStatus(child);
-        html.append("Found · OCR text asset ").append(h(childStatus == null ? "unknown" : childStatus.value()));
-        Models.ExtractedText extracted = child.content() == null ? null : child.content().extractedText();
+        html.append("Found");
+        Models.ExtractedText extracted = photo.extractedText;
         if (extracted != null && extracted.content() != null) {
           String text = extracted.content();
           if (text.length() > Calmmarket.MAX_EXTRACTED_TEXT_SHOWN) text = text.substring(0, Calmmarket.MAX_EXTRACTED_TEXT_SHOWN) + "…";
           html.append("<q>").append(h(text)).append("</q>");
         }
       }
-      case NO_TEXT -> html.append("No text found (no OCR child)");
-      case LOOKUP_FAILED -> html.append("Could not be loaded");
+      case NO_TEXT -> html.append("No retained extracted text");
       default -> html.append("Checked once a decision arrives");
     }
     html.append("</dd>");
@@ -192,11 +189,10 @@ final class Page {
     List<Calmmarket.CategoryRow> rows = photo.categories();
     if (!rows.isEmpty()) {
       html.append("<details><summary>Report categories").append(app.demo() ? " (synthetic)" : "").append("</summary><table><thead><tr>")
-          .append("<th scope=\"col\">Category</th><th scope=\"col\">Combined</th><th scope=\"col\">Text in photo</th><th scope=\"col\">From</th></tr></thead><tbody>");
+          .append("<th scope=\"col\">Category</th><th scope=\"col\">Combined</th></tr></thead><tbody>");
       for (Calmmarket.CategoryRow row : rows)
         html.append("<tr><th scope=\"row\">").append(h(row.label())).append("</th><td>").append(h(result(row.status(), row.score(), row.reason())))
-            .append("</td><td>").append(h(photo.ocr == Calmmarket.Ocr.FOUND ? result(row.textStatus(), row.textScore(), null) : "—"))
-            .append("</td><td>").append(h(row.source().label)).append("</td></tr>");
+            .append("</td></tr>");
       html.append("</tbody></table></details>");
     }
     html.append("</div></div>");

@@ -386,9 +386,9 @@ public final class Models {
   /**
    * Optional analyses to run on an asset, keyed by feature. Each feature is off unless its {@code
    * enabled} is true. Results of person and face detection appear in {@link
-   * ClassificationReport#features()}; OCR creates a linked text asset.
+   * ClassificationReport#features()}; OCR stores extracted text on the image asset.
    *
-   * @param ocr read text in images and moderate it as a linked text asset
+   * @param ocr extract text onto the image asset and add text moderation
    * @param personDetection (beta) locate people in images
    * @param faceDetection (beta) locate faces in images and optionally estimate ages
    */
@@ -1309,7 +1309,7 @@ public final class Models {
    * @param folderId containing folder, or null at the project root
    * @param metadata metadata entries
    * @param userId creating user, if any
-   * @param parentId parent asset for derived assets such as OCR text
+   * @param parentId parent asset for derived assets such as images extracted from documents
    * @param uploadPresetId upload preset the asset was uploaded through, if any
    * @param createdAt creation time
    * @param updatedAt last update time

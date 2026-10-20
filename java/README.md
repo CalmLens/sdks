@@ -51,7 +51,7 @@ if (decided.moderation().status() == AssetModerationStatus.REJECTED) hidePhoto(d
 
 Request options live in `com.calmlens.Models`: required fields have constructors and fluent setters configure the rest. Unset options are not sent. In update options, `Patch.value(value)` sets a field, `Patch.clear()` clears it, and leaving it unset keeps it.
 
-Optional analyses are turned on per request with `ProcessingOptions.features`. Every feature is off unless you enable it. OCR creates a linked text asset (find it with `assets.listChildren`); person and face detection (beta) write their results to `asset.moderation().report().features()`, where each result has a `status` of `evaluated` (with `people()` or `faces()`, boxes as fractions of the image size) or `not-evaluated` (with a `reason()`):
+Optional analyses are turned on per request with `ProcessingOptions.features`. Every feature is off unless you enable it. OCR stores text in the image’s `content().extractedText()` and adds a text moderation pass to its combined report; person and face detection (beta) write their results to `asset.moderation().report().features()`, where each result has a `status` of `evaluated` (with `people()` or `faces()`, boxes as fractions of the image size) or `not-evaluated` (with a `reason()`):
 
 ```java
 SubmitAsset photo = new SubmitAsset("photo.jpg", Content.file(Path.of("photo.jpg"), "image/jpeg"))

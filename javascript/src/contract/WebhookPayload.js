@@ -1,8 +1,8 @@
-import { a as MODERATION_POLICY_CATEGORY_SCHEMA, c as saneStringField, d as PROCESSING_FEATURES_SCHEMA, f as docPropertyInfo, h as metaStore, i as MODERATION_POLICY_CATEGORIES, l as updatedAtField, m as getModerationQualifiers, n as CLASSIFICATION_REPORT_SCHEMA, o as createdAtField, p as MODERATION_QUALIFIERS, r as FLAGGED_CONTENT_ACTION_SCHEMA, s as primaryUuidField, u as uuidField } from "./Classification-CGDEzhxh.js";
-import "./SharedConstants-Dn7ZJF5S.js";
+import { a as MODERATION_POLICY_CATEGORY_SCHEMA, c as saneStringField, d as PROCESSING_FEATURES_SCHEMA, f as docPropertyInfo, h as getModerationQualifiers, i as MODERATION_POLICY_CATEGORIES, l as updatedAtField, m as MODERATION_QUALIFIERS, n as CLASSIFICATION_REPORT_SCHEMA, o as createdAtField, p as metaStore, r as FLAGGED_CONTENT_ACTION_SCHEMA, s as primaryUuidField, u as uuidField } from "./Classification-I_opp8t0.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-B5dqc8aj.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as TEST_INPUT_KEY_PATTERN } from "./TestTriggers-7yylawYV.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-B5dqc8aj.js";
+import "./SharedConstants-Dn7ZJF5S.js";
 import * as zod from "zod";
 //#region packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
@@ -281,7 +281,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	projectId: uuidField().describe("ID of the project that owns the asset"),
 	sizeInBytes: zod.number().nullish().describe("Size of the uploaded content in bytes"),
 	userId: saneStringField().nullish().describe("ID of the user whose account created the asset"),
-	parentId: uuidField().nullish().describe("ID of the parent asset for child assets CalmLens extracts during processing, such as images in a document or OCR text. `null` for uploaded assets."),
+	parentId: uuidField().nullish().describe("ID of the parent asset for child assets CalmLens extracts during processing, such as images in a document. `null` for uploaded assets."),
 	folderId: uuidField().nullish().meta(metaStore([docPropertyInfo({ description: "Folder containing the asset" })])),
 	uploadPresetId: uuidField().nullish().describe("ID of the upload preset the asset was uploaded through, if any"),
 	createdAt: createdAtField().describe("When the asset was created, in milliseconds since the Unix epoch"),
@@ -376,7 +376,7 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the uploaded content"),
 	image: IMAGE_DATA_SCHEMA.nullable().describe("Image properties, for image assets"),
 	previewImage: PUBLIC_PREVIEW_IMAGE_SCHEMA.nullable().describe("Browser-friendly preview generated for images, documents and websites"),
-	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content, inline for small content or stored as a document")
+	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
 	namedType: "AssetContent"
