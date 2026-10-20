@@ -90,6 +90,7 @@ jobs:
           node --input-type=module -e "const { CalmLensAppClient } = await
           import('@calmlens/sdk/app'); new CalmLensAppClient({ uploadPresetId:
           'u' })"
+        working-directory: javascript
   java:
     runs-on: ubuntu-latest
     strategy:

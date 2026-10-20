@@ -3,7 +3,6 @@
 module CalmLens
   # CDN URLs and authenticated content delivery. Reach it through {ServerClient#cdn}.
   class CDN < Resource
-
     # Builds the CDN URL of an asset's content or preview. Private assets need the API key
     # ({#serve}) or a signed URL ({Assets#create_signed_url}).
     # @option options [String] :asset_identifier the asset ID or external ID
