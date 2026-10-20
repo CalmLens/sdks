@@ -1,0 +1,16 @@
+{
+  "name": "calmlens-sdks",
+  "private": true,
+  "workspaces": [
+    "javascript"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@changesets/cli": "3.0.3",
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "version:sdk": "changeset version && bun install --lockfile-only --ignore-scripts",
+    "release:sdk": "changeset publish"
+  }
+}

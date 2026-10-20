@@ -1,0 +1,125 @@
+{
+  "name": "@calmlens/sdk",
+  "version": "0.16.1",
+  "description": "Official CalmLens SDK for JavaScript and TypeScript: content moderation, asset storage and CDN delivery.",
+  "license": "MIT",
+  "homepage": "https://calmlens.com/docs/sdk/javascript",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CalmLens/sdks.git",
+    "directory": "javascript"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "main": "cjs/index.js",
+  "types": "cjs/index.d.ts",
+  "module": "esm/index.js",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepublishOnly": "npm run check && npm run test && npm run build",
+    "test": "bun test --parallel=4 tests",
+    "check:fix": "tsc --noEmit --project tsconfig.json && npx @biomejs/biome check --write",
+    "check": "tsc --noEmit --project tsconfig.json && npx @biomejs/biome check",
+    "cleanup": "rimraf esm && rimraf cjs && rimraf bin",
+    "build": "npm run cleanup && rolldown -c rolldown.config.mjs && node scripts/post-build.js && npm run verify:package",
+    "verify:package": "node scripts/verify-package.mjs"
+  },
+  "keywords": [
+    "calmlens",
+    "content-moderation",
+    "moderation",
+    "image-moderation",
+    "text-moderation",
+    "trust-and-safety",
+    "webhooks",
+    "cdn",
+    "sdk",
+    "typescript"
+  ],
+  "files": [
+    "LICENSE",
+    "README.md",
+    "esm/",
+    "cjs/"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@oxc-project/runtime": "0.148.0",
+    "@types/bun": "^1.4.2",
+    "@types/node": "26.6.1",
+    "rimraf": "6.1.3",
+    "rolldown": "1.2.13",
+    "rolldown-plugin-dts": "0.28.7",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "zod": "^4.6.5",
+    "json-schema-to-ts": "^3.1.1"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./esm/index.d.ts",
+        "default": "./esm/index.js"
+      },
+      "require": {
+        "types": "./cjs/index.d.ts",
+        "default": "./cjs/index.js"
+      },
+      "default": "./esm/index.js"
+    },
+    "./server": {
+      "import": {
+        "types": "./esm/server.d.ts",
+        "default": "./esm/server.js"
+      },
+      "require": {
+        "types": "./cjs/server.d.ts",
+        "default": "./cjs/server.js"
+      },
+      "default": "./esm/server.js"
+    },
+    "./app": {
+      "import": {
+        "types": "./esm/app.d.ts",
+        "default": "./esm/app.js"
+      },
+      "require": {
+        "types": "./cjs/app.d.ts",
+        "default": "./cjs/app.js"
+      },
+      "default": "./esm/app.js"
+    },
+    "./testing": {
+      "import": {
+        "types": "./esm/testing.d.ts",
+        "default": "./esm/testing.js"
+      },
+      "require": {
+        "types": "./cjs/testing.d.ts",
+        "default": "./cjs/testing.js"
+      },
+      "default": "./esm/testing.js"
+    },
+    "./package.json": "./package.json",
+    "./test-inputs": {
+      "import": {
+        "types": "./esm/test-inputs.d.ts",
+        "default": "./esm/test-inputs.js"
+      },
+      "require": {
+        "types": "./cjs/test-inputs.d.ts",
+        "default": "./cjs/test-inputs.js"
+      },
+      "default": "./esm/test-inputs.js"
+    }
+  },
+  "bugs": {
+    "url": "https://github.com/CalmLens/sdks/issues"
+  }
+}

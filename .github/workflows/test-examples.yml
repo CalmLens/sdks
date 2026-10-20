@@ -1,0 +1,93 @@
+name: SDK examples
+on:
+  push:
+    branches:
+      - main
+  pull_request: {}
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: python -m pip install ./python
+      - run: python -m unittest discover -v
+        working-directory: examples/link-board-python
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/voice-clips-go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.22.x
+          cache: false
+      - run: test -z "$(gofmt -l .)"
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: go build -o /tmp/calmlens-voice-clips .
+  ruby-example:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/comment-thread-ruby
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          working-directory: examples/comment-thread-ruby
+          bundler-cache: true
+      - run: bundle exec ruby -W app_test.rb
+  java-example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - run: mvn -B -q install -DskipTests
+        working-directory: java
+      - run: mvn -B verify
+        working-directory: examples/marketplace-listing-java
+  rust-example:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/media-library-rust
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+          --component clippy
+      - run: cargo +stable fmt --check
+      - run: cargo +stable test --locked
+      - run: cargo +stable clippy --locked --all-targets -- -D warnings
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run --cwd javascript build
+      - run: bun link
+        working-directory: javascript
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: examples/calmgram
+      - run: bun run test
+        working-directory: examples/calmgram

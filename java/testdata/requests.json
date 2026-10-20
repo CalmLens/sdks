@@ -1,0 +1,935 @@
+[
+  {
+    "operation": "text.moderate",
+    "options": {
+      "text": "héllo 🌍",
+      "metadata": [
+        {
+          "id": "source",
+          "value": "comment"
+        }
+      ]
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/assets",
+      "query": {
+        "name": "text",
+        "queue": "false",
+        "metadata": "[{\"id\":\"source\",\"value\":\"comment\"}]",
+        "contentType": "text/plain",
+        "sizeInBytes": "11"
+      },
+      "body": "héllo 🌍"
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.moderate",
+    "options": {
+      "name": "text",
+      "content": {
+        "plainText": "héllo 🌍",
+        "type": "text/plain"
+      },
+      "metadata": [
+        {
+          "id": "source",
+          "value": "comment"
+        }
+      ]
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/assets",
+      "query": {
+        "name": "text",
+        "queue": "false",
+        "metadata": "[{\"id\":\"source\",\"value\":\"comment\"}]",
+        "contentType": "text/plain",
+        "sizeInBytes": "11"
+      },
+      "body": "héllo 🌍"
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.create",
+    "options": {
+      "name": "note.txt",
+      "content": {
+        "plainText": "hello",
+        "type": "text/plain"
+      },
+      "processingOptions": {
+        "keepContentAfterProcessing": false,
+        "features": {
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          }
+        }
+      }
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/assets",
+      "query": {
+        "name": "note.txt",
+        "queue": "true",
+        "processingOptions": "{\"keepContentAfterProcessing\":false,\"features\":{\"faceDetection\":{\"enabled\":true,\"ageEstimation\":true}}}",
+        "contentType": "text/plain",
+        "sizeInBytes": "5"
+      },
+      "body": "hello"
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.moderate",
+    "options": {
+      "name": "note.txt",
+      "content": {
+        "plainText": "hello",
+        "type": "text/plain"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/assets",
+      "query": {
+        "name": "note.txt",
+        "queue": "false",
+        "contentType": "text/plain",
+        "sizeInBytes": "5"
+      },
+      "body": "hello"
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.search",
+    "options": {
+      "query": "a red car at night",
+      "mode": "hybrid",
+      "limit": 10
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/assets/search",
+      "query": {
+        "query": "a red car at night",
+        "mode": "hybrid",
+        "limit": "10"
+      },
+      "body": null
+    },
+    "response": {
+      "query": "a red car at night",
+      "items": [
+        {
+          "asset": {
+            "id": "asset-1",
+            "processing": {
+              "status": "done"
+            },
+            "moderation": {
+              "status": "approved",
+              "action": null
+            },
+            "content": {
+              "status": "removed",
+              "removalReason": "retention"
+            }
+          },
+          "score": 0.85,
+          "matchedFields": [
+            "visual"
+          ]
+        }
+      ],
+      "semanticStatus": "ready"
+    }
+  },
+  {
+    "operation": "assets.list",
+    "options": {
+      "pageSize": 20,
+      "filter": "moderation.status==approved"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/assets/page",
+      "query": {
+        "pageSize": "20",
+        "filter": "moderation.status==approved"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "asset-1",
+          "processing": {
+            "status": "done"
+          },
+          "moderation": {
+            "status": "approved",
+            "action": null
+          },
+          "content": {
+            "status": "removed",
+            "removalReason": "retention"
+          }
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 20
+    }
+  },
+  {
+    "operation": "assets.search",
+    "options": {
+      "query": "cats & dogs #1, 100% [ok]",
+      "mode": "keyword",
+      "limit": 5
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/assets/search",
+      "query": {
+        "query": "cats & dogs #1, 100% [ok]",
+        "mode": "keyword",
+        "limit": "5"
+      },
+      "body": null
+    },
+    "response": {
+      "query": "a red car at night",
+      "items": [
+        {
+          "asset": {
+            "id": "asset-1",
+            "processing": {
+              "status": "done"
+            },
+            "moderation": {
+              "status": "approved",
+              "action": null
+            },
+            "content": {
+              "status": "removed",
+              "removalReason": "retention"
+            }
+          },
+          "score": 0.85,
+          "matchedFields": [
+            "visual"
+          ]
+        }
+      ],
+      "semanticStatus": "ready"
+    }
+  },
+  {
+    "operation": "assets.list",
+    "options": {
+      "cursor": "opaque+/cursor=",
+      "ordering": [
+        {
+          "field": "createdAt",
+          "direction": "DESC"
+        },
+        {
+          "field": "id",
+          "direction": "ASC"
+        }
+      ],
+      "filter": "moderation.status==approved,name==\"a&b #1\""
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/assets/page",
+      "query": {
+        "cursor": "opaque+/cursor=",
+        "ordering[0][field]": "createdAt",
+        "ordering[0][direction]": "DESC",
+        "ordering[1][field]": "id",
+        "ordering[1][direction]": "ASC",
+        "filter": "moderation.status==approved,name==\"a&b #1\""
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "asset-1",
+          "processing": {
+            "status": "done"
+          },
+          "moderation": {
+            "status": "approved",
+            "action": null
+          },
+          "content": {
+            "status": "removed",
+            "removalReason": "retention"
+          }
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 20
+    }
+  },
+  {
+    "operation": "assets.listChildren",
+    "options": {
+      "assetId": "asset-1",
+      "ordering": [
+        {
+          "field": "createdAt",
+          "direction": "ASC"
+        }
+      ]
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/asset-1/children",
+      "query": {
+        "ordering[0][field]": "createdAt",
+        "ordering[0][direction]": "ASC"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "asset-1",
+          "processing": {
+            "status": "done"
+          },
+          "moderation": {
+            "status": "approved",
+            "action": null
+          },
+          "content": {
+            "status": "removed",
+            "removalReason": "retention"
+          }
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 20
+    }
+  },
+  {
+    "operation": "assets.retrieve",
+    "options": {
+      "assetId": "a/b?c#d%e f"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/a%2Fb%3Fc%23d%25e%20f",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.retrieve",
+    "options": {
+      "assetId": "ünï✓"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/%C3%BCn%C3%AF%E2%9C%93",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.listChildren",
+    "options": {
+      "assetId": "x/children",
+      "pageSize": 5
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/x%2Fchildren/children",
+      "query": {
+        "pageSize": "5"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "asset-1",
+          "processing": {
+            "status": "done"
+          },
+          "moderation": {
+            "status": "approved",
+            "action": null
+          },
+          "content": {
+            "status": "removed",
+            "removalReason": "retention"
+          }
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 20
+    }
+  },
+  {
+    "operation": "folders.delete",
+    "options": {
+      "folderId": "../assets/victim"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/folders/..%2Fassets%2Fvictim",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "folder-1",
+      "name": "Folder",
+      "parentId": null
+    }
+  },
+  {
+    "operation": "assets.retrieve",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/asset-1",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.update",
+    "options": {
+      "assetId": "asset-1",
+      "description": null,
+      "tags": []
+    },
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/assets/asset-1",
+      "query": {},
+      "body": {
+        "description": null,
+        "tags": []
+      }
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.listChildren",
+    "options": {
+      "assetId": "asset-1",
+      "pageSize": 5
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/asset-1/children",
+      "query": {
+        "pageSize": "5"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "asset-1",
+          "processing": {
+            "status": "done"
+          },
+          "moderation": {
+            "status": "approved",
+            "action": null
+          },
+          "content": {
+            "status": "removed",
+            "removalReason": "retention"
+          }
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 20
+    }
+  },
+  {
+    "operation": "assets.retry",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/retry",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.deleteContent",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/assets/asset-1/content",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.delete",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/assets/asset-1",
+      "query": {},
+      "body": null
+    },
+    "response": {}
+  },
+  {
+    "operation": "assets.move",
+    "options": {
+      "assetId": "asset-1",
+      "folderId": null
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/move",
+      "query": {},
+      "body": {
+        "folderId": null
+      }
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "lens": "thumb",
+      "transform": "imageTransform[format=avif]"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/signed-url",
+      "query": {},
+      "body": {
+        "resource": "content",
+        "expiresInSeconds": 900,
+        "lens": "thumb",
+        "transform": "imageTransform[format=avif]"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/signed",
+      "expiresAt": 1760000900000
+    }
+  },
+  {
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "transform": {
+        "type": "imageTransform",
+        "options": {
+          "width": 640,
+          "border": {
+            "color": "#fff"
+          }
+        }
+      }
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/signed-url",
+      "query": {},
+      "body": {
+        "resource": "content",
+        "expiresInSeconds": 900,
+        "transform": "imageTransform[border%5Bcolor%5D=%23fff,width=640]"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/signed",
+      "expiresAt": 1760000900000
+    }
+  },
+  {
+    "operation": "assets.uploadPart",
+    "options": {
+      "assetId": "asset-1",
+      "part": {
+        "plainText": "final",
+        "partNumber": 2,
+        "isFinal": true
+      }
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/part",
+      "query": {
+        "partNumber": "2",
+        "isFinal": "true",
+        "sizeInBytes": "5"
+      },
+      "body": "final"
+    },
+    "response": {
+      "id": "asset-1",
+      "processing": {
+        "status": "done"
+      },
+      "moderation": {
+        "status": "approved",
+        "action": null
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      }
+    }
+  },
+  {
+    "operation": "folders.list",
+    "options": {},
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/folders",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "folders": []
+    }
+  },
+  {
+    "operation": "folders.retrieve",
+    "options": {
+      "folderId": "folder-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/folders/folder-1",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "folder-1",
+      "name": "Folder",
+      "parentId": null
+    }
+  },
+  {
+    "operation": "folders.create",
+    "options": {
+      "name": "Folder",
+      "parentId": "folder-1"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/folders",
+      "query": {},
+      "body": {
+        "name": "Folder",
+        "parentId": "folder-1"
+      }
+    },
+    "response": {
+      "id": "folder-1",
+      "name": "Folder",
+      "parentId": null
+    }
+  },
+  {
+    "operation": "folders.update",
+    "options": {
+      "folderId": "folder-1",
+      "name": "New"
+    },
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/folders/folder-1",
+      "query": {},
+      "body": {
+        "name": "New"
+      }
+    },
+    "response": {
+      "id": "folder-1",
+      "name": "Folder",
+      "parentId": null
+    }
+  },
+  {
+    "operation": "folders.move",
+    "options": {
+      "folderId": "folder-1",
+      "parentId": null
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/folders/folder-1/move",
+      "query": {},
+      "body": {
+        "parentId": null
+      }
+    },
+    "response": {
+      "id": "folder-1",
+      "name": "Folder",
+      "parentId": null
+    }
+  },
+  {
+    "operation": "folders.delete",
+    "options": {
+      "folderId": "folder-1"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/folders/folder-1",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "folder-1",
+      "name": "Folder",
+      "parentId": null
+    }
+  },
+  {
+    "operation": "events.list",
+    "options": {
+      "after": "123_abc",
+      "limit": 100
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/events",
+      "query": {
+        "after": "123_abc",
+        "limit": "100"
+      },
+      "body": null
+    },
+    "response": {
+      "events": [],
+      "cursor": "123_abc",
+      "hasMore": false
+    }
+  },
+  {
+    "operation": "ensureLenses",
+    "options": {
+      "lenses": [
+        {
+          "identifier": "thumb",
+          "name": "Thumbnail",
+          "type": "image",
+          "active": true,
+          "version": 1,
+          "description": null,
+          "transforms": null
+        }
+      ]
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/lenses",
+      "query": {},
+      "body": {
+        "lenses": [
+          {
+            "identifier": "thumb",
+            "name": "Thumbnail",
+            "type": "image",
+            "active": true,
+            "version": 1,
+            "description": null,
+            "transforms": null
+          }
+        ]
+      }
+    },
+    "response": {
+      "lenses": [
+        {
+          "identifier": "thumb",
+          "name": "Thumbnail",
+          "type": "image",
+          "active": true,
+          "version": 1,
+          "description": null,
+          "transforms": null
+        }
+      ]
+    }
+  }
+]

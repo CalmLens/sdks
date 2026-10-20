@@ -1,0 +1,273 @@
+# Public API of the calmlens gem. Request and response shapes are in sig/types.rbs and error codes
+# in sig/error_codes.rbs.
+module CalmLens
+  VERSION: String
+
+  WEBHOOK_DELIVERY_HEADER: String
+  WEBHOOK_TIMESTAMP_HEADER: String
+  WEBHOOK_SIGNATURE_HEADER: String
+  WEBHOOK_SIGNATURE_TOLERANCE_SECONDS: Integer
+
+  module SdkErrorCodes
+    INVALID_ARGUMENT: String
+    INVALID_CONFIG: String
+    TRANSPORT_ERROR: String
+    TIMEOUT: String
+    INVALID_RESPONSE: String
+    HTTP_ERROR: String
+    RESPONSE_TOO_LARGE: String
+    INVALID_WEBHOOK_SIGNATURE: String
+    INVALID_WEBHOOK_PAYLOAD: String
+  end
+
+  class Error < StandardError
+    attr_reader code: String
+    # Extra details from the API error body (any JSON), plus `"network" => true` for API errors.
+    attr_reader details: Hash[String, json_value]
+    attr_reader status: Integer?
+    attr_reader request_id: String?
+    attr_reader headers: Hash[String, String]
+    def initialize: (String code, ?String? message, ?details: Hash[String, json_value], ?status: Integer?,
+                     ?headers: Hash[String, String], ?request_id: String?) -> void
+    def retry_after: () -> Float?
+    def not_found?: () -> bool
+    def retryable?: () -> bool
+    def self.build: (String code, ?String? message, ?status: Integer?, ?details: Hash[String, json_value],
+                     ?headers: Hash[String, String], ?request_id: String?) -> Error
+  end
+  class APIError < Error end
+  class BadRequestError < APIError end
+  class AuthenticationError < APIError end
+  class PermissionDeniedError < APIError end
+  class NotFoundError < APIError end
+  class ConflictError < APIError end
+  class RateLimitError < APIError end
+  class ServerError < APIError end
+  class ConnectionError < Error end
+  class TimeoutError < ConnectionError end
+  class InvalidResponseError < Error end
+  class InvalidArgumentError < Error end
+  class ConfigurationError < InvalidArgumentError end
+  class WebhookVerificationError < Error end
+
+  class Response
+    attr_reader status: Integer
+    attr_reader headers: Hash[String, String]
+    # Give `body:` for a complete body, or a reader block that yields each String chunk to the
+    # block it receives. RBS cannot describe a block that takes a block, hence `(?)`.
+    def initialize: (status: Integer | String, ?headers: Hash[String | Symbol, String | Array[String]], ?body: String?)
+                    ?{ (?) -> void } -> void
+    def request_id: () -> String?
+    def content_type: () -> String?
+    def content_length: () -> Integer?
+    def success?: () -> bool
+    def each_chunk: () { (String chunk) -> void } -> nil
+                  | () -> Enumerator[String, nil]
+    def body: (?limit: Integer?) -> String
+  end
+
+  module Transport
+    class Request < Struct[untyped]
+      attr_accessor method: String
+      attr_accessor url: String
+      attr_accessor headers: Hash[String, String]
+      attr_accessor body: (String | _Reader)?
+      attr_accessor open_timeout: number
+      attr_accessor timeout: number
+      def initialize: (method: String, url: String, headers: Hash[String, String], body: (String | _Reader)?,
+                       open_timeout: number, timeout: number) -> void
+    end
+
+    interface _Reader
+      def read: (?Integer? length, ?String? buffer) -> String?
+    end
+
+    # A custom transport receives each request and either yields a {Response} to the block (and
+    # returns the block's result) or returns a response: a {Response}, or any object with `status`
+    # (or `code`), `headers` (or `to_hash`) and `body`. The return value is untyped because the
+    # client only inspects it when the transport did not yield.
+    interface _Transport
+      def call: (Request request) { (Response response) -> untyped } -> untyped
+    end
+
+    class NetHTTP
+      def initialize: () -> void
+      # Returns the block's result.
+      def call: [T] (Request request) { (Response response) -> T } -> T?
+      def close: () -> void
+    end
+  end
+
+  class ServerClient
+    DEFAULT_BASE_URL: String
+    DEFAULT_CDN_BASE_URL: String
+    attr_reader assets: Assets
+    attr_reader folders: Folders
+    attr_reader text: Text
+    attr_reader upload_tokens: UploadTokens
+    attr_reader events: Events
+    attr_reader cdn: CDN
+    attr_reader project_id: String
+    attr_reader base_url: String
+    attr_reader cdn_base_url: String
+    def initialize: (api_key: String, project_id: String, ?base_url: String, ?cdn_base_url: String, ?timeout: number,
+                     ?open_timeout: number, ?max_retries: Integer, ?retry_base_delay: number,
+                     ?transport: Transport::_Transport?) -> void
+    def close: () -> nil
+    def ensure_lenses: (ensure_lenses_options options) -> Array[lens]
+    def ensure_lens: (ensure_lens_options options) -> lens
+  end
+
+  class Resource
+    # Resources are created by {ServerClient}; the session is internal.
+    private def initialize: (untyped session) -> void
+  end
+
+  class Assets < Resource
+    # Moderation statuses that carry a decision.
+    DECIDED_MODERATION_STATUSES: Array[String]
+    # Processing statuses after which no decision arrives without a retry.
+    FINISHED_PROCESSING_STATUSES: Array[String]
+
+    def search: (asset_search_options options) -> asset_search_response
+    def list: (?list_assets_options options) -> asset_page
+    def each: (?list_assets_options options) { (asset) -> void } -> nil
+            | (?list_assets_options options) -> Enumerator[asset, nil]
+    def list_children: (list_asset_children_options options) -> asset_page
+    def each_child: (list_asset_children_options options) { (asset) -> void } -> nil
+                  | (list_asset_children_options options) -> Enumerator[asset, nil]
+    def retrieve: (asset_id_options options) -> asset
+    def wait_for_decision: (wait_for_decision_options options) -> asset
+    def update: (update_asset_options options) -> asset
+    def retry: (asset_id_options options) -> asset
+    def delete_content: (asset_id_options options) -> asset
+    def delete: (asset_id_options options) -> nil
+    def move: (move_asset_options options) -> asset
+    def create_signed_url: (create_signed_url_options options) -> signed_url
+    def create: (upload_options options) -> asset
+    def moderate: (upload_options options) -> asset
+    def upload_part: (upload_part_options options) -> asset
+  end
+
+  class Folders < Resource
+    def list: (?list_folders_options options) -> Array[folder]
+    def create: (create_folder_options options) -> folder
+    def retrieve: (folder_id_options options) -> folder
+    def update: (update_folder_options options) -> folder
+    def move: (move_folder_options options) -> folder
+    def delete: (folder_id_options options) -> nil
+  end
+
+  class UploadTokens < Resource
+    TOKEN_PREFIX: String
+    SIGNING_CONTEXT: String
+    DEFAULT_TTL_SECONDS: Integer
+    MAX_TTL_SECONDS: Integer
+    private def initialize: (untyped session, String api_key) -> void
+    def sign: (sign_upload_token_options options) -> signed_upload_token
+  end
+
+  class Text < Resource
+    private def initialize: (untyped session, Assets assets) -> void
+    def moderate: (moderate_text_options options) -> asset
+  end
+
+  class Events < Resource
+    def list: (?list_events_options options) -> events_page
+    def each_page: (?list_events_options options) { (events_page) -> void } -> nil
+                 | (?list_events_options options) -> Enumerator[events_page, nil]
+    def each: (?list_events_options options) { (event) -> void } -> nil
+            | (?list_events_options options) -> Enumerator[event, nil]
+  end
+
+  class CDN < Resource
+    def get_asset_url: (asset_url_options options) -> String
+    def serve: (serve_options options) -> Response
+             | [T] (serve_options options) { (Response) -> T } -> T
+  end
+
+  class WebhookEvent < Struct[untyped]
+    attr_accessor id: String
+    attr_accessor type: event_type
+    # Milliseconds since the Unix epoch.
+    attr_accessor created_at: Integer
+    attr_accessor project_id: String
+    attr_accessor data: webhook_event_data
+    def initialize: (id: String, type: event_type, created_at: Integer, project_id: String, data: webhook_event_data) -> void
+    def asset_id: () -> String?
+    def facts: () -> Array[event_fact]
+    def test?: () -> bool
+  end
+
+  module Webhooks
+    def self.signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
+    def self.verify: (payload: String, signature: String?, timestamp: String?, secret: String, ?tolerance_seconds: Integer,
+                      ?now: number) -> bool
+    def self.parse_event: (payload: String, signature: String?, timestamp: String?, secret: String,
+                           ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
+  end
+
+  def self.create_webhook_signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
+  def self.verify_webhook_signature: (payload: String, signature: String?, timestamp: String?, secret: String,
+                                      ?tolerance_seconds: Integer, ?now: number) -> bool
+  def self.parse_webhook_event: (payload: String, signature: String?, timestamp: String?, secret: String,
+                                 ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
+
+  # require 'calmlens/testing'
+  module Testing
+    # The mock's in-memory records. Change them to arrange a test, such as setting an asset's `moderation.status`.
+    class State < Struct[untyped]
+      attr_accessor assets: Hash[String, asset]
+      attr_accessor folders: Hash[String, folder]
+      # Stored bytes by asset ID, with each part's bytes by part number.
+      attr_accessor content: Hash[String, { "type" => String, "parts" => Hash[Integer, String] }]
+      attr_accessor events: Array[event]
+      attr_accessor lenses: Hash[String, lens]
+    end
+  end
+
+  class MockServerClient < ServerClient
+    class Request < Struct[untyped]
+      attr_accessor method: String
+      attr_accessor url: String
+      attr_accessor path: String
+      attr_accessor query: Hash[String, String]
+      attr_accessor headers: Hash[String, String]
+      attr_accessor body: String?
+      def json: () -> json_value
+    end
+
+    interface _Clock
+      # The current time in milliseconds since the Unix epoch.
+      def call: () -> Integer
+    end
+
+    interface _IdFactory
+      def call: () -> String
+    end
+
+    # Where a mock upload ends up: `pending` (still processing), `approved` or `rejected`
+    # (processing done with that decision), or `failed` (processing failed, retryable).
+    type outcome = "pending" | "approved" | "rejected" | "failed"
+
+    # An outcome, fields to deep-merge into the asset, or a callable that receives a copy of the
+    # asset and returns either.
+    type analyzed_outcome = outcome | Hash[String, json_input] | _AnalyzedOutcome
+
+    interface _AnalyzedOutcome
+      def call: (asset asset) -> (String | Hash[String, json_input])
+    end
+
+    def initialize: (?project_id: String, ?base_url: String, ?cdn_base_url: String, ?now: _Clock, ?create_id: _IdFactory,
+                     ?queued_outcome: outcome, ?analyzed_outcome: analyzed_outcome, ?timeout: number,
+                     ?open_timeout: number, ?max_retries: Integer, ?retry_base_delay: number) -> void
+    def state: () -> Testing::State
+    # `body` is any JSON value, encoded as the response body.
+    def enqueue: (body: json_input, ?status: Integer, ?headers: Hash[String, String]) -> self
+    def enqueue_raw: (body: String, ?status: Integer, ?headers: Hash[String, String]) -> self
+    def enqueue_error: (Exception error) -> self
+    def enqueue_event: (mock_event_input event) -> event
+    def requests: () -> Array[Request]
+    def remaining_responses: () -> Integer
+  end
+end

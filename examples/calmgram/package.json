@@ -1,0 +1,36 @@
+{
+  "name": "calmgram",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An Instagram-style example app that moderates photos, captions, comments and bios with CalmLens.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:demo": "wrangler dev --ip 127.0.0.1 --var CALMLENS_DEMO:1",
+    "deploy": "wrangler deploy",
+    "build": "node scripts/sync-artwork.mjs && bun run build:css && bun run build:client",
+    "build:css": "tailwindcss --input src/styles.css --output public/styles.css --minify",
+    "build:client": "bun build browser/upload.ts browser/confirm.ts --outdir public --target browser --minify",
+    "check": "tsc --noEmit && tsc --noEmit -p browser && biome check .",
+    "check:fix": "tsc --noEmit && tsc --noEmit -p browser && biome check --write .",
+    "test-images": "bun scripts/make-test-images.mjs",
+    "test": "bun test tests"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@calmlens/sdk": "file:../../javascript",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@cloudflare/workers-types": "^5.20261008.1",
+    "@tailwindcss/cli": "^4.3.3",
+    "@types/node": "^26.6.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "7.0.2",
+    "wrangler": "4.135.0"
+  }
+}

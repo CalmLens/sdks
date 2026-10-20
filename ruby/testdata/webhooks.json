@@ -1,0 +1,402 @@
+{
+  "parsing": [
+    {
+      "body": "{\"id\":\"event-future\",\"type\":\"asset.future-action\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"futureEnvelope\":{\"version\":2},\"data\":{\"severity\":\"future-severity\",\"title\":\"Future event\",\"futureData\":true,\"facts\":[{\"key\":\"future-fact\",\"value\":{\"count\":3},\"futureFact\":\"added\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=fe49cf2f0d00a81332381d712a80b574c65b88b9a536b4140641ba5e637f909d",
+      "now": 1700000000,
+      "expectedType": "asset.future-action",
+      "expectedFactKey": "future-fact"
+    }
+  ],
+  "signatures": [
+    {
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae"
+    },
+    {
+      "secret": "whsec_test",
+      "timestamp": "1760000000",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.flagged\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset flagged\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"processing\":{\"status\":\"done\"},\"moderation\":{\"status\":\"rejected\",\"action\":\"hide\"},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}}",
+      "signature": "v1=9cd9019ca62cdaefe53af6732244bd192ced3a388dffedebc15826bec545408f"
+    }
+  ],
+  "verification": [
+    {
+      "name": "test vector",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "payload",
+      "secret": "whsec_test",
+      "timestamp": "1760000000",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.flagged\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset flagged\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"processing\":{\"status\":\"done\"},\"moderation\":{\"status\":\"rejected\",\"action\":\"hide\"},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}}",
+      "signature": "v1=9cd9019ca62cdaefe53af6732244bd192ced3a388dffedebc15826bec545408f",
+      "now": 1760000000,
+      "valid": true
+    },
+    {
+      "name": "within tolerance (ahead)",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000300,
+      "valid": true
+    },
+    {
+      "name": "within tolerance (behind)",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1699999700,
+      "valid": true
+    },
+    {
+      "name": "custom tolerance",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000600,
+      "toleranceSeconds": 600,
+      "valid": true
+    },
+    {
+      "name": "signature list",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v0=abc, v1=0000000000000000000000000000000000000000000000000000000000000000, v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "expired",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000301,
+      "valid": false
+    },
+    {
+      "name": "future",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1699999699,
+      "valid": false
+    },
+    {
+      "name": "tampered body",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{ }",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "wrong secret",
+      "secret": "other",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "wrong timestamp",
+      "secret": "key",
+      "timestamp": "1700000001",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "missing scheme",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "unknown scheme",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v0=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "missing signature",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "missing timestamp",
+      "secret": "key",
+      "timestamp": "",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "malformed timestamp",
+      "secret": "key",
+      "timestamp": "17e8",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    }
+  ],
+  "payloads": [
+    {
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "userId": "user-1",
+        "type": "asset.flagged",
+        "severity": "high",
+        "title": "Asset flagged",
+        "description": "héllo 🌍",
+        "assetId": "asset-1",
+        "asset": {
+          "id": "asset-1",
+          "externalId": "post-1",
+          "processing": {
+            "status": "done"
+          },
+          "moderation": {
+            "status": "rejected",
+            "action": "hide"
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "flagged-categories",
+            "value": [
+              "harassment"
+            ]
+          }
+        ],
+        "notify": true,
+        "createdAt": 1760000000000,
+        "updatedAt": 1760000000001,
+        "readAt": null
+      },
+      "payload": {
+        "id": "event-1",
+        "type": "asset.flagged",
+        "createdAt": 1760000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset flagged",
+          "description": "héllo 🌍",
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1",
+            "externalId": "post-1",
+            "processing": {
+              "status": "done"
+            },
+            "moderation": {
+              "status": "rejected",
+              "action": "hide"
+            },
+            "content": {
+              "status": "stored"
+            }
+          },
+          "facts": [
+            {
+              "key": "flagged-categories",
+              "value": [
+                "harassment"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "event": {
+        "id": "event-2",
+        "projectId": "project-1",
+        "type": "asset.uploaded",
+        "severity": "low",
+        "title": "Asset uploaded",
+        "facts": [],
+        "createdAt": 1760000000000,
+        "updatedAt": 1760000000000
+      },
+      "payload": {
+        "id": "event-2",
+        "type": "asset.uploaded",
+        "createdAt": 1760000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "low",
+          "title": "Asset uploaded",
+          "description": null,
+          "assetId": null,
+          "asset": null,
+          "facts": []
+        }
+      }
+    },
+    {
+      "event": {
+        "id": "event-2",
+        "projectId": "project-1",
+        "type": "appeal.submitted",
+        "severity": "low",
+        "title": "Asset uploaded",
+        "facts": [
+          {
+            "key": "appeal-id",
+            "value": "00000000-0000-4000-8000-000000000001"
+          },
+          {
+            "key": "subject-type",
+            "value": "reported-user"
+          },
+          {
+            "key": "subject-id",
+            "value": "user-1"
+          }
+        ],
+        "createdAt": 1760000000000,
+        "updatedAt": 1760000000000
+      },
+      "payload": {
+        "id": "event-2",
+        "type": "appeal.submitted",
+        "createdAt": 1760000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "low",
+          "title": "Asset uploaded",
+          "description": null,
+          "assetId": null,
+          "asset": null,
+          "facts": [
+            {
+              "key": "appeal-id",
+              "value": "00000000-0000-4000-8000-000000000001"
+            },
+            {
+              "key": "subject-type",
+              "value": "reported-user"
+            },
+            {
+              "key": "subject-id",
+              "value": "user-1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "event": {
+        "id": "event-2",
+        "projectId": "project-1",
+        "type": "appeal.resolved",
+        "severity": "low",
+        "title": "Asset uploaded",
+        "facts": [
+          {
+            "key": "appeal-id",
+            "value": "00000000-0000-4000-8000-000000000001"
+          },
+          {
+            "key": "subject-type",
+            "value": "reported-user"
+          },
+          {
+            "key": "subject-id",
+            "value": "user-1"
+          },
+          {
+            "key": "decision",
+            "value": "overturned"
+          },
+          {
+            "key": "action",
+            "value": "unban"
+          },
+          {
+            "key": "applied-to-asset",
+            "value": false
+          }
+        ],
+        "createdAt": 1760000000000,
+        "updatedAt": 1760000000000
+      },
+      "payload": {
+        "id": "event-2",
+        "type": "appeal.resolved",
+        "createdAt": 1760000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "low",
+          "title": "Asset uploaded",
+          "description": null,
+          "assetId": null,
+          "asset": null,
+          "facts": [
+            {
+              "key": "appeal-id",
+              "value": "00000000-0000-4000-8000-000000000001"
+            },
+            {
+              "key": "subject-type",
+              "value": "reported-user"
+            },
+            {
+              "key": "subject-id",
+              "value": "user-1"
+            },
+            {
+              "key": "decision",
+              "value": "overturned"
+            },
+            {
+              "key": "action",
+              "value": "unban"
+            },
+            {
+              "key": "applied-to-asset",
+              "value": false
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

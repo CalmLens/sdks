@@ -1,0 +1,880 @@
+import { CalmLensError } from "@calmlens/sdk";
+import { type Context, Hono } from "hono";
+import { raw } from "hono/html";
+import type { Child } from "hono/jsx";
+import { DailyLimitReached } from "./budget";
+import {
+  addComment,
+  attachUpload,
+  createPost,
+  deleteComment,
+  deletePost,
+  imageUrlFor,
+  isVisibleTo,
+  loadFeed,
+  MAX_IMAGE_BYTES,
+  MAX_POSTS_PER_SANDBOX,
+  ModerationRejection,
+  refreshPending,
+  startUpload,
+  syncAsset,
+  toggleLike,
+  UnknownUpload,
+  updateBio,
+} from "./content";
+import type { Env, ModerationFields, Sandbox } from "./data";
+import { EXAMPLE_AUTHORS, exampleContentType } from "./examples";
+import { getModeration, isLoopbackHost, ModerationNotConfigured } from "./moderation";
+import { describeCalmLensError } from "./moderation/calmlens";
+import { readDemoUpload } from "./moderation/demo";
+import { describeFindings } from "./moderation/types";
+import { encodePng } from "./png";
+import {
+  currentSandbox,
+  deleteExpiredSandboxes,
+  endSession,
+  ensureSandbox,
+  flash,
+  saveSandbox,
+  takeFlash,
+} from "./sandbox";
+import {
+  DEMO_TEST_INPUT_KEY,
+  paintTestImage,
+  TEST_INPUT_KEY_PATTERN,
+  testTextCode,
+} from "./testInputs";
+import { requireHuman } from "./turnstile";
+import {
+  Avatar,
+  buttonClass,
+  CalmLensOverlay,
+  cx,
+  Decision,
+  Findings,
+  FlashMessage,
+  FormError,
+  Layout,
+  logoClass,
+  PostButton,
+  PostCaption,
+  PostCard,
+  PostImage,
+  panelClass,
+  QueueScores,
+  QueueTypeIcon,
+  timeAgo,
+} from "./views";
+import { readWebhookDelivery } from "./webhooks";
+
+const FEED = "mx-auto grid max-w-[470px] gap-5";
+const CARD = cx(panelClass, "mx-auto max-w-[470px] p-6");
+const ROW = "mt-2 flex flex-wrap items-center gap-3";
+const EMPTY = "px-4 py-12 text-center";
+
+type AppContext = Context<{ Bindings: Env }>;
+const app = new Hono<{ Bindings: Env }>();
+
+// Fail closed: without CalmLens keys nothing would be moderated, so refuse to serve unless demo
+// mode was asked for, and keep the simulator to localhost unless that is explicitly allowed.
+app.use("*", async (c, next) => {
+  let mode: "calmlens" | "demo";
+  try {
+    mode = getModeration(c.env).mode;
+  } catch (error) {
+    if (!(error instanceof ModerationNotConfigured)) throw error;
+    console.error("[calmgram]", error.message);
+    return c.text("Calmgram isn't configured yet.", 503);
+  }
+  if (
+    mode === "demo" &&
+    c.env.CALMLENS_DEMO_ALLOW_REMOTE !== "1" &&
+    !isLoopbackHost(new URL(c.req.url).hostname)
+  ) {
+    console.error("[calmgram] demo mode only serves localhost; set CALMLENS_DEMO_ALLOW_REMOTE=1");
+    return c.text("Calmgram isn't configured yet.", 503);
+  }
+  await next();
+});
+
+// Every form submission can call CalmLens, so limit them per visitor IP. CalmLens's own webhook
+// deliveries are verified by signature instead.
+app.use("*", async (c, next) => {
+  if (c.req.method === "POST" && !c.req.path.startsWith("/api/webhooks/") && c.env.WRITE_LIMITER) {
+    const key = c.req.header("cf-connecting-ip") ?? "unknown";
+    const { success } = await c.env.WRITE_LIMITER.limit({ key });
+    if (!success) return c.text("You're doing that too often. Please wait a minute.", 429);
+  }
+  await next();
+});
+
+// On the public demo, a Turnstile check keeps crawlers from creating sandboxes (see turnstile.ts).
+app.use("*", requireHuman);
+
+const USERNAME_PATTERN = /^[a-z0-9_.]{3,24}$/;
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"];
+const TEST_IMAGES = [
+  ["violence", "Violence"],
+  ["harassment", "Harassment"],
+  ["hate", "Hate"],
+  ["criminal-activity", "Criminal activity"],
+  ["sexual", "Sexual content"],
+  ["self-harm", "Self-harm"],
+] as const;
+
+const page = async (
+  c: AppContext,
+  sandbox: Sandbox | null,
+  title: string | undefined,
+  body: Child,
+) =>
+  c.html(
+    <Layout
+      title={title}
+      username={sandbox?.username ?? null}
+      demo={getModeration(c.env).mode === "demo"}
+      overlay={await moderationQueue(c, sandbox)}
+    >
+      {body}
+    </Layout>,
+  );
+
+/** Sends the visitor back where they came from, if that was this site. */
+const back = (c: AppContext, fallback = "/") => {
+  const referer = c.req.header("referer");
+  const url = referer ? new URL(referer) : null;
+  return c.redirect(
+    url && url.origin === new URL(c.req.url).origin ? url.pathname + url.hash : fallback,
+    303,
+  );
+};
+
+/** Turns a failed moderation call into a message for the visitor. */
+const toError = (error: unknown) => {
+  if (error instanceof ModerationRejection) return error.message;
+  if (error instanceof UnknownUpload)
+    return "That upload didn't work. Please choose the photo again.";
+  if (error instanceof DailyLimitReached) {
+    return "The Calmgram demo has reached today's limit. Please try again tomorrow.";
+  }
+  console.error("[calmgram] moderation request failed:", describeCalmLensError(error));
+  return "We couldn't check that right now. Please try again.";
+};
+
+/** The home feed, also drawn underneath the moderation queue. */
+const feedView = async (c: AppContext, sandbox: Sandbox | null) => {
+  const viewer = sandbox?.username ?? null;
+  const feed = await loadFeed(c.env, sandbox);
+  const posts = await refreshPending(
+    c.env,
+    sandbox,
+    feed.posts.filter((post) => isVisibleTo(post, viewer)),
+  );
+  // Hide the viewer's rejected posts from the feed; they still see them on their profile.
+  const visible = posts.filter((post) => post.status !== "rejected" && post.status !== "error");
+  return (
+    <div class={FEED}>
+      {visible.length === 0 && (
+        <div class={EMPTY}>
+          <h1>No posts yet</h1>
+          <p>Share the first photo. It'll appear once CalmLens has checked it.</p>
+          <a href="/new" class={buttonClass()}>
+            New post
+          </a>
+        </div>
+      )}
+      {visible.map((post) => (
+        <PostCard
+          post={post}
+          imageUrl={imageUrlFor(c.env, post, "feed")}
+          comments={feed.comments.filter((comment) => comment.postId === post.id)}
+          likes={feed.likesFor(post.id)}
+          viewer={viewer}
+        />
+      ))}
+    </div>
+  );
+};
+
+app.get("/", async (c) => {
+  const sandbox = await ensureSandbox(c);
+  return page(c, sandbox, undefined, await feedView(c, sandbox));
+});
+
+// Old links to the sign-in page land on the username page.
+app.get("/login", (c) => c.redirect("/username", 301));
+
+// Errors travel as fixed codes, so the page never shows text taken from the URL.
+const USERNAME_ERRORS = {
+  invalid: "Use 3–24 lowercase letters, numbers, dots or underscores.",
+  taken: "That username is taken. Try another.",
+} as const;
+
+app.get("/username", async (c) => {
+  const sandbox = await ensureSandbox(c);
+  const errorCode = c.req.query("error");
+  const error =
+    errorCode && Object.hasOwn(USERNAME_ERRORS, errorCode)
+      ? USERNAME_ERRORS[errorCode as keyof typeof USERNAME_ERRORS]
+      : null;
+  return page(
+    c,
+    sandbox,
+    "Change username",
+    <div class={cx(panelClass, "mx-auto mt-10 max-w-[360px] p-6")}>
+      <h1 class={cx(logoClass, "text-center text-[44px]")}>Calmgram</h1>
+      <p class="text-muted">
+        You were given a random username so you can try the app straight away. Pick another if you
+        like. There are no passwords in this demo.
+      </p>
+      <form method="post" action="/username" class="grid gap-2.5">
+        <input
+          name="username"
+          value={sandbox?.username ?? ""}
+          placeholder="username"
+          autocomplete="username"
+          required
+          aria-label="Username"
+        />
+        {error && <FormError>{error}</FormError>}
+        <button type="submit" class={buttonClass()}>
+          Save username
+        </button>
+      </form>
+    </div>,
+  );
+});
+
+app.post("/username", async (c) => {
+  const username = String((await c.req.formData()).get("username") ?? "")
+    .trim()
+    .toLowerCase();
+  const error: keyof typeof USERNAME_ERRORS | null = !USERNAME_PATTERN.test(username)
+    ? "invalid"
+    : EXAMPLE_AUTHORS.has(username)
+      ? "taken"
+      : null;
+  if (error) return c.redirect(`/username?error=${error}`, 303);
+  // Sandboxes are only created by page views, so scripted POSTs can't create them in bulk.
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  // Renaming keeps the same sandbox.
+  sandbox.username = username;
+  await saveSandbox(c.env, sandbox);
+  return c.redirect(`/u/${username}`, 303);
+});
+
+// Drops this sandbox; the next page creates a fresh one with a new random username. The old one
+// is deleted by the hourly cleanup like any other.
+app.post("/start-over", (c) => {
+  endSession(c);
+  return c.redirect("/", 303);
+});
+
+app.get("/test-inputs/:file", (c) => {
+  const file = c.req.param("file");
+  const image = TEST_IMAGES.find(([name]) => file === `calmlens-test-${name}.png`);
+  if (!image) return c.notFound();
+  const key =
+    getModeration(c.env).mode === "demo" ? DEMO_TEST_INPUT_KEY : c.env.CALMLENS_TEST_INPUT_KEY;
+  if (!key || !TEST_INPUT_KEY_PATTERN.test(key))
+    return c.text("Test inputs are not configured for this project.", 503);
+  const signal = image[0];
+  return c.body(new Uint8Array(encodePng(512, 512, paintTestImage(signal, key))).buffer, 200, {
+    "Content-Type": "image/png",
+    "Cache-Control": "private, no-store",
+    "Content-Disposition": `inline; filename="${file}"`,
+  });
+});
+
+app.get("/new", async (c) => {
+  const sandbox = await ensureSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  const message = await takeFlash(c.env, sandbox);
+  const moderation = getModeration(c.env);
+  const demo = moderation.mode === "demo";
+  // Test inputs carry the project's secret key; the simulator has its own.
+  const testInputKey = demo ? DEMO_TEST_INPUT_KEY : (c.env.CALMLENS_TEST_INPUT_KEY ?? "XXXXXXXX");
+  return page(
+    c,
+    sandbox,
+    "New post",
+    <div class={CARD}>
+      <h1>New post</h1>
+      <form
+        id="new-post"
+        class="grid gap-3"
+        method="post"
+        action="/posts"
+        enctype="multipart/form-data"
+        // With an upload preset, /upload.js sends the photo straight to CalmLens. Without
+        // JavaScript (or a preset), the form posts the photo here instead.
+        data-upload-preset-id={moderation.uploadPresetId ?? undefined}
+        data-calmlens-api-url={c.env.CALMLENS_API_URL || undefined}
+      >
+        <label
+          id="dropzone"
+          class="relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-line text-center text-muted"
+        >
+          <span id="dropzone-hint">
+            <strong>Choose a photo</strong>
+            <br />
+            JPEG, PNG, WebP, GIF or HEIC, up to 10MB
+          </span>
+          <img id="preview" alt="Selected photo preview" class="size-full object-cover" hidden />
+          <input
+            type="file"
+            name="image"
+            id="image"
+            accept={ACCEPTED_TYPES.join(",")}
+            class="absolute inset-0 cursor-pointer opacity-0"
+            required
+          />
+        </label>
+        <PostCaption draft={message?.draft} prefill={c.req.query("caption")} />
+        <FlashMessage flash={message} />
+        <p id="upload-error" class="mt-1.5 mb-0 text-danger" role="alert" hidden />
+        <button type="submit" class={buttonClass()} id="share">
+          Share
+        </button>
+      </form>
+      {raw(`<script>
+        const input = document.getElementById("image");
+        const preview = document.getElementById("preview");
+        input.addEventListener("change", () => {
+          const file = input.files[0];
+          if (!file) return;
+          if (file.size >= ${MAX_IMAGE_BYTES}) { alert("Images must be smaller than 10MB."); input.value = ""; return; }
+          preview.src = URL.createObjectURL(file);
+          preview.hidden = false;
+          document.getElementById("dropzone-hint").hidden = true;
+          document.getElementById("dropzone").classList.replace("border-dashed", "border-solid");
+        });
+        document.getElementById("new-post").addEventListener("submit", () => {
+          const button = document.getElementById("share");
+          button.disabled = true;
+          button.textContent = "Uploading…";
+        });
+      </script>`)}
+      {moderation.uploadPresetId && <script type="module" src="/upload.js" />}
+      <details class="mt-5 border-t border-line pt-3.5">
+        <summary class="cursor-pointer font-semibold">
+          Want to see a post or comment get rejected?
+        </summary>
+        <p>
+          These harmless images are CalmLens <em>test triggers</em>: CalmLens classifies each one as
+          the named category, so you can test the rejection flow without uploading real harmful
+          content.
+        </p>
+        {TEST_INPUT_KEY_PATTERN.test(testInputKey) ? (
+          <ul class="grid grid-cols-4 gap-2">
+            {TEST_IMAGES.map(([file, label]) => (
+              <li>
+                <a
+                  href={`/test-inputs/calmlens-test-${file}.png`}
+                  class="grid gap-1 text-center text-xs"
+                  download
+                >
+                  <img
+                    src={`/test-inputs/calmlens-test-${file}.png`}
+                    alt=""
+                    class="aspect-square w-full rounded-lg"
+                  />
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="text-muted">
+            Set CALMLENS_TEST_INPUT_KEY to enable downloads for this project.
+          </p>
+        )}
+        <p>
+          For text, paste a test code into a caption, comment or bio:
+          <br />
+          <code>{testTextCode("harassment", testInputKey)}</code>
+        </p>
+        {demo && (
+          <p class="text-muted">
+            In demo mode, insults like “you idiot” are flagged for review and threats are rejected.
+          </p>
+        )}
+      </details>
+    </div>,
+  );
+});
+
+/** Why a new post can't be started yet, or null. */
+const postLimitError = (sandbox: Sandbox) =>
+  sandbox.posts.length >= MAX_POSTS_PER_SANDBOX
+    ? `This demo allows ${MAX_POSTS_PER_SANDBOX} posts. Delete one to share another.`
+    : null;
+
+// Step 1 of a browser upload: check who is asking, then sign a single-use upload token for a new
+// post. In your app, this is where you check the signed-in user and what they may upload.
+app.post("/api/uploads", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.json({ error: "Reload the page and try again." }, 401);
+  if (!getModeration(c.env).uploadPresetId) return c.json({ error: "Not found" }, 404);
+  const limit = postLimitError(sandbox);
+  if (limit) return c.json({ error: limit }, 409);
+  try {
+    return c.json(await startUpload(c.env, sandbox));
+  } catch (error) {
+    return c.json({ error: toError(error) }, error instanceof DailyLimitReached ? 429 : 502);
+  }
+});
+
+// Creates a post. With JavaScript and an upload preset, the browser has already uploaded the
+// photo to CalmLens and sends its asset ID (step 2); otherwise the photo itself is posted here.
+app.post("/posts", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  const form = await c.req.formData();
+  const image = form.get("image");
+  const assetId = String(form.get("assetId") ?? "");
+  const postId = String(form.get("postId") ?? "");
+  const caption = String(form.get("caption") ?? "");
+  const fail = async (error: string) => {
+    await flash(c.env, sandbox, { error, draft: caption });
+    return c.redirect("/new", 303);
+  };
+
+  if (caption.length > 2200) return fail("Captions can be up to 2,200 characters.");
+  const limit = postLimitError(sandbox);
+  if (limit) return fail(limit);
+
+  if (assetId || postId) {
+    if (!assetId || !postId) return fail("Choose a photo to share.");
+    try {
+      const post = await attachUpload(c.env, sandbox, { postId, assetId, caption });
+      return c.redirect(`/p/${post.id}`, 303);
+    } catch (error) {
+      return fail(toError(error));
+    }
+  }
+
+  if (!(image instanceof File) || image.size === 0) return fail("Choose a photo to share.");
+  if (!ACCEPTED_TYPES.includes(image.type))
+    return fail("Use a JPEG, PNG, WebP, GIF or HEIC image.");
+  if (image.size >= MAX_IMAGE_BYTES) return fail("Images must be smaller than 10MB.");
+
+  try {
+    const post = await createPost(c.env, sandbox, { caption, image });
+    return c.redirect(`/p/${post.id}`, 303);
+  } catch (error) {
+    return fail(toError(error));
+  }
+});
+
+app.get("/p/:id", async (c) => {
+  const sandbox = await ensureSandbox(c);
+  const viewer = sandbox?.username ?? null;
+  const feed = await loadFeed(c.env, sandbox);
+  const stored = feed.posts.find((post) => post.id === c.req.param("id"));
+  if (!stored || !isVisibleTo(stored, viewer)) return c.notFound();
+  const [post] = await refreshPending(c.env, sandbox, [stored]);
+  const message = await takeFlash(c.env, sandbox);
+  const comments = feed.comments.filter((comment) => comment.postId === post.id);
+  const visible = comments
+    .filter((comment) => comment.status === "approved")
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  return page(
+    c,
+    sandbox,
+    post.caption || `Post by ${post.author}`,
+    <div class={FEED}>
+      <PostCard
+        post={post}
+        imageUrl={imageUrlFor(c.env, post, "feed")}
+        comments={comments}
+        likes={feed.likesFor(post.id)}
+        viewer={viewer}
+        linkToPost={false}
+      />
+      {post.status === "approved" && (
+        <section id="comments" class={cx(panelClass, "grid gap-2.5 p-3 max-sm:px-4")}>
+          {visible.length === 0 && <p class="text-muted">No comments yet.</p>}
+          {visible.map((comment) => (
+            <div class="flex items-start gap-2">
+              <Avatar username={comment.author} size={24} />
+              <p class="my-0.5">
+                <a href={`/u/${comment.author}`} class="font-semibold">
+                  {comment.author}
+                </a>{" "}
+                {comment.text}
+                <span class="text-muted"> · {timeAgo(comment.createdAt)}</span>
+              </p>
+            </div>
+          ))}
+          {viewer ? (
+            <form
+              method="post"
+              action={`/p/${post.id}/comments`}
+              class="grid grid-cols-[1fr_auto] gap-2 border-t border-line pt-2.5"
+            >
+              <input
+                class="border-0 px-0 py-1.5 focus:outline-none"
+                name="text"
+                value={message?.draft ?? ""}
+                placeholder="Add a comment…"
+                maxlength={500}
+                autocomplete="off"
+                required
+                aria-label="Add a comment"
+              />
+              <button
+                type="submit"
+                class="cursor-pointer text-sm font-semibold text-accent disabled:opacity-50"
+              >
+                Post
+              </button>
+              <FlashMessage flash={message} class="col-span-full" />
+            </form>
+          ) : null}
+        </section>
+      )}
+      {post.author === viewer && !post.exampleId && (
+        <div class={cx(ROW, "justify-end")}>
+          <PostButton
+            action={`/p/${post.id}/delete`}
+            confirm={{ title: "Delete this post?", action: "Delete" }}
+          >
+            Delete post
+          </PostButton>
+        </div>
+      )}
+    </div>,
+  );
+});
+
+app.post("/p/:id/like", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  await toggleLike(c.env, sandbox, c.req.param("id"));
+  return back(c);
+});
+
+app.post("/p/:id/comments", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  const postId = c.req.param("id");
+  const text = String((await c.req.formData()).get("text") ?? "").trim();
+  const target = `/p/${postId}#comments`;
+  if (!text) return c.redirect(target, 303);
+  if (text.length > 500) {
+    await flash(c.env, sandbox, { error: "Comments can be up to 500 characters.", draft: text });
+    return c.redirect(target, 303);
+  }
+  try {
+    await addComment(c.env, sandbox, { postId, text });
+  } catch (error) {
+    // The rejected comment stays in the box so its author can edit it.
+    await flash(c.env, sandbox, { error: toError(error), draft: text });
+  }
+  return c.redirect(target, 303);
+});
+
+app.post("/p/:id/delete", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  const fromModeration = c.req.header("referer")?.includes("/moderation");
+  await deletePost(c.env, sandbox, c.req.param("id"));
+  return c.redirect(fromModeration ? "/moderation" : `/u/${sandbox.username}`, 303);
+});
+
+app.post("/comments/:id/delete", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  await deleteComment(c.env, sandbox, c.req.param("id"));
+  return back(c, "/moderation");
+});
+
+app.get("/u/:username", async (c) => {
+  const username = c.req.param("username");
+  const sandbox = await ensureSandbox(c);
+  const viewer = sandbox?.username ?? null;
+  const feed = await loadFeed(c.env, sandbox);
+  const authored = feed.posts.filter((post) => post.author === username);
+  if (authored.length === 0 && username !== viewer && !EXAMPLE_AUTHORS.has(username))
+    return c.notFound();
+  const isOwner = viewer === username;
+  const posts = await refreshPending(
+    c.env,
+    sandbox,
+    authored.filter((post) => isVisibleTo(post, viewer)),
+  );
+  const published = posts.filter((post) => post.status === "approved").length;
+  const message = isOwner ? await takeFlash(c.env, sandbox) : null;
+  const bio = isOwner ? (message?.draft ?? feed.bioFor(username)) : feed.bioFor(username);
+
+  return page(
+    c,
+    sandbox,
+    username,
+    <div class="max-sm:px-4">
+      <header class="mb-1 flex items-start gap-8 border-b border-line pt-2 pb-7 max-sm:gap-4">
+        <Avatar username={username} size={88} class="max-sm:size-16! max-sm:text-[27px]!" />
+        <div class="min-w-0 flex-1">
+          <h1>{username}</h1>
+          {isOwner && (
+            <p>
+              <a href="/username" class="text-muted">
+                Change username
+              </a>
+            </p>
+          )}
+          <p>
+            <strong>{published}</strong> {published === 1 ? "post" : "posts"}
+          </p>
+          {isOwner ? (
+            <form method="post" action="/bio" class="mt-2 max-w-[360px]">
+              <textarea
+                name="bio"
+                maxlength={150}
+                rows={2}
+                placeholder="Write a bio…"
+                aria-label="Bio"
+              >
+                {bio}
+              </textarea>
+              <div class={ROW}>
+                <button type="submit" class={buttonClass("secondary")}>
+                  Save bio
+                </button>
+              </div>
+              <FlashMessage flash={message} />
+            </form>
+          ) : (
+            bio && <p>{bio}</p>
+          )}
+        </div>
+      </header>
+      {posts.length === 0 ? (
+        <p class={cx(EMPTY, "text-muted")}>No posts yet.</p>
+      ) : (
+        <div class="grid grid-cols-3 gap-1">
+          {posts.map((post) => (
+            <a
+              href={`/p/${post.id}`}
+              class="block aspect-square overflow-hidden bg-subtle"
+              title={post.status === "approved" ? post.caption : `Status: ${post.status}`}
+            >
+              <PostImage post={post} variant="thumb" url={imageUrlFor(c.env, post, "thumb")} />
+            </a>
+          ))}
+        </div>
+      )}
+    </div>,
+  );
+});
+
+app.post("/bio", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  const bio = String((await c.req.formData()).get("bio") ?? "");
+  const target = `/u/${sandbox.username}`;
+  if (bio.length > 150) {
+    await flash(c.env, sandbox, { error: "Bios can be up to 150 characters.", draft: bio });
+    return c.redirect(target, 303);
+  }
+  try {
+    await updateBio(c.env, sandbox, bio);
+    await flash(c.env, sandbox, { notice: "Saved" });
+  } catch (error) {
+    await flash(c.env, sandbox, { error: toError(error), draft: bio });
+  }
+  return c.redirect(target, 303);
+});
+
+// Demo-only review tools: each visitor sees only their own sandbox. A production app
+// should keep these tools in a separate, authenticated admin interface.
+const moderationQueue = async (c: AppContext, sandbox: Sandbox | null) => {
+  const posts = await refreshPending(c.env, sandbox, (await loadFeed(c.env, sandbox)).posts);
+  const items = [
+    ...posts.map((item) => ({ kind: "post" as const, item })),
+    ...(sandbox?.comments ?? []).map((item) => ({ kind: "comment" as const, item })),
+  ].sort((a, b) => b.item.createdAt - a.item.createdAt);
+
+  return (
+    <CalmLensOverlay title="Moderation queue">
+      <p class="text-muted">
+        Includes illustrative examples. Your uploads are checked by CalmLens separately.
+      </p>
+      <div class="queue-heading">
+        <span>Assets</span>
+        <span>{items.length}</span>
+      </div>
+      {items.length === 0 && (
+        <p class="text-muted">No assets yet. Share a photo or comment to see its status here.</p>
+      )}
+      {items.map((entry) => (
+        <details class="queue-card">
+          <summary class="queue-summary">
+            <span class="queue-preview">
+              {entry.kind === "post" ? (
+                <PostImage
+                  post={entry.item}
+                  variant="thumb"
+                  url={imageUrlFor(c.env, entry.item, "thumb")}
+                />
+              ) : (
+                <span class="queue-text-preview" aria-hidden="true">
+                  <QueueTypeIcon kind={entry.kind} />
+                  <span>{entry.item.text}</span>
+                </span>
+              )}
+            </span>
+            <span class="queue-body">
+              <span class="queue-row">
+                <span class="queue-name">
+                  {entry.kind === "post"
+                    ? entry.item.exampleId && entry.item.status === "rejected"
+                      ? "Hidden example"
+                      : entry.item.caption || "Photo"
+                    : entry.item.text}
+                </span>
+                <Decision item={entry.item} />
+              </span>
+              <QueueScores item={entry.item} />
+              <span class="queue-meta">
+                {entry.kind === "post" ? exampleContentType(entry.item) : "Text"} ·{" "}
+                {timeAgo(entry.item.createdAt)}
+              </span>
+            </span>
+          </summary>
+          <div class="queue-detail">
+            <p class="text-muted">
+              By <a href={`/u/${entry.item.author}`}>{entry.item.author}</a>
+            </p>
+            <a
+              href={`/p/${entry.kind === "post" ? entry.item.id : entry.item.postId}`}
+              class="text-accent"
+            >
+              {entry.kind === "post"
+                ? entry.item.exampleId
+                  ? "Example post"
+                  : "Photo"
+                : "Comment"}
+            </a>
+            {entry.kind === "post" ? (
+              entry.item.caption && <p class="text-muted">“{entry.item.caption}”</p>
+            ) : (
+              <blockquote>{entry.item.text}</blockquote>
+            )}
+            <Findings item={entry.item} />
+            {!(entry.kind === "post" && entry.item.exampleId) && (
+              <div class={ROW}>
+                <PostButton
+                  action={
+                    entry.kind === "post"
+                      ? `/p/${entry.item.id}/delete`
+                      : `/comments/${entry.item.id}/delete`
+                  }
+                  confirm={
+                    entry.kind === "post"
+                      ? { title: "Remove this post and its image?", action: "Remove" }
+                      : undefined
+                  }
+                >
+                  Remove {entry.kind}
+                </PostButton>
+              </div>
+            )}
+          </div>
+        </details>
+      ))}
+    </CalmLensOverlay>
+  );
+};
+
+app.get("/moderation", (c) => c.redirect("/", 302));
+
+// Polled by the author's browser while their post is pending.
+// A pending post's page waits here for its decision (a long poll), so it updates as soon as
+// CalmLens decides. After DECISION_WAIT_MS without one it answers `pending` and the page asks
+// again. Webhooks would update the post too; this is what keeps the open page live.
+const DECISION_WAIT_MS = 25_000;
+
+app.get("/api/posts/:id/status", async (c) => {
+  const sandbox = await currentSandbox(c);
+  const post = sandbox?.posts.find((p) => p.id === c.req.param("id"));
+  if (!sandbox || !post) return c.json({ error: "Not found" }, 404);
+  let decided: ModerationFields = post;
+  if (post.status === "pending") {
+    const outcome = await getModeration(c.env).waitForDecision(post.assetId, {
+      timeoutMs: DECISION_WAIT_MS,
+      signal: c.req.raw.signal,
+    });
+    if (outcome.status !== "pending") {
+      decided = (await syncAsset(c.env, post.assetId, outcome)) ?? post;
+    }
+  }
+  return c.json({
+    status: decided.status,
+    flagged: decided.flagged,
+    reason: decided.status === "rejected" ? describeFindings(decided.findings) : null,
+  });
+});
+
+// Configure in CalmLens: Portal → Webhooks → https://<your-app>/api/webhooks/calmlens
+// Subscribe to asset.approved and asset.rejected. They report every outcome, from automated
+// moderation or a reviewer in the portal; the decided-by fact says which.
+app.post("/api/webhooks/calmlens", async (c) => {
+  // Verify the exact raw body. Parsing and re-serialising JSON would change the signature.
+  const rawBody = await c.req.text();
+  const signature = c.req.header("x-calmlens-signature") ?? "";
+  const timestamp = c.req.header("x-calmlens-timestamp") ?? "";
+  if (!(await getModeration(c.env).verifyWebhook(rawBody, signature, timestamp))) {
+    return c.json({ error: "Invalid signature" }, 401);
+  }
+
+  let delivery: ReturnType<typeof readWebhookDelivery>;
+  try {
+    delivery = readWebhookDelivery(rawBody);
+  } catch {
+    return c.json({ error: "Invalid delivery" }, 400);
+  }
+
+  // CalmLens retries failed deliveries, so make the handler idempotent by event ID.
+  const eventKey = `event:${delivery.eventId}`;
+  if (await c.env.CALMGRAM.get(eventKey)) return c.json({ ok: true, duplicate: true });
+
+  if (delivery.syncAssetId) {
+    // Fetch the asset for its current status and report rather than trusting the snapshot.
+    await syncAsset(c.env, delivery.syncAssetId);
+  }
+  await c.env.CALMGRAM.put(eventKey, "1", { expirationTtl: 2 * 24 * 60 * 60 });
+  return c.json({ ok: true });
+});
+
+// Demo mode's stand-in for the CalmLens CDN. With CalmLens configured, images are served
+// from cdn.calmlens.com and this route is unused.
+app.get("/demo-media/:assetId", async (c) => {
+  const upload = await readDemoUpload(c.env.CALMGRAM, c.req.param("assetId"));
+  if (!upload) return c.text("Not available", 403);
+  return c.body(upload.bytes, 200, {
+    "Content-Type": upload.mimeType,
+    "Cache-Control": "private, max-age=3600",
+  });
+});
+
+app.notFound((c) => c.text("Not found", 404));
+
+app.onError((error, c) => {
+  console.error(
+    "[calmgram]",
+    error instanceof CalmLensError ? describeCalmLensError(error) : error,
+  );
+  return c.text("Something went wrong. Please try again.", 500);
+});
+
+export default {
+  fetch: app.fetch,
+  async scheduled(_controller: ScheduledController, env: Env) {
+    const deleted = await deleteExpiredSandboxes(env, getModeration(env));
+    if (deleted) console.debug(`[calmgram] deleted ${deleted} expired sandboxes`);
+  },
+} satisfies ExportedHandler<Env>;

@@ -1,0 +1,30 @@
+{
+  "name": "calmsnap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An Expo app that uploads photos straight from the phone to CalmLens through an upload preset, with tokens from a tiny server.",
+  "license": "MIT",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
+    "server": "bun server/index.ts",
+    "check": "tsc --noEmit && tsc --project server"
+  },
+  "dependencies": {
+    "@calmlens/sdk": "file:../../javascript",
+    "expo": "~57.0.29",
+    "expo-file-system": "~57.0.7",
+    "expo-image-picker": "~57.0.20",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3",
+    "@types/bun": "^1.4.2"
+  }
+}

@@ -1,0 +1,2952 @@
+//! Typed request options and response models.
+//!
+//! Rust fields are snake_case; the wire JSON is camelCase. Response models are
+//! `#[non_exhaustive]` and keep fields this SDK version does not know in `extra`, and enums
+//! keep values it does not know in an `Unknown` variant, so new API fields and values never
+//! fail decoding. Only metadata values, event fact values and the options of transform types
+//! this SDK does not know use JSON values.
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{collections::HashMap, fmt};
+
+/// A field in an update: leave it unchanged, clear it, or set it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum Patch<T> {
+    /// Leaves the field unchanged (omitted from the request).
+    #[default]
+    Missing,
+    /// Clears the field (sent as `null`).
+    Null,
+    /// Replaces the field.
+    Value(T),
+}
+impl<T> Patch<T> {
+    /// Whether the field is left unchanged.
+    pub fn is_missing(&self) -> bool {
+        matches!(self, Self::Missing)
+    }
+}
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Patch<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        Ok(Option::<T>::deserialize(deserializer)?.map_or(Self::Null, Self::Value))
+    }
+}
+impl<T> From<T> for Patch<T> {
+    fn from(value: T) -> Self {
+        Self::Value(value)
+    }
+}
+
+macro_rules! string_enum {
+    ($(#[$meta:meta])* $name:ident { $( $(#[$vmeta:meta])* $variant:ident = $value:literal ),* $(,)? }) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
+        pub enum $name {
+            $( $(#[$vmeta])* $variant, )*
+            /// A value this SDK version does not know.
+            Unknown(String),
+        }
+        impl $name {
+            /// The wire value.
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $value,)*
+                    Self::Unknown(value) => value,
+                }
+            }
+        }
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($value => Self::$variant,)*
+                    other => Self::Unknown(other.to_owned()),
+                }
+            }
+        }
+        impl Default for $name {
+            /// An empty `Unknown` value, used only when the API omits a required field.
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                Self::from(value.as_str())
+            }
+        }
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                Ok(Self::from(String::deserialize(deserializer)?.as_str()))
+            }
+        }
+    };
+}
+
+string_enum! {
+    /// Where an asset is in the pipeline.
+    AssetProcessingStatus {
+        /// The content is still arriving, e.g. a multipart upload receiving parts.
+        Uploading = "uploading",
+        /// The content is being processed and classified.
+        Processing = "processing",
+        /// Processing finished.
+        Done = "done",
+        /// Processing failed; the asset can be retried.
+        Failed = "failed",
+    }
+}
+
+string_enum! {
+    /// The moderation decision in force: a reviewer's decision when there is one, else the
+    /// automated one.
+    AssetModerationStatus {
+        /// Waiting for classification or review.
+        Pending = "pending",
+        /// Approved for delivery.
+        Approved = "approved",
+        /// Rejected by moderation.
+        Rejected = "rejected",
+    }
+}
+
+string_enum! {
+    /// What the moderation policy did with an asset's flagged content.
+    AssetModerationAction {
+        /// Kept delivery enabled and alerted.
+        Alert = "alert",
+        /// Blocked delivery while keeping the content.
+        Hide = "hide",
+        /// Deleted the content.
+        Purge = "purge",
+    }
+}
+
+string_enum! {
+    /// A reviewer's decision on an asset.
+    AssetReviewerAction {
+        /// The reviewer approved the asset.
+        Approved = "approved",
+        /// The reviewer rejected the asset.
+        Rejected = "rejected",
+    }
+}
+
+string_enum! {
+    /// Whether CalmLens holds an asset's content (source, preview and extracted text).
+    AssetContentStatus {
+        /// Held only until processing finishes.
+        Temporary = "temporary",
+        /// Retained.
+        Stored = "stored",
+        /// Deleted; [`AssetContent::removal_reason`] says why.
+        Removed = "removed",
+    }
+}
+
+string_enum! {
+    /// Why an asset's content was removed.
+    AssetContentRemovalReason {
+        /// The moderation policy purged it.
+        Policy = "policy",
+        /// `keepContentAfterProcessing` was off, so it was removed after processing.
+        Retention = "retention",
+        /// Removed through the API or portal.
+        Requested = "requested",
+        /// Removed with its parent asset's content.
+        ParentRemoved = "parent-removed",
+        /// Disposed of after a safety hold.
+        Disposed = "disposed",
+    }
+}
+
+string_enum! {
+    /// Whether the CDN serves an asset without a signed URL.
+    Visibility {
+        /// Served to anyone with the URL once approved.
+        Public = "public",
+        /// Served only through signed URLs or with an API key.
+        Private = "private",
+    }
+}
+
+string_enum! {
+    /// The kind of content an asset holds, detected from its MIME type.
+    AssetType {
+        /// An image.
+        Image = "image",
+        /// A video.
+        Video = "video",
+        /// An audio file.
+        Audio = "audio",
+        /// A plain-text document.
+        PlaintextDocument = "plaintext-document",
+        /// A document with text and embedded media, such as a PDF.
+        MultimediaDocument = "multimedia-document",
+        /// A captured website.
+        Website = "website",
+        /// Any other file.
+        File = "file",
+    }
+}
+
+string_enum! {
+    /// What happens to content that crosses a moderation threshold.
+    FlaggedContentAction {
+        /// Take no action.
+        Ignore = "ignore",
+        /// Keep delivery enabled and alert.
+        Alert = "alert",
+        /// Block delivery while keeping the content.
+        Hide = "hide",
+        /// Delete the content.
+        Purge = "purge",
+    }
+}
+
+string_enum! {
+    /// Why an asset is under a safety hold.
+    SafetyHoldReason {
+        /// The content is suspected to be illegal.
+        SuspectedIllegalContent = "suspected-illegal-content",
+    }
+}
+
+string_enum! {
+    /// Where extracted text is stored.
+    ExtractedTextType {
+        /// Inline, in [`ExtractedText::content`].
+        String = "string",
+        /// In a separate document, identified by [`ExtractedText::id`].
+        Document = "document",
+    }
+}
+
+string_enum! {
+    /// Whether a moderation category or qualifier was assessed.
+    EvaluationStatus {
+        /// Fully assessed.
+        Evaluated = "evaluated",
+        /// Assessed from part of the content, e.g. some video frames.
+        Partial = "partial",
+        /// Not assessed; `reason` says why.
+        NotEvaluated = "not-evaluated",
+    }
+}
+
+string_enum! {
+    /// Why a moderation category or qualifier was not assessed.
+    NotEvaluatedReason {
+        /// This kind of content cannot be assessed for it.
+        NotSupported = "not-supported",
+        /// Assessment was attempted but produced no usable result.
+        Unavailable = "unavailable",
+    }
+}
+
+string_enum! {
+    /// How likely a category, qualifier or label applies.
+    Likelihood {
+        /// Very unlikely.
+        VeryUnlikely = "very-unlikely",
+        /// Unlikely.
+        Unlikely = "unlikely",
+        /// Possible.
+        Possible = "possible",
+        /// Likely.
+        Likely = "likely",
+        /// Very likely.
+        VeryLikely = "very-likely",
+    }
+}
+
+string_enum! {
+    /// A moderation policy category, the key of [`ClassificationReport::categories`].
+    ClassificationCategory {
+        /// Sexual content.
+        Sexual = "sexual",
+        /// Violence.
+        Violence = "violence",
+        /// Self-harm.
+        SelfHarm = "self-harm",
+        /// Harassment and bullying.
+        Harassment = "harassment",
+        /// Hate and identity abuse.
+        Hate = "hate",
+        /// Criminal and dangerous activity.
+        CriminalActivity = "criminal-activity",
+    }
+}
+
+string_enum! {
+    /// A moderation qualifier, the key of [`CategoryResult::qualifiers`].
+    ModerationQualifier {
+        /// Sexual: nudity.
+        SexualNudity = "sexual-nudity",
+        /// Sexual: activity.
+        SexualActivity = "sexual-activity",
+        /// Sexual: explicit language.
+        SexualExplicitLanguage = "sexual-explicit-language",
+        /// Sexual: solicitation.
+        SexualSolicitation = "sexual-solicitation",
+        /// Sexual: historical.
+        SexualHistorical = "sexual-historical",
+        /// Sexual: documentary.
+        SexualDocumentary = "sexual-documentary",
+        /// Sexual: educational.
+        SexualEducational = "sexual-educational",
+        /// Sexual: fictional.
+        SexualFictional = "sexual-fictional",
+        /// Sexual: support prevention.
+        SexualSupportPrevention = "sexual-support-prevention",
+        /// Violence: attack.
+        ViolenceAttack = "violence-attack",
+        /// Violence: threat.
+        ViolenceThreat = "violence-threat",
+        /// Violence: preparation.
+        ViolencePreparation = "violence-preparation",
+        /// Violence: encouragement.
+        ViolenceEncouragement = "violence-encouragement",
+        /// Violence: injury.
+        ViolenceInjury = "violence-injury",
+        /// Violence: violent death.
+        ViolenceViolentDeath = "violence-violent-death",
+        /// Violence: natural or non-violent death.
+        ViolenceNaturalDeath = "violence-natural-death",
+        /// Violence: graphic.
+        ViolenceGraphic = "violence-graphic",
+        /// Violence: historical.
+        ViolenceHistorical = "violence-historical",
+        /// Violence: documentary.
+        ViolenceDocumentary = "violence-documentary",
+        /// Violence: educational.
+        ViolenceEducational = "violence-educational",
+        /// Violence: fictional.
+        ViolenceFictional = "violence-fictional",
+        /// Violence: support prevention.
+        ViolenceSupportPrevention = "violence-support-prevention",
+        /// Self harm: thoughts.
+        SelfHarmThoughts = "self-harm-thoughts",
+        /// Self harm: preparation.
+        SelfHarmPreparation = "self-harm-preparation",
+        /// Self harm: act.
+        SelfHarmAct = "self-harm-act",
+        /// Self harm: methods.
+        SelfHarmMethods = "self-harm-methods",
+        /// Self harm: encouragement.
+        SelfHarmEncouragement = "self-harm-encouragement",
+        /// Self harm: documentary.
+        SelfHarmDocumentary = "self-harm-documentary",
+        /// Self harm: educational.
+        SelfHarmEducational = "self-harm-educational",
+        /// Self harm: fictional.
+        SelfHarmFictional = "self-harm-fictional",
+        /// Self harm: support prevention.
+        SelfHarmSupportPrevention = "self-harm-support-prevention",
+        /// Harassment: abuse.
+        HarassmentAbuse = "harassment-abuse",
+        /// Harassment: intimidation.
+        HarassmentIntimidation = "harassment-intimidation",
+        /// Harassment: threat.
+        HarassmentThreat = "harassment-threat",
+        /// Harassment: sexual.
+        HarassmentSexual = "harassment-sexual",
+        /// Harassment: encouragement.
+        HarassmentEncouragement = "harassment-encouragement",
+        /// Harassment: fictional.
+        HarassmentFictional = "harassment-fictional",
+        /// Hate: abuse.
+        HateAbuse = "hate-abuse",
+        /// Hate: dehumanization.
+        HateDehumanization = "hate-dehumanization",
+        /// Hate: inferiority.
+        HateInferiority = "hate-inferiority",
+        /// Hate: exclusion.
+        HateExclusion = "hate-exclusion",
+        /// Hate: threat.
+        HateThreat = "hate-threat",
+        /// Hate: historical.
+        HateHistorical = "hate-historical",
+        /// Hate: fictional.
+        HateFictional = "hate-fictional",
+        /// Criminal activity: demonstration.
+        CriminalActivityDemonstration = "criminal-activity-demonstration",
+        /// Criminal activity: preparation.
+        CriminalActivityPreparation = "criminal-activity-preparation",
+        /// Criminal activity: request.
+        CriminalActivityRequest = "criminal-activity-request",
+        /// Criminal activity: instructions.
+        CriminalActivityInstructions = "criminal-activity-instructions",
+        /// Criminal activity: promotion.
+        CriminalActivityPromotion = "criminal-activity-promotion",
+        /// Criminal activity: substances.
+        CriminalActivitySubstances = "criminal-activity-substances",
+        /// Criminal activity: fraud and scams.
+        CriminalActivityFraud = "criminal-activity-fraud",
+        /// Criminal activity: fictional.
+        CriminalActivityFictional = "criminal-activity-fictional",
+    }
+}
+
+string_enum! {
+    /// What a media segment's scores come from.
+    MediaSegmentSource {
+        /// A sampled video frame.
+        Frame = "frame",
+        /// Transcribed speech.
+        Speech = "speech",
+        /// Text read from a frame.
+        FrameText = "frame-text",
+        /// A video clip.
+        Clip = "clip",
+    }
+}
+
+string_enum! {
+    /// An event type.
+    EventType {
+        /// `asset.uploaded`.
+        AssetUploaded = "asset.uploaded",
+        /// `asset.flagged`.
+        AssetFlagged = "asset.flagged",
+        /// `asset.approved`.
+        AssetApproved = "asset.approved",
+        /// `asset.rejected`.
+        AssetRejected = "asset.rejected",
+        /// `asset.failed`.
+        AssetFailed = "asset.failed",
+        /// `asset.deleted`.
+        AssetDeleted = "asset.deleted",
+        /// `asset.content-removed`.
+        AssetContentRemoved = "asset.content-removed",
+        /// `asset.retried`.
+        AssetRetried = "asset.retried",
+        /// `asset.review-requested`.
+        AssetReviewRequested = "asset.review-requested",
+        /// `usage.limit-reached`.
+        UsageLimitReached = "usage.limit-reached",
+        /// `usage.spend-limit-reached`.
+        UsageSpendLimitReached = "usage.spend-limit-reached",
+        /// `upload-preset.daily-limit-reached`.
+        UploadPresetDailyLimitReached = "upload-preset.daily-limit-reached",
+        /// `project.member-joined`.
+        ProjectMemberJoined = "project.member-joined",
+        /// `project.member-removed`.
+        ProjectMemberRemoved = "project.member-removed",
+        /// `project.member-role-changed`.
+        ProjectMemberRoleChanged = "project.member-role-changed",
+        /// `project.invitation-sent`.
+        ProjectInvitationSent = "project.invitation-sent",
+        /// `api-key.created`.
+        ApiKeyCreated = "api-key.created",
+        /// `api-key.revoked`.
+        ApiKeyRevoked = "api-key.revoked",
+        /// `connector.failing`.
+        ConnectorFailing = "connector.failing",
+        /// `appeal.submitted`.
+        AppealSubmitted = "appeal.submitted",
+        /// `appeal.resolved`.
+        AppealResolved = "appeal.resolved",
+    }
+}
+
+string_enum! {
+    /// An event's severity.
+    EventSeverity {
+        /// Informational.
+        Low = "low",
+        /// Needs attention.
+        High = "high",
+    }
+}
+
+string_enum! {
+    /// The asset type a lens applies to.
+    LensType {
+        /// Images.
+        Image = "image",
+        /// Videos.
+        Video = "video",
+        /// Audio.
+        Audio = "audio",
+        /// Documents.
+        Document = "document",
+        /// Websites.
+        Website = "website",
+    }
+}
+
+string_enum! {
+    /// How asset search matches the query.
+    SearchMode {
+        /// Keyword and semantic matching combined (the default).
+        Hybrid = "hybrid",
+        /// Keyword matching only.
+        Keyword = "keyword",
+        /// Semantic matching only.
+        Semantic = "semantic",
+    }
+}
+
+string_enum! {
+    /// Whether semantic search is available for the project.
+    SemanticStatus {
+        /// Semantic search is turned off.
+        Disabled = "disabled",
+        /// The semantic index is ready.
+        Ready = "ready",
+        /// The semantic index is still being built.
+        Indexing = "indexing",
+        /// Semantic search could not run this time.
+        Unavailable = "unavailable",
+    }
+}
+
+string_enum! {
+    /// A field a search result matched on.
+    SearchMatchField {
+        /// The name.
+        Name = "name",
+        /// The asset ID.
+        Id = "id",
+        /// Your ID for the asset.
+        ExternalId = "externalId",
+        /// The description.
+        Description = "description",
+        /// The tags.
+        Tags = "tags",
+        /// The asset type.
+        Type = "type",
+        /// The content format.
+        ContentFormat = "content.format",
+        /// The content's file extension.
+        ContentExtension = "content.extension",
+        /// The moderation status.
+        ModerationStatus = "moderation.status",
+        /// The visual content.
+        Visual = "visual",
+        /// The audio transcript.
+        Transcript = "transcript",
+    }
+}
+
+string_enum! {
+    /// A sort direction.
+    SortDirection {
+        /// Ascending.
+        Asc = "ASC",
+        /// Descending.
+        Desc = "DESC",
+    }
+}
+
+string_enum! {
+    /// Which CDN resource of an asset to serve or sign.
+    CdnResource {
+        /// The asset's content (the default).
+        Content = "content",
+        /// The generated preview image.
+        Preview = "preview",
+    }
+}
+
+/// What happens to flagged content for one asset, overriding the project's moderation action.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlaggedContentPolicy {
+    /// The action.
+    pub action: FlaggedContentAction,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl FlaggedContentPolicy {
+    /// A policy applying `action`.
+    pub fn new(action: FlaggedContentAction) -> Self {
+        Self {
+            action,
+            extra: HashMap::new(),
+        }
+    }
+}
+
+/// Processing options for an asset.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessingOptions {
+    /// Keep the stored content after classification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep_content_after_processing: Option<bool>,
+    /// Overrides the project's moderation action for this asset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flagged_content_policy: Option<FlaggedContentPolicy>,
+    /// Optional analyses to run, keyed by feature. Every feature is off unless enabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub features: Option<ProcessingFeatures>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Optional analyses to run on an asset, keyed by feature. The API rejects unknown features.
+/// Results of person and face detection are in [`ClassificationReport::features`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessingFeatures {
+    /// Extract image text into a child asset and moderate it as text. Applies to images,
+    /// including those extracted from documents and websites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ocr: Option<FeatureOptions>,
+    /// Beta. Locate people in images, including people whose faces are not visible. Results
+    /// are informational and never change the moderation decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person_detection: Option<FeatureOptions>,
+    /// Beta. Locate faces in images and optionally estimate an age range for each. Faces are
+    /// not identified. Results are informational and never change the moderation decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face_detection: Option<FaceDetectionOptions>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Options for a feature that only needs turning on.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeatureOptions {
+    /// Whether to run the feature.
+    pub enabled: bool,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl FeatureOptions {
+    /// Options that turn the feature on.
+    pub fn enabled() -> Self {
+        Self {
+            enabled: true,
+            ..Self::default()
+        }
+    }
+}
+
+/// Face detection options.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FaceDetectionOptions {
+    /// Whether to run face detection.
+    pub enabled: bool,
+    /// Also estimate an age range for each face. Defaults to `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age_estimation: Option<bool>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl FaceDetectionOptions {
+    /// Options that turn face detection on, without age estimation.
+    pub fn enabled() -> Self {
+        Self {
+            enabled: true,
+            ..Self::default()
+        }
+    }
+}
+
+/// The bytes of an upload or multipart part.
+///
+/// `Text` and `Bytes` are sent as they are and can be retried. `Reader` and `Stream` are read
+/// once while the request is sent, so the whole file never needs to be in memory; the SDK
+/// does not retry them. Both need the exact `size`.
+#[non_exhaustive]
+pub enum Payload {
+    /// UTF-8 text.
+    Text(String),
+    /// Bytes. Cloning [`Bytes`] does not copy them.
+    Bytes(Bytes),
+    /// Base64 bytes, optionally as a `data:` URL. Split multipart files before encoding parts.
+    Base64(String),
+    /// A blocking reader with its exact length, read on Tokio's blocking thread pool.
+    #[cfg(feature = "async")]
+    Reader {
+        /// The source, e.g. a [`std::fs::File`].
+        reader: Box<dyn std::io::Read + Send + 'static>,
+        /// The exact number of bytes the reader yields.
+        size: u64,
+    },
+    /// An async byte stream with its exact length.
+    #[cfg(feature = "async")]
+    Stream {
+        /// The chunks.
+        stream: crate::ByteStream,
+        /// The exact total number of bytes.
+        size: u64,
+    },
+}
+impl Default for Payload {
+    fn default() -> Self {
+        Self::Bytes(Bytes::new())
+    }
+}
+impl fmt::Debug for Payload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Text(text) => f.debug_struct("Text").field("len", &text.len()).finish(),
+            Self::Bytes(bytes) => f.debug_struct("Bytes").field("len", &bytes.len()).finish(),
+            Self::Base64(text) => f.debug_struct("Base64").field("len", &text.len()).finish(),
+            #[cfg(feature = "async")]
+            Self::Reader { size, .. } => f.debug_struct("Reader").field("size", size).finish(),
+            #[cfg(feature = "async")]
+            Self::Stream { size, .. } => f.debug_struct("Stream").field("size", size).finish(),
+        }
+    }
+}
+
+/// Upload content (`content`) or a multipart part (`part`): a concrete MIME type and the bytes.
+#[derive(Debug, Default)]
+pub struct Content {
+    /// The file's MIME type, such as `image/png` (`type` on the wire). A multipart part sent
+    /// with [`AssetsClient::upload_part`](crate::AssetsClient::upload_part) may leave it empty.
+    pub mime_type: String,
+    /// The bytes.
+    pub payload: Payload,
+    /// The multipart part number, starting at 1. Only for parts.
+    pub part_number: Option<u32>,
+    /// Whether this is the last multipart part. Only for parts.
+    pub is_final: Option<bool>,
+}
+
+impl Content {
+    /// `text/plain` content.
+    pub fn text(text: impl Into<String>) -> Self {
+        Self::new(Payload::Text(text.into()), "text/plain")
+    }
+    /// Binary content. Pass a `Vec<u8>`, `Bytes` or `&'static [u8]` to avoid a copy.
+    pub fn bytes(bytes: impl Into<Bytes>, mime_type: impl Into<String>) -> Self {
+        Self::new(Payload::Bytes(bytes.into()), mime_type)
+    }
+    /// Content read from `reader`, which yields exactly `size` bytes, while it is uploaded.
+    #[cfg(feature = "async")]
+    pub fn reader(
+        reader: impl std::io::Read + Send + 'static,
+        size: u64,
+        mime_type: impl Into<String>,
+    ) -> Self {
+        Self::new(
+            Payload::Reader {
+                reader: Box::new(reader),
+                size,
+            },
+            mime_type,
+        )
+    }
+    /// Content streamed from `stream`, which yields exactly `size` bytes, while it is uploaded.
+    #[cfg(feature = "async")]
+    pub fn stream<S, E>(stream: S, size: u64, mime_type: impl Into<String>) -> Self
+    where
+        S: futures_util::Stream<Item = std::result::Result<Bytes, E>> + Send + 'static,
+        E: Into<Box<dyn std::error::Error + Send + Sync>> + 'static,
+    {
+        use futures_util::TryStreamExt;
+        Self::new(
+            Payload::Stream {
+                stream: Box::pin(stream.map_err(Into::into)),
+                size,
+            },
+            mime_type,
+        )
+    }
+    /// Streams the file at `path` without reading it into memory.
+    #[cfg(feature = "async")]
+    pub fn file(
+        path: impl AsRef<std::path::Path>,
+        mime_type: impl Into<String>,
+    ) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let size = file.metadata()?.len();
+        Ok(Self::reader(file, size, mime_type))
+    }
+    fn new(payload: Payload, mime_type: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            payload,
+            part_number: None,
+            is_final: None,
+        }
+    }
+    /// Marks the content as multipart part `part_number`, the last part when `is_final`.
+    pub fn part(mut self, part_number: u32, is_final: bool) -> Self {
+        self.part_number = Some(part_number);
+        self.is_final = Some(is_final);
+        self
+    }
+}
+
+/// Reads the JSON request shape `{type, plainText | base64 | bytes, partNumber?, isFinal?}`.
+impl<'de> Deserialize<'de> for Content {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct Wire {
+            #[serde(default, rename = "type")]
+            mime_type: String,
+            plain_text: Option<String>,
+            base64: Option<String>,
+            bytes: Option<Vec<u8>>,
+            size_in_bytes: Option<u64>,
+            part_number: Option<u32>,
+            is_final: Option<bool>,
+        }
+        use serde::de::Error;
+        let wire = Wire::deserialize(deserializer)?;
+        let payload = match (wire.plain_text, wire.base64, wire.bytes) {
+            (Some(text), None, None) => Payload::Text(text),
+            (None, Some(base64), None) => Payload::Base64(base64),
+            (None, None, Some(bytes)) => Payload::Bytes(bytes.into()),
+            _ => {
+                return Err(D::Error::custom(
+                    "Supply exactly one payload representation",
+                ))
+            }
+        };
+        if let (Some(size), Payload::Text(_) | Payload::Bytes(_)) = (wire.size_in_bytes, &payload) {
+            let length = match &payload {
+                Payload::Text(text) => text.len(),
+                Payload::Bytes(bytes) => bytes.len(),
+                _ => 0,
+            };
+            if size != length as u64 {
+                return Err(D::Error::custom(
+                    "sizeInBytes must match the payload byte length",
+                ));
+            }
+        }
+        Ok(Self {
+            mime_type: wire.mime_type,
+            payload,
+            part_number: wire.part_number,
+            is_final: wire.is_final,
+        })
+    }
+}
+
+/// Options for [`AssetsClient::create`](crate::AssetsClient::create) and
+/// [`moderate`](crate::AssetsClient::moderate). Supply exactly one of `content`, `part` (the
+/// first part of a multipart upload) or `url`.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitAsset {
+    /// The asset name, such as a file name.
+    pub name: String,
+    /// The whole file.
+    #[serde(default)]
+    pub content: Option<Content>,
+    /// The first part of a multipart upload; continue with `upload_part`.
+    #[serde(default)]
+    pub part: Option<Content>,
+    /// A URL CalmLens downloads the file from.
+    #[serde(default)]
+    pub url: Option<String>,
+    /// A description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Processing options.
+    #[serde(default)]
+    pub processing_options: Option<ProcessingOptions>,
+    /// CDN visibility.
+    #[serde(default)]
+    pub visibility: Option<Visibility>,
+    /// Metadata items.
+    #[serde(default)]
+    pub metadata: Option<Vec<MetadataItem>>,
+    /// Your ID for the asset, unique within the project.
+    #[serde(default)]
+    pub external_id: Option<String>,
+    /// A link to the asset in your system.
+    #[serde(default)]
+    pub external_url: Option<String>,
+    /// The folder to put the asset in.
+    #[serde(default)]
+    pub folder_id: Patch<String>,
+    /// The upload preset to apply: its folder, visibility, file types and size limit.
+    #[serde(default)]
+    pub upload_preset_id: Option<String>,
+    /// For a multipart upload, the size of the whole file; CalmLens then refuses an upload
+    /// that could never finish, and parts that overshoot or fall short.
+    #[serde(default)]
+    pub total_size_in_bytes: Option<u64>,
+    /// The `Idempotency-Key` for this upload. The SDK generates one when it is `None`.
+    #[serde(default)]
+    pub idempotency_key: Option<String>,
+}
+
+impl SubmitAsset {
+    /// Text named `text`.
+    pub fn text(text: impl Into<String>) -> Self {
+        Self::new("text", Content::text(text))
+    }
+    /// An asset named `name` with `content`.
+    pub fn new(name: impl Into<String>, content: Content) -> Self {
+        Self {
+            name: name.into(),
+            content: Some(content),
+            ..Self::default()
+        }
+    }
+    /// An asset CalmLens downloads from `url`.
+    pub fn from_url(name: impl Into<String>, url: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            url: Some(url.into()),
+            ..Self::default()
+        }
+    }
+    /// The first part of a multipart upload of the file `name`.
+    pub fn multipart(name: impl Into<String>, part: Content) -> Self {
+        Self {
+            name: name.into(),
+            part: Some(part),
+            ..Self::default()
+        }
+    }
+}
+
+/// A metadata item.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataItem {
+    /// The metadata field ID.
+    pub id: String,
+    /// The value.
+    pub value: Value,
+}
+impl MetadataItem {
+    /// A metadata item.
+    pub fn new(id: impl Into<String>, value: impl Into<Value>) -> Self {
+        Self {
+            id: id.into(),
+            value: value.into(),
+        }
+    }
+}
+
+/// Identifies an asset.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetId {
+    /// The asset ID.
+    pub asset_id: String,
+}
+impl AssetId {
+    /// Identifies asset `asset_id`.
+    pub fn new(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+        }
+    }
+}
+
+/// Options for [`AssetsClient::wait_for_decision`](crate::AssetsClient::wait_for_decision).
+#[derive(Debug, Clone, Default)]
+pub struct WaitForDecision {
+    /// The asset ID.
+    pub asset_id: String,
+    /// How long to wait for a decision; 60 seconds when `None`.
+    pub timeout: Option<std::time::Duration>,
+}
+impl WaitForDecision {
+    /// Waits for asset `asset_id` with the default 60-second timeout.
+    pub fn new(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            timeout: None,
+        }
+    }
+    /// Sets how long to wait for a decision.
+    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+}
+
+/// Identifies a folder.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderId {
+    /// The folder ID.
+    pub folder_id: String,
+}
+impl FolderId {
+    /// Identifies folder `folder_id`.
+    pub fn new(folder_id: impl Into<String>) -> Self {
+        Self {
+            folder_id: folder_id.into(),
+        }
+    }
+}
+
+/// A sort order.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Order {
+    /// The field, e.g. `createdAt`.
+    pub field: String,
+    /// The direction.
+    pub direction: SortDirection,
+}
+
+/// Options for listing assets.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAssets {
+    /// The cursor returned by the previous page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Items per page, 1 to 100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    /// A filter such as `moderation.status==approved`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+    /// Sort orders.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ordering: Option<Vec<Order>>,
+    /// Lists only the assets directly in this folder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+}
+
+/// Options for listing an asset's children.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListChildren {
+    /// The parent asset ID.
+    pub asset_id: String,
+    /// The cursor returned by the previous page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Items per page, 1 to 100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    /// A filter such as `moderation.status==approved`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+    /// Sort orders.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ordering: Option<Vec<Order>>,
+}
+
+/// Changes to an asset. [`Patch::Missing`] fields are left unchanged.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAsset {
+    /// The asset ID.
+    #[serde(skip_serializing)]
+    pub asset_id: String,
+    /// The name.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub name: Patch<String>,
+    /// The description.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub description: Patch<String>,
+    /// The tags.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub tags: Patch<Vec<String>>,
+    /// The metadata items.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub metadata: Patch<Vec<MetadataItem>>,
+    /// The folder.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub folder_id: Patch<String>,
+    /// Your ID for the asset.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub external_id: Patch<String>,
+    /// A link to the asset in your system.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub external_url: Patch<String>,
+    /// CDN visibility.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub visibility: Patch<Visibility>,
+    /// Processing options.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub processing_options: Patch<ProcessingOptions>,
+}
+
+/// Moves an asset to a folder, or to the project root with `folder_id: None`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveAsset {
+    /// The asset ID.
+    #[serde(skip_serializing)]
+    pub asset_id: String,
+    /// The destination folder.
+    pub folder_id: Option<String>,
+}
+
+/// A later part of a multipart upload.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadPart {
+    /// The asset returned when the upload started.
+    pub asset_id: String,
+    /// The part, with `part_number` set.
+    pub part: Content,
+    /// Overrides the `queue` choice saved when the upload started, for the final part.
+    #[serde(default)]
+    pub queue: Option<bool>,
+    /// The `Idempotency-Key` for this part. The SDK generates one when it is `None`.
+    #[serde(default)]
+    pub idempotency_key: Option<String>,
+}
+
+/// Options for a signed asset URL.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedUrlOptions {
+    /// The asset ID.
+    #[serde(skip_serializing)]
+    pub asset_id: String,
+    /// `content` (default) or `preview`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource: Option<CdnResource>,
+    /// A lens identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lens: Option<String>,
+    /// A transform: a selector string or structured steps, sent as a selector string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transform: Option<CdnTransform>,
+    /// Lifetime in seconds; defaults to 900.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_in_seconds: Option<u64>,
+}
+
+/// Options for creating a folder.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFolder {
+    /// The name, unique among folders with the same parent.
+    pub name: String,
+    /// The parent folder, or the project root when missing or null.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub parent_id: Patch<String>,
+}
+
+/// Changes to a folder.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateFolder {
+    /// The folder ID.
+    #[serde(skip_serializing)]
+    pub folder_id: String,
+    /// The new name.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub name: Patch<String>,
+}
+
+/// Moves a folder under another, or to the project root with `parent_id: None`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveFolder {
+    /// The folder ID.
+    #[serde(skip_serializing)]
+    pub folder_id: String,
+    /// The new parent.
+    pub parent_id: Option<String>,
+}
+
+/// Options for one page of the events feed.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListEvents {
+    /// The cursor from a previous page. Without it, the feed starts from now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+    /// The page size.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+/// A named lens definition.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LensDefinition {
+    /// The lens identifier used in CDN URLs as `@identifier`.
+    pub identifier: String,
+    /// The display name.
+    pub name: String,
+    /// A description.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub description: Patch<String>,
+    /// The asset type the lens applies to.
+    #[serde(rename = "type")]
+    pub lens_type: LensType,
+    /// Whether the lens is active.
+    pub active: bool,
+    /// The definition version; bump it to change an existing lens.
+    pub version: u32,
+    /// The transforms.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub transforms: Patch<Vec<Transform>>,
+}
+
+/// Options for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureLenses {
+    /// The lenses, returned in the same order.
+    pub lenses: Vec<LensDefinition>,
+}
+
+/// A CDN request for an asset's content or preview.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CdnRequest {
+    /// The asset ID or external ID.
+    pub asset_identifier: String,
+    /// `content` (default) or `preview`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource: Option<CdnResource>,
+    /// A lens identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lens: Option<String>,
+    /// A transform: a selector such as `imageTransform[width=320]` or structured steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transform: Option<CdnTransform>,
+    /// The HTTP method and headers, e.g. `HEAD` or a `Range` header.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub init: Option<HttpOptions>,
+}
+
+/// HTTP method and headers for a CDN request. The SDK always sends its own API key.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpOptions {
+    /// The method; defaults to `GET`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
+    /// Extra request headers.
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
+}
+
+/// An asset.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Asset {
+    /// The asset ID.
+    pub id: String,
+    /// The owning project.
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// The user who created the asset.
+    #[serde(default)]
+    pub user_id: Option<String>,
+    /// The parent asset, for child assets CalmLens extracts during processing.
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// The folder, or `None` at the project root.
+    #[serde(default)]
+    pub folder_id: Option<String>,
+    /// The upload preset the asset was uploaded through.
+    #[serde(default)]
+    pub upload_preset_id: Option<String>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub created_at: Option<u64>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// The asset type (`type` on the wire).
+    #[serde(default, rename = "type")]
+    pub asset_type: Option<AssetType>,
+    /// The name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Your ID for the asset.
+    #[serde(default)]
+    pub external_id: Option<String>,
+    /// A link to the asset in your system.
+    #[serde(default)]
+    pub external_url: Option<String>,
+    /// Metadata items.
+    #[serde(default)]
+    pub metadata: Option<Vec<MetadataItem>>,
+    /// Tags.
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    /// Processing options.
+    #[serde(default)]
+    pub processing_options: Option<ProcessingOptions>,
+    /// CDN visibility.
+    #[serde(default)]
+    pub visibility: Option<Visibility>,
+    /// Where the asset is in the pipeline.
+    #[serde(default)]
+    pub processing: AssetProcessing,
+    /// The moderation decision, policy action and report.
+    #[serde(default)]
+    pub moderation: AssetModeration,
+    /// Whether CalmLens holds the content, and its details.
+    #[serde(default)]
+    pub content: AssetContent,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl Asset {
+    /// An asset with `id`, processing status `processing` and moderation status `moderation`,
+    /// e.g. for a mock response.
+    pub fn new(
+        id: impl Into<String>,
+        processing: AssetProcessingStatus,
+        moderation: AssetModerationStatus,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            processing: AssetProcessing {
+                status: processing,
+                ..AssetProcessing::default()
+            },
+            moderation: AssetModeration {
+                status: moderation,
+                ..AssetModeration::default()
+            },
+            ..Self::default()
+        }
+    }
+    /// Whether moderation has finished: the moderation status is `approved` or `rejected`, or
+    /// processing failed.
+    pub fn is_decided(&self) -> bool {
+        matches!(
+            self.moderation.status,
+            AssetModerationStatus::Approved | AssetModerationStatus::Rejected
+        ) || self.processing.status == AssetProcessingStatus::Failed
+    }
+}
+
+/// Where an asset is in the pipeline.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetProcessing {
+    /// `uploading` while the content arrives, `processing`, then `done` or `failed`.
+    #[serde(default)]
+    pub status: AssetProcessingStatus,
+    /// When the processing status last changed, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// How many parts of a multipart upload have been received.
+    #[serde(default)]
+    pub upload_parts_received: Option<u32>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// An asset's moderation state.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetModeration {
+    /// The decision in force: `pending` until moderation finishes, then `approved` or
+    /// `rejected`. A reviewer's decision takes precedence over the automated one.
+    #[serde(default)]
+    pub status: AssetModerationStatus,
+    /// What the policy did with flagged content, or `None` when nothing was flagged. Kept after a
+    /// reviewer decides.
+    #[serde(default)]
+    pub action: Option<AssetModerationAction>,
+    /// Why automated moderation rejected the asset.
+    #[serde(default)]
+    pub note: Option<String>,
+    /// A reviewer's decision, or `None` when no reviewer has decided.
+    #[serde(default)]
+    pub reviewer_action: Option<AssetReviewerAction>,
+    /// The reviewer's note.
+    #[serde(default)]
+    pub reviewer_note: Option<String>,
+    /// The user who reviewed the asset.
+    #[serde(default)]
+    pub reviewer_user_id: Option<String>,
+    /// When a reviewer decided, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub reviewed_at: Option<u64>,
+    /// When the decision in force was made, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub decided_at: Option<u64>,
+    /// The moderation report, set once classification finishes.
+    #[serde(default)]
+    pub report: Option<ClassificationReport>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Whether CalmLens holds an asset's content, and the content's details.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetContent {
+    /// `temporary` until processing finishes, `stored`, or `removed`.
+    #[serde(default)]
+    pub status: AssetContentStatus,
+    /// Why the content was removed; `None` while it is held.
+    #[serde(default)]
+    pub removal_reason: Option<AssetContentRemovalReason>,
+    /// When the content status last changed, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// A safety hold restricting access.
+    #[serde(default)]
+    pub safety_hold: Option<SafetyHold>,
+    /// The MIME type.
+    #[serde(default)]
+    pub format: Option<String>,
+    /// The file extension.
+    #[serde(default)]
+    pub extension: Option<String>,
+    /// The uploaded size in bytes.
+    #[serde(default)]
+    pub size_in_bytes: Option<u64>,
+    /// Digests of the uploaded content.
+    #[serde(default)]
+    pub checksums: Option<Checksums>,
+    /// Image details, for image assets.
+    #[serde(default)]
+    pub image: Option<ImageData>,
+    /// The browser-friendly preview generated for images, documents and websites.
+    #[serde(default)]
+    pub preview_image: Option<PreviewImage>,
+    /// Text extracted from the content.
+    #[serde(default)]
+    pub extracted_text: Option<ExtractedText>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A moderation report.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ClassificationReport {
+    /// The overall score.
+    #[serde(default)]
+    pub score: Option<f64>,
+    /// Notes.
+    #[serde(default)]
+    pub notes: Option<String>,
+    /// Results by category.
+    #[serde(default)]
+    pub categories: HashMap<ClassificationCategory, CategoryResult>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub processed_at: Option<u64>,
+    /// Labels.
+    #[serde(default)]
+    pub labels: Option<Vec<ClassificationLabel>>,
+    /// Audio and video results.
+    #[serde(default)]
+    pub media: Option<MediaClassificationReport>,
+    /// Results of the features requested in [`ProcessingOptions::features`].
+    #[serde(default)]
+    pub features: Option<ProcessingFeatureResults>,
+    /// What the project's policy made of the report when the asset was decided.
+    #[serde(default)]
+    pub policy: Option<ReportPolicy>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Each assessed category's policy score and action, and the highest policy score.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ReportPolicy {
+    /// The highest category policy score.
+    #[serde(default)]
+    pub score: f64,
+    /// Policy results by category.
+    #[serde(default)]
+    pub categories: HashMap<ClassificationCategory, CategoryPolicyScore>,
+}
+
+/// How strongly a category meets the policy, from 0 to 1, and what the policy does with it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CategoryPolicyScore {
+    /// The policy score.
+    #[serde(default)]
+    pub score: f64,
+    /// `ignore`, `alert`, `hide` or `purge`.
+    #[serde(default)]
+    pub action: String,
+}
+
+/// One category's result.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CategoryResult {
+    /// Whether the category was assessed.
+    #[serde(default)]
+    pub status: Option<EvaluationStatus>,
+    /// The score from 0 to 1, unless `status` is `NotEvaluated`.
+    #[serde(default)]
+    pub score: Option<f64>,
+    /// The likelihood, unless `status` is `NotEvaluated`.
+    #[serde(default)]
+    pub likelihood: Option<Likelihood>,
+    /// Why the category was not assessed.
+    #[serde(default)]
+    pub reason: Option<NotEvaluatedReason>,
+    /// Qualifier results.
+    #[serde(default)]
+    pub qualifiers: Option<HashMap<ModerationQualifier, QualifierResult>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A qualifier's result.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct QualifierResult {
+    /// Confidence that the content is only this qualifier, from 0 to 1; never above `some_score`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub all_score: Option<f64>,
+    /// Whether the qualifier was assessed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<EvaluationStatus>,
+    /// Confidence that some of the content is this qualifier, from 0 to 1, when evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub some_score: Option<f64>,
+    /// The likelihood, when evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub likelihood: Option<Likelihood>,
+    /// Why the qualifier was not assessed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<NotEvaluatedReason>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+string_enum! {
+    /// Whether a feature produced a result.
+    FeatureResultStatus {
+        /// The feature ran; its results are present.
+        Evaluated = "evaluated",
+        /// The feature did not run; `reason` says why.
+        NotEvaluated = "not-evaluated",
+    }
+}
+
+string_enum! {
+    /// How mature a feature is. Beta results may change shape.
+    FeatureStage {
+        /// Beta.
+        Beta = "beta",
+        /// Generally available.
+        Ga = "ga",
+    }
+}
+
+string_enum! {
+    /// Why a requested feature did not run.
+    FeatureNotEvaluatedReason {
+        /// The feature does not apply to this asset, e.g. a text asset.
+        NotSupported = "not-supported",
+        /// The feature could not run this time.
+        Unavailable = "unavailable",
+    }
+}
+
+/// Results of the features requested in [`ProcessingOptions::features`], keyed by feature.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ProcessingFeatureResults {
+    /// Person detection results.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person_detection: Option<PersonDetectionResult>,
+    /// Face detection results.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face_detection: Option<FaceDetectionResult>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Person detection's result. `people` is present when `status` is `Evaluated`, and `reason`
+/// when it is `NotEvaluated`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PersonDetectionResult {
+    /// Whether the feature ran.
+    #[serde(default)]
+    pub status: Option<FeatureResultStatus>,
+    /// The feature's stage.
+    #[serde(default)]
+    pub stage: Option<FeatureStage>,
+    /// Why the feature did not run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<FeatureNotEvaluatedReason>,
+    /// The people found.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub people: Option<Vec<DetectedPerson>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Face detection's result. `faces` is present when `status` is `Evaluated`, and `reason`
+/// when it is `NotEvaluated`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct FaceDetectionResult {
+    /// Whether the feature ran.
+    #[serde(default)]
+    pub status: Option<FeatureResultStatus>,
+    /// The feature's stage.
+    #[serde(default)]
+    pub stage: Option<FeatureStage>,
+    /// Why the feature did not run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<FeatureNotEvaluatedReason>,
+    /// The faces found.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faces: Option<Vec<DetectedFace>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A detected person.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct DetectedPerson {
+    /// Where the person is (`box` on the wire).
+    #[serde(default, rename = "box")]
+    pub bounding_box: BoundingBox,
+    /// Detection confidence from 0 to 1.
+    #[serde(default)]
+    pub confidence: f64,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A detected face.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct DetectedFace {
+    /// Where the face is (`box` on the wire).
+    #[serde(default, rename = "box")]
+    pub bounding_box: BoundingBox,
+    /// Detection confidence from 0 to 1.
+    #[serde(default)]
+    pub confidence: f64,
+    /// The estimated age range, when age estimation was requested.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age_range: Option<AgeRange>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Position and size as fractions of the image width and height, from 0 to 1. `left` and
+/// `top` can be slightly negative when the subject extends past the edge.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct BoundingBox {
+    /// The left edge.
+    #[serde(default)]
+    pub left: f64,
+    /// The top edge.
+    #[serde(default)]
+    pub top: f64,
+    /// The width.
+    #[serde(default)]
+    pub width: f64,
+    /// The height.
+    #[serde(default)]
+    pub height: f64,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// An estimated age range in years. Estimates can be off by several years.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AgeRange {
+    /// The lowest estimated age.
+    #[serde(default)]
+    pub low: u32,
+    /// The highest estimated age.
+    #[serde(default)]
+    pub high: u32,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A classification label.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ClassificationLabel {
+    /// The label.
+    #[serde(default)]
+    pub description: String,
+    /// The score.
+    #[serde(default)]
+    pub score: f64,
+    /// The topicality score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topicality_score: Option<f64>,
+    /// The likelihood.
+    #[serde(default)]
+    pub likelihood: Likelihood,
+    /// A knowledge base ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub knowledge_base_id: Option<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Audio and video moderation results.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct MediaClassificationReport {
+    /// The media duration.
+    #[serde(default)]
+    pub duration_seconds: f64,
+    /// The interval between sampled frames.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_interval_seconds: Option<f64>,
+    /// The number of sampled frames.
+    #[serde(default)]
+    pub sampled_frames: u32,
+    /// Whether the audio was transcribed.
+    #[serde(default)]
+    pub audio_transcribed: bool,
+    /// Results by time segment.
+    #[serde(default)]
+    pub segments: Vec<MediaClassificationSegment>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A time segment's results.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct MediaClassificationSegment {
+    /// What the scores come from.
+    #[serde(default)]
+    pub source: MediaSegmentSource,
+    /// The segment start.
+    #[serde(default)]
+    pub start_seconds: f64,
+    /// The segment end.
+    #[serde(default)]
+    pub end_seconds: f64,
+    /// Results by category.
+    #[serde(default)]
+    pub categories: HashMap<ClassificationCategory, CategoryResult>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A page of assets.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetPage {
+    /// The assets on this page.
+    #[serde(default)]
+    pub items: Vec<Asset>,
+    /// The cursor for the next page, or None.
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+    /// The page size.
+    #[serde(default)]
+    pub page_size: Option<u32>,
+    /// Whether another page follows.
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    /// The sort orders applied.
+    #[serde(default)]
+    pub ordering: Option<Vec<Order>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl AssetPage {
+    /// A page of `items`, with `has_more`, e.g. for a mock response.
+    pub fn new(items: Vec<Asset>, has_more: bool) -> Self {
+        Self {
+            items,
+            has_more: Some(has_more),
+            ..Self::default()
+        }
+    }
+}
+
+/// A folder.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Folder {
+    /// The folder ID.
+    pub id: String,
+    /// The name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The parent folder, or `None` at the project root.
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// The owning project.
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub created_at: Option<u64>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl Folder {
+    /// A folder with `id`, `name` and `parent_id`, e.g. for a mock response.
+    pub fn new(id: impl Into<String>, name: impl Into<String>, parent_id: Option<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: Some(name.into()),
+            parent_id,
+            ..Self::default()
+        }
+    }
+}
+
+/// An event fact registered for the event type.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventFact {
+    /// The registered fact key, e.g. `reviewer`.
+    pub key: String,
+    /// The value.
+    pub value: Value,
+    /// A link for the fact.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// An event from the events feed.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Event {
+    /// The event ID.
+    pub id: String,
+    /// The event type (`type` on the wire).
+    #[serde(default, rename = "type")]
+    pub event_type: Option<EventType>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub created_at: Option<u64>,
+    /// The owning project.
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// The user the event concerns.
+    #[serde(default)]
+    pub user_id: Option<String>,
+    /// The severity.
+    #[serde(default)]
+    pub severity: Option<EventSeverity>,
+    /// The title.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// The description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The asset the event concerns.
+    #[serde(default)]
+    pub asset_id: Option<String>,
+    /// Snapshot of the asset's state when the event was created. Retrieve the
+    /// asset for its current state.
+    #[serde(default)]
+    pub asset: Option<EventAsset>,
+    /// The event's facts.
+    #[serde(default)]
+    pub facts: Vec<EventFact>,
+    /// Whether the event notifies.
+    #[serde(default)]
+    pub notify: Option<bool>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub read_at: Option<u64>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl Event {
+    /// An event with `id` and `event_type`, e.g. for a mock response.
+    pub fn new(id: impl Into<String>, event_type: impl Into<EventType>) -> Self {
+        Self {
+            id: id.into(),
+            event_type: Some(event_type.into()),
+            ..Self::default()
+        }
+    }
+}
+
+/// The JSON body of a webhook delivery. Read it with [`crate::construct_webhook_event`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct WebhookEventPayload {
+    /// The event ID; deduplicate deliveries with it.
+    pub id: String,
+    /// The event type (`type` on the wire).
+    #[serde(rename = "type")]
+    pub event_type: EventType,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub created_at: Option<u64>,
+    /// The owning project.
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// The event fields.
+    pub data: WebhookEventData,
+}
+impl WebhookEventPayload {
+    /// The delivery body CalmLens sends for `event`, e.g. to test a webhook handler.
+    pub fn from_event(event: &Event) -> Self {
+        Self {
+            id: event.id.clone(),
+            event_type: event.event_type.clone().unwrap_or_default(),
+            created_at: event.created_at,
+            project_id: event.project_id.clone(),
+            data: WebhookEventData {
+                severity: event.severity.clone(),
+                title: event.title.clone(),
+                description: event.description.clone(),
+                asset_id: event.asset_id.clone(),
+                asset: event.asset.clone(),
+                facts: event.facts.clone(),
+            },
+        }
+    }
+}
+
+/// Snapshot of an asset's state when an event was created.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EventAsset {
+    /// The asset ID.
+    pub id: String,
+    /// Your ID for the asset, if you set one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
+    /// The processing status when the event was created.
+    #[serde(default)]
+    pub processing: EventAssetProcessing,
+    /// The moderation decision and policy action when the event was created.
+    #[serde(default)]
+    pub moderation: EventAssetModeration,
+    /// Whether CalmLens held the content when the event was created.
+    #[serde(default)]
+    pub content: EventAssetContent,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl EventAsset {
+    /// A snapshot of asset `id` with processing status `processing`, moderation status
+    /// `moderation` and content status `content`, e.g. for a mock event.
+    pub fn new(
+        id: impl Into<String>,
+        processing: AssetProcessingStatus,
+        moderation: AssetModerationStatus,
+        content: AssetContentStatus,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            processing: EventAssetProcessing {
+                status: processing,
+                ..EventAssetProcessing::default()
+            },
+            moderation: EventAssetModeration {
+                status: moderation,
+                ..EventAssetModeration::default()
+            },
+            content: EventAssetContent {
+                status: content,
+                ..EventAssetContent::default()
+            },
+            ..Self::default()
+        }
+    }
+}
+
+/// An asset's processing status in an [`EventAsset`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EventAssetProcessing {
+    /// The processing status.
+    #[serde(default)]
+    pub status: AssetProcessingStatus,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// An asset's moderation decision and policy action in an [`EventAsset`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EventAssetModeration {
+    /// The moderation status.
+    #[serde(default)]
+    pub status: AssetModerationStatus,
+    /// What the policy did with flagged content, or `None` when nothing was flagged.
+    #[serde(default)]
+    pub action: Option<AssetModerationAction>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Whether CalmLens held an asset's content, in an [`EventAsset`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EventAssetContent {
+    /// The content status.
+    #[serde(default)]
+    pub status: AssetContentStatus,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// The event fields of a webhook delivery; the events feed has the same fields at the top level.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct WebhookEventData {
+    /// The severity.
+    #[serde(default)]
+    pub severity: Option<EventSeverity>,
+    /// The title.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// The description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The asset the event concerns.
+    #[serde(default)]
+    pub asset_id: Option<String>,
+    /// Snapshot of the asset's state when the event was created. Retrieve the asset for its
+    /// current state.
+    #[serde(default)]
+    pub asset: Option<EventAsset>,
+    /// The event's facts.
+    #[serde(default)]
+    pub facts: Vec<EventFact>,
+}
+
+/// A page of the events feed.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EventsPage {
+    /// The events.
+    #[serde(default)]
+    pub events: Vec<Event>,
+    /// Pass as `after` to continue; store it between polls.
+    #[serde(default)]
+    pub cursor: String,
+    /// Whether more events are available now.
+    #[serde(default)]
+    pub has_more: bool,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl EventsPage {
+    /// A page of `events`, e.g. for a mock response.
+    pub fn new(events: Vec<Event>, cursor: impl Into<String>, has_more: bool) -> Self {
+        Self {
+            events,
+            cursor: cursor.into(),
+            has_more,
+            extra: HashMap::new(),
+        }
+    }
+}
+
+/// A lens.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Lens {
+    /// The lens ID.
+    #[serde(default)]
+    pub id: Option<String>,
+    /// The identifier.
+    pub identifier: String,
+    /// The display name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The asset type the lens applies to (`type` on the wire).
+    #[serde(default, rename = "type")]
+    pub lens_type: Option<LensType>,
+    /// Whether the lens is active.
+    #[serde(default)]
+    pub active: Option<bool>,
+    /// The definition version.
+    #[serde(default)]
+    pub version: Option<u32>,
+    /// The owning project.
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// The user who created the lens.
+    #[serde(default)]
+    pub user_id: Option<String>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub created_at: Option<u64>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// The description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The transforms.
+    #[serde(default)]
+    pub transforms: Option<Vec<Transform>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A signed URL.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct SignedUrl {
+    /// The URL.
+    pub url: String,
+    /// When it expires, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub expires_at: Option<u64>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Image details.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ImageData {
+    /// The perceptual hash.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub perceptual_hash: Option<String>,
+    /// The width in pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    /// The height in pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Digests of an asset's uploaded content.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Checksums {
+    /// The MD5 digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub md5: Option<String>,
+    /// The SHA-1 digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha1: Option<String>,
+    /// The SHA-256 digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    /// The SHA-384 digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha384: Option<String>,
+    /// The SHA-512 digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha512: Option<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A preview image.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PreviewImage {
+    /// The file format.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_format: Option<String>,
+    /// A ThumbHash placeholder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbhash: Option<String>,
+    /// The average colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub average_color: Option<String>,
+    /// The width in pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    /// The height in pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A safety hold.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct SafetyHold {
+    /// Why the asset is held.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<SafetyHoldReason>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placed_at: Option<u64>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposed_at: Option<u64>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Extracted text.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ExtractedText {
+    /// `String` (inline `content`) or `Document` (stored separately under `id`).
+    #[serde(default, rename = "type")]
+    pub extraction_type: ExtractedTextType,
+    /// The text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// The document ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A lens transform step. Build image transforms with [`Transform::image`].
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum Transform {
+    /// An `imageTransform` (boxed, as the options are large).
+    Image(Box<ImageTransformOptions>),
+    /// A transform type this SDK version does not know, or options it cannot read, kept as
+    /// received. The CDN only accepts `imageTransform`.
+    Unknown {
+        /// The transform type (`type` on the wire).
+        transform_type: String,
+        /// The options, kept as received.
+        options: Value,
+    },
+}
+impl Transform {
+    /// An image transform.
+    pub fn image(options: ImageTransformOptions) -> Self {
+        Self::Image(Box::new(options))
+    }
+    /// The transform type, e.g. `imageTransform`.
+    pub fn transform_type(&self) -> &str {
+        match self {
+            Self::Image(_) => "imageTransform",
+            Self::Unknown { transform_type, .. } => transform_type,
+        }
+    }
+    fn options_value(&self) -> std::result::Result<Value, serde_json::Error> {
+        match self {
+            Self::Image(options) => serde_json::to_value(options.as_ref()),
+            Self::Unknown { options, .. } => Ok(options.clone()),
+        }
+    }
+}
+impl Serialize for Transform {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let options = self.options_value().map_err(serde::ser::Error::custom)?;
+        let mut state = serializer.serialize_struct("Transform", 2)?;
+        state.serialize_field("type", self.transform_type())?;
+        state.serialize_field("options", &options)?;
+        state.end()
+    }
+}
+impl<'de> Deserialize<'de> for Transform {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Repr {
+            #[serde(rename = "type")]
+            transform_type: String,
+            #[serde(default)]
+            options: Value,
+        }
+        let repr = Repr::deserialize(deserializer)?;
+        if repr.transform_type == "imageTransform" {
+            let options = match &repr.options {
+                Value::Null => Some(ImageTransformOptions::default()),
+                value => ImageTransformOptions::deserialize(value).ok(),
+            };
+            if let Some(options) = options {
+                return Ok(Self::image(options));
+            }
+        }
+        Ok(Self::Unknown {
+            transform_type: repr.transform_type,
+            options: repr.options,
+        })
+    }
+}
+
+/// A direct CDN transform: a selector string or one or more structured [`Transform`] steps.
+///
+/// `"imageTransform[width=320]".into()`, `Transform::image(..).into()` and a
+/// `Vec<Transform>` all convert into it. Structured steps serialize to a selector with
+/// option keys sorted, nested objects as `parent[child]` keys, and keys and values
+/// percent-encoded, so equal transforms share a URL.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CdnTransform {
+    /// A selector string such as `imageTransform[format=png,width=1024]`.
+    Selector(String),
+    /// Structured steps, applied in order. At least one is required.
+    Steps(Vec<Transform>),
+}
+impl CdnTransform {
+    /// Whether this is an empty selector string, which means no transform.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Selector(value) if value.is_empty())
+    }
+    /// The selector string the API and CDN accept. Fails with `sdk/invalid-argument` for
+    /// no steps, a type that isn't letters, digits and underscores, options that aren't an
+    /// object, or option values that are arrays.
+    pub fn selector(&self) -> crate::Result<String> {
+        let steps = match self {
+            Self::Selector(value) => return Ok(value.clone()),
+            Self::Steps(steps) => steps,
+        };
+        if steps.is_empty() {
+            return Err(transform_error("Transform needs at least one step"));
+        }
+        let mut selectors = Vec::with_capacity(steps.len());
+        for step in steps {
+            let kind = step.transform_type();
+            if kind.is_empty() || !kind.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+                return Err(transform_error(
+                    "Transform type must contain only letters, digits and underscores",
+                ));
+            }
+            let mut pairs = Vec::new();
+            let options = step
+                .options_value()
+                .map_err(|cause| transform_error(&cause.to_string()))?;
+            match &options {
+                Value::Null => {}
+                Value::Object(options) => append_transform_options(&mut pairs, None, options)?,
+                _ => return Err(transform_error("Transform options must be an object")),
+            }
+            selectors.push(format!("{kind}[{}]", pairs.join(",")));
+        }
+        Ok(selectors.join(","))
+    }
+}
+impl From<&str> for CdnTransform {
+    fn from(value: &str) -> Self {
+        Self::Selector(value.into())
+    }
+}
+impl From<String> for CdnTransform {
+    fn from(value: String) -> Self {
+        Self::Selector(value)
+    }
+}
+impl From<Transform> for CdnTransform {
+    fn from(value: Transform) -> Self {
+        Self::Steps(vec![value])
+    }
+}
+impl From<Vec<Transform>> for CdnTransform {
+    fn from(value: Vec<Transform>) -> Self {
+        Self::Steps(value)
+    }
+}
+impl Serialize for CdnTransform {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let selector = self.selector().map_err(serde::ser::Error::custom)?;
+        serializer.serialize_str(&selector)
+    }
+}
+impl<'de> Deserialize<'de> for CdnTransform {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            Selector(String),
+            Step(Transform),
+            Steps(Vec<Transform>),
+        }
+        Ok(match Repr::deserialize(deserializer)? {
+            Repr::Selector(value) => Self::Selector(value),
+            Repr::Step(step) => Self::Steps(vec![step]),
+            Repr::Steps(steps) => Self::Steps(steps),
+        })
+    }
+}
+
+fn transform_error(message: &str) -> crate::Error {
+    crate::Error::new(crate::ErrorCode::InvalidArgument, message)
+}
+/// Appends `key=value` pairs, keys sorted by code point at every level.
+fn append_transform_options(
+    pairs: &mut Vec<String>,
+    parent: Option<&str>,
+    options: &serde_json::Map<String, Value>,
+) -> crate::Result<()> {
+    let mut keys: Vec<&String> = options.keys().collect();
+    // JavaScript sorts by UTF-16 code unit; this matches it for every key without
+    // characters outside the Basic Multilingual Plane.
+    keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+    for key in keys {
+        let full = match parent {
+            Some(parent) => format!("{parent}[{key}]"),
+            None => key.clone(),
+        };
+        let text = match &options[key] {
+            Value::Null => continue,
+            Value::Object(child) => {
+                append_transform_options(pairs, Some(&full), child)?;
+                continue;
+            }
+            Value::String(value) => value.clone(),
+            Value::Bool(value) => value.to_string(),
+            Value::Number(value) => js_number(value),
+            Value::Array(_) => {
+                return Err(transform_error(&format!(
+                    "Transform option \"{full}\" must be a string, number, boolean or object"
+                )))
+            }
+        };
+        pairs.push(format!(
+            "{}={}",
+            encode_transform_component(&full),
+            encode_transform_component(&text)
+        ));
+    }
+    Ok(())
+}
+/// Percent-encodes everything except RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`).
+fn encode_transform_component(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+            out.push(byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+/// Formats a number as JavaScript's `String(number)` does.
+fn js_number(value: &serde_json::Number) -> String {
+    let float = match value.as_f64() {
+        Some(float) if value.is_f64() => float,
+        _ => return value.to_string(),
+    };
+    if float == 0.0 {
+        return "0".into();
+    }
+    // `{:e}` gives the shortest round-trip digits, e.g. `1.5e0`.
+    let exp_form = format!("{:e}", float.abs());
+    let (mantissa, exponent) = exp_form.split_once('e').unwrap_or((&exp_form, "0"));
+    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let exponent: i32 = exponent.parse().unwrap_or(0);
+    let (k, n) = (digits.len() as i32, exponent + 1);
+    let body = if k <= n && n <= 21 {
+        format!("{digits}{}", "0".repeat((n - k) as usize))
+    } else if 0 < n && n <= 21 {
+        format!("{}.{}", &digits[..n as usize], &digits[n as usize..])
+    } else if -6 < n && n <= 0 {
+        format!("0.{}{digits}", "0".repeat((-n) as usize))
+    } else {
+        let sign = if n - 1 < 0 { '-' } else { '+' };
+        let rest = if k > 1 {
+            format!("{}.{}", &digits[..1], &digits[1..])
+        } else {
+            digits.clone()
+        };
+        format!("{rest}e{sign}{}", (n - 1).abs())
+    };
+    if float < 0.0 {
+        format!("-{body}")
+    } else {
+        body
+    }
+}
+
+string_enum! {
+    /// An image transform's output format.
+    ImageFormat {
+        /// JPEG.
+        Jpg = "jpg",
+        /// PNG.
+        Png = "png",
+        /// WebP.
+        Webp = "webp",
+        /// AVIF.
+        Avif = "avif",
+        /// GIF.
+        Gif = "gif",
+    }
+}
+
+string_enum! {
+    /// How an image fits the `width` and `height` box.
+    ImageFit {
+        /// Shrink to fit, never enlarge.
+        ScaleDown = "scale-down",
+        /// Fit inside the box, keeping the aspect ratio.
+        Contain = "contain",
+        /// Fit inside the box and pad to fill it with `background`.
+        Pad = "pad",
+        /// Stretch to fill the box.
+        Squeeze = "squeeze",
+        /// Fill the box, cropping the overflow.
+        Cover = "cover",
+        /// Crop to the box without enlarging.
+        Crop = "crop",
+    }
+}
+
+string_enum! {
+    /// Flip direction.
+    ImageFlip {
+        /// Horizontally.
+        H = "h",
+        /// Vertically.
+        V = "v",
+        /// Both.
+        Hv = "hv",
+    }
+}
+
+string_enum! {
+    /// Image segmentation.
+    ImageSegment {
+        /// Keep the foreground and remove the background.
+        Foreground = "foreground",
+    }
+}
+
+string_enum! {
+    /// A named crop gravity.
+    GravityPosition {
+        /// Centre on detected faces.
+        Face = "face",
+        /// The left edge.
+        Left = "left",
+        /// The right edge.
+        Right = "right",
+        /// The top edge.
+        Top = "top",
+        /// The bottom edge.
+        Bottom = "bottom",
+        /// The centre.
+        Center = "center",
+        /// Chosen automatically.
+        Auto = "auto",
+        /// The most detailed area.
+        Entropy = "entropy",
+    }
+}
+
+string_enum! {
+    /// How a [`GravityPoint`] is interpreted.
+    GravityMode {
+        /// `x` and `y` are fractions of the space left over after resizing.
+        Remainder = "remainder",
+        /// `x` and `y` are the centre of the crop box, as fractions of the image.
+        BoxCenter = "box-center",
+    }
+}
+
+/// Where to crop from: a named position or a point.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Gravity {
+    /// A named position, such as `Face`.
+    Position(GravityPosition),
+    /// A point.
+    Point(GravityPoint),
+}
+impl From<GravityPosition> for Gravity {
+    fn from(value: GravityPosition) -> Self {
+        Self::Position(value)
+    }
+}
+
+/// A crop gravity point.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GravityPoint {
+    /// How `x` and `y` are interpreted.
+    pub mode: GravityMode,
+    /// The horizontal position from 0 to 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<f64>,
+    /// The vertical position from 0 to 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<f64>,
+}
+
+/// A border drawn around the image.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageBorder {
+    /// The colour, e.g. `#fff`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// The width in pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+}
+
+string_enum! {
+    /// A named trim mode.
+    TrimMode {
+        /// Trim a uniform border.
+        Border = "border",
+    }
+}
+
+/// What to trim from the image edges.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Trim {
+    /// A named mode, such as `Border`.
+    Mode(TrimMode),
+    /// Pixels to trim from each edge, or the size to trim to.
+    Edges(TrimEdges),
+}
+impl From<TrimMode> for Trim {
+    fn from(value: TrimMode) -> Self {
+        Self::Mode(value)
+    }
+}
+impl From<TrimEdges> for Trim {
+    fn from(value: TrimEdges) -> Self {
+        Self::Edges(value)
+    }
+}
+
+/// Pixels to trim from each edge.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrimEdges {
+    /// Pixels from the top.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top: Option<f64>,
+    /// Pixels from the bottom.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bottom: Option<f64>,
+    /// Pixels from the left.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left: Option<f64>,
+    /// Pixels from the right.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub right: Option<f64>,
+    /// The width to trim to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    /// The height to trim to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
+    /// Also trim a uniform border.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border: Option<TrimBorder>,
+}
+
+/// Whether and how to trim a uniform border.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TrimBorder {
+    /// Trim it (`true`) or not.
+    Enabled(bool),
+    /// Trim it with these settings.
+    Options(TrimBorderOptions),
+}
+
+/// How to detect and keep a uniform border.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrimBorderOptions {
+    /// The border colour; detected when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// How far colours may differ from it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tolerance: Option<f64>,
+    /// Pixels of border to keep.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep: Option<f64>,
+}
+
+/// Image transform options; set only what you need.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageTransformOptions {
+    /// The output format.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<ImageFormat>,
+    /// The width in pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    /// The height in pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// The background colour, e.g. for `ImageFit::Pad`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
+    /// The blur radius.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blur: Option<f64>,
+    /// A border to draw around the image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border: Option<ImageBorder>,
+    /// The brightness factor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brightness: Option<f64>,
+    /// The contrast factor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contrast: Option<f64>,
+    /// The quality, 0 to 255.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality: Option<u32>,
+    /// How the image fits the `width` and `height` box.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit: Option<ImageFit>,
+    /// Flip direction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flip: Option<ImageFlip>,
+    /// The gamma.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gamma: Option<f64>,
+    /// Segmentation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub segment: Option<ImageSegment>,
+    /// Where to crop from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gravity: Option<Gravity>,
+    /// Rotation in degrees: 0, 90, 180 or 270.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotate: Option<u32>,
+    /// The saturation factor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saturation: Option<f64>,
+    /// The sharpen amount.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sharpen: Option<f64>,
+    /// What to trim from the edges.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trim: Option<Trim>,
+    /// Options this SDK version does not know, as received in a lens.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Options for [`TextClient::moderate`](crate::TextClient::moderate).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModerateText {
+    /// The text; must not be blank.
+    pub text: String,
+    /// The asset name; defaults to `text`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// A description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Processing options.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub processing_options: Option<ProcessingOptions>,
+    /// Metadata items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Vec<MetadataItem>>,
+    /// Your ID for the asset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
+    /// A link to the asset in your system.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_url: Option<String>,
+    /// The folder.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub folder_id: Patch<String>,
+    /// The upload preset to apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload_preset_id: Option<String>,
+    /// The `Idempotency-Key`. The SDK generates one when it is `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotency_key: Option<String>,
+}
+impl ModerateText {
+    /// Moderates `text`.
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            ..Self::default()
+        }
+    }
+}
+
+/// Options for [`UploadTokensClient::sign`](crate::UploadTokensClient::sign).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignUploadToken {
+    /// The upload preset the token may upload through.
+    pub upload_preset_id: String,
+    /// The external ID the uploaded asset gets. Must not be empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
+    /// The token's lifetime, from 1 to 3600 seconds. Defaults to 600.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_in_seconds: Option<u32>,
+}
+impl SignUploadToken {
+    /// A token for `upload_preset_id` with the default lifetime.
+    pub fn new(upload_preset_id: impl Into<String>) -> Self {
+        Self {
+            upload_preset_id: upload_preset_id.into(),
+            ..Self::default()
+        }
+    }
+}
+
+/// A signed upload token.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedUploadToken {
+    /// The token, to hand to the browser as its bearer token.
+    pub token: String,
+    /// When the token expires, in milliseconds since the Unix epoch.
+    pub expires_at: u64,
+}
+
+/// Options for asset search.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchAssets {
+    /// The natural-language query.
+    pub query: String,
+    /// How to match; defaults to `Hybrid`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<SearchMode>,
+    /// The maximum number of results.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+/// One search result.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetSearchMatch {
+    /// The asset.
+    pub asset: Asset,
+    /// The relevance score.
+    #[serde(default)]
+    pub score: f64,
+    /// The fields that matched.
+    #[serde(default)]
+    pub matched_fields: Vec<SearchMatchField>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Search results.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetSearchResponse {
+    /// The query.
+    #[serde(default)]
+    pub query: String,
+    /// The results.
+    #[serde(default)]
+    pub items: Vec<AssetSearchMatch>,
+    /// Whether semantic search is available.
+    #[serde(default)]
+    pub semantic_status: SemanticStatus,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}

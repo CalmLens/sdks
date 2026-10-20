@@ -1,0 +1,74 @@
+import "zod";
+//#region packages/shared/src/RequestInfo.d.ts
+interface RequestErrorCode {
+  getId(): string;
+  getDefaultMessage(): string | undefined;
+  is(error: any): error is any;
+  getStatus(): number | undefined;
+}
+//#endregion
+//#region packages/shared/src/PublicErrorCodes.d.ts
+declare const PUBLIC_ERROR_CODES: {
+  readonly INVALID_CURSOR: RequestErrorCode;
+  readonly MISSING_TOKEN: RequestErrorCode;
+  readonly INVALID_API_KEY: RequestErrorCode;
+  readonly API_KEY_PROJECT_MISMATCH: RequestErrorCode;
+  readonly API_KEY_NOT_ACCEPTED: RequestErrorCode;
+  readonly FILE_TOO_LARGE: RequestErrorCode;
+  readonly IMAGE_REQUIRES_MULTIPART_UPLOAD: RequestErrorCode;
+  readonly MULTIPART_IMAGE_TOO_SMALL: RequestErrorCode;
+  readonly MULTIPART_IMAGE_TOO_LARGE: RequestErrorCode;
+  readonly IMAGE_EXCEEDED_MAX_DIMENSIONS: RequestErrorCode;
+  readonly UPLOAD_LIMIT_EXCEEDED: RequestErrorCode;
+  readonly SPEND_LIMIT_REACHED: RequestErrorCode;
+  readonly INVALID_UPLOAD_MIME_TYPE: RequestErrorCode;
+  readonly INVALID_EVENT_CURSOR: RequestErrorCode;
+  readonly INVALID_UPLOAD_PAYLOAD: RequestErrorCode;
+  readonly USE_UPLOAD_PART: RequestErrorCode;
+  readonly UPLOAD_NOT_OPEN: RequestErrorCode;
+  readonly INVALID_UPLOAD_PART_NUMBER: RequestErrorCode;
+  readonly UPLOAD_MISSING: RequestErrorCode;
+  readonly UPLOAD_SIZE_MISMATCH: RequestErrorCode;
+  readonly INVALID_IDEMPOTENCY_KEY: RequestErrorCode;
+  readonly IDEMPOTENCY_KEY_REUSED: RequestErrorCode;
+  readonly IDEMPOTENT_REQUEST_IN_PROGRESS: RequestErrorCode;
+  readonly ASSET_NOT_FOUND: RequestErrorCode;
+  readonly PROJECT_NOT_FOUND: RequestErrorCode;
+  readonly ASSET_UPDATE_FAILED: RequestErrorCode;
+  readonly ASSET_SAFETY_HELD: RequestErrorCode;
+  readonly ASSET_NOT_RETRYABLE: RequestErrorCode;
+  readonly ASSET_CONTENT_UNAVAILABLE: RequestErrorCode;
+  readonly SUPPORT_TICKET_NOT_FOUND: RequestErrorCode;
+  readonly DUPLICATE_EXTERNAL_ID: RequestErrorCode;
+  readonly FOLDER_NOT_FOUND: RequestErrorCode;
+  readonly DUPLICATE_FOLDER_NAME: RequestErrorCode;
+  readonly FOLDER_NOT_EMPTY: RequestErrorCode;
+  readonly FOLDER_PARENT_CYCLE: RequestErrorCode;
+  readonly LENS_VERSION_CONFLICT: RequestErrorCode;
+  readonly UPLOAD_PRESET_NOT_FOUND: RequestErrorCode;
+  readonly UPLOAD_PRESET_DISABLED: RequestErrorCode;
+  readonly UPLOAD_PRESET_TOKEN_REQUIRED: RequestErrorCode;
+  readonly REMOTE_URL_NOT_ALLOWED: RequestErrorCode;
+  readonly WEBSITE_RATE_LIMIT_EXCEEDED: RequestErrorCode;
+  readonly UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED: RequestErrorCode;
+  readonly UPLOAD_PRESET_TOO_LARGE: RequestErrorCode;
+  readonly UPLOAD_PRESET_DAILY_LIMIT_REACHED: RequestErrorCode;
+  readonly UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: RequestErrorCode;
+  readonly UPLOAD_PRESET_FIELD_NOT_ALLOWED: RequestErrorCode;
+  readonly UPLOAD_TOKEN_INVALID: RequestErrorCode;
+  readonly UPLOAD_TOKEN_EXPIRED: RequestErrorCode;
+  readonly UPLOAD_TOKEN_USED: RequestErrorCode;
+  readonly INVALID_REMOTE_URL: RequestErrorCode;
+  readonly REMOTE_URL_UNAVAILABLE: RequestErrorCode;
+  readonly APPEAL_NOT_FOUND: RequestErrorCode;
+  readonly APPEAL_JUDGMENT_NOT_FOUND: RequestErrorCode;
+  readonly APPEAL_ASSET_NOT_FOUND: RequestErrorCode;
+  readonly APPEAL_PERMISSION_DENIED: RequestErrorCode;
+  readonly APPEAL_ALREADY_REVIEWED: RequestErrorCode;
+  readonly APPEAL_DECISION_CHANGED: RequestErrorCode;
+  readonly APPEAL_INVALID_ACTION: RequestErrorCode;
+  readonly APPEAL_SAFETY_HELD: RequestErrorCode;
+  readonly APPEAL_CONTENT_UNAVAILABLE: RequestErrorCode;
+};
+//#endregion
+export { PUBLIC_ERROR_CODES as t };

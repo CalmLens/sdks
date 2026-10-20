@@ -1,0 +1,12 @@
+{
+  "name": "calmform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A static feedback form that uploads screenshots to CalmLens through an upload preset, with no backend.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "sdk": "bun bundle-sdk.ts",
+    "dev": "bun bundle-sdk.ts && bun server.ts"
+  }
+}

@@ -1,0 +1,51 @@
+[package]
+name = "calmlens"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Rust SDK for CalmLens moderation, storage and CDN delivery"
+license = "MIT"
+repository = "https://github.com/CalmLens/sdks/tree/main/rust"
+homepage = "https://calmlens.com/docs/sdk/rust"
+documentation = "https://docs.rs/calmlens"
+readme = "README.md"
+keywords = ["calmlens", "moderation", "content-moderation", "cdn", "sdk"]
+categories = ["api-bindings", "web-programming::http-client", "asynchronous"]
+include = ["src/**/*.rs", "build.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[features]
+default = ["async", "rustls"]
+## The async `ServerClient` (Tokio, reqwest). Without it the crate offers models and webhooks only.
+async = ["dep:reqwest", "dep:tokio", "dep:tokio-util", "dep:futures-util", "dep:getrandom"]
+## `calmlens::blocking::ServerClient`, which runs the async client on a private runtime.
+blocking = ["async", "tokio/rt-multi-thread"]
+## TLS through rustls with the bundled Mozilla (webpki) root certificates.
+rustls = ["reqwest?/rustls-tls-webpki-roots"]
+## TLS through rustls with the operating system's root certificates.
+rustls-native-roots = ["reqwest?/rustls-tls-native-roots"]
+## TLS through the platform library (OpenSSL, Secure Transport or SChannel).
+native-tls = ["reqwest?/native-tls"]
+## `calmlens::testing::MockServerClient` for offline tests. Enable it in `[dev-dependencies]` only.
+testing = ["async"]
+
+[dependencies]
+base64 = "0.22"
+bytes = "1"
+hmac = "0.12"
+http = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+futures-util = { version = "0.3", default-features = false, features = ["std"], optional = true }
+getrandom = { version = "0.2", optional = true }
+reqwest = { version = "0.12.5", default-features = false, features = ["stream"], optional = true }
+tokio = { version = "1.38", default-features = false, features = ["time", "fs"], optional = true }
+tokio-util = { version = "0.7", default-features = false, features = ["io"], optional = true }
+
+[dev-dependencies]
+calmlens = { path = ".", features = ["blocking", "testing"] }
+tokio = { version = "1.38", features = ["rt-multi-thread", "macros", "time", "test-util"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

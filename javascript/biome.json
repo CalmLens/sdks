@@ -1,0 +1,14 @@
+{
+  "root": false,
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": "//",
+  "files": {
+    "includes": [
+      "**",
+      "!!worker-configuration.d.ts",
+      "!!wrangler",
+      "!!src/client/CalmLensErrorCodes.ts",
+      "!!src/contract"
+    ]
+  }
+}

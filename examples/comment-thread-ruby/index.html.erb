@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calmthread · Ruby SDK example</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#2b2540;background:#f7f5fb;line-height:1.6}*{box-sizing:border-box}body{margin:0}main{max-width:1100px;margin:auto;padding:40px 24px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #e1dcef;padding-bottom:22px}.wordmark{font-size:22px;font-weight:750;letter-spacing:-1px}
+.mode,.badge{border-radius:30px;padding:5px 12px;background:#e9e4f7;font-size:12px;font-weight:650;white-space:nowrap}.badge.held{background:#fff0ca;color:#6a490d}
+h1{font-size:clamp(32px,5vw,52px);line-height:1.1;letter-spacing:-2px;margin:34px 0 12px}.intro{max-width:640px;color:#665f7d}
+.topic{background:#2f2a4a;color:#f4f1ff;border-radius:18px;padding:22px 24px;margin-top:28px}.topic small{color:#c9c1ea;font-size:12px;text-transform:uppercase;letter-spacing:1px}.topic p{font-size:20px;font-weight:650;margin:6px 0 0}
+.layout{display:grid;grid-template-columns:1.25fr 1fr;gap:28px;margin-top:28px}h2{font-size:19px;margin:0 0 14px}.stats,.hint,small{font-size:13px;color:#665f7d}
+article,form,.panel,.empty{background:white;border:1px solid #e1dcef;border-radius:18px;padding:20px 22px;margin-bottom:16px}
+article.placeholder{background:#fbfaf6;border-style:dashed;color:#665f7d}article.placeholder p{font-style:italic}
+.who{display:flex;align-items:center;gap:12px}.avatar{flex:none;width:36px;height:36px;border-radius:50%;background:#e9e4f7;color:#4b3f8f;display:flex;align-items:center;justify-content:center;font-weight:750}
+.who strong{display:block;overflow-wrap:anywhere}.who .badge{margin-left:auto}article p{white-space:pre-wrap;overflow-wrap:anywhere;margin:14px 0 10px}article small{display:block;font-size:11px;overflow-wrap:anywhere}
+label{display:block;font-size:14px;font-weight:650;margin:14px 0 8px}input,textarea,select,button{font:inherit;width:100%;border-radius:9px;padding:11px 12px}
+input,textarea,select{border:1px solid #cfc6ec;background:#fdfcff}textarea{min-height:140px;resize:vertical}button{background:#4b3f8f;color:white;border:0;cursor:pointer;margin-top:20px;font-weight:650}button:hover{background:#3b3173}
+:focus-visible{outline:3px solid #bd8725;outline-offset:3px}.notice{padding:16px 20px;border:1px solid #cfc6ec;background:#efebfa;border-radius:12px;margin-top:24px}
+.empty{padding:44px 22px;text-align:center;font-weight:650}.empty span{display:block;font-size:13px;color:#665f7d;font-weight:400}
+.panel ol{list-style:none;margin:0;padding:0}.panel li{border-top:1px solid #efebf7;padding:10px 0;font-size:14px;overflow-wrap:anywhere}.panel li:first-child{border-top:0}
+.panel time{font-size:12px;color:#665f7d;margin-right:6px;font-variant-numeric:tabular-nums}.panel dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:6px 0 0;font-size:12px;color:#665f7d}.panel dt{font-weight:650}.panel dd{margin:0}
+.panel form{border:0;padding:0;margin:0;background:none}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.actions form{margin:0}
+.actions button{width:auto;margin:0;padding:7px 14px;font-size:13px;background:#fff;color:#4b3f8f;border:1px solid #cfc6ec}.actions button:hover{background:#f3f0fb}
+.kind-held,.kind-removed,.kind-failed{color:#7a3a33}.kind-released{color:#2f6a3a}
+footer{color:#665f7d;font-size:12px;margin-top:32px}@media(max-width:760px){.layout{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
+</style></head><body><main>
+<header><div class="wordmark">❖ Calmthread</div><span class="mode"><%= @demo ? 'Demo · simulated decisions' : 'Live · CalmLens moderation' %></span></header>
+<h1>Kind replies,<br>checked before they show.</h1>
+<p class="intro">A pre-moderated discussion thread. Clean replies publish at once. Anything the moderation policy flags is held, unseen, until a person reviews it in CalmLens. Built with the CalmLens Ruby SDK.</p>
+<%- unless @notice.empty? -%>
+<div class="notice" role="status"><%= h @notice %></div>
+<%- end -%>
+<div class="topic"><small>Thread</small><p>What small habit made your week a little calmer?</p></div>
+<div class="layout">
+<section aria-label="Thread"><h2>Replies</h2><p class="stats"><%= @replies.size - @held.size %> published · <%= @held.size %> held for review</p>
+<%- if @replies.empty? -%>
+<div class="empty">The thread is quiet so far.<span>Add the first reply to try the moderation flow.</span></div>
+<%- end -%>
+<%- @replies.each do |reply| -%>
+<%- if reply[:state] == :held -%>
+<article class="placeholder" aria-label="Reply held for review">
+<div class="who"><span class="avatar" aria-hidden="true">·</span><div><strong>Held for review</strong><small><%= h reply[:created_at].strftime('%H:%M') %></small></div><span class="badge held">Held</span></div>
+<p>This reply is waiting for a moderator.</p>
+</article>
+<%- else -%>
+<article>
+<div class="who"><span class="avatar" aria-hidden="true"><%= h initial(reply[:name]) %></span><div><strong><%= h reply[:name] %></strong><small><%= h reply[:created_at].strftime('%H:%M') %></small></div><span class="badge">Published</span></div>
+<p><%= h reply[:text] %></p>
+</article>
+<%- end -%>
+<%- end -%>
+</section>
+<section>
+<form action="/replies" method="post"><h2>Join the thread</h2><input type="hidden" name="csrf" value="<%= h @csrf %>">
+<label for="name">Display name</label><input id="name" name="name" maxlength="<%= @max_name %>" required autocomplete="nickname" placeholder="How should we show your name?">
+<label for="text">Your reply</label><textarea id="text" name="text" maxlength="<%= @max_text %>" required placeholder="Share something small that helped."></textarea>
+<%- if @demo -%>
+<label for="demo_result">Try a moderation outcome</label><select id="demo_result" name="demo_result">
+<%- @demo_results.each do |value, label| -%>
+<option value="<%= h value %>"><%= h label %></option>
+<%- end -%>
+</select>
+<%- end -%>
+<button type="submit">Check &amp; post</button>
+<p class="hint">Both fields are checked. If either is flagged, the whole reply waits for a moderator and nobody sees its text until it is approved.</p></form>
+<div class="panel" aria-label="Held for review"><h2>Held for review</h2>
+<%- if @held.empty? -%>
+<p class="hint">Nothing is waiting for a moderator.</p>
+<%- else -%>
+<p class="hint"><%= @demo ? 'Simulate the portal decision. It runs through the same events-feed code as live mode.' : 'Approve or reject these assets in the CalmLens portal, then check for review decisions.' %></p>
+<ol>
+<%- @held.each do |reply| -%>
+<li><time><%= h reply[:created_at].strftime('%H:%M:%S') %></time>Flagged <%= h held_labels(reply) %>
+<dl><%- reply[:asset_ids].each do |field, id| -%><dt><%= h Calmthread::FIELD_LABELS[field].capitalize %> asset</dt><dd><%= h id %></dd><%- end -%></dl>
+<%- if @demo -%>
+<div class="actions">
+<form action="/demo/review" method="post"><input type="hidden" name="csrf" value="<%= h @csrf %>"><input type="hidden" name="reply" value="<%= h reply[:id] %>"><input type="hidden" name="decision" value="approve"><button type="submit">Simulate a reviewer approving it</button></form>
+<form action="/demo/review" method="post"><input type="hidden" name="csrf" value="<%= h @csrf %>"><input type="hidden" name="reply" value="<%= h reply[:id] %>"><input type="hidden" name="decision" value="reject"><button type="submit">Simulate a reviewer rejecting it</button></form>
+</div>
+<%- end -%>
+</li>
+<%- end -%>
+</ol>
+<%- end -%>
+<%- unless @demo -%>
+<form action="/reviews/sync" method="post"><input type="hidden" name="csrf" value="<%= h @csrf %>"><p class="hint">Reads new project events and applies portal review decisions.<%= @webhooks ? ' Verified webhooks apply them automatically too.' : '' %></p><button type="submit">Check for review decisions</button></form>
+<%- end -%>
+</div>
+<div class="panel"><h2>Moderation activity</h2>
+<%- if @activity.empty? -%>
+<p class="hint">Nothing yet.</p>
+<%- else -%>
+<ol>
+<%- @activity.each do |entry| -%>
+<li class="kind-<%= h entry[:kind] %>"><time><%= h entry[:at].strftime('%H:%M:%S') %></time><%= h entry[:text] %>
+<%- unless entry[:facts].empty? -%>
+<dl><%- entry[:facts].each do |fact| -%><dt><%= h fact[:label] %></dt><dd><%- if fact[:url] -%><a href="<%= h fact[:url] %>" rel="noopener noreferrer"><%= h fact[:value] %></a><%- else -%><%= h fact[:value] %><%- end -%></dd><%- end -%></dl>
+<%- end -%>
+</li>
+<%- end -%>
+</ol>
+<%- end -%>
+</div>
+</section></div>
+<footer>Local learning example · the latest <%= Calmthread::MAX_REPLIES %> replies live in memory · demo choices do not run a moderation model</footer>
+</main></body></html>

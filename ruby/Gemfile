@@ -1,0 +1,11 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+gemspec
+
+group :development do
+  gem 'minitest', '~> 5.0'
+  # test/signature_test.rb loads sig/ with RBS.
+  gem 'rbs', '~> 3.4'
+  gem 'rubocop', '~> 1.75', require: false
+end

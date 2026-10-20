@@ -1,0 +1,70 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.calmlens</groupId><artifactId>calmlens-sdk</artifactId><version>0.1.0</version>
+  <name>CalmLens Java SDK</name><description>Moderation, storage and CDN client for CalmLens</description>
+  <url>https://calmlens.com/docs/sdk/java</url>
+  <licenses>
+    <license><name>MIT License</name><url>https://opensource.org/license/mit</url><distribution>repo</distribution></license>
+  </licenses>
+  <developers>
+    <developer><id>calmlens</id><name>CalmLens</name><organization>CalmLens</organization><organizationUrl>https://calmlens.com</organizationUrl></developer>
+  </developers>
+  <scm>
+    <connection>scm:git:https://github.com/CalmLens/sdks.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/CalmLens/sdks.git</developerConnection>
+    <url>https://github.com/CalmLens/sdks/tree/main/java</url>
+  </scm>
+  <properties><maven.compiler.release>17</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
+  <dependencies>
+    <dependency><groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><version>2.11.0</version></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.11.4</version><scope>test</scope></dependency>
+  </dependencies>
+  <build>
+    <!-- sdk.properties carries the project version, so CalmLensServerClient.VERSION and the User-Agent come from this file. -->
+    <resources><resource><directory>src/main/resources</directory><filtering>true</filtering></resource></resources>
+    <plugins>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version>
+      <configuration><compilerArgs><arg>-Xlint:all,-serial,-processing</arg></compilerArgs></configuration>
+    </plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.2</version></plugin>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.4.2</version>
+      <configuration><archive><manifestEntries><Automatic-Module-Name>com.calmlens</Automatic-Module-Name></manifestEntries></archive></configuration>
+    </plugin>
+    <!-- Javadoc runs with doclint on every `mvn verify`, so broken or malformed API docs fail the build. -->
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-javadoc-plugin</artifactId><version>3.11.2</version>
+      <configuration><doclint>all,-missing</doclint><failOnWarnings>true</failOnWarnings><quiet>true</quiet></configuration>
+      <executions><execution><id>check-javadoc</id><phase>verify</phase><goals><goal>javadoc-no-fork</goal></goals></execution></executions>
+    </plugin>
+  </plugins></build>
+  <profiles>
+    <!-- `mvn -P release deploy` (.github/workflows/release-java-sdk.yml): sources and javadoc jars,
+         GPG signatures and the upload to Maven Central, which Central requires for every release. -->
+    <profile>
+      <id>release</id>
+      <build><plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId><artifactId>maven-source-plugin</artifactId><version>3.3.1</version>
+          <executions><execution><id>attach-sources</id><goals><goal>jar-no-fork</goal></goals></execution></executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId><artifactId>maven-javadoc-plugin</artifactId><version>3.11.2</version>
+          <configuration><doclint>all,-missing</doclint><quiet>true</quiet></configuration>
+          <executions><execution><id>attach-javadocs</id><goals><goal>jar</goal></goals></execution></executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId><artifactId>maven-gpg-plugin</artifactId><version>3.2.7</version>
+          <configuration><gpgArguments><arg>--pinentry-mode</arg><arg>loopback</arg></gpgArguments></configuration>
+          <executions><execution><id>sign-artifacts</id><phase>verify</phase><goals><goal>sign</goal></goals></execution></executions>
+        </plugin>
+        <plugin>
+          <groupId>org.sonatype.central</groupId><artifactId>central-publishing-maven-plugin</artifactId><version>0.9.0</version>
+          <extensions>true</extensions>
+          <configuration><publishingServerId>central</publishingServerId><autoPublish>true</autoPublish><waitUntil>published</waitUntil></configuration>
+        </plugin>
+      </plugins></build>
+    </profile>
+  </profiles>
+</project>

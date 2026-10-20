@@ -1,0 +1,3225 @@
+{
+  "posts": [
+    {
+      "id": "obituary",
+      "author": "Alex Morgan",
+      "label": "An obituary",
+      "text": "Grandad passed away peacefully last night, with all of us around him.",
+      "findings": {
+        "scores": {
+          "violence": 0.8
+        },
+        "qualifiers": {
+          "violence-natural-death": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          }
+        }
+      }
+    },
+    {
+      "id": "garden",
+      "author": "Amelia Green",
+      "label": "A garden update",
+      "text": "The tomatoes are ripening. First harvest soon.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      },
+      "media": "garden"
+    },
+    {
+      "id": "insult",
+      "author": "Tom Hale",
+      "label": "An insult",
+      "text": "You’re a pathetic loser and everyone here knows it.",
+      "findings": {
+        "scores": {
+          "harassment": 0.93
+        },
+        "qualifiers": {
+          "harassment-abuse": {
+            "someScore": 0.95,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "battlefield",
+      "author": "Lily Brown",
+      "label": "A history documentary",
+      "text": "A short film about the Battle of Hastings and the people who died there.",
+      "findings": {
+        "scores": {
+          "violence": 0.85
+        },
+        "qualifiers": {
+          "violence-attack": {
+            "someScore": 0.9,
+            "allScore": 0.9
+          },
+          "violence-historical": {
+            "someScore": 0.97,
+            "allScore": 0.96
+          }
+        }
+      },
+      "media": "video"
+    },
+    {
+      "id": "scam",
+      "author": "Account Security",
+      "label": "A phishing scam",
+      "text": "Your account has been locked. Confirm your card details to restore it.",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.91
+        },
+        "qualifiers": {
+          "criminal-activity-fraud": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          }
+        }
+      }
+    },
+    {
+      "id": "support",
+      "author": "Jordan Lee",
+      "label": "A plea for help",
+      "media": "voice",
+      "text": "I’m struggling with thoughts of hurting myself. Can someone help me stay safe?",
+      "findings": {
+        "scores": {
+          "self-harm": 0.88
+        },
+        "qualifiers": {
+          "self-harm-support-prevention": {
+            "someScore": 0.98,
+            "allScore": 0.97
+          }
+        }
+      }
+    },
+    {
+      "id": "adult-ad",
+      "author": "Spam Account",
+      "label": "Adult solicitation",
+      "text": "[Censored adult solicitation and explicit promotional content]",
+      "findings": {
+        "scores": {
+          "sexual": 0.96
+        },
+        "qualifiers": {
+          "sexual-solicitation": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          }
+        }
+      }
+    },
+    {
+      "id": "document-history",
+      "author": "Riley Scott",
+      "label": "A history document",
+      "text": "A classroom handout discusses a historical conflict. [Violence details omitted.]",
+      "media": "document",
+      "findings": {
+        "scores": {
+          "violence": 0.85
+        },
+        "qualifiers": {
+          "violence-attack": {
+            "someScore": 0.9,
+            "allScore": 0.9
+          },
+          "violence-historical": {
+            "someScore": 0.97,
+            "allScore": 0.96
+          }
+        }
+      }
+    },
+    {
+      "id": "graphic-clip",
+      "author": "Unfiltered Clips",
+      "label": "A graphic clip",
+      "text": "Uncensored close-ups of severe injuries after the attack.",
+      "findings": {
+        "scores": {
+          "violence": 0.92
+        },
+        "qualifiers": {
+          "violence-documentary": {
+            "someScore": 0.96,
+            "allScore": 0.95
+          },
+          "violence-graphic": {
+            "someScore": 0.93,
+            "allScore": 0.6
+          }
+        }
+      },
+      "media": "video"
+    },
+    {
+      "id": "website-recipe",
+      "author": "Nora Brooks",
+      "label": "A recipe website",
+      "text": "A public page with a tomato soup recipe and photos of the ingredients.",
+      "media": "website",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "hate-exclusion",
+      "author": "Hostile Account",
+      "label": "Identity-based exclusion",
+      "text": "People from [protected group] should be driven out of this town.",
+      "findings": {
+        "scores": {
+          "hate": 0.96
+        },
+        "qualifiers": {
+          "hate-exclusion": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          }
+        }
+      }
+    },
+    {
+      "id": "kitten",
+      "author": "Sofia Khan",
+      "label": "A new pet",
+      "text": "We adopted this tiny troublemaker yesterday.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      },
+      "media": "kitten"
+    },
+    {
+      "id": "voice-abuse",
+      "author": "Chris Lane",
+      "label": "A hostile voice note",
+      "text": "[Targeted personal abuse omitted.]",
+      "media": "voice",
+      "findings": {
+        "scores": {
+          "harassment": 0.93
+        },
+        "qualifiers": {
+          "harassment-abuse": {
+            "someScore": 0.95,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "bread",
+      "media": "bread",
+      "author": "Ben Carter",
+      "label": "A baking photo",
+      "text": "Third loaf this week. Finally got the crust right.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "document-scam",
+      "author": "Account Services",
+      "label": "A fraudulent document",
+      "text": "[Instructions to enter a password and payment details on a fake form omitted.]",
+      "media": "document",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.91
+        },
+        "qualifiers": {
+          "criminal-activity-fraud": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          }
+        }
+      }
+    },
+    {
+      "id": "video-recovery",
+      "author": "Jordan Bell",
+      "label": "A recovery video",
+      "text": "Talking about recovery and asking for help made a difference. [Sensitive details omitted.]",
+      "media": "video",
+      "findings": {
+        "scores": {
+          "self-harm": 0.88
+        },
+        "qualifiers": {
+          "self-harm-support-prevention": {
+            "someScore": 0.98,
+            "allScore": 0.97
+          }
+        }
+      }
+    },
+    {
+      "id": "news",
+      "media": "website",
+      "author": "Riverside Gazette",
+      "label": "A local news report",
+      "text": "Police say two people were injured in a stabbing on the high street last night.",
+      "findings": {
+        "scores": {
+          "violence": 0.82
+        },
+        "qualifiers": {
+          "violence-documentary": {
+            "someScore": 0.95,
+            "allScore": 0.94
+          },
+          "violence-injury": {
+            "someScore": 0.9,
+            "allScore": 0.8
+          }
+        }
+      }
+    },
+    {
+      "id": "website-drugs",
+      "author": "Quick Delivery",
+      "label": "A prohibited sales page",
+      "text": "[An offer to sell illegal drugs and ordering instructions omitted.]",
+      "media": "website",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.94
+        },
+        "qualifiers": {
+          "criminal-activity-promotion": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          },
+          "criminal-activity-substances": {
+            "someScore": 0.94,
+            "allScore": 0.9
+          }
+        }
+      }
+    },
+    {
+      "id": "birthday",
+      "author": "Noah Bennett",
+      "label": "A birthday post",
+      "media": "party",
+      "text": "Happy 30th to my favourite person!",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "voice-scam",
+      "author": "Parcel Updates",
+      "label": "A scam voice message",
+      "text": "[A request for payment details and a verification code omitted.]",
+      "media": "voice",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.91
+        },
+        "qualifiers": {
+          "criminal-activity-fraud": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          }
+        }
+      }
+    },
+    {
+      "id": "museum",
+      "author": "Freya Adams",
+      "label": "A museum visit",
+      "text": "A museum display explains how soldiers were wounded in the First World War.",
+      "findings": {
+        "scores": {
+          "violence": 0.85
+        },
+        "qualifiers": {
+          "violence-attack": {
+            "someScore": 0.9,
+            "allScore": 0.9
+          },
+          "violence-historical": {
+            "someScore": 0.97,
+            "allScore": 0.96
+          }
+        }
+      }
+    },
+    {
+      "id": "video-hate",
+      "author": "Public Notice",
+      "label": "A hateful video",
+      "text": "[An identity-based call for exclusion omitted.]",
+      "media": "video",
+      "findings": {
+        "scores": {
+          "hate": 0.96
+        },
+        "qualifiers": {
+          "hate-exclusion": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          }
+        }
+      }
+    },
+    {
+      "id": "hike",
+      "author": "Sam Rivera",
+      "label": "A holiday photo",
+      "media": "mountain-lake",
+      "text": "A long walk and this view. Worth every step.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "pills",
+      "author": "quickmeds",
+      "label": "A drug sale",
+      "text": "DM me for pills. Next-day delivery, no questions asked.",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.94
+        },
+        "qualifiers": {
+          "criminal-activity-promotion": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          },
+          "criminal-activity-substances": {
+            "someScore": 0.94,
+            "allScore": 0.9
+          }
+        }
+      }
+    },
+    {
+      "id": "voice-recipe",
+      "author": "Maya Ellis",
+      "label": "A spoken recipe",
+      "text": "A quick voice note: roast the tomatoes, add basil, and save a little pasta water.",
+      "media": "voice",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "targeted-abuse",
+      "media": "voice",
+      "author": "Max Turner",
+      "label": "A personal attack",
+      "text": "You’re a worthless idiot. Nobody here wants you around.",
+      "findings": {
+        "scores": {
+          "harassment": 0.93
+        },
+        "qualifiers": {
+          "harassment-abuse": {
+            "someScore": 0.95,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "image-memorial",
+      "author": "Morgan Reed",
+      "label": "A memorial image",
+      "text": "A peaceful landscape with a remembrance message for someone who died naturally.",
+      "media": "landscape",
+      "findings": {
+        "scores": {
+          "violence": 0.8
+        },
+        "qualifiers": {
+          "violence-natural-death": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          }
+        }
+      }
+    },
+    {
+      "id": "documentary",
+      "author": "Casey Patel",
+      "label": "A war documentary",
+      "media": "video",
+      "text": "Raw footage from the front line, with close-ups of the wounded after the shelling.",
+      "findings": {
+        "scores": {
+          "violence": 0.92
+        },
+        "qualifiers": {
+          "violence-documentary": {
+            "someScore": 0.96,
+            "allScore": 0.95
+          },
+          "violence-graphic": {
+            "someScore": 0.93,
+            "allScore": 0.6
+          }
+        }
+      }
+    },
+    {
+      "id": "graduation",
+      "author": "Ethan Cole",
+      "label": "A graduation post",
+      "text": "Four years, many late nights, and one very proud family.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      },
+      "media": "party"
+    },
+    {
+      "id": "fake-refund",
+      "author": "Refund Team",
+      "label": "A refund scam",
+      "text": "To receive your refund, send your card number and security code in a reply.",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.91
+        },
+        "qualifiers": {
+          "criminal-activity-fraud": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          }
+        }
+      }
+    },
+    {
+      "id": "asking-help",
+      "author": "Chloe Wright",
+      "label": "Asking for support",
+      "text": "I’m having thoughts of hurting myself and need someone to sit with me.",
+      "findings": {
+        "scores": {
+          "self-harm": 0.88
+        },
+        "qualifiers": {
+          "self-harm-support-prevention": {
+            "someScore": 0.98,
+            "allScore": 0.97
+          }
+        }
+      },
+      "media": "voice"
+    },
+    {
+      "id": "image-harassment",
+      "author": "Anonymous",
+      "label": "An abusive captioned image",
+      "text": "[A caption humiliating a named person omitted.]",
+      "media": "party",
+      "findings": {
+        "scores": {
+          "harassment": 0.93
+        },
+        "qualifiers": {
+          "harassment-abuse": {
+            "someScore": 0.95,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "video-garden",
+      "author": "Amelia Green",
+      "label": "A garden time-lapse",
+      "text": "Six weeks of growth in forty seconds. The first tomatoes are ready.",
+      "media": "video",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "threat",
+      "author": "Riley Park",
+      "label": "A threat",
+      "text": "Keep posting and I’ll find out where you live.",
+      "findings": {
+        "scores": {
+          "violence": 0.84,
+          "harassment": 0.95,
+          "criminal-activity": 0.12
+        },
+        "qualifiers": {
+          "violence-threat": {
+            "someScore": 0.95,
+            "allScore": 0.9
+          },
+          "harassment-threat": {
+            "someScore": 0.96,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "archive",
+      "author": "Henry Bell",
+      "label": "An archive recording",
+      "text": "This archive interview describes a wartime air raid, without graphic images.",
+      "findings": {
+        "scores": {
+          "violence": 0.7
+        },
+        "qualifiers": {
+          "violence-historical": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          },
+          "violence-violent-death": {
+            "someScore": 0.9,
+            "allScore": 0.8
+          }
+        }
+      },
+      "media": "voice"
+    },
+    {
+      "id": "drug-ad",
+      "author": "Fast Dispatch",
+      "label": "A prohibited sale",
+      "text": "Prescription pills for sale without a prescription. Message for delivery.",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.94
+        },
+        "qualifiers": {
+          "criminal-activity-promotion": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          },
+          "criminal-activity-substances": {
+            "someScore": 0.94,
+            "allScore": 0.9
+          }
+        }
+      }
+    },
+    {
+      "id": "puppy",
+      "author": "Ellie Ward",
+      "label": "A puppy photo",
+      "media": "puppy",
+      "text": "Meet Biscuit: eight weeks old and already in charge.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "ticket-scam",
+      "author": "Event Deals",
+      "label": "A ticket scam",
+      "text": "Your prize is waiting. Pay a release fee using gift cards to collect it.",
+      "findings": {
+        "scores": {
+          "criminal-activity": 0.91
+        },
+        "qualifiers": {
+          "criminal-activity-fraud": {
+            "someScore": 0.95,
+            "allScore": 0.93
+          }
+        }
+      }
+    },
+    {
+      "id": "recovery",
+      "media": "voice",
+      "author": "Alice Morgan",
+      "label": "A recovery update",
+      "text": "A difficult week, but I reached out for help instead of hurting myself.",
+      "findings": {
+        "scores": {
+          "self-harm": 0.88
+        },
+        "qualifiers": {
+          "self-harm-support-prevention": {
+            "someScore": 0.98,
+            "allScore": 0.97
+          }
+        }
+      }
+    },
+    {
+      "id": "bullying",
+      "author": "Anonymous Reply",
+      "label": "Targeted bullying",
+      "text": "Everyone should keep mocking Jamie until they leave this group.",
+      "findings": {
+        "scores": {
+          "harassment": 0.93
+        },
+        "qualifiers": {
+          "harassment-abuse": {
+            "someScore": 0.95,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "concert",
+      "author": "Isla Jones",
+      "label": "A concert photo",
+      "text": "Lost my voice singing along. What a night.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      },
+      "media": "party"
+    },
+    {
+      "id": "intimidation",
+      "author": "Unknown Sender",
+      "label": "Intimidation",
+      "text": "Delete that review or I’ll come to your workplace and make you regret it.",
+      "findings": {
+        "scores": {
+          "violence": 0.84,
+          "harassment": 0.95,
+          "criminal-activity": 0.12
+        },
+        "qualifiers": {
+          "violence-threat": {
+            "someScore": 0.95,
+            "allScore": 0.9
+          },
+          "harassment-threat": {
+            "someScore": 0.96,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "check-in",
+      "author": "Daniel Hill",
+      "label": "A supportive check-in",
+      "text": "If thoughts of self-harm are getting louder, tell someone you trust. You deserve support.",
+      "findings": {
+        "scores": {
+          "self-harm": 0.62
+        },
+        "qualifiers": {
+          "self-harm-support-prevention": {
+            "someScore": 0.98,
+            "allScore": 0.97
+          }
+        }
+      }
+    },
+    {
+      "id": "threatening-reply",
+      "author": "Angry Commenter",
+      "label": "A threatening reply",
+      "text": "I know where you live. You’ll pay for saying that.",
+      "findings": {
+        "scores": {
+          "violence": 0.84,
+          "harassment": 0.95,
+          "criminal-activity": 0.12
+        },
+        "qualifiers": {
+          "violence-threat": {
+            "someScore": 0.95,
+            "allScore": 0.9
+          },
+          "harassment-threat": {
+            "someScore": 0.96,
+            "allScore": 0.92
+          }
+        }
+      }
+    },
+    {
+      "id": "rain",
+      "author": "Ava Brooks",
+      "label": "A rainy walk",
+      "text": "A rainy afternoon by the lake is still a good afternoon.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      },
+      "media": "landscape"
+    },
+    {
+      "id": "history",
+      "media": "document",
+      "author": "Jamie Chen",
+      "label": "A history lesson",
+      "text": "In 1066 Harold was cut down at Hastings as the Norman cavalry broke the shield wall.",
+      "findings": {
+        "scores": {
+          "violence": 0.85
+        },
+        "qualifiers": {
+          "violence-attack": {
+            "someScore": 0.9,
+            "allScore": 0.9
+          },
+          "violence-historical": {
+            "someScore": 0.97,
+            "allScore": 0.96
+          }
+        }
+      }
+    },
+    {
+      "id": "criticism",
+      "author": "Luca Hall",
+      "label": "Constructive criticism",
+      "text": "The proposal needs stronger evidence before we approve it.",
+      "findings": {
+        "scores": {
+          "harassment": 0.12
+        },
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "memorial",
+      "author": "James Wilson",
+      "label": "A memorial",
+      "text": "Today would have been Mum’s birthday. Missing her kindness.",
+      "findings": {
+        "scores": {
+          "violence": 0.8
+        },
+        "qualifiers": {
+          "violence-natural-death": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          }
+        }
+      }
+    },
+    {
+      "id": "train",
+      "author": "Oliver Reed",
+      "label": "A travel update",
+      "text": "Missed the train, found a brilliant little bookshop instead.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "news-update",
+      "media": "video",
+      "author": "Local Bulletin",
+      "label": "A news update",
+      "text": "An injured cyclist is recovering after yesterday’s road collision.",
+      "findings": {
+        "scores": {
+          "violence": 0.82
+        },
+        "qualifiers": {
+          "violence-documentary": {
+            "someScore": 0.95,
+            "allScore": 0.94
+          },
+          "violence-injury": {
+            "someScore": 0.9,
+            "allScore": 0.8
+          }
+        }
+      }
+    },
+    {
+      "id": "dislike",
+      "author": "Ruby King",
+      "label": "An expression of dislike",
+      "text": "I hate this new app layout. Please bring the old one back.",
+      "findings": {
+        "scores": {
+          "harassment": 0.12
+        },
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "support-group",
+      "author": "Community Care",
+      "label": "A support group",
+      "text": "Our peer support meeting is open to anyone struggling with self-harm.",
+      "findings": {
+        "scores": {
+          "self-harm": 0.62
+        },
+        "qualifiers": {
+          "self-harm-support-prevention": {
+            "someScore": 0.98,
+            "allScore": 0.97
+          }
+        }
+      }
+    },
+    {
+      "id": "coffee",
+      "author": "Grace Wood",
+      "label": "A café recommendation",
+      "text": "The café on Mill Road makes an excellent flat white.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "fire-report",
+      "media": "website",
+      "author": "Town Reporter",
+      "label": "A fire report",
+      "text": "Firefighters rescued two people from a house fire this morning.",
+      "findings": {
+        "scores": {
+          "violence": 0.82
+        },
+        "qualifiers": {
+          "violence-documentary": {
+            "someScore": 0.95,
+            "allScore": 0.94
+          },
+          "violence-injury": {
+            "someScore": 0.9,
+            "allScore": 0.8
+          }
+        }
+      }
+    },
+    {
+      "id": "personal-dislike",
+      "author": "Theo Evans",
+      "label": "An interpersonal disagreement",
+      "text": "I hate you right now. I need some space.",
+      "findings": {
+        "scores": {
+          "harassment": 0.12
+        },
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "recipe",
+      "media": "document",
+      "author": "Priya Shah",
+      "label": "A recipe",
+      "text": "Slow-roast lamb shoulder: five hours at 150°C, then rest it for twenty minutes.",
+      "findings": {
+        "scores": {},
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "bad-service",
+      "author": "Emily Scott",
+      "label": "A critical review",
+      "text": "Our food arrived cold and the restaurant never replied.",
+      "findings": {
+        "scores": {
+          "harassment": 0.12
+        },
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "remembrance",
+      "author": "Owen Price",
+      "label": "A remembrance post",
+      "text": "Remembering my great-grandad, killed at the Somme in 1916.",
+      "findings": {
+        "scores": {
+          "violence": 0.7
+        },
+        "qualifiers": {
+          "violence-historical": {
+            "someScore": 0.97,
+            "allScore": 0.95
+          },
+          "violence-violent-death": {
+            "someScore": 0.9,
+            "allScore": 0.8
+          }
+        }
+      }
+    },
+    {
+      "id": "review",
+      "author": "Mia Clarke",
+      "label": "A bad review",
+      "text": "Honestly, I can’t stand this band’s new album.",
+      "findings": {
+        "scores": {
+          "harassment": 0.12
+        },
+        "qualifiers": {}
+      }
+    },
+    {
+      "id": "helpline",
+      "media": "website",
+      "author": "Community team",
+      "label": "A helpline",
+      "text": "Having a hard time? Our helpline is free to call, day or night.",
+      "findings": {
+        "scores": {
+          "self-harm": 0.62
+        },
+        "qualifiers": {
+          "self-harm-support-prevention": {
+            "someScore": 0.98,
+            "allScore": 0.97
+          }
+        }
+      }
+    }
+  ],
+  "feed": [
+    {
+      "id": "example-obituary",
+      "exampleId": "obituary",
+      "author": "alex_morgan",
+      "caption": "Grandad passed away peacefully last night, with all of us around him.",
+      "createdAt": -60000,
+      "assetId": "example-obituary",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.040000000000000036
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-garden",
+      "exampleId": "garden",
+      "author": "amelia_green",
+      "caption": "The tomatoes are ripening. First harvest soon.",
+      "createdAt": -120000,
+      "assetId": "example-garden",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-insult",
+      "exampleId": "insult",
+      "author": "tom_hale",
+      "caption": "You’re a pathetic loser and everyone here knows it.",
+      "createdAt": -180000,
+      "assetId": "example-insult",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.93
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-battlefield",
+      "exampleId": "battlefield",
+      "author": "lily_brown",
+      "caption": "A short film about the Battle of Hastings and the people who died there.",
+      "createdAt": -240000,
+      "assetId": "example-battlefield",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.03400000000000003
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-scam",
+      "exampleId": "scam",
+      "author": "account_security",
+      "caption": "Your account has been locked. Confirm your card details to restore it.",
+      "createdAt": -300000,
+      "assetId": "example-scam",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.91
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-support",
+      "exampleId": "support",
+      "author": "jordan_lee",
+      "caption": "I’m struggling with thoughts of hurting myself. Can someone help me stay safe?",
+      "createdAt": -360000,
+      "assetId": "example-support",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "self-harm",
+          "score": 0.026400000000000024
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-adult-ad",
+      "exampleId": "adult-ad",
+      "author": "spam_account",
+      "caption": "[Censored adult solicitation and explicit promotional content]",
+      "createdAt": -420000,
+      "assetId": "example-adult-ad",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.96
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-document-history",
+      "exampleId": "document-history",
+      "author": "riley_scott",
+      "caption": "A classroom handout discusses a historical conflict. [Violence details omitted.]",
+      "createdAt": -480000,
+      "assetId": "example-document-history",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.03400000000000003
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-graphic-clip",
+      "exampleId": "graphic-clip",
+      "author": "unfiltered_clips",
+      "caption": "Uncensored close-ups of severe injuries after the attack.",
+      "createdAt": -540000,
+      "assetId": "example-graphic-clip",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.8556
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-website-recipe",
+      "exampleId": "website-recipe",
+      "author": "nora_brooks",
+      "caption": "A public page with a tomato soup recipe and photos of the ingredients.",
+      "createdAt": -600000,
+      "assetId": "example-website-recipe",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-hate-exclusion",
+      "exampleId": "hate-exclusion",
+      "author": "hostile_account",
+      "caption": "People from [protected group] should be driven out of this town.",
+      "createdAt": -660000,
+      "assetId": "example-hate-exclusion",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "hate",
+          "score": 0.96
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-kitten",
+      "exampleId": "kitten",
+      "author": "sofia_khan",
+      "caption": "We adopted this tiny troublemaker yesterday.",
+      "createdAt": -720000,
+      "assetId": "example-kitten",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-voice-abuse",
+      "exampleId": "voice-abuse",
+      "author": "chris_lane",
+      "caption": "[Targeted personal abuse omitted.]",
+      "createdAt": -780000,
+      "assetId": "example-voice-abuse",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.93
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-bread",
+      "exampleId": "bread",
+      "author": "ben_carter",
+      "caption": "Third loaf this week. Finally got the crust right.",
+      "createdAt": -840000,
+      "assetId": "example-bread",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-document-scam",
+      "exampleId": "document-scam",
+      "author": "account_services",
+      "caption": "[Instructions to enter a password and payment details on a fake form omitted.]",
+      "createdAt": -900000,
+      "assetId": "example-document-scam",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.91
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-video-recovery",
+      "exampleId": "video-recovery",
+      "author": "jordan_bell",
+      "caption": "Talking about recovery and asking for help made a difference. [Sensitive details omitted.]",
+      "createdAt": -960000,
+      "assetId": "example-video-recovery",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "self-harm",
+          "score": 0.026400000000000024
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-news",
+      "exampleId": "news",
+      "author": "riverside_gazette",
+      "caption": "Police say two people were injured in a stabbing on the high street last night.",
+      "createdAt": -1020000,
+      "assetId": "example-news",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.04920000000000004
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-website-drugs",
+      "exampleId": "website-drugs",
+      "author": "quick_delivery",
+      "caption": "[An offer to sell illegal drugs and ordering instructions omitted.]",
+      "createdAt": -1080000,
+      "assetId": "example-website-drugs",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.94
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-birthday",
+      "exampleId": "birthday",
+      "author": "noah_bennett",
+      "caption": "Happy 30th to my favourite person!",
+      "createdAt": -1140000,
+      "assetId": "example-birthday",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-voice-scam",
+      "exampleId": "voice-scam",
+      "author": "parcel_updates",
+      "caption": "[A request for payment details and a verification code omitted.]",
+      "createdAt": -1200000,
+      "assetId": "example-voice-scam",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.91
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-museum",
+      "exampleId": "museum",
+      "author": "freya_adams",
+      "caption": "A museum display explains how soldiers were wounded in the First World War.",
+      "createdAt": -1260000,
+      "assetId": "example-museum",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.03400000000000003
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-video-hate",
+      "exampleId": "video-hate",
+      "author": "public_notice",
+      "caption": "[An identity-based call for exclusion omitted.]",
+      "createdAt": -1320000,
+      "assetId": "example-video-hate",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "hate",
+          "score": 0.96
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-hike",
+      "exampleId": "hike",
+      "author": "sam_rivera",
+      "caption": "A long walk and this view. Worth every step.",
+      "createdAt": -1380000,
+      "assetId": "example-hike",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-pills",
+      "exampleId": "pills",
+      "author": "quickmeds",
+      "caption": "DM me for pills. Next-day delivery, no questions asked.",
+      "createdAt": -1440000,
+      "assetId": "example-pills",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.94
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-voice-recipe",
+      "exampleId": "voice-recipe",
+      "author": "maya_ellis",
+      "caption": "A quick voice note: roast the tomatoes, add basil, and save a little pasta water.",
+      "createdAt": -1500000,
+      "assetId": "example-voice-recipe",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-targeted-abuse",
+      "exampleId": "targeted-abuse",
+      "author": "max_turner",
+      "caption": "You’re a worthless idiot. Nobody here wants you around.",
+      "createdAt": -1560000,
+      "assetId": "example-targeted-abuse",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.93
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-image-memorial",
+      "exampleId": "image-memorial",
+      "author": "morgan_reed",
+      "caption": "A peaceful landscape with a remembrance message for someone who died naturally.",
+      "createdAt": -1620000,
+      "assetId": "example-image-memorial",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.040000000000000036
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-documentary",
+      "exampleId": "documentary",
+      "author": "casey_patel",
+      "caption": "Raw footage from the front line, with close-ups of the wounded after the shelling.",
+      "createdAt": -1680000,
+      "assetId": "example-documentary",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.8556
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-graduation",
+      "exampleId": "graduation",
+      "author": "ethan_cole",
+      "caption": "Four years, many late nights, and one very proud family.",
+      "createdAt": -1740000,
+      "assetId": "example-graduation",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-fake-refund",
+      "exampleId": "fake-refund",
+      "author": "refund_team",
+      "caption": "To receive your refund, send your card number and security code in a reply.",
+      "createdAt": -1800000,
+      "assetId": "example-fake-refund",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.91
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-asking-help",
+      "exampleId": "asking-help",
+      "author": "chloe_wright",
+      "caption": "I’m having thoughts of hurting myself and need someone to sit with me.",
+      "createdAt": -1860000,
+      "assetId": "example-asking-help",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "self-harm",
+          "score": 0.026400000000000024
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-image-harassment",
+      "exampleId": "image-harassment",
+      "author": "anonymous",
+      "caption": "[A caption humiliating a named person omitted.]",
+      "createdAt": -1920000,
+      "assetId": "example-image-harassment",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.93
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-video-garden",
+      "exampleId": "video-garden",
+      "author": "amelia_green",
+      "caption": "Six weeks of growth in forty seconds. The first tomatoes are ready.",
+      "createdAt": -1980000,
+      "assetId": "example-video-garden",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-threat",
+      "exampleId": "threat",
+      "author": "riley_park",
+      "caption": "Keep posting and I’ll find out where you live.",
+      "createdAt": -2040000,
+      "assetId": "example-threat",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.95
+        },
+        {
+          "category": "violence",
+          "score": 0.84
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-archive",
+      "exampleId": "archive",
+      "author": "henry_bell",
+      "caption": "This archive interview describes a wartime air raid, without graphic images.",
+      "createdAt": -2100000,
+      "assetId": "example-archive",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.03500000000000003
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-drug-ad",
+      "exampleId": "drug-ad",
+      "author": "fast_dispatch",
+      "caption": "Prescription pills for sale without a prescription. Message for delivery.",
+      "createdAt": -2160000,
+      "assetId": "example-drug-ad",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.94
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-puppy",
+      "exampleId": "puppy",
+      "author": "ellie_ward",
+      "caption": "Meet Biscuit: eight weeks old and already in charge.",
+      "createdAt": -2220000,
+      "assetId": "example-puppy",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-ticket-scam",
+      "exampleId": "ticket-scam",
+      "author": "event_deals",
+      "caption": "Your prize is waiting. Pay a release fee using gift cards to collect it.",
+      "createdAt": -2280000,
+      "assetId": "example-ticket-scam",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "criminal-activity",
+          "score": 0.91
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-recovery",
+      "exampleId": "recovery",
+      "author": "alice_morgan",
+      "caption": "A difficult week, but I reached out for help instead of hurting myself.",
+      "createdAt": -2340000,
+      "assetId": "example-recovery",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "self-harm",
+          "score": 0.026400000000000024
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-bullying",
+      "exampleId": "bullying",
+      "author": "anonymous_reply",
+      "caption": "Everyone should keep mocking Jamie until they leave this group.",
+      "createdAt": -2400000,
+      "assetId": "example-bullying",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.93
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-concert",
+      "exampleId": "concert",
+      "author": "isla_jones",
+      "caption": "Lost my voice singing along. What a night.",
+      "createdAt": -2460000,
+      "assetId": "example-concert",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-intimidation",
+      "exampleId": "intimidation",
+      "author": "unknown_sender",
+      "caption": "Delete that review or I’ll come to your workplace and make you regret it.",
+      "createdAt": -2520000,
+      "assetId": "example-intimidation",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.95
+        },
+        {
+          "category": "violence",
+          "score": 0.84
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-check-in",
+      "exampleId": "check-in",
+      "author": "daniel_hill",
+      "caption": "If thoughts of self-harm are getting louder, tell someone you trust. You deserve support.",
+      "createdAt": -2580000,
+      "assetId": "example-check-in",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.018600000000000016
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-threatening-reply",
+      "exampleId": "threatening-reply",
+      "author": "angry_commenter",
+      "caption": "I know where you live. You’ll pay for saying that.",
+      "createdAt": -2640000,
+      "assetId": "example-threatening-reply",
+      "status": "rejected",
+      "flagged": true,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.95
+        },
+        {
+          "category": "violence",
+          "score": 0.84
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-rain",
+      "exampleId": "rain",
+      "author": "ava_brooks",
+      "caption": "A rainy afternoon by the lake is still a good afternoon.",
+      "createdAt": -2700000,
+      "assetId": "example-rain",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-history",
+      "exampleId": "history",
+      "author": "jamie_chen",
+      "caption": "In 1066 Harold was cut down at Hastings as the Norman cavalry broke the shield wall.",
+      "createdAt": -2760000,
+      "assetId": "example-history",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.03400000000000003
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-criticism",
+      "exampleId": "criticism",
+      "author": "luca_hall",
+      "caption": "The proposal needs stronger evidence before we approve it.",
+      "createdAt": -2820000,
+      "assetId": "example-criticism",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-memorial",
+      "exampleId": "memorial",
+      "author": "james_wilson",
+      "caption": "Today would have been Mum’s birthday. Missing her kindness.",
+      "createdAt": -2880000,
+      "assetId": "example-memorial",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.040000000000000036
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-train",
+      "exampleId": "train",
+      "author": "oliver_reed",
+      "caption": "Missed the train, found a brilliant little bookshop instead.",
+      "createdAt": -2940000,
+      "assetId": "example-train",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-news-update",
+      "exampleId": "news-update",
+      "author": "local_bulletin",
+      "caption": "An injured cyclist is recovering after yesterday’s road collision.",
+      "createdAt": -3000000,
+      "assetId": "example-news-update",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.04920000000000004
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-dislike",
+      "exampleId": "dislike",
+      "author": "ruby_king",
+      "caption": "I hate this new app layout. Please bring the old one back.",
+      "createdAt": -3060000,
+      "assetId": "example-dislike",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-support-group",
+      "exampleId": "support-group",
+      "author": "community_care",
+      "caption": "Our peer support meeting is open to anyone struggling with self-harm.",
+      "createdAt": -3120000,
+      "assetId": "example-support-group",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.018600000000000016
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-coffee",
+      "exampleId": "coffee",
+      "author": "grace_wood",
+      "caption": "The café on Mill Road makes an excellent flat white.",
+      "createdAt": -3180000,
+      "assetId": "example-coffee",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-fire-report",
+      "exampleId": "fire-report",
+      "author": "town_reporter",
+      "caption": "Firefighters rescued two people from a house fire this morning.",
+      "createdAt": -3240000,
+      "assetId": "example-fire-report",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.04920000000000004
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-personal-dislike",
+      "exampleId": "personal-dislike",
+      "author": "theo_evans",
+      "caption": "I hate you right now. I need some space.",
+      "createdAt": -3300000,
+      "assetId": "example-personal-dislike",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-recipe",
+      "exampleId": "recipe",
+      "author": "priya_shah",
+      "caption": "Slow-roast lamb shoulder: five hours at 150°C, then rest it for twenty minutes.",
+      "createdAt": -3360000,
+      "assetId": "example-recipe",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-bad-service",
+      "exampleId": "bad-service",
+      "author": "emily_scott",
+      "caption": "Our food arrived cold and the restaurant never replied.",
+      "createdAt": -3420000,
+      "assetId": "example-bad-service",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-remembrance",
+      "exampleId": "remembrance",
+      "author": "owen_price",
+      "caption": "Remembering my great-grandad, killed at the Somme in 1916.",
+      "createdAt": -3480000,
+      "assetId": "example-remembrance",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "violence",
+          "score": 0.03500000000000003
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-review",
+      "exampleId": "review",
+      "author": "mia_clarke",
+      "caption": "Honestly, I can’t stand this band’s new album.",
+      "createdAt": -3540000,
+      "assetId": "example-review",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "harassment",
+          "score": 0.12
+        },
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        }
+      ],
+      "checkedAt": 0
+    },
+    {
+      "id": "example-helpline",
+      "exampleId": "helpline",
+      "author": "community_team",
+      "caption": "Having a hard time? Our helpline is free to call, day or night.",
+      "createdAt": -3600000,
+      "assetId": "example-helpline",
+      "status": "approved",
+      "flagged": false,
+      "findings": [
+        {
+          "category": "sexual",
+          "score": 0.02
+        },
+        {
+          "category": "violence",
+          "score": 0.02
+        },
+        {
+          "category": "harassment",
+          "score": 0.02
+        },
+        {
+          "category": "hate",
+          "score": 0.02
+        },
+        {
+          "category": "criminal-activity",
+          "score": 0.02
+        },
+        {
+          "category": "self-harm",
+          "score": 0.018600000000000016
+        }
+      ],
+      "checkedAt": 0
+    }
+  ]
+}

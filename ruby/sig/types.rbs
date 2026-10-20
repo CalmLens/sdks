@@ -1,0 +1,682 @@
+# Request and response shapes of the CalmLens API, mirroring the Zod schemas in packages/shared/src.
+#
+# Options (`*_options`, `*_input`) are the snake_case Symbol keys the SDK documents. At runtime the
+# SDK also accepts camelCase and String keys, which these records do not describe.
+#
+# Responses keep the API's camelCase String keys. Fields marked optional (`?"key"`) can be missing
+# from the JSON; `T?` values can be null. Records whose variants differ by `status` (category,
+# qualifier and feature results) are one record with every variant's keys optional, because Steep
+# cannot narrow a union of records on a key's value: read `status` first, then the keys it names.
+module CalmLens
+  # Any JSON value the API returns where it allows arbitrary JSON (metadata values, error details).
+  type json_value = String | Integer | Float | bool | nil | Array[json_value] | Hash[String, json_value]
+  # Any value the SDK can encode as JSON.
+  type json_input = String | Integer | Float | bool | nil | Array[json_input] | Hash[String | Symbol, json_input]
+  # A JSON number: whole numbers parse as Integer, others as Float.
+  type number = Integer | Float
+
+  # Per-call settings every method accepts under `request_options:`.
+  type request_options = {
+    ?idempotency_key: String,
+    ?timeout: number,
+    ?open_timeout: number,
+    ?max_retries: Integer
+  }
+
+  # ---- Assets (Asset.ts) ----------------------------------------------------------------------
+
+  # Where the asset is in the pipeline.
+  type asset_processing_status = "uploading" | "processing" | "done" | "failed"
+  # The moderation decision in force: a reviewer's when there is one, else the automated one.
+  type asset_moderation_status = "pending" | "approved" | "rejected"
+  # What the policy did with flagged content (never `ignore`, unlike `flagged_content_action`).
+  type asset_moderation_action = "alert" | "hide" | "purge"
+  type asset_reviewer_action = "approved" | "rejected"
+  # Whether CalmLens holds the content: only until processing finishes, retained, or deleted.
+  type asset_content_status = "temporary" | "stored" | "removed"
+  type asset_content_removal_reason = "policy" | "retention" | "requested" | "parent-removed" | "disposed"
+  type asset_type = "image" | "video" | "audio" | "plaintext-document" | "multimedia-document" | "website" | "file"
+  type asset_visibility = "public" | "private"
+  # FLAGGED_CONTENT_ACTION_SCHEMA in Project.ts.
+  type flagged_content_action = "ignore" | "alert" | "hide" | "purge"
+
+  # A custom metadata item. `value` is any JSON value you chose.
+  type metadata_item = { "id" => String, "value" => json_value }
+  # A metadata item to send. Keys inside `metadata` are sent unchanged, so use `id:` and `value:`.
+  type metadata_item_input = { id: String, value: json_input }
+
+  # ProcessingFeatures.ts: optional analyses to run, keyed by feature. Every feature is off unless
+  # `enabled` is true.
+  type processing_features_input = {
+    ?ocr: { enabled: bool }?,
+    ?person_detection: { enabled: bool }?,
+    ?face_detection: { enabled: bool, ?age_estimation: bool }?
+  }
+  type processing_options_input = {
+    ?keep_content_after_processing: bool?,
+    ?flagged_content_policy: { action: flagged_content_action }?,
+    ?features: processing_features_input?
+  }
+
+  type processing_features = {
+    ?"ocr" => { "enabled" => bool }?,
+    ?"personDetection" => { "enabled" => bool }?,
+    ?"faceDetection" => { "enabled" => bool, ?"ageEstimation" => bool }?
+  }
+  # The processing options an asset was uploaded with.
+  type processing_options = {
+    ?"keepContentAfterProcessing" => bool?,
+    ?"flaggedContentPolicy" => { "action" => flagged_content_action }?,
+    ?"features" => processing_features?
+  }
+
+  type checksums = {
+    ?"md5" => String?,
+    ?"sha1" => String?,
+    ?"sha256" => String?,
+    ?"sha384" => String?,
+    ?"sha512" => String?
+  }
+  type image_data = { ?"perceptualHash" => String?, ?"width" => Integer?, ?"height" => Integer? }
+  type preview_image = {
+    "fileFormat" => String?,
+    "thumbhash" => String?,
+    "averageColor" => String?,
+    "width" => Integer?,
+    "height" => Integer?
+  }
+  type safety_hold = { "placedAt" => Integer, "reason" => "suspected-illegal-content", ?"disposedAt" => Integer? }
+  # `type: "string"` carries the text in `content`; `type: "document"` stores it under `id`.
+  type extracted_text = { "type" => "string" | "document", ?"content" => String, ?"id" => String }
+
+  # ASSET_PROCESSING_SCHEMA. Epoch times are milliseconds.
+  type asset_processing = {
+    "status" => asset_processing_status,
+    "updatedAt" => Integer?,
+    # Parts of a multipart upload received so far; null otherwise.
+    "uploadPartsReceived" => Integer?
+  }
+  # ASSET_MODERATION_SCHEMA. `action` is kept after a reviewer decides.
+  type asset_moderation = {
+    "status" => asset_moderation_status,
+    "action" => asset_moderation_action?,
+    # Why automated moderation rejected the asset.
+    "note" => String?,
+    "reviewerAction" => asset_reviewer_action?,
+    "reviewerNote" => String?,
+    "reviewerUserId" => String?,
+    "reviewedAt" => Integer?,
+    "decidedAt" => Integer?,
+    "report" => classification_report?
+  }
+  # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
+  type asset_content = {
+    "status" => asset_content_status,
+    "removalReason" => asset_content_removal_reason?,
+    "updatedAt" => Integer?,
+    "safetyHold" => safety_hold?,
+    "format" => String?,
+    "extension" => String?,
+    "sizeInBytes" => Integer?,
+    "checksums" => checksums?,
+    "image" => image_data?,
+    "previewImage" => preview_image?,
+    "extractedText" => extracted_text?
+  }
+
+  type asset = {
+    "id" => String,
+    "projectId" => String,
+    ?"userId" => String?,
+    ?"parentId" => String?,
+    ?"folderId" => String?,
+    ?"uploadPresetId" => String?,
+    "createdAt" => Integer,
+    ?"updatedAt" => Integer,
+    "name" => String,
+    ?"description" => String?,
+    ?"externalId" => String?,
+    ?"externalUrl" => String?,
+    "type" => asset_type,
+    ?"metadata" => Array[metadata_item]?,
+    ?"tags" => Array[String]?,
+    ?"processingOptions" => processing_options?,
+    ?"visibility" => asset_visibility?,
+    "processing" => asset_processing,
+    "moderation" => asset_moderation,
+    "content" => asset_content
+  }
+
+  # ---- Moderation report (Classification.ts, ProcessingFeatures.ts) ----------------------------
+
+  type likelihood = "very-unlikely" | "unlikely" | "possible" | "likely" | "very-likely"
+  # not-supported: this processing path cannot assess the signal; unavailable: assessment failed.
+  type not_evaluated_reason = "not-supported" | "unavailable"
+  type classification_category = "sexual" | "violence" | "self-harm" | "harassment" | "hate" | "criminal-activity"
+
+  # `status: "evaluated"` carries `someScore`, `likelihood` and optionally `allScore`;
+  # `status: "not-evaluated"` carries `reason`.
+  type qualifier_result = {
+    "status" => "evaluated" | "not-evaluated",
+    ?"someScore" => number,
+    ?"allScore" => number,
+    ?"likelihood" => likelihood,
+    ?"reason" => not_evaluated_reason
+  }
+  # MODERATION_QUALIFIERS in ModerationPolicyDimensions.ts.
+  type qualifier_results = {
+    ?"sexual-nudity" => qualifier_result,
+    ?"sexual-activity" => qualifier_result,
+    ?"sexual-explicit-language" => qualifier_result,
+    ?"sexual-solicitation" => qualifier_result,
+    ?"sexual-historical" => qualifier_result,
+    ?"sexual-documentary" => qualifier_result,
+    ?"sexual-educational" => qualifier_result,
+    ?"sexual-fictional" => qualifier_result,
+    ?"sexual-support-prevention" => qualifier_result,
+    ?"violence-attack" => qualifier_result,
+    ?"violence-threat" => qualifier_result,
+    ?"violence-preparation" => qualifier_result,
+    ?"violence-encouragement" => qualifier_result,
+    ?"violence-injury" => qualifier_result,
+    ?"violence-violent-death" => qualifier_result,
+    ?"violence-natural-death" => qualifier_result,
+    ?"violence-graphic" => qualifier_result,
+    ?"violence-historical" => qualifier_result,
+    ?"violence-documentary" => qualifier_result,
+    ?"violence-educational" => qualifier_result,
+    ?"violence-fictional" => qualifier_result,
+    ?"violence-support-prevention" => qualifier_result,
+    ?"self-harm-thoughts" => qualifier_result,
+    ?"self-harm-preparation" => qualifier_result,
+    ?"self-harm-act" => qualifier_result,
+    ?"self-harm-methods" => qualifier_result,
+    ?"self-harm-encouragement" => qualifier_result,
+    ?"self-harm-documentary" => qualifier_result,
+    ?"self-harm-educational" => qualifier_result,
+    ?"self-harm-fictional" => qualifier_result,
+    ?"self-harm-support-prevention" => qualifier_result,
+    ?"harassment-abuse" => qualifier_result,
+    ?"harassment-intimidation" => qualifier_result,
+    ?"harassment-threat" => qualifier_result,
+    ?"harassment-sexual" => qualifier_result,
+    ?"harassment-encouragement" => qualifier_result,
+    ?"harassment-fictional" => qualifier_result,
+    ?"hate-abuse" => qualifier_result,
+    ?"hate-dehumanization" => qualifier_result,
+    ?"hate-inferiority" => qualifier_result,
+    ?"hate-exclusion" => qualifier_result,
+    ?"hate-threat" => qualifier_result,
+    ?"hate-historical" => qualifier_result,
+    ?"hate-fictional" => qualifier_result,
+    ?"criminal-activity-demonstration" => qualifier_result,
+    ?"criminal-activity-preparation" => qualifier_result,
+    ?"criminal-activity-request" => qualifier_result,
+    ?"criminal-activity-instructions" => qualifier_result,
+    ?"criminal-activity-promotion" => qualifier_result,
+    ?"criminal-activity-substances" => qualifier_result,
+    ?"criminal-activity-fraud" => qualifier_result,
+    ?"criminal-activity-fictional" => qualifier_result
+  }
+  # `status: "evaluated"` or `"partial"` carries `likelihood` and `score`; `"not-evaluated"`
+  # carries `reason`.
+  type category_report = {
+    "status" => "evaluated" | "partial" | "not-evaluated",
+    ?"likelihood" => likelihood,
+    ?"score" => number,
+    ?"reason" => not_evaluated_reason,
+    ?"qualifiers" => qualifier_results
+  }
+  type classification_categories = {
+    "sexual" => category_report,
+    "violence" => category_report,
+    "self-harm" => category_report,
+    "harassment" => category_report,
+    "hate" => category_report,
+    "criminal-activity" => category_report
+  }
+  type classification_label = {
+    "description" => String,
+    "score" => number,
+    ?"topicalityScore" => number?,
+    "likelihood" => likelihood,
+    ?"knowledgeBaseId" => String?
+  }
+  type media_segment = {
+    "source" => "frame" | "speech" | "frame-text" | "clip",
+    "startSeconds" => number,
+    "endSeconds" => number,
+    "categories" => classification_categories
+  }
+  type media_report = {
+    "durationSeconds" => number,
+    ?"frameIntervalSeconds" => number,
+    "sampledFrames" => Integer,
+    "audioTranscribed" => bool,
+    "segments" => Array[media_segment]
+  }
+
+  # Position and size as fractions of the image width and height, from 0 to 1.
+  type bounding_box = { "left" => number, "top" => number, "width" => number, "height" => number }
+  type age_range = { "low" => Integer, "high" => Integer }
+  type detected_person = { "box" => bounding_box, "confidence" => number }
+  type detected_face = { "box" => bounding_box, "confidence" => number, ?"ageRange" => age_range }
+  type processing_feature_stage = "beta" | "ga"
+  # `status: "evaluated"` carries `people`; `"not-evaluated"` carries `reason`.
+  type person_detection_result = {
+    "status" => "evaluated" | "not-evaluated",
+    "stage" => processing_feature_stage,
+    ?"people" => Array[detected_person],
+    ?"reason" => not_evaluated_reason
+  }
+  # `status: "evaluated"` carries `faces`; `"not-evaluated"` carries `reason`.
+  type face_detection_result = {
+    "status" => "evaluated" | "not-evaluated",
+    "stage" => processing_feature_stage,
+    ?"faces" => Array[detected_face],
+    ?"reason" => not_evaluated_reason
+  }
+  # Results of the features requested in `processingOptions.features`. OCR produces a text child
+  # asset instead of a result here.
+  type processing_feature_results = {
+    ?"personDetection" => person_detection_result,
+    ?"faceDetection" => face_detection_result
+  }
+
+  # How strongly each assessed category meets the policy and what the policy does with it.
+  type report_policy = {
+    "score" => number,
+    "categories" => Hash[String, { "score" => number, "action" => String }]
+  }
+
+  type classification_report = {
+    "processedAt" => Integer,
+    "categories" => classification_categories,
+    "score" => number,
+    ?"notes" => String?,
+    ?"media" => media_report,
+    ?"labels" => Array[classification_label]?,
+    ?"features" => processing_feature_results,
+    ?"policy" => report_policy
+  }
+
+  # ---- Pages and search (Page.ts, AssetSearch.ts) --------------------------------------------
+
+  type order_direction = "ASC" | "DESC"
+  type order_input = { field: String, direction: order_direction }
+  type order = { "field" => String, "direction" => order_direction }
+
+  type asset_page = {
+    "items" => Array[asset],
+    "hasMore" => bool,
+    "nextCursor" => String?,
+    "pageSize" => Integer,
+    "ordering" => Array[order]
+  }
+
+  type asset_search_mode = "keyword" | "semantic" | "hybrid"
+  type asset_search_match_field = "name" | "id" | "externalId" | "description" | "tags" | "type" | "content.format" |
+                                  "content.extension" | "moderation.status" | "visual" | "transcript"
+  type asset_search_result = { "asset" => asset, "score" => number, "matchedFields" => Array[asset_search_match_field] }
+  type asset_search_response = {
+    "query" => String,
+    "items" => Array[asset_search_result],
+    "semanticStatus" => "disabled" | "ready" | "indexing" | "unavailable"
+  }
+
+  type signed_url = { "url" => String, "expiresAt" => Integer }
+
+  # ---- Transforms and lenses (AssetTransform.ts, Lens.ts) -------------------------------------
+
+  type image_format = "jpg" | "png" | "webp" | "avif" | "gif"
+  type image_fit = "scale-down" | "contain" | "pad" | "squeeze" | "cover" | "crop"
+  type image_gravity_side = "face" | "left" | "right" | "top" | "bottom" | "center" | "auto" | "entropy"
+
+  # IMAGE_TRANSFORM_OPTIONS_SCHEMA, as options to send.
+  type image_transform_options_input = {
+    ?format: image_format,
+    ?width: Integer,
+    ?height: Integer,
+    ?background: String,
+    ?blur: number,
+    ?border: { ?color: String, ?width: number },
+    ?brightness: number,
+    ?contrast: number,
+    ?quality: Integer,
+    ?fit: image_fit,
+    ?flip: "h" | "v" | "hv",
+    ?gamma: number,
+    ?segment: "foreground",
+    ?gravity: image_gravity_side | { mode: "remainder" | "box-center", ?x: number, ?y: number },
+    ?rotate: 0 | 90 | 180 | 270,
+    ?saturation: number,
+    ?sharpen: number,
+    ?trim: "border" | {
+      ?top: number,
+      ?bottom: number,
+      ?left: number,
+      ?right: number,
+      ?width: number,
+      ?height: number,
+      ?border: bool | { ?color: String, ?tolerance: number, ?keep: number }
+    }
+  }
+  # IMAGE_TRANSFORM_OPTIONS_SCHEMA, as the API returns it in a lens.
+  type image_transform_options = {
+    ?"format" => image_format,
+    ?"width" => Integer,
+    ?"height" => Integer,
+    ?"background" => String,
+    ?"blur" => number,
+    ?"border" => { ?"color" => String, ?"width" => number },
+    ?"brightness" => number,
+    ?"contrast" => number,
+    ?"quality" => Integer,
+    ?"fit" => image_fit,
+    ?"flip" => "h" | "v" | "hv",
+    ?"gamma" => number,
+    ?"segment" => "foreground",
+    ?"gravity" => image_gravity_side | { "mode" => "remainder" | "box-center", ?"x" => number, ?"y" => number },
+    ?"rotate" => 0 | 90 | 180 | 270,
+    ?"saturation" => number,
+    ?"sharpen" => number,
+    ?"trim" => "border" | {
+      ?"top" => number,
+      ?"bottom" => number,
+      ?"left" => number,
+      ?"right" => number,
+      ?"width" => number,
+      ?"height" => number,
+      ?"border" => bool | { ?"color" => String, ?"tolerance" => number, ?"keep" => number }
+    }
+  }
+
+  # One structured transform step. `imageTransform` is the only transform type.
+  type transform_step_input = { type: "imageTransform", ?options: image_transform_options_input }
+  type transform_step = { "type" => "imageTransform", ?"options" => image_transform_options }
+  # A selector String such as `imageTransform[format=png,width=1024]`, or structured steps, which
+  # the SDK serializes into a selector.
+  type transform_input = String | transform_step_input | Array[transform_step_input]
+
+  type lens_type = "image" | "video" | "audio" | "document" | "website"
+  # ENSURE_LENS_BODY_SCHEMA. Changing a saved lens needs a greater `version` (default 1).
+  type lens_definition = {
+    identifier: String,
+    name: String,
+    type: lens_type,
+    active: bool,
+    ?description: String?,
+    ?version: Integer,
+    ?transforms: Array[transform_step_input]?
+  }
+  type lens = {
+    "id" => String,
+    ?"projectId" => String?,
+    ?"userId" => String?,
+    "version" => Integer,
+    "identifier" => String,
+    "name" => String,
+    ?"description" => String?,
+    "type" => lens_type,
+    "active" => bool,
+    ?"transforms" => Array[transform_step]?,
+    "createdAt" => Integer,
+    ?"updatedAt" => Integer
+  }
+
+  # ---- Folders (Folder.ts) --------------------------------------------------------------------
+
+  type folder = {
+    "id" => String,
+    "projectId" => String,
+    ?"parentId" => String?,
+    "name" => String,
+    "createdAt" => Integer,
+    ?"updatedAt" => Integer
+  }
+
+  # ---- Events and webhooks (Event.ts, EventCatalog.ts, WebhookPayload.ts) ----------------------
+
+  # EVENT_TYPES in EventCatalog.ts. Ignore types your code does not handle. Webhook, Slack and email
+  # deliveries and the public events feed leave out facts that hold personal or account data.
+  type event_type = "asset.uploaded" | "asset.flagged" | "asset.approved" | "asset.rejected" |
+                    "asset.failed" | "asset.deleted" | "asset.content-removed" | "asset.retried" |
+                    "asset.review-requested" | "usage.limit-reached" | "usage.spend-limit-reached" |
+                    "upload-preset.daily-limit-reached" | "project.member-joined" | "project.member-removed" |
+                    "project.member-role-changed" | "project.invitation-sent" | "api-key.created" |
+                    "api-key.revoked" | "connector.failing" | "appeal.submitted" | "appeal.resolved"
+  type event_severity = "low" | "high"
+  # A registered fact's value: text, an enum value, a count, a list of enum values, or null.
+  # Test sends carry `{ "key" => "test", "value" => true }`.
+  type event_fact_value = String | Integer | bool | Array[String] | nil
+  # A registered fact. `key` is a kebab-case key registered for the event's type, such as
+  # `asset-name` or `flagged-categories`. Render `url` only when it is an internal path or HTTP(S) URL.
+  type event_fact = { "key" => String, "value" => event_fact_value, ?"url" => String }
+  type event_fact_input = { key: String, value: event_fact_value, ?url: String }
+
+  # Snapshot of the asset's processing, moderation and content status when the event was created.
+  type event_asset = {
+    "id" => String,
+    ?"externalId" => String?,
+    "processing" => { "status" => asset_processing_status },
+    "moderation" => { "status" => asset_moderation_status, "action" => asset_moderation_action? },
+    "content" => { "status" => asset_content_status }
+  }
+  type event = {
+    "id" => String,
+    "projectId" => String,
+    ?"userId" => String?,
+    "type" => event_type,
+    "severity" => event_severity,
+    "title" => String,
+    ?"description" => String?,
+    ?"assetId" => String?,
+    ?"asset" => event_asset?,
+    "facts" => Array[event_fact],
+    ?"notify" => bool?,
+    "createdAt" => Integer,
+    ?"updatedAt" => Integer,
+    ?"readAt" => Integer?
+  }
+  type events_page = { "events" => Array[event], "cursor" => String, "hasMore" => bool }
+
+  # WEBHOOK_EVENT_DATA_SCHEMA: the event fields a webhook delivery carries under `data`.
+  type webhook_event_data = {
+    "severity" => event_severity,
+    "title" => String,
+    ?"description" => String?,
+    ?"assetId" => String?,
+    ?"asset" => event_asset?,
+    "facts" => Array[event_fact]
+  }
+
+  # ---- Method options -------------------------------------------------------------------------
+
+  type asset_id_options = { asset_id: String, ?request_options: request_options }
+  # `timeout` is the whole wait in seconds (default 60).
+  type wait_for_decision_options = { asset_id: String, ?timeout: number, ?request_options: request_options }
+
+  type asset_search_options = {
+    query: String,
+    ?mode: asset_search_mode,
+    ?limit: Integer,
+    ?request_options: request_options
+  }
+  type list_assets_options = {
+    ?cursor: String,
+    ?page_size: Integer,
+    ?ordering: Array[order_input],
+    # An RSQL filter such as `moderation.status==approved`.
+    ?filter: String?,
+    ?folder_id: String?,
+    ?request_options: request_options
+  }
+  type list_asset_children_options = {
+    asset_id: String,
+    ?cursor: String,
+    ?page_size: Integer,
+    ?ordering: Array[order_input],
+    ?request_options: request_options
+  }
+  type update_asset_options = {
+    asset_id: String,
+    ?name: String,
+    ?description: String?,
+    ?external_id: String?,
+    ?external_url: String?,
+    ?metadata: Array[metadata_item_input]?,
+    ?tags: Array[String]?,
+    ?visibility: asset_visibility?,
+    ?request_options: request_options
+  }
+  type move_asset_options = { asset_id: String, folder_id: String?, ?request_options: request_options }
+  type create_signed_url_options = {
+    asset_id: String,
+    ?resource: "content" | "preview",
+    ?expires_in_seconds: Integer,
+    # A lens runs before any additional transforms.
+    ?lens: String,
+    ?transform: transform_input,
+    ?request_options: request_options
+  }
+
+  # Upload content: exactly one of `plain_text`, `base64` (optionally a data URL) or `data` (a
+  # binary String or an IO, which streams). `size_in_bytes` is required for an IO of unknown length.
+  type upload_content = { type: String, plain_text: String, ?size_in_bytes: Integer }
+                      | { type: String, base64: String, ?size_in_bytes: Integer }
+                      | { type: String, data: String | Transport::_Reader, ?size_in_bytes: Integer }
+  # The first part of a multipart upload.
+  type upload_first_part = { type: String, plain_text: String, ?is_final: bool, ?size_in_bytes: Integer }
+                         | { type: String, base64: String, ?is_final: bool, ?size_in_bytes: Integer }
+                         | { type: String, data: String | Transport::_Reader, ?is_final: bool, ?size_in_bytes: Integer }
+  # A later part of a multipart upload; part numbers start at 2.
+  type upload_part = { part_number: Integer, plain_text: String, ?is_final: bool, ?size_in_bytes: Integer }
+                   | { part_number: Integer, base64: String, ?is_final: bool, ?size_in_bytes: Integer }
+                   | { part_number: Integer, data: String | Transport::_Reader, ?is_final: bool, ?size_in_bytes: Integer }
+
+  # Options of {Assets#create} and {Assets#moderate}: the shared asset fields with exactly one of
+  # `content:` (a whole file), `part:` (the first part of a multipart upload) or `url:` (a page or
+  # file CalmLens fetches).
+  type upload_options = {
+                          name: String,
+                          content: upload_content,
+                          ?description: String?,
+                          ?visibility: asset_visibility?,
+                          ?metadata: Array[metadata_item_input]?,
+                          ?external_id: String?,
+                          ?external_url: String?,
+                          ?folder_id: String?,
+                          ?upload_preset_id: String,
+                          ?processing_options: processing_options_input?,
+                          ?request_options: request_options
+                        }
+                      | {
+                          name: String,
+                          part: upload_first_part,
+                          ?total_size_in_bytes: Integer,
+                          ?description: String?,
+                          ?visibility: asset_visibility?,
+                          ?metadata: Array[metadata_item_input]?,
+                          ?external_id: String?,
+                          ?external_url: String?,
+                          ?folder_id: String?,
+                          ?upload_preset_id: String,
+                          ?processing_options: processing_options_input?,
+                          ?request_options: request_options
+                        }
+                      | {
+                          name: String,
+                          url: String,
+                          ?description: String?,
+                          ?visibility: asset_visibility?,
+                          ?metadata: Array[metadata_item_input]?,
+                          ?external_id: String?,
+                          ?external_url: String?,
+                          ?folder_id: String?,
+                          ?upload_preset_id: String,
+                          ?processing_options: processing_options_input?,
+                          ?request_options: request_options
+                        }
+  type upload_part_options = { asset_id: String, part: upload_part, ?queue: bool, ?request_options: request_options }
+
+  # Options of {Text#moderate}: the text, with the shared asset fields. `name` defaults to `text`.
+  type moderate_text_options = {
+    text: String,
+    ?name: String,
+    ?description: String?,
+    ?visibility: asset_visibility?,
+    ?metadata: Array[metadata_item_input]?,
+    ?external_id: String?,
+    ?external_url: String?,
+    ?folder_id: String?,
+    ?upload_preset_id: String,
+    ?processing_options: processing_options_input?,
+    ?request_options: request_options
+  }
+
+  # Options of {UploadTokens#sign}.
+  type sign_upload_token_options = {
+    upload_preset_id: String,
+    ?external_id: String,
+    ?expires_in_seconds: Integer,
+    ?request_options: request_options
+  }
+  type signed_upload_token = { "token" => String, "expiresAt" => Integer }
+
+  type list_folders_options = { ?request_options: request_options }
+  type folder_id_options = { folder_id: String, ?request_options: request_options }
+  type create_folder_options = { name: String, ?parent_id: String?, ?request_options: request_options }
+  type update_folder_options = { folder_id: String, ?name: String, ?request_options: request_options }
+  type move_folder_options = { folder_id: String, parent_id: String?, ?request_options: request_options }
+
+  type list_events_options = { ?after: String, ?limit: Integer, ?request_options: request_options }
+
+  type ensure_lenses_options = { lenses: Array[lens_definition], ?request_options: request_options }
+  type ensure_lens_options = {
+    identifier: String,
+    name: String,
+    type: lens_type,
+    active: bool,
+    ?description: String?,
+    ?version: Integer,
+    ?transforms: Array[transform_step_input]?,
+    ?request_options: request_options
+  }
+
+  type asset_url_options = {
+    # The asset ID or external ID.
+    asset_identifier: String,
+    ?resource: "content" | "preview",
+    # A lens runs before any additional transforms.
+    ?lens: String,
+    ?transform: transform_input
+  }
+  type serve_options = {
+    asset_identifier: String,
+    ?resource: "content" | "preview",
+    ?lens: String,
+    ?transform: transform_input,
+    ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] },
+    ?request_options: request_options
+  }
+
+  # Options of {MockServerClient#enqueue_event}. Omitted fields are filled in.
+  type mock_event_input = {
+    type: event_type,
+    ?id: String,
+    ?project_id: String,
+    ?severity: event_severity,
+    ?title: String,
+    ?description: String?,
+    ?asset_id: String?,
+    ?asset: {
+      id: String,
+      ?external_id: String?,
+      processing: { status: asset_processing_status },
+      moderation: { status: asset_moderation_status, action: asset_moderation_action? },
+      content: { status: asset_content_status }
+    }?,
+    ?facts: Array[event_fact_input],
+    ?created_at: Integer
+  }
+end

@@ -1,0 +1,338 @@
+@import "tailwindcss";
+
+/* Colour tokens switch with the system theme; Tailwind utilities (bg-surface, text-muted, …)
+   read them through the theme below. */
+:root {
+  --page: #fafafa;
+  --surface: #ffffff;
+  --fg: #0f1419;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #0095f6;
+  --accent-fg: #ffffff;
+  --danger: #ed4956;
+  --danger-soft: #fde8ea;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --subtle: #f3f4f6;
+  --banner: #eef6ff;
+  --banner-fg: #0b4a8b;
+  /* CalmLens's own colours, for the parts of the demo that belong to CalmLens, not Calmgram. */
+  --cl-ink: #0b1220;
+  --cl-page: #f4f6fa;
+  --cl-link: #0b1220;
+  --cl-edge: #0b1220;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #000000;
+    --surface: #0b0b0c;
+    --fg: #f5f5f5;
+    --muted: #a3a3a3;
+    --line: #262626;
+    --danger-soft: #3b1116;
+    --warn: #fbbf24;
+    --warn-soft: #3a2a05;
+    --subtle: #171717;
+    --banner: #0b2540;
+    --banner-fg: #bfdcff;
+    --cl-page: #131c2e;
+    --cl-edge: #2a3550;
+    --cl-link: #ffffff;
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-subtle: var(--subtle);
+  --color-banner: var(--banner);
+  --color-banner-fg: var(--banner-fg);
+  --color-cl-ink: var(--cl-ink);
+  --color-cl-page: var(--cl-page);
+  --color-cl-link: var(--cl-link);
+  --color-cl-edge: var(--cl-edge);
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-logo: "Snell Roundhand", "Brush Script MT", "Segoe Script", cursive;
+}
+
+/* Server-rendered pages keep plain elements readable without a class on every tag. */
+@layer base {
+  body {
+    @apply bg-page font-sans text-sm/[1.45] text-fg;
+  }
+  a:hover {
+    @apply underline;
+  }
+  h1 {
+    @apply mb-3 text-xl font-bold;
+  }
+  h2 {
+    @apply mt-7 mb-2.5 text-base font-bold;
+  }
+  p {
+    @apply my-1.5;
+  }
+  code {
+    @apply rounded bg-subtle px-1.5 py-0.5 text-xs break-all;
+  }
+  blockquote {
+    @apply my-1.5 border-l-3 border-line px-2.5 py-1.5 wrap-anywhere;
+  }
+  input,
+  textarea {
+    @apply w-full rounded-lg border border-line bg-surface px-[11px] py-[9px] text-fg focus:outline-2 focus:-outline-offset-1 focus:outline-accent;
+  }
+  textarea {
+    @apply resize-y;
+  }
+}
+
+/* Match the portal palette from packages/shared-web/src/theme.css, scoped to its review panel. */
+.calmlens {
+  --cl-track: rgb(17 24 39 / 5%);
+  --cl-raised: #ffffff;
+  --fg: #111827;
+  --muted: #4b5563;
+  --surface: #ffffff;
+  --cl-page: #fbfbfc;
+  --line: #e2e6ec;
+  --subtle: #f7f8fa;
+  --accent: #635bff;
+  --cl-link: #635bff;
+  --danger: #b91c1c;
+  --danger-soft: rgb(211 34 34 / 8%);
+  --success: #166534;
+  --success-soft: rgb(22 163 74 / 8%);
+  --warn: #854d0e;
+  --warn-soft: rgb(217 119 6 / 8%);
+  font-family: Inter, Arial, sans-serif;
+}
+
+.calmlens :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .calmlens {
+    --cl-track: rgb(243 244 246 / 7%);
+    --cl-raised: #1a2028;
+    --fg: #f3f4f6;
+    --muted: #8d97a7;
+    --surface: #171c23;
+    --cl-page: #0e1319;
+    --line: #29303a;
+    --subtle: #151a21;
+    --accent: #7b78ff;
+    --cl-link: #8a87ff;
+    --danger: #ef4444;
+    --danger-soft: rgb(211 34 34 / 14%);
+    --success: #22c55e;
+    --success-soft: rgb(22 163 74 / 14%);
+    --warn: #eab308;
+    --warn-soft: rgb(217 119 6 / 14%);
+  }
+}
+
+/* The landing page DecisionFeed's compact card layout, adapted to server-rendered assets. */
+.queue-heading {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.queue-card {
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.queue-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.queue-summary::-webkit-details-marker {
+  display: none;
+}
+.queue-summary:hover {
+  background: var(--subtle);
+  border-radius: 12px;
+}
+.queue-type {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--cl-raised);
+  color: var(--muted);
+}
+.queue-type svg {
+  width: 18px;
+  height: 18px;
+}
+.queue-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.queue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.queue-row > :last-child {
+  flex-shrink: 0;
+}
+.queue-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.queue-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+.queue-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.queue-scores:empty {
+  display: none;
+}
+.queue-score {
+  position: relative;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  color: var(--fg);
+}
+.queue-score > svg {
+  width: 32px;
+  height: 32px;
+}
+.queue-score-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.queue-score-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.queue-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  border: 1px solid var(--status-tint);
+  border-radius: 6px;
+  padding: 2px 8px;
+  min-height: 24px;
+  background: var(--status-tint);
+  color: var(--status-text);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.queue-status svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.queue-status-approved {
+  --status-tint: rgb(22 163 74 / 10%);
+  --status-text: var(--success);
+}
+.queue-status-error {
+  --status-tint: rgb(211 34 34 / 10%);
+  --status-text: var(--danger);
+}
+.queue-status-flagged,
+.queue-status-rejected {
+  --status-tint: rgb(217 119 6 / 10%);
+  --status-text: var(--warn);
+}
+.queue-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+.queue-detail {
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+.queue-toggle {
+  color: var(--muted);
+}
+details[open] > summary > .queue-toggle {
+  transform: rotate(180deg);
+}
+
+.queue-status-pending {
+  --status-tint: color-mix(in srgb, var(--muted) 5%, transparent);
+  --status-text: var(--muted);
+  border-color: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+.queue-preview {
+  display: block;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--cl-raised);
+}
+.queue-text-preview {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 12px;
+  overflow-wrap: anywhere;
+}
+.queue-text-preview .queue-type {
+  width: auto;
+  height: auto;
+  justify-content: start;
+}
+.queue-text-preview .queue-type svg {
+  width: 14px;
+  height: 14px;
+}
+.queue-text-preview > span:last-child {
+  overflow: hidden;
+}

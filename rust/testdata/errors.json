@@ -1,0 +1,242 @@
+[
+  {
+    "code": "validation/invalid-cursor",
+    "status": 400
+  },
+  {
+    "code": "auth/missing-token",
+    "status": 401
+  },
+  {
+    "code": "auth/invalid-api-key",
+    "status": 401
+  },
+  {
+    "code": "auth/project-mismatch",
+    "status": 403
+  },
+  {
+    "code": "auth/api-key-not-accepted",
+    "status": 403
+  },
+  {
+    "code": "upload/file-too-large",
+    "status": 400
+  },
+  {
+    "code": "upload/image-requires-multipart-upload",
+    "status": 400
+  },
+  {
+    "code": "upload/multipart-image-too-small",
+    "status": 400
+  },
+  {
+    "code": "upload/multipart-image-too-large",
+    "status": 400
+  },
+  {
+    "code": "upload/image-exceeded-max-dimensions",
+    "status": 400
+  },
+  {
+    "code": "upload/limit-exceeded",
+    "status": 403
+  },
+  {
+    "code": "upload/spend-limit-reached",
+    "status": 402
+  },
+  {
+    "code": "upload/invalid-mime-type",
+    "status": 400
+  },
+  {
+    "code": "events/invalid-cursor",
+    "status": 400
+  },
+  {
+    "code": "upload/invalid-payload",
+    "status": 400
+  },
+  {
+    "code": "upload/use-upload-part",
+    "status": 409
+  },
+  {
+    "code": "upload/not-open",
+    "status": 409
+  },
+  {
+    "code": "upload/invalid-part-number",
+    "status": 409
+  },
+  {
+    "code": "upload/missing",
+    "status": 409
+  },
+  {
+    "code": "upload/size-mismatch",
+    "status": 400
+  },
+  {
+    "code": "idempotency/invalid-key",
+    "status": 400
+  },
+  {
+    "code": "idempotency/key-reused",
+    "status": 409
+  },
+  {
+    "code": "idempotency/request-in-progress",
+    "status": 409
+  },
+  {
+    "code": "asset/not-found",
+    "status": 404
+  },
+  {
+    "code": "project/not-found",
+    "status": 404
+  },
+  {
+    "code": "asset/update-failed",
+    "status": 500
+  },
+  {
+    "code": "asset/safety-held",
+    "status": 423
+  },
+  {
+    "code": "asset/not-retryable",
+    "status": 409
+  },
+  {
+    "code": "asset/content-unavailable",
+    "status": 409
+  },
+  {
+    "code": "support/ticket-not-found",
+    "status": 404
+  },
+  {
+    "code": "asset/duplicate-external-id",
+    "status": 409
+  },
+  {
+    "code": "folder/not-found",
+    "status": 404
+  },
+  {
+    "code": "folder/duplicate-name",
+    "status": 409
+  },
+  {
+    "code": "folder/not-empty",
+    "status": 409
+  },
+  {
+    "code": "folder/parent-cycle",
+    "status": 409
+  },
+  {
+    "code": "lens/version-conflict",
+    "status": 409
+  },
+  {
+    "code": "upload-preset/not-found",
+    "status": 404
+  },
+  {
+    "code": "upload-preset/disabled",
+    "status": 403
+  },
+  {
+    "code": "upload-preset/token-required",
+    "status": 401
+  },
+  {
+    "code": "upload/remote-url-not-allowed",
+    "status": 403
+  },
+  {
+    "code": "upload/website-rate-limit-exceeded",
+    "status": 429
+  },
+  {
+    "code": "upload-preset/content-type-not-allowed",
+    "status": 415
+  },
+  {
+    "code": "upload-preset/too-large",
+    "status": 413
+  },
+  {
+    "code": "upload-preset/daily-limit-reached",
+    "status": 429
+  },
+  {
+    "code": "upload-preset/origin-not-allowed",
+    "status": 403
+  },
+  {
+    "code": "upload-preset/field-not-allowed",
+    "status": 400
+  },
+  {
+    "code": "upload-token/invalid",
+    "status": 401
+  },
+  {
+    "code": "upload-token/expired",
+    "status": 401
+  },
+  {
+    "code": "upload-token/used",
+    "status": 409
+  },
+  {
+    "code": "asset/invalid-remote-url",
+    "status": 400
+  },
+  {
+    "code": "asset/remote-url-unavailable",
+    "status": 422
+  },
+  {
+    "code": "appeal/not-found",
+    "status": 404
+  },
+  {
+    "code": "appeal/judgment-not-found",
+    "status": 404
+  },
+  {
+    "code": "appeal/asset-not-found",
+    "status": 404
+  },
+  {
+    "code": "appeal/permission-denied",
+    "status": 403
+  },
+  {
+    "code": "appeal/already-reviewed",
+    "status": 409
+  },
+  {
+    "code": "appeal/decision-changed",
+    "status": 409
+  },
+  {
+    "code": "appeal/invalid-action",
+    "status": 400
+  },
+  {
+    "code": "appeal/safety-held",
+    "status": 409
+  },
+  {
+    "code": "appeal/content-unavailable",
+    "status": 409
+  }
+]

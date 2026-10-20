@@ -1,0 +1,42 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "calmgram",
+  "main": "src/index.tsx",
+  "compatibility_date": "2026-09-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "public", "binding": "ASSETS" },
+  // Builds public/styles.css with Tailwind and bundles browser/upload.ts to public/upload.js before
+  // `wrangler dev` and `wrangler deploy`, and again whenever src or browser changes during dev.
+  "build": { "command": "bun run build", "watch_dir": ["src", "browser"] },
+  "observability": { "logs": { "enabled": true } },
+  // Deletes sandboxes 24 hours after their last use.
+  "triggers": { "crons": ["0 * * * *"] },
+  "kv_namespaces": [{ "binding": "CALMGRAM", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+  // Form submissions per visitor IP per minute; each can call CalmLens.
+  "ratelimits": [
+    { "name": "WRITE_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }
+  ],
+  // Secrets, set with `wrangler secret put`: CALMLENS_API_KEY, CALMLENS_PROJECT_ID,
+  // CALMLENS_WEBHOOK_SECRET, and the project's CALMLENS_TEST_INPUT_KEY for the New post page's
+  // test code. Without the first two the app refuses to serve, unless
+  // CALMLENS_DEMO=1 asks for the local simulator (`bun run dev:demo`). The optional
+  // CALMLENS_UPLOAD_PRESET_ID lets browsers upload photos straight to CalmLens. The optional
+  // TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY put a Turnstile check in front of every page.
+  "env": {
+    // The public demo at example.calmlens.com: `npm run deploy -- --env main`.
+    "main": {
+      "name": "calmgram-main",
+      "routes": [{ "pattern": "example.calmlens.com", "custom_domain": true }],
+      "kv_namespaces": [{ "binding": "CALMGRAM", "id": "09a6e6ef8cb74439b797fb7e096546dd" }],
+      "ratelimits": [
+        { "name": "WRITE_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }
+      ],
+      // The public demo runs the simulator until CalmLens keys are set as secrets, which then
+      // take precedence. Demo mode has to be asked for explicitly, here and for this hostname.
+      "vars": {
+        "CALMLENS_DEMO": "1",
+        "CALMLENS_DEMO_ALLOW_REMOTE": "1"
+      }
+    }
+  }
+}

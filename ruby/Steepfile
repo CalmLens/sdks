@@ -1,0 +1,22 @@
+# frozen_string_literal: true
+
+# Type-checks the RBS signatures in sig/. Steep is not a bundled dependency; run it with
+#   gem install steep && steep check
+D = Steep::Diagnostic
+
+# The implementation against its public signatures. Internals are untyped, so this target checks
+# that each declared method's parameters and return types match the code.
+target :lib do
+  signature 'sig'
+  check 'lib'
+  library 'json', 'openssl', 'uri', 'net-http', 'securerandom', 'zlib', 'timeout'
+  configure_code_diagnostics(D::Ruby.lenient)
+end
+
+# Documented usage, checked strictly: a signature that rejects it or drops a response field fails.
+target :usage do
+  signature 'sig'
+  check 'test/types'
+  library 'json', 'openssl', 'uri', 'net-http', 'securerandom', 'zlib', 'timeout'
+  configure_code_diagnostics(D::Ruby.strict)
+end

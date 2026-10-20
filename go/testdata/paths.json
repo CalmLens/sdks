@@ -1,0 +1,268 @@
+{
+  "rejections": [
+    {
+      "operation": "assets.retrieve",
+      "options": {
+        "assetId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "assets.retrieve",
+      "options": {
+        "assetId": "."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "assets.update",
+      "options": {
+        "assetId": "..",
+        "description": null
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "assets.listChildren",
+      "options": {
+        "assetId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "assets.retry",
+      "options": {
+        "assetId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "assets.move",
+      "options": {
+        "assetId": "..",
+        "folderId": null
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "assets.uploadPart",
+      "options": {
+        "assetId": "..",
+        "part": {
+          "plainText": "final",
+          "partNumber": 2,
+          "isFinal": true
+        }
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "folders.retrieve",
+      "options": {
+        "folderId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "folders.move",
+      "options": {
+        "folderId": ".",
+        "parentId": null
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "folders.delete",
+      "options": {
+        "folderId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    }
+  ],
+  "cdnUrls": [
+    {
+      "options": {
+        "assetIdentifier": "a/b c",
+        "transform": "imageTransform[format=png,width=1024]"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/content/imageTransform[format=png,width=1024]"
+    },
+    {
+      "options": {
+        "assetIdentifier": "ünï✓",
+        "resource": "preview",
+        "transform": "/imageTransform[width=10]"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/%C3%BCn%C3%AF%E2%9C%93/preview/imageTransform[width=10]"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "lens": "thumb/small"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content/@thumb%2Fsmall"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "lens": "thumbnail",
+        "transform": "imageTransform[format=avif]"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content/@thumbnail,imageTransform[format=avif]"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "preview",
+        "lens": "thumbnail",
+        "transform": {
+          "type": "imageTransform",
+          "options": {
+            "format": "webp"
+          }
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/preview/@thumbnail,imageTransform[format=webp]"
+    },
+    {
+      "options": {
+        "assetIdentifier": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "lens": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": "../../other-project/asset/content"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": "imageTransform[width=10]?download=1"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": "imageTransform[width=10]#x"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": {
+          "type": "imageTransform",
+          "options": {
+            "width": 1024,
+            "format": "png"
+          }
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content/imageTransform[format=png,width=1024]"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "preview",
+        "transform": [
+          {
+            "type": "imageTransform",
+            "options": {
+              "fit": "cover",
+              "sharpen": 1.5,
+              "background": "rgb(0, 0, 0)",
+              "border": {
+                "width": 2,
+                "color": "#ff0000"
+              },
+              "gravity": {
+                "mode": "box-center",
+                "x": 0.5,
+                "y": 0.25
+              },
+              "trim": {
+                "border": true
+              },
+              "quality": null
+            }
+          },
+          {
+            "type": "imageTransform",
+            "options": {
+              "format": "webp"
+            }
+          }
+        ]
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/preview/imageTransform[background=rgb%280%2C%200%2C%200%29,border%5Bcolor%5D=%23ff0000,border%5Bwidth%5D=2,fit=cover,gravity%5Bmode%5D=box-center,gravity%5Bx%5D=0.5,gravity%5By%5D=0.25,sharpen=1.5,trim%5Bborder%5D=true],imageTransform[format=webp]"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": {
+          "type": "imageTransform",
+          "options": {}
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content/imageTransform[]"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": []
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": {
+          "type": "../imageTransform",
+          "options": {}
+        }
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": {
+          "type": "imageTransform",
+          "options": "width=10"
+        }
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": {
+          "type": "imageTransform",
+          "options": {
+            "width": [
+              10
+            ]
+          }
+        }
+      },
+      "error": "sdk/invalid-argument"
+    }
+  ]
+}

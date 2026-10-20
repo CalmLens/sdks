@@ -1,0 +1,15 @@
+node_modules
+.wrangler
+.dev.vars
+.env*.local
+.env
+.DS_Store
+# Built from src/styles.css by Tailwind (bun run build:css, run automatically by wrangler).
+public/styles.css
+# Bundled from browser/upload.ts and browser/confirm.ts (bun run build:client, run automatically
+# by wrangler).
+public/upload.js
+public/confirm.js
+
+# Shared illustrative media copied during build.
+public/post-examples/

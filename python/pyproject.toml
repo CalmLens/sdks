@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "calmlens"
+version = "0.1.0"
+description = "Python SDK for CalmLens moderation, storage, and CDN delivery"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "CalmLens" }]
+keywords = ["calmlens", "moderation", "content-moderation", "cdn", "sdk"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Operating System :: OS Independent",
+  "Topic :: Internet :: WWW/HTTP",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://calmlens.com"
+Documentation = "https://calmlens.com/docs/sdk/python"
+Repository = "https://github.com/CalmLens/sdks/tree/main/python"
+Changelog = "https://calmlens.com/docs/changelog"
+
+[tool.setuptools.packages.find]
+include = ["calmlens*"]
+
+[tool.setuptools.package-data]
+calmlens = ["py.typed"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["calmlens"]

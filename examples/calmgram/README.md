@@ -1,0 +1,270 @@
+# Calmgram
+
+An Instagram-style photo app that shows how to add content moderation to a real product with
+[CalmLens](https://calmlens.com). Every photo, caption, comment and bio is checked before other
+people can see it.
+
+| Feed | Rejected upload (author's view) | Moderation queue |
+| --- | --- | --- |
+| ![Feed](docs/feed.jpg) | ![Rejected post](docs/rejected-post.jpg) | ![Moderation queue](docs/moderation-queue.jpg) |
+
+- **Photos** go straight from the browser to CalmLens through an
+  [upload preset](https://calmlens.com/docs/guides/upload-presets), with a single-use token the
+  server signs. They stay private to their author while they're checked, then appear in the feed,
+  served and resized by the CalmLens CDN.
+- **Captions, comments and bios** are checked before they're saved. Rejected text is never shown,
+  and the author is told why.
+- **Borderline content** that your policy marks "alert" is published but lands in a **moderation
+  queue** for a human to look at.
+
+Try it at **[example.calmlens.com](https://example.calmlens.com)**. It's a single Cloudflare Worker
+([Hono](https://hono.dev), server-rendered HTML, Workers KV, styled with [Tailwind CSS](https://tailwindcss.com)) with two small browser scripts: one for photo uploads, and one that asks before deletes in a native `<dialog>`. Every form also works without JavaScript. It uses Bun, TypeScript 7 and Biome (`bun run check`).
+
+It runs in two modes:
+
+| Mode | When | Moderation |
+| --- | --- | --- |
+| **Demo** | `CALMLENS_DEMO=1` (`bun run dev:demo`) | Simulated locally, so you can click around in 30 seconds |
+| **Live** | `CALMLENS_API_KEY` + `CALMLENS_PROJECT_ID` set | Real CalmLens moderation and CDN. Add `CALMLENS_UPLOAD_PRESET_ID` for browser uploads |
+
+Missing keys never switch demo mode on by themselves: without keys and without `CALMLENS_DEMO=1`,
+Calmgram answers every request with `503` instead of publishing unmoderated content. Demo mode
+also only serves `localhost` unless you set `CALMLENS_DEMO_ALLOW_REMOTE=1`.
+
+## Quick start (demo mode)
+
+This example links to `@calmlens/sdk` in the repo, and the browser upload script is bundled from
+that build: no published release includes `CalmLensAppClient` yet. Once one does, depend on
+the published `@calmlens/sdk` instead of `link:@calmlens/sdk`. From the repo root, install
+dependencies, build the SDK and register it with `bun link` first:
+
+```bash
+(cd javascript && bun install)
+cd examples/calmgram
+bun install
+bun run dev:demo --port 6400
+```
+
+Open http://localhost:6400 (you're given a random username straight away; change it from your profile) and try:
+
+- commenting `you idiot` (published but flagged), `i will hurt you` (rejected), or a
+  [test code](#testing-rejections-safely);
+- uploading one of the test images from the **New post** page (rejected) or any normal photo
+  (approved after ~2 seconds);
+- the CalmLens moderation panel, open by default over every page. Click its header to collapse or reopen it.
+
+Demo mode is a stand-in, not a moderation model. Use live mode to see real decisions.
+
+## Live mode
+
+1. Create a CalmLens account and open the portal.
+2. **API key:** Developer → API Keys → create a key.
+3. **Project ID:** open the project selector, choose **Edit** on your project, and copy the
+   Project ID.
+4. **Policy:** Moderation Policies → pick a preset (*General community* suits most social apps).
+5. **Upload preset:** Developer → Upload presets → create one for post photos (see
+   [below](#upload-preset)) and copy its ID.
+6. Copy `.dev.vars.example` to `.dev.vars` and fill in the key, project ID and upload preset ID.
+7. `bun run dev --port 6400`. The demo banner disappears when live mode is on.
+
+### Upload preset
+
+With `CALMLENS_UPLOAD_PRESET_ID` set, the browser uploads photos straight to CalmLens instead of
+posting them to the Worker. Create the preset with these settings:
+
+| Setting | Value |
+| --- | --- |
+| Who can upload | **Users your server approves**, so every upload needs a token Calmgram signed |
+| File types | `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `image/heic` |
+| Maximum file size | 10 MB |
+| Visibility | **Public**, so approved photos can be served from the CDN (Calmgram never builds a CDN URL before approval) |
+| Keep content after moderation | On, so approved photos can be served and resized by the CDN |
+| Read text in images | On, to catch harmful text in screenshots and memes |
+| Show the decision to the uploader | Off. Calmgram's server reads the decision, not the browser |
+| Allowed sites | Your app's origins, such as `http://localhost:6400` and `https://<your-app>` |
+
+Over the API, the two switches are the preset's `processingOptions`:
+`{ keepContentAfterProcessing: true, features: { ocr: { enabled: true } } }`. The no-JavaScript
+form post also uploads through the preset from the server, so both paths follow the same rules. Without `CALMLENS_UPLOAD_PRESET_ID`, every photo is posted to the Worker and
+forwarded to CalmLens, as in demo mode.
+
+### Webhooks (recommended)
+
+CalmLens tells your app when an image has been checked. In the portal, go to **Webhooks**, add
+`https://<your-app>/api/webhooks/calmlens`, subscribe to `asset.approved` and `asset.rejected` (sent for automated moderation outcomes and
+for reviewer decisions made in the portal), and put the secret in
+`CALMLENS_WEBHOOK_SECRET`. The handler reads the asset ID from the delivery's `data.assetId`.
+
+For local development, forward events to the dev server with the SDK's CLI. It signs each event
+with your `CALMLENS_WEBHOOK_SECRET`, so the handler's signature check works unchanged:
+
+```bash
+bunx calmlens listen --forward-to http://localhost:6400/api/webhooks/calmlens --env-file .dev.vars
+```
+
+Without webhooks the app still works: pages showing a pending post poll CalmLens for its status.
+CalmLens retries failed deliveries for about 20 hours, but Calmgram keeps polling as a fallback
+for anything still pending.
+
+## How it works
+
+```
+                 ┌────────────── text: caption, comment, bio ───────────────┐
+ user ──► Calmgram server ──► client.text.moderate({ text })                 (waits)
+                 │                 └─► approved → save · rejected → tell the user why
+                 │
+                 └────────────── photo: the browser uploads, the server approves ───┐
+  1. browser ──► POST /api/uploads ──► server checks the user,
+                                       client.uploadTokens.sign({ uploadPresetId,
+                                         externalId: "post-<id>" })      (local, no request)
+  2. browser ──► new CalmLensAppClient({ uploadPresetId, token })
+                 .assets.create({ content: { data: file } }) ──► CalmLens (returns undecided)
+  3. browser ──► POST /posts { postId, assetId, caption }
+                 server: assets.retrieve(assetId) must have externalId "post-<id>" and
+                 come through the preset · moderate the caption · save post as pending
+                            ▲                               │
+      webhook: asset.approved / asset.rejected   or poll: assets.retrieve
+                            └──────── approved → show in feed via CDN lens URL
+                                      rejected → author sees "not published" notice
+                                      approved + flagged → shown, and queued for review
+```
+
+Without JavaScript, or without an upload preset, the form posts the photo to the server instead,
+which checks the caption and forwards the photo with `client.assets.create`. The rest is the same.
+
+CalmLens's **moderation policy** (set in the portal) turns each report into an action. The app
+only needs a few fields:
+
+| `moderation.status` | `moderation.action` | Calmgram does |
+| --- | --- | --- |
+| `approved` | `null` | Publish |
+| `approved` | `alert` | Publish and add to the moderation queue |
+| `rejected` | `hide` or `purge` | Don't publish; tell the author which category matched (from `moderation.report`) |
+| `pending` | — | Show only to the author with a "Checking…" placeholder |
+
+When `processing.status` is `failed`, Calmgram doesn't publish and asks the author to retry.
+
+### Where to look
+
+| File | What it shows |
+| --- | --- |
+| [`src/moderation/calmlens.ts`](src/moderation/calmlens.ts) | Every server-side CalmLens call: text, images, upload tokens, lenses, CDN URLs, deletion, webhook verification |
+| [`browser/upload.ts`](browser/upload.ts) | The browser upload: fetch a token, upload through the preset, submit the asset ID. Bundled to `public/upload.js` by `bun run build:client`, which `wrangler dev` and `wrangler deploy` run for you |
+| [`browser/confirm.ts`](browser/confirm.ts) | The native `<dialog>` that asks before deleting a post or starting over, bundled to `public/confirm.js` |
+| [`src/content.ts`](src/content.ts) | App logic: when to block, when to queue, checking a browser upload, the polling fallback |
+| [`src/index.tsx`](src/index.tsx) | Routes, including the upload token endpoint, the webhook handler (signature check on the raw body, idempotent by event ID) and the moderation queue |
+| [`src/sandbox.ts`](src/sandbox.ts) | The public demo's per-visitor storage and 24-hour cleanup |
+| [`src/budget.ts`](src/budget.ts) | The public demo's daily CalmLens budget |
+| [`src/moderation/demo.ts`](src/moderation/demo.ts) | The demo-mode simulator |
+
+### Things worth copying
+
+- **Text is checked synchronously, images asynchronously.** Text is fast to classify, so the user
+  gets an immediate answer. Images are queued so uploads return quickly.
+- **The browser uploads, the server approves.** Photos never pass through the Worker, and the
+  browser never sees an API key: it gets a single-use upload token for one photo. The token sets
+  the asset's `externalId` to the post it was signed for, so when the browser submits an asset ID,
+  the server fetches that asset and accepts it only if the `externalId` and upload preset match.
+  The browser's word never publishes anything; only a CalmLens decision does.
+- **The no-JavaScript fallback checks the caption before uploading**, so a bad caption fails fast.
+  With browser uploads, a rejected caption deletes the photo that was just uploaded.
+- **CDN URLs are only built for approved images.** The CalmLens CDN serves public assets while
+  they are still pending, so Calmgram never sends an image URL to a browser until CalmLens has
+  approved it, and it uses CalmLens's random asset ID in URLs rather than its own (guessable)
+  post IDs.
+- **`not-evaluated` is not zero.** Only `evaluated` and `partial` category results have scores.
+- **Lenses** are named, versioned image presets. Calmgram defines `calmgram-feed` (1080px WebP)
+  and `calmgram-thumb` (400px square) once with `ensureLenses`, so it needs no image-resizing code.
+- **Deleting a post deletes the image from CalmLens** with `assets.delete`, because CalmLens holds
+  the only copy.
+- **Decisions are tied back to the record they belong to.** A webhook or poll only updates a post or
+  comment when the asset's `externalId` matches the one Calmgram created it with.
+- **Retries are safe.** The SDK retries network failures and throttling with an idempotency key,
+  so a retried upload never creates a second asset.
+
+## Testing rejections safely
+
+CalmLens recognises special test inputs, so you can test your "post removed" flow without uploading
+real harmful content.
+
+Every test input carries your project's secret **test input key**, shown under **Assets → Try test
+inputs** in the CalmLens portal. CalmLens moderates inputs with another project's key like any
+other content, so only your project's members can make one. Demo mode recognises the key
+`1a2b3c4d`.
+
+- **Images:** download them from **New post**. They are generated with the active project's
+  test input key. A full-image 4×4 grid encodes the key using the category's four colours, so
+  violence remains red and self-harm remains purple. Download new files after changing projects.
+  `bun run test-images` also writes standalone simulator fixtures to `public/test-images/`;
+  set `CALMLENS_TEST_INPUT_KEY` when generating fixtures for a real project.
+- **Text:** include `<!calmlens-test XXXXXXXX harassment>` in a comment, where `XXXXXXXX` is your
+  test input key. `hate` and `criminal-activity` also work. `bun run test-images` prints the exact
+  codes, and the **New post** page shows one when `CALMLENS_TEST_INPUT_KEY` is set.
+
+## The public demo
+
+Calmgram is built to be deployed as a shared public demo, so each visitor gets a **private
+sandbox**, created on their first visit with a random username (no sign-up; crawlers don't get
+one). A session cookie keys one KV value holding their username, posts, comments, likes and
+bio. Nobody sees anyone else's uploads or rejected text, and the moderation queue shows shared illustrative examples alongside the
+visitor's own content. Everyone shares a read-only example feed, rendered from the same fixed list as the landing page. These examples are never uploaded to CalmLens.
+
+An hourly cron deletes each sandbox 24 hours after its last use, along with its images and text
+records on CalmLens. Because every visitor shares one CalmLens API key, Calmgram limits what anyone
+can spend:
+
+- uploads are capped at 20 per sandbox, and upload tokens are only signed below that cap;
+- form submissions and upload token requests are rate limited per IP address (20 a minute, the `WRITE_LIMITER` Workers Rate
+  Limiting binding in `wrangler.jsonc`);
+- sandboxes are only created by page views, never by a form submission without a session cookie;
+- all visitors together get a daily CalmLens budget (`CALMGRAM_DAILY_MODERATION_LIMIT`, default
+  2000 calls a day, counted in KV);
+- with `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` set, visitors pass a
+  [Turnstile](https://developers.cloudflare.com/turnstile/) check before any page loads, so
+  crawlers never reach the app (CalmLens webhook deliveries skip it). Without the keys, as in
+  local development, there is no check.
+
+To deploy your own:
+
+```bash
+bunx wrangler kv namespace create CALMGRAM   # put the id in wrangler.jsonc
+bunx wrangler secret put CALMLENS_API_KEY
+bunx wrangler secret put CALMLENS_PROJECT_ID
+bunx wrangler secret put CALMLENS_WEBHOOK_SECRET
+bunx wrangler secret put CALMLENS_UPLOAD_PRESET_ID   # optional, enables browser uploads
+bunx wrangler secret put TURNSTILE_SITE_KEY          # optional, with the secret key below
+bunx wrangler secret put TURNSTILE_SECRET_KEY        # enables the Turnstile check
+bun run deploy
+```
+
+Add your deployed origin to the upload preset's allowed sites.
+
+In the CalmLens repo, the public demo (`--env main`, example.calmlens.com) deploys automatically
+when a push to `main` changes this folder, via `.github/workflows/deploy-examples.yml`. Its
+`wrangler.jsonc` environment turns demo mode on explicitly (`CALMLENS_DEMO` and
+`CALMLENS_DEMO_ALLOW_REMOTE`); setting the CalmLens secrets switches it to live mode.
+
+## Before you ship something like this
+
+- Replace the per-visitor KV sandbox and automatic random accounts with your real database and auth.
+- Protect `/moderation` with admin auth.
+- Check your real user, and what they may post, in the upload token endpoint (`POST /api/uploads`).
+- Clean up uploads that were never submitted as a post: a token is signed for a post ID, so you
+  can list assets in the preset's folder whose `externalId` never became a post and delete them.
+- Pick and review your CalmLens moderation policy, and decide how users can appeal decisions.
+- CalmLens's general sexual-content moderation doesn't estimate age or detect CSAM. Platforms that
+  host user images usually need a dedicated hash-matching service as well.
+
+## License
+
+MIT
+
+The test-image palettes, grid encoding and compression-tolerant decoding come
+from `@calmlens/sdk/test-inputs`, also used by CalmLens itself. Calmgram only
+encodes/decodes PNG files and supplies the simulator's demo key. When developing
+against this repository, rebuild `javascript` after changing the shared
+test-input helpers.
+
+Links to `/new?caption=...` prefill the new post caption (up to 2,200 characters). The visitor can edit it and choose a photo before sharing. A draft retained after a failed submission takes precedence.
+
+The landing page and Calmgram use `packages/shared/src/ModerationExamplePosts.ts` as their fixed example list. These fictional posts and their illustrative decisions are available immediately in the feed and moderation queue. They are never seeded into KV or uploaded to CalmLens, and incur no moderation usage. Visitor-created posts remain isolated to their sandbox and use the configured moderation provider.

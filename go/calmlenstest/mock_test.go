@@ -1,0 +1,555 @@
+package calmlenstest
+
+import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	calmlens "github.com/CalmLens/sdks/go"
+)
+
+func TestMockLifecycle(t *testing.T) {
+	c, err := NewServerClient(Options{Now: func() int64 { return 123 }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	root, err := c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Root"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Child", ParentID: &root.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.Folders.Move(ctx, calmlens.MoveFolderOptions{FolderID: root.ID, ParentID: &child.ID}); err == nil {
+		t.Fatal("cycle allowed")
+	}
+	if err = c.Folders.Delete(ctx, calmlens.FolderIDOptions{FolderID: root.ID}); err == nil {
+		t.Fatal("deleted nonempty folder")
+	}
+	if _, err = c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Root"}); err == nil {
+		t.Fatal("duplicate allowed")
+	}
+	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	a, err := c.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
+	if err != nil || a.Processing.Status != calmlens.ProcessingStatusDone || a.Moderation.Status != calmlens.ModerationStatusApproved || *a.Moderation.DecidedAt != 123 ||
+		a.Content.Status != calmlens.ContentStatusStored || *a.Content.Format != "text/plain" || *a.Content.SizeInBytes != 5 || a.CreatedAt != 123 {
+		t.Fatal(a, err)
+	}
+	page, err := c.Assets.List(ctx, calmlens.ListAssetsOptions{})
+	if err != nil || len(page.Items) != 1 {
+		t.Fatal(page, err)
+	}
+	c.DatabaseStorage.Assets[a.ID]["processing"].(calmlens.JSON)["status"] = calmlens.ProcessingStatusFailed
+	a, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
+	if err != nil || a.Processing.Status != calmlens.ProcessingStatusProcessing || a.Moderation.Status != calmlens.ModerationStatusPending || a.Moderation.DecidedAt != nil {
+		t.Fatal(a, err)
+	}
+	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotRetryable {
+		t.Fatal("retried processing asset", err)
+	}
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 403 {
+		t.Fatal(res.StatusCode)
+	}
+	c.DatabaseStorage.Assets[a.ID]["visibility"] = "public"
+	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if string(body) != "hello" || res.StatusCode != 200 {
+		t.Fatal(string(body), res.StatusCode)
+	}
+	signed, err := c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, ExpiresInSeconds: 1})
+	if err != nil || signed.ExpiresAt != 1123 {
+		t.Fatal(signed, err)
+	}
+	signed, err = c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, TransformSteps: []calmlens.LensTransform{{Type: "imageTransform", Options: calmlens.JSON{"width": 64, "border": calmlens.JSON{"color": "#fff"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedURL, err := url.Parse(signed.URL)
+	if err != nil || signedURL.Query().Get("transform") != "imageTransform[border%5Bcolor%5D=%23fff,width=64]" {
+		t.Fatal(signed.URL, err)
+	}
+}
+func TestMockLensAndMultipart(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	lens := calmlens.EnsureLensOptions{Identifier: "x", Name: "X", Type: "image", Active: true, Version: 1}
+	if _, err := c.EnsureLens(ctx, lens); err != nil {
+		t.Fatal(err)
+	}
+	lens.Name = "New"
+	if _, err := c.EnsureLens(ctx, lens); err == nil {
+		t.Fatal("expected version conflict")
+	}
+	lens.Version = 2
+	if _, err := c.EnsureLens(ctx, lens); err != nil {
+		t.Fatal(err)
+	}
+	size := 5 * 1024 * 1024
+	a, err := c.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{Name: "x.png", Part: &calmlens.Content{Type: "image/png", Bytes: make([]byte, size)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err = c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: a.ID, Part: calmlens.Content{Bytes: make([]byte, size), PartNumber: 2, IsFinal: true}})
+	if err != nil || a.Moderation.Status != calmlens.ModerationStatusApproved || *a.Content.SizeInBytes != int64(2*size) || *a.Processing.UploadPartsReceived != 2 {
+		t.Fatal(a, err)
+	}
+}
+func TestMockDownloadGrant(t *testing.T) {
+	c, _ := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}, IncludeSubfolders: true}})})
+	ctx := context.Background()
+	a, err := c.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode)
+	}
+}
+
+func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
+	c, err := NewServerClient(Options{ProjectID: "my project", BaseURL: "http://localhost:8787/api/v1/", Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	folder, err := c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Inbox"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "note", FolderID: &folder.ID, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
+	if err != nil || a.Processing.Status != calmlens.ProcessingStatusProcessing || a.Moderation.Status != calmlens.ModerationStatusPending || a.Content.Status != calmlens.ContentStatusTemporary {
+		t.Fatal(a, err)
+	}
+	if _, err = c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	requests := c.Requests()
+	if len(requests) != 3 {
+		t.Fatalf("captured %d requests", len(requests))
+	}
+	create := requests[0]
+	if create.Method != "POST" || create.Path != "/projects/my project/folders" || create.Body["name"] != "Inbox" {
+		t.Fatalf("%+v", create)
+	}
+	upload := requests[1]
+	if upload.Path != "/projects/my project/assets" || upload.Header.Get("X-CalmLens-Upload") != "content" || upload.Query.Get("queue") != "true" || upload.Query.Get("folderId") != folder.ID || string(upload.RawBody) != "hi" || upload.Body != nil {
+		t.Fatalf("%+v", upload)
+	}
+	if requests[2].Method != "GET" || requests[2].Path != "/assets/"+a.ID {
+		t.Fatalf("%+v", requests[2])
+	}
+	c.ClearRequests()
+	if len(c.Requests()) != 0 {
+		t.Fatal("requests not cleared")
+	}
+	if _, err = NewServerClient(Options{Timeout: -time.Second}); err == nil {
+		t.Fatal("invalid timeout accepted")
+	}
+	if _, err = NewServerClient(Options{BaseURL: "localhost"}); err == nil {
+		t.Fatal("invalid base URL accepted")
+	}
+}
+
+func TestMockSimulatesTransportFailures(t *testing.T) {
+	c, err := NewServerClient(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	offline := errors.New("connection reset by peer")
+	c.FailNext(offline, context.DeadlineExceeded)
+	_, err = c.Folders.List(ctx)
+	var sdk *calmlens.Error
+	if !errors.As(err, &sdk) || sdk.Code != "sdk/transport-error" || !errors.Is(err, offline) {
+		t.Fatalf("transport failure: %v", err)
+	}
+	_, err = c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: "missing"})
+	if !errors.As(err, &sdk) || sdk.Code != "sdk/timeout" || !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("timeout: %v", err)
+	}
+	if _, err = c.Folders.List(ctx); err != nil {
+		t.Fatalf("failure queue not drained: %v", err)
+	}
+	if got := len(c.Requests()); got != 3 {
+		t.Fatalf("failed requests should be captured, got %d", got)
+	}
+}
+
+func TestMockDeleteContentKeepsRecordThenDeleteRemovesIt(t *testing.T) {
+	now := int64(500)
+	c, err := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}}), Now: func() int64 { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	serve := func(id string) int {
+		t.Helper()
+		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: id}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	a, err := c.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{Name: "clip", ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}, Content: &calmlens.Content{Type: "audio/mpeg", Bytes: []byte("ID3 clip")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := serve(a.ID); status != 200 {
+		t.Fatal("not served before removal", status)
+	}
+	now = 900
+	removed, err := c.Assets.DeleteContent(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
+	if err != nil || removed.ID != a.ID || removed.Moderation.Status != calmlens.ModerationStatusApproved || removed.Content.Status != calmlens.ContentStatusRemoved ||
+		*removed.Content.RemovalReason != calmlens.ContentRemovalReasonRequested || *removed.Content.UpdatedAt != 900 {
+		t.Fatal(removed, err)
+	}
+	if c.ImageStorage.Content[a.ID] != nil {
+		t.Fatal("stored bytes kept")
+	}
+	if status := serve(a.ID); status != 404 {
+		t.Fatal("content still served", status)
+	}
+	again, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
+	if err != nil || again.Content.Status != calmlens.ContentStatusRemoved || *again.Content.UpdatedAt != 900 {
+		t.Fatal(again, err)
+	}
+	if err = c.Assets.Delete(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	var apiErr *calmlens.Error
+	if _, err = c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); !errors.As(err, &apiErr) || apiErr.Code != "asset/not-found" {
+		t.Fatal("deleted asset still resolves", err)
+	}
+	if err = c.Assets.Delete(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); !errors.As(err, &apiErr) || apiErr.Code != "asset/not-found" {
+		t.Fatal("deleted twice", err)
+	}
+	if _, err = c.Assets.DeleteContent(ctx, calmlens.AssetIDOptions{}); !errors.As(err, &apiErr) || apiErr.Code != calmlens.CodeSDKInvalidArgument {
+		t.Fatal("empty ID accepted", err)
+	}
+}
+
+func TestMockErrorsUseAPIStatusesAndShape(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	_, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: "missing"})
+	var apiErr *calmlens.Error
+	if !errors.As(err, &apiErr) || apiErr.Status != 404 || apiErr.Code != calmlens.CodeAssetNotFound || apiErr.Details["network"] != true || apiErr.RequestID == "" || !calmlens.IsNotFound(err) {
+		t.Fatalf("%#v", apiErr)
+	}
+	folder, _ := c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Box"})
+	if _, err = c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "n", FolderID: &folder.ID, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("x")}}); err != nil {
+		t.Fatal(err)
+	}
+	err = c.Folders.Delete(ctx, calmlens.FolderIDOptions{FolderID: folder.ID})
+	if !errors.As(err, &apiErr) || apiErr.Status != 409 || apiErr.Code != calmlens.CodeFolderNotEmpty {
+		t.Fatal(err)
+	}
+}
+
+func TestMockSearchReturnsMatchingAssets(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	for _, name := range []string{"red car.png", "blue car.png", "red boat.png"} {
+		if _, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: name, Content: &calmlens.Content{Type: "image/png", Bytes: []byte("png")}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := c.Assets.Search(ctx, calmlens.SearchAssetsOptions{Query: "red car", Mode: "keyword"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Items) != 1 || result.Items[0].Asset.Name != "red car.png" || result.Items[0].Asset.ID == "" || fmt.Sprint(result.Items[0].MatchedFields) != "[name]" || result.Query != "red car" {
+		t.Fatalf("%+v", result)
+	}
+}
+
+func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
+	now := int64(0)
+	c, _ := NewServerClient(Options{Now: func() int64 { now++; return now }})
+	ctx := context.Background()
+	folder, _ := c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Inbox"})
+	create := func(name string, folderID *string) string {
+		a, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: name, FolderID: folderID, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr(name)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return a.ID
+	}
+	create("b", nil)
+	rejected := create("a", &folder.ID)
+	create("c", &folder.ID)
+	c.DatabaseStorage.Assets[rejected]["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusRejected
+	names := func(options calmlens.ListAssetsOptions) string {
+		page, err := c.Assets.List(ctx, options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := []string{}
+		for _, a := range page.Items {
+			out = append(out, a.Name)
+		}
+		return fmt.Sprint(out)
+	}
+	desc := []calmlens.Order{{Field: "createdAt", Direction: "DESC"}}
+	if got := names(calmlens.ListAssetsOptions{Ordering: desc}); got != "[c a b]" {
+		t.Fatal(got)
+	}
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("moderation.status==pending"), Ordering: desc}); got != "[c b]" {
+		t.Fatal(got)
+	}
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("moderation.status==rejected,name=in=(b,x)"), Ordering: desc}); got != "[a b]" {
+		t.Fatal(got)
+	}
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("processing.status==processing;content.format==text/plain"), Ordering: []calmlens.Order{{Field: "createdAt", Direction: "ASC"}}}); got != "[b a c]" {
+		t.Fatal(got)
+	}
+	if got := names(calmlens.ListAssetsOptions{FolderID: &folder.ID}); got != "[c a]" {
+		t.Fatal(got)
+	}
+	for _, filter := range []string{"secret==1", "status==pending"} {
+		_, err := c.Assets.List(ctx, calmlens.ListAssetsOptions{Filter: calmlens.Ptr(filter)})
+		var apiErr *calmlens.Error
+		if !errors.As(err, &apiErr) || apiErr.Status != 400 {
+			t.Fatal("unknown filter field accepted", filter, err)
+		}
+	}
+}
+
+func TestMockEventsAreEnqueuedAndPaged(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	start, err := c.Events.List(ctx, calmlens.ListEventsOptions{})
+	if err != nil || len(start.Events) != 0 {
+		t.Fatal(start, err)
+	}
+	c.EnqueueEvent(calmlens.Event{Type: "asset.approved", AssetID: calmlens.Ptr("a1")}, calmlens.Event{Type: "asset.failed"}, calmlens.Event{Type: "asset.rejected"})
+	it := c.Events.ListAll(calmlens.ListEventsOptions{After: start.Cursor, Limit: 2})
+	types := []string{}
+	for it.Next(ctx) {
+		types = append(types, it.Event().Type)
+	}
+	if it.Err() != nil || fmt.Sprint(types) != "[asset.approved asset.failed asset.rejected]" {
+		t.Fatal(types, it.Err())
+	}
+	again, err := c.Events.List(ctx, calmlens.ListEventsOptions{After: it.Cursor()})
+	if err != nil || len(again.Events) != 0 || again.Cursor != it.Cursor() {
+		t.Fatal("cursor did not resume after the last event", again, err)
+	}
+	_, err = c.Events.List(ctx, calmlens.ListEventsOptions{After: "bogus"})
+	if calmlens.ErrorCode(err) != calmlens.CodeInvalidEventCursor {
+		t.Fatal(err)
+	}
+}
+
+func TestMockMultipartUsesSavedQueueModeAndChecksParts(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	size := 5 * 1024 * 1024
+	start := func() string {
+		a, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "doc.pdf", Part: &calmlens.Content{Type: "application/pdf", Bytes: make([]byte, size)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return a.ID
+	}
+	id := start()
+	_, err := c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: id, Part: calmlens.Content{Bytes: []byte("x"), PartNumber: 3, IsFinal: true}})
+	var apiErr *calmlens.Error
+	if !errors.As(err, &apiErr) || apiErr.Status != 409 || apiErr.Code != calmlens.CodeInvalidUploadPartNumber || fmt.Sprint(apiErr.Details["expectedPartNumber"]) != "2" {
+		t.Fatal(err)
+	}
+	final, err := c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: id, Part: calmlens.Content{Bytes: []byte("x"), PartNumber: 2, IsFinal: true}})
+	if err != nil || final.Processing.Status != calmlens.ProcessingStatusProcessing || final.Moderation.Status != calmlens.ModerationStatusPending {
+		t.Fatal("saved queue mode not applied", final, err)
+	}
+	if requests := c.Requests(); requests[len(requests)-1].Query.Has("queue") {
+		t.Fatal("part sent queue without an override")
+	}
+	if _, err = c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: id, Part: calmlens.Content{Bytes: []byte("x"), PartNumber: 3, IsFinal: true}}); calmlens.ErrorCode(err) != calmlens.CodeUploadNotOpen {
+		t.Fatal("closed upload accepted a part", err)
+	}
+	id = start()
+	final, err = c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: id, Queue: calmlens.Ptr(false), Part: calmlens.Content{Bytes: []byte("x"), PartNumber: 2, IsFinal: true}})
+	if err != nil || final.Moderation.Status != calmlens.ModerationStatusApproved {
+		t.Fatal("queue override ignored", final, err)
+	}
+}
+
+func TestMockReplaysIdempotentRequests(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	options := calmlens.SubmitAssetOptions{Name: "n", IdempotencyKey: "key-1", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("x")}}
+	first, err := c.Assets.Create(ctx, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := c.Assets.Create(ctx, options)
+	if err != nil || second.ID != first.ID || len(c.DatabaseStorage.Assets) != 1 {
+		t.Fatal("replay created another asset", err)
+	}
+	options.Name = "other"
+	if _, err = c.Assets.Create(ctx, options); calmlens.ErrorCode(err) != calmlens.CodeIdempotencyKeyReused {
+		t.Fatal(err)
+	}
+}
+
+func TestMockCDNResponseIsRealistic(t *testing.T) {
+	c, _ := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}})})
+	ctx := context.Background()
+	a, _ := c.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{Name: "clip", ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}, Content: &calmlens.Content{Type: "audio/mpeg", Bytes: []byte("ID3 clip")}})
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}, Headers: http.Header{"Range": {"bytes=0-2"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != 206 || string(body) != "ID3" || res.Header.Get("Content-Type") != "audio/mpeg" || res.Header.Get("Content-Range") != "bytes 0-2/8" || res.ContentLength != 3 || res.Header.Get("X-Request-Id") == "" {
+		t.Fatal(res.Status, res.Header, string(body))
+	}
+	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: "missing"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var failure calmlens.JSON
+	if err = json.NewDecoder(res.Body).Decode(&failure); err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 404 || failure["code"] != calmlens.CodeAssetNotFound {
+		t.Fatal(res.StatusCode, failure)
+	}
+}
+
+func TestMockSignsUploadTokensWithItsKeyWithoutARequest(t *testing.T) {
+	key := CreateMockAPIKey(nil)
+	c, err := NewServerClient(Options{APIKey: key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := c.UploadTokens.Sign(context.Background(), calmlens.SignUploadTokenOptions{UploadPresetID: "preset-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rest, _ := strings.CutPrefix(signed.Token, "clut_")
+	body, signature, _ := strings.Cut(rest, ".")
+	hash := sha256.Sum256([]byte(key))
+	mac := hmac.New(sha256.New, []byte(hex.EncodeToString(hash[:])))
+	mac.Write([]byte("calmlens-upload-token:v1:" + body))
+	if signature != hex.EncodeToString(mac.Sum(nil)) || len(c.Requests()) != 0 {
+		t.Fatalf("signature %q, %d requests", signature, len(c.Requests()))
+	}
+}
+
+func TestMockWaitForDecisionReadsStorage(t *testing.T) {
+	c, err := NewServerClient(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	queued, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "note", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
+	if err != nil || queued.Moderation.Status != calmlens.ModerationStatusPending {
+		t.Fatal(queued, err)
+	}
+	c.ClearRequests()
+	type result struct {
+		asset *calmlens.Asset
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() {
+		asset, err := c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID})
+		done <- result{asset, err}
+	}()
+	// Decide the asset in storage while the client waits between checks.
+	for len(c.Requests()) == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
+		db.Assets[queued.ID]["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusRejected
+	})
+	got := <-done
+	if got.err != nil || got.asset.ID != queued.ID || got.asset.Moderation.Status != calmlens.ModerationStatusRejected {
+		t.Fatal(got.asset, got.err)
+	}
+	requests := c.Requests()
+	if len(requests) != 2 || requests[1].Method != http.MethodGet || requests[1].Path != "/assets/"+queued.ID {
+		t.Fatal(requests)
+	}
+	if _, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: "missing"}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotFound {
+		t.Fatal(err)
+	}
+}
+
+func TestMockOutcomesFinishProcessingAndRemoveTemporaryContent(t *testing.T) {
+	now := int64(10)
+	c, err := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}}), Now: func() int64 { return now }, QueuedOutcome: OutcomeFailed, AnalyzedOutcome: OutcomeRejected})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	text := &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}
+	rejected, err := c.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{Name: "rejected", Content: text})
+	if err != nil || rejected.Processing.Status != calmlens.ProcessingStatusDone || rejected.Moderation.Status != calmlens.ModerationStatusRejected ||
+		rejected.Content.Status != calmlens.ContentStatusRemoved || *rejected.Content.RemovalReason != calmlens.ContentRemovalReasonRetention || c.ImageStorage.Content[rejected.ID] != nil {
+		t.Fatal(rejected, err)
+	}
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: rejected.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 404 {
+		t.Fatal("removed content served", res.StatusCode)
+	}
+	failed, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "failed", Content: text})
+	if err != nil || failed.Processing.Status != calmlens.ProcessingStatusFailed || failed.Moderation.Status != calmlens.ModerationStatusPending || failed.Content.Status != calmlens.ContentStatusTemporary {
+		t.Fatal(failed, err)
+	}
+	now = 20
+	retried, err := c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: failed.ID})
+	if err != nil || retried.Processing.Status != calmlens.ProcessingStatusProcessing || *retried.Processing.UpdatedAt != 20 || c.ImageStorage.Content[failed.ID] == nil {
+		t.Fatal(retried, err)
+	}
+	c.DatabaseStorage.Assets[rejected.ID]["processing"].(calmlens.JSON)["status"] = calmlens.ProcessingStatusFailed
+	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: rejected.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetContentUnavailable {
+		t.Fatal("retried an asset without content", err)
+	}
+	if _, err = NewServerClient(Options{AnalyzedOutcome: "error"}); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
+		t.Fatal("unknown outcome accepted", err)
+	}
+}
+
+func TestMockOpenMultipartUploadIsUploading(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	a, err := c.Assets.Create(context.Background(), calmlens.SubmitAssetOptions{Name: "x.png", Part: &calmlens.Content{Type: "image/png", Bytes: make([]byte, 5*1024*1024)}})
+	if err != nil || a.Processing.Status != calmlens.ProcessingStatusUploading || *a.Processing.UploadPartsReceived != 1 || a.Moderation.Status != calmlens.ModerationStatusPending || a.Moderation.DecidedAt != nil {
+		t.Fatal(a, err)
+	}
+}

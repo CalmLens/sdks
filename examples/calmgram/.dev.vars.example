@@ -1,0 +1,13 @@
+# Fill in the CalmLens key and project ID. Without them Calmgram refuses to start, unless you
+# ask for demo mode (moderation simulated locally) with CALMLENS_DEMO=1 or `bun run dev:demo`.
+# CALMLENS_DEMO=1
+
+# Portal → Developer → API Keys. Keep it server-side only.
+CALMLENS_API_KEY=
+# Portal → project selector → Edit project → Project ID
+CALMLENS_PROJECT_ID=
+# Portal → Developer → Upload presets: a preset that requires upload tokens (see README). With it,
+# browsers upload photos straight to CalmLens; without it, photos are posted to the Worker.
+CALMLENS_UPLOAD_PRESET_ID=
+# Portal → Webhooks. Point a destination at https://<your-app>/api/webhooks/calmlens
+CALMLENS_WEBHOOK_SECRET=

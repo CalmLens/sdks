@@ -1,0 +1,45 @@
+name: Publish Go SDK
+on:
+  push:
+    tags:
+      - go/v*
+concurrency:
+  group: calmlens-go-sdk-release
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the tag matches the SDK version
+        id: version
+        working-directory: .
+        run: node scripts/check-sdk-release-tag.mjs go "$GITHUB_REF_NAME"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Test
+        run: |
+          test -z "$(gofmt -l .)"
+          go test -race ./...
+          go vet ./...
+      - name: Verify the public Go proxy can resolve the release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if GOPROXY=https://proxy.golang.org go list -m "github.com/CalmLens/sdks/go@v$VERSION"; then exit 0; fi
+            sleep 10
+          done
+          exit 1
