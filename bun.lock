@@ -10,7 +10,7 @@
     },
     "javascript": {
       "name": "@calmlens/sdk",
-      "version": "0.16.1",
+      "version": "0.16.2",
       "dependencies": {
         "json-schema-to-ts": "^3.1.1",
         "zod": "^4.6.5",

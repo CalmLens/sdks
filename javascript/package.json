@@ -1,6 +1,6 @@
 {
   "name": "@calmlens/sdk",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "Official CalmLens SDK for JavaScript and TypeScript: content moderation, asset storage and CDN delivery.",
   "license": "MIT",
   "homepage": "https://calmlens.com/docs/sdk/javascript",

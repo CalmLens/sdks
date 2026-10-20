@@ -109,7 +109,7 @@ class WebhookTests(unittest.TestCase):
 
     def test_javascript_contract(self):
         # Generated from the JavaScript SDK by packages/sdk-contract/generate.ts.
-        path = Path(__file__).parents[2] / "go" / "testdata" / "webhooks.json"
+        path = Path(__file__).resolve().parents[2] / "go" / "testdata" / "webhooks.json"
         fixtures = json.loads(path.read_text(encoding="utf-8"))
         for case in fixtures["parsing"]:
             parsed = parse_webhook_event(case["body"], signature=case["signature"], timestamp=case["timestamp"], secret=case["secret"], now=case["now"])

@@ -11,7 +11,7 @@ from calmlens import CalmLensServerClient, CalmLensError
 
 class ContractTests(unittest.TestCase):
     def test_javascript_requests(self):
-        fixtures = json.loads((Path(__file__).parents[2] / "go" / "testdata" / "requests.json").read_text())
+        fixtures = json.loads((Path(__file__).resolve().parents[2] / "go" / "testdata" / "requests.json").read_text())
         for fixture in fixtures:
             with self.subTest(operation=fixture["operation"]):
                 captured = []
@@ -36,7 +36,7 @@ class ContractTests(unittest.TestCase):
                 self.assertEqual({"method": request.method, "path": url.path, "query": dict(parse_qsl(url.query)), "body": body}, fixture["request"])
 
     def test_javascript_path_safety(self):
-        paths = json.loads((Path(__file__).parents[2] / "go" / "testdata" / "paths.json").read_text())
+        paths = json.loads((Path(__file__).resolve().parents[2] / "go" / "testdata" / "paths.json").read_text())
         def transport(request, timeout):
             raise AssertionError(f"Sent {request.full_url} for a rejected ID")
         c = CalmLensServerClient(api_key="key", project_id="project-1", transport=transport)

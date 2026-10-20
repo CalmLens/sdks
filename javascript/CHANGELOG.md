@@ -1,6 +1,6 @@
 ## 0.16.0
 
-## 0.16.1
+## 0.16.2
 
 - Maintain the SDK and examples in the public CalmLens/sdks repository, with standalone buildable TypeScript source and public issue links.
 
