@@ -1,7 +1,7 @@
 PATH
   remote: ../../ruby
   specs:
-    calmlens (0.1.0)
+    calmlens (0.1.1)
 
 GEM
   remote: https://rubygems.org/
@@ -19,7 +19,7 @@ DEPENDENCIES
   webrick (~> 1.8)
 
 CHECKSUMS
-  calmlens (0.1.0)
+  calmlens (0.1.1)
   minitest (5.27.0) sha256=2d3b17f8a36fe7801c1adcffdbc38233b938eb0b4966e97a6739055a45fa77d5
   webrick (1.9.2) sha256=beb4a15fc474defed24a3bda4ffd88a490d517c9e4e6118c3edce59e45864131
 

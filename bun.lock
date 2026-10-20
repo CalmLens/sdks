@@ -11,15 +11,15 @@
     },
     "go": {
       "name": "@calmlens/sdk-go",
-      "version": "0.1.0",
+      "version": "0.1.1",
     },
     "java": {
       "name": "@calmlens/sdk-java",
-      "version": "0.1.1",
+      "version": "0.1.2",
     },
     "javascript": {
       "name": "@calmlens/sdk",
-      "version": "0.16.2",
+      "version": "0.16.3",
       "dependencies": {
         "json-schema-to-ts": "^3.1.1",
         "zod": "^4.6.5",
@@ -37,15 +37,15 @@
     },
     "python": {
       "name": "@calmlens/sdk-python",
-      "version": "0.1.1",
+      "version": "0.1.2",
     },
     "ruby": {
       "name": "@calmlens/sdk-ruby",
-      "version": "0.1.0",
+      "version": "0.1.1",
     },
     "rust": {
       "name": "@calmlens/sdk-rust",
-      "version": "0.1.0",
+      "version": "0.1.1",
     },
   },
   "packages": {
