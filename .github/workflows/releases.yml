@@ -1,0 +1,29 @@
+name: Version SDKs
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+concurrency:
+  group: sdk-version-pr
+  cancel-in-progress: false
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - uses: changesets/action@v2.1.2
+        with:
+          version-script: bun run release:version
+          pr-title: Version SDKs
+          commit-message: Version SDKs
+          create-github-releases: false
+          push-git-tags: false

@@ -1,6 +1,9 @@
 name: Publish Go SDK
 on:
+  workflow_dispatch: {}
   push:
+    branches: [main]
+    paths: [".changeset/release.json"]
     tags:
       - go/v*
 concurrency:
@@ -9,7 +12,24 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/release-go.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
   publish:
+    if: startsWith(github.ref, 'refs/tags/go/v')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}

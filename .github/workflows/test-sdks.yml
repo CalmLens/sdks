@@ -15,6 +15,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run release:check
+      - run: bun run release:test
       - run: node --test scripts/check-sdk-release-tag.test.mjs
   python:
     runs-on: ubuntu-latest

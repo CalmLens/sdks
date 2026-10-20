@@ -51,11 +51,18 @@ Private backend provisioning and implementation stay in the application reposito
 
 ## Releases
 
+Add a changeset with `bun run changeset` when an SDK needs a release. Select the SDKs
+and bump type; the Version SDKs workflow maintains a release PR containing the native
+version updates and per-SDK changelogs. Merge that PR to release.
+
 Registry publishing runs in the private application repository with its existing trusted
-publishers and protected environments. A release pins the reviewed public commit there,
-then tags that private commit with `javascript/v<version>`, `python-sdk/v<version>`,
-`ruby-sdk/v<version>`, `rust-sdk/v<version>` or `java-sdk/v<version>`. Each job checks its
-manifest version before publishing. Go releases use `go/v<version>` here, verified by CI
-and the public Go proxy. Published versions and tags are immutable.
+publishers and protected environments. Its Release SDKs workflow checks tested public
+release plans every 15 minutes (or on manual dispatch), advances the submodule pin,
+creates immutable release tags and dispatches the existing publishing jobs. Go tags and
+proxy validation run here. Check both repositories' Actions for completion.
+
+See [.changeset/README.md](.changeset/README.md) for package identifiers and retry guidance.
+The small native `package.json` files are version records for Changesets, not npm packages.
+Published versions and tags are immutable.
 
 All SDKs and examples are available under the [MIT licence](LICENSE).

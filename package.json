@@ -2,9 +2,21 @@
   "name": "calmlens-sdks",
   "private": true,
   "workspaces": [
-    "javascript"
+    "javascript",
+    "python",
+    "ruby",
+    "rust",
+    "java",
+    "go"
   ],
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15"
+    "@biomejs/biome": "^2.5.15",
+    "@changesets/cli": "^3.0.3"
+  },
+  "scripts": {
+    "changeset": "changeset",
+    "release:version": "node scripts/version-sdks.mjs",
+    "release:check": "node scripts/version-sdks.mjs --check",
+    "release:test": "node --test scripts/version-sdks.test.mjs scripts/changesets.test.mjs"
   }
 }
