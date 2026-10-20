@@ -1,5 +1,9 @@
 ## 0.16.0
 
+## 0.16.1
+
+- Maintain the SDK and examples in the public CalmLens/sdks repository, with standalone buildable TypeScript source and public issue links.
+
 ### Minor Changes
 
 - bf9eaa5: Breaking: asset and child-asset lists now accept `cursor` instead of `pageIndex` and return `nextCursor`. The exported generic page type is now `CursorPage`. Iterators follow continuation cursors automatically. Public list ordering supports `createdAt` and `id`, with an ID tie-breaker; exact totals are no longer returned.
