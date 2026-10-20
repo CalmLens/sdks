@@ -316,13 +316,44 @@ type ClassificationReport struct {
 type ReportPolicy struct {
 	Score      float64                        `json:"score"`
 	Categories map[string]CategoryPolicyScore `json:"categories"`
+	Decision   *ReportPolicyDecision          `json:"decision,omitempty"`
 }
 
 // CategoryPolicyScore is how strongly a category meets the policy, from 0 to 1, and the action
 // the policy takes: ignore, alert, hide or purge.
 type CategoryPolicyScore struct {
-	Score  float64 `json:"score"`
-	Action string  `json:"action"`
+	Score    float64                         `json:"score"`
+	Action   string                          `json:"action"`
+	Source   *CategoryPolicySource           `json:"source,omitempty"`
+	Settings *CategoryPolicySettingsSnapshot `json:"settings,omitempty"`
+}
+
+// CategoryPolicySource identifies the deciding rule or threshold.
+type CategoryPolicySource struct {
+	Kind  string `json:"kind"`
+	Index *int   `json:"index,omitempty"`
+}
+
+// PolicyRuleSnapshot records a rule in force when the asset was decided.
+type PolicyRuleSnapshot struct {
+	Name   string   `json:"name,omitempty"`
+	When   []string `json:"when"`
+	Action string   `json:"action"`
+}
+
+// CategoryPolicySettingsSnapshot preserves settings independently of later policy edits.
+type CategoryPolicySettingsSnapshot struct {
+	Threshold      float64              `json:"threshold"`
+	CategoryAction string               `json:"categoryAction"`
+	Allowances     []PolicyRuleSnapshot `json:"allowances"`
+	Restrictions   []PolicyRuleSnapshot `json:"restrictions"`
+}
+
+// ReportPolicyDecision records the automatic action and what triggered it.
+type ReportPolicyDecision struct {
+	Source            string   `json:"source"`
+	Action            *string  `json:"action"`
+	FlaggedCategories []string `json:"flaggedCategories"`
 }
 
 // Processing feature stages. Beta results may change shape.

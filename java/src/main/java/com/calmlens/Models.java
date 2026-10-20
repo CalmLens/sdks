@@ -1417,7 +1417,7 @@ public final class Models {
    * @param score the highest category policy score
    * @param categories policy results by category
    */
-  public record ReportPolicy(Double score, Map<String, CategoryPolicyScore> categories) {
+  public record ReportPolicy(Double score, Map<String, CategoryPolicyScore> categories, ReportPolicyDecision decision) {
     /** Copies collections so the record stays immutable. */
     public ReportPolicy { categories = map(categories); }
   }
@@ -1428,7 +1428,27 @@ public final class Models {
    * @param score policy score from 0 to 1
    * @param action {@code ignore}, {@code alert}, {@code hide} or {@code purge}
    */
-  public record CategoryPolicyScore(Double score, String action) {}
+  public record CategoryPolicyScore(Double score, String action, CategoryPolicySource source,
+      CategoryPolicySettingsSnapshot settings) {}
+
+  /** The category threshold or rule that decided the outcome. */
+  public record CategoryPolicySource(String kind, Integer index) {}
+
+  /** A named rule as it was configured when the asset was decided. */
+  public record PolicyRuleSnapshot(String name, List<String> when, String action) {
+    public PolicyRuleSnapshot { when = list(when); }
+  }
+
+  /** Historical category settings used to explain the saved decision. */
+  public record CategoryPolicySettingsSnapshot(Double threshold, String categoryAction,
+      List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions) {
+    public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
+  }
+
+  /** Final automatic action, flagged categories and decision source. */
+  public record ReportPolicyDecision(String source, String action, List<String> flaggedCategories) {
+    public ReportPolicyDecision { flaggedCategories = list(flaggedCategories); }
+  }
 
   /**
    * One category result. {@code score} is set only for {@code evaluated} and {@code partial}.

@@ -1,4 +1,4 @@
-import { C as MODERATION_QUALIFIERS, S as docPropertyInfo, T as metaStore, _ as primaryUuidField, b as uuidField, f as CLASSIFICATION_REPORT_SCHEMA, g as createdAtField, h as MODERATION_POLICY_CATEGORY_SCHEMA, m as MODERATION_POLICY_CATEGORIES, n as TEST_INPUT_KEY_PATTERN, p as FLAGGED_CONTENT_ACTION_SCHEMA, v as saneStringField, w as getModerationQualifiers, x as PROCESSING_FEATURES_SCHEMA, y as updatedAtField } from "./TestTriggers-DV6Y1ah7.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-Dhh-1H6c.js";
 import "./SharedConstants-Dn7ZJF5S.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-B5dqc8aj.js";
@@ -41,18 +41,6 @@ const FLAGGED_CONTENT_ACTION_RANK = {
 	hide: 2,
 	purge: 3
 };
-const policyRuleSchema = (whenDescription, actionDescription) => zod.object({
-	name: zod.string().trim().min(1).max(80).optional(),
-	when: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, "Qualifiers must be unique").meta({ description: whenDescription }),
-	action: FLAGGED_CONTENT_ACTION_SCHEMA.meta({ description: actionDescription })
-}).strict();
-/**
-* Lets content through, or acts on it more softly, when all of the category's content is one of
-* these qualifiers. One historical sentence never excuses a live threat beside it.
-*/
-const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Applies when all of the category's content is one of these qualifiers.", "Softer than the category action: what happens to content the allowance covers.");
-/** Acts on the content as soon as any of these qualifiers is present, whatever else it contains. */
-const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Applies when any of these qualifiers is present.", "At least as strong as the category action, and never `ignore`.");
 /** Why a rule can't be used with its category's action, or undefined when it can. */
 const getPolicyRuleConflict = (kind, rule, categoryAction) => {
 	const rank = FLAGGED_CONTENT_ACTION_RANK[rule.action];

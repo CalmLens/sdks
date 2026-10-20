@@ -1,5 +1,14 @@
 import "./ModerationPolicyDimensions-CGuT-QNm.js";
 import * as zod from "zod";
+//#region packages/shared/src/PolicyRule.d.ts
+declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
+  alert: "alert";
+  hide: "hide";
+  ignore: "ignore";
+  purge: "purge";
+}>;
+type FlaggedContentAction = zod.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
+//#endregion
 //#region packages/shared/src/Classification.d.ts
 declare const CLASSIFICATION_CATEGORY_SCHEMA: zod.ZodEnum<{
   "criminal-activity": "criminal-activity";
@@ -1933,14 +1942,6 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>], "status">;
 }, zod.core.$strict>;
 type ClassificationCategories = zod.infer<typeof CATEGORIES_SCHEMA>;
-/** What a moderation policy does with a category: nothing, alert, hide or purge. */
-declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
-  alert: "alert";
-  hide: "hide";
-  ignore: "ignore";
-  purge: "purge";
-}>;
-type FlaggedContentAction = zod.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
 declare const CLASSIFICATION_LABEL_SCHEMA: zod.ZodObject<{
   description: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
   score: zod.ZodNumber;
@@ -5199,9 +5200,189 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         ignore: "ignore";
         purge: "purge";
       }>;
+      source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        kind: zod.ZodLiteral<"default">;
+      }, zod.core.$strict>, zod.ZodObject<{
+        kind: zod.ZodLiteral<"below-threshold">;
+      }, zod.core.$strict>, zod.ZodObject<{
+        kind: zod.ZodLiteral<"allowance">;
+        index: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        kind: zod.ZodLiteral<"restriction">;
+        index: zod.ZodNumber;
+      }, zod.core.$strict>], "kind">>;
+      settings: zod.ZodOptional<zod.ZodObject<{
+        threshold: zod.ZodNumber;
+        categoryAction: zod.ZodEnum<{
+          alert: "alert";
+          hide: "hide";
+          ignore: "ignore";
+          purge: "purge";
+        }>;
+        allowances: zod.ZodArray<zod.ZodObject<{
+          name: zod.ZodOptional<zod.ZodString>;
+          when: zod.ZodArray<zod.ZodEnum<{
+            "criminal-activity-demonstration": "criminal-activity-demonstration";
+            "criminal-activity-fictional": "criminal-activity-fictional";
+            "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
+            "criminal-activity-instructions": "criminal-activity-instructions";
+            "criminal-activity-preparation": "criminal-activity-preparation";
+            "criminal-activity-promotion": "criminal-activity-promotion";
+            "criminal-activity-request": "criminal-activity-request";
+            "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+            "harassment-abuse": "harassment-abuse";
+            "harassment-encouragement": "harassment-encouragement";
+            "harassment-fictional": "harassment-fictional";
+            "harassment-intimidation": "harassment-intimidation";
+            "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
+            "harassment-threat": "harassment-threat";
+            "hate-abuse": "hate-abuse";
+            "hate-dehumanization": "hate-dehumanization";
+            "hate-exclusion": "hate-exclusion";
+            "hate-fictional": "hate-fictional";
+            "hate-historical": "hate-historical";
+            "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
+            "hate-threat": "hate-threat";
+            "self-harm-act": "self-harm-act";
+            "self-harm-documentary": "self-harm-documentary";
+            "self-harm-educational": "self-harm-educational";
+            "self-harm-encouragement": "self-harm-encouragement";
+            "self-harm-fictional": "self-harm-fictional";
+            "self-harm-methods": "self-harm-methods";
+            "self-harm-preparation": "self-harm-preparation";
+            "self-harm-support-prevention": "self-harm-support-prevention";
+            "self-harm-thoughts": "self-harm-thoughts";
+            "sexual-activity": "sexual-activity";
+            "sexual-documentary": "sexual-documentary";
+            "sexual-educational": "sexual-educational";
+            "sexual-explicit-language": "sexual-explicit-language";
+            "sexual-fictional": "sexual-fictional";
+            "sexual-historical": "sexual-historical";
+            "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
+            "sexual-solicitation": "sexual-solicitation";
+            "sexual-support-prevention": "sexual-support-prevention";
+            "violence-attack": "violence-attack";
+            "violence-documentary": "violence-documentary";
+            "violence-educational": "violence-educational";
+            "violence-encouragement": "violence-encouragement";
+            "violence-fictional": "violence-fictional";
+            "violence-graphic": "violence-graphic";
+            "violence-historical": "violence-historical";
+            "violence-injury": "violence-injury";
+            "violence-natural-death": "violence-natural-death";
+            "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
+            "violence-support-prevention": "violence-support-prevention";
+            "violence-threat": "violence-threat";
+            "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
+          }>>;
+          action: zod.ZodEnum<{
+            alert: "alert";
+            hide: "hide";
+            ignore: "ignore";
+            purge: "purge";
+          }>;
+        }, zod.core.$strict>>;
+        restrictions: zod.ZodArray<zod.ZodObject<{
+          name: zod.ZodOptional<zod.ZodString>;
+          when: zod.ZodArray<zod.ZodEnum<{
+            "criminal-activity-demonstration": "criminal-activity-demonstration";
+            "criminal-activity-fictional": "criminal-activity-fictional";
+            "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
+            "criminal-activity-instructions": "criminal-activity-instructions";
+            "criminal-activity-preparation": "criminal-activity-preparation";
+            "criminal-activity-promotion": "criminal-activity-promotion";
+            "criminal-activity-request": "criminal-activity-request";
+            "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+            "harassment-abuse": "harassment-abuse";
+            "harassment-encouragement": "harassment-encouragement";
+            "harassment-fictional": "harassment-fictional";
+            "harassment-intimidation": "harassment-intimidation";
+            "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
+            "harassment-threat": "harassment-threat";
+            "hate-abuse": "hate-abuse";
+            "hate-dehumanization": "hate-dehumanization";
+            "hate-exclusion": "hate-exclusion";
+            "hate-fictional": "hate-fictional";
+            "hate-historical": "hate-historical";
+            "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
+            "hate-threat": "hate-threat";
+            "self-harm-act": "self-harm-act";
+            "self-harm-documentary": "self-harm-documentary";
+            "self-harm-educational": "self-harm-educational";
+            "self-harm-encouragement": "self-harm-encouragement";
+            "self-harm-fictional": "self-harm-fictional";
+            "self-harm-methods": "self-harm-methods";
+            "self-harm-preparation": "self-harm-preparation";
+            "self-harm-support-prevention": "self-harm-support-prevention";
+            "self-harm-thoughts": "self-harm-thoughts";
+            "sexual-activity": "sexual-activity";
+            "sexual-documentary": "sexual-documentary";
+            "sexual-educational": "sexual-educational";
+            "sexual-explicit-language": "sexual-explicit-language";
+            "sexual-fictional": "sexual-fictional";
+            "sexual-historical": "sexual-historical";
+            "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
+            "sexual-solicitation": "sexual-solicitation";
+            "sexual-support-prevention": "sexual-support-prevention";
+            "violence-attack": "violence-attack";
+            "violence-documentary": "violence-documentary";
+            "violence-educational": "violence-educational";
+            "violence-encouragement": "violence-encouragement";
+            "violence-fictional": "violence-fictional";
+            "violence-graphic": "violence-graphic";
+            "violence-historical": "violence-historical";
+            "violence-injury": "violence-injury";
+            "violence-natural-death": "violence-natural-death";
+            "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
+            "violence-support-prevention": "violence-support-prevention";
+            "violence-threat": "violence-threat";
+            "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
+          }>>;
+          action: zod.ZodEnum<{
+            alert: "alert";
+            hide: "hide";
+            ignore: "ignore";
+            purge: "purge";
+          }>;
+        }, zod.core.$strict>>;
+      }, zod.core.$strict>>;
+    }, zod.core.$strict>>;
+    decision: zod.ZodOptional<zod.ZodObject<{
+      source: zod.ZodEnum<{
+        "asset-override": "asset-override";
+        children: "children";
+        policy: "policy";
+      }>;
+      action: zod.ZodNullable<zod.ZodEnum<{
+        alert: "alert";
+        hide: "hide";
+        purge: "purge";
+      }>>;
+      flaggedCategories: zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>;
     }, zod.core.$strict>>;
   }, zod.core.$strict>>;
 }, zod.core.$strict>;
 type ClassificationReport = zod.infer<typeof CLASSIFICATION_REPORT_SCHEMA>;
 //#endregion
-export { ClassificationNotEvaluatedReason as a, FlaggedContentAction as c, ClassificationLabel as i, Likelihood as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, ClassificationReport as s, ClassificationCategories as t };
+export { ClassificationNotEvaluatedReason as a, Likelihood as c, ClassificationLabel as i, FlaggedContentAction as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, ClassificationReport as s, ClassificationCategories as t };

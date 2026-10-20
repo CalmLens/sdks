@@ -309,3 +309,17 @@ func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 		t.Fatalf("FactDecidedBy %+v", fact)
 	}
 }
+
+func TestReportPolicySnapshotDecode(t *testing.T) {
+	var policy ReportPolicy
+	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"restriction","index":0},"settings":{"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
+		t.Fatal(err)
+	}
+	category := policy.Categories["violence"]
+	if category.Settings.Threshold != 0.6 || category.Settings.Restrictions[0].Name != "snapshot-rule" || *category.Source.Index != 0 {
+		t.Fatalf("lost category snapshot: %#v", category)
+	}
+	if *policy.Decision.Action != "purge" || policy.Decision.Source != "asset-override" || !reflect.DeepEqual(policy.Decision.FlaggedCategories, []string{"violence"}) {
+		t.Fatalf("lost decision snapshot: %#v", policy.Decision)
+	}
+}

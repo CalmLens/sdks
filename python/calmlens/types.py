@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Union
 
 __all__ = [
+    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "CategoryPolicyScore", "ReportPolicy",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
     "AssetModeration", "AssetModerationAction", "AssetModerationStatus", "AssetPage", "AssetProcessing",
     "AssetProcessingStatus", "AssetReviewerAction", "AssetSearchMatch", "AssetSearchMatchField",
@@ -362,16 +363,55 @@ class ProcessingFeatureResults(TypedDict, total=False):
     faceDetection: FaceDetectionResult
 
 
-class CategoryPolicyScore(TypedDict):
+class _PolicyRuleSnapshotRequired(TypedDict):
+    when: List[str]
+    action: ModerationAction
+
+
+class PolicyRuleSnapshot(_PolicyRuleSnapshotRequired, total=False):
+    name: str
+
+
+class CategoryPolicySettingsSnapshot(TypedDict):
+    threshold: float
+    categoryAction: ModerationAction
+    allowances: List[PolicyRuleSnapshot]
+    restrictions: List[PolicyRuleSnapshot]
+
+
+class _CategoryPolicySourceRequired(TypedDict):
+    kind: str
+
+
+class CategoryPolicySource(_CategoryPolicySourceRequired, total=False):
+    index: int
+
+
+class ReportPolicyDecision(TypedDict):
+    source: str
+    action: Optional[ModerationAction]
+    flaggedCategories: List[str]
+
+
+class _CategoryPolicyScoreRequired(TypedDict):
     """How strongly a category meets the policy (``score``) and what the policy does with it."""
     score: float
     action: ModerationAction
 
 
-class ReportPolicy(TypedDict):
+class CategoryPolicyScore(_CategoryPolicyScoreRequired, total=False):
+    source: CategoryPolicySource
+    settings: CategoryPolicySettingsSnapshot
+
+
+class _ReportPolicyRequired(TypedDict):
     """What the project's policy made of the report when the asset was decided."""
     score: float
     categories: Dict[str, CategoryPolicyScore]
+
+
+class ReportPolicy(_ReportPolicyRequired, total=False):
+    decision: ReportPolicyDecision
 
 
 class _ClassificationReportRequired(TypedDict):

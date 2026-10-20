@@ -1507,6 +1507,9 @@ pub struct ReportPolicy {
     /// Policy results by category.
     #[serde(default)]
     pub categories: HashMap<ClassificationCategory, CategoryPolicyScore>,
+    /// The final automatic asset decision.
+    #[serde(default)]
+    pub decision: Option<ReportPolicyDecision>,
 }
 
 /// How strongly a category meets the policy, from 0 to 1, and what the policy does with it.
@@ -1520,6 +1523,76 @@ pub struct CategoryPolicyScore {
     /// `ignore`, `alert`, `hide` or `purge`.
     #[serde(default)]
     pub action: String,
+    /// The rule or threshold that decided the category.
+    #[serde(default)]
+    pub source: Option<CategoryPolicySource>,
+    /// Settings at decision time, independent of subsequent policy edits.
+    #[serde(default)]
+    pub settings: Option<CategoryPolicySettingsSnapshot>,
+}
+
+/// The category threshold or rule that decided the outcome.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CategoryPolicySource {
+    /// Saved kind.
+    #[serde(default)]
+    pub kind: String,
+    /// Saved index.
+    #[serde(default)]
+    pub index: Option<usize>,
+}
+
+/// A named rule in force when the asset was decided.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PolicyRuleSnapshot {
+    /// Saved name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Saved when.
+    #[serde(default)]
+    pub when: Vec<String>,
+    /// Saved action.
+    #[serde(default)]
+    pub action: String,
+}
+
+/// Historical category settings for explaining the decision.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CategoryPolicySettingsSnapshot {
+    /// Saved threshold.
+    #[serde(default)]
+    pub threshold: f64,
+    /// Saved category action.
+    #[serde(default)]
+    pub category_action: String,
+    /// Saved allowances.
+    #[serde(default)]
+    pub allowances: Vec<PolicyRuleSnapshot>,
+    /// Saved restrictions.
+    #[serde(default)]
+    pub restrictions: Vec<PolicyRuleSnapshot>,
+}
+
+/// The final automatic action, its source and flagged categories.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ReportPolicyDecision {
+    /// Saved source.
+    #[serde(default)]
+    pub source: String,
+    /// Saved action.
+    #[serde(default)]
+    pub action: Option<String>,
+    /// Saved flagged categories.
+    #[serde(default)]
+    pub flagged_categories: Vec<ClassificationCategory>,
 }
 
 /// One category's result.

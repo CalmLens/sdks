@@ -112,4 +112,16 @@ class ModelsTest {
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/content/imageTransform[gravity%5Bmode%5D=remainder,gravity%5Bx%5D=0.25,gravity%5By%5D=1]",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(List.of(point))));
   }
+  @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
+    Models.ReportPolicy policy = Json.GSON.fromJson("""
+        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"restriction","index":0},"settings":{"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
+        """, Models.ReportPolicy.class);
+    Models.CategoryPolicyScore category = policy.categories().get("violence");
+    assertEquals(0.6, category.settings().threshold());
+    assertEquals("snapshot-rule", category.settings().restrictions().get(0).name());
+    assertEquals(0, category.source().index());
+    assertEquals("asset-override", policy.decision().source());
+    assertEquals("purge", policy.decision().action());
+    assertEquals(List.of("violence"), policy.decision().flaggedCategories());
+  }
 }

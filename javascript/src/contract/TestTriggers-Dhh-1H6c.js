@@ -7999,6 +7999,26 @@ const MODERATION_QUALIFIERS_BY_CATEGORY = {
 };
 const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
 //#endregion
+//#region packages/shared/src/PolicyRule.ts
+const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([
+	"ignore",
+	"alert",
+	"hide",
+	"purge"
+]);
+const policyRuleSchema = (whenDescription, actionDescription) => zod.object({
+	name: zod.string().trim().min(1).max(80).optional(),
+	when: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, "Qualifiers must be unique").meta({ description: whenDescription }),
+	action: FLAGGED_CONTENT_ACTION_SCHEMA.meta({ description: actionDescription })
+}).strict();
+/**
+* Lets content through, or acts on it more softly, when all of the category's content is one of
+* these qualifiers. One historical sentence never excuses a live threat beside it.
+*/
+const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Applies when all of the category's content is one of these qualifiers.", "Softer than the category action: what happens to content the allowance covers.");
+/** Acts on the content as soon as any of these qualifiers is present, whatever else it contains. */
+const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Applies when any of these qualifiers is present.", "At least as strong as the category action, and never `ignore`.");
+//#endregion
 //#region packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
 //#endregion
@@ -8254,20 +8274,40 @@ const CATEGORIES_SCHEMA = zod.object({
 	hate: CLASSIFICATION_CATEGORY_REPORT_SCHEMA,
 	"criminal-activity": CLASSIFICATION_CATEGORY_REPORT_SCHEMA
 }).strict();
-/** What a moderation policy does with a category: nothing, alert, hide or purge. */
-const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([
-	"ignore",
-	"alert",
-	"hide",
-	"purge"
-]);
 /** What the project's policy made of the report when the asset was decided. */
 const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 	score: zod.number().min(0).max(1).describe("The highest category policy score."),
 	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, zod.object({
 		score: zod.number().min(0).max(1).describe("How strongly the content meets the policy, from 0 to 1: the category score, lowered by allowances that cover the content and raised to the presence score of a restriction."),
-		action: FLAGGED_CONTENT_ACTION_SCHEMA.describe("What the policy does with this category. `ignore` when the policy score is below the category threshold.")
-	}).strict()).describe("Each assessed category's policy score and action. Unassessed categories are left out.")
+		action: FLAGGED_CONTENT_ACTION_SCHEMA.describe("What the policy does with this category. `ignore` when the policy score is below the category threshold."),
+		source: zod.discriminatedUnion("kind", [
+			zod.object({ kind: zod.literal("default") }).strict(),
+			zod.object({ kind: zod.literal("below-threshold") }).strict(),
+			zod.object({
+				kind: zod.literal("allowance"),
+				index: zod.number().int().nonnegative()
+			}).strict(),
+			zod.object({
+				kind: zod.literal("restriction"),
+				index: zod.number().int().nonnegative()
+			}).strict()
+		]).optional(),
+		settings: zod.object({
+			threshold: zod.number().min(0).max(1),
+			categoryAction: FLAGGED_CONTENT_ACTION_SCHEMA,
+			allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(10),
+			restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(10)
+		}).strict().optional().describe("The category threshold, default action and rules in force at decision time.")
+	}).strict()).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
+	decision: zod.object({
+		source: zod.enum([
+			"policy",
+			"asset-override",
+			"children"
+		]),
+		action: FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["ignore"]).nullable(),
+		flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA)
+	}).strict().optional().describe("The automatic asset decision, including a per-asset action override or a decision inherited from children.")
 }).strict();
 const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	description: saneStringField(),
@@ -8561,4 +8601,4 @@ const detectTestImage = async (image, testInputKey) => {
 	}
 };
 //#endregion
-export { MODERATION_QUALIFIERS as C, docPropertyInfo as S, metaStore as T, primaryUuidField as _, generateTestTextCode as a, uuidField as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, createdAtField as g, MODERATION_POLICY_CATEGORY_SCHEMA as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORIES as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, FLAGGED_CONTENT_ACTION_SCHEMA as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, saneStringField as v, getModerationQualifiers as w, PROCESSING_FEATURES_SCHEMA as x, updatedAtField as y };
+export { POLICY_ALLOWANCE_SCHEMA as C, metaStore as E, FLAGGED_CONTENT_ACTION_SCHEMA as S, getModerationQualifiers as T, saneStringField as _, generateTestTextCode as a, PROCESSING_FEATURES_SCHEMA as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, primaryUuidField as g, createdAtField as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORY_SCHEMA as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORIES as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, updatedAtField as v, POLICY_RESTRICTION_SCHEMA as w, docPropertyInfo as x, uuidField as y };

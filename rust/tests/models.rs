@@ -476,3 +476,23 @@ fn newer_event_types_decode_to_their_own_variants() {
         EventType::Unknown("api-key.rotated".into())
     );
 }
+
+#[test]
+fn report_policy_snapshot_decodes_into_typed_models() {
+    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"restriction","index":0},"settings":{"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
+    let category = &policy.categories[&ClassificationCategory::Violence];
+    let settings = category.settings.as_ref().unwrap();
+    assert_eq!(settings.threshold, 0.6);
+    assert_eq!(
+        settings.restrictions[0].name.as_deref(),
+        Some("snapshot-rule")
+    );
+    assert_eq!(category.source.as_ref().unwrap().index, Some(0));
+    let decision = policy.decision.as_ref().unwrap();
+    assert_eq!(decision.source, "asset-override");
+    assert_eq!(decision.action.as_deref(), Some("purge"));
+    assert_eq!(
+        decision.flagged_categories,
+        vec![ClassificationCategory::Violence]
+    );
+}
