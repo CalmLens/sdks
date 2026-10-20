@@ -87,7 +87,8 @@ go run .
 
 All three values are required; a missing one, or a missing SDK build, stops startup, as
 does combining them with `CALMLENS_DEMO=1`. Optionally set `CALMLENS_API_URL` for a local
-backend (the page uploads to the same API).
+backend (the page uploads to the same API), and `CALMLENS_CDN_URL` for its CDN.
+Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
 
 - **Upload.** Choosing a clip calls `POST /uploads/start` with its name, type and size. The
   server checks the format and size, reserves a slot, and returns a token from

@@ -127,7 +127,7 @@ type entry struct {
 
 // config is read from the environment by main.
 type config struct {
-	APIKey, ProjectID, BaseURL, WebhookSecret string
+	APIKey, ProjectID, BaseURL, CDNBaseURL, WebhookSecret string
 	// UploadPresetID is the token-only upload preset browsers upload through (live mode).
 	UploadPresetID string
 	// SDKDir holds the JavaScript SDK's ESM build, served to the page at /sdk/.
@@ -190,7 +190,7 @@ func newApp(cfg config) (*app, error) {
 	if _, err := os.Stat(filepath.Join(a.sdkDir, "index.js")); err != nil {
 		return nil, fmt.Errorf("the page imports the JavaScript SDK from %s: run npm run build in javascript, or set CALMLENS_JS_SDK_DIR", a.sdkDir)
 	}
-	a.client, err = calmlens.NewServerClient(calmlens.Options{APIKey: cfg.APIKey, ProjectID: cfg.ProjectID, BaseURL: a.apiURL})
+	a.client, err = calmlens.NewServerClient(calmlens.Options{APIKey: cfg.APIKey, ProjectID: cfg.ProjectID, BaseURL: a.apiURL, CDNBaseURL: cfg.CDNBaseURL})
 	return a, err
 }
 
@@ -210,7 +210,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /retry", a.retry)
 	mux.HandleFunc("POST /delete", a.remove)
 	mux.HandleFunc("POST /webhooks/calmlens", a.webhook)
-	policy := "default-src 'none'; style-src 'unsafe-inline'; media-src 'self' https:; form-action 'self'; frame-ancestors 'none'"
+	policy := "default-src 'none'; style-src 'unsafe-inline'; media-src 'self' https: http://localhost:* http://127.0.0.1:*; form-action 'self'; frame-ancestors 'none'"
 	if a.demo == nil {
 		// The page's script and the SDK come from this server; uploads go to the CalmLens API.
 		policy += "; script-src 'self'; connect-src 'self' " + origin(a.apiURL)
@@ -709,7 +709,7 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	destination, err := url.Parse(signed.URL)
-	if err != nil || destination.Scheme != "https" || destination.Host == "" {
+	if err != nil || destination.Host == "" || (destination.Scheme != "https" && !(destination.Scheme == "http" && (destination.Hostname() == "localhost" || destination.Hostname() == "127.0.0.1"))) {
 		http.Error(w, "Invalid playback URL", 502)
 		return
 	}
@@ -901,7 +901,7 @@ func (a *app) markSeen(id string) {
 func main() {
 	cfg := config{
 		APIKey: os.Getenv("CALMLENS_API_KEY"), ProjectID: os.Getenv("CALMLENS_PROJECT_ID"),
-		BaseURL: os.Getenv("CALMLENS_API_URL"), WebhookSecret: os.Getenv("CALMLENS_WEBHOOK_SECRET"),
+		BaseURL: os.Getenv("CALMLENS_API_URL"), CDNBaseURL: os.Getenv("CALMLENS_CDN_URL"), WebhookSecret: os.Getenv("CALMLENS_WEBHOOK_SECRET"),
 		UploadPresetID: os.Getenv("CALMLENS_UPLOAD_PRESET_ID"), SDKDir: os.Getenv("CALMLENS_JS_SDK_DIR"),
 		Demo: os.Getenv("CALMLENS_DEMO") == "1",
 	}

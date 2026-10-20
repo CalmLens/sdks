@@ -814,3 +814,38 @@ func TestUploadRequiresCSRF(t *testing.T) {
 		t.Fatal("finish without CSRF token")
 	}
 }
+
+func TestLocalCDNPlayback(t *testing.T) {
+	a, err := newApp(config{APIKey: "key", ProjectID: "project", UploadPresetID: testPreset, SDKDir: sdkDir(t), CDNBaseURL: "http://localhost:6130/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cdnURL, err := a.client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "clip", Resource: calmlens.ResourceContent})
+	if err != nil || !strings.HasPrefix(cdnURL, "http://localhost:6130/v1/assets/") {
+		t.Fatal(cdnURL, err)
+	}
+	for _, baseURL := range []string{"http://localhost:6130/v1", "http://127.0.0.1:6130/v1", "http://cdn.example.com/v1"} {
+		t.Run(baseURL, func(t *testing.T) {
+			app := demoApp(t)
+			mock, err := calmlenstest.NewServerClient(calmlenstest.Options{SignedURLBaseURL: baseURL})
+			if err != nil {
+				t.Fatal(err)
+			}
+			app.demo, app.client = nil, mock.ServerClient
+			app.preset, app.apiURL, app.sdkDir = testPreset, "https://api.example.test/v1", sdkDir(t)
+			item := liveClip(t, app, mock)
+			decideAsset(mock.DatabaseStorage.Assets[item.ID], "approved")
+			response := get(app, "/media?id="+item.ID)
+			expected := 303
+			if baseURL == "http://cdn.example.com/v1" {
+				expected = 502
+			}
+			if response.Code != expected {
+				t.Fatal(response.Code, response.Body.String())
+			}
+			if expected == 303 && !strings.HasPrefix(response.Header().Get("Location"), baseURL+"/") {
+				t.Fatal(response.Header().Get("Location"))
+			}
+		})
+	}
+}
