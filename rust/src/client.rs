@@ -757,7 +757,7 @@ impl AssetsClient<'_> {
                 let more = page.has_more.unwrap_or(false)
                     && page.next_cursor.is_some()
                     && !page.items.is_empty();
-                let next = more.then(|| ListAssets {
+                let next = more.then_some(ListAssets {
                     cursor: page.next_cursor,
                     ..options
                 });
@@ -779,7 +779,7 @@ impl AssetsClient<'_> {
                 let more = page.has_more.unwrap_or(false)
                     && page.next_cursor.is_some()
                     && !page.items.is_empty();
-                let next = more.then(|| ListChildren {
+                let next = more.then_some(ListChildren {
                     cursor: page.next_cursor,
                     ..options
                 });
