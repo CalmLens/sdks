@@ -7,11 +7,12 @@ import {
   detectTestImage,
   detectTestText,
   TEST_IMAGE_PALETTES,
+  testTextCode,
 } from "../src/testInputs";
 
-const OTHER_KEY = "0badc0de";
+const OTHER_KEY = "0badc0de0badc0de0badc0de0badc0de";
 
-test("the committed test images carry demo mode's key and are ordinary images for any other", () => {
+test("the committed test images authenticate demo mode and are ordinary images for any other", async () => {
   for (const signal of Object.keys(TEST_IMAGE_PALETTES)) {
     const file = path.join(
       import.meta.dir,
@@ -20,16 +21,19 @@ test("the committed test images carry demo mode's key and are ordinary images fo
     );
     const image = decodePng(readFileSync(file));
     if (!image) throw new Error(`${file} is not a PNG`);
-    expect(detectTestImage(image, DEMO_TEST_INPUT_KEY)).toBe(signal);
-    expect(detectTestImage(image, OTHER_KEY)).toBeUndefined();
+    expect(await detectTestImage(image, DEMO_TEST_INPUT_KEY)).toBe(signal);
+    expect(await detectTestImage(image, OTHER_KEY)).toBeUndefined();
   }
 });
 
-test("text codes count only with the project's key", () => {
+test("text codes count only with the project's key", async () => {
   expect(
-    detectTestText(`nice <!calmlens-test ${DEMO_TEST_INPUT_KEY} hate>`, DEMO_TEST_INPUT_KEY),
+    await detectTestText(
+      `nice ${await testTextCode("hate", DEMO_TEST_INPUT_KEY)}`,
+      DEMO_TEST_INPUT_KEY,
+    ),
   ).toBe("hate");
   expect(
-    detectTestText(`nice <!calmlens-test ${OTHER_KEY} hate>`, DEMO_TEST_INPUT_KEY),
+    await detectTestText(`nice ${await testTextCode("hate", OTHER_KEY)}`, DEMO_TEST_INPUT_KEY),
   ).toBeUndefined();
 });

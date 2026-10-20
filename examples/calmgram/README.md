@@ -187,19 +187,10 @@ When `processing.status` is `failed`, Calmgram doesn't publish and asks the auth
 CalmLens recognises special test inputs, so you can test your "post removed" flow without uploading
 real harmful content.
 
-Every test input carries your project's secret **test input key**, shown under **Assets → Try test
-inputs** in the CalmLens portal. CalmLens moderates inputs with another project's key like any
-other content, so only your project's members can make one. Demo mode recognises the key
-`1a2b3c4d`.
+Every test input contains an authentication tag generated with your project's secret **test input key**, available under **Assets → Try it → Test inputs** in the portal. Tags are specific to the category and content type and do not disclose the key. A valid sample can still be reused in the same project while test inputs are enabled. Demo mode uses the public key `1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d`.
 
-- **Images:** download them from **New post**. They are generated with the active project's
-  test input key. A full-image 4×4 grid encodes the key using the category's four colours, so
-  violence remains red and self-harm remains purple. Download new files after changing projects.
-  `bun run test-images` also writes standalone simulator fixtures to `public/test-images/`;
-  set `CALMLENS_TEST_INPUT_KEY` when generating fixtures for a real project.
-- **Text:** include `<!calmlens-test XXXXXXXX harassment>` in a comment, where `XXXXXXXX` is your
-  test input key. `hate` and `criminal-activity` also work. `bun run test-images` prints the exact
-  codes, and the **New post** page shows one when `CALMLENS_TEST_INPUT_KEY` is set.
+- **Images:** download them from **New post**. An 8×8 grid encodes a 128-bit category-specific HMAC tag using four colours. Download new files after changing projects. `bun run test-images` regenerates simulator fixtures; set `CALMLENS_TEST_INPUT_KEY` to generate them for a real project.
+- **Text:** copy an authenticated category code from the portal into a comment. All six moderation categories are supported. `bun run test-images` prints the exact codes, and **New post** shows one when `CALMLENS_TEST_INPUT_KEY` is set.
 
 ## The public demo
 

@@ -74,7 +74,7 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
 
   async moderateText({ text, externalId }) {
     const assetId = `demo-${crypto.randomUUID()}`;
-    const trigger = detectTestText(text, DEMO_TEST_INPUT_KEY);
+    const trigger = await detectTestText(text, DEMO_TEST_INPUT_KEY);
     if (trigger) return outcomeFor(assetId, externalId, { category: trigger, score: 0.95 });
     const rule = TEXT_RULES.find(([pattern]) => pattern.test(text));
     return outcomeFor(assetId, externalId, rule && { category: rule[1], score: rule[2] });
@@ -84,7 +84,7 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
     const assetId = `demo-${crypto.randomUUID()}`;
     const bytes = new Uint8Array(await file.arrayBuffer());
     const image = decodePng(bytes);
-    const category = image ? detectTestImage(image, DEMO_TEST_INPUT_KEY) : undefined;
+    const category = image ? await detectTestImage(image, DEMO_TEST_INPUT_KEY) : undefined;
     await storeDemoImage(kv, assetId, bytes, {
       outcome: outcomeFor(assetId, externalId, category ? { category, score: 0.95 } : undefined),
       readyAt: Date.now() + IMAGE_DELAY_MS,

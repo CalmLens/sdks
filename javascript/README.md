@@ -628,7 +628,7 @@ The SDK does not validate responses against its types, so fields and values adde
 
 ## Testing
 
-`@calmlens/sdk/testing` exports `MockCalmLensServerClient`, an in-memory stand-in for `CalmLensServerClient`,, in-memory storage implementations, mock API key helpers, webhook delivery builders and `generateMediaTestCode`, for testing without network requests. `generateMediaTestCode(signal, testInputKey)` returns the spoken or on-screen test phrase for your project's secret test input key, shown under **Assets → Try test inputs** in the portal; a phrase with another project's key is moderated normally.
+`@calmlens/sdk/testing` exports `MockCalmLensServerClient`, an in-memory stand-in for `CalmLensServerClient`,, in-memory storage implementations, mock API key helpers, webhook delivery builders and `generateMediaTestCode`, for testing without network requests. `generateMediaTestCode(signal, testInputKey)` asynchronously returns the spoken or on-screen test phrase authenticated with your project's secret test input key, shown under **Assets → Try it → Test inputs** in the portal; a phrase with another project's key is moderated normally.
 
 The `@calmlens/sdk`, `/server` and `/app` entry points do not load or export testing helpers, to keep production bundles small. Keep `/testing` imports in test files.
 
@@ -818,8 +818,8 @@ import { paintTestImage, detectTestImage } from "@calmlens/sdk/test-inputs";
 
 const width = 512;
 const height = 512;
-const rgba = paintTestImage("violence", projectTestInputKey, width, height);
-const signal = detectTestImage({ width, height, rgba }, projectTestInputKey);
+const rgba = await paintTestImage("violence", projectTestInputKey, width, height);
+const signal = await detectTestImage({ width, height, rgba }, projectTestInputKey);
 // signal === "violence"
 ```
 

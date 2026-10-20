@@ -1,4 +1,5 @@
-import { t as CLASSIFICATION_CATEGORIES } from "./Classification-DwmCqYzn.js";
+import { d as CLASSIFICATION_CATEGORIES, l as getTestInputTag } from "./TestTriggers-C3O6vvrd.js";
+import "./CryptoUtils-Cb7_Afa0.js";
 //#region packages/shared/src/MediaTestTriggers.ts
 const MEDIA_TEST_SIGNALS = [...CLASSIFICATION_CATEGORIES, "violence.graphic"];
 const HEX_WORDS = [
@@ -20,11 +21,9 @@ const HEX_WORDS = [
 	"foxtrot"
 ];
 /** Read this aloud, or render it as large, high-contrast text in a video frame. */
-function generateMediaTestCode(signal, testInputKey) {
-	if (!MEDIA_TEST_SIGNALS.includes(signal)) throw new Error("Unsupported media test signal");
-	const suffix = testInputKey.toLowerCase();
-	if (!/^[a-f0-9]{8}$/.test(suffix)) throw new Error("Expected an eight-character hexadecimal test input key");
-	return `Calm Lens test ${[...suffix].map((character) => HEX_WORDS[Number.parseInt(character, 16)]).join(" ")} ${signal.replace(/[.-]/g, " ")} end test`;
+async function generateMediaTestCode(signal, testInputKey) {
+	if (!MEDIA_TEST_SIGNALS.includes(signal)) throw new RangeError("Unsupported media test signal");
+	return `Calm Lens test ${[...await getTestInputTag("media", signal, testInputKey)].map((character) => HEX_WORDS[Number.parseInt(character, 16)]).join(" ")} ${signal.replace(/[.-]/g, " ")} end test`;
 }
 //#endregion
 export { MEDIA_TEST_SIGNALS, generateMediaTestCode };

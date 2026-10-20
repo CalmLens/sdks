@@ -9,10 +9,17 @@ export {
 } from "@calmlens/sdk/test-inputs";
 
 /** The key demo mode's simulator recognises. Real projects each have their own. */
-export const DEMO_TEST_INPUT_KEY = "1a2b3c4d";
-export const TEST_TEXT_CATEGORIES = ["harassment", "hate", "criminal-activity"] as const;
+export const DEMO_TEST_INPUT_KEY = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";
+export const TEST_TEXT_CATEGORIES = [
+  "sexual",
+  "violence",
+  "self-harm",
+  "harassment",
+  "hate",
+  "criminal-activity",
+] as const;
 
-export const detectTestText = (text: string, testInputKey: string): string | undefined =>
-  detectTestTrigger(text, testInputKey).signals.find((signal) =>
+export const detectTestText = async (text: string, testInputKey: string) =>
+  (await detectTestTrigger(text, testInputKey)).signals.find((signal) =>
     TEST_TEXT_CATEGORIES.some((category) => category === signal),
   );

@@ -271,7 +271,7 @@ app.post("/start-over", (c) => {
   return c.redirect("/", 303);
 });
 
-app.get("/test-inputs/:file", (c) => {
+app.get("/test-inputs/:file", async (c) => {
   const file = c.req.param("file");
   const image = TEST_IMAGES.find(([name]) => file === `calmlens-test-${name}.png`);
   if (!image) return c.notFound();
@@ -280,11 +280,15 @@ app.get("/test-inputs/:file", (c) => {
   if (!key || !TEST_INPUT_KEY_PATTERN.test(key))
     return c.text("Test inputs are not configured for this project.", 503);
   const signal = image[0];
-  return c.body(new Uint8Array(encodePng(512, 512, paintTestImage(signal, key))).buffer, 200, {
-    "Content-Type": "image/png",
-    "Cache-Control": "private, no-store",
-    "Content-Disposition": `inline; filename="${file}"`,
-  });
+  return c.body(
+    new Uint8Array(encodePng(512, 512, await paintTestImage(signal, key))).buffer,
+    200,
+    {
+      "Content-Type": "image/png",
+      "Cache-Control": "private, no-store",
+      "Content-Disposition": `inline; filename="${file}"`,
+    },
+  );
 });
 
 app.get("/new", async (c) => {
@@ -293,8 +297,8 @@ app.get("/new", async (c) => {
   const message = await takeFlash(c.env, sandbox);
   const moderation = getModeration(c.env);
   const demo = moderation.mode === "demo";
-  // Test inputs carry the project's secret key; the simulator has its own.
-  const testInputKey = demo ? DEMO_TEST_INPUT_KEY : (c.env.CALMLENS_TEST_INPUT_KEY ?? "XXXXXXXX");
+  // Test inputs use category-specific authentication tags; the simulator has its own.
+  const testInputKey = demo ? DEMO_TEST_INPUT_KEY : (c.env.CALMLENS_TEST_INPUT_KEY ?? "");
   return page(
     c,
     sandbox,
@@ -387,14 +391,16 @@ app.get("/new", async (c) => {
           </ul>
         ) : (
           <p class="text-muted">
-            Set CALMLENS_TEST_INPUT_KEY to enable downloads for this project.
+            Set CALMLENS_TEST_INPUT_KEY to enable test inputs for this project.
           </p>
         )}
-        <p>
-          For text, paste a test code into a caption, comment or bio:
-          <br />
-          <code>{testTextCode("harassment", testInputKey)}</code>
-        </p>
+        {TEST_INPUT_KEY_PATTERN.test(testInputKey) && (
+          <p>
+            For text, paste a test code into a caption, comment or bio:
+            <br />
+            <code>{await testTextCode("harassment", testInputKey)}</code>
+          </p>
+        )}
         {demo && (
           <p class="text-muted">
             In demo mode, insults like “you idiot” are flagged for review and threats are rejected.
