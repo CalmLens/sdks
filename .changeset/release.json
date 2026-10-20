@@ -1,1 +1,28 @@
-{ "releases": [] }
+{
+  "releases": [
+    {
+      "sdk": "javascript",
+      "version": "0.16.3"
+    },
+    {
+      "sdk": "python",
+      "version": "0.1.2"
+    },
+    {
+      "sdk": "ruby",
+      "version": "0.1.1"
+    },
+    {
+      "sdk": "rust",
+      "version": "0.1.1"
+    },
+    {
+      "sdk": "java",
+      "version": "0.1.2"
+    },
+    {
+      "sdk": "go",
+      "version": "0.1.1"
+    }
+  ]
+}
