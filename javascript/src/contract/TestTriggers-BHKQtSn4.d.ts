@@ -1,4 +1,4 @@
-import { n as ClassificationCategory } from "./Classification-BNhgwGEm.js";
+import { n as ClassificationCategory } from "./Classification-DiEostEx.js";
 //#region packages/shared/src/TestTriggers.d.ts
 type ClassificationTestSignal = ClassificationCategory | "sexual.involving-minors" | "violence.graphic";
 declare const TEST_IMAGE_PALETTES: Partial<Record<ClassificationTestSignal, [[number, number, number, number], [number, number, number, number], [number, number, number, number], [number, number, number, number]]>>;
@@ -11,7 +11,7 @@ declare const detectTestTrigger: (text: string, testInputKey: string) => Promise
   isTestTrigger: boolean;
   signals: ClassificationTestSignal[];
 }>;
-/** One cell in the full-image 8×8 colour grid carrying the project key. */
+/** One cell in the full-image 8×8 colour grid carrying an authenticated tag. */
 interface TestImageKeyCell {
   x: number;
   y: number;

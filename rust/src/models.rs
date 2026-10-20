@@ -308,6 +308,8 @@ string_enum! {
         SexualExplicitLanguage = "sexual-explicit-language",
         /// Sexual: solicitation.
         SexualSolicitation = "sexual-solicitation",
+        /// Sexual: revealing clothing.
+        SexualRevealingClothing = "sexual-revealing-clothing",
         /// Sexual: historical.
         SexualHistorical = "sexual-historical",
         /// Sexual: documentary.
@@ -334,6 +336,10 @@ string_enum! {
         ViolenceNaturalDeath = "violence-natural-death",
         /// Violence: graphic.
         ViolenceGraphic = "violence-graphic",
+        /// Violence: a weapon without an attack.
+        ViolenceWeapon = "violence-weapon",
+        /// Violence: combat sport or training.
+        ViolenceSport = "violence-sport",
         /// Violence: historical.
         ViolenceHistorical = "violence-historical",
         /// Violence: documentary.
@@ -374,6 +380,8 @@ string_enum! {
         HarassmentEncouragement = "harassment-encouragement",
         /// Harassment: fictional.
         HarassmentFictional = "harassment-fictional",
+        /// Harassment: awareness, support or prevention.
+        HarassmentSupportPrevention = "harassment-support-prevention",
         /// Hate: abuse.
         HateAbuse = "hate-abuse",
         /// Hate: dehumanization.
@@ -388,6 +396,8 @@ string_enum! {
         HateHistorical = "hate-historical",
         /// Hate: fictional.
         HateFictional = "hate-fictional",
+        /// Hate: awareness, support or prevention.
+        HateSupportPrevention = "hate-support-prevention",
         /// Criminal activity: demonstration.
         CriminalActivityDemonstration = "criminal-activity-demonstration",
         /// Criminal activity: preparation.
@@ -402,8 +412,12 @@ string_enum! {
         CriminalActivitySubstances = "criminal-activity-substances",
         /// Criminal activity: fraud and scams.
         CriminalActivityFraud = "criminal-activity-fraud",
+        /// Criminal activity: graffiti.
+        CriminalActivityGraffiti = "criminal-activity-graffiti",
         /// Criminal activity: fictional.
         CriminalActivityFictional = "criminal-activity-fictional",
+        /// Criminal activity: harm reduction, recovery or prevention.
+        CriminalActivitySupportPrevention = "criminal-activity-support-prevention",
     }
 }
 

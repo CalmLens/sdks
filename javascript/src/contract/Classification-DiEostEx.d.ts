@@ -1,4 +1,4 @@
-import "./ModerationPolicyDimensions-C2XX8SqK.js";
+import "./ModerationPolicyDimensions-CGuT-QNm.js";
 import * as zod from "zod";
 //#region packages/shared/src/Classification.d.ts
 declare const CLASSIFICATION_CATEGORY_SCHEMA: zod.ZodEnum<{
@@ -27,16 +27,19 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "criminal-activity-demonstration": "criminal-activity-demonstration";
   "criminal-activity-fictional": "criminal-activity-fictional";
   "criminal-activity-fraud": "criminal-activity-fraud";
+  "criminal-activity-graffiti": "criminal-activity-graffiti";
   "criminal-activity-instructions": "criminal-activity-instructions";
   "criminal-activity-preparation": "criminal-activity-preparation";
   "criminal-activity-promotion": "criminal-activity-promotion";
   "criminal-activity-request": "criminal-activity-request";
   "criminal-activity-substances": "criminal-activity-substances";
+  "criminal-activity-support-prevention": "criminal-activity-support-prevention";
   "harassment-abuse": "harassment-abuse";
   "harassment-encouragement": "harassment-encouragement";
   "harassment-fictional": "harassment-fictional";
   "harassment-intimidation": "harassment-intimidation";
   "harassment-sexual": "harassment-sexual";
+  "harassment-support-prevention": "harassment-support-prevention";
   "harassment-threat": "harassment-threat";
   "hate-abuse": "hate-abuse";
   "hate-dehumanization": "hate-dehumanization";
@@ -44,6 +47,7 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "hate-fictional": "hate-fictional";
   "hate-historical": "hate-historical";
   "hate-inferiority": "hate-inferiority";
+  "hate-support-prevention": "hate-support-prevention";
   "hate-threat": "hate-threat";
   "self-harm-act": "self-harm-act";
   "self-harm-documentary": "self-harm-documentary";
@@ -61,6 +65,7 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "sexual-fictional": "sexual-fictional";
   "sexual-historical": "sexual-historical";
   "sexual-nudity": "sexual-nudity";
+  "sexual-revealing-clothing": "sexual-revealing-clothing";
   "sexual-solicitation": "sexual-solicitation";
   "sexual-support-prevention": "sexual-support-prevention";
   "violence-attack": "violence-attack";
@@ -73,9 +78,11 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "violence-injury": "violence-injury";
   "violence-natural-death": "violence-natural-death";
   "violence-preparation": "violence-preparation";
+  "violence-sport": "violence-sport";
   "violence-support-prevention": "violence-support-prevention";
   "violence-threat": "violence-threat";
   "violence-violent-death": "violence-violent-death";
+  "violence-weapon": "violence-weapon";
 }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
   status: zod.ZodLiteral<"evaluated">;
   someScore: zod.ZodNumber;
@@ -109,16 +116,19 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "criminal-activity-demonstration": "criminal-activity-demonstration";
     "criminal-activity-fictional": "criminal-activity-fictional";
     "criminal-activity-fraud": "criminal-activity-fraud";
+    "criminal-activity-graffiti": "criminal-activity-graffiti";
     "criminal-activity-instructions": "criminal-activity-instructions";
     "criminal-activity-preparation": "criminal-activity-preparation";
     "criminal-activity-promotion": "criminal-activity-promotion";
     "criminal-activity-request": "criminal-activity-request";
     "criminal-activity-substances": "criminal-activity-substances";
+    "criminal-activity-support-prevention": "criminal-activity-support-prevention";
     "harassment-abuse": "harassment-abuse";
     "harassment-encouragement": "harassment-encouragement";
     "harassment-fictional": "harassment-fictional";
     "harassment-intimidation": "harassment-intimidation";
     "harassment-sexual": "harassment-sexual";
+    "harassment-support-prevention": "harassment-support-prevention";
     "harassment-threat": "harassment-threat";
     "hate-abuse": "hate-abuse";
     "hate-dehumanization": "hate-dehumanization";
@@ -126,6 +136,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
     "hate-inferiority": "hate-inferiority";
+    "hate-support-prevention": "hate-support-prevention";
     "hate-threat": "hate-threat";
     "self-harm-act": "self-harm-act";
     "self-harm-documentary": "self-harm-documentary";
@@ -143,6 +154,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
     "sexual-nudity": "sexual-nudity";
+    "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
@@ -155,9 +167,11 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-injury": "violence-injury";
     "violence-natural-death": "violence-natural-death";
     "violence-preparation": "violence-preparation";
+    "violence-sport": "violence-sport";
     "violence-support-prevention": "violence-support-prevention";
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
+    "violence-weapon": "violence-weapon";
   }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
     someScore: zod.ZodNumber;
@@ -190,16 +204,19 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "criminal-activity-demonstration": "criminal-activity-demonstration";
     "criminal-activity-fictional": "criminal-activity-fictional";
     "criminal-activity-fraud": "criminal-activity-fraud";
+    "criminal-activity-graffiti": "criminal-activity-graffiti";
     "criminal-activity-instructions": "criminal-activity-instructions";
     "criminal-activity-preparation": "criminal-activity-preparation";
     "criminal-activity-promotion": "criminal-activity-promotion";
     "criminal-activity-request": "criminal-activity-request";
     "criminal-activity-substances": "criminal-activity-substances";
+    "criminal-activity-support-prevention": "criminal-activity-support-prevention";
     "harassment-abuse": "harassment-abuse";
     "harassment-encouragement": "harassment-encouragement";
     "harassment-fictional": "harassment-fictional";
     "harassment-intimidation": "harassment-intimidation";
     "harassment-sexual": "harassment-sexual";
+    "harassment-support-prevention": "harassment-support-prevention";
     "harassment-threat": "harassment-threat";
     "hate-abuse": "hate-abuse";
     "hate-dehumanization": "hate-dehumanization";
@@ -207,6 +224,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
     "hate-inferiority": "hate-inferiority";
+    "hate-support-prevention": "hate-support-prevention";
     "hate-threat": "hate-threat";
     "self-harm-act": "self-harm-act";
     "self-harm-documentary": "self-harm-documentary";
@@ -224,6 +242,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
     "sexual-nudity": "sexual-nudity";
+    "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
@@ -236,9 +255,11 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-injury": "violence-injury";
     "violence-natural-death": "violence-natural-death";
     "violence-preparation": "violence-preparation";
+    "violence-sport": "violence-sport";
     "violence-support-prevention": "violence-support-prevention";
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
+    "violence-weapon": "violence-weapon";
   }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
     someScore: zod.ZodNumber;
@@ -267,16 +288,19 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "criminal-activity-demonstration": "criminal-activity-demonstration";
     "criminal-activity-fictional": "criminal-activity-fictional";
     "criminal-activity-fraud": "criminal-activity-fraud";
+    "criminal-activity-graffiti": "criminal-activity-graffiti";
     "criminal-activity-instructions": "criminal-activity-instructions";
     "criminal-activity-preparation": "criminal-activity-preparation";
     "criminal-activity-promotion": "criminal-activity-promotion";
     "criminal-activity-request": "criminal-activity-request";
     "criminal-activity-substances": "criminal-activity-substances";
+    "criminal-activity-support-prevention": "criminal-activity-support-prevention";
     "harassment-abuse": "harassment-abuse";
     "harassment-encouragement": "harassment-encouragement";
     "harassment-fictional": "harassment-fictional";
     "harassment-intimidation": "harassment-intimidation";
     "harassment-sexual": "harassment-sexual";
+    "harassment-support-prevention": "harassment-support-prevention";
     "harassment-threat": "harassment-threat";
     "hate-abuse": "hate-abuse";
     "hate-dehumanization": "hate-dehumanization";
@@ -284,6 +308,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
     "hate-inferiority": "hate-inferiority";
+    "hate-support-prevention": "hate-support-prevention";
     "hate-threat": "hate-threat";
     "self-harm-act": "self-harm-act";
     "self-harm-documentary": "self-harm-documentary";
@@ -301,6 +326,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
     "sexual-nudity": "sexual-nudity";
+    "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
@@ -313,9 +339,11 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-injury": "violence-injury";
     "violence-natural-death": "violence-natural-death";
     "violence-preparation": "violence-preparation";
+    "violence-sport": "violence-sport";
     "violence-support-prevention": "violence-support-prevention";
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
+    "violence-weapon": "violence-weapon";
   }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
     someScore: zod.ZodNumber;
@@ -351,16 +379,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -368,6 +399,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -385,6 +417,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -397,9 +430,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -432,16 +467,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -449,6 +487,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -466,6 +505,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -478,9 +518,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -509,16 +551,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -526,6 +571,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -543,6 +589,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -555,9 +602,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -591,16 +640,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -608,6 +660,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -625,6 +678,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -637,9 +691,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -672,16 +728,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -689,6 +748,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -706,6 +766,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -718,9 +779,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -749,16 +812,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -766,6 +832,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -783,6 +850,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -795,9 +863,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -831,16 +901,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -848,6 +921,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -865,6 +939,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -877,9 +952,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -912,16 +989,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -929,6 +1009,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -946,6 +1027,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -958,9 +1040,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -989,16 +1073,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1006,6 +1093,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1023,6 +1111,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1035,9 +1124,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1071,16 +1162,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1088,6 +1182,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1105,6 +1200,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1117,9 +1213,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1152,16 +1250,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1169,6 +1270,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1186,6 +1288,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1198,9 +1301,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1229,16 +1334,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1246,6 +1354,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1263,6 +1372,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1275,9 +1385,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1311,16 +1423,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1328,6 +1443,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1345,6 +1461,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1357,9 +1474,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1392,16 +1511,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1409,6 +1531,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1426,6 +1549,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1438,9 +1562,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1469,16 +1595,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1486,6 +1615,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1503,6 +1633,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1515,9 +1646,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1551,16 +1684,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1568,6 +1704,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1585,6 +1722,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1597,9 +1735,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1632,16 +1772,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1649,6 +1792,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1666,6 +1810,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1678,9 +1823,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1709,16 +1856,19 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-fictional": "criminal-activity-fictional";
       "criminal-activity-fraud": "criminal-activity-fraud";
+      "criminal-activity-graffiti": "criminal-activity-graffiti";
       "criminal-activity-instructions": "criminal-activity-instructions";
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
       "criminal-activity-substances": "criminal-activity-substances";
+      "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
       "harassment-encouragement": "harassment-encouragement";
       "harassment-fictional": "harassment-fictional";
       "harassment-intimidation": "harassment-intimidation";
       "harassment-sexual": "harassment-sexual";
+      "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
       "hate-dehumanization": "hate-dehumanization";
@@ -1726,6 +1876,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "self-harm-act": "self-harm-act";
       "self-harm-documentary": "self-harm-documentary";
@@ -1743,6 +1894,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-nudity": "sexual-nudity";
+      "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
@@ -1755,9 +1907,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-injury": "violence-injury";
       "violence-natural-death": "violence-natural-death";
       "violence-preparation": "violence-preparation";
+      "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
+      "violence-weapon": "violence-weapon";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1818,16 +1972,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -1835,6 +1992,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -1852,6 +2010,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -1864,9 +2023,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -1899,16 +2060,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -1916,6 +2080,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -1933,6 +2098,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -1945,9 +2111,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -1976,16 +2144,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -1993,6 +2164,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2010,6 +2182,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2022,9 +2195,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2058,16 +2233,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2075,6 +2253,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2092,6 +2271,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2104,9 +2284,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2139,16 +2321,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2156,6 +2341,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2173,6 +2359,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2185,9 +2372,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2216,16 +2405,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2233,6 +2425,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2250,6 +2443,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2262,9 +2456,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2298,16 +2494,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2315,6 +2514,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2332,6 +2532,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2344,9 +2545,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2379,16 +2582,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2396,6 +2602,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2413,6 +2620,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2425,9 +2633,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2456,16 +2666,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2473,6 +2686,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2490,6 +2704,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2502,9 +2717,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2538,16 +2755,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2555,6 +2775,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2572,6 +2793,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2584,9 +2806,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2619,16 +2843,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2636,6 +2863,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2653,6 +2881,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2665,9 +2894,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2696,16 +2927,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2713,6 +2947,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2730,6 +2965,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2742,9 +2978,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2778,16 +3016,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2795,6 +3036,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2812,6 +3054,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2824,9 +3067,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2859,16 +3104,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2876,6 +3124,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2893,6 +3142,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2905,9 +3155,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -2936,16 +3188,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -2953,6 +3208,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -2970,6 +3226,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -2982,9 +3239,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -3018,16 +3277,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -3035,6 +3297,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -3052,6 +3315,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -3064,9 +3328,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -3099,16 +3365,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -3116,6 +3385,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -3133,6 +3403,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -3145,9 +3416,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -3176,16 +3449,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "criminal-activity-demonstration": "criminal-activity-demonstration";
         "criminal-activity-fictional": "criminal-activity-fictional";
         "criminal-activity-fraud": "criminal-activity-fraud";
+        "criminal-activity-graffiti": "criminal-activity-graffiti";
         "criminal-activity-instructions": "criminal-activity-instructions";
         "criminal-activity-preparation": "criminal-activity-preparation";
         "criminal-activity-promotion": "criminal-activity-promotion";
         "criminal-activity-request": "criminal-activity-request";
         "criminal-activity-substances": "criminal-activity-substances";
+        "criminal-activity-support-prevention": "criminal-activity-support-prevention";
         "harassment-abuse": "harassment-abuse";
         "harassment-encouragement": "harassment-encouragement";
         "harassment-fictional": "harassment-fictional";
         "harassment-intimidation": "harassment-intimidation";
         "harassment-sexual": "harassment-sexual";
+        "harassment-support-prevention": "harassment-support-prevention";
         "harassment-threat": "harassment-threat";
         "hate-abuse": "hate-abuse";
         "hate-dehumanization": "hate-dehumanization";
@@ -3193,6 +3469,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "hate-fictional": "hate-fictional";
         "hate-historical": "hate-historical";
         "hate-inferiority": "hate-inferiority";
+        "hate-support-prevention": "hate-support-prevention";
         "hate-threat": "hate-threat";
         "self-harm-act": "self-harm-act";
         "self-harm-documentary": "self-harm-documentary";
@@ -3210,6 +3487,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
         "sexual-nudity": "sexual-nudity";
+        "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
         "sexual-support-prevention": "sexual-support-prevention";
         "violence-attack": "violence-attack";
@@ -3222,9 +3500,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
         "violence-injury": "violence-injury";
         "violence-natural-death": "violence-natural-death";
         "violence-preparation": "violence-preparation";
+        "violence-sport": "violence-sport";
         "violence-support-prevention": "violence-support-prevention";
         "violence-threat": "violence-threat";
         "violence-violent-death": "violence-violent-death";
+        "violence-weapon": "violence-weapon";
       }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
         someScore: zod.ZodNumber;
@@ -3276,16 +3556,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3293,6 +3576,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3310,6 +3594,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3322,9 +3607,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3357,16 +3644,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3374,6 +3664,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3391,6 +3682,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3403,9 +3695,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3434,16 +3728,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3451,6 +3748,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3468,6 +3766,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3480,9 +3779,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3516,16 +3817,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3533,6 +3837,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3550,6 +3855,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3562,9 +3868,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3597,16 +3905,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3614,6 +3925,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3631,6 +3943,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3643,9 +3956,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3674,16 +3989,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3691,6 +4009,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3708,6 +4027,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3720,9 +4040,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3756,16 +4078,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3773,6 +4098,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3790,6 +4116,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3802,9 +4129,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3837,16 +4166,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3854,6 +4186,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3871,6 +4204,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3883,9 +4217,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3914,16 +4250,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -3931,6 +4270,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -3948,6 +4288,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -3960,9 +4301,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -3996,16 +4339,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4013,6 +4359,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4030,6 +4377,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4042,9 +4390,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4077,16 +4427,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4094,6 +4447,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4111,6 +4465,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4123,9 +4478,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4154,16 +4511,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4171,6 +4531,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4188,6 +4549,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4200,9 +4562,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4236,16 +4600,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4253,6 +4620,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4270,6 +4638,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4282,9 +4651,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4317,16 +4688,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4334,6 +4708,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4351,6 +4726,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4363,9 +4739,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4394,16 +4772,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4411,6 +4792,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4428,6 +4810,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4440,9 +4823,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4476,16 +4861,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4493,6 +4881,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4510,6 +4899,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4522,9 +4912,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4557,16 +4949,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4574,6 +4969,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4591,6 +4987,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4603,9 +5000,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;
@@ -4634,16 +5033,19 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "criminal-activity-demonstration": "criminal-activity-demonstration";
             "criminal-activity-fictional": "criminal-activity-fictional";
             "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
             "criminal-activity-instructions": "criminal-activity-instructions";
             "criminal-activity-preparation": "criminal-activity-preparation";
             "criminal-activity-promotion": "criminal-activity-promotion";
             "criminal-activity-request": "criminal-activity-request";
             "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
             "harassment-abuse": "harassment-abuse";
             "harassment-encouragement": "harassment-encouragement";
             "harassment-fictional": "harassment-fictional";
             "harassment-intimidation": "harassment-intimidation";
             "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
             "harassment-threat": "harassment-threat";
             "hate-abuse": "hate-abuse";
             "hate-dehumanization": "hate-dehumanization";
@@ -4651,6 +5053,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "hate-fictional": "hate-fictional";
             "hate-historical": "hate-historical";
             "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
             "hate-threat": "hate-threat";
             "self-harm-act": "self-harm-act";
             "self-harm-documentary": "self-harm-documentary";
@@ -4668,6 +5071,7 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
             "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
             "sexual-support-prevention": "sexual-support-prevention";
             "violence-attack": "violence-attack";
@@ -4680,9 +5084,11 @@ declare const CLASSIFICATION_REPORT_SCHEMA: zod.ZodObject<{
             "violence-injury": "violence-injury";
             "violence-natural-death": "violence-natural-death";
             "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
             "violence-support-prevention": "violence-support-prevention";
             "violence-threat": "violence-threat";
             "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
           }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             someScore: zod.ZodNumber;

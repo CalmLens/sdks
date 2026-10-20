@@ -169,6 +169,7 @@ module CalmLens
     ?"sexual-activity" => qualifier_result,
     ?"sexual-explicit-language" => qualifier_result,
     ?"sexual-solicitation" => qualifier_result,
+    ?"sexual-revealing-clothing" => qualifier_result,
     ?"sexual-historical" => qualifier_result,
     ?"sexual-documentary" => qualifier_result,
     ?"sexual-educational" => qualifier_result,
@@ -182,6 +183,8 @@ module CalmLens
     ?"violence-violent-death" => qualifier_result,
     ?"violence-natural-death" => qualifier_result,
     ?"violence-graphic" => qualifier_result,
+    ?"violence-weapon" => qualifier_result,
+    ?"violence-sport" => qualifier_result,
     ?"violence-historical" => qualifier_result,
     ?"violence-documentary" => qualifier_result,
     ?"violence-educational" => qualifier_result,
@@ -202,6 +205,7 @@ module CalmLens
     ?"harassment-sexual" => qualifier_result,
     ?"harassment-encouragement" => qualifier_result,
     ?"harassment-fictional" => qualifier_result,
+    ?"harassment-support-prevention" => qualifier_result,
     ?"hate-abuse" => qualifier_result,
     ?"hate-dehumanization" => qualifier_result,
     ?"hate-inferiority" => qualifier_result,
@@ -209,6 +213,7 @@ module CalmLens
     ?"hate-threat" => qualifier_result,
     ?"hate-historical" => qualifier_result,
     ?"hate-fictional" => qualifier_result,
+    ?"hate-support-prevention" => qualifier_result,
     ?"criminal-activity-demonstration" => qualifier_result,
     ?"criminal-activity-preparation" => qualifier_result,
     ?"criminal-activity-request" => qualifier_result,
@@ -216,7 +221,9 @@ module CalmLens
     ?"criminal-activity-promotion" => qualifier_result,
     ?"criminal-activity-substances" => qualifier_result,
     ?"criminal-activity-fraud" => qualifier_result,
-    ?"criminal-activity-fictional" => qualifier_result
+    ?"criminal-activity-graffiti" => qualifier_result,
+    ?"criminal-activity-fictional" => qualifier_result,
+    ?"criminal-activity-support-prevention" => qualifier_result
   }
   # `status: "evaluated"` or `"partial"` carries `likelihood` and `score`; `"not-evaluated"`
   # carries `reason`.
