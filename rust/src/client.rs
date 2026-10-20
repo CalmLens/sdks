@@ -1108,7 +1108,11 @@ impl CdnClient<'_> {
             url.push_str(&format!("/@{}", id(lens)?));
         }
         if let Some(value) = options.transform.as_ref().filter(|v| !v.is_empty()) {
-            url.push(if options.lens.as_deref().is_some_and(|v| !v.is_empty()) { ',' } else { '/' });
+            url.push(if options.lens.as_deref().is_some_and(|v| !v.is_empty()) {
+                ','
+            } else {
+                '/'
+            });
             match value {
                 CdnTransform::Selector(value) => url.push_str(&transform(value)?),
                 // Already path-safe: unreserved characters, percent escapes, brackets, `=` and `,`.

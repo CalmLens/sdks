@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 # The example runs against the SDK in this repository.
-gem 'calmlens', path: '../../packages/ruby-sdk'
+gem 'calmlens', path: '../../ruby'
 # WEBrick left the standard library in Ruby 3.0; it is the only runtime dependency.
 gem 'webrick', '~> 1.8'
 
