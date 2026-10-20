@@ -11,7 +11,7 @@ Official SDKs for [CalmLens](https://calmlens.com): content moderation, storage 
 | Java | [java](java) | `com.calmlens:calmlens-sdk` |
 | Go | [go](go) | `go get github.com/CalmLens/sdks/go` |
 
-Some SDKs may still await their first registry release. See the [SDK documentation](https://calmlens.com/docs/sdk) for availability.
+All six SDKs are published. See the [SDK documentation](https://calmlens.com/docs/sdk) for usage and API coverage.
 
 ## Examples
 
