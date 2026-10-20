@@ -36,6 +36,7 @@ test("Changesets versions all six SDKs and generates native changelogs and a rel
       "go/version.go",
       "examples/marketplace-listing-java/pom.xml",
       "examples/media-library-rust/Cargo.lock",
+      "examples/comment-thread-ruby/Gemfile.lock",
     ]) {
       mkdirSync(join(root, file, ".."), { recursive: true });
       cpSync(join(original, file), join(root, file));

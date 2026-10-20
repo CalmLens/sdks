@@ -16,6 +16,11 @@ test("version synchronization updates every native SDK without changing dependen
       writeFileSync(join(root, language, "package.json"), JSON.stringify({ version: "1.2.3" }));
     }
     cpSync(join(source, "rust/Cargo.lock"), join(root, "rust/Cargo.lock"));
+    mkdirSync(join(root, "examples/comment-thread-ruby"), { recursive: true });
+    cpSync(
+      join(source, "examples/comment-thread-ruby/Gemfile.lock"),
+      join(root, "examples/comment-thread-ruby/Gemfile.lock"),
+    );
     mkdirSync(join(root, "examples/marketplace-listing-java"), { recursive: true });
     cpSync(
       join(source, "examples/marketplace-listing-java/pom.xml"),
@@ -36,6 +41,9 @@ test("version synchronization updates every native SDK without changing dependen
       readFileSync(join(root, "rust/Cargo.lock"), "utf8"),
       /name = "calmlens"\nversion = "1.2.3"/,
     );
+    const gemLock = readFileSync(join(root, "examples/comment-thread-ruby/Gemfile.lock"), "utf8");
+    assert.equal(gemLock.match(/^\s+calmlens \(1\.2\.3\)$/gm)?.length, 2);
+    assert.doesNotMatch(gemLock, /calmlens \(0\./);
     const example = readFileSync(join(root, "examples/marketplace-listing-java/pom.xml"), "utf8");
     assert.match(example, /<artifactId>calmlens-sdk<\/artifactId><version>1.2.3<\/version>/);
     assert.match(

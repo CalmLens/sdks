@@ -40,6 +40,13 @@ export function syncVersions(directory, check = false) {
         if (!check) writeFileSync(lock, next);
       }
     }
+    if (language === "ruby") {
+      const lock = resolve(directory, "examples/comment-thread-ruby/Gemfile.lock");
+      const contents = readFileSync(lock, "utf8");
+      const next = replaceVersion(contents, /^(\s+calmlens \()[^)]+(\))$/gm, version);
+      if (check && contents !== next) throw new Error("Ruby lockfile version disagrees with gem");
+      if (!check) writeFileSync(lock, next);
+    }
     if (language === "java" && !check) {
       const example = resolve(directory, "examples/marketplace-listing-java/pom.xml");
       writeFileSync(example, replaceVersion(readFileSync(example, "utf8"), pattern, version));
