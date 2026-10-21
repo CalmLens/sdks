@@ -14,6 +14,38 @@ import { CalmLensServerClient } from "../src/server";
 const projectId = "123e4567-e89b-12d3-a456-426614174000";
 
 describe("multipart binary field names", () => {
+  test("rejects incorrect declared sizes before sending first or later parts", async () => {
+    const requests: unknown[] = [];
+    const client = new CalmLensServerClient({
+      apiKey: "test-api-key",
+      projectId,
+      fetch: async (...args) => {
+        requests.push(args);
+        return Response.json({});
+      },
+    });
+    for (const payload of [
+      { base64: "aGVsbG8=" },
+      { uint8Array: [104, 101, 108, 108, 111] },
+      { data: new Blob(["hello"]) },
+      { data: Uint8Array.from([104, 101, 108, 108, 111]).buffer },
+    ]) {
+      await expect(
+        client.assets.create({
+          name: "note",
+          part: { ...payload, type: "text/plain", partNumber: 1, isFinal: true, sizeInBytes: 6 },
+        }),
+      ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+      await expect(
+        client.assets.uploadPart({
+          assetId: "asset-1",
+          part: { ...payload, partNumber: 2, isFinal: true, sizeInBytes: 6 },
+        }),
+      ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+    }
+    expect(requests).toEqual([]);
+  });
+
   test("passes direct and multipart ReadableStream bodies through without buffering", async () => {
     const bodies: Array<BodyInit | null | undefined> = [];
     const uploadFetch: typeof fetch = async (_input, init) => {

@@ -743,6 +743,8 @@ pub struct Content {
     pub mime_type: String,
     /// The bytes.
     pub payload: Payload,
+    /// Optional declared byte length. Uploads reject a value that differs from the payload size.
+    pub size_in_bytes: Option<u64>,
     /// The multipart part number, starting at 1. Only for parts.
     pub part_number: Option<u32>,
     /// Whether this is the last multipart part. Only for parts.
@@ -803,6 +805,7 @@ impl Content {
         Self {
             mime_type: mime_type.into(),
             payload,
+            size_in_bytes: None,
             part_number: None,
             is_final: None,
         }
@@ -857,6 +860,7 @@ impl<'de> Deserialize<'de> for Content {
         Ok(Self {
             mime_type: wire.mime_type,
             payload,
+            size_in_bytes: wire.size_in_bytes,
             part_number: wire.part_number,
             is_final: wire.is_final,
         })

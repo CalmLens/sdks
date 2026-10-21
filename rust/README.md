@@ -98,6 +98,8 @@ Each upload (`assets().create`, `assets().classify`, `text().classify`) and each
 
 Readers, streams and files are sent as they are read, so a file is never held in memory. A reader or stream that yields a different number of bytes than `size` fails with `sdk/transport-error`.
 
+Set `Content.size_in_bytes` to declare a payload's byte length explicitly. A value that differs from the measured payload length or the reader/stream size fails with `upload/invalid-payload` before the request is sent.
+
 For a multipart upload, start with `SubmitAsset::multipart(name, content.part(1, is_final))` and send later parts with `assets().upload_part(UploadPart { asset_id, part: content.part(n, is_final), .. })`. Non-final parts must be at least 5 MiB. Set `total_size_in_bytes` on the first request when you know the file's size; CalmLens then refuses an upload that could never finish and parts that overshoot or fall short. CalmLens saves the `queue` choice when the upload starts, so any process or client that knows the asset ID can send the remaining parts; set `queue` on a part only to override it.
 
 Optional analyses are off unless a request turns them on in `ProcessingOptions::features`. Person and face detection are in beta; their results are informational, never change the moderation decision, and are returned in `asset.classification.personDetection` and `asset.classification.faceDetection`:

@@ -531,7 +531,7 @@ impl ServerClient {
             ));
         }
         let is_final = content.is_final.unwrap_or(false);
-        let (body, size) = upload_body(content.payload, multipart)?;
+        let (body, size) = upload_body(content.payload, multipart, content.size_in_bytes)?;
         if multipart {
             check_part_size(size, is_final)?;
             if mime.starts_with("image/") {
@@ -568,7 +568,7 @@ impl ServerClient {
             ));
         }
         let is_final = options.part.is_final.unwrap_or(false);
-        let (body, size) = upload_body(options.part.payload, true)?;
+        let (body, size) = upload_body(options.part.payload, true, options.part.size_in_bytes)?;
         check_part_size(size, is_final)?;
         let mut query = Query::default();
         query.opt("queue", options.queue);

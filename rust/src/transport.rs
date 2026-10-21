@@ -392,9 +392,13 @@ pub(crate) fn stream_error(error: Box<dyn std::error::Error + Send + Sync>) -> E
 }
 
 /// The request body for an upload payload, and its size.
-pub(crate) fn upload_body(payload: Payload, multipart: bool) -> Result<(RequestBody, u64)> {
+pub(crate) fn upload_body(
+    payload: Payload,
+    multipart: bool,
+    declared_size: Option<u64>,
+) -> Result<(RequestBody, u64)> {
     use base64::{engine::general_purpose::STANDARD, Engine};
-    Ok(match payload {
+    let (body, size) = match payload {
         Payload::Text(text) => {
             let size = text.len() as u64;
             (RequestBody::Bytes(Bytes::from(text)), size)
@@ -427,7 +431,13 @@ pub(crate) fn upload_body(payload: Payload, multipart: bool) -> Result<(RequestB
             (RequestBody::Stream(Some(reader_stream(reader)), size), size)
         }
         Payload::Stream { stream, size } => (RequestBody::Stream(Some(stream), size), size),
-    })
+    };
+    if declared_size.is_some_and(|declared| declared != size) {
+        return Err(crate::error::invalid_payload(
+            "sizeInBytes must match the payload byte length",
+        ));
+    }
+    Ok((body, size))
 }
 
 /// Reads a blocking reader in 64 KiB chunks on Tokio's blocking thread pool.

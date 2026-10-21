@@ -105,6 +105,66 @@ async fn validation_happens_before_the_transport() {
 }
 
 #[tokio::test]
+async fn declared_payload_sizes_are_checked_for_first_and_later_parts() {
+    let mock = MockServerClient::new().unwrap();
+    for continuation in [false, true] {
+        for declared in [5, 6] {
+            for payload in [
+                Payload::Text("hello".into()),
+                Payload::Bytes(bytes::Bytes::from_static(b"hello")),
+                Payload::Base64("aGVsbG8=".into()),
+                Payload::Reader {
+                    reader: Box::new(std::io::Cursor::new(b"hello")),
+                    size: 5,
+                },
+            ] {
+                let before = mock.requests().len();
+                if declared == 5 {
+                    mock.enqueue(
+                        200,
+                        Asset::new(
+                            "asset-1",
+                            AssetClassificationStatus::Completed,
+                            AssetModerationStatus::Approved,
+                        ),
+                    );
+                }
+                let part = Content {
+                    payload,
+                    size_in_bytes: Some(declared),
+                    ..Content::text("")
+                }
+                .part(if continuation { 2 } else { 1 }, true);
+                let result = if continuation {
+                    mock.assets()
+                        .upload_part(UploadPart {
+                            asset_id: "asset-1".into(),
+                            part,
+                            ..Default::default()
+                        })
+                        .await
+                } else {
+                    mock.assets()
+                        .create(SubmitAsset::multipart("note.txt", part))
+                        .await
+                };
+                if declared == 5 {
+                    assert_eq!(result.unwrap().id, "asset-1");
+                    let request = mock.last_request().unwrap();
+                    assert_eq!(request.query_param("sizeInBytes"), Some("5"));
+                    assert_eq!(request.body, b"hello");
+                } else {
+                    assert_eq!(result.unwrap_err().code(), &"upload/invalid-payload");
+                    assert_eq!(mock.requests().len(), before);
+                }
+            }
+        }
+    }
+    assert_eq!(mock.requests().len(), 8);
+    assert_eq!(mock.remaining_responses(), 0);
+}
+
+#[tokio::test]
 async fn mock_simulates_transport_failures() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue_timeout();

@@ -1,3 +1,4 @@
+import { assertDeclaredPayloadSize } from "../client/CalmLensConnection";
 import {
   CalmLensError,
   type CalmLensErrorDetails,
@@ -588,6 +589,7 @@ export class MockCalmLensServerClient {
         const { assetId, part } = options;
         encodePathSegment(assetId, "Asset ID");
         if (!part) throw invalidArgument("Part options are required");
+        assertDeclaredPayloadSize(part);
         return this.withIdempotency("assets.uploadPart", options, async () => {
           const asset = await this.findOwnAsset(assetId);
           const validation = validateAssetPayload(part, {
@@ -960,6 +962,7 @@ export class MockCalmLensServerClient {
       throw this.apiError(API_ERROR_CODES.USE_UPLOAD_PART);
     }
     if ("content" in options) {
+      assertDeclaredPayloadSize(options.content);
       this.assertValidUploadMimeType(options.content.type);
       if (!("plainText" in options.content)) {
         const validation = validateAssetPayload(options.content);
@@ -967,6 +970,7 @@ export class MockCalmLensServerClient {
       }
     }
     if ("part" in options) {
+      assertDeclaredPayloadSize(options.part, options.part.sizeInBytes ?? options.sizeInBytes);
       this.assertValidUploadMimeType(options.part.type);
       const validation = validateAssetPayload(options.part, {
         multipart: true,

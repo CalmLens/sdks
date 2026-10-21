@@ -152,6 +152,29 @@ describe("MockCalmLensServerClient events", () => {
 describe("MockCalmLensServerClient multipart and idempotency", () => {
   const firstPart = new Uint8Array(MIN_MULTIPART_UPLOAD_PART_BYTES).fill(1);
 
+  it("rejects mismatched declared sizes without creating or completing an upload", async () => {
+    const client = createClient();
+    await expect(
+      client.assets.create({
+        name: "bad.txt",
+        part: { base64: "aGVsbG8=", type: "text/plain", isFinal: true, sizeInBytes: 6 },
+      }),
+    ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+    expect((await client.assets.list()).items).toEqual([]);
+    const uploading = await client.assets.create({
+      name: "doc.pdf",
+      part: { uint8Array: firstPart, type: "application/pdf", isFinal: false },
+    });
+    await expect(
+      client.assets.uploadPart({
+        assetId: uploading.id,
+        part: { base64: "aGVsbG8=", partNumber: 2, isFinal: true, sizeInBytes: 6 },
+      }),
+    ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+    const unchanged = await client.assets.retrieve({ assetId: uploading.id });
+    expect(unchanged.upload).toMatchObject({ status: "uploading", partsReceived: 1 });
+  });
+
   it("applies the queue mode saved at the start and enforces part order", async () => {
     const client = createClient();
     const started = await client.assets.classify({

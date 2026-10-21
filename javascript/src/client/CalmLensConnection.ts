@@ -78,6 +78,25 @@ const isImageMimeType = (mimeType: string) => mimeType.toLowerCase().startsWith(
 export const invalidPayload = (message: string) =>
   new CalmLensError(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, { message });
 
+export const assertDeclaredPayloadSize = (
+  payload: AssetBinaryPayloadInput & { sizeInBytes?: number },
+  declared = payload.sizeInBytes,
+) => {
+  if (declared === undefined) return;
+  const data = "data" in payload ? payload.data : undefined;
+  const measured =
+    data instanceof ArrayBuffer || ArrayBuffer.isView(data)
+      ? data.byteLength
+      : getAssetPayloadByteLength(payload);
+  if (
+    !Number.isSafeInteger(declared) ||
+    declared < 0 ||
+    (measured !== undefined && measured !== declared)
+  ) {
+    throw invalidPayload("sizeInBytes must match the payload byte length");
+  }
+};
+
 /** Checks upload options before anything is sent. */
 export const prepareSubmitAssetOptions = (options: SubmitAssetOptions): SubmitAssetOptions => {
   if (!options || typeof options !== "object") {
@@ -98,6 +117,7 @@ export const prepareSubmitAssetOptions = (options: SubmitAssetOptions): SubmitAs
     });
   }
   if ("content" in options) {
+    assertDeclaredPayloadSize(options.content);
     assertValidUploadMimeType(options.content.type);
     if (!("plainText" in options.content)) {
       const validation = validateAssetPayload(options.content);
@@ -105,6 +125,7 @@ export const prepareSubmitAssetOptions = (options: SubmitAssetOptions): SubmitAs
     }
   }
   if ("part" in options) {
+    assertDeclaredPayloadSize(options.part, options.part.sizeInBytes ?? options.sizeInBytes);
     assertValidUploadMimeType(options.part.type);
     const partSizeInBytes = options.part.sizeInBytes ?? getAssetPayloadByteLength(options.part);
     if (isImageMimeType(options.part.type) && partSizeInBytes !== undefined) {
@@ -325,6 +346,7 @@ export class CalmLensConnection {
     authHeaders: Record<string, string> = {},
   ): Promise<unknown> {
     if (!part) throw invalidArgument("Part options are required");
+    assertDeclaredPayloadSize(part);
     const validation = validateAssetPayload(part, {
       multipart: true,
       isFinal: part.isFinal,
