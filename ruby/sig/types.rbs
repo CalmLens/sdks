@@ -100,6 +100,7 @@ module CalmLens
     ?"labels" => Array[classification_label]?
   }
   type asset_review = {
+    "action" => String,
     "id" => String,
     "decision" => asset_reviewer_action,
     "note" => String?,

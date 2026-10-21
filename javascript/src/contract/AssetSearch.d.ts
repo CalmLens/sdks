@@ -111,6 +111,11 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             approved: "approved";
             rejected: "rejected";
           }>;
+          action: zod.ZodEnum<{
+            approve: "approve";
+            hide: "hide";
+            purge: "purge";
+          }>;
           note: zod.ZodNullable<zod.ZodString>;
           reviewerUserId: zod.ZodNullable<zod.ZodString>;
           reviewedAt: zod.ZodNumber;

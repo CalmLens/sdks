@@ -472,6 +472,7 @@ class AssetUpload(TypedDict):
 
 
 class AssetReview(TypedDict):
+    action: Union[Literal["approve", "hide", "purge"], str]
     id: str
     decision: AssetReviewerAction
     note: Optional[str]

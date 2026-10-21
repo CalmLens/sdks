@@ -1377,7 +1377,7 @@ public final class Models {
   }
 
   /** One reviewer decision in an asset's review history. */
-  public record AssetReview(String id, String decision, String note, String reviewerUserId,
+  public record AssetReview(String id, String decision, String action, String note, String reviewerUserId,
       @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean appliedToAsset) {}
 
   /** Content-safety findings, policy assessment and reviewer decision. */

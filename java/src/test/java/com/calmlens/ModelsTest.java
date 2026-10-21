@@ -56,7 +56,7 @@ class ModelsTest {
     "updatedAt": 1700000000100,
     "moderation": {
       "action": "hide",
-      "manualReviews": [{"id": "review-1", "decision": "approved", "note": "fine", "reviewerUserId": "user-2", "reviewedAt": 1700000000200, "appliedToAsset": true}],
+      "manualReviews": [{"id": "review-1", "decision": "approved", "action": "approve", "note": "fine", "reviewerUserId": "user-2", "reviewedAt": 1700000000200, "appliedToAsset": true}],
       "decision": "approved",
       "categories": {
         "harassment": {
@@ -78,6 +78,7 @@ class ModelsTest {
     assertSame(Models.AssetModerationStatus.APPROVED, moderation.decision());
     assertEquals("hide", moderation.action());
     assertEquals("approved", moderation.manualReviews().get(0).decision());
+    assertEquals("approve", moderation.manualReviews().get(0).action());
     assertEquals("fine", moderation.manualReviews().get(0).note());
     assertEquals("user-2", moderation.manualReviews().get(0).reviewerUserId());
     assertEquals(Instant.ofEpochMilli(1700000000200L), moderation.manualReviews().get(0).reviewedAt());

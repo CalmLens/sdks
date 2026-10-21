@@ -70,7 +70,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
     "updatedAt": 1760000000500,
     "moderation": {
       "action": "purge",
-      "manualReviews": [{"id": "review-1", "decision": "approved", "note": "Fine", "reviewerUserId": "user-1", "reviewedAt": 1760000000700, "appliedToAsset": true}],
+      "manualReviews": [{"id": "review-1", "decision": "approved", "action": "approve", "note": "Fine", "reviewerUserId": "user-1", "reviewedAt": 1760000000700, "appliedToAsset": true}],
       "decision": "approved",
       "categories": {
         "sexual": {
@@ -120,7 +120,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if p := a.Classification; p.Status != ClassificationStatusCompleted || *p.UpdatedAt != 1760000000500 || *a.Upload.PartsReceived != 3 {
 		t.Fatalf("processing: %+v", p)
 	}
-	if m := a.Classification.Moderation; m.Decision != ModerationStatusApproved || *m.Action != ModerationActionPurge || m.ManualReviews[0].Decision != ReviewerActionApproved ||
+	if m := a.Classification.Moderation; m.Decision != ModerationStatusApproved || *m.Action != ModerationActionPurge || m.ManualReviews[0].Decision != ReviewerActionApproved || m.ManualReviews[0].Action != "approve" ||
 		*m.ManualReviews[0].Note != "Fine" || *m.ManualReviews[0].ReviewerUserID != "user-1" || m.ManualReviews[0].ReviewedAt != 1760000000700 || *a.Classification.CompletedAt != 1760000000700 {
 		t.Fatalf("moderation: %+v", m)
 	}

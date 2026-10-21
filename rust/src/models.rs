@@ -1424,6 +1424,8 @@ pub struct AssetClassification {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetReview {
+    /// The chosen action: approve, hide, or purge.
+    pub action: String,
     /// Unique identifier for this review.
     pub id: String,
     /// The reviewer’s decision.

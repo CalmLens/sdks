@@ -3,6 +3,13 @@ import "./SharedConstants-CdFPZV7z.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
 import * as zod from "zod";
+//#region packages/shared/src/AssetReviewAction.ts
+const ASSET_REVIEW_ACTION_SCHEMA = zod.enum([
+	"approve",
+	"hide",
+	"purge"
+]);
+//#endregion
 //#region packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
 const HUMAN_REVIEW_SETTINGS_SCHEMA = zod.object({
@@ -19,6 +26,7 @@ zod.object({
 	automatedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA,
 	status: HUMAN_REVIEW_STATUS_SCHEMA,
 	decision: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
+	action: ASSET_REVIEW_ACTION_SCHEMA.nullish(),
 	note: zod.string().max(1e3).nullish(),
 	reviewerUserId: zod.string().nullish(),
 	/** Whether the decision changed the asset's status (only when it overturned the outcome). */
@@ -27,9 +35,16 @@ zod.object({
 	reviewedAt: zod.number().int().nullish()
 });
 zod.object({
-	decision: HUMAN_REVIEW_OUTCOME_SCHEMA,
+	action: ASSET_REVIEW_ACTION_SCHEMA,
+	confirmPurge: zod.boolean().optional(),
 	note: zod.string().trim().max(1e3).nullish()
-}).strict();
+}).strict().superRefine((body, ctx) => {
+	if (body.action === "purge" && body.confirmPurge !== true) ctx.addIssue({
+		code: "custom",
+		path: ["confirmPurge"],
+		message: "Confirm permanent deletion"
+	});
+});
 //#endregion
 //#region packages/shared/src/Project.ts
 const MINIMUM_MODERATION_THRESHOLD = .1;
@@ -175,6 +190,7 @@ const ASSET_REVIEWER_ACTION_SCHEMA = zod.enum(["approved", "rejected"]);
 const ASSET_REVIEW_SCHEMA = zod.object({
 	id: zod.string().uuid(),
 	decision: ASSET_REVIEWER_ACTION_SCHEMA,
+	action: ASSET_REVIEW_ACTION_SCHEMA,
 	note: zod.string().nullable(),
 	reviewerUserId: zod.string().nullable(),
 	reviewedAt: zod.number(),
@@ -632,6 +648,20 @@ const ASSET_APPROVED = defineEventType({
 		assetType: assetTypeField,
 		decidedBy: decidedByField,
 		moderationAction: decisionModerationActionField,
+		reviewAction: field(zod.enum([
+			"approve",
+			"hide",
+			"purge"
+		]).optional(), {
+			label: "Reviewer action",
+			description: "The action chosen by a reviewer.",
+			display: "enum",
+			valueLabels: {
+				approve: "Approve",
+				hide: "Hide",
+				purge: "Purge"
+			}
+		}),
 		reviewerUserId: reviewerUserIdField,
 		reviewerName: reviewerNameField,
 		note: field(zod.string().nullish(), {
@@ -660,6 +690,20 @@ const ASSET_REJECTED = defineEventType({
 		assetType: assetTypeField,
 		decidedBy: decidedByField,
 		moderationAction: decisionModerationActionField,
+		reviewAction: field(zod.enum([
+			"approve",
+			"hide",
+			"purge"
+		]).optional(), {
+			label: "Reviewer action",
+			description: "The action chosen by a reviewer.",
+			display: "enum",
+			valueLabels: {
+				approve: "Approve",
+				hide: "Hide",
+				purge: "Purge"
+			}
+		}),
 		reviewerUserId: reviewerUserIdField,
 		reviewerName: reviewerNameField,
 		note: field(zod.string().nullish(), {

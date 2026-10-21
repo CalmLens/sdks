@@ -68,8 +68,9 @@ export type AssetModeration = Omit<
   decision: AssetModerationStatus;
   action: AssetModerationAction | null;
   manualReviews: Array<
-    Omit<SharedAssetModeration["manualReviews"][number], "decision"> & {
+    Omit<SharedAssetModeration["manualReviews"][number], "decision" | "action"> & {
       decision: AssetReviewerAction;
+      action: "approve" | "hide" | "purge" | (string & {});
     }
   >;
 };

@@ -224,6 +224,11 @@ declare const EVENT_TYPE_INFO: {
         hide: "hide";
         purge: "purge";
       }>>>>;
+      reviewAction: EventFieldDefinition<zod.ZodOptional<zod.ZodEnum<{
+        approve: "approve";
+        hide: "hide";
+        purge: "purge";
+      }>>>;
       reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
@@ -234,6 +239,7 @@ declare const EVENT_TYPE_INFO: {
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       decidedBy: "automated" | "reviewer";
       moderationAction?: "alert" | "hide" | "purge" | null | undefined;
+      reviewAction?: "approve" | "hide" | "purge" | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
@@ -274,6 +280,11 @@ declare const EVENT_TYPE_INFO: {
         hide: "hide";
         purge: "purge";
       }>>>;
+      reviewAction: zod.ZodOptional<zod.ZodEnum<{
+        approve: "approve";
+        hide: "hide";
+        purge: "purge";
+      }>>;
       reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -314,6 +325,11 @@ declare const EVENT_TYPE_INFO: {
         hide: "hide";
         purge: "purge";
       }>>>>;
+      reviewAction: EventFieldDefinition<zod.ZodOptional<zod.ZodEnum<{
+        approve: "approve";
+        hide: "hide";
+        purge: "purge";
+      }>>>;
       reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
@@ -324,6 +340,7 @@ declare const EVENT_TYPE_INFO: {
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       decidedBy: "automated" | "reviewer";
       moderationAction?: "alert" | "hide" | "purge" | null | undefined;
+      reviewAction?: "approve" | "hide" | "purge" | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
@@ -364,6 +381,11 @@ declare const EVENT_TYPE_INFO: {
         hide: "hide";
         purge: "purge";
       }>>>;
+      reviewAction: zod.ZodOptional<zod.ZodEnum<{
+        approve: "approve";
+        hide: "hide";
+        purge: "purge";
+      }>>;
       reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;

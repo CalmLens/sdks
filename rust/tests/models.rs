@@ -55,7 +55,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         "updatedAt": 5,
         "moderation": {
           "action": "hide",
-          "manualReviews": [{"id": "review-1", "decision": "rejected", "note": "confirmed", "reviewerUserId": "user-9", "reviewedAt": 7, "appliedToAsset": true}],
+          "manualReviews": [{"id": "review-1", "decision": "rejected", "action": "hide", "note": "confirmed", "reviewerUserId": "user-9", "reviewedAt": 7, "appliedToAsset": true}],
           "decision": "rejected",
           "categories": {
             "sexual": {
@@ -122,6 +122,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         (&AssetClassificationStatus::Completed, Some(5), Some(3))
     );
     let moderation = &asset.classification.moderation;
+    assert_eq!(moderation.manual_reviews[0].action, "hide");
     assert_eq!(
         (
             &moderation.decision,
@@ -249,7 +250,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         "status": "paused",
         "moderation": {
           "action": "quarantine",
-          "manualReviews": [{"id": "review-1", "decision": "deferred", "note": null, "reviewerUserId": null, "reviewedAt": 7, "appliedToAsset": true}],
+          "manualReviews": [{"id": "review-1", "decision": "deferred", "action": "hide", "note": null, "reviewerUserId": null, "reviewedAt": 7, "appliedToAsset": true}],
           "decision": "escalated",
           "categories": {
             "spam": {

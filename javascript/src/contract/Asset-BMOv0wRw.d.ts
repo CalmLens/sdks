@@ -153,6 +153,11 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
       approved: "approved";
       rejected: "rejected";
     }>;
+    action: zod.ZodEnum<{
+      approve: "approve";
+      hide: "hide";
+      purge: "purge";
+    }>;
     note: zod.ZodNullable<zod.ZodString>;
     reviewerUserId: zod.ZodNullable<zod.ZodString>;
     reviewedAt: zod.ZodNumber;
@@ -3575,6 +3580,11 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
       decision: zod.ZodEnum<{
         approved: "approved";
         rejected: "rejected";
+      }>;
+      action: zod.ZodEnum<{
+        approve: "approve";
+        hide: "hide";
+        purge: "purge";
       }>;
       note: zod.ZodNullable<zod.ZodString>;
       reviewerUserId: zod.ZodNullable<zod.ZodString>;
@@ -7182,6 +7192,11 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         decision: zod.ZodEnum<{
           approved: "approved";
           rejected: "rejected";
+        }>;
+        action: zod.ZodEnum<{
+          approve: "approve";
+          hide: "hide";
+          purge: "purge";
         }>;
         note: zod.ZodNullable<zod.ZodString>;
         reviewerUserId: zod.ZodNullable<zod.ZodString>;

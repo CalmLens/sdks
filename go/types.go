@@ -145,6 +145,7 @@ type AssetClassification struct {
 
 // AssetReview records one reviewer decision without erasing earlier reviews.
 type AssetReview struct {
+	Action         string  `json:"action"`
 	ID             string  `json:"id"`
 	Decision       string  `json:"decision"`
 	Note           *string `json:"note"`
