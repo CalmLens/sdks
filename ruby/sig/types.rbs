@@ -173,6 +173,31 @@ module CalmLens
   }
   # MODERATION_QUALIFIERS in ModerationPolicyDimensions.ts.
   type qualifier_results = {
+    ?"personal-information-contact" => qualifier_result,
+    ?"personal-information-email" => qualifier_result,
+    ?"personal-information-phone" => qualifier_result,
+    ?"personal-information-government-id" => qualifier_result,
+    ?"personal-information-financial" => qualifier_result,
+    ?"personal-information-location" => qualifier_result,
+    ?"personal-information-identifiers" => qualifier_result,
+    ?"personal-information-credentials" => qualifier_result,
+    ?"personal-information-request" => qualifier_result,
+    ?"personal-information-self-disclosure" => qualifier_result,
+    ?"personal-information-third-party" => qualifier_result,
+    ?"personal-information-historical" => qualifier_result,
+    ?"personal-information-documentary" => qualifier_result,
+    ?"personal-information-educational" => qualifier_result,
+    ?"personal-information-fictional" => qualifier_result,
+    ?"personal-information-support-prevention" => qualifier_result,
+    ?"profanity-mild" => qualifier_result,
+    ?"profanity-strong" => qualifier_result,
+    ?"profanity-slurs" => qualifier_result,
+    ?"profanity-obfuscated" => qualifier_result,
+    ?"profanity-historical" => qualifier_result,
+    ?"profanity-documentary" => qualifier_result,
+    ?"profanity-educational" => qualifier_result,
+    ?"profanity-fictional" => qualifier_result,
+    ?"profanity-support-prevention" => qualifier_result,
     ?"sexual-nudity" => qualifier_result,
     ?"sexual-activity" => qualifier_result,
     ?"sexual-explicit-language" => qualifier_result,
@@ -234,6 +259,10 @@ module CalmLens
     ?"criminal-activity-instructions" => qualifier_result,
     ?"criminal-activity-promotion" => qualifier_result,
     ?"criminal-activity-substances" => qualifier_result,
+    ?"criminal-activity-grooming" => qualifier_result,
+    ?"criminal-activity-alcohol" => qualifier_result,
+    ?"criminal-activity-tobacco" => qualifier_result,
+    ?"criminal-activity-gambling" => qualifier_result,
     ?"criminal-activity-fraud" => qualifier_result,
     ?"criminal-activity-sexual-solicitation" => qualifier_result,
     ?"criminal-activity-graffiti" => qualifier_result,
@@ -243,14 +272,17 @@ module CalmLens
     ?"criminal-activity-fictional" => qualifier_result,
     ?"criminal-activity-support-prevention" => qualifier_result
   }
+
   # `status: "evaluated"` or `"partial"` carries `likelihood` and `score`; `"not-evaluated"`
   # carries `reason`.
+  type policy_condition_result = { "status" => "evaluated" | "not-evaluated", ?"score" => number, ?"reason" => not_evaluated_reason }
   type category_report = {
     "status" => "evaluated" | "partial" | "not-evaluated",
     ?"likelihood" => likelihood,
     ?"score" => number,
     ?"reason" => not_evaluated_reason,
-    ?"qualifiers" => qualifier_results
+    ?"qualifiers" => qualifier_results,
+    ?"policyConditions" => Hash[String, policy_condition_result]
   }
   type classification_categories = {
     "sexual" => category_report,
@@ -258,7 +290,9 @@ module CalmLens
     "self-harm" => category_report,
     "harassment" => category_report,
     "hate" => category_report,
-    "criminal-activity" => category_report
+    "criminal-activity" => category_report,
+    "personal-information" => category_report,
+    "profanity" => category_report
   }
   type classification_label = {
     "description" => String,
@@ -309,9 +343,22 @@ module CalmLens
   }
 
   # How strongly each assessed category meets the policy and what the policy does with it.
+  type policy_rule_snapshot = {
+    "when" => Array[String], "action" => flagged_content_action,
+    ?"name" => String, ?"match" => "all", ?"unless" => Array[String]
+  }
+  type category_policy_source = { "kind" => String, ?"index" => Integer, ?"indexes" => Array[Integer] }
+  type category_policy_settings_snapshot = {
+    "threshold" => number, "categoryAction" => flagged_content_action, ?"enabled" => bool,
+    "allowances" => Array[policy_rule_snapshot], "restrictions" => Array[policy_rule_snapshot]
+  }
+  type category_policy_score = {
+    "score" => number, "action" => flagged_content_action,
+    ?"source" => category_policy_source, ?"settings" => category_policy_settings_snapshot
+  }
   type report_policy = {
-    "score" => number,
-    "categories" => Hash[String, { "score" => number, "action" => String }]
+    "score" => number, "categories" => Hash[String, category_policy_score],
+    ?"decision" => { "source" => String, "action" => flagged_content_action?, "flaggedCategories" => Array[String] }
   }
 
   # ---- Pages and search (Page.ts, AssetSearch.ts) --------------------------------------------

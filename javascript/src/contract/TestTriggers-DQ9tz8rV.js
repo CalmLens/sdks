@@ -7939,6 +7939,10 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 //#region packages/shared/src/ModerationPolicyDimensions.ts
 const MODERATION_QUALIFIERS = [
 	"personal-information-contact",
+	"personal-information-email",
+	"personal-information-phone",
+	"personal-information-government-id",
+	"personal-information-financial",
 	"personal-information-location",
 	"personal-information-identifiers",
 	"personal-information-credentials",
@@ -8036,6 +8040,10 @@ const MODERATION_QUALIFIERS = [
 const MODERATION_QUALIFIERS_BY_CATEGORY = {
 	"personal-information": [
 		"personal-information-contact",
+		"personal-information-email",
+		"personal-information-phone",
+		"personal-information-government-id",
+		"personal-information-financial",
 		"personal-information-location",
 		"personal-information-identifiers",
 		"personal-information-credentials",
@@ -8157,15 +8165,19 @@ const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([
 const policyRuleSchema = (whenDescription, actionDescription) => zod.object({
 	name: zod.string().trim().min(1).max(80).optional(),
 	when: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, "Qualifiers must be unique").meta({ description: whenDescription }),
+	match: zod.literal("all").optional().meta({ description: "All selected qualifiers must describe the same qualifying instance. If supplied, must be all." }),
+	unless: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, "Qualifiers must be unique").optional().meta({ description: "Exclude instances covered by any of these qualifiers from this rule. Does not exempt other content or other categories." }),
 	action: FLAGGED_CONTENT_ACTION_SCHEMA.meta({ description: actionDescription })
-}).strict();
-/**
-* Lets content through, or acts on it more softly, when all of the category's content is one of
-* these qualifiers. One historical sentence never excuses a live threat beside it.
-*/
-const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Applies when all of the category's content is one of these qualifiers.", "Softer than the category action: what happens to content the allowance covers.");
-/** Acts on the content as soon as any of these qualifiers is present, whatever else it contains. */
-const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Applies when any of these qualifiers is present.", "At least as strong as the category action, and never `ignore`.");
+}).strict().refine((rule) => !rule.unless || !rule.when.some((qualifier) => rule.unless.includes(qualifier)), {
+	message: "The exclusions prevent this rule from ever matching",
+	path: ["unless"]
+});
+const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the content this allowance covers. Every selected qualifier must hold on the same instance. Eligible allowances may jointly cover all qualifying content.", "Softer than the category action: what happens to content the allowance covers.").refine((rule) => !rule.unless?.length, {
+	message: "Only restrictions can have exclusions",
+	path: ["unless"]
+});
+/** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
+const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "At least as strong as the category action, and never `ignore`.");
 //#endregion
 //#region packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
@@ -8336,23 +8348,33 @@ const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA = zod.partialRecord(zod.enum(MODER
 	status: zod.literal("not-evaluated"),
 	reason: CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA
 }).strict()]));
+const CLASSIFICATION_POLICY_CONDITIONS_SCHEMA = zod.record(zod.string().min(1).max(65536), zod.discriminatedUnion("status", [zod.object({
+	status: zod.literal("evaluated"),
+	score: zod.number().min(0).max(1)
+}).strict(), zod.object({
+	status: zod.literal("not-evaluated"),
+	reason: CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA
+}).strict()]));
 const CLASSIFICATION_CATEGORY_REPORT_SCHEMA = zod.discriminatedUnion("status", [
 	zod.object({
 		status: zod.literal("evaluated"),
 		likelihood: LIKELIHOOD_SCHEMA,
 		score: zod.number().min(0).max(1),
-		qualifiers: CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA.optional()
+		qualifiers: CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA.optional(),
+		policyConditions: CLASSIFICATION_POLICY_CONDITIONS_SCHEMA.optional()
 	}).strict(),
 	zod.object({
 		status: zod.literal("partial"),
 		likelihood: LIKELIHOOD_SCHEMA,
 		score: zod.number().min(0).max(1),
-		qualifiers: CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA.optional()
+		qualifiers: CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA.optional(),
+		policyConditions: CLASSIFICATION_POLICY_CONDITIONS_SCHEMA.optional()
 	}).strict(),
 	zod.object({
 		status: zod.literal("not-evaluated"),
 		reason: CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA,
-		qualifiers: CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA.optional()
+		qualifiers: CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA.optional(),
+		policyConditions: CLASSIFICATION_POLICY_CONDITIONS_SCHEMA.optional()
 	}).strict()
 ]);
 const CATEGORIES_SCHEMA = zod.object({
@@ -8377,19 +8399,21 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 			zod.object({ kind: zod.literal("disabled") }).strict(),
 			zod.object({
 				kind: zod.literal("allowance"),
-				index: zod.number().int().nonnegative()
+				index: zod.number().int().nonnegative(),
+				indexes: zod.array(zod.number().int().nonnegative()).min(2).optional()
 			}).strict(),
 			zod.object({
 				kind: zod.literal("restriction"),
-				index: zod.number().int().nonnegative()
+				index: zod.number().int().nonnegative(),
+				indexes: zod.array(zod.number().int().nonnegative()).min(2).optional()
 			}).strict()
 		]).optional(),
 		settings: zod.object({
 			enabled: zod.boolean().optional(),
 			threshold: zod.number().min(0).max(1),
 			categoryAction: FLAGGED_CONTENT_ACTION_SCHEMA,
-			allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(10),
-			restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(10)
+			allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50),
+			restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
 		}).strict().optional().describe("The category threshold, default action and rules in force at decision time.")
 	}).strict()).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
 	decision: zod.object({

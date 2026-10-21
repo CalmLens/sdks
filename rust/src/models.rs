@@ -282,6 +282,10 @@ string_enum! {
 string_enum! {
     /// A moderation policy category, the key of [`AssetModeration::categories`].
     ClassificationCategory {
+        /// Private personal information (Preview).
+        PersonalInformation = "personal-information",
+        /// Profanity.
+        Profanity = "profanity",
         /// Sexual content.
         Sexual = "sexual",
         /// Violence.
@@ -300,6 +304,14 @@ string_enum! {
 string_enum! {
     /// A moderation qualifier, the key of [`CategoryResult::qualifiers`].
     ModerationQualifier {
+        /// Personal information: private email.
+        PersonalInformationEmail = "personal-information-email",
+        /// Personal information: private phone.
+        PersonalInformationPhone = "personal-information-phone",
+        /// Personal information: government identifier.
+        PersonalInformationGovernmentId = "personal-information-government-id",
+        /// Personal information: financial identifier.
+        PersonalInformationFinancial = "personal-information-financial",
         /// Sexual: nudity.
         SexualNudity = "sexual-nudity",
         /// Sexual: activity.
@@ -438,6 +450,56 @@ string_enum! {
         CriminalActivityFictional = "criminal-activity-fictional",
         /// Criminal activity: harm reduction, recovery or prevention.
         CriminalActivitySupportPrevention = "criminal-activity-support-prevention",
+        /// personal-information-contact.
+        PersonalInformationContact = "personal-information-contact",
+        /// personal-information-location.
+        PersonalInformationLocation = "personal-information-location",
+        /// personal-information-identifiers.
+        PersonalInformationIdentifiers = "personal-information-identifiers",
+        /// personal-information-credentials.
+        PersonalInformationCredentials = "personal-information-credentials",
+        /// personal-information-request.
+        PersonalInformationRequest = "personal-information-request",
+        /// personal-information-self-disclosure.
+        PersonalInformationSelfDisclosure = "personal-information-self-disclosure",
+        /// personal-information-third-party.
+        PersonalInformationThirdParty = "personal-information-third-party",
+        /// personal-information-historical.
+        PersonalInformationHistorical = "personal-information-historical",
+        /// personal-information-documentary.
+        PersonalInformationDocumentary = "personal-information-documentary",
+        /// personal-information-educational.
+        PersonalInformationEducational = "personal-information-educational",
+        /// personal-information-fictional.
+        PersonalInformationFictional = "personal-information-fictional",
+        /// personal-information-support-prevention.
+        PersonalInformationSupportPrevention = "personal-information-support-prevention",
+        /// profanity-mild.
+        ProfanityMild = "profanity-mild",
+        /// profanity-strong.
+        ProfanityStrong = "profanity-strong",
+        /// profanity-slurs.
+        ProfanitySlurs = "profanity-slurs",
+        /// profanity-obfuscated.
+        ProfanityObfuscated = "profanity-obfuscated",
+        /// profanity-historical.
+        ProfanityHistorical = "profanity-historical",
+        /// profanity-documentary.
+        ProfanityDocumentary = "profanity-documentary",
+        /// profanity-educational.
+        ProfanityEducational = "profanity-educational",
+        /// profanity-fictional.
+        ProfanityFictional = "profanity-fictional",
+        /// profanity-support-prevention.
+        ProfanitySupportPrevention = "profanity-support-prevention",
+        /// criminal-activity-grooming.
+        CriminalActivityGrooming = "criminal-activity-grooming",
+        /// criminal-activity-alcohol.
+        CriminalActivityAlcohol = "criminal-activity-alcohol",
+        /// criminal-activity-tobacco.
+        CriminalActivityTobacco = "criminal-activity-tobacco",
+        /// criminal-activity-gambling.
+        CriminalActivityGambling = "criminal-activity-gambling",
     }
 }
 
@@ -1580,6 +1642,9 @@ pub struct CategoryPolicySource {
     /// Saved index.
     #[serde(default)]
     pub index: Option<usize>,
+    /// Indexes of allowances contributing combined coverage.
+    #[serde(default)]
+    pub indexes: Option<Vec<usize>>,
 }
 
 /// A named rule in force when the asset was decided.
@@ -1593,6 +1658,12 @@ pub struct PolicyRuleSnapshot {
     /// Saved when.
     #[serde(default)]
     pub when: Vec<String>,
+    /// Fixed all tag: selected qualifiers apply to the same instance.
+    #[serde(default)]
+    pub r#match: Option<String>,
+    /// Same-instance exclusions.
+    #[serde(default)]
+    pub unless: Option<Vec<String>>,
     /// Saved action.
     #[serde(default)]
     pub action: String,
@@ -1603,6 +1674,9 @@ pub struct PolicyRuleSnapshot {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryPolicySettingsSnapshot {
+    /// Whether the category was enabled.
+    #[serde(default)]
+    pub enabled: Option<bool>,
     /// Saved threshold.
     #[serde(default)]
     pub threshold: f64,
@@ -1653,9 +1727,28 @@ pub struct CategoryResult {
     /// Qualifier results.
     #[serde(default)]
     pub qualifiers: Option<HashMap<ModerationQualifier, QualifierResult>>,
+    /// Direct condition evidence, keyed by opaque condition identifiers.
+    #[serde(default)]
+    pub policy_conditions: Option<HashMap<String, PolicyConditionResult>>,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
+}
+
+/// Direct assessment of a same-instance or combined-coverage policy condition.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PolicyConditionResult {
+    /// Whether the condition was assessed.
+    #[serde(default)]
+    pub status: Option<EvaluationStatus>,
+    /// Assessed score, absent when unassessed.
+    #[serde(default)]
+    pub score: Option<f64>,
+    /// Why the condition was not assessed.
+    #[serde(default)]
+    pub reason: Option<NotEvaluatedReason>,
 }
 
 /// A qualifier's result.

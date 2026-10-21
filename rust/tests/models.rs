@@ -577,7 +577,7 @@ fn newer_event_types_decode_to_their_own_variants() {
 
 #[test]
 fn report_policy_snapshot_decodes_into_typed_models() {
-    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"restriction","index":0},"settings":{"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
+    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
     let category = &policy.categories[&ClassificationCategory::Violence];
     let settings = category.settings.as_ref().unwrap();
     assert_eq!(settings.threshold, 0.6);
@@ -586,6 +586,20 @@ fn report_policy_snapshot_decodes_into_typed_models() {
         Some("snapshot-rule")
     );
     assert_eq!(category.source.as_ref().unwrap().index, Some(0));
+    assert_eq!(settings.enabled, Some(true));
+    assert_eq!(settings.restrictions[0].r#match.as_deref(), Some("all"));
+    assert_eq!(
+        settings.restrictions[0].unless.as_deref(),
+        Some(["violence-documentary".to_string()].as_slice())
+    );
+    assert_eq!(
+        category.source.as_ref().unwrap().indexes.as_deref(),
+        Some([0, 1].as_slice())
+    );
+    let finding: CategoryResult = serde_json::from_value(json!({"status": "evaluated", "score": 0.9, "policyConditions": {"some:opaque": {"status": "evaluated", "score": 0.8}}})).unwrap();
+    let evidence = &finding.policy_conditions.as_ref().unwrap()["some:opaque"];
+    assert_eq!(evidence.status, Some(EvaluationStatus::Evaluated));
+    assert_eq!(evidence.score, Some(0.8));
     let decision = policy.decision.as_ref().unwrap();
     assert_eq!(decision.source, "asset-override");
     assert_eq!(decision.action.as_deref(), Some("purge"));

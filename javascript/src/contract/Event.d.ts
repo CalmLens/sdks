@@ -1,3 +1,3 @@
 import { a as EventSeverity, o as EventType, r as EventFactValues, t as EventCategory } from "./EventCatalog-Bfi4O8xq.js";
-import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-QpGGS9CH.js";
+import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-ZEpkmYvn.js";
 export type { Event, EventAsset, EventCategory, EventFactValues, EventSeverity, EventType, TypedEvent };

@@ -182,7 +182,7 @@ class ModelsTest {
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
     Models.ReportPolicy policy = Json.GSON.fromJson("""
-        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"restriction","index":0},"settings":{"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
+        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
         """, Models.ReportPolicy.class);
     Models.CategoryPolicyScore category = policy.categories().get("violence");
     assertEquals(0.6, category.settings().threshold());
@@ -191,5 +191,15 @@ class ModelsTest {
     assertEquals("asset-override", policy.decision().source());
     assertEquals("purge", policy.decision().action());
     assertEquals(List.of("violence"), policy.decision().flaggedCategories());
+    assertEquals(Boolean.TRUE, category.settings().enabled());
+    assertEquals("all", category.settings().restrictions().get(0).match());
+    assertEquals(List.of("violence-documentary"), category.settings().restrictions().get(0).unless());
+    assertEquals(List.of(0, 1), category.source().indexes());
+    Models.CategoryResult finding = Json.GSON.fromJson("""
+        {"status":"evaluated","score":0.9,"policyConditions":{"some:opaque":{"status":"evaluated","score":0.8}}}
+        """, Models.CategoryResult.class);
+    assertEquals("evaluated", finding.policyConditions().get("some:opaque").status());
+    assertEquals(0.8, finding.policyConditions().get("some:opaque").score());
+
   }
 }

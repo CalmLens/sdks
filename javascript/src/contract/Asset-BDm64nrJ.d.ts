@@ -219,10 +219,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -282,6 +286,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -342,10 +356,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -412,6 +430,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -461,10 +489,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -524,6 +556,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -585,10 +627,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -648,6 +694,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -708,10 +764,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -778,6 +838,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -827,10 +897,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -890,6 +964,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -951,10 +1035,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1014,6 +1102,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -1074,10 +1172,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1144,6 +1246,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -1193,10 +1305,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1256,6 +1372,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -1317,10 +1443,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1380,6 +1510,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -1440,10 +1580,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1510,6 +1654,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -1559,10 +1713,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1622,6 +1780,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -1683,10 +1851,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1746,6 +1918,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -1806,10 +1988,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1876,6 +2062,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -1925,10 +2121,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -1988,6 +2188,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -2049,10 +2259,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2112,6 +2326,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -2172,10 +2396,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2242,6 +2470,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -2291,10 +2529,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2354,6 +2596,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -2415,10 +2667,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2478,6 +2734,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -2538,10 +2804,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2608,6 +2878,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -2657,10 +2937,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2720,6 +3004,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -2781,10 +3075,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2844,6 +3142,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -2904,10 +3212,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -2974,6 +3286,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
@@ -3023,10 +3345,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "personal-information-credentials": "personal-information-credentials";
         "personal-information-documentary": "personal-information-documentary";
         "personal-information-educational": "personal-information-educational";
+        "personal-information-email": "personal-information-email";
         "personal-information-fictional": "personal-information-fictional";
+        "personal-information-financial": "personal-information-financial";
+        "personal-information-government-id": "personal-information-government-id";
         "personal-information-historical": "personal-information-historical";
         "personal-information-identifiers": "personal-information-identifiers";
         "personal-information-location": "personal-information-location";
+        "personal-information-phone": "personal-information-phone";
         "personal-information-request": "personal-information-request";
         "personal-information-self-disclosure": "personal-information-self-disclosure";
         "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3086,6 +3412,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "very-likely": "very-likely";
           "very-unlikely": "very-unlikely";
         }>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>>;
+      policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        score: zod.ZodNumber;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -3164,10 +3500,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3227,6 +3567,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -3287,10 +3637,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3357,6 +3711,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -3406,10 +3770,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3469,6 +3837,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -3530,10 +3908,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3593,6 +3975,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -3653,10 +4045,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3723,6 +4119,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -3772,10 +4178,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3835,6 +4245,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -3896,10 +4316,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -3959,6 +4383,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -4019,10 +4453,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4089,6 +4527,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -4138,10 +4586,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4201,6 +4653,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -4262,10 +4724,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4325,6 +4791,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -4385,10 +4861,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4455,6 +4935,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -4504,10 +4994,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4567,6 +5061,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -4628,10 +5132,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4691,6 +5199,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -4751,10 +5269,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4821,6 +5343,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -4870,10 +5402,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -4933,6 +5469,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -4994,10 +5540,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5057,6 +5607,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -5117,10 +5677,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5187,6 +5751,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -5236,10 +5810,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5299,6 +5877,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -5360,10 +5948,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5423,6 +6015,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -5483,10 +6085,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5553,6 +6159,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -5602,10 +6218,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5665,6 +6285,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -5726,10 +6356,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5789,6 +6423,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -5849,10 +6493,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -5912,6 +6560,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -5968,10 +6626,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6038,6 +6700,16 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>], "status">;
       }, zod.core.$strict>;
     }, zod.core.$strict>>;
@@ -6070,9 +6742,11 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
       }, zod.core.$strict>, zod.ZodObject<{
         kind: zod.ZodLiteral<"allowance">;
         index: zod.ZodNumber;
+        indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
       }, zod.core.$strict>, zod.ZodObject<{
         kind: zod.ZodLiteral<"restriction">;
         index: zod.ZodNumber;
+        indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
       }, zod.core.$strict>], "kind">>;
       settings: zod.ZodOptional<zod.ZodObject<{
         enabled: zod.ZodOptional<zod.ZodBoolean>;
@@ -6128,10 +6802,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6181,6 +6859,107 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-violent-death": "violence-violent-death";
             "violence-weapon": "violence-weapon";
           }>>;
+          match: zod.ZodOptional<zod.ZodLiteral<"all">>;
+          unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+            "criminal-activity-alcohol": "criminal-activity-alcohol";
+            "criminal-activity-demonstration": "criminal-activity-demonstration";
+            "criminal-activity-documentary": "criminal-activity-documentary";
+            "criminal-activity-educational": "criminal-activity-educational";
+            "criminal-activity-fictional": "criminal-activity-fictional";
+            "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-gambling": "criminal-activity-gambling";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
+            "criminal-activity-grooming": "criminal-activity-grooming";
+            "criminal-activity-historical": "criminal-activity-historical";
+            "criminal-activity-instructions": "criminal-activity-instructions";
+            "criminal-activity-preparation": "criminal-activity-preparation";
+            "criminal-activity-promotion": "criminal-activity-promotion";
+            "criminal-activity-request": "criminal-activity-request";
+            "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
+            "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+            "criminal-activity-tobacco": "criminal-activity-tobacco";
+            "harassment-abuse": "harassment-abuse";
+            "harassment-documentary": "harassment-documentary";
+            "harassment-educational": "harassment-educational";
+            "harassment-encouragement": "harassment-encouragement";
+            "harassment-fictional": "harassment-fictional";
+            "harassment-historical": "harassment-historical";
+            "harassment-intimidation": "harassment-intimidation";
+            "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
+            "harassment-threat": "harassment-threat";
+            "hate-abuse": "hate-abuse";
+            "hate-dehumanization": "hate-dehumanization";
+            "hate-documentary": "hate-documentary";
+            "hate-educational": "hate-educational";
+            "hate-exclusion": "hate-exclusion";
+            "hate-fictional": "hate-fictional";
+            "hate-historical": "hate-historical";
+            "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
+            "hate-threat": "hate-threat";
+            "personal-information-contact": "personal-information-contact";
+            "personal-information-credentials": "personal-information-credentials";
+            "personal-information-documentary": "personal-information-documentary";
+            "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
+            "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
+            "personal-information-historical": "personal-information-historical";
+            "personal-information-identifiers": "personal-information-identifiers";
+            "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
+            "personal-information-request": "personal-information-request";
+            "personal-information-self-disclosure": "personal-information-self-disclosure";
+            "personal-information-support-prevention": "personal-information-support-prevention";
+            "personal-information-third-party": "personal-information-third-party";
+            "profanity-documentary": "profanity-documentary";
+            "profanity-educational": "profanity-educational";
+            "profanity-fictional": "profanity-fictional";
+            "profanity-historical": "profanity-historical";
+            "profanity-mild": "profanity-mild";
+            "profanity-obfuscated": "profanity-obfuscated";
+            "profanity-slurs": "profanity-slurs";
+            "profanity-strong": "profanity-strong";
+            "profanity-support-prevention": "profanity-support-prevention";
+            "self-harm-act": "self-harm-act";
+            "self-harm-documentary": "self-harm-documentary";
+            "self-harm-educational": "self-harm-educational";
+            "self-harm-encouragement": "self-harm-encouragement";
+            "self-harm-fictional": "self-harm-fictional";
+            "self-harm-historical": "self-harm-historical";
+            "self-harm-methods": "self-harm-methods";
+            "self-harm-preparation": "self-harm-preparation";
+            "self-harm-support-prevention": "self-harm-support-prevention";
+            "self-harm-thoughts": "self-harm-thoughts";
+            "sexual-activity": "sexual-activity";
+            "sexual-documentary": "sexual-documentary";
+            "sexual-educational": "sexual-educational";
+            "sexual-explicit-language": "sexual-explicit-language";
+            "sexual-fictional": "sexual-fictional";
+            "sexual-historical": "sexual-historical";
+            "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
+            "sexual-solicitation": "sexual-solicitation";
+            "sexual-support-prevention": "sexual-support-prevention";
+            "violence-attack": "violence-attack";
+            "violence-documentary": "violence-documentary";
+            "violence-educational": "violence-educational";
+            "violence-encouragement": "violence-encouragement";
+            "violence-fictional": "violence-fictional";
+            "violence-graphic": "violence-graphic";
+            "violence-historical": "violence-historical";
+            "violence-injury": "violence-injury";
+            "violence-natural-death": "violence-natural-death";
+            "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
+            "violence-support-prevention": "violence-support-prevention";
+            "violence-threat": "violence-threat";
+            "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
+          }>>>;
           action: zod.ZodEnum<{
             alert: "alert";
             hide: "hide";
@@ -6233,10 +7012,14 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6286,6 +7069,107 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-violent-death": "violence-violent-death";
             "violence-weapon": "violence-weapon";
           }>>;
+          match: zod.ZodOptional<zod.ZodLiteral<"all">>;
+          unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+            "criminal-activity-alcohol": "criminal-activity-alcohol";
+            "criminal-activity-demonstration": "criminal-activity-demonstration";
+            "criminal-activity-documentary": "criminal-activity-documentary";
+            "criminal-activity-educational": "criminal-activity-educational";
+            "criminal-activity-fictional": "criminal-activity-fictional";
+            "criminal-activity-fraud": "criminal-activity-fraud";
+            "criminal-activity-gambling": "criminal-activity-gambling";
+            "criminal-activity-graffiti": "criminal-activity-graffiti";
+            "criminal-activity-grooming": "criminal-activity-grooming";
+            "criminal-activity-historical": "criminal-activity-historical";
+            "criminal-activity-instructions": "criminal-activity-instructions";
+            "criminal-activity-preparation": "criminal-activity-preparation";
+            "criminal-activity-promotion": "criminal-activity-promotion";
+            "criminal-activity-request": "criminal-activity-request";
+            "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
+            "criminal-activity-substances": "criminal-activity-substances";
+            "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+            "criminal-activity-tobacco": "criminal-activity-tobacco";
+            "harassment-abuse": "harassment-abuse";
+            "harassment-documentary": "harassment-documentary";
+            "harassment-educational": "harassment-educational";
+            "harassment-encouragement": "harassment-encouragement";
+            "harassment-fictional": "harassment-fictional";
+            "harassment-historical": "harassment-historical";
+            "harassment-intimidation": "harassment-intimidation";
+            "harassment-sexual": "harassment-sexual";
+            "harassment-support-prevention": "harassment-support-prevention";
+            "harassment-threat": "harassment-threat";
+            "hate-abuse": "hate-abuse";
+            "hate-dehumanization": "hate-dehumanization";
+            "hate-documentary": "hate-documentary";
+            "hate-educational": "hate-educational";
+            "hate-exclusion": "hate-exclusion";
+            "hate-fictional": "hate-fictional";
+            "hate-historical": "hate-historical";
+            "hate-inferiority": "hate-inferiority";
+            "hate-support-prevention": "hate-support-prevention";
+            "hate-threat": "hate-threat";
+            "personal-information-contact": "personal-information-contact";
+            "personal-information-credentials": "personal-information-credentials";
+            "personal-information-documentary": "personal-information-documentary";
+            "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
+            "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
+            "personal-information-historical": "personal-information-historical";
+            "personal-information-identifiers": "personal-information-identifiers";
+            "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
+            "personal-information-request": "personal-information-request";
+            "personal-information-self-disclosure": "personal-information-self-disclosure";
+            "personal-information-support-prevention": "personal-information-support-prevention";
+            "personal-information-third-party": "personal-information-third-party";
+            "profanity-documentary": "profanity-documentary";
+            "profanity-educational": "profanity-educational";
+            "profanity-fictional": "profanity-fictional";
+            "profanity-historical": "profanity-historical";
+            "profanity-mild": "profanity-mild";
+            "profanity-obfuscated": "profanity-obfuscated";
+            "profanity-slurs": "profanity-slurs";
+            "profanity-strong": "profanity-strong";
+            "profanity-support-prevention": "profanity-support-prevention";
+            "self-harm-act": "self-harm-act";
+            "self-harm-documentary": "self-harm-documentary";
+            "self-harm-educational": "self-harm-educational";
+            "self-harm-encouragement": "self-harm-encouragement";
+            "self-harm-fictional": "self-harm-fictional";
+            "self-harm-historical": "self-harm-historical";
+            "self-harm-methods": "self-harm-methods";
+            "self-harm-preparation": "self-harm-preparation";
+            "self-harm-support-prevention": "self-harm-support-prevention";
+            "self-harm-thoughts": "self-harm-thoughts";
+            "sexual-activity": "sexual-activity";
+            "sexual-documentary": "sexual-documentary";
+            "sexual-educational": "sexual-educational";
+            "sexual-explicit-language": "sexual-explicit-language";
+            "sexual-fictional": "sexual-fictional";
+            "sexual-historical": "sexual-historical";
+            "sexual-nudity": "sexual-nudity";
+            "sexual-revealing-clothing": "sexual-revealing-clothing";
+            "sexual-solicitation": "sexual-solicitation";
+            "sexual-support-prevention": "sexual-support-prevention";
+            "violence-attack": "violence-attack";
+            "violence-documentary": "violence-documentary";
+            "violence-educational": "violence-educational";
+            "violence-encouragement": "violence-encouragement";
+            "violence-fictional": "violence-fictional";
+            "violence-graphic": "violence-graphic";
+            "violence-historical": "violence-historical";
+            "violence-injury": "violence-injury";
+            "violence-natural-death": "violence-natural-death";
+            "violence-preparation": "violence-preparation";
+            "violence-sport": "violence-sport";
+            "violence-support-prevention": "violence-support-prevention";
+            "violence-threat": "violence-threat";
+            "violence-violent-death": "violence-violent-death";
+            "violence-weapon": "violence-weapon";
+          }>>>;
           action: zod.ZodEnum<{
             alert: "alert";
             hide: "hide";
@@ -6412,10 +7296,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6475,6 +7363,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -6535,10 +7433,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6605,6 +7507,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -6654,10 +7566,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6717,6 +7633,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -6778,10 +7704,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6841,6 +7771,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -6901,10 +7841,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -6971,6 +7915,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -7020,10 +7974,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7083,6 +8041,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -7144,10 +8112,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7207,6 +8179,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -7267,10 +8249,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7337,6 +8323,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -7386,10 +8382,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7449,6 +8449,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -7510,10 +8520,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7573,6 +8587,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -7633,10 +8657,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7703,6 +8731,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -7752,10 +8790,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7815,6 +8857,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -7876,10 +8928,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -7939,6 +8995,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -7999,10 +9065,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8069,6 +9139,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -8118,10 +9198,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8181,6 +9265,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -8242,10 +9336,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8305,6 +9403,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -8365,10 +9473,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8435,6 +9547,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -8484,10 +9606,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8547,6 +9673,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -8608,10 +9744,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8671,6 +9811,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -8731,10 +9881,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8801,6 +9955,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -8850,10 +10014,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -8913,6 +10081,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -8974,10 +10152,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9037,6 +10219,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -9097,10 +10289,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9167,6 +10363,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             unavailable: "unavailable";
           }>;
         }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
       }, zod.core.$strict>, zod.ZodObject<{
         status: zod.ZodLiteral<"not-evaluated">;
         reason: zod.ZodEnum<{
@@ -9216,10 +10422,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "personal-information-credentials": "personal-information-credentials";
           "personal-information-documentary": "personal-information-documentary";
           "personal-information-educational": "personal-information-educational";
+          "personal-information-email": "personal-information-email";
           "personal-information-fictional": "personal-information-fictional";
+          "personal-information-financial": "personal-information-financial";
+          "personal-information-government-id": "personal-information-government-id";
           "personal-information-historical": "personal-information-historical";
           "personal-information-identifiers": "personal-information-identifiers";
           "personal-information-location": "personal-information-location";
+          "personal-information-phone": "personal-information-phone";
           "personal-information-request": "personal-information-request";
           "personal-information-self-disclosure": "personal-information-self-disclosure";
           "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9279,6 +10489,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "very-likely": "very-likely";
             "very-unlikely": "very-unlikely";
           }>;
+        }, zod.core.$strict>, zod.ZodObject<{
+          status: zod.ZodLiteral<"not-evaluated">;
+          reason: zod.ZodEnum<{
+            "not-supported": "not-supported";
+            unavailable: "unavailable";
+          }>;
+        }, zod.core.$strict>], "status">>>;
+        policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+          status: zod.ZodLiteral<"evaluated">;
+          score: zod.ZodNumber;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -9357,10 +10577,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9420,6 +10644,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -9480,10 +10714,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9550,6 +10788,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -9599,10 +10847,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9662,6 +10914,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -9723,10 +10985,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9786,6 +11052,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -9846,10 +11122,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -9916,6 +11196,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -9965,10 +11255,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10028,6 +11322,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -10089,10 +11393,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10152,6 +11460,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -10212,10 +11530,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10282,6 +11604,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -10331,10 +11663,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10394,6 +11730,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -10455,10 +11801,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10518,6 +11868,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -10578,10 +11938,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10648,6 +12012,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -10697,10 +12071,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10760,6 +12138,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -10821,10 +12209,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -10884,6 +12276,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -10944,10 +12346,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11014,6 +12420,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -11063,10 +12479,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11126,6 +12546,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -11187,10 +12617,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11250,6 +12684,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -11310,10 +12754,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11380,6 +12828,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -11429,10 +12887,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11492,6 +12954,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -11553,10 +13025,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11616,6 +13092,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -11676,10 +13162,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11746,6 +13236,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -11795,10 +13295,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11858,6 +13362,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -11919,10 +13433,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -11982,6 +13500,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -12042,10 +13570,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -12105,6 +13637,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 "very-likely": "very-likely";
                 "very-unlikely": "very-unlikely";
               }>;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -12161,10 +13703,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -12231,6 +13777,16 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
                 unavailable: "unavailable";
               }>;
             }, zod.core.$strict>], "status">>>;
+            policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+              status: zod.ZodLiteral<"evaluated">;
+              score: zod.ZodNumber;
+            }, zod.core.$strict>, zod.ZodObject<{
+              status: zod.ZodLiteral<"not-evaluated">;
+              reason: zod.ZodEnum<{
+                "not-supported": "not-supported";
+                unavailable: "unavailable";
+              }>;
+            }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>], "status">;
         }, zod.core.$strict>;
       }, zod.core.$strict>>;
@@ -12263,9 +13819,11 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
         }, zod.core.$strict>, zod.ZodObject<{
           kind: zod.ZodLiteral<"allowance">;
           index: zod.ZodNumber;
+          indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
         }, zod.core.$strict>, zod.ZodObject<{
           kind: zod.ZodLiteral<"restriction">;
           index: zod.ZodNumber;
+          indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
         }, zod.core.$strict>], "kind">>;
         settings: zod.ZodOptional<zod.ZodObject<{
           enabled: zod.ZodOptional<zod.ZodBoolean>;
@@ -12321,10 +13879,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -12374,6 +13936,107 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-violent-death": "violence-violent-death";
               "violence-weapon": "violence-weapon";
             }>>;
+            match: zod.ZodOptional<zod.ZodLiteral<"all">>;
+            unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+              "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-demonstration": "criminal-activity-demonstration";
+              "criminal-activity-documentary": "criminal-activity-documentary";
+              "criminal-activity-educational": "criminal-activity-educational";
+              "criminal-activity-fictional": "criminal-activity-fictional";
+              "criminal-activity-fraud": "criminal-activity-fraud";
+              "criminal-activity-gambling": "criminal-activity-gambling";
+              "criminal-activity-graffiti": "criminal-activity-graffiti";
+              "criminal-activity-grooming": "criminal-activity-grooming";
+              "criminal-activity-historical": "criminal-activity-historical";
+              "criminal-activity-instructions": "criminal-activity-instructions";
+              "criminal-activity-preparation": "criminal-activity-preparation";
+              "criminal-activity-promotion": "criminal-activity-promotion";
+              "criminal-activity-request": "criminal-activity-request";
+              "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
+              "criminal-activity-substances": "criminal-activity-substances";
+              "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+              "criminal-activity-tobacco": "criminal-activity-tobacco";
+              "harassment-abuse": "harassment-abuse";
+              "harassment-documentary": "harassment-documentary";
+              "harassment-educational": "harassment-educational";
+              "harassment-encouragement": "harassment-encouragement";
+              "harassment-fictional": "harassment-fictional";
+              "harassment-historical": "harassment-historical";
+              "harassment-intimidation": "harassment-intimidation";
+              "harassment-sexual": "harassment-sexual";
+              "harassment-support-prevention": "harassment-support-prevention";
+              "harassment-threat": "harassment-threat";
+              "hate-abuse": "hate-abuse";
+              "hate-dehumanization": "hate-dehumanization";
+              "hate-documentary": "hate-documentary";
+              "hate-educational": "hate-educational";
+              "hate-exclusion": "hate-exclusion";
+              "hate-fictional": "hate-fictional";
+              "hate-historical": "hate-historical";
+              "hate-inferiority": "hate-inferiority";
+              "hate-support-prevention": "hate-support-prevention";
+              "hate-threat": "hate-threat";
+              "personal-information-contact": "personal-information-contact";
+              "personal-information-credentials": "personal-information-credentials";
+              "personal-information-documentary": "personal-information-documentary";
+              "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
+              "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
+              "personal-information-historical": "personal-information-historical";
+              "personal-information-identifiers": "personal-information-identifiers";
+              "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
+              "personal-information-request": "personal-information-request";
+              "personal-information-self-disclosure": "personal-information-self-disclosure";
+              "personal-information-support-prevention": "personal-information-support-prevention";
+              "personal-information-third-party": "personal-information-third-party";
+              "profanity-documentary": "profanity-documentary";
+              "profanity-educational": "profanity-educational";
+              "profanity-fictional": "profanity-fictional";
+              "profanity-historical": "profanity-historical";
+              "profanity-mild": "profanity-mild";
+              "profanity-obfuscated": "profanity-obfuscated";
+              "profanity-slurs": "profanity-slurs";
+              "profanity-strong": "profanity-strong";
+              "profanity-support-prevention": "profanity-support-prevention";
+              "self-harm-act": "self-harm-act";
+              "self-harm-documentary": "self-harm-documentary";
+              "self-harm-educational": "self-harm-educational";
+              "self-harm-encouragement": "self-harm-encouragement";
+              "self-harm-fictional": "self-harm-fictional";
+              "self-harm-historical": "self-harm-historical";
+              "self-harm-methods": "self-harm-methods";
+              "self-harm-preparation": "self-harm-preparation";
+              "self-harm-support-prevention": "self-harm-support-prevention";
+              "self-harm-thoughts": "self-harm-thoughts";
+              "sexual-activity": "sexual-activity";
+              "sexual-documentary": "sexual-documentary";
+              "sexual-educational": "sexual-educational";
+              "sexual-explicit-language": "sexual-explicit-language";
+              "sexual-fictional": "sexual-fictional";
+              "sexual-historical": "sexual-historical";
+              "sexual-nudity": "sexual-nudity";
+              "sexual-revealing-clothing": "sexual-revealing-clothing";
+              "sexual-solicitation": "sexual-solicitation";
+              "sexual-support-prevention": "sexual-support-prevention";
+              "violence-attack": "violence-attack";
+              "violence-documentary": "violence-documentary";
+              "violence-educational": "violence-educational";
+              "violence-encouragement": "violence-encouragement";
+              "violence-fictional": "violence-fictional";
+              "violence-graphic": "violence-graphic";
+              "violence-historical": "violence-historical";
+              "violence-injury": "violence-injury";
+              "violence-natural-death": "violence-natural-death";
+              "violence-preparation": "violence-preparation";
+              "violence-sport": "violence-sport";
+              "violence-support-prevention": "violence-support-prevention";
+              "violence-threat": "violence-threat";
+              "violence-violent-death": "violence-violent-death";
+              "violence-weapon": "violence-weapon";
+            }>>>;
             action: zod.ZodEnum<{
               alert: "alert";
               hide: "hide";
@@ -12426,10 +14089,14 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "personal-information-credentials": "personal-information-credentials";
               "personal-information-documentary": "personal-information-documentary";
               "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
               "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
               "personal-information-historical": "personal-information-historical";
               "personal-information-identifiers": "personal-information-identifiers";
               "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
               "personal-information-request": "personal-information-request";
               "personal-information-self-disclosure": "personal-information-self-disclosure";
               "personal-information-support-prevention": "personal-information-support-prevention";
@@ -12479,6 +14146,107 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-violent-death": "violence-violent-death";
               "violence-weapon": "violence-weapon";
             }>>;
+            match: zod.ZodOptional<zod.ZodLiteral<"all">>;
+            unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+              "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-demonstration": "criminal-activity-demonstration";
+              "criminal-activity-documentary": "criminal-activity-documentary";
+              "criminal-activity-educational": "criminal-activity-educational";
+              "criminal-activity-fictional": "criminal-activity-fictional";
+              "criminal-activity-fraud": "criminal-activity-fraud";
+              "criminal-activity-gambling": "criminal-activity-gambling";
+              "criminal-activity-graffiti": "criminal-activity-graffiti";
+              "criminal-activity-grooming": "criminal-activity-grooming";
+              "criminal-activity-historical": "criminal-activity-historical";
+              "criminal-activity-instructions": "criminal-activity-instructions";
+              "criminal-activity-preparation": "criminal-activity-preparation";
+              "criminal-activity-promotion": "criminal-activity-promotion";
+              "criminal-activity-request": "criminal-activity-request";
+              "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
+              "criminal-activity-substances": "criminal-activity-substances";
+              "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+              "criminal-activity-tobacco": "criminal-activity-tobacco";
+              "harassment-abuse": "harassment-abuse";
+              "harassment-documentary": "harassment-documentary";
+              "harassment-educational": "harassment-educational";
+              "harassment-encouragement": "harassment-encouragement";
+              "harassment-fictional": "harassment-fictional";
+              "harassment-historical": "harassment-historical";
+              "harassment-intimidation": "harassment-intimidation";
+              "harassment-sexual": "harassment-sexual";
+              "harassment-support-prevention": "harassment-support-prevention";
+              "harassment-threat": "harassment-threat";
+              "hate-abuse": "hate-abuse";
+              "hate-dehumanization": "hate-dehumanization";
+              "hate-documentary": "hate-documentary";
+              "hate-educational": "hate-educational";
+              "hate-exclusion": "hate-exclusion";
+              "hate-fictional": "hate-fictional";
+              "hate-historical": "hate-historical";
+              "hate-inferiority": "hate-inferiority";
+              "hate-support-prevention": "hate-support-prevention";
+              "hate-threat": "hate-threat";
+              "personal-information-contact": "personal-information-contact";
+              "personal-information-credentials": "personal-information-credentials";
+              "personal-information-documentary": "personal-information-documentary";
+              "personal-information-educational": "personal-information-educational";
+              "personal-information-email": "personal-information-email";
+              "personal-information-fictional": "personal-information-fictional";
+              "personal-information-financial": "personal-information-financial";
+              "personal-information-government-id": "personal-information-government-id";
+              "personal-information-historical": "personal-information-historical";
+              "personal-information-identifiers": "personal-information-identifiers";
+              "personal-information-location": "personal-information-location";
+              "personal-information-phone": "personal-information-phone";
+              "personal-information-request": "personal-information-request";
+              "personal-information-self-disclosure": "personal-information-self-disclosure";
+              "personal-information-support-prevention": "personal-information-support-prevention";
+              "personal-information-third-party": "personal-information-third-party";
+              "profanity-documentary": "profanity-documentary";
+              "profanity-educational": "profanity-educational";
+              "profanity-fictional": "profanity-fictional";
+              "profanity-historical": "profanity-historical";
+              "profanity-mild": "profanity-mild";
+              "profanity-obfuscated": "profanity-obfuscated";
+              "profanity-slurs": "profanity-slurs";
+              "profanity-strong": "profanity-strong";
+              "profanity-support-prevention": "profanity-support-prevention";
+              "self-harm-act": "self-harm-act";
+              "self-harm-documentary": "self-harm-documentary";
+              "self-harm-educational": "self-harm-educational";
+              "self-harm-encouragement": "self-harm-encouragement";
+              "self-harm-fictional": "self-harm-fictional";
+              "self-harm-historical": "self-harm-historical";
+              "self-harm-methods": "self-harm-methods";
+              "self-harm-preparation": "self-harm-preparation";
+              "self-harm-support-prevention": "self-harm-support-prevention";
+              "self-harm-thoughts": "self-harm-thoughts";
+              "sexual-activity": "sexual-activity";
+              "sexual-documentary": "sexual-documentary";
+              "sexual-educational": "sexual-educational";
+              "sexual-explicit-language": "sexual-explicit-language";
+              "sexual-fictional": "sexual-fictional";
+              "sexual-historical": "sexual-historical";
+              "sexual-nudity": "sexual-nudity";
+              "sexual-revealing-clothing": "sexual-revealing-clothing";
+              "sexual-solicitation": "sexual-solicitation";
+              "sexual-support-prevention": "sexual-support-prevention";
+              "violence-attack": "violence-attack";
+              "violence-documentary": "violence-documentary";
+              "violence-educational": "violence-educational";
+              "violence-encouragement": "violence-encouragement";
+              "violence-fictional": "violence-fictional";
+              "violence-graphic": "violence-graphic";
+              "violence-historical": "violence-historical";
+              "violence-injury": "violence-injury";
+              "violence-natural-death": "violence-natural-death";
+              "violence-preparation": "violence-preparation";
+              "violence-sport": "violence-sport";
+              "violence-support-prevention": "violence-support-prevention";
+              "violence-threat": "violence-threat";
+              "violence-violent-death": "violence-violent-death";
+              "violence-weapon": "violence-weapon";
+            }>>>;
             action: zod.ZodEnum<{
               alert: "alert";
               hide: "hide";
@@ -12789,10 +14557,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -12852,6 +14624,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -12912,10 +14694,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -12982,6 +14768,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -13031,10 +14827,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13094,6 +14894,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -13155,10 +14965,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13218,6 +15032,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -13278,10 +15102,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13348,6 +15176,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -13397,10 +15235,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13460,6 +15302,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -13521,10 +15373,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13584,6 +15440,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -13644,10 +15510,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13714,6 +15584,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -13763,10 +15643,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13826,6 +15710,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -13887,10 +15781,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -13950,6 +15848,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -14010,10 +15918,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14080,6 +15992,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -14129,10 +16051,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14192,6 +16118,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -14253,10 +16189,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14316,6 +16256,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -14376,10 +16326,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14446,6 +16400,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -14495,10 +16459,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14558,6 +16526,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -14619,10 +16597,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14682,6 +16664,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -14742,10 +16734,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14812,6 +16808,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -14861,10 +16867,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -14924,6 +16934,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -14985,10 +17005,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15048,6 +17072,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -15108,10 +17142,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15178,6 +17216,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -15227,10 +17275,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15290,6 +17342,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -15351,10 +17413,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15414,6 +17480,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -15474,10 +17550,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15544,6 +17624,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               unavailable: "unavailable";
             }>;
           }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
         }, zod.core.$strict>, zod.ZodObject<{
           status: zod.ZodLiteral<"not-evaluated">;
           reason: zod.ZodEnum<{
@@ -15593,10 +17683,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "personal-information-credentials": "personal-information-credentials";
             "personal-information-documentary": "personal-information-documentary";
             "personal-information-educational": "personal-information-educational";
+            "personal-information-email": "personal-information-email";
             "personal-information-fictional": "personal-information-fictional";
+            "personal-information-financial": "personal-information-financial";
+            "personal-information-government-id": "personal-information-government-id";
             "personal-information-historical": "personal-information-historical";
             "personal-information-identifiers": "personal-information-identifiers";
             "personal-information-location": "personal-information-location";
+            "personal-information-phone": "personal-information-phone";
             "personal-information-request": "personal-information-request";
             "personal-information-self-disclosure": "personal-information-self-disclosure";
             "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15656,6 +17750,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "very-likely": "very-likely";
               "very-unlikely": "very-unlikely";
             }>;
+          }, zod.core.$strict>, zod.ZodObject<{
+            status: zod.ZodLiteral<"not-evaluated">;
+            reason: zod.ZodEnum<{
+              "not-supported": "not-supported";
+              unavailable: "unavailable";
+            }>;
+          }, zod.core.$strict>], "status">>>;
+          policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            status: zod.ZodLiteral<"evaluated">;
+            score: zod.ZodNumber;
           }, zod.core.$strict>, zod.ZodObject<{
             status: zod.ZodLiteral<"not-evaluated">;
             reason: zod.ZodEnum<{
@@ -15734,10 +17838,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15797,6 +17905,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -15857,10 +17975,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -15927,6 +18049,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -15976,10 +18108,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16039,6 +18175,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -16100,10 +18246,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16163,6 +18313,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -16223,10 +18383,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16293,6 +18457,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -16342,10 +18516,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16405,6 +18583,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -16466,10 +18654,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16529,6 +18721,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -16589,10 +18791,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16659,6 +18865,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -16708,10 +18924,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16771,6 +18991,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -16832,10 +19062,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -16895,6 +19129,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -16955,10 +19199,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17025,6 +19273,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -17074,10 +19332,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17137,6 +19399,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -17198,10 +19470,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17261,6 +19537,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -17321,10 +19607,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17391,6 +19681,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -17440,10 +19740,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17503,6 +19807,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -17564,10 +19878,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17627,6 +19945,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -17687,10 +20015,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17757,6 +20089,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -17806,10 +20148,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17869,6 +20215,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -17930,10 +20286,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -17993,6 +20353,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -18053,10 +20423,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -18123,6 +20497,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -18172,10 +20556,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -18235,6 +20623,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -18296,10 +20694,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -18359,6 +20761,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -18419,10 +20831,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -18482,6 +20898,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -18538,10 +20964,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -18608,6 +21038,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
+              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+                status: zod.ZodLiteral<"evaluated">;
+                score: zod.ZodNumber;
+              }, zod.core.$strict>, zod.ZodObject<{
+                status: zod.ZodLiteral<"not-evaluated">;
+                reason: zod.ZodEnum<{
+                  "not-supported": "not-supported";
+                  unavailable: "unavailable";
+                }>;
+              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>], "status">;
           }, zod.core.$strict>;
         }, zod.core.$strict>>;
@@ -18640,9 +21080,11 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
           }, zod.core.$strict>, zod.ZodObject<{
             kind: zod.ZodLiteral<"allowance">;
             index: zod.ZodNumber;
+            indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
           }, zod.core.$strict>, zod.ZodObject<{
             kind: zod.ZodLiteral<"restriction">;
             index: zod.ZodNumber;
+            indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
           }, zod.core.$strict>], "kind">>;
           settings: zod.ZodOptional<zod.ZodObject<{
             enabled: zod.ZodOptional<zod.ZodBoolean>;
@@ -18698,10 +21140,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -18751,6 +21197,107 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-violent-death": "violence-violent-death";
                 "violence-weapon": "violence-weapon";
               }>>;
+              match: zod.ZodOptional<zod.ZodLiteral<"all">>;
+              unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+                "criminal-activity-alcohol": "criminal-activity-alcohol";
+                "criminal-activity-demonstration": "criminal-activity-demonstration";
+                "criminal-activity-documentary": "criminal-activity-documentary";
+                "criminal-activity-educational": "criminal-activity-educational";
+                "criminal-activity-fictional": "criminal-activity-fictional";
+                "criminal-activity-fraud": "criminal-activity-fraud";
+                "criminal-activity-gambling": "criminal-activity-gambling";
+                "criminal-activity-graffiti": "criminal-activity-graffiti";
+                "criminal-activity-grooming": "criminal-activity-grooming";
+                "criminal-activity-historical": "criminal-activity-historical";
+                "criminal-activity-instructions": "criminal-activity-instructions";
+                "criminal-activity-preparation": "criminal-activity-preparation";
+                "criminal-activity-promotion": "criminal-activity-promotion";
+                "criminal-activity-request": "criminal-activity-request";
+                "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
+                "criminal-activity-substances": "criminal-activity-substances";
+                "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+                "criminal-activity-tobacco": "criminal-activity-tobacco";
+                "harassment-abuse": "harassment-abuse";
+                "harassment-documentary": "harassment-documentary";
+                "harassment-educational": "harassment-educational";
+                "harassment-encouragement": "harassment-encouragement";
+                "harassment-fictional": "harassment-fictional";
+                "harassment-historical": "harassment-historical";
+                "harassment-intimidation": "harassment-intimidation";
+                "harassment-sexual": "harassment-sexual";
+                "harassment-support-prevention": "harassment-support-prevention";
+                "harassment-threat": "harassment-threat";
+                "hate-abuse": "hate-abuse";
+                "hate-dehumanization": "hate-dehumanization";
+                "hate-documentary": "hate-documentary";
+                "hate-educational": "hate-educational";
+                "hate-exclusion": "hate-exclusion";
+                "hate-fictional": "hate-fictional";
+                "hate-historical": "hate-historical";
+                "hate-inferiority": "hate-inferiority";
+                "hate-support-prevention": "hate-support-prevention";
+                "hate-threat": "hate-threat";
+                "personal-information-contact": "personal-information-contact";
+                "personal-information-credentials": "personal-information-credentials";
+                "personal-information-documentary": "personal-information-documentary";
+                "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
+                "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
+                "personal-information-historical": "personal-information-historical";
+                "personal-information-identifiers": "personal-information-identifiers";
+                "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
+                "personal-information-request": "personal-information-request";
+                "personal-information-self-disclosure": "personal-information-self-disclosure";
+                "personal-information-support-prevention": "personal-information-support-prevention";
+                "personal-information-third-party": "personal-information-third-party";
+                "profanity-documentary": "profanity-documentary";
+                "profanity-educational": "profanity-educational";
+                "profanity-fictional": "profanity-fictional";
+                "profanity-historical": "profanity-historical";
+                "profanity-mild": "profanity-mild";
+                "profanity-obfuscated": "profanity-obfuscated";
+                "profanity-slurs": "profanity-slurs";
+                "profanity-strong": "profanity-strong";
+                "profanity-support-prevention": "profanity-support-prevention";
+                "self-harm-act": "self-harm-act";
+                "self-harm-documentary": "self-harm-documentary";
+                "self-harm-educational": "self-harm-educational";
+                "self-harm-encouragement": "self-harm-encouragement";
+                "self-harm-fictional": "self-harm-fictional";
+                "self-harm-historical": "self-harm-historical";
+                "self-harm-methods": "self-harm-methods";
+                "self-harm-preparation": "self-harm-preparation";
+                "self-harm-support-prevention": "self-harm-support-prevention";
+                "self-harm-thoughts": "self-harm-thoughts";
+                "sexual-activity": "sexual-activity";
+                "sexual-documentary": "sexual-documentary";
+                "sexual-educational": "sexual-educational";
+                "sexual-explicit-language": "sexual-explicit-language";
+                "sexual-fictional": "sexual-fictional";
+                "sexual-historical": "sexual-historical";
+                "sexual-nudity": "sexual-nudity";
+                "sexual-revealing-clothing": "sexual-revealing-clothing";
+                "sexual-solicitation": "sexual-solicitation";
+                "sexual-support-prevention": "sexual-support-prevention";
+                "violence-attack": "violence-attack";
+                "violence-documentary": "violence-documentary";
+                "violence-educational": "violence-educational";
+                "violence-encouragement": "violence-encouragement";
+                "violence-fictional": "violence-fictional";
+                "violence-graphic": "violence-graphic";
+                "violence-historical": "violence-historical";
+                "violence-injury": "violence-injury";
+                "violence-natural-death": "violence-natural-death";
+                "violence-preparation": "violence-preparation";
+                "violence-sport": "violence-sport";
+                "violence-support-prevention": "violence-support-prevention";
+                "violence-threat": "violence-threat";
+                "violence-violent-death": "violence-violent-death";
+                "violence-weapon": "violence-weapon";
+              }>>>;
               action: zod.ZodEnum<{
                 alert: "alert";
                 hide: "hide";
@@ -18803,10 +21350,14 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "personal-information-credentials": "personal-information-credentials";
                 "personal-information-documentary": "personal-information-documentary";
                 "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
                 "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
                 "personal-information-historical": "personal-information-historical";
                 "personal-information-identifiers": "personal-information-identifiers";
                 "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
                 "personal-information-request": "personal-information-request";
                 "personal-information-self-disclosure": "personal-information-self-disclosure";
                 "personal-information-support-prevention": "personal-information-support-prevention";
@@ -18856,6 +21407,107 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-violent-death": "violence-violent-death";
                 "violence-weapon": "violence-weapon";
               }>>;
+              match: zod.ZodOptional<zod.ZodLiteral<"all">>;
+              unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+                "criminal-activity-alcohol": "criminal-activity-alcohol";
+                "criminal-activity-demonstration": "criminal-activity-demonstration";
+                "criminal-activity-documentary": "criminal-activity-documentary";
+                "criminal-activity-educational": "criminal-activity-educational";
+                "criminal-activity-fictional": "criminal-activity-fictional";
+                "criminal-activity-fraud": "criminal-activity-fraud";
+                "criminal-activity-gambling": "criminal-activity-gambling";
+                "criminal-activity-graffiti": "criminal-activity-graffiti";
+                "criminal-activity-grooming": "criminal-activity-grooming";
+                "criminal-activity-historical": "criminal-activity-historical";
+                "criminal-activity-instructions": "criminal-activity-instructions";
+                "criminal-activity-preparation": "criminal-activity-preparation";
+                "criminal-activity-promotion": "criminal-activity-promotion";
+                "criminal-activity-request": "criminal-activity-request";
+                "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
+                "criminal-activity-substances": "criminal-activity-substances";
+                "criminal-activity-support-prevention": "criminal-activity-support-prevention";
+                "criminal-activity-tobacco": "criminal-activity-tobacco";
+                "harassment-abuse": "harassment-abuse";
+                "harassment-documentary": "harassment-documentary";
+                "harassment-educational": "harassment-educational";
+                "harassment-encouragement": "harassment-encouragement";
+                "harassment-fictional": "harassment-fictional";
+                "harassment-historical": "harassment-historical";
+                "harassment-intimidation": "harassment-intimidation";
+                "harassment-sexual": "harassment-sexual";
+                "harassment-support-prevention": "harassment-support-prevention";
+                "harassment-threat": "harassment-threat";
+                "hate-abuse": "hate-abuse";
+                "hate-dehumanization": "hate-dehumanization";
+                "hate-documentary": "hate-documentary";
+                "hate-educational": "hate-educational";
+                "hate-exclusion": "hate-exclusion";
+                "hate-fictional": "hate-fictional";
+                "hate-historical": "hate-historical";
+                "hate-inferiority": "hate-inferiority";
+                "hate-support-prevention": "hate-support-prevention";
+                "hate-threat": "hate-threat";
+                "personal-information-contact": "personal-information-contact";
+                "personal-information-credentials": "personal-information-credentials";
+                "personal-information-documentary": "personal-information-documentary";
+                "personal-information-educational": "personal-information-educational";
+                "personal-information-email": "personal-information-email";
+                "personal-information-fictional": "personal-information-fictional";
+                "personal-information-financial": "personal-information-financial";
+                "personal-information-government-id": "personal-information-government-id";
+                "personal-information-historical": "personal-information-historical";
+                "personal-information-identifiers": "personal-information-identifiers";
+                "personal-information-location": "personal-information-location";
+                "personal-information-phone": "personal-information-phone";
+                "personal-information-request": "personal-information-request";
+                "personal-information-self-disclosure": "personal-information-self-disclosure";
+                "personal-information-support-prevention": "personal-information-support-prevention";
+                "personal-information-third-party": "personal-information-third-party";
+                "profanity-documentary": "profanity-documentary";
+                "profanity-educational": "profanity-educational";
+                "profanity-fictional": "profanity-fictional";
+                "profanity-historical": "profanity-historical";
+                "profanity-mild": "profanity-mild";
+                "profanity-obfuscated": "profanity-obfuscated";
+                "profanity-slurs": "profanity-slurs";
+                "profanity-strong": "profanity-strong";
+                "profanity-support-prevention": "profanity-support-prevention";
+                "self-harm-act": "self-harm-act";
+                "self-harm-documentary": "self-harm-documentary";
+                "self-harm-educational": "self-harm-educational";
+                "self-harm-encouragement": "self-harm-encouragement";
+                "self-harm-fictional": "self-harm-fictional";
+                "self-harm-historical": "self-harm-historical";
+                "self-harm-methods": "self-harm-methods";
+                "self-harm-preparation": "self-harm-preparation";
+                "self-harm-support-prevention": "self-harm-support-prevention";
+                "self-harm-thoughts": "self-harm-thoughts";
+                "sexual-activity": "sexual-activity";
+                "sexual-documentary": "sexual-documentary";
+                "sexual-educational": "sexual-educational";
+                "sexual-explicit-language": "sexual-explicit-language";
+                "sexual-fictional": "sexual-fictional";
+                "sexual-historical": "sexual-historical";
+                "sexual-nudity": "sexual-nudity";
+                "sexual-revealing-clothing": "sexual-revealing-clothing";
+                "sexual-solicitation": "sexual-solicitation";
+                "sexual-support-prevention": "sexual-support-prevention";
+                "violence-attack": "violence-attack";
+                "violence-documentary": "violence-documentary";
+                "violence-educational": "violence-educational";
+                "violence-encouragement": "violence-encouragement";
+                "violence-fictional": "violence-fictional";
+                "violence-graphic": "violence-graphic";
+                "violence-historical": "violence-historical";
+                "violence-injury": "violence-injury";
+                "violence-natural-death": "violence-natural-death";
+                "violence-preparation": "violence-preparation";
+                "violence-sport": "violence-sport";
+                "violence-support-prevention": "violence-support-prevention";
+                "violence-threat": "violence-threat";
+                "violence-violent-death": "violence-violent-death";
+                "violence-weapon": "violence-weapon";
+              }>>>;
               action: zod.ZodEnum<{
                 alert: "alert";
                 hide: "hide";

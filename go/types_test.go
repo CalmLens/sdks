@@ -461,12 +461,24 @@ func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 
 func TestReportPolicySnapshotDecode(t *testing.T) {
 	var policy ReportPolicy
-	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"restriction","index":0},"settings":{"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
+	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
 		t.Fatal(err)
 	}
 	category := policy.Categories["violence"]
 	if category.Settings.Threshold != 0.6 || category.Settings.Restrictions[0].Name != "snapshot-rule" || *category.Source.Index != 0 {
 		t.Fatalf("lost category snapshot: %#v", category)
+	}
+	rule := category.Settings.Restrictions[0]
+	if category.Settings.Enabled == nil || !*category.Settings.Enabled || rule.Match != "all" || !reflect.DeepEqual(rule.Unless, []string{"violence-documentary"}) || !reflect.DeepEqual(category.Source.Indexes, []int{0, 1}) {
+		t.Fatalf("lost condition snapshot: %#v %#v", rule, category.Source)
+	}
+	var finding CategoryResult
+	if err := json.Unmarshal([]byte(`{"status":"evaluated","score":0.9,"policyConditions":{"some:opaque":{"status":"evaluated","score":0.8}}}`), &finding); err != nil {
+		t.Fatal(err)
+	}
+	evidence := finding.PolicyConditions["some:opaque"]
+	if evidence.Status != "evaluated" || evidence.Score == nil || *evidence.Score != 0.8 {
+		t.Fatalf("lost condition evidence: %#v", evidence)
 	}
 	if *policy.Decision.Action != "purge" || policy.Decision.Source != "asset-override" || !reflect.DeepEqual(policy.Decision.FlaggedCategories, []string{"violence"}) {
 		t.Fatalf("lost decision snapshot: %#v", policy.Decision)

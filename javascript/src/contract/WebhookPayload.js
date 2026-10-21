@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-BfX2WJpN.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-DQ9tz8rV.js";
 import "./SharedConstants-CdFPZV7z.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -46,6 +46,22 @@ zod.object({
 	});
 });
 //#endregion
+//#region packages/shared/src/PolicyCondition.ts
+const ruleCondition = (rule) => {
+	return [{
+		all: [...rule.when].sort(),
+		none: [...rule.unless ?? []].sort()
+	}];
+};
+const normalizePolicyCondition = (condition) => [...new Map(condition.map((clause) => {
+	const normalized = {
+		all: [...new Set(clause.all)].sort(),
+		none: [...new Set(clause.none)].sort()
+	};
+	return [JSON.stringify(normalized), normalized];
+})).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, clause]) => clause);
+const policyConditionKey = (scope, condition) => `${scope}:${JSON.stringify(normalizePolicyCondition(condition))}`;
+//#endregion
 //#region packages/shared/src/Project.ts
 const MINIMUM_MODERATION_THRESHOLD = .1;
 const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTION_SCHEMA });
@@ -62,13 +78,13 @@ const getPolicyRuleConflict = (kind, rule, categoryAction) => {
 	if (kind === "allowance") return rank < FLAGGED_CONTENT_ACTION_RANK[categoryAction] ? void 0 : "allowance-not-softer";
 	return rule.action !== "ignore" && rank >= FLAGGED_CONTENT_ACTION_RANK[categoryAction] ? void 0 : "restriction-weaker";
 };
-const policyRuleKey = (rule) => [...rule.when].sort().join("+");
+const policyRuleKey = (rule) => policyConditionKey("some", ruleCondition(rule));
 const uniqueRules = (rules) => new Set(rules.map(policyRuleKey)).size === rules.length;
 const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	enabled: zod.boolean().optional().meta({ description: "Whether this category can affect policy decisions. Disabled categories retain their configured actions and rules." }),
 	threshold: zod.number().min(0).max(1).transform((threshold) => Math.max(threshold, MINIMUM_MODERATION_THRESHOLD)).meta({ description: "The policy score at which the category's action applies. The policy score is the category score, lowered by allowances that cover the content and raised to a restriction's presence score." }),
-	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(10).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
-	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(10).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Forms that are acted on as soon as any of their qualifiers is present. They outweigh allowances." }),
+	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
+	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: ignore it, alert while continuing delivery, hide while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
 	const categoryAction = value.flaggedContentPolicy?.action ?? "hide";
@@ -90,7 +106,7 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	}
 });
 zod.object({ categorySettings: zod.partialRecord(MODERATION_POLICY_CATEGORY_SCHEMA, CATEGORY_FLAGGING_SETTINGS_SCHEMA) }).strict().superRefine((settings, context) => {
-	for (const [category, value] of Object.entries(settings.categorySettings)) for (const key of ["allowances", "restrictions"]) for (const [index, rule] of (value?.[key] ?? []).entries()) if (rule.when.some((q) => !getModerationQualifiers(category).includes(q))) context.addIssue({
+	for (const [category, value] of Object.entries(settings.categorySettings)) for (const key of ["allowances", "restrictions"]) for (const [index, rule] of (value?.[key] ?? []).entries()) if ([...rule.when, ...rule.unless ?? []].some((q) => !getModerationQualifiers(category).includes(q))) context.addIssue({
 		code: "custom",
 		message: "Unsupported qualifier for this category",
 		path: [

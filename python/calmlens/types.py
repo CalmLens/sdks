@@ -19,7 +19,7 @@ __all__ = [
     "ClassificationCategory", "ClassificationLabel", "Content", "CreateFolderOptions",
     "CustomTransform", "DetectedFace", "DetectedPerson", "EnsureLensesOptions",
     "EvaluatedCategoryResult", "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult",
-    "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
+    "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExtractedText", "FaceDetectionFeatureOptions",
     "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "ImageData", "ImageTransform",
@@ -65,26 +65,106 @@ ModerationAction = Literal["ignore", "alert", "hide", "purge"]
 SafetyHoldReason = Union[Literal["suspected-illegal-content"], str]
 #: Moderation categories in ``report.categories``. New categories may be added.
 ClassificationCategory = Union[Literal["sexual", "violence", "self-harm", "harassment", "hate",
-                                       "criminal-activity"], str]
+                                       "criminal-activity", "personal-information", "profanity"], str]
 #: Qualifiers in a category's ``qualifiers``. New qualifiers may be added.
 ModerationQualifier = Union[Literal[
-    "sexual-nudity", "sexual-activity", "sexual-explicit-language", "sexual-solicitation",
-    "sexual-revealing-clothing", "sexual-historical", "sexual-documentary", "sexual-educational",
-    "sexual-fictional", "sexual-support-prevention",
-    "violence-attack", "violence-threat", "violence-preparation", "violence-encouragement",
-    "violence-injury", "violence-violent-death", "violence-natural-death", "violence-graphic",
-    "violence-weapon", "violence-sport", "violence-historical", "violence-documentary",
-    "violence-educational", "violence-fictional", "violence-support-prevention",
-    "self-harm-thoughts", "self-harm-preparation", "self-harm-act", "self-harm-methods",
-    "self-harm-encouragement", "self-harm-historical", "self-harm-documentary", "self-harm-educational",
-    "self-harm-fictional", "self-harm-support-prevention",
-    "harassment-abuse", "harassment-intimidation", "harassment-threat", "harassment-sexual",
-    "harassment-encouragement", "harassment-historical", "harassment-documentary", "harassment-educational", "harassment-fictional", "harassment-support-prevention",
-    "hate-abuse", "hate-dehumanization", "hate-inferiority", "hate-exclusion", "hate-threat",
-    "hate-historical", "hate-documentary", "hate-educational", "hate-fictional", "hate-support-prevention",
-    "criminal-activity-demonstration", "criminal-activity-preparation", "criminal-activity-request",
-    "criminal-activity-instructions", "criminal-activity-promotion", "criminal-activity-substances",
-    "criminal-activity-fraud", "criminal-activity-sexual-solicitation", "criminal-activity-graffiti", "criminal-activity-historical", "criminal-activity-documentary", "criminal-activity-educational", "criminal-activity-fictional",
+    "personal-information-contact",
+    "personal-information-email",
+    "personal-information-phone",
+    "personal-information-government-id",
+    "personal-information-financial",
+    "personal-information-location",
+    "personal-information-identifiers",
+    "personal-information-credentials",
+    "personal-information-request",
+    "personal-information-self-disclosure",
+    "personal-information-third-party",
+    "personal-information-historical",
+    "personal-information-documentary",
+    "personal-information-educational",
+    "personal-information-fictional",
+    "personal-information-support-prevention",
+    "profanity-mild",
+    "profanity-strong",
+    "profanity-slurs",
+    "profanity-obfuscated",
+    "profanity-historical",
+    "profanity-documentary",
+    "profanity-educational",
+    "profanity-fictional",
+    "profanity-support-prevention",
+    "sexual-nudity",
+    "sexual-activity",
+    "sexual-explicit-language",
+    "sexual-solicitation",
+    "sexual-revealing-clothing",
+    "sexual-historical",
+    "sexual-documentary",
+    "sexual-educational",
+    "sexual-fictional",
+    "sexual-support-prevention",
+    "violence-attack",
+    "violence-threat",
+    "violence-preparation",
+    "violence-encouragement",
+    "violence-injury",
+    "violence-violent-death",
+    "violence-natural-death",
+    "violence-graphic",
+    "violence-weapon",
+    "violence-sport",
+    "violence-historical",
+    "violence-documentary",
+    "violence-educational",
+    "violence-fictional",
+    "violence-support-prevention",
+    "self-harm-thoughts",
+    "self-harm-preparation",
+    "self-harm-act",
+    "self-harm-methods",
+    "self-harm-encouragement",
+    "self-harm-historical",
+    "self-harm-documentary",
+    "self-harm-educational",
+    "self-harm-fictional",
+    "self-harm-support-prevention",
+    "harassment-abuse",
+    "harassment-intimidation",
+    "harassment-threat",
+    "harassment-sexual",
+    "harassment-encouragement",
+    "harassment-historical",
+    "harassment-documentary",
+    "harassment-educational",
+    "harassment-fictional",
+    "harassment-support-prevention",
+    "hate-abuse",
+    "hate-dehumanization",
+    "hate-inferiority",
+    "hate-exclusion",
+    "hate-threat",
+    "hate-historical",
+    "hate-documentary",
+    "hate-educational",
+    "hate-fictional",
+    "hate-support-prevention",
+    "criminal-activity-demonstration",
+    "criminal-activity-preparation",
+    "criminal-activity-request",
+    "criminal-activity-instructions",
+    "criminal-activity-promotion",
+    "criminal-activity-substances",
+    "criminal-activity-grooming",
+    "criminal-activity-alcohol",
+    "criminal-activity-tobacco",
+    "criminal-activity-gambling",
+    "criminal-activity-fraud",
+    "criminal-activity-sexual-solicitation",
+    "criminal-activity-graffiti",
+    "criminal-activity-historical",
+    "criminal-activity-documentary",
+    "criminal-activity-educational",
+    "criminal-activity-fictional",
     "criminal-activity-support-prevention",
 ], str]
 #: How likely content matches a category or label. New values may be added.
@@ -241,6 +321,14 @@ QualifierResult = Union[EvaluatedQualifierResult, NotEvaluatedQualifierResult]
 QualifierResults = Dict[ModerationQualifier, QualifierResult]
 
 
+class EvaluatedPolicyConditionResult(TypedDict):
+    status: Literal["evaluated"]
+    score: float
+
+
+PolicyConditionResult = Union[EvaluatedPolicyConditionResult, NotEvaluatedQualifierResult]
+
+
 class _EvaluatedCategoryRequired(TypedDict):
     status: Literal["evaluated"]
     likelihood: Likelihood
@@ -249,6 +337,7 @@ class _EvaluatedCategoryRequired(TypedDict):
 
 class EvaluatedCategoryResult(_EvaluatedCategoryRequired, total=False):
     qualifiers: QualifierResults
+    policyConditions: Dict[str, PolicyConditionResult]
 
 
 class _PartialCategoryRequired(TypedDict):
@@ -260,6 +349,7 @@ class _PartialCategoryRequired(TypedDict):
 class PartialCategoryResult(_PartialCategoryRequired, total=False):
     """Some of the content (for example a media segment) could not be assessed."""
     qualifiers: QualifierResults
+    policyConditions: Dict[str, PolicyConditionResult]
 
 
 class _NotEvaluatedCategoryRequired(TypedDict):
@@ -269,6 +359,7 @@ class _NotEvaluatedCategoryRequired(TypedDict):
 
 class NotEvaluatedCategoryResult(_NotEvaluatedCategoryRequired, total=False):
     qualifiers: QualifierResults
+    policyConditions: Dict[str, PolicyConditionResult]
 
 
 #: A category result; narrow on ``result["status"]`` before reading ``score``.
@@ -370,13 +461,19 @@ class _PolicyRuleSnapshotRequired(TypedDict):
 
 class PolicyRuleSnapshot(_PolicyRuleSnapshotRequired, total=False):
     name: str
+    match: Literal["all"]
+    unless: List[str]
 
 
-class CategoryPolicySettingsSnapshot(TypedDict):
+class _CategoryPolicySettingsSnapshotRequired(TypedDict):
     threshold: float
     categoryAction: ModerationAction
     allowances: List[PolicyRuleSnapshot]
     restrictions: List[PolicyRuleSnapshot]
+
+
+class CategoryPolicySettingsSnapshot(_CategoryPolicySettingsSnapshotRequired, total=False):
+    enabled: bool
 
 
 class _CategoryPolicySourceRequired(TypedDict):
@@ -385,6 +482,7 @@ class _CategoryPolicySourceRequired(TypedDict):
 
 class CategoryPolicySource(_CategoryPolicySourceRequired, total=False):
     index: int
+    indexes: List[int]
 
 
 class ReportPolicyDecision(TypedDict):

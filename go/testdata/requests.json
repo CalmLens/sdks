@@ -557,7 +557,70 @@
         "status": "completed",
         "moderation": {
           "decision": "approved",
-          "action": null
+          "action": null,
+          "categories": {
+            "violence": {
+              "status": "evaluated",
+              "score": 0.9,
+              "likelihood": "very-likely",
+              "policyConditions": {
+                "some:contract-condition": {
+                  "status": "evaluated",
+                  "score": 0.8
+                }
+              }
+            }
+          },
+          "policy": {
+            "score": 0.9,
+            "categories": {
+              "violence": {
+                "score": 0.9,
+                "action": "hide",
+                "source": {
+                  "kind": "allowance",
+                  "index": 0,
+                  "indexes": [
+                    0,
+                    1
+                  ]
+                },
+                "settings": {
+                  "enabled": true,
+                  "threshold": 0.6,
+                  "categoryAction": "purge",
+                  "allowances": [
+                    {
+                      "when": [
+                        "violence-injury",
+                        "violence-educational"
+                      ],
+                      "match": "all",
+                      "action": "hide"
+                    },
+                    {
+                      "when": [
+                        "violence-historical"
+                      ],
+                      "action": "hide"
+                    }
+                  ],
+                  "restrictions": [
+                    {
+                      "when": [
+                        "violence-threat"
+                      ],
+                      "unless": [
+                        "violence-documentary"
+                      ],
+                      "match": "all",
+                      "action": "purge"
+                    }
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     }

@@ -1430,16 +1430,18 @@ public final class Models {
       CategoryPolicySettingsSnapshot settings) {}
 
   /** The category threshold or rule that decided the outcome. */
-  public record CategoryPolicySource(String kind, Integer index) {}
+  public record CategoryPolicySource(String kind, Integer index, List<Integer> indexes) {
+    public CategoryPolicySource { indexes = list(indexes); }
+  }
 
   /** A named rule as it was configured when the asset was decided. */
-  public record PolicyRuleSnapshot(String name, List<String> when, String action) {
-    public PolicyRuleSnapshot { when = list(when); }
+  public record PolicyRuleSnapshot(String name, List<String> when, String action, String match, List<String> unless) {
+    public PolicyRuleSnapshot { when = list(when); unless = list(unless); }
   }
 
   /** Historical category settings used to explain the saved decision. */
   public record CategoryPolicySettingsSnapshot(Double threshold, String categoryAction,
-      List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions) {
+      List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions, Boolean enabled) {
     public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
   }
 
@@ -1456,11 +1458,15 @@ public final class Models {
    * @param likelihood likelihood bucket
    * @param reason why the category was not evaluated
    * @param qualifiers qualifier results
+   * @param policyConditions direct condition evidence
    */
-  public record CategoryResult(String status, Double score, String likelihood, String reason, Map<String, QualifierResult> qualifiers) {
+  public record CategoryResult(String status, Double score, String likelihood, String reason, Map<String, QualifierResult> qualifiers, Map<String, PolicyConditionResult> policyConditions) {
     /** Copies collections so the record stays immutable. */
-    public CategoryResult { qualifiers = map(qualifiers); }
+    public CategoryResult { qualifiers = map(qualifiers); policyConditions = map(policyConditions); }
   }
+
+  /** Direct assessment of a same-instance or combined-coverage condition, keyed by an opaque identifier. */
+  public record PolicyConditionResult(String status, Double score, String reason) {}
 
   /**
    * A category qualifier result.

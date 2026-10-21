@@ -320,19 +320,23 @@ type CategoryPolicyScore struct {
 
 // CategoryPolicySource identifies the deciding rule or threshold.
 type CategoryPolicySource struct {
-	Kind  string `json:"kind"`
-	Index *int   `json:"index,omitempty"`
+	Kind    string `json:"kind"`
+	Index   *int   `json:"index,omitempty"`
+	Indexes []int  `json:"indexes,omitempty"`
 }
 
 // PolicyRuleSnapshot records a rule in force when the asset was decided.
 type PolicyRuleSnapshot struct {
 	Name   string   `json:"name,omitempty"`
 	When   []string `json:"when"`
+	Match  string   `json:"match,omitempty"`
+	Unless []string `json:"unless,omitempty"`
 	Action string   `json:"action"`
 }
 
 // CategoryPolicySettingsSnapshot preserves settings independently of later policy edits.
 type CategoryPolicySettingsSnapshot struct {
+	Enabled        *bool                `json:"enabled,omitempty"`
 	Threshold      float64              `json:"threshold"`
 	CategoryAction string               `json:"categoryAction"`
 	Allowances     []PolicyRuleSnapshot `json:"allowances"`
@@ -440,12 +444,14 @@ type MediaClassificationSegment struct {
 // Moderation categories, the keys of ClassificationReport.Categories. Categories added
 // later still decode under their own keys.
 const (
-	CategorySexual           = "sexual"
-	CategoryViolence         = "violence"
-	CategorySelfHarm         = "self-harm"
-	CategoryHarassment       = "harassment"
-	CategoryHate             = "hate"
-	CategoryCriminalActivity = "criminal-activity"
+	CategoryPersonalInformation = "personal-information"
+	CategoryProfanity           = "profanity"
+	CategorySexual              = "sexual"
+	CategoryViolence            = "violence"
+	CategorySelfHarm            = "self-harm"
+	CategoryHarassment          = "harassment"
+	CategoryHate                = "hate"
+	CategoryCriminalActivity    = "criminal-activity"
 )
 
 // Result status values of categories, qualifiers and processing features. Status is a plain
@@ -485,82 +491,120 @@ type CategoryResult struct {
 	Reason string `json:"reason"`
 	// Qualifiers holds results for the category's qualifiers, keyed by a Qualifier constant.
 	Qualifiers map[string]QualifierResult `json:"qualifiers"`
+	// PolicyConditions contains assessed same-instance and collective-coverage conditions. Keys are opaque.
+	PolicyConditions map[string]PolicyConditionResult `json:"policyConditions,omitempty"`
 	// Raw contains the entire category result.
 	Raw JSON `json:"-"`
+}
+
+// PolicyConditionResult carries either an evaluated score or an unassessed reason.
+type PolicyConditionResult struct {
+	Status string   `json:"status"`
+	Score  *float64 `json:"score,omitempty"`
+	Reason string   `json:"reason,omitempty"`
 }
 
 // Qualifiers, the keys of CategoryResult.Qualifiers. Qualifiers added later still decode
 // under their own keys.
 const (
-	QualifierSexualNudity                       = "sexual-nudity"
-	QualifierSexualActivity                     = "sexual-activity"
-	QualifierSexualExplicitLanguage             = "sexual-explicit-language"
-	QualifierSexualSolicitation                 = "sexual-solicitation"
-	QualifierSexualRevealingClothing            = "sexual-revealing-clothing"
-	QualifierSexualHistorical                   = "sexual-historical"
-	QualifierSexualDocumentary                  = "sexual-documentary"
-	QualifierSexualEducational                  = "sexual-educational"
-	QualifierSexualFictional                    = "sexual-fictional"
-	QualifierSexualSupportPrevention            = "sexual-support-prevention"
-	QualifierViolenceAttack                     = "violence-attack"
-	QualifierViolenceThreat                     = "violence-threat"
-	QualifierViolencePreparation                = "violence-preparation"
-	QualifierViolenceEncouragement              = "violence-encouragement"
-	QualifierViolenceInjury                     = "violence-injury"
-	QualifierViolenceViolentDeath               = "violence-violent-death"
-	QualifierViolenceNaturalDeath               = "violence-natural-death"
-	QualifierViolenceGraphic                    = "violence-graphic"
-	QualifierViolenceWeapon                     = "violence-weapon"
-	QualifierViolenceSport                      = "violence-sport"
-	QualifierViolenceHistorical                 = "violence-historical"
-	QualifierViolenceDocumentary                = "violence-documentary"
-	QualifierViolenceEducational                = "violence-educational"
-	QualifierViolenceFictional                  = "violence-fictional"
-	QualifierViolenceSupportPrevention          = "violence-support-prevention"
-	QualifierSelfHarmThoughts                   = "self-harm-thoughts"
-	QualifierSelfHarmPreparation                = "self-harm-preparation"
-	QualifierSelfHarmAct                        = "self-harm-act"
-	QualifierSelfHarmMethods                    = "self-harm-methods"
-	QualifierSelfHarmEncouragement              = "self-harm-encouragement"
-	QualifierSelfHarmHistorical                 = "self-harm-historical"
-	QualifierSelfHarmDocumentary                = "self-harm-documentary"
-	QualifierSelfHarmEducational                = "self-harm-educational"
-	QualifierSelfHarmFictional                  = "self-harm-fictional"
-	QualifierSelfHarmSupportPrevention          = "self-harm-support-prevention"
-	QualifierHarassmentAbuse                    = "harassment-abuse"
-	QualifierHarassmentIntimidation             = "harassment-intimidation"
-	QualifierHarassmentThreat                   = "harassment-threat"
-	QualifierHarassmentSexual                   = "harassment-sexual"
-	QualifierHarassmentEncouragement            = "harassment-encouragement"
-	QualifierHarassmentHistorical               = "harassment-historical"
-	QualifierHarassmentDocumentary              = "harassment-documentary"
-	QualifierHarassmentEducational              = "harassment-educational"
-	QualifierHarassmentFictional                = "harassment-fictional"
-	QualifierHarassmentSupportPrevention        = "harassment-support-prevention"
-	QualifierHateAbuse                          = "hate-abuse"
-	QualifierHateDehumanization                 = "hate-dehumanization"
-	QualifierHateInferiority                    = "hate-inferiority"
-	QualifierHateExclusion                      = "hate-exclusion"
-	QualifierHateThreat                         = "hate-threat"
-	QualifierHateHistorical                     = "hate-historical"
-	QualifierHateDocumentary                    = "hate-documentary"
-	QualifierHateEducational                    = "hate-educational"
-	QualifierHateFictional                      = "hate-fictional"
-	QualifierHateSupportPrevention              = "hate-support-prevention"
-	QualifierCriminalActivityDemonstration      = "criminal-activity-demonstration"
-	QualifierCriminalActivityPreparation        = "criminal-activity-preparation"
-	QualifierCriminalActivityRequest            = "criminal-activity-request"
-	QualifierCriminalActivityInstructions       = "criminal-activity-instructions"
-	QualifierCriminalActivityPromotion          = "criminal-activity-promotion"
-	QualifierCriminalActivitySubstances         = "criminal-activity-substances"
-	QualifierCriminalActivityFraud              = "criminal-activity-fraud"
-	QualifierCriminalActivitySexualSolicitation = "criminal-activity-sexual-solicitation"
-	QualifierCriminalActivityGraffiti           = "criminal-activity-graffiti"
-	QualifierCriminalActivityHistorical         = "criminal-activity-historical"
-	QualifierCriminalActivityDocumentary        = "criminal-activity-documentary"
-	QualifierCriminalActivityEducational        = "criminal-activity-educational"
-	QualifierCriminalActivityFictional          = "criminal-activity-fictional"
-	QualifierCriminalActivitySupportPrevention  = "criminal-activity-support-prevention"
+	QualifierPersonalInformationEmail             = "personal-information-email"
+	QualifierPersonalInformationPhone             = "personal-information-phone"
+	QualifierPersonalInformationGovernmentID      = "personal-information-government-id"
+	QualifierPersonalInformationFinancial         = "personal-information-financial"
+	QualifierSexualNudity                         = "sexual-nudity"
+	QualifierSexualActivity                       = "sexual-activity"
+	QualifierSexualExplicitLanguage               = "sexual-explicit-language"
+	QualifierSexualSolicitation                   = "sexual-solicitation"
+	QualifierSexualRevealingClothing              = "sexual-revealing-clothing"
+	QualifierSexualHistorical                     = "sexual-historical"
+	QualifierSexualDocumentary                    = "sexual-documentary"
+	QualifierSexualEducational                    = "sexual-educational"
+	QualifierSexualFictional                      = "sexual-fictional"
+	QualifierSexualSupportPrevention              = "sexual-support-prevention"
+	QualifierViolenceAttack                       = "violence-attack"
+	QualifierViolenceThreat                       = "violence-threat"
+	QualifierViolencePreparation                  = "violence-preparation"
+	QualifierViolenceEncouragement                = "violence-encouragement"
+	QualifierViolenceInjury                       = "violence-injury"
+	QualifierViolenceViolentDeath                 = "violence-violent-death"
+	QualifierViolenceNaturalDeath                 = "violence-natural-death"
+	QualifierViolenceGraphic                      = "violence-graphic"
+	QualifierViolenceWeapon                       = "violence-weapon"
+	QualifierViolenceSport                        = "violence-sport"
+	QualifierViolenceHistorical                   = "violence-historical"
+	QualifierViolenceDocumentary                  = "violence-documentary"
+	QualifierViolenceEducational                  = "violence-educational"
+	QualifierViolenceFictional                    = "violence-fictional"
+	QualifierViolenceSupportPrevention            = "violence-support-prevention"
+	QualifierSelfHarmThoughts                     = "self-harm-thoughts"
+	QualifierSelfHarmPreparation                  = "self-harm-preparation"
+	QualifierSelfHarmAct                          = "self-harm-act"
+	QualifierSelfHarmMethods                      = "self-harm-methods"
+	QualifierSelfHarmEncouragement                = "self-harm-encouragement"
+	QualifierSelfHarmHistorical                   = "self-harm-historical"
+	QualifierSelfHarmDocumentary                  = "self-harm-documentary"
+	QualifierSelfHarmEducational                  = "self-harm-educational"
+	QualifierSelfHarmFictional                    = "self-harm-fictional"
+	QualifierSelfHarmSupportPrevention            = "self-harm-support-prevention"
+	QualifierHarassmentAbuse                      = "harassment-abuse"
+	QualifierHarassmentIntimidation               = "harassment-intimidation"
+	QualifierHarassmentThreat                     = "harassment-threat"
+	QualifierHarassmentSexual                     = "harassment-sexual"
+	QualifierHarassmentEncouragement              = "harassment-encouragement"
+	QualifierHarassmentHistorical                 = "harassment-historical"
+	QualifierHarassmentDocumentary                = "harassment-documentary"
+	QualifierHarassmentEducational                = "harassment-educational"
+	QualifierHarassmentFictional                  = "harassment-fictional"
+	QualifierHarassmentSupportPrevention          = "harassment-support-prevention"
+	QualifierHateAbuse                            = "hate-abuse"
+	QualifierHateDehumanization                   = "hate-dehumanization"
+	QualifierHateInferiority                      = "hate-inferiority"
+	QualifierHateExclusion                        = "hate-exclusion"
+	QualifierHateThreat                           = "hate-threat"
+	QualifierHateHistorical                       = "hate-historical"
+	QualifierHateDocumentary                      = "hate-documentary"
+	QualifierHateEducational                      = "hate-educational"
+	QualifierHateFictional                        = "hate-fictional"
+	QualifierHateSupportPrevention                = "hate-support-prevention"
+	QualifierCriminalActivityDemonstration        = "criminal-activity-demonstration"
+	QualifierCriminalActivityPreparation          = "criminal-activity-preparation"
+	QualifierCriminalActivityRequest              = "criminal-activity-request"
+	QualifierCriminalActivityInstructions         = "criminal-activity-instructions"
+	QualifierCriminalActivityPromotion            = "criminal-activity-promotion"
+	QualifierCriminalActivitySubstances           = "criminal-activity-substances"
+	QualifierCriminalActivityFraud                = "criminal-activity-fraud"
+	QualifierCriminalActivitySexualSolicitation   = "criminal-activity-sexual-solicitation"
+	QualifierCriminalActivityGraffiti             = "criminal-activity-graffiti"
+	QualifierCriminalActivityHistorical           = "criminal-activity-historical"
+	QualifierCriminalActivityDocumentary          = "criminal-activity-documentary"
+	QualifierCriminalActivityEducational          = "criminal-activity-educational"
+	QualifierCriminalActivityFictional            = "criminal-activity-fictional"
+	QualifierCriminalActivitySupportPrevention    = "criminal-activity-support-prevention"
+	QualifierPersonalInformationContact           = "personal-information-contact"
+	QualifierPersonalInformationLocation          = "personal-information-location"
+	QualifierPersonalInformationIdentifiers       = "personal-information-identifiers"
+	QualifierPersonalInformationCredentials       = "personal-information-credentials"
+	QualifierPersonalInformationRequest           = "personal-information-request"
+	QualifierPersonalInformationSelfDisclosure    = "personal-information-self-disclosure"
+	QualifierPersonalInformationThirdParty        = "personal-information-third-party"
+	QualifierPersonalInformationHistorical        = "personal-information-historical"
+	QualifierPersonalInformationDocumentary       = "personal-information-documentary"
+	QualifierPersonalInformationEducational       = "personal-information-educational"
+	QualifierPersonalInformationFictional         = "personal-information-fictional"
+	QualifierPersonalInformationSupportPrevention = "personal-information-support-prevention"
+	QualifierProfanityMild                        = "profanity-mild"
+	QualifierProfanityStrong                      = "profanity-strong"
+	QualifierProfanitySlurs                       = "profanity-slurs"
+	QualifierProfanityObfuscated                  = "profanity-obfuscated"
+	QualifierProfanityHistorical                  = "profanity-historical"
+	QualifierProfanityDocumentary                 = "profanity-documentary"
+	QualifierProfanityEducational                 = "profanity-educational"
+	QualifierProfanityFictional                   = "profanity-fictional"
+	QualifierProfanitySupportPrevention           = "profanity-support-prevention"
+	QualifierCriminalActivityGrooming             = "criminal-activity-grooming"
+	QualifierCriminalActivityAlcohol              = "criminal-activity-alcohol"
+	QualifierCriminalActivityTobacco              = "criminal-activity-tobacco"
+	QualifierCriminalActivityGambling             = "criminal-activity-gambling"
 )
 
 // QualifierResult is the result for one qualifier of a category, such as QualifierSexualNudity.
