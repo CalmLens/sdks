@@ -699,14 +699,14 @@ class EventAssetUpload(TypedDict):
     status: Literal["uploading", "completed"]
 
 
-class EventAssetClassification(TypedDict):
-    status: AssetClassificationStatus
-    moderation: EventAssetModeration
-
-
 class EventAssetModeration(TypedDict):
     decision: AssetModerationStatus
     action: Optional[AssetModerationAction]
+
+
+class EventAssetClassification(TypedDict):
+    status: AssetClassificationStatus
+    moderation: EventAssetModeration
 
 
 class EventAssetContent(TypedDict):
