@@ -51,7 +51,20 @@
       "metadata": [
         {
           "id": "source",
-          "value": "comment"
+          "value": {
+            "counter": 3000000000,
+            "nested": [
+              null,
+              {
+                "empty": null
+              }
+            ],
+            "optional": null
+          }
+        },
+        {
+          "id": "cleared",
+          "value": null
         }
       ]
     },
@@ -61,7 +74,7 @@
       "query": {
         "name": "text",
         "queue": "false",
-        "metadata": "[{\"id\":\"source\",\"value\":\"comment\"}]",
+        "metadata": "[{\"id\":\"source\",\"value\":{\"counter\":3000000000,\"nested\":[null,{\"empty\":null}],\"optional\":null}},{\"id\":\"cleared\",\"value\":null}]",
         "contentType": "text/plain",
         "sizeInBytes": "11"
       },
@@ -222,14 +235,16 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.decision==approved"
+      "filter": "classification.moderation.decision==approved",
+      "folderId": "folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets/page",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.decision==approved"
+        "filter": "classification.moderation.decision==approved",
+        "folderId": "folder-1"
       },
       "body": null
     },

@@ -311,7 +311,7 @@ public final class Models {
    * @param id metadata field identifier
    * @param value field value
    */
-  public record MetadataItem(String id, Object value) {
+  public record MetadataItem(String id, @JsonAdapter(value = Json.MetadataValueAdapter.class, nullSafe = false) Object value) {
     /** An empty item; set {@link #id(String)} and {@link #value(Object)}. */
     public MetadataItem() { this(null, null); }
 
@@ -1044,12 +1044,15 @@ public final class Models {
     private String cursor;
     private Integer pageSize;
     private String filter;
+    private String folderId;
     private List<Order> ordering;
     public ListAssets() {}
     public ListAssets cursor(String value) { cursor = value; return this; }
     public ListAssets pageSize(Integer value) { pageSize = value; return this; }
     /** @param value a filter such as {@code classification.moderation.decision==approved} @return these options */
     public ListAssets filter(String value) { filter = value; return this; }
+    /** @param value lists only assets directly in this folder @return these options */
+    public ListAssets folderId(String value) { folderId = value; return this; }
     public ListAssets ordering(List<Order> value) { ordering = value; return this; }
     @Override public String toString() { return describe(this); }
   }

@@ -35,6 +35,23 @@ final class Json {
 
   static String write(JsonElement value) { return WRITE.toJson(value); }
 
+  /** Metadata nulls are data; optional request fields still omit unset values. */
+  static final class MetadataValueAdapter extends TypeAdapter<Object> {
+    @Override public void write(JsonWriter out, Object value) throws IOException {
+      boolean serializeNulls = out.getSerializeNulls();
+      out.setSerializeNulls(true);
+      try {
+        GSON.getAdapter(Object.class).write(out, value);
+      } finally {
+        out.setSerializeNulls(serializeNulls);
+      }
+    }
+
+    @Override public Object read(JsonReader in) throws IOException {
+      return GSON.getAdapter(Object.class).read(in);
+    }
+  }
+
   /** Timestamps are milliseconds since the Unix epoch on the wire and {@link Instant} in models. */
   static final class EpochMillis extends TypeAdapter<Instant> {
     @Override public void write(JsonWriter out, Instant value) throws IOException {
