@@ -7832,8 +7832,8 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 	},
 	violence: {
 		summary: "Physical attacks, injury, death, threats against others, and planning or encouraging physical violence.",
-		definition: "covers physical attacks, bodily injury, death and threats against others. Accidental or medical injuries and natural death also count; an attacker or intent to harm is not required. It also includes planning, requesting, encouraging or praising physical violence. A depicted or described act can qualify in fiction or news reporting even when the author condemns it. In images, a weapon shown without an attack and consensual combat sport or training also count, so that a policy can allow or restrict them.",
-		exclusions: "Solely intentional self-injury or suicide belongs under self-harm. Property damage alone, figurative language and abstract discussion of violence, injury or death do not establish violence.",
+		definition: "covers physical attacks, bodily injury, death and threats against others. Accidental or medical injuries beyond the minor, and natural death, also count; an attacker or intent to harm is not required. It also includes planning, requesting, encouraging or praising physical violence. A depicted or described act can qualify in fiction or news reporting even when the author condemns it. In images, a weapon shown without an attack and consensual combat sport or training also count, so that a policy can allow or restrict them.",
+		exclusions: "Solely intentional self-injury or suicide belongs under self-harm. Property damage alone, figurative language and abstract discussion of violence, injury or death do not establish violence. A minor everyday injury without an attack, such as a scratch from a pet, a paper cut, a small cut or a bruise, does not count in text, and a light or healed scar does not count anywhere; a visible wound in an image does.",
 		docsHref: "/docs/guides/moderation-categories#violence"
 	},
 	"self-harm": {

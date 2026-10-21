@@ -1,7 +1,7 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-Cl2l0Vo_.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-DxjYCueQ.js";
 import "./SharedConstants-Dn7ZJF5S.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-B5dqc8aj.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
 import * as zod from "zod";
 //#region packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
@@ -319,6 +319,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	contentRemovalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullish(),
 	contentUpdatedAt: zod.number().nullish(),
 	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullish(),
+	copyrightHolds: zod.array(zod.string().uuid()).nullish(),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullish().meta(metaStore([docPropertyInfo({ description: "Extracted text stored inline for small content or in R2 for larger content" })])),
 	processingOptions: PROCESSING_OPTIONS_SCHEMA.describe("Processing options supplied when the asset was uploaded"),
 	visibility: ASSET_VISIBILITY_SCHEMA.nullish().meta(metaStore([docPropertyInfo({

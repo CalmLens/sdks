@@ -230,10 +230,8 @@ bun run deploy
 
 Add your deployed origin to the upload preset's allowed sites.
 
-In the CalmLens repo, the public demo (`--env main`, example.calmlens.com) deploys automatically
-when a push to `main` changes this folder, via `.github/workflows/deploy-examples.yml`. Its
-`wrangler.jsonc` environment turns demo mode on explicitly (`CALMLENS_DEMO` and
-`CALMLENS_DEMO_ALLOW_REMOTE`); setting the CalmLens secrets switches it to live mode.
+The hosted CalmLens demo is deployed separately. This repository's Wrangler configuration is
+a template for your own deployment; replace the KV namespace placeholder before deploying.
 
 ## Before you ship something like this
 

@@ -67,12 +67,6 @@ const permits = (grants, action, folderId, folders) => grants.some((grant) => {
 	}
 	return false;
 });
-const SYSTEM_PERMISSION_SCHEMA = zod.enum([
-	"system:admin",
-	"system:assets:read-all",
-	"system:uploads:unlimited"
-]);
-zod.array(SYSTEM_PERMISSION_SCHEMA);
 zod.enum(["active", "banned"]);
 //#endregion
 export { GRANTS_SCHEMA as n, permits as r, ACCESS_ROLE_SCHEMA as t };
