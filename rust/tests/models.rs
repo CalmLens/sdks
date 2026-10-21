@@ -55,10 +55,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         "updatedAt": 5,
         "moderation": {
           "action": "hide",
-          "reviewerAction": "rejected",
-          "reviewerNote": "confirmed",
-          "reviewerUserId": "user-9",
-          "reviewedAt": 7,
+          "manualReviews": [{"id": "review-1", "decision": "rejected", "note": "confirmed", "reviewerUserId": "user-9", "reviewedAt": 7, "appliedToAsset": true}],
           "decision": "rejected",
           "categories": {
             "sexual": {
@@ -129,16 +126,16 @@ fn asset_nested_fields_decode_into_typed_models() {
         (
             &moderation.decision,
             &moderation.action,
-            &moderation.reviewer_action,
-            moderation.reviewer_note.as_deref(),
-            moderation.reviewer_user_id.as_deref(),
-            moderation.reviewed_at,
+            &moderation.manual_reviews[0].decision,
+            moderation.manual_reviews[0].note.as_deref(),
+            moderation.manual_reviews[0].reviewer_user_id.as_deref(),
+            Some(moderation.manual_reviews[0].reviewed_at),
             asset.classification.completed_at
         ),
         (
             &AssetModerationStatus::Rejected,
             &Some(AssetModerationAction::Hide),
-            &Some(AssetReviewerAction::Rejected),
+            &AssetReviewerAction::Rejected,
             Some("confirmed"),
             Some("user-9"),
             Some(7),
@@ -252,7 +249,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         "status": "paused",
         "moderation": {
           "action": "quarantine",
-          "reviewerAction": "deferred",
+          "manualReviews": [{"id": "review-1", "decision": "deferred", "note": null, "reviewerUserId": null, "reviewedAt": 7, "appliedToAsset": true}],
           "decision": "escalated",
           "categories": {
             "spam": {
@@ -285,7 +282,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
             &asset.classification.status,
             &asset.classification.moderation.decision,
             &asset.classification.moderation.action,
-            &asset.classification.moderation.reviewer_action,
+            &asset.classification.moderation.manual_reviews[0].decision,
             &asset.content.status,
             &asset.content.removal_reason
         ),
@@ -293,7 +290,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
             &AssetClassificationStatus::Unknown("paused".into()),
             &AssetModerationStatus::Unknown("escalated".into()),
             &Some(AssetModerationAction::Unknown("quarantine".into())),
-            &Some(AssetReviewerAction::Unknown("deferred".into())),
+            &AssetReviewerAction::Unknown("deferred".into()),
             &AssetContentStatus::Unknown("archived".into()),
             &Some(AssetContentRemovalReason::Unknown("expired".into()))
         )

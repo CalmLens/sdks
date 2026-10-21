@@ -143,19 +143,26 @@ type AssetClassification struct {
 	Labels          []ClassificationLabel  `json:"labels,omitempty"`
 }
 
+// AssetReview records one reviewer decision without erasing earlier reviews.
+type AssetReview struct {
+	ID             string  `json:"id"`
+	Decision       string  `json:"decision"`
+	Note           *string `json:"note"`
+	ReviewerUserID *string `json:"reviewerUserId"`
+	ReviewedAt     int64   `json:"reviewedAt"`
+	AppliedToAsset bool    `json:"appliedToAsset"`
+}
+
 // AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	Decision       string                     `json:"decision"`
-	Action         *string                    `json:"action"`
-	ReviewerAction *string                    `json:"reviewerAction"`
-	ReviewerNote   *string                    `json:"reviewerNote"`
-	ReviewerUserID *string                    `json:"reviewerUserId"`
-	ReviewedAt     *int64                     `json:"reviewedAt"`
-	Categories     map[string]CategoryResult  `json:"categories,omitempty"`
-	Score          *float64                   `json:"score,omitempty"`
-	Timeline       *MediaClassificationReport `json:"timeline,omitempty"`
-	Policy         *ReportPolicy              `json:"policy,omitempty"`
-	Raw            JSON                       `json:"-"`
+	ManualReviews []AssetReview              `json:"manualReviews"`
+	Decision      string                     `json:"decision"`
+	Action        *string                    `json:"action"`
+	Categories    map[string]CategoryResult  `json:"categories,omitempty"`
+	Score         *float64                   `json:"score,omitempty"`
+	Timeline      *MediaClassificationReport `json:"timeline,omitempty"`
+	Policy        *ReportPolicy              `json:"policy,omitempty"`
+	Raw           JSON                       `json:"-"`
 }
 
 // AssetContent describes an asset's content: its format and properties, and whether CalmLens

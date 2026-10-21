@@ -12,7 +12,7 @@ from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Unio
 __all__ = [
     "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "CategoryPolicyScore", "ReportPolicy",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "AssetModeration", "AssetModerationAction", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
+    "AssetReview", "AssetModeration", "AssetModerationAction", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
     "AssetClassificationStatus", "AssetReviewerAction", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
@@ -47,7 +47,7 @@ AssetClassificationStatus = Union[Literal["pending", "processing", "completed", 
 AssetModerationStatus = Union[Literal["pending", "approved", "rejected"], str]
 #: What the policy did with flagged content (``classification.moderation.action``). New actions may be added.
 AssetModerationAction = Union[Literal["alert", "hide", "purge"], str]
-#: A reviewer's decision (``classification.moderation.reviewerAction``). New values may be added.
+#: A reviewer's decision (``classification.moderation.manualReviews[].decision``). New values may be added.
 AssetReviewerAction = Union[Literal["approved", "rejected"], str]
 #: Whether CalmLens holds the content (``content.status``). New statuses may be added.
 AssetContentStatus = Union[Literal["temporary", "stored", "removed"], str]
@@ -471,14 +471,19 @@ class AssetUpload(TypedDict):
     partsReceived: Optional[int]
 
 
+class AssetReview(TypedDict):
+    id: str
+    decision: AssetReviewerAction
+    note: Optional[str]
+    reviewerUserId: Optional[str]
+    reviewedAt: int
+    appliedToAsset: bool
+
+
 class _AssetModerationRequired(TypedDict):
+    manualReviews: List[AssetReview]
     decision: AssetModerationStatus
     action: Optional[AssetModerationAction]
-    reviewerAction: Optional[AssetReviewerAction]
-    reviewerNote: Optional[str]
-    reviewerUserId: Optional[str]
-    reviewedAt: Optional[int]
-
 
 class AssetModeration(_AssetModerationRequired, total=False):
     categories: ClassificationCategories

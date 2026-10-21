@@ -99,13 +99,18 @@ module CalmLens
     ?"faceDetection" => face_detection_result,
     ?"labels" => Array[classification_label]?
   }
+  type asset_review = {
+    "id" => String,
+    "decision" => asset_reviewer_action,
+    "note" => String?,
+    "reviewerUserId" => String?,
+    "reviewedAt" => Integer,
+    "appliedToAsset" => bool
+  }
   type asset_moderation = {
+    "manualReviews" => Array[asset_review],
     "decision" => asset_moderation_status,
     "action" => asset_moderation_action?,
-    "reviewerAction" => asset_reviewer_action?,
-    "reviewerNote" => String?,
-    "reviewerUserId" => String?,
-    "reviewedAt" => Integer?,
     ?"categories" => classification_categories,
     ?"score" => number,
     ?"timeline" => media_report,

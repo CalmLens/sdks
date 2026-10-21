@@ -105,13 +105,17 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           hide: "hide";
           purge: "purge";
         }>>;
-        reviewerAction: zod.ZodNullable<zod.ZodEnum<{
-          approved: "approved";
-          rejected: "rejected";
-        }>>;
-        reviewerNote: zod.ZodNullable<zod.ZodString>;
-        reviewerUserId: zod.ZodNullable<zod.ZodString>;
-        reviewedAt: zod.ZodNullable<zod.ZodNumber>;
+        manualReviews: zod.ZodArray<zod.ZodObject<{
+          id: zod.ZodString;
+          decision: zod.ZodEnum<{
+            approved: "approved";
+            rejected: "rejected";
+          }>;
+          note: zod.ZodNullable<zod.ZodString>;
+          reviewerUserId: zod.ZodNullable<zod.ZodString>;
+          reviewedAt: zod.ZodNumber;
+          appliedToAsset: zod.ZodBoolean;
+        }, zod.core.$strip>>;
         categories: zod.ZodOptional<zod.ZodObject<{
           sexual: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;

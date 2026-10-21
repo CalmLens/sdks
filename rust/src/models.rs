@@ -1419,29 +1419,39 @@ pub struct AssetClassification {
     pub extra: HashMap<String, Value>,
 }
 
+/// One reviewer decision in an asset's review history.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetReview {
+    /// Unique identifier for this review.
+    pub id: String,
+    /// The reviewer’s decision.
+    pub decision: AssetReviewerAction,
+    /// The reviewer’s explanation; required for an override.
+    pub note: Option<String>,
+    /// The reviewing user, or none for an API key.
+    pub reviewer_user_id: Option<String>,
+    /// Review time in milliseconds since the Unix epoch.
+    pub reviewed_at: u64,
+    /// Whether this review changed the asset decision.
+    pub applied_to_asset: bool,
+}
+
 /// Content-safety findings and decision.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetModeration {
+    /// Reviews in chronological order.
+    #[serde(default)]
+    pub manual_reviews: Vec<AssetReview>,
     /// The moderation decision in force, with reviewer decisions taking precedence.
     #[serde(default)]
     pub decision: AssetModerationStatus,
     /// The policy action, or none when no content was flagged.
     #[serde(default)]
     pub action: Option<AssetModerationAction>,
-    /// The reviewer decision, if any.
-    #[serde(default)]
-    pub reviewer_action: Option<AssetReviewerAction>,
-    /// The reviewer-provided note.
-    #[serde(default)]
-    pub reviewer_note: Option<String>,
-    /// The user who reviewed the asset.
-    #[serde(default)]
-    pub reviewer_user_id: Option<String>,
-    /// When the reviewer decided, in milliseconds since the Unix epoch.
-    #[serde(default)]
-    pub reviewed_at: Option<u64>,
     /// Content-safety category scores and qualifiers.
     #[serde(default)]
     pub categories: HashMap<ClassificationCategory, CategoryResult>,

@@ -193,8 +193,7 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
 - `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `decision` (`pending`, `approved` or `rejected`), `action`, category scores, policy assessment, an optional `timeline` and reviewer details. A reviewer decision does not change `completedAt`.
   precedence over the automated one), `action` (what your policy did with flagged content:
   `alert`, `hide` or `purge`, or `None` when nothing was flagged), `note` (why automated
-  moderation rejected the asset), `reviewerAction`, `reviewerNote`, `reviewerUserId`,
-  `reviewedAt`, `completedAt` and `report`. `report` (the classification: `score`,
+  moderation rejected the asset), `manualReviews`, `completedAt` and `report`. `report` (the classification: `score`,
   `categories`, `processedAt`, ...) is `None` until classification finishes. Inside it,
   `categories` maps category names to `{status, score, likelihood, reason}`; a
   `not-evaluated` category has no score.

@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-CdxJq9Bb.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-DRqr9r7v.js";
 import "./SharedConstants-CdFPZV7z.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -172,6 +172,14 @@ const ASSET_MODERATION_ACTION_SCHEMA = zod.enum([
 ]);
 /** A reviewer's decision on an asset. */
 const ASSET_REVIEWER_ACTION_SCHEMA = zod.enum(["approved", "rejected"]);
+const ASSET_REVIEW_SCHEMA = zod.object({
+	id: zod.string().uuid(),
+	decision: ASSET_REVIEWER_ACTION_SCHEMA,
+	note: zod.string().nullable(),
+	reviewerUserId: zod.string().nullable(),
+	reviewedAt: zod.number(),
+	appliedToAsset: zod.boolean()
+});
 /**
 * Whether CalmLens holds the asset's content (source, preview and extracted text): kept only until
 * processing finishes (`temporary`), retained (`stored`) or deleted (`removed`).
@@ -310,10 +318,8 @@ const STORED_ASSET_SCHEMA = zod.object({
 	classificationUpdatedAt: zod.number().nullish(),
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
 	moderationAction: ASSET_MODERATION_ACTION_SCHEMA.nullish(),
-	reviewerAction: ASSET_REVIEWER_ACTION_SCHEMA.nullish(),
-	reviewerNote: saneStringField({ type: "large" }).nullish(),
-	reviewerUserId: saneStringField().nullish(),
-	reviewedAt: zod.number().nullish(),
+	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
+	reviewRevision: zod.number().int().default(0).meta(metaStore([backfill({ value: 0 })])),
 	completedAt: zod.number().nullish(),
 	contentStatus: ASSET_CONTENT_STATUS_SCHEMA,
 	contentRemovalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullish(),
@@ -345,10 +351,7 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 const ASSET_MODERATION_SCHEMA = zod.object({
 	decision: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force: pending, approved or rejected. A reviewer's decision takes precedence."),
 	action: ASSET_MODERATION_ACTION_SCHEMA.nullable(),
-	reviewerAction: ASSET_REVIEWER_ACTION_SCHEMA.nullable(),
-	reviewerNote: zod.string().nullable(),
-	reviewerUserId: zod.string().nullable(),
-	reviewedAt: epoch("When a reviewer decided"),
+	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
 	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),
 	timeline: CLASSIFICATION_REPORT_SCHEMA.shape.media,
@@ -430,10 +433,7 @@ STORED_ASSET_SCHEMA.pick({
 			moderation: {
 				decision: "approved",
 				action: null,
-				reviewerAction: null,
-				reviewerNote: null,
-				reviewerUserId: null,
-				reviewedAt: null
+				manualReviews: []
 			}
 		},
 		content: {

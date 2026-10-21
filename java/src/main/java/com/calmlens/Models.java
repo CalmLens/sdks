@@ -1376,13 +1376,15 @@ public final class Models {
     public AssetClassification { labels = list(labels); }
   }
 
+  /** One reviewer decision in an asset's review history. */
+  public record AssetReview(String id, String decision, String note, String reviewerUserId,
+      @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean appliedToAsset) {}
+
   /** Content-safety findings, policy assessment and reviewer decision. */
-  public record AssetModeration(AssetModerationStatus decision, String action,
-      String reviewerAction, String reviewerNote, String reviewerUserId,
-      @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt,
+  public record AssetModeration(AssetModerationStatus decision, String action, List<AssetReview> manualReviews,
       Map<String, CategoryResult> categories, Double score,
       MediaClassificationReport timeline, ReportPolicy policy) {
-    public AssetModeration { categories = map(categories); }
+    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); }
   }
 
   /**

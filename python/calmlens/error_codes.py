@@ -25,6 +25,8 @@ IDEMPOTENCY_KEY_REUSED = "idempotency/key-reused"
 IDEMPOTENT_REQUEST_IN_PROGRESS = "idempotency/request-in-progress"
 ASSET_NOT_FOUND = "asset/not-found"
 PROJECT_NOT_FOUND = "project/not-found"
+ASSET_REVIEW_CHANGED = "asset/review-changed"
+ASSET_REVIEW_NOTE_REQUIRED = "asset/review-note-required"
 ASSET_UPDATE_FAILED = "asset/update-failed"
 ASSET_SAFETY_HELD = "asset/safety-held"
 ASSET_NOT_RETRYABLE = "asset/not-retryable"
@@ -99,6 +101,8 @@ STATUS_BY_CODE: dict[str, int] = {
     "idempotency/request-in-progress": 409,
     "asset/not-found": 404,
     "project/not-found": 404,
+    "asset/review-changed": 409,
+    "asset/review-note-required": 400,
     "asset/update-failed": 500,
     "asset/safety-held": 423,
     "asset/not-retryable": 409,

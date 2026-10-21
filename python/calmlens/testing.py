@@ -503,7 +503,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             id=self.create_id(), projectId=self.project_id, folderId=options.get("folderId"), type=kind,
             visibility=options.get("visibility", "private"), createdAt=now, updatedAt=now,
             upload={"status": "completed" if final else "uploading", "updatedAt": now, "partsReceived": 1 if multipart else None},
-            classification={'status': 'processing' if final else 'pending', 'updatedAt': now, 'completedAt': None, 'moderation': {'decision': 'pending', 'action': None, 'reviewerAction': None, 'reviewerNote': None, 'reviewerUserId': None, 'reviewedAt': None}},
+            classification={'status': 'processing' if final else 'pending', 'updatedAt': now, 'completedAt': None, 'moderation': {'decision': 'pending', 'action': None, 'manualReviews': []}},
             content={"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                      "safetyHold": None, "format": mime or None,
                      "extension": None, "sizeInBytes": len(raw) if raw_upload and raw is not None else None,

@@ -618,7 +618,7 @@ public final class Calmmarket {
     photo.moderation = moderationStatus(asset);
     photo.moderationAction = moderation == null ? null : moderation.action();
     photo.report = report(asset);
-    photo.rejectionNote = moderation == null ? null : moderation.reviewerNote();
+    photo.rejectionNote = moderation == null || moderation.manualReviews().isEmpty() ? null : moderation.manualReviews().get(moderation.manualReviews().size() - 1).note();
     photo.extractedText = asset.content() == null ? null : asset.content().extractedText();
     photo.ocr = !photo.decided() ? Ocr.NOT_CHECKED : photo.extractedText == null ? Ocr.NO_TEXT : Ocr.FOUND;
   }

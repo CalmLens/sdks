@@ -50,6 +50,10 @@ error_codes! {
     AssetNotFound = "asset/not-found", 404;
     /// `project/not-found` (HTTP 404): Project not found
     ProjectNotFound = "project/not-found", 404;
+    /// `asset/review-changed` (HTTP 409): The asset changed during review. Refresh and review the current decision.
+    AssetReviewChanged = "asset/review-changed", 409;
+    /// `asset/review-note-required` (HTTP 400): A note is required when changing the decision.
+    AssetReviewNoteRequired = "asset/review-note-required", 400;
     /// `asset/update-failed` (HTTP 500): Failed to update asset
     AssetUpdateFailed = "asset/update-failed", 500;
     /// `asset/safety-held` (HTTP 423): Asset access is restricted by a safety hold.

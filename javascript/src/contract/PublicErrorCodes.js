@@ -415,6 +415,16 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "Project not found",
 		status: 404
 	}),
+	ASSET_REVIEW_CHANGED: new ErrorCode({
+		id: "asset/review-changed",
+		defaultMessage: "The asset changed during review. Refresh and review the current decision.",
+		status: 409
+	}),
+	ASSET_REVIEW_NOTE_REQUIRED: new ErrorCode({
+		id: "asset/review-note-required",
+		defaultMessage: "A note is required when changing the decision.",
+		status: 400
+	}),
 	ASSET_UPDATE_FAILED: new ErrorCode({
 		id: "asset/update-failed",
 		defaultMessage: "Failed to update asset",

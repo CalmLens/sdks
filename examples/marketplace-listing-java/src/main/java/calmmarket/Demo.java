@@ -78,8 +78,7 @@ final class Demo implements Calmmarket.Backend {
       // A reviewer's decision replaces the automated one; the policy action stays as it was.
       Map<String, Object> moderation = moderation(asset);
       moderation.put("decision", "rejected");
-      moderation.put("reviewerAction", "rejected");
-      moderation.put("reviewerNote", "Simulated portal decision");
+      moderation.put("manualReviews", java.util.List.of(Map.of("id", java.util.UUID.randomUUID().toString(), "decision", "rejected", "note", "Simulated portal decision", "reviewerUserId", "demo-reviewer", "reviewedAt", System.currentTimeMillis(), "appliedToAsset", true)));
     }
     mock.enqueue(200, asset);
 

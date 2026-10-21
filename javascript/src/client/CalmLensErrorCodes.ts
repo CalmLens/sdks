@@ -27,6 +27,8 @@ export const API_ERROR_CODES = {
   IDEMPOTENT_REQUEST_IN_PROGRESS: "idempotency/request-in-progress",
   ASSET_NOT_FOUND: "asset/not-found",
   PROJECT_NOT_FOUND: "project/not-found",
+  ASSET_REVIEW_CHANGED: "asset/review-changed",
+  ASSET_REVIEW_NOTE_REQUIRED: "asset/review-note-required",
   ASSET_UPDATE_FAILED: "asset/update-failed",
   ASSET_SAFETY_HELD: "asset/safety-held",
   ASSET_NOT_RETRYABLE: "asset/not-retryable",
@@ -172,6 +174,14 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "project/not-found": {
     status: 404,
     message: "Project not found",
+  },
+  "asset/review-changed": {
+    status: 409,
+    message: "The asset changed during review. Refresh and review the current decision.",
+  },
+  "asset/review-note-required": {
+    status: 400,
+    message: "A note is required when changing the decision.",
   },
   "asset/update-failed": {
     status: 500,

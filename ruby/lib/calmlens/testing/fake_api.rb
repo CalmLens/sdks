@@ -524,8 +524,7 @@ module CalmLens
         {
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'updatedAt' => now, 'completedAt' => nil,
-                                'moderation' => { 'decision' => 'pending', 'action' => nil, 'reviewerAction' => nil,
-                                                  'reviewerNote' => nil, 'reviewerUserId' => nil, 'reviewedAt' => nil } },
+                                'moderation' => { 'decision' => 'pending', 'action' => nil, 'manualReviews' => [] } },
           'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
                          'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
                          'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'previewImage' => nil,

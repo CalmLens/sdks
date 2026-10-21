@@ -63,11 +63,15 @@ export type AssetClassification = Omit<SharedAssetClassification, "status" | "mo
 /** An asset's moderation state. */
 export type AssetModeration = Omit<
   SharedAssetModeration,
-  "decision" | "action" | "reviewerAction"
+  "decision" | "action" | "manualReviews"
 > & {
   decision: AssetModerationStatus;
   action: AssetModerationAction | null;
-  reviewerAction: AssetReviewerAction | null;
+  manualReviews: Array<
+    Omit<SharedAssetModeration["manualReviews"][number], "decision"> & {
+      decision: AssetReviewerAction;
+    }
+  >;
 };
 /** Whether CalmLens holds an asset's content, and what is known about it. */
 export type AssetContent = Omit<SharedAssetContent, "status" | "removalReason"> & {

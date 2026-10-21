@@ -16,9 +16,9 @@ var filterFields = map[string]bool{
 	"folderId": true, "externalId": true, "externalUrl": true, "createdAt": true, "updatedAt": true,
 	"tags": true, "description": true, "userId": true,
 	"classification.status": true, "classification.updatedAt": true,
-	"classification.moderation.decision": true, "classification.moderation.action": true, "classification.moderation.reviewerAction": true,
-	"classification.moderation.reviewedAt": true, "moderation.completedAt": true,
-	"content.status": true, "content.removalReason": true, "content.format": true,
+	"classification.moderation.decision": true, "classification.moderation.action": true,
+	"moderation.completedAt": true,
+	"content.status":         true, "content.removalReason": true, "content.format": true,
 	"content.extension": true, "content.sizeInBytes": true,
 }
 

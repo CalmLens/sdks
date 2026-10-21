@@ -1029,10 +1029,7 @@ export class MockCalmLensServerClient {
         moderation: {
           decision: "pending",
           action: null,
-          reviewerAction: null,
-          reviewerNote: null,
-          reviewerUserId: null,
-          reviewedAt: null,
+          manualReviews: [],
         },
       },
     };

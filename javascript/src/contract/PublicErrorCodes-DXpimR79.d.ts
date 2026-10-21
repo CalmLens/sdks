@@ -34,6 +34,8 @@ declare const PUBLIC_ERROR_CODES: {
   readonly IDEMPOTENT_REQUEST_IN_PROGRESS: RequestErrorCode;
   readonly ASSET_NOT_FOUND: RequestErrorCode;
   readonly PROJECT_NOT_FOUND: RequestErrorCode;
+  readonly ASSET_REVIEW_CHANGED: RequestErrorCode;
+  readonly ASSET_REVIEW_NOTE_REQUIRED: RequestErrorCode;
   readonly ASSET_UPDATE_FAILED: RequestErrorCode;
   readonly ASSET_SAFETY_HELD: RequestErrorCode;
   readonly ASSET_NOT_RETRYABLE: RequestErrorCode;

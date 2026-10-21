@@ -61,7 +61,7 @@ console.log(image.classification.status, image.classification.moderation.decisio
 | `pending` or `processing` | `pending` | `null` | Still being received or classified; `upload.status` is `uploading` while parts are arriving. |
 | `failed` | `pending` | `null` | Processing failed; see `assets.retry`. |
 
-A reviewer's decision (`classification.moderation.reviewerAction`) takes precedence over the automated one in
+The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated one in
 `classification.moderation.decision`; `classification.moderation.action` keeps what your policy did.
 
 See [How CalmLens works](https://calmlens.com/docs/how-it-works) and [Testing your integration](https://calmlens.com/docs/guides/testing) for test inputs that trigger rejections safely.
@@ -539,7 +539,7 @@ Upload, classification and content each have a status; moderation has its own de
 
 - `upload.status`: `uploading` while source content is arriving, then `completed`
 - `classification.status`: `pending`, `processing`, `completed` or `failed`
-- `classification.moderation.decision`: `pending` until moderation finishes, then `approved` or `rejected`. A reviewer's decision (`classification.moderation.reviewerAction`) takes precedence over the automated one. `classification.moderation.action` is what your policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged; an `alert` leaves the asset `approved`.
+- `classification.moderation.decision`: `pending` until moderation finishes, then `approved` or `rejected`. The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated one. `classification.moderation.action` is what your policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged; an `alert` leaves the asset `approved`.
 - `content.status`: `temporary` (kept only until processing finishes), `stored` or `removed`, with `content.removalReason` `policy` (purged), `retention` (`keepContentAfterProcessing` off), `requested`, `parent-removed` or `disposed`
 
 ## Moderation Reports

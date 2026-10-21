@@ -50,8 +50,9 @@ module Calmthread
         targets.each do |field|
           id = ids.fetch(field)
           decision = type == 'asset.approved' ? 'approved' : 'rejected'
-          client.state.assets.fetch(id)['classification']['moderation'].merge!('decision' => decision, 'reviewerAction' => decision,
-                                                             'reviewerUserId' => 'demo-reviewer')
+          moderation = client.state.assets.fetch(id)['classification']['moderation']
+          moderation['decision'] = decision
+          moderation['manualReviews'] << { 'id' => SecureRandom.uuid, 'decision' => decision, 'note' => 'Simulated portal decision', 'reviewerUserId' => 'demo-reviewer', 'reviewedAt' => (Time.now.to_f * 1000).to_i, 'appliedToAsset' => true }
           client.enqueue_event(type: type, asset_id: id, title: EVENT_LABELS[type], facts: [
                                  { key: 'asset-type', value: 'text' },
                                  { key: 'decided-by', value: 'reviewer' },

@@ -7821,6 +7821,68 @@ const metaStore = (meta) => {
 		}
 	} };
 };
+(/* @__PURE__ */ __commonJSMin(((exports, module) => {
+	const CHARS_GLOBAL_BACKSLASH_SUPPORTED_RX = /[\0\b\t\n\r\x1a"'\\]/g;
+	const CHARS_ESCAPE_BACKSLASH_SUPPORTED_MAP = {
+		"\0": "\\0",
+		"\b": "\\b",
+		"	": "\\t",
+		"\n": "\\n",
+		"\r": "\\r",
+		"": "\\Z",
+		"\"": "\\\"",
+		"'": "\\'",
+		"\\": "\\\\"
+	};
+	/**
+	* Escapes the given string to protect against SQL injection attacks.
+	*
+	* By default it assumes that backslashes are not supported as they are not part of the standard SQL spec.
+	* Quoting from the [SQLlite web site](https://sqlite.org/lang_expr.html):
+	*
+	* > C-style escapes using the backslash character are not supported because they are not standard SQL.
+	*
+	* This means three things:
+	*
+	* - backslashes and double quotes `"` are not escaped by default
+	* - single quotes are escaped via `''` instead of `\'`
+	* - your sql engine should throw an error when encountering a backslash escape
+	*   as part of a string, unless it is a literal backslash, i.e. `'backslash: \\'`.
+	*
+	* It is recommended to set the `backslashSupported` option `true` if your SQL
+	* engine supports it. In that case backslash sequences are escaped and single
+	* and double quotes are escaped via a backslash, i.e. `'\''`.
+	*
+	* @param {String} val the original string to be used in a SQL query
+	* @param {Object} $0 opts
+	* @param {Boolean} [$0.backslashSupported = false] if `true` backslashes are supported
+	* @returns {String} the original string escaped wrapped in single quotes, i.e. `'mystring'`
+	*/
+	function escapeString(val, opts) {
+		if (val == null) throw new Error("Need to pass a valid string");
+		opts = opts || {};
+		if (!!!opts.backslashSupported) return "'" + val.replace(/'/g, "''") + "'";
+		const charsRx = CHARS_GLOBAL_BACKSLASH_SUPPORTED_RX;
+		const charsEscapeMap = CHARS_ESCAPE_BACKSLASH_SUPPORTED_MAP;
+		var chunkIndex = charsRx.lastIndex = 0;
+		var escapedVal = "";
+		var match;
+		while (match = charsRx.exec(val)) {
+			escapedVal += val.slice(chunkIndex, match.index) + charsEscapeMap[match[0]];
+			chunkIndex = charsRx.lastIndex;
+		}
+		if (chunkIndex === 0) return "'" + val + "'";
+		if (chunkIndex < val.length) return "'" + escapedVal + val.slice(chunkIndex) + "'";
+		return "'" + escapedVal + "'";
+	}
+	module.exports = escapeString;
+})))();
+//#endregion
+//#region packages/zodbase/src/index.browser.ts
+const noop = () => {};
+const primaryKey = noop;
+const updatedAt = noop;
+const backfill = noop;
 //#endregion
 //#region packages/shared/src/ModerationCategoryDefinitions.ts
 const MODERATION_CATEGORY_DEFINITIONS = {
@@ -7851,7 +7913,7 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 	hate: {
 		summary: "Identity-based abuse, dehumanization, discriminatory exclusion or threats against people because of protected characteristics.",
 		definition: "covers attacks on people because of race, ethnicity, nationality, religion, caste, sex, gender identity, sexual orientation or disability. It includes dehumanization, asserted inferiority, discriminatory exclusion, identity-based abuse and threats. Images that show a hate symbol or attack to counter or prevent hate, such as anti-hate education, also count, so that a policy can allow or restrict them.",
-		exclusions: "Both the protected target and the identity-based attack must be supported. Identity mentions, cultural clothing, religious imagery, criticism of beliefs or an unrelated threat do not establish hate. Neutral reporting, condemnation and opposition to hate are excluded unless a separate attack is expressed or endorsed.",
+		exclusions: "Both the protected target and the identity-based attack must be supported. Identity mentions, cultural clothing, religious imagery, criticism of beliefs or an unrelated threat do not establish hate. Neutral reporting, condemnation, reclaimed identity language without contempt and opposition to hate are excluded unless a separate attack is expressed or endorsed. Conventional identity slurs used contemptuously about people can themselves establish an attack, including inside criticism of someone else. Grammatical gender, gendered profanity, an insult about personal conduct or a protected trait that merely identifies a victim does not alone establish identity-based hate.",
 		docsHref: "/docs/guides/moderation-categories#hate-and-identity-abuse"
 	},
 	"criminal-activity": {
@@ -8119,67 +8181,6 @@ const PROCESSING_FEATURE_RESULTS_SCHEMA = zod.object({
 	description: "Results of the optional features requested in `processingOptions.features`, keyed by feature",
 	namedType: "ProcessingFeatureResults"
 })]));
-(/* @__PURE__ */ __commonJSMin(((exports, module) => {
-	const CHARS_GLOBAL_BACKSLASH_SUPPORTED_RX = /[\0\b\t\n\r\x1a"'\\]/g;
-	const CHARS_ESCAPE_BACKSLASH_SUPPORTED_MAP = {
-		"\0": "\\0",
-		"\b": "\\b",
-		"	": "\\t",
-		"\n": "\\n",
-		"\r": "\\r",
-		"": "\\Z",
-		"\"": "\\\"",
-		"'": "\\'",
-		"\\": "\\\\"
-	};
-	/**
-	* Escapes the given string to protect against SQL injection attacks.
-	*
-	* By default it assumes that backslashes are not supported as they are not part of the standard SQL spec.
-	* Quoting from the [SQLlite web site](https://sqlite.org/lang_expr.html):
-	*
-	* > C-style escapes using the backslash character are not supported because they are not standard SQL.
-	*
-	* This means three things:
-	*
-	* - backslashes and double quotes `"` are not escaped by default
-	* - single quotes are escaped via `''` instead of `\'`
-	* - your sql engine should throw an error when encountering a backslash escape
-	*   as part of a string, unless it is a literal backslash, i.e. `'backslash: \\'`.
-	*
-	* It is recommended to set the `backslashSupported` option `true` if your SQL
-	* engine supports it. In that case backslash sequences are escaped and single
-	* and double quotes are escaped via a backslash, i.e. `'\''`.
-	*
-	* @param {String} val the original string to be used in a SQL query
-	* @param {Object} $0 opts
-	* @param {Boolean} [$0.backslashSupported = false] if `true` backslashes are supported
-	* @returns {String} the original string escaped wrapped in single quotes, i.e. `'mystring'`
-	*/
-	function escapeString(val, opts) {
-		if (val == null) throw new Error("Need to pass a valid string");
-		opts = opts || {};
-		if (!!!opts.backslashSupported) return "'" + val.replace(/'/g, "''") + "'";
-		const charsRx = CHARS_GLOBAL_BACKSLASH_SUPPORTED_RX;
-		const charsEscapeMap = CHARS_ESCAPE_BACKSLASH_SUPPORTED_MAP;
-		var chunkIndex = charsRx.lastIndex = 0;
-		var escapedVal = "";
-		var match;
-		while (match = charsRx.exec(val)) {
-			escapedVal += val.slice(chunkIndex, match.index) + charsEscapeMap[match[0]];
-			chunkIndex = charsRx.lastIndex;
-		}
-		if (chunkIndex === 0) return "'" + val + "'";
-		if (chunkIndex < val.length) return "'" + escapedVal + val.slice(chunkIndex) + "'";
-		return "'" + escapedVal + "'";
-	}
-	module.exports = escapeString;
-})))();
-//#endregion
-//#region packages/zodbase/src/index.browser.ts
-const noop = () => {};
-const primaryKey = noop;
-const updatedAt = noop;
 //#endregion
 //#region packages/shared/src/ZodUtils.ts
 const primaryUuidField = () => zod.string().uuid({ version: "v4" }).meta({
@@ -8602,4 +8603,4 @@ const detectTestImage = async (image, testInputKey) => {
 	}
 };
 //#endregion
-export { POLICY_ALLOWANCE_SCHEMA as C, metaStore as E, FLAGGED_CONTENT_ACTION_SCHEMA as S, getModerationQualifiers as T, saneStringField as _, generateTestTextCode as a, PROCESSING_FEATURES_SCHEMA as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, primaryUuidField as g, createdAtField as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORY_SCHEMA as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORIES as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, updatedAtField as v, POLICY_RESTRICTION_SCHEMA as w, docPropertyInfo as x, uuidField as y };
+export { POLICY_ALLOWANCE_SCHEMA as C, metaStore as D, backfill as E, FLAGGED_CONTENT_ACTION_SCHEMA as S, getModerationQualifiers as T, saneStringField as _, generateTestTextCode as a, PROCESSING_FEATURES_SCHEMA as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, primaryUuidField as g, createdAtField as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORY_SCHEMA as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORIES as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, updatedAtField as v, POLICY_RESTRICTION_SCHEMA as w, docPropertyInfo as x, uuidField as y };
