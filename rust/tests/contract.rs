@@ -255,6 +255,14 @@ fn webhook_payload_contracts() {
             parsed.data.asset_id.as_deref(),
             expected["data"]["assetId"].as_str()
         );
+        assert_eq!(
+            parsed
+                .data
+                .asset
+                .as_ref()
+                .and_then(|asset| asset.upload_preset_id.as_deref()),
+            expected["data"]["asset"]["uploadPresetId"].as_str()
+        );
         assert_eq!(serde_json::to_value(&parsed).unwrap(), *expected);
         // The same conversion CalmLens applies to a stored event before delivering it.
         let event: Event = typed(item["event"].clone());

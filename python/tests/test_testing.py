@@ -249,13 +249,15 @@ class MockFeedSearchAndListTests(unittest.TestCase):
         first = c.enqueue_event("asset.approved", asset_id=asset["id"],
                                 facts=[{"key": "decided-by", "value": "automated"}])
         self.tick()
+        c.database_storage.assets[asset["id"]]["uploadPresetId"] = "preset-1"
         second = c.enqueue_event("asset.approved", asset_id=asset["id"])
         page = c.events.list(after=start["cursor"], limit=1)
         self.assertEqual(([e["id"] for e in page["events"]], page["hasMore"]), ([first["id"]], True))
-        self.assertEqual(page["events"][0]["asset"], {'id': asset['id'], 'externalId': None, 'content': {'status': 'removed'}, 'upload': {'status': 'completed'}, 'classification': {'status': 'completed', 'moderation': {'decision': 'approved', 'action': None}}})
+        self.assertEqual(page["events"][0]["asset"], {'id': asset['id'], 'externalId': None, 'uploadPresetId': None, 'content': {'status': 'removed'}, 'upload': {'status': 'completed'}, 'classification': {'status': 'completed', 'moderation': {'decision': 'approved', 'action': None}}})
         self.assertEqual(page["events"][0]["facts"], [{"key": "decided-by", "value": "automated"}])
         self.assertEqual([e["id"] for e in c.events.iter(after=start["cursor"], limit=1)], [first["id"], second["id"]])
         last = c.events.list(after=page["cursor"])
+        self.assertEqual(last["events"][0]["asset"]["uploadPresetId"], "preset-1")
         self.assertEqual(([e["type"] for e in last["events"]], last["hasMore"]), (["asset.approved"], False))
         self.assertEqual(c.events.list(after=last["cursor"]), {"events": [], "cursor": last["cursor"], "hasMore": False})
         with self.assertRaises(CalmLensAPIError) as raised:

@@ -78,6 +78,7 @@ const (
 type EventAsset struct {
 	ID             string                   `json:"id"`
 	ExternalID     *string                  `json:"externalId,omitempty"`
+	UploadPresetID *string                  `json:"uploadPresetId,omitempty"`
 	Upload         EventAssetUpload         `json:"upload"`
 	Classification EventAssetClassification `json:"classification"`
 	Content        EventAssetContent        `json:"content"`

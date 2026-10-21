@@ -312,6 +312,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             asset: EventAsset | None = None
             if stored is not None:
                 asset = {"id": stored["id"], "externalId": stored.get("externalId"),
+                         "uploadPresetId": stored.get("uploadPresetId"),
                          "upload": {"status": stored["upload"]["status"]},
                          "classification": {'status': stored['classification']['status'], 'moderation': {'decision': stored['classification']['moderation']['decision'], 'action': stored['classification']['moderation']['action']}},
                          "content": {"status": stored["content"]["status"]}}

@@ -724,6 +724,7 @@ class EventAsset(_EventAssetRequired, total=False):
     """Snapshot of an asset's processing, moderation and content status when the event was
     created."""
     externalId: Optional[str]
+    uploadPresetId: Optional[str]
 
 
 class _EventRequired(TypedDict):

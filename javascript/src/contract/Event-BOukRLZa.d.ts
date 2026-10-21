@@ -6,6 +6,7 @@ import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  uploadPresetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   upload: zod.ZodObject<{
     status: zod.ZodEnum<{
       completed: "completed";
@@ -78,6 +79,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
     externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    uploadPresetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     upload: zod.ZodObject<{
       status: zod.ZodEnum<{
         completed: "completed";

@@ -20,8 +20,8 @@
     {
       "secret": "whsec_test",
       "timestamp": "1760000000",
-      "body": "{\"id\":\"event-1\",\"type\":\"asset.flagged\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset flagged\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"rejected\",\"action\":\"hide\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}}",
-      "signature": "v1=a15aecce8262cc827404e901e84569e3f36a8dd75ca30535babc29e6651ea065"
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.flagged\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset flagged\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"rejected\",\"action\":\"hide\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}}",
+      "signature": "v1=f373047a46f618b57c0954fb82fb1492fdc00564b80d940d41ad36075fdd4923"
     }
   ],
   "verification": [
@@ -38,8 +38,8 @@
       "name": "payload",
       "secret": "whsec_test",
       "timestamp": "1760000000",
-      "body": "{\"id\":\"event-1\",\"type\":\"asset.flagged\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset flagged\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"rejected\",\"action\":\"hide\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}}",
-      "signature": "v1=a15aecce8262cc827404e901e84569e3f36a8dd75ca30535babc29e6651ea065",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.flagged\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset flagged\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"rejected\",\"action\":\"hide\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}}",
+      "signature": "v1=f373047a46f618b57c0954fb82fb1492fdc00564b80d940d41ad36075fdd4923",
       "now": 1760000000,
       "valid": true
     },
@@ -185,6 +185,7 @@
         "asset": {
           "id": "asset-1",
           "externalId": "post-1",
+          "uploadPresetId": "preset-1",
           "content": {
             "status": "stored"
           },
@@ -225,6 +226,7 @@
           "asset": {
             "id": "asset-1",
             "externalId": "post-1",
+            "uploadPresetId": "preset-1",
             "content": {
               "status": "stored"
             },

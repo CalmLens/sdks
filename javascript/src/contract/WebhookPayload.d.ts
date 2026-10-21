@@ -1,5 +1,5 @@
 import { i as EventFacts, o as EventType } from "./EventCatalog-CaXrihFR.js";
-import { t as Event } from "./Event-CfVBoE4O.js";
+import { t as Event } from "./Event-BOukRLZa.js";
 import * as zod from "zod";
 //#region packages/shared/src/WebhookPayload.d.ts
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
@@ -18,6 +18,7 @@ declare const WEBHOOK_EVENT_DATA_SCHEMA: zod.ZodObject<{
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
     externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    uploadPresetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     upload: zod.ZodObject<{
       status: zod.ZodEnum<{
         completed: "completed";
@@ -75,6 +76,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
     asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       id: zod.ZodString;
       externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      uploadPresetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       upload: zod.ZodObject<{
         status: zod.ZodEnum<{
           completed: "completed";
@@ -127,6 +129,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
     asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       id: zod.ZodString;
       externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      uploadPresetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       upload: zod.ZodObject<{
         status: zod.ZodEnum<{
           completed: "completed";

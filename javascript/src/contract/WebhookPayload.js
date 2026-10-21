@@ -1262,6 +1262,7 @@ const EVENT_FACTS_SCHEMA = zod.array(EVENT_FACT_SCHEMA);
 const EVENT_ASSET_SCHEMA = zod.object({
 	id: zod.string().describe("Asset ID"),
 	externalId: zod.string().nullish().describe("The asset's `externalId`, if you set one"),
+	uploadPresetId: zod.string().nullish().describe("The upload preset used to create the asset, if any"),
 	upload: zod.object({ status: zod.enum(["uploading", "completed"]) }),
 	classification: zod.object({
 		status: ASSET_CLASSIFICATION_STATUS_SCHEMA,

@@ -1697,11 +1697,12 @@ public final class Models {
    *
    * @param id asset ID
    * @param externalId the asset's external ID
+   * @param uploadPresetId upload preset used to create the asset, or null
    * @param upload upload status at the time
    * @param classification classification status and moderation decision at the time
    * @param content content status at the time
    */
-  public record EventAsset(String id, String externalId, EventAssetUpload upload, EventAssetClassification classification, EventAssetContent content) {}
+  public record EventAsset(String id, String externalId, String uploadPresetId, EventAssetUpload upload, EventAssetClassification classification, EventAssetContent content) {}
 
   /** @param status the asset's classification status */
   public record EventAssetUpload(String status) {}

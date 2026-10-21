@@ -2082,6 +2082,9 @@ pub struct EventAsset {
     /// Your ID for the asset, if you set one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
+    /// The upload preset used to create the asset, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload_preset_id: Option<String>,
     /// The classification status when the event was created.
     #[serde(default)]
     pub upload: EventAssetUpload,

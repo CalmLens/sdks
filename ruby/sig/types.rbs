@@ -455,6 +455,7 @@ module CalmLens
   # Snapshot of the asset's processing, moderation and content status when the event was created.
   type event_asset = {
     "id" => String,
+    ?"uploadPresetId" => String?,
     ?"externalId" => String?,
     "upload" => { "status" => "uploading" | "completed" },
     "classification" => { "status" => asset_classification_status, "moderation" => { "decision" => asset_moderation_status, "action" => asset_moderation_action? } },
