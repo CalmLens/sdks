@@ -62,6 +62,10 @@ public final class ErrorCodes {
   public static final String ASSET_NOT_FOUND = "asset/not-found";
   /** {@code project/not-found} (HTTP 404). */
   public static final String PROJECT_NOT_FOUND = "project/not-found";
+  /** {@code asset/review-changed} (HTTP 409). */
+  public static final String ASSET_REVIEW_CHANGED = "asset/review-changed";
+  /** {@code asset/review-note-required} (HTTP 400). */
+  public static final String ASSET_REVIEW_NOTE_REQUIRED = "asset/review-note-required";
   /** {@code asset/update-failed} (HTTP 500). */
   public static final String ASSET_UPDATE_FAILED = "asset/update-failed";
   /** {@code asset/safety-held} (HTTP 423). */
@@ -182,6 +186,8 @@ public final class ErrorCodes {
       Map.entry(IDEMPOTENT_REQUEST_IN_PROGRESS, 409),
       Map.entry(ASSET_NOT_FOUND, 404),
       Map.entry(PROJECT_NOT_FOUND, 404),
+      Map.entry(ASSET_REVIEW_CHANGED, 409),
+      Map.entry(ASSET_REVIEW_NOTE_REQUIRED, 400),
       Map.entry(ASSET_UPDATE_FAILED, 500),
       Map.entry(ASSET_SAFETY_HELD, 423),
       Map.entry(ASSET_NOT_RETRYABLE, 409),
