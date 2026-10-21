@@ -7856,7 +7856,7 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 	},
 	"criminal-activity": {
 		summary: "Planning, assistance, instructions, encouragement or facilitation of a concrete criminal or seriously dangerous act, fraud and scams, and illegal drugs or contraband.",
-		definition: "covers planning, requests for assistance, instructions, encouragement or facilitation of a concrete criminal or seriously dangerous act. A request can qualify even when no act occurs and a later reply refuses it. Dangerous activity requires a concrete serious risk of physical harm. It also covers fraud, scams and phishing aimed at the reader, illegal drug use, dealing, production or trafficking, and contraband such as stolen goods, counterfeit money or documents and smuggled or illegally traded weapons. In images, graffiti on property counts. Harm-reduction, recovery or prevention material about illegal drug use counts in text and images. A policy can allow or restrict each.",
+		definition: "covers planning, requests for assistance, instructions, encouragement or facilitation of a concrete criminal or seriously dangerous act. A request can qualify even when no act occurs and a later reply refuses it. Dangerous activity requires a concrete serious risk of physical harm. It also covers fraud, scams and phishing aimed at the reader, illegal drug use, dealing, production or trafficking, and contraband such as stolen goods, counterfeit money or documents and smuggled or illegally traded weapons. Consensual adult sexual solicitation, including paid services, also counts so that a policy can allow or restrict it; this does not establish illegality. In images, graffiti on property counts. Harm-reduction, recovery or prevention material about illegal drug use counts in text and images. A policy can allow or restrict each.",
 		exclusions: "Neutral reporting, prevention, lawful safety advice, fiction without criminal assistance, and vague dangerous references do not qualify. Medical, pharmaceutical, clinical, research and educational content does not qualify, including prescriptions, dosages, side effects, controlled medicines used as prescribed, pharmacies, hospitals and drug manufacturing by pharmaceutical companies. Lawful alcohol and tobacco and drug-policy discussion do not qualify either. Masks, computers, payment cards, detention or ordinary tools do not establish criminal facilitation by themselves. A clear visual demonstration of how to carry out a crime can qualify.",
 		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
 	}
@@ -7920,6 +7920,7 @@ const MODERATION_QUALIFIERS = [
 	"criminal-activity-promotion",
 	"criminal-activity-substances",
 	"criminal-activity-fraud",
+	"criminal-activity-sexual-solicitation",
 	"criminal-activity-graffiti",
 	"criminal-activity-fictional",
 	"criminal-activity-support-prevention"
@@ -7992,6 +7993,7 @@ const MODERATION_QUALIFIERS_BY_CATEGORY = {
 		"criminal-activity-promotion",
 		"criminal-activity-substances",
 		"criminal-activity-fraud",
+		"criminal-activity-sexual-solicitation",
 		"criminal-activity-graffiti",
 		"criminal-activity-fictional",
 		"criminal-activity-support-prevention"

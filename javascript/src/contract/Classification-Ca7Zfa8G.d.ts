@@ -1,4 +1,4 @@
-import "./ModerationPolicyDimensions-CGuT-QNm.js";
+import "./ModerationPolicyDimensions-BgVixz6W.js";
 import * as zod from "zod";
 //#region packages/shared/src/PolicyRule.d.ts
 declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
@@ -41,6 +41,7 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "criminal-activity-preparation": "criminal-activity-preparation";
   "criminal-activity-promotion": "criminal-activity-promotion";
   "criminal-activity-request": "criminal-activity-request";
+  "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
   "criminal-activity-substances": "criminal-activity-substances";
   "criminal-activity-support-prevention": "criminal-activity-support-prevention";
   "harassment-abuse": "harassment-abuse";
@@ -130,6 +131,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "criminal-activity-preparation": "criminal-activity-preparation";
     "criminal-activity-promotion": "criminal-activity-promotion";
     "criminal-activity-request": "criminal-activity-request";
+    "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
     "criminal-activity-substances": "criminal-activity-substances";
     "criminal-activity-support-prevention": "criminal-activity-support-prevention";
     "harassment-abuse": "harassment-abuse";
@@ -218,6 +220,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "criminal-activity-preparation": "criminal-activity-preparation";
     "criminal-activity-promotion": "criminal-activity-promotion";
     "criminal-activity-request": "criminal-activity-request";
+    "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
     "criminal-activity-substances": "criminal-activity-substances";
     "criminal-activity-support-prevention": "criminal-activity-support-prevention";
     "harassment-abuse": "harassment-abuse";
@@ -302,6 +305,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "criminal-activity-preparation": "criminal-activity-preparation";
     "criminal-activity-promotion": "criminal-activity-promotion";
     "criminal-activity-request": "criminal-activity-request";
+    "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
     "criminal-activity-substances": "criminal-activity-substances";
     "criminal-activity-support-prevention": "criminal-activity-support-prevention";
     "harassment-abuse": "harassment-abuse";
@@ -393,6 +397,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -481,6 +486,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -565,6 +571,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -654,6 +661,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -742,6 +750,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -826,6 +835,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -915,6 +925,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1003,6 +1014,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1087,6 +1099,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1176,6 +1189,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1264,6 +1278,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1348,6 +1363,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1437,6 +1453,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1525,6 +1542,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1609,6 +1627,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1698,6 +1717,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1786,6 +1806,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
@@ -1870,6 +1891,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "criminal-activity-preparation": "criminal-activity-preparation";
       "criminal-activity-promotion": "criminal-activity-promotion";
       "criminal-activity-request": "criminal-activity-request";
+      "criminal-activity-sexual-solicitation": "criminal-activity-sexual-solicitation";
       "criminal-activity-substances": "criminal-activity-substances";
       "criminal-activity-support-prevention": "criminal-activity-support-prevention";
       "harassment-abuse": "harassment-abuse";
