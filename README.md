@@ -9,9 +9,10 @@ Official SDKs for [CalmLens](https://calmlens.com): content moderation, storage 
 | Ruby | [ruby](ruby) | `gem install calmlens` |
 | Rust | [rust](rust) | `cargo add calmlens` |
 | Java | [java](java) | `com.calmlens:calmlens-sdk` |
+| PHP | [php](php) | Composer path package (pre-release; see PHP README) |
 | Go | [go](go) | `go get github.com/CalmLens/sdks/go` |
 
-All six SDKs are published. See the [SDK documentation](https://calmlens.com/docs/sdk) for usage and API coverage.
+The six existing SDKs are published; PHP is available from this checkout pending registry setup. See the [SDK documentation](https://calmlens.com/docs/sdk) for usage and API coverage.
 
 ## Examples
 
@@ -21,6 +22,7 @@ All six SDKs are published. See the [SDK documentation](https://calmlens.com/doc
 | [Calmform: static feedback form](examples/feedback-form-static) | JavaScript |
 | [Calmsnap: mobile photo uploads](examples/mobile-uploads-expo) | TypeScript / Expo |
 | [Link board](examples/link-board-python) | Python |
+| [Comment board](examples/comment-board-laravel) | PHP / Laravel |
 | [Comment thread](examples/comment-thread-ruby) | Ruby |
 | [Media library](examples/media-library-rust) | Rust |
 | [Marketplace listings](examples/marketplace-listing-java) | Java |
