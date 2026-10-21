@@ -10,9 +10,9 @@ use crate::messages::Failure;
 use calmlens::models::Content;
 use calmlens::models::{
     Asset, AssetId, AssetPage, AssetReviewerAction, AssetSearchResponse, CreateFolder, Folder,
-    FolderId, ImageTransformOptions, LensDefinition, ListAssets, MetadataItem, MoveAsset,
-    MoveFolder, Patch, ProcessingOptions, SearchAssets, SignedUrlOptions, SubmitAsset, Transform,
-    UpdateAsset, UpdateFolder, Visibility,
+    FolderId, ImageTransformOptions, LensDefinition, ListAssets, ListFolders, MetadataItem,
+    MoveAsset, MoveFolder, Patch, ProcessingOptions, SearchAssets, SignedUrlOptions, SubmitAsset,
+    Transform, UpdateAsset, UpdateFolder, Visibility,
 };
 use calmlens::{Bytes, ServerClient};
 use std::sync::{Arc, Mutex};
@@ -104,7 +104,30 @@ impl Library {
 
     pub async fn folders(&self) -> Result<Vec<Folder>, Failure> {
         match self {
-            Library::Live(client) => Ok(client.folders().list().await?),
+            Library::Live(client) => {
+                // Folders are listed one parent at a time; walk the tree to collect them all.
+                let mut folders = Vec::new();
+                let mut parents = vec![None];
+                while let Some(parent_id) = parents.pop() {
+                    for page_index in 0.. {
+                        let page = client
+                            .folders()
+                            .list(ListFolders {
+                                parent_id: parent_id.clone(),
+                                page_index: Some(page_index),
+                                page_size: Some(100),
+                                ..Default::default()
+                            })
+                            .await?;
+                        parents.extend(page.folders.iter().map(|folder| Some(folder.id.clone())));
+                        folders.extend(page.folders);
+                        if !page.has_more {
+                            break;
+                        }
+                    }
+                }
+                Ok(folders)
+            }
             Library::Demo(store) => Ok(Self::with_store(store, |store| store.folders())),
         }
     }

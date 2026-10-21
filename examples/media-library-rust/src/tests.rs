@@ -566,7 +566,12 @@ async fn live_listing_paginates_and_filters_the_folder() {
     let app = live(&mock, "");
     mock.enqueue(
         200,
-        json!({"folders": [{"id": "folder-1", "name": "Photos"}]}),
+        json!({"folders": [{"id": "folder-1", "name": "Photos"}], "ancestors": [], "hasMore": false}),
+    );
+    // The folder tree is walked, so Photos is asked for its children too.
+    mock.enqueue(
+        200,
+        json!({"folders": [], "ancestors": [], "hasMore": false}),
     );
     mock.enqueue(
         200,
@@ -577,7 +582,7 @@ async fn live_listing_paginates_and_filters_the_folder() {
         .get("/?folder=folder-1&cursor=previous-token&status=approved")
         .await;
     assert_eq!(response.status, StatusCode::OK);
-    let list = &mock.requests()[1];
+    let list = &mock.requests()[2];
     assert_eq!(list.path, "/v1/projects/project-1/assets/page");
     assert_eq!(list.query_param("folderId"), Some("folder-1"));
     assert_eq!(list.query_param("cursor"), Some("previous-token"));
@@ -606,7 +611,10 @@ async fn listing_filters_only_accept_known_statuses() {
     );
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    mock.enqueue(200, json!({"folders": []}));
+    mock.enqueue(
+        200,
+        json!({"folders": [], "ancestors": [], "hasMore": false}),
+    );
     mock.enqueue(200, json!({"items": [], "total": 0}));
     app.get("/?status=approved,status==rejected").await;
     assert_eq!(
@@ -619,7 +627,10 @@ async fn listing_filters_only_accept_known_statuses() {
 async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_status() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    mock.enqueue(200, json!({"folders": []}));
+    mock.enqueue(
+        200,
+        json!({"folders": [], "ancestors": [], "hasMore": false}),
+    );
     mock.enqueue(
         200,
         json!({"query": "cyclists at sunrise", "semanticStatus": "indexing", "items": [
@@ -640,7 +651,10 @@ async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_statu
     assert!(page.contains(r#"src="/assets/asset-7/thumb""#));
 
     // An unknown mode falls back to hybrid.
-    mock.enqueue(200, json!({"folders": []}));
+    mock.enqueue(
+        200,
+        json!({"folders": [], "ancestors": [], "hasMore": false}),
+    );
     mock.enqueue(
         200,
         json!({"query": "x", "semanticStatus": "ready", "items": []}),
@@ -1333,7 +1347,10 @@ async fn escapes_library_text() {
 async fn library_load_failure_shows_nothing() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    mock.enqueue(200, json!({"folders": []}));
+    mock.enqueue(
+        200,
+        json!({"folders": [], "ancestors": [], "hasMore": false}),
+    );
     mock.enqueue_timeout();
     let response = app.get("/").await;
     assert_eq!(response.status, StatusCode::BAD_GATEWAY);

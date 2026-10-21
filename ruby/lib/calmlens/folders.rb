@@ -7,9 +7,10 @@ module CalmLens
     def list(options = {})
       call(options) do |api, request|
         response = request('GET', project('folders'), query: api, request_options: request)
-        unless response.is_a?(Hash) && response['folders'].is_a?(Array) && response['ancestors'].is_a?(Array) && [true, false].include?(response['hasMore'])
-          raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid folder page')
-        end
+        valid = response.is_a?(Hash) && response['folders'].is_a?(Array) && response['ancestors'].is_a?(Array) &&
+                [true, false].include?(response['hasMore'])
+        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid folder page') unless valid
+
         response
       end
     end

@@ -156,8 +156,12 @@ module CalmLens
       end
 
       def project_assets = @state.assets.values.select { |item| item['projectId'] == @project_id }
+
       def folder_page(query)
-        found = project_folders.select { |f| ((query['searchAll'] && query['search']) || f['parentId'] == query['parentId']) && (!query['search'] || f['name'].downcase.include?(query['search'].downcase)) }
+        found = project_folders.select do |f|
+          in_scope = (query['searchAll'] && query['search']) || f['parentId'] == query['parentId']
+          in_scope && (!query['search'] || f['name'].downcase.include?(query['search'].downcase))
+        end
         found.sort_by! { |f| [query['sort'] == 'createdAt' ? f['createdAt'] : f['name'], f['id']] }
         found.reverse! if query['direction'] == 'DESC'
         size = query.fetch('pageSize', 100)
@@ -172,7 +176,9 @@ module CalmLens
             queue << parent
           end
         end
-        { 'folders' => page, 'ancestors' => project_folders.select { |f| ids.include?(f['id']) && !page.include?(f) }, 'hasMore' => !query['resolveOnly'] && found.length > start + size }
+        { 'folders' => page, 'ancestors' => project_folders.select do |f|
+          ids.include?(f['id']) && !page.include?(f)
+        end, 'hasMore' => !query['resolveOnly'] && found.length > start + size }
       end
 
       def project_folders = @state.folders.values.select { |item| item['projectId'] == @project_id }

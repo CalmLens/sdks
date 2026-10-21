@@ -448,7 +448,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 if query.get("parentId"): ids.add(query["parentId"])
                 queue = list(ids)
                 while queue:
-                    parent = folders.get(queue.pop(), {}).get("parentId")
+                    node = folders.get(queue.pop())
+                    parent = node.get("parentId") if node else None
                     if parent and parent not in ids: ids.add(parent); queue.append(parent)
                 return {"folders": page, "ancestors": [f for f in all_folders if f["id"] in ids and f not in page], "hasMore": not query.get("resolveOnly", False) and len(found) > start + size}
             if body.get("parentId"):
