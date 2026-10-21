@@ -1393,9 +1393,6 @@ pub struct AssetModeration {
     /// reviewer decides.
     #[serde(default)]
     pub action: Option<AssetModerationAction>,
-    /// Why automated moderation rejected the asset.
-    #[serde(default)]
-    pub note: Option<String>,
     /// A reviewer's decision, or `None` when no reviewer has decided.
     #[serde(default)]
     pub reviewer_action: Option<AssetReviewerAction>,

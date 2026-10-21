@@ -100,8 +100,6 @@ module CalmLens
   type asset_moderation = {
     "status" => asset_moderation_status,
     "action" => asset_moderation_action?,
-    # Why automated moderation rejected the asset.
-    "note" => String?,
     "reviewerAction" => asset_reviewer_action?,
     "reviewerNote" => String?,
     "reviewerUserId" => String?,

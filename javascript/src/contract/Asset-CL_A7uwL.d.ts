@@ -148,7 +148,6 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
     hide: "hide";
     purge: "purge";
   }>>;
-  note: zod.ZodNullable<zod.ZodString>;
   reviewerAction: zod.ZodNullable<zod.ZodEnum<{
     approved: "approved";
     rejected: "rejected";
@@ -3713,7 +3712,6 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       hide: "hide";
       purge: "purge";
     }>>;
-    note: zod.ZodNullable<zod.ZodString>;
     reviewerAction: zod.ZodNullable<zod.ZodEnum<{
       approved: "approved";
       rejected: "rejected";

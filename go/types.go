@@ -145,8 +145,6 @@ type AssetModeration struct {
 	// ModerationActionHide or ModerationActionPurge), or nil when nothing was flagged. It is
 	// kept after a reviewer decides.
 	Action *string `json:"action"`
-	// Note is why automated moderation rejected the asset.
-	Note *string `json:"note"`
 	// ReviewerAction is a reviewer's decision (a ReviewerAction constant), or nil when no
 	// reviewer has decided.
 	ReviewerAction *string `json:"reviewerAction"`

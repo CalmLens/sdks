@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-Dhh-1H6c.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-BfJcm_Af.js";
 import "./SharedConstants-Dn7ZJF5S.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-B5dqc8aj.js";
@@ -308,7 +308,6 @@ const STORED_ASSET_SCHEMA = zod.object({
 	processingUpdatedAt: zod.number().nullish(),
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
 	moderationAction: ASSET_MODERATION_ACTION_SCHEMA.nullish(),
-	moderationNote: saneStringField({ type: "large" }).nullish(),
 	reviewerAction: ASSET_REVIEWER_ACTION_SCHEMA.nullish(),
 	reviewerNote: saneStringField({ type: "large" }).nullish(),
 	reviewerUserId: saneStringField().nullish(),
@@ -341,7 +340,6 @@ const ASSET_PROCESSING_SCHEMA = zod.object({
 const ASSET_MODERATION_SCHEMA = zod.object({
 	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force: `pending` until moderation finishes, then `approved` or `rejected`. A reviewer's decision takes precedence over the automated one."),
 	action: ASSET_MODERATION_ACTION_SCHEMA.nullable().describe("What your policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged. Kept after a reviewer decides."),
-	note: zod.string().nullable().describe("Why automated moderation rejected the asset, or `null`"),
 	reviewerAction: ASSET_REVIEWER_ACTION_SCHEMA.nullable().describe("A reviewer's decision (`approved` or `rejected`), or `null` when no reviewer has decided"),
 	reviewerNote: zod.string().nullable().describe("The reviewer's note, or `null`"),
 	reviewerUserId: zod.string().nullable().describe("ID of the user who reviewed the asset, or `null`"),
@@ -409,7 +407,6 @@ STORED_ASSET_SCHEMA.pick({
 		moderation: {
 			status: "approved",
 			action: null,
-			note: null,
 			reviewerAction: null,
 			reviewerNote: null,
 			reviewerUserId: null,

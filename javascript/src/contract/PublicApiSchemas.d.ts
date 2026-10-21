@@ -1,13 +1,51 @@
-import "./Asset-C3kg2IbZ.js";
+import "./Asset-CL_A7uwL.js";
 import "./AssetPayload-CqMF2R4w.js";
 import "./Folder-DPmIHVJj.js";
 import "./EventCatalog-s-bZ7p6b.js";
 import "./Page-Bpd8G-D0.js";
-import { r as TypedEvent } from "./Event-BkZ8SOmF.js";
+import { r as TypedEvent } from "./Event-CgbG2Sau.js";
 import "./Lens-yZlVGaQR.js";
 import "./PublicErrorCodes-Cp74INbA.js";
 import * as zod from "zod";
 //#region packages/shared/src/PublicApiSchemas.d.ts
+declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
+  parentId: zod.ZodOptional<zod.ZodString>;
+  pageSize: zod.ZodDefault<zod.ZodCoercedNumber<unknown>>;
+  sort: zod.ZodDefault<zod.ZodEnum<{
+    createdAt: "createdAt";
+    name: "name";
+  }>>;
+  direction: zod.ZodDefault<zod.ZodEnum<{
+    ASC: "ASC";
+    DESC: "DESC";
+  }>>;
+  pageIndex: zod.ZodDefault<zod.ZodCoercedNumber<unknown>>;
+  search: zod.ZodOptional<zod.ZodString>;
+  searchAll: zod.ZodPreprocess<zod.ZodOptional<zod.ZodCoercedBoolean<unknown>>, unknown>;
+  ids: zod.ZodDefault<zod.ZodArray<zod.ZodString>>;
+  resolveOnly: zod.ZodPreprocess<zod.ZodOptional<zod.ZodCoercedBoolean<unknown>>, unknown>;
+}, zod.core.$strip>;
+type GetFoldersQuery = Partial<zod.infer<typeof GET_FOLDERS_QUERY_SCHEMA>>;
+declare const GET_FOLDERS_RESPONSE_SCHEMA: zod.ZodObject<{
+  folders: zod.ZodArray<zod.ZodObject<{
+    id: zod.ZodString;
+    projectId: zod.ZodString;
+    parentId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    name: zod.ZodString;
+    createdAt: zod.ZodNumber;
+    updatedAt: zod.ZodOptional<zod.ZodNumber>;
+  }, zod.core.$strip>>;
+  ancestors: zod.ZodArray<zod.ZodObject<{
+    id: zod.ZodString;
+    projectId: zod.ZodString;
+    parentId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    name: zod.ZodString;
+    createdAt: zod.ZodNumber;
+    updatedAt: zod.ZodOptional<zod.ZodNumber>;
+  }, zod.core.$strip>>;
+  hasMore: zod.ZodBoolean;
+}, zod.core.$strip>;
+type GetFoldersResponse = zod.infer<typeof GET_FOLDERS_RESPONSE_SCHEMA>;
 declare const POST_FOLDER_BODY_SCHEMA: zod.ZodObject<{
   name: zod.ZodString;
   parentId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -81,4 +119,4 @@ type GetEventsResponse = {
   hasMore: boolean;
 };
 //#endregion
-export type { GetAssetChildrenQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, PatchAssetBody, PatchFolderBody, PostAssetSignedUrlResponse, PostFolderBody };
+export type { GetAssetChildrenQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, PatchAssetBody, PatchFolderBody, PostAssetSignedUrlResponse, PostFolderBody };

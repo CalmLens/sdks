@@ -496,7 +496,7 @@ module CalmLens
         {
           'processing' => { 'status' => open ? 'uploading' : 'processing', 'updatedAt' => now,
                             'uploadPartsReceived' => open ? 1 : nil },
-          'moderation' => { 'status' => 'pending', 'action' => nil, 'note' => nil, 'reviewerAction' => nil,
+          'moderation' => { 'status' => 'pending', 'action' => nil, 'reviewerAction' => nil,
                             'reviewerNote' => nil, 'reviewerUserId' => nil, 'reviewedAt' => nil, 'decidedAt' => nil,
                             'report' => nil },
           'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,

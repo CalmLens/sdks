@@ -974,7 +974,6 @@ export class MockCalmLensServerClient {
       moderation: {
         status: "pending",
         action: null,
-        note: null,
         reviewerAction: null,
         reviewerNote: null,
         reviewerUserId: null,

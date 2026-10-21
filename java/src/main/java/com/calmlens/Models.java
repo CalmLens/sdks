@@ -1354,7 +1354,6 @@ public final class Models {
    * @param status the decision in force; a reviewer's decision takes precedence over the automated one
    * @param action what the policy did with flagged content: {@code alert}, {@code hide} or {@code
    *     purge}; null when nothing was flagged. Kept after a reviewer decides
-   * @param note why automated moderation rejected the asset
    * @param reviewerAction a reviewer's decision, {@code approved} or {@code rejected}; null when no
    *     reviewer has decided
    * @param reviewerNote the reviewer's note
@@ -1363,7 +1362,7 @@ public final class Models {
    * @param decidedAt when the decision in force was made
    * @param report classification report; null until classification produced one
    */
-  public record AssetModeration(AssetModerationStatus status, String action, String note,
+  public record AssetModeration(AssetModerationStatus status, String action,
       String reviewerAction, String reviewerNote, String reviewerUserId,
       @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt,
       @JsonAdapter(Json.EpochMillis.class) Instant decidedAt,

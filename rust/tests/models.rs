@@ -25,7 +25,6 @@ fn asset_nested_fields_decode_into_typed_models() {
         "moderation": {
         "status": "rejected",
         "action": "hide",
-        "note": null,
         "reviewerAction": "rejected",
         "reviewerNote": "confirmed",
         "reviewerUserId": "user-9",
@@ -77,7 +76,6 @@ fn asset_nested_fields_decode_into_typed_models() {
         (
             &moderation.status,
             &moderation.action,
-            moderation.note.as_deref(),
             &moderation.reviewer_action,
             moderation.reviewer_note.as_deref(),
             moderation.reviewer_user_id.as_deref(),
@@ -87,7 +85,6 @@ fn asset_nested_fields_decode_into_typed_models() {
         (
             &AssetModerationStatus::Rejected,
             &Some(AssetModerationAction::Hide),
-            None,
             &Some(AssetReviewerAction::Rejected),
             Some("confirmed"),
             Some("user-9"),

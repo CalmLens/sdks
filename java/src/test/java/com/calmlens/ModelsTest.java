@@ -13,7 +13,7 @@ class ModelsTest {
     Models.Asset asset = Json.GSON.fromJson("""
         {"id": "asset-1", "uploadPresetId": "preset-1",
          "processing": {"status": "done", "updatedAt": 1700000000100, "uploadPartsReceived": 3},
-         "moderation": {"status": "approved", "action": "hide", "note": null, "reviewerAction": "approved",
+         "moderation": {"status": "approved", "action": "hide", "reviewerAction": "approved",
            "reviewerNote": "fine", "reviewerUserId": "user-2", "reviewedAt": 1700000000200, "decidedAt": 1700000000300,
            "report": {"score": 0.7, "categories": {"harassment": {"status": "evaluated", "score": 0.7}}}},
          "content": {"status": "removed", "removalReason": "retention", "updatedAt": 1700000000400,
@@ -28,7 +28,6 @@ class ModelsTest {
     Models.AssetModeration moderation = asset.moderation();
     assertSame(Models.AssetModerationStatus.APPROVED, moderation.status());
     assertEquals("hide", moderation.action());
-    assertNull(moderation.note());
     assertEquals("approved", moderation.reviewerAction());
     assertEquals("fine", moderation.reviewerNote());
     assertEquals("user-2", moderation.reviewerUserId());

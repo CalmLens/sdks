@@ -494,8 +494,6 @@ class AssetModeration(TypedDict):
     (``None`` when nothing was flagged) and is kept after a reviewer decides."""
     status: AssetModerationStatus
     action: Optional[AssetModerationAction]
-    #: Why automated moderation rejected the asset.
-    note: Optional[str]
     reviewerAction: Optional[AssetReviewerAction]
     reviewerNote: Optional[str]
     reviewerUserId: Optional[str]

@@ -98,7 +98,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         hide: "hide";
         purge: "purge";
       }>>;
-      note: zod.ZodNullable<zod.ZodString>;
       reviewerAction: zod.ZodNullable<zod.ZodEnum<{
         approved: "approved";
         rejected: "rejected";

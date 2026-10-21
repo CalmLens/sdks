@@ -18,7 +18,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 			"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},
 			"extractedText":{"type":"document","id":"doc-1"}},
 		"processingOptions":{"keepContentAfterProcessing":true,"flaggedContentPolicy":{"action":"hide"},"features":{"ocr":{"enabled":true},"faceDetection":{"enabled":true,"ageEstimation":false}}},
-		"moderation":{"status":"approved","action":"purge","note":"Nudity","reviewerAction":"approved","reviewerNote":"Fine","reviewerUserId":"user-1","reviewedAt":1760000000700,"decidedAt":1760000000700,
+		"moderation":{"status":"approved","action":"purge","reviewerAction":"approved","reviewerNote":"Fine","reviewerUserId":"user-1","reviewedAt":1760000000700,"decidedAt":1760000000700,
 		"report":{"score":0.9,"categories":{
 			"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{
 				"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},
@@ -31,7 +31,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if p := a.Processing; p.Status != ProcessingStatusDone || *p.UpdatedAt != 1760000000500 || *p.UploadPartsReceived != 3 {
 		t.Fatalf("processing: %+v", p)
 	}
-	if m := a.Moderation; m.Status != ModerationStatusApproved || *m.Action != ModerationActionPurge || *m.Note != "Nudity" || *m.ReviewerAction != ReviewerActionApproved ||
+	if m := a.Moderation; m.Status != ModerationStatusApproved || *m.Action != ModerationActionPurge || *m.ReviewerAction != ReviewerActionApproved ||
 		*m.ReviewerNote != "Fine" || *m.ReviewerUserID != "user-1" || *m.ReviewedAt != 1760000000700 || *m.DecidedAt != 1760000000700 {
 		t.Fatalf("moderation: %+v", m)
 	}
