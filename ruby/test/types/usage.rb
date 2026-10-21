@@ -29,7 +29,8 @@ first = client.assets.classify(name: 'big.png', part: { type: 'image/png', base6
 client.assets.upload_part(asset_id: first['id'], part: { part_number: 2, data: 'bytes', is_final: true }, queue: true)
 client.assets.classify(name: 'page', url: 'https://example.com')
 
-page = client.assets.list(page_size: 20, filter: 'classification.moderation.decision==approved', ordering: [{ field: 'createdAt', direction: 'DESC' }])
+page = client.assets.list(page_size: 20, filter: 'classification.moderation.decision==approved',
+                          ordering: [{ field: 'createdAt', direction: 'DESC' }])
 names = page['items'].map { |item| item['name'] }
 more = page['hasMore']
 client.assets.each(filter: 'classification.moderation.decision==rejected') { |item| item['id'] }

@@ -36,11 +36,13 @@ class MockTest < Minitest::Test
     asset = mock.assets.classify(name: 'note.txt', content: { data: StringIO.new('hello'), type: 'text/plain' },
                                  processing_options: KEEP)
     assert_equal ['completed', 'approved', 7, 'stored', 'text/plain', 5],
-                 [asset.dig('classification', 'status'), asset.dig('classification', 'moderation', 'decision'), asset.dig('classification', 'completedAt'),
+                 [asset.dig('classification', 'status'), asset.dig('classification', 'moderation', 'decision'),
+                  asset.dig('classification', 'completedAt'),
                   asset.dig('content', 'status'), asset.dig('content', 'format'), asset.dig('content', 'sizeInBytes')]
     queued = mock.assets.create(name: 'later.txt', content: { plain_text: 'x', type: 'text/plain' })
     assert_equal %w[processing pending temporary],
-                 [queued.dig('classification', 'status'), queued.dig('classification', 'moderation', 'decision'), queued.dig('content', 'status')]
+                 [queued.dig('classification', 'status'), queued.dig('classification', 'moderation', 'decision'),
+                  queued.dig('content', 'status')]
     assert_equal asset, mock.assets.retrieve(asset_id: asset['id'])
     served = mock.cdn.serve(asset_identifier: asset['id'])
     assert_equal [200, 'hello', 'text/plain', '5'], [served.status, served.body, served.content_type, served.headers['content-length']]
@@ -66,7 +68,8 @@ class MockTest < Minitest::Test
   end
 
   def test_rejected_hidden_assets_are_not_served
-    mock = CalmLens::MockServerClient.new(analyzed_outcome: { 'classification' => { 'moderation' => { 'decision' => 'rejected', 'action' => 'hide' } } })
+    mock = CalmLens::MockServerClient.new(analyzed_outcome: { 'classification' => { 'moderation' => { 'decision' => 'rejected',
+                                                                                                      'action' => 'hide' } } })
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
     assert_equal({ 'decision' => 'rejected', 'action' => 'hide' }, asset['classification']['moderation'].slice('decision', 'action'))
     assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
@@ -76,7 +79,8 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new(analyzed_outcome: 'failed')
     failed = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' })
     assert_equal %w[failed pending temporary],
-                 [failed.dig('classification', 'status'), failed.dig('classification', 'moderation', 'decision'), failed.dig('content', 'status')]
+                 [failed.dig('classification', 'status'), failed.dig('classification', 'moderation', 'decision'),
+                  failed.dig('content', 'status')]
     retried = mock.assets.retry(asset_id: failed['id'])
     assert_equal %w[processing pending], [retried.dig('classification', 'status'), retried.dig('classification', 'moderation', 'decision')]
     assert_equal CalmLens::ErrorCodes::ASSET_NOT_RETRYABLE,
@@ -112,7 +116,9 @@ class MockTest < Minitest::Test
     assert_equal([['GET', "/assets/#{asset['id']}"]] * 2, mock.requests.drop(before).map { |request| [request.method, request.path] })
 
     other = mock.assets.create(name: 'other.txt', content: { plain_text: 'x', type: 'text/plain' })
-    mock.assets.define_singleton_method(:sleep) { |_| mock.state.assets[other['id']]['classification']['moderation']['decision'] = 'approved' }
+    mock.assets.define_singleton_method(:sleep) do |_|
+      mock.state.assets[other['id']]['classification']['moderation']['decision'] = 'approved'
+    end
     before = mock.requests.size
     decided = mock.assets.wait_for_decision(asset_id: other['id'])
     assert_equal [other['id'], 'approved'], [decided['id'], decided.dig('classification', 'moderation', 'decision')]
@@ -144,10 +150,12 @@ class MockTest < Minitest::Test
     })
     %w[good-b bad-a good-a good-c].each { |name| mock.assets.classify(name: name, content: { plain_text: name, type: 'text/plain' }) }
 
-    page = mock.assets.list(filter: 'classification.moderation.decision==approved', ordering: [{ field: 'createdAt', direction: 'ASC' }], page_size: 2)
+    page = mock.assets.list(filter: 'classification.moderation.decision==approved', ordering: [{ field: 'createdAt', direction: 'ASC' }],
+                            page_size: 2)
     assert_equal [%w[good-b good-a], true], [page['items'].map { |asset| asset['name'] }, page['hasMore']]
     assert_equal(%w[good-c good-a bad-a good-b], mock.assets.each.map { |asset| asset['name'] })
-    either = mock.assets.list(filter: 'classification.moderation.decision==rejected,name==good-c', ordering: [{ field: 'createdAt', direction: 'ASC' }])
+    either = mock.assets.list(filter: 'classification.moderation.decision==rejected,name==good-c',
+                              ordering: [{ field: 'createdAt', direction: 'ASC' }])
     assert_equal(%w[bad-a good-c], either['items'].map { |asset| asset['name'] })
     ascending = mock.assets.each(filter: 'name==good-*;classification.moderation.decision!=rejected', page_size: 1,
                                  ordering: [{ field: 'createdAt', direction: 'ASC' }])
@@ -185,7 +193,8 @@ class MockTest < Minitest::Test
     assert_equal ['uploading', 1], [asset.dig('upload', 'status'), asset.dig('upload', 'partsReceived')]
     done = mock.assets.upload_part(asset_id: asset['id'], part: { data: 'end', part_number: 2, is_final: true })
     assert_equal ['processing', 'pending', 2, first.bytesize + 3],
-                 [done.dig('classification', 'status'), done.dig('classification', 'moderation', 'decision'), done.dig('upload', 'partsReceived'),
+                 [done.dig('classification', 'status'), done.dig('classification', 'moderation', 'decision'),
+                  done.dig('upload', 'partsReceived'),
                   done.dig('content', 'sizeInBytes')]
     refute mock.requests.last.query.key?('queue')
     assert_equal 'upload/not-open', assert_raises(CalmLens::ConflictError) {

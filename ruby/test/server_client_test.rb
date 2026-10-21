@@ -164,34 +164,45 @@ class ServerClientTest < Minitest::Test
   end
 
   def test_unknown_response_values_are_returned_unchanged
-    client, = scripted([200, '{"id": "a", "visibility": "team", "newField": {"x": 1}, "classification": {"moderation": {"decision": "quarantined"}}}'])
-    assert_equal({ 'id' => 'a', 'classification' => { 'moderation' => { 'decision' => 'quarantined' } }, 'visibility' => 'team', 'newField' => { 'x' => 1 } },
+    client, = scripted([200,
+                        '{"id": "a", "visibility": "team", "newField": {"x": 1}, ' \
+                        '"classification": {"moderation": {"decision": "quarantined"}}}'])
+    assert_equal({ 'id' => 'a', 'classification' => { 'moderation' => { 'decision' => 'quarantined' } },
+                   'visibility' => 'team', 'newField' => { 'x' => 1 } },
                  client.assets.retrieve(asset_id: 'a'))
   end
 
   def test_wait_for_decision_checks_until_decided_backing_off_up_to_five_seconds
     asset = lambda { |processing, moderation|
-      [200, %({"id": "asset-1", "upload": {"status": "completed"}, "classification": {"status": "#{processing}", "moderation": {"decision": "#{moderation}"}}})]
+      [200,
+       '{"id": "asset-1", "upload": {"status": "completed"}, ' \
+       "\"classification\": {\"status\": \"#{processing}\", \"moderation\": {\"decision\": \"#{moderation}\"}}}"]
     }
     client, sent = scripted(*Array.new(8) { asset.call('processing', 'pending') }, asset.call('completed', 'rejected'))
     delays = []
     client.assets.define_singleton_method(:sleep) { |seconds| delays << seconds }
-    assert_equal({ 'id' => 'asset-1', 'upload' => { 'status' => 'completed' }, 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'rejected' } } },
+    assert_equal({ 'id' => 'asset-1', 'upload' => { 'status' => 'completed' },
+                   'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'rejected' } } },
                  client.assets.wait_for_decision(asset_id: 'asset-1'))
     assert_equal(['/v1/assets/asset-1'] * 9, sent.map { |request| URI(request.url).path })
     assert_equal [0.5, 0.75, 1.125, 1.6875, 2.53125, 3.796875, 5.0, 5.0], delays
   end
 
   def test_wait_for_decision_returns_failed_processing_without_a_decision
-    client, sent = scripted([200, '{"id": "asset-1", "upload": {"status": "completed"}, "classification": {"status": "failed", "moderation": {"decision": "pending"}}}'])
+    client, sent = scripted([200,
+                             '{"id": "asset-1", "upload": {"status": "completed"}, ' \
+                             '"classification": {"status": "failed", "moderation": {"decision": "pending"}}}'])
     client.assets.define_singleton_method(:sleep) { |_| flunk 'waited after processing failed' }
     assert_equal 'failed', client.assets.wait_for_decision(asset_id: 'asset-1').dig('classification', 'status')
     assert_equal 1, sent.size
   end
 
   def test_wait_for_decision_raises_sdk_timeout_with_the_last_status_without_waiting_past_the_deadline
-    client, sent = scripted([200, '{"id": "asset-1", "upload": {"status": "uploading"}, "classification": {"status": "pending", "moderation": {"decision": "pending"}}}'],
-                            [200, '{"id": "asset-1", "upload": {"status": "completed"}, "classification": {"status": "processing", "moderation": {"decision": "pending"}}}'])
+    client, sent = scripted([200, '{"id": "asset-1", "upload": {"status": "uploading"}, ' \
+                                  '"classification": {"status": "pending", "moderation": {"decision": "pending"}}}'],
+                            [200,
+                             '{"id": "asset-1", "upload": {"status": "completed"}, ' \
+                             '"classification": {"status": "processing", "moderation": {"decision": "pending"}}}'])
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     error = assert_raises(CalmLens::TimeoutError) { client.assets.wait_for_decision(asset_id: 'asset-1', timeout: 0.2) }
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 0.45
