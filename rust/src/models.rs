@@ -360,6 +360,8 @@ string_enum! {
         SelfHarmMethods = "self-harm-methods",
         /// Self harm: encouragement.
         SelfHarmEncouragement = "self-harm-encouragement",
+        /// Self: historical.
+        SelfHarmHistorical = "self-harm-historical",
         /// Self harm: documentary.
         SelfHarmDocumentary = "self-harm-documentary",
         /// Self harm: educational.
@@ -378,6 +380,12 @@ string_enum! {
         HarassmentSexual = "harassment-sexual",
         /// Harassment: encouragement.
         HarassmentEncouragement = "harassment-encouragement",
+        /// Harassment: historical.
+        HarassmentHistorical = "harassment-historical",
+        /// Harassment: documentary.
+        HarassmentDocumentary = "harassment-documentary",
+        /// Harassment: educational.
+        HarassmentEducational = "harassment-educational",
         /// Harassment: fictional.
         HarassmentFictional = "harassment-fictional",
         /// Harassment: awareness, support or prevention.
@@ -394,6 +402,10 @@ string_enum! {
         HateThreat = "hate-threat",
         /// Hate: historical.
         HateHistorical = "hate-historical",
+        /// Hate: documentary.
+        HateDocumentary = "hate-documentary",
+        /// Hate: educational.
+        HateEducational = "hate-educational",
         /// Hate: fictional.
         HateFictional = "hate-fictional",
         /// Hate: awareness, support or prevention.
@@ -412,8 +424,16 @@ string_enum! {
         CriminalActivitySubstances = "criminal-activity-substances",
         /// Criminal activity: fraud and scams.
         CriminalActivityFraud = "criminal-activity-fraud",
+        /// Criminal: solicitation.
+        CriminalActivitySexualSolicitation = "criminal-activity-sexual-solicitation",
         /// Criminal activity: graffiti.
         CriminalActivityGraffiti = "criminal-activity-graffiti",
+        /// Criminal: historical.
+        CriminalActivityHistorical = "criminal-activity-historical",
+        /// Criminal: documentary.
+        CriminalActivityDocumentary = "criminal-activity-documentary",
+        /// Criminal: educational.
+        CriminalActivityEducational = "criminal-activity-educational",
         /// Criminal activity: fictional.
         CriminalActivityFictional = "criminal-activity-fictional",
         /// Criminal activity: harm reduction, recovery or prevention.
