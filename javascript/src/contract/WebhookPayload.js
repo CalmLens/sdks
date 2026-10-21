@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-Drt5T91s.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-BfX2WJpN.js";
 import "./SharedConstants-CdFPZV7z.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -65,6 +65,7 @@ const getPolicyRuleConflict = (kind, rule, categoryAction) => {
 const policyRuleKey = (rule) => [...rule.when].sort().join("+");
 const uniqueRules = (rules) => new Set(rules.map(policyRuleKey)).size === rules.length;
 const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
+	enabled: zod.boolean().optional().meta({ description: "Whether this category can affect policy decisions. Disabled categories retain their configured actions and rules." }),
 	threshold: zod.number().min(0).max(1).transform((threshold) => Math.max(threshold, MINIMUM_MODERATION_THRESHOLD)).meta({ description: "The policy score at which the category's action applies. The policy score is the category score, lowered by allowances that cover the content and raised to a restriction's presence score." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(10).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(10).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Forms that are acted on as soon as any of their qualifiers is present. They outweigh allowances." }),
@@ -193,6 +194,8 @@ const ASSET_REVIEW_SCHEMA = zod.object({
 	action: ASSET_REVIEW_ACTION_SCHEMA,
 	note: zod.string().nullable(),
 	reviewerUserId: zod.string().nullable(),
+	reviewerName: zod.string().nullish(),
+	reviewerEmail: zod.string().nullish(),
 	reviewedAt: zod.number(),
 	appliedToAsset: zod.boolean()
 });

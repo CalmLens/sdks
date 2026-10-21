@@ -190,7 +190,7 @@ real harmful content.
 Every test input contains an authentication tag generated with your project's secret **test input key**, available under **Assets → Try it → Test inputs** in the portal. Tags are specific to the category and content type and do not disclose the key. A valid sample can still be reused in the same project while test inputs are enabled. Demo mode uses the public key `1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d`.
 
 - **Images:** download them from **New post**. An 8×8 grid encodes a 128-bit category-specific HMAC tag using four colours. Download new files after changing projects. `bun run test-images` regenerates simulator fixtures; set `CALMLENS_TEST_INPUT_KEY` to generate them for a real project.
-- **Text:** copy an authenticated category code from the portal into a comment. All six moderation categories are supported. `bun run test-images` prints the exact codes, and **New post** shows one when `CALMLENS_TEST_INPUT_KEY` is set.
+- **Text:** copy an authenticated category code from the portal into a comment. All eight moderation categories are supported. `bun run test-images` prints the exact codes, and **New post** shows one when `CALMLENS_TEST_INPUT_KEY` is set.
 
 ## The public demo
 

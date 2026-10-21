@@ -52,11 +52,11 @@ public final class Calmmarket {
           .transforms(Patch.value(List.of(Transform.image(
               new ImageTransformOptions().fit("cover").width(640).height(480).format("webp")))));
 
-  /** The six parent categories every report contains, in display order. */
-  static final List<String> CATEGORIES = List.of("sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity");
+  /** The eight parent categories every report contains, in display order. */
+  static final List<String> CATEGORIES = List.of("sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity", "personal-information", "profanity");
   static final Map<String, String> CATEGORY_LABELS = Map.of(
       "sexual", "Sexual content", "violence", "Violence", "self-harm", "Self-harm",
-      "harassment", "Harassment", "hate", "Hate", "criminal-activity", "Criminal activity");
+      "harassment", "Harassment", "hate", "Hate", "criminal-activity", "Criminal activity", "personal-information", "Personal information", "profanity", "Profanity");
 
   /** Outcomes a seller can pick in demo mode; {@link Demo} answers with them. Nothing is classified. */
   static final Map<String, String> DEMO_TEXT_RESULTS = new LinkedHashMap<>();

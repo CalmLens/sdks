@@ -544,7 +544,7 @@ Upload, classification and content each have a status; moderation has its own de
 
 ## Moderation Reports
 
-Completed reports always contain the six parent categories: `sexual`, `violence`, `self-harm`, `harassment`, `hate`, and `criminal-activity`. Category-specific detail is nested under `qualifiers`, for example `classification.moderation.categories.violence.qualifiers["violence-graphic"]`. Reports have no `subcategories` field or dedicated minor-safety placeholder. Retired generic qualifier IDs are rejected.
+Completed reports always contain the eight parent categories: `sexual`, `violence`, `self-harm`, `harassment`, `hate`, `criminal-activity`, `personal-information`, and `profanity`. Category-specific detail is nested under `qualifiers`, for example `classification.moderation.categories.violence.qualifiers["violence-graphic"]`. Reports have no `subcategories` field or dedicated minor-safety placeholder. Retired generic qualifier IDs are rejected.
 
 Always narrow on a category's `status` before reading `score`. An `evaluated` or `partial` result includes `score` and `likelihood`; a `not-evaluated` result includes a reason and represents unknown coverage, not a safe zero score.
 
