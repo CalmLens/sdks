@@ -13,6 +13,10 @@ import { fileURLToPath } from "node:url";
 
 /** Each published language SDK: its manifest and how to read the version it declares. */
 export const SDK_MANIFESTS = {
+  php: {
+    path: "php/src/Version.php",
+    version: /^\s*public const VERSION = '([^']+)'/m,
+  },
   go: {
     path: "go/version.go",
     version: /^const Version = "([^"]+)"/m,

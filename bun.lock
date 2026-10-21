@@ -35,6 +35,10 @@
         "typescript": "7.0.2",
       },
     },
+    "php": {
+      "name": "@calmlens/sdk-php",
+      "version": "0.1.0",
+    },
     "python": {
       "name": "@calmlens/sdk-python",
       "version": "0.1.2",
@@ -74,6 +78,8 @@
     "@calmlens/sdk-go": ["@calmlens/sdk-go@workspace:go"],
 
     "@calmlens/sdk-java": ["@calmlens/sdk-java@workspace:java"],
+
+    "@calmlens/sdk-php": ["@calmlens/sdk-php@workspace:php"],
 
     "@calmlens/sdk-python": ["@calmlens/sdk-python@workspace:python"],
 

@@ -167,3 +167,25 @@ jobs:
           'CalmLens::ServerClient.new(api_key: "test", project_id:
           "test").close'
         working-directory: ruby
+
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ["8.2", "8.5"]
+    defaults:
+      run:
+        working-directory: php
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: curl, mbstring, dom, xml, xmlwriter
+          coverage: none
+      - run: composer validate --strict
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer check
+      - run: composer test
+      - run: composer archive --format=zip --dir=/tmp/calmlens-php-dist

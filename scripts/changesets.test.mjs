@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-test("Changesets versions all six SDKs and generates native changelogs and a release plan", () => {
+test("Changesets versions all seven SDKs and generates native changelogs and a release plan", () => {
   const original = fileURLToPath(new URL("../", import.meta.url));
   const root = mkdtempSync(join(tmpdir(), "calmlens-changesets-roundtrip-"));
   try {
@@ -23,11 +23,12 @@ test("Changesets versions all six SDKs and generates native changelogs and a rel
     cpSync(join(original, ".changeset"), join(root, ".changeset"), { recursive: true });
     cpSync(join(original, "scripts"), join(root, "scripts"), { recursive: true });
     symlinkSync(join(original, "node_modules"), join(root, "node_modules"));
-    for (const lang of ["javascript", "python", "ruby", "rust", "java", "go"]) {
+    for (const lang of ["javascript", "python", "ruby", "rust", "java", "go", "php"]) {
       mkdirSync(join(root, lang), { recursive: true });
       cpSync(join(original, lang, "package.json"), join(root, lang, "package.json"));
     }
     for (const file of [
+      "php/src/Version.php",
       "python/pyproject.toml",
       "ruby/lib/calmlens/version.rb",
       "rust/Cargo.toml",
@@ -43,13 +44,13 @@ test("Changesets versions all six SDKs and generates native changelogs and a rel
     }
     writeFileSync(
       join(root, ".changeset/roundtrip.md"),
-      '---\n"@calmlens/sdk": patch\n"@calmlens/sdk-python": patch\n"@calmlens/sdk-ruby": patch\n"@calmlens/sdk-rust": patch\n"@calmlens/sdk-java": patch\n"@calmlens/sdk-go": patch\n---\n\nExercise native release adapters.\n',
+      '---\n"@calmlens/sdk": patch\n"@calmlens/sdk-python": patch\n"@calmlens/sdk-ruby": patch\n"@calmlens/sdk-rust": patch\n"@calmlens/sdk-java": patch\n"@calmlens/sdk-go": patch\n"@calmlens/sdk-php": patch\n---\n\nExercise native release adapters.\n',
     );
     execFileSync("git", ["init", "-b", "main"], { cwd: root, stdio: "ignore" });
     execFileSync("bun", ["run", "release:version"], { cwd: root, stdio: "inherit" });
     execFileSync("bun", ["run", "release:check"], { cwd: root, stdio: "inherit" });
     const { releases } = JSON.parse(readFileSync(join(root, ".changeset/release.json")));
-    assert.equal(releases.length, 6);
+    assert.equal(releases.length, 7);
     for (const { sdk, version } of releases) {
       const before = JSON.parse(readFileSync(join(original, sdk, "package.json")))
         .version.split(".")
