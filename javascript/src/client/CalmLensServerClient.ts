@@ -398,7 +398,7 @@ export default class CalmLensServerClient {
       /**
        * Removes an asset's stored content (source, preview and retained extracted text) while
        * keeping the asset record, metadata and classification results. The returned asset has
-       * `storageDeletedAt` set; the CDN no longer serves it.
+       * `content.status` set to `removed` and `content.removalReason` to `requested`; the CDN no longer serves it.
        */
       deleteContent: async ({ assetId }: DeleteAssetContentOptions): Promise<Asset> =>
         this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}/content`),

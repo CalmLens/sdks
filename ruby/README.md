@@ -32,9 +32,10 @@ Any method also accepts `request_options:`:
 `sig/` holds RBS signatures for every public method, with record types for each option Hash and response (in `sig/types.rbs`): `CalmLens::asset` (with `asset_classification`, `asset_moderation` and `asset_content`), `classification_report` (categories, qualifiers, labels, media segments and `features` results), `processing_options_input`, `folder`, `lens`, `event`, `events_page`, `asset_page`, `asset_search_response`, `signed_url`, `webhook_event_data` and the rest. Steep and other RBS tools check your calls and the response keys you read:
 
 ```ruby
-asset = client.text.classify(text: 'Hello', processing_options: { features: { face_detection: { enabled: true } } })
+asset = client.assets.classify(name: 'photo.jpg', content: {data: File.binread('photo.jpg'), type: 'image/jpeg'},
+    processing_options: {features: {face_detection: {enabled: true}}})
 asset['classification']['moderation']['decision']                                              # CalmLens::asset_moderation_status
-asset.dig('moderation', 'report', 'features', 'faceDetection', 'faces')    # Array[CalmLens::detected_face]?
+asset.dig('classification', 'faceDetection', 'faces')    # Array[CalmLens::detected_face]?
 ```
 
 The signatures describe snake_case Symbol option keys; camelCase and String keys still work at runtime but are not typed. Results whose fields depend on `status` (category, qualifier and feature results) are typed as one record with those fields optional: check `status`, then read `score` or `reason`. `metadata` values and API error `details` are any JSON (`CalmLens::json_value`).
@@ -47,7 +48,7 @@ The signatures describe snake_case Symbol option keys; camelCase and String keys
 - `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `decision` (`pending`, `approved` or `rejected`), `action`, category scores, policy assessment, an optional `timeline` and reviewer details. A reviewer decision does not change `completedAt`.
 - `content`: `status` is `temporary` (held until processing finishes), `stored` (kept with `keep_content_after_processing: true`) or `removed`, with `removalReason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`). It also holds `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image`, `previewImage`, `extractedText` and `safetyHold`.
 
-Publish only when `asset['classification']['moderation']['decision']` is `approved` and `asset['classification']['moderation']['action']` is nil. New statuses, visibilities and fields may appear in later API versions: the SDK returns them unchanged, so treat any value you do not recognise as not ready.
+Publish only when `asset['classification']['moderation']['decision']` is `approved`. An approved asset with action `alert` may still need review. A reviewer's approval takes precedence even when the original policy action remains `hide` or `purge`; approval does not restore removed content. New statuses, visibilities and fields may appear in later API versions: the SDK returns them unchanged, so treat any value you do not recognise as not ready.
 
 ### Waiting for a decision
 

@@ -58,7 +58,7 @@ console.log(image.classification.status, image.classification.moderation.decisio
 | `completed` | `approved` | `null` | Safe to show. |
 | `completed` | `approved` | `alert` | Show it, but your policy asked to be alerted. |
 | `completed` | `rejected` | `hide` or `purge` | Your policy hid or purged it. Don't show it. |
-| `uploading` or `processing` | `pending` | `null` | Still being received or classified. |
+| `pending` or `processing` | `pending` | `null` | Still being received or classified; `upload.status` is `uploading` while parts are arriving. |
 | `failed` | `pending` | `null` | Processing failed; see `assets.retry`. |
 
 A reviewer's decision (`classification.moderation.reviewerAction`) takes precedence over the automated one in
@@ -111,7 +111,7 @@ async assets.create(options: SubmitAssetOptions): Promise<Asset>
 - `part` (optional): First part of a sequential multipart upload
 - `description` (string, optional): Description of the asset
 - `processingOptions.keepContentAfterProcessing` (boolean, optional): Retain content after processing
-- `processingOptions.features` (object, optional): Optional analyses to run, each turned on with `enabled: true`: `ocr`, and in beta `personDetection` and `faceDetection` (with `ageEstimation`). Person and face results are returned in `asset.report.features`. See [People and faces](https://calmlens.com/docs/guides/people-and-faces).
+- `processingOptions.features` (object, optional): Optional analyses to run, each turned on with `enabled: true`: `ocr`, and in beta `personDetection` and `faceDetection` (with `ageEstimation`). Person and face results are returned in `asset.classification.personDetection` and `asset.classification.faceDetection`. See [People and faces](https://calmlens.com/docs/guides/people-and-faces).
 - `visibility` (string, optional): "public" or "private"
 
 **Example:**
@@ -153,7 +153,7 @@ asset.classification.status;  // "pending" | "processing" | "completed" | "faile
 asset.classification.moderation.decision;  // "pending" | "approved" | "rejected"
 asset.classification.moderation.action;  // "alert" | "hide" | "purge", what your policy did with flagged content; null when nothing was flagged
 asset.classification.moderation?.score;                         // number, the overall score
-asset.classification.moderation?.categories.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
+asset.classification.moderation.categories?.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
 asset.content.status;     // "temporary" | "stored" | "removed"
 asset.content.removalReason; // "policy" | "retention" | "requested" | "parent-removed" | "disposed" | null
 asset.type;               // "plaintext-document" for text
@@ -535,7 +535,7 @@ Assets can be of the following types:
 
 ## Asset Status
 
-An asset's state is split in three:
+Upload, classification and content each have a status; moderation has its own decision:
 
 - `upload.status`: `uploading` while source content is arriving, then `completed`
 - `classification.status`: `pending`, `processing`, `completed` or `failed`
@@ -544,12 +544,12 @@ An asset's state is split in three:
 
 ## Moderation Reports
 
-Completed reports always contain the six parent categories: `sexual`, `violence`, `self-harm`, `harassment`, `hate`, and `criminal-activity`. Category-specific detail is nested under `qualifiers`, for example `violence.qualifiers.graphic`. Reports have no `subcategories` field or dedicated minor-safety placeholder. Retired generic qualifier IDs are rejected.
+Completed reports always contain the six parent categories: `sexual`, `violence`, `self-harm`, `harassment`, `hate`, and `criminal-activity`. Category-specific detail is nested under `qualifiers`, for example `classification.moderation.categories.violence.qualifiers["violence-graphic"]`. Reports have no `subcategories` field or dedicated minor-safety placeholder. Retired generic qualifier IDs are rejected.
 
 Always narrow on a category's `status` before reading `score`. An `evaluated` or `partial` result includes `score` and `likelihood`; a `not-evaluated` result includes a reason and represents unknown coverage, not a safe zero score.
 
 ```typescript
-const violence = asset.report?.categories.violence;
+const violence = asset.classification.moderation.categories?.violence;
 if (violence?.status === 'evaluated' || violence?.status === 'partial') {
   console.log(violence.score);
 }
