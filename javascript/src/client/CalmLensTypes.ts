@@ -24,6 +24,8 @@ import type {
   GetAssetChildrenQuery,
   GetAssetsPageQuery,
   GetEventsQuery,
+  GetFoldersQuery,
+  GetFoldersResponse,
   PatchAssetBody,
   PatchFolderBody,
   PostAssetSignedUrlResponse,
@@ -462,3 +464,6 @@ export interface ModerateTextOptions
   text: string;
   name?: string;
 }
+
+export type ListFoldersOptions = GetFoldersQuery;
+export type FolderPage = GetFoldersResponse;

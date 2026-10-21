@@ -3,14 +3,14 @@
 module CalmLens
   # Folders organise a project's assets. Reach it through {ServerClient#folders}.
   class Folders < Resource
-    # @return [Array<Hash>] every folder in the project.
+    # @return [Hash] folders, ancestors and hasMore for one child page.
     def list(options = {})
-      call(options) do |_api, request|
-        response = request('GET', project('folders'), request_options: request)
-        folders = response.is_a?(Hash) ? response['folders'] : nil
-        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Folder list has no folders') unless folders.is_a?(Array)
-
-        folders
+      call(options) do |api, request|
+        response = request('GET', project('folders'), query: api, request_options: request)
+        unless response.is_a?(Hash) && response['folders'].is_a?(Array) && response['ancestors'].is_a?(Array) && [true, false].include?(response['hasMore'])
+          raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid folder page')
+        end
+        response
       end
     end
 

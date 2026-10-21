@@ -22,7 +22,7 @@ __all__ = [
     "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetProcessing", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderIdOptions", "ImageData", "ImageTransform",
+    "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "ImageData", "ImageTransform",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
@@ -943,3 +943,20 @@ class ServeInit(TypedDict, total=False):
 
 class ServeOptions(AssetUrlOptions, total=False):
     init: ServeInit
+
+
+class ListFoldersOptions(TypedDict, total=False):
+    parentId: str
+    pageIndex: int
+    pageSize: int
+    search: str
+    searchAll: bool
+    resolveOnly: bool
+    ids: List[str]
+    sort: Literal["name", "createdAt"]
+    direction: Literal["ASC", "DESC"]
+
+class FolderPage(TypedDict):
+    folders: List[Folder]
+    ancestors: List[Folder]
+    hasMore: bool

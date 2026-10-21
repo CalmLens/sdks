@@ -75,7 +75,11 @@ async fn api_errors_carry_status_request_id_and_details() {
 
     // Codes this SDK does not know are kept as they are.
     mock.enqueue_api_error("billing/new-code", "New");
-    let error = mock.folders().list().await.unwrap_err();
+    let error = mock
+        .folders()
+        .list(ListFolders::default())
+        .await
+        .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::Other("billing/new-code".into()));
     assert_eq!(error.status(), Some(400));
 }
@@ -466,7 +470,11 @@ async fn reads_are_retried_after_unavailable_and_rate_limits() {
     mock.enqueue_response(MockResponse::json(429, json!({})).header("retry-after", "0"));
     mock.enqueue_response(MockResponse::json(429, json!({})).header("retry-after", "0"));
     mock.enqueue_response(MockResponse::json(429, json!({})).header("retry-after", "0"));
-    let error = mock.folders().list().await.unwrap_err();
+    let error = mock
+        .folders()
+        .list(ListFolders::default())
+        .await
+        .unwrap_err();
     assert_eq!(error.status(), Some(429));
     assert_eq!(error.retry_after(), Some(std::time::Duration::ZERO));
     assert_eq!(mock.requests().len(), 6, "one attempt plus max_retries");

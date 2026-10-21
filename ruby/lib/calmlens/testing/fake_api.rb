@@ -32,7 +32,7 @@ module CalmLens
     # and body shape. It does not classify content, run transforms or index for semantic search.
     # @api private
     class FakeAPI
-      JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize limit
+      JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize pageIndex searchAll resolveOnly limit
                       processingOptions metadata].freeze
       # Search match fields and where each one's value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
@@ -96,6 +96,8 @@ module CalmLens
         uri = URI.parse(relative)
         parts = uri.path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
         query = URI.decode_www_form(uri.query.to_s).to_h.to_h { |key, value| [key, query_value(key, value)] }
+        selected_ids = query.keys.grep(/\Aids\[\d+\]\z/).sort_by { |key| key[/\d+/].to_i }
+        query['ids'] = selected_ids.map { |key| query.delete(key) } unless selected_ids.empty?
         json = headers['Content-Type'] == 'application/json' && body ? JSON.parse(body) : {}
         key = headers['Idempotency-Key']
         upload = headers.find { |name, _| name.to_s.casecmp?('X-CalmLens-Upload') }&.last
@@ -142,7 +144,7 @@ module CalmLens
         case [method, parts[2..], upload]
         in ['GET', ['events'], _] then events(query)
         in ['PUT', ['lenses'], _] then lenses(json.fetch('lenses', []))
-        in ['GET', ['folders'], _] then { 'folders' => project_folders.sort_by { |item| item['name'] } }
+        in ['GET', ['folders'], _] then folder_page(query)
         in ['POST', ['folders'], _] then create_folder(json)
         in ['GET', ['assets', 'page'], _] then page(project_assets.reject { |item| item['parentId'] }, query)
         in ['GET', ['assets', 'search'], _] then search(query)
@@ -154,6 +156,25 @@ module CalmLens
       end
 
       def project_assets = @state.assets.values.select { |item| item['projectId'] == @project_id }
+      def folder_page(query)
+        found = project_folders.select { |f| ((query['searchAll'] && query['search']) || f['parentId'] == query['parentId']) && (!query['search'] || f['name'].downcase.include?(query['search'].downcase)) }
+        found.sort_by! { |f| [query['sort'] == 'createdAt' ? f['createdAt'] : f['name'], f['id']] }
+        found.reverse! if query['direction'] == 'DESC'
+        size = query.fetch('pageSize', 100)
+        start = query.fetch('pageIndex', 0) * size
+        page = query['resolveOnly'] ? [] : found.slice(start, size) || []
+        ids = (Array(query['ids']) + page.map { |f| f['id'] } + [query['parentId']]).compact.uniq
+        queue = ids.dup
+        until queue.empty?
+          parent = @state.folders.dig(queue.pop, 'parentId')
+          if parent && !ids.include?(parent)
+            ids << parent
+            queue << parent
+          end
+        end
+        { 'folders' => page, 'ancestors' => project_folders.select { |f| ids.include?(f['id']) && !page.include?(f) }, 'hasMore' => !query['resolveOnly'] && found.length > start + size }
+      end
+
       def project_folders = @state.folders.values.select { |item| item['projectId'] == @project_id }
 
       def events(query)

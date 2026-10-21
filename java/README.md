@@ -251,3 +251,5 @@ The mock is the real client with a queued transport: validation, encoding, retri
 ## Development
 
 Run `mvn verify` (tests and Javadoc with doclint). The shared request, path, webhook and error-code fixtures in `testdata/` are generated from the JavaScript SDK by `bun packages/sdk-contract/generate.ts`. Run `bun run test:sdk:e2e` from the repository root for all SDKs against the local backend.
+
+Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.

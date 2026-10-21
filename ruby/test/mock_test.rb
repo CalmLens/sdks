@@ -16,7 +16,7 @@ class MockTest < Minitest::Test
       result = invoke(mock, fixture['operation'], fixture['options'])
       expected = case fixture['operation']
                  when /\.delete\z/ then nil
-                 when 'folders.list' then fixture['response']['folders']
+                 when 'folders.list' then fixture['response']
                  when 'ensureLenses' then fixture['response']['lenses']
                  else fixture['response']
                  end

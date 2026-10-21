@@ -85,7 +85,7 @@ func TestJavaScriptContract(t *testing.T) {
 			case "assets.uploadPart":
 				_, err = c.Assets.UploadPart(ctx, decodeOptions[UploadAssetPartOptions](t, fixture.Options))
 			case "folders.list":
-				_, err = c.Folders.List(ctx)
+				_, err = c.Folders.List(ctx, decodeOptions[ListFoldersOptions](t, fixture.Options))
 			case "folders.retrieve":
 				_, err = c.Folders.Retrieve(ctx, decodeOptions[FolderIDOptions](t, fixture.Options))
 			case "folders.create":

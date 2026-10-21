@@ -105,7 +105,7 @@ class MockTests(unittest.TestCase):
             self.assertEqual((raised.exception.code, raised.exception.status), (code, 409))
         c.folders.move({"folderId": child["id"], "parentId": None})
         c.folders.delete({"folderId": root["id"]})
-        self.assertEqual(len(c.folders.list()), 1)
+        self.assertEqual(len(c.folders.list()["folders"]), 1)
         a = c.assets.moderate({'name': 'text', 'content': {'plainText': 'hi', 'type': 'text/plain'}})
         self.assertEqual(c.assets.move({"assetId": a["id"], "folderId": child["id"]})["folderId"], child["id"])
         with self.assertRaises(CalmLensError):

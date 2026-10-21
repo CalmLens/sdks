@@ -1161,6 +1161,29 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
+  /** One page of folders and the visible paths needed to reveal them. */
+  public record FolderPage(List<Folder> folders, List<Folder> ancestors, boolean hasMore) {}
+  public static final class ListFolders {
+    private String parentId;
+    private Integer pageIndex;
+    private Integer pageSize;
+    private String search;
+    private Boolean searchAll;
+    private Boolean resolveOnly;
+    private List<String> ids;
+    private String sort;
+    private String direction;
+    public ListFolders parentId(String value) { parentId = value; return this; }
+    public ListFolders pageIndex(Integer value) { pageIndex = value; return this; }
+    public ListFolders pageSize(Integer value) { pageSize = value; return this; }
+    public ListFolders search(String value) { search = value; return this; }
+    public ListFolders searchAll(Boolean value) { searchAll = value; return this; }
+    public ListFolders resolveOnly(Boolean value) { resolveOnly = value; return this; }
+    public ListFolders ids(List<String> value) { ids = value; return this; }
+    public ListFolders sort(String value) { sort = value; return this; }
+    public ListFolders direction(String value) { direction = value; return this; }
+  }
+
   /** Options for {@code folders.create}. */
   public static final class CreateFolder {
     private String name;

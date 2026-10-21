@@ -3034,3 +3034,48 @@ pub struct AssetSearchResponse {
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
+
+/// One page of child folders.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPage {
+    /// Child folders on this page.
+    pub folders: Vec<Folder>,
+    /// Visible folders needed to reveal the selected paths.
+    pub ancestors: Vec<Folder>,
+    /// Whether another page is available.
+    pub has_more: bool,
+}
+
+/// Options for browsing folders.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListFolders {
+    /// Lists immediate children of this folder; omit for project root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// Zero-based page number.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_index: Option<u32>,
+    /// Page size from 1 to 100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    /// Literal folder-name substring.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<String>,
+    /// Search the accessible tree instead of only the current parent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search_all: Option<bool>,
+    /// Only resolve selected paths without listing children.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolve_only: Option<bool>,
+    /// Selected folder IDs whose paths should be resolved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ids: Option<Vec<String>>,
+    /// Sort by name or createdAt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+    /// ASC or DESC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<String>,
+}

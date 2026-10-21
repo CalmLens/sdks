@@ -713,7 +713,22 @@ describe("MockCalmLensServerClient", () => {
 
     // 5. List folders (sorted alphabetically)
     const list = await client.folders.list();
-    expect(list.map((f) => f.name)).toEqual(["Campaigns", "Campaigns", "Marketing", "Product"]);
+    expect(list.folders.map((f) => f.id)).toEqual([marketing.id, product.id]);
+    expect(
+      (await client.folders.list({ parentId: marketing.id })).folders.map((f) => f.id),
+    ).toEqual([campaigns.id]);
+
+    const first = await client.folders.list({ pageSize: 1 });
+    expect(first.folders.map((folder) => folder.id)).toEqual([marketing.id]);
+    expect(first.hasMore).toBe(true);
+    const second = await client.folders.list({ pageIndex: 1, pageSize: 1 });
+    expect(second.folders.map((folder) => folder.id)).toEqual([product.id]);
+    expect(second.hasMore).toBe(false);
+    const resolved = await client.folders.list({ ids: [campaigns.id], resolveOnly: true });
+    expect(resolved.folders).toEqual([]);
+    expect(resolved.ancestors.map((folder) => folder.id).sort()).toEqual(
+      [marketing.id, campaigns.id].sort(),
+    );
 
     // 6. Retrieve folder
     const retrieved = await client.folders.retrieve({ folderId: campaigns.id });

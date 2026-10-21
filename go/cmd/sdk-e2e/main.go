@@ -80,7 +80,7 @@ func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 	case "folders.retrieve":
 		return decode(cmd.Options, func(o sdk.FolderIDOptions) (any, error) { return c.Folders.Retrieve(ctx, o) })
 	case "folders.list":
-		return c.Folders.List(ctx)
+		return decode(cmd.Options, func(o sdk.ListFoldersOptions) (any, error) { return c.Folders.List(ctx, o) })
 	case "folders.delete":
 		return decode(cmd.Options, func(o sdk.FolderIDOptions) (any, error) { return nil, c.Folders.Delete(ctx, o) })
 	case "cdn.serve":

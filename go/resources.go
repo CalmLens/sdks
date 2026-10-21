@@ -194,15 +194,17 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	return &result, nil
 }
 
-// List returns every folder in the project.
-func (s *FoldersService) List(ctx context.Context) ([]Folder, error) {
-	var result struct {
-		Folders []Folder `json:"folders"`
-	}
-	if err := s.c.request(ctx, "GET", s.c.project("folders"), nil, nil, &result); err != nil {
+// List returns one page of folders.
+func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (*FolderPage, error) {
+	params, err := query(options)
+	if err != nil {
 		return nil, err
 	}
-	return result.Folders, nil
+	var result FolderPage
+	if err := s.c.request(ctx, "GET", s.c.project("folders"), params, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // Retrieve returns a folder.

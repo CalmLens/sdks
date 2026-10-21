@@ -25,12 +25,14 @@ import type {
   EnsureLensesOptions,
   EnsureLensOptions,
   FolderIdOptions,
+  FolderPage,
   IterateAssetChildrenOptions,
   IterateAssetsOptions,
   Lens,
   ListAssetChildrenOptions,
   ListAssetsOptions,
   ListEventsOptions,
+  ListFoldersOptions,
   ModerateTextOptions,
   MoveAssetOptions,
   MoveFolderOptions,
@@ -126,7 +128,7 @@ export interface MockCalmLensOperationOptions {
   "text.moderate": ModerateTextOptions;
   "cdn.serve": CdnServeOptions;
   "events.list": ListEventsOptions;
-  "folders.list": undefined;
+  "folders.list": ListFoldersOptions;
   "folders.retrieve": FolderIdOptions;
   "folders.create": CreateFolderOptions;
   "folders.update": UpdateFolderOptions;
@@ -719,12 +721,44 @@ export class MockCalmLensServerClient {
 
   get folders() {
     return {
-      list: async (): Promise<Folder[]> => {
-        this.begin("folders.list", undefined);
-        const folders = this.databaseStorage.listFolders
-          ? await this.databaseStorage.listFolders(this.projectId)
-          : [];
-        return [...folders].sort((a, b) => a.name.localeCompare(b.name));
+      list: async (options: ListFoldersOptions = {}): Promise<FolderPage> => {
+        this.begin("folders.list", options);
+        const all = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
+        const size = options.pageSize ?? 100;
+        if (size < 1 || size > 100) throw this.invalidPayload("Invalid folder page size");
+        const matching = all
+          .filter(
+            (folder) =>
+              ((options.searchAll && options.search) ||
+                (folder.parentId ?? null) === (options.parentId ?? null)) &&
+              (!options.search || folder.name.toLowerCase().includes(options.search.toLowerCase())),
+          )
+          .sort((a, b) => {
+            const order =
+              (options.sort === "createdAt"
+                ? a.createdAt - b.createdAt
+                : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id);
+            return options.direction === "DESC" ? -order : order;
+          });
+        const start = (options.pageIndex ?? 0) * size;
+        const folders = options.resolveOnly ? [] : matching.slice(start, start + size);
+        const ids = new Set([
+          ...(options.ids ?? []),
+          ...(options.parentId ? [options.parentId] : []),
+          ...folders.map((folder) => folder.id),
+        ]);
+        const byId = new Map(all.map((folder) => [folder.id, folder]));
+        for (const id of ids) {
+          const parent = byId.get(id)?.parentId;
+          if (parent) ids.add(parent);
+        }
+        return {
+          folders,
+          ancestors: all.filter(
+            (folder) => ids.has(folder.id) && !folders.some((item) => item.id === folder.id),
+          ),
+          hasMore: !options.resolveOnly && matching.length > start + size,
+        };
       },
 
       retrieve: async (options: FolderIdOptions): Promise<Folder> => {

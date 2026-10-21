@@ -452,6 +452,9 @@ public final class CalmLensServerClient implements AutoCloseable {
               params.add(id("ordering[" + index + "][" + field.getKey() + "]") + "=" + id(field.getValue().getAsString()));
             index++;
           }
+        } else if (entry.getKey().equals("ids") && value.isJsonArray()) {
+          int index = 0;
+          for (JsonElement folderId : value.getAsJsonArray()) params.add(id("ids[" + index++ + "]") + "=" + id(folderId.getAsString()));
         } else
           params.add(id(entry.getKey()) + "=" + URLEncoder.encode(
               value.isJsonPrimitive() && value.getAsJsonPrimitive().isString() ? value.getAsString() : Json.write(value),
@@ -1062,13 +1065,13 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final class Folders {
     private Folders() {}
 
-    /** @return every folder in the project */
-    public List<Models.Folder> list() {
-      Reply reply = json("GET", project("folders"), null, null);
-      JsonElement folders = object(reply).get("folders");
-      if (folders == null || !folders.isJsonArray())
-        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected a folders array", null, reply.status(), reply.headers(), null);
-      return List.of(decode(new Reply(reply.status(), reply.headers(), reply.body(), folders), Models.Folder[].class));
+    /** @return one child-folder page */
+    public Models.FolderPage list(Models.ListFolders options) {
+      Reply reply = json("GET", project("folders"), Models.encode(options), null);
+      JsonObject page = object(reply);
+      if (!page.has("folders") || !page.get("folders").isJsonArray() || !page.has("ancestors") || !page.get("ancestors").isJsonArray() || !page.has("hasMore") || !page.get("hasMore").isJsonPrimitive() || !page.get("hasMore").getAsJsonPrimitive().isBoolean())
+        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected a folder page", null, reply.status(), reply.headers(), null);
+      return decode(reply, Models.FolderPage.class);
     }
 
     /** @param options the folder @return the folder */

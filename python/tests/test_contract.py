@@ -24,10 +24,7 @@ class ContractTests(unittest.TestCase):
                 target = c
                 for key in fixture["operation"].split("."):
                     target = getattr(target, re.sub(r"(?<!^)(?=[A-Z])", "_", key).lower())
-                if fixture["operation"] == "folders.list":
-                    target()
-                else:
-                    target(fixture["options"])
+                target(fixture["options"])
                 request = captured[0]
                 url = urlsplit(request.full_url)
                 body = request.data.decode() if request.data else None

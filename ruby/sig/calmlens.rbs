@@ -150,7 +150,7 @@ module CalmLens
   end
 
   class Folders < Resource
-    def list: (?list_folders_options options) -> Array[folder]
+    def list: (?list_folders_options options) -> folder_page
     def create: (create_folder_options options) -> folder
     def retrieve: (folder_id_options options) -> folder
     def update: (update_folder_options options) -> folder

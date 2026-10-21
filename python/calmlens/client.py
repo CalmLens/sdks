@@ -32,7 +32,7 @@ from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError)
 from .types import (Asset, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
-                    Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderIdOptions, Lens,
+                    Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
                     MetadataItem, ModerateTextOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
@@ -723,7 +723,9 @@ class CalmLensServerClient:
 
     def _url(self, path: str, query: Mapping[str, Any] | None = None) -> str:
         params = {k: v if isinstance(v, str) else _json(v)
-                  for k, v in (query or {}).items() if v is not None and k != "ordering"}
+                  for k, v in (query or {}).items() if v is not None and k not in ("ordering", "ids")}
+        for index, folder_id in enumerate((query or {}).get("ids") or []):
+            params[f"ids[{index}]"] = folder_id
         for index, order in enumerate((query or {}).get("ordering") or []):
             for key, value in order.items():
                 params[f"ordering[{index}][{key}]"] = value
@@ -1171,9 +1173,9 @@ class Folders:
     def __init__(self, client: CalmLensServerClient):
         self._c = client
 
-    def list(self) -> List[Folder]:
-        """Every folder in the project."""
-        return cast(List[Folder], self._c._request("GET", self._c._project("folders"))["folders"])
+    def list(self, options: ListFoldersOptions | None = None, /, **kwargs: Any) -> FolderPage:
+        """One page of child folders, with visible paths for selected folders."""
+        return cast(FolderPage, self._c._request("GET", self._c._project("folders"), query=_merge(options, **kwargs)))
 
     def retrieve(self, options: FolderIdOptions | None = None, /, *, folder_id: str = _UNSET) -> Folder:
         """Fetch a folder by ID."""

@@ -35,7 +35,7 @@ final class Fixtures {
   static Object invoke(CalmLensServerClient client, String operation, JsonObject options) throws Throwable {
     String[] parts = operation.split("\\.");
     Object target = parts.length == 1 ? client : CalmLensServerClient.class.getField(parts[0]).get(client);
-    int arity = operation.equals("folders.list") ? 0 : 1;
+    int arity = 1;
     Method method = Arrays.stream(target.getClass().getMethods())
         .filter(m -> m.getName().equals(parts[parts.length - 1]) && m.getParameterCount() == arity
             && (arity == 0 || m.getParameterTypes()[0] != String.class))

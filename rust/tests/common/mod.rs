@@ -39,7 +39,7 @@ pub async fn invoke(
         "assets.createSignedUrl" => {
             output(client.assets().create_signed_url(input(options)?).await)
         }
-        "folders.list" => output(client.folders().list().await),
+        "folders.list" => output(client.folders().list(input(options)?).await),
         "folders.create" => output(client.folders().create(input(options)?).await),
         "folders.retrieve" => output(client.folders().retrieve(input(options)?).await),
         "folders.update" => output(client.folders().update(input(options)?).await),

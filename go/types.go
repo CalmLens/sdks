@@ -983,3 +983,21 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 }
 
 var _ json.Unmarshaler = (*Asset)(nil)
+
+// ListFoldersOptions selects a page of immediate children or searches folder names.
+type ListFoldersOptions struct {
+	ParentID    *string  `json:"parentId,omitempty"`
+	PageIndex   int      `json:"pageIndex,omitempty"`
+	PageSize    int      `json:"pageSize,omitempty"`
+	Search      string   `json:"search,omitempty"`
+	SearchAll   bool     `json:"searchAll,omitempty"`
+	ResolveOnly bool     `json:"resolveOnly,omitempty"`
+	IDs         []string `json:"ids,omitempty"`
+	Sort        string   `json:"sort,omitempty"`
+	Direction   string   `json:"direction,omitempty"`
+}
+type FolderPage struct {
+	Folders   []Folder `json:"folders"`
+	Ancestors []Folder `json:"ancestors"`
+	HasMore   bool     `json:"hasMore"`
+}

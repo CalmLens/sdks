@@ -476,12 +476,80 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		case route == "folders" && method == "GET":
 			folders := []calmlens.JSON{}
 			for _, f := range db.Folders {
-				if f["projectId"] == m.options.ProjectID {
+				if f["projectId"] == m.options.ProjectID && ((q.Get("searchAll") == "true" && q.Get("search") != "") || text(f["parentId"]) == q.Get("parentId")) && strings.Contains(strings.ToLower(text(f["name"])), strings.ToLower(q.Get("search"))) {
 					folders = append(folders, f)
 				}
 			}
-			sort.Slice(folders, func(i, j int) bool { return text(folders[i]["name"]) < text(folders[j]["name"]) })
-			return calmlens.JSON{"folders": folders}, nil
+			sort.Slice(folders, func(i, j int) bool {
+				a, b := text(folders[i]["name"]), text(folders[j]["name"])
+				if q.Get("sort") == "createdAt" {
+					a, b = fmt.Sprintf("%020v", folders[i]["createdAt"]), fmt.Sprintf("%020v", folders[j]["createdAt"])
+				}
+				if a == b {
+					a, b = text(folders[i]["id"]), text(folders[j]["id"])
+				}
+				if q.Get("direction") == "DESC" {
+					return a > b
+				}
+				return a < b
+			})
+			size, _ := strconv.Atoi(q.Get("pageSize"))
+			if size == 0 {
+				size = 100
+			}
+			index, _ := strconv.Atoi(q.Get("pageIndex"))
+			start := index * size
+			end := start + size
+			if end > len(folders) {
+				end = len(folders)
+			}
+			if start > end {
+				start = end
+			}
+			page := folders[start:end]
+			if q.Get("resolveOnly") == "true" {
+				page = []calmlens.JSON{}
+			}
+			ids := map[string]bool{}
+			var selected []string
+			for index := 0; ; index++ {
+				id := q.Get(fmt.Sprintf("ids[%d]", index))
+				if id == "" {
+					break
+				}
+				selected = append(selected, id)
+			}
+			selected = append(selected, q.Get("parentId"))
+			for _, f := range page {
+				selected = append(selected, text(f["id"]))
+			}
+			for len(selected) > 0 {
+				id := selected[len(selected)-1]
+				selected = selected[:len(selected)-1]
+				if id == "" || ids[id] {
+					continue
+				}
+				ids[id] = true
+				if f := db.Folders[id]; f != nil {
+					selected = append(selected, text(f["parentId"]))
+				}
+			}
+			ancestors := []calmlens.JSON{}
+			for id := range ids {
+				if f := db.Folders[id]; f != nil && f["projectId"] == m.options.ProjectID {
+					inPage := false
+					for _, item := range page {
+						if text(item["id"]) == id {
+							inPage = true
+							break
+						}
+					}
+					if !inPage {
+						ancestors = append(ancestors, f)
+					}
+				}
+			}
+			return calmlens.JSON{"folders": page, "ancestors": ancestors, "hasMore": q.Get("resolveOnly") != "true" && len(folders) > index*size+size}, nil
 		case route == "folders" && method == "POST":
 			if id := text(body["parentId"]); id != "" {
 				if _, err := m.folder(id); err != nil {

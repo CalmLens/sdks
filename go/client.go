@@ -271,6 +271,16 @@ func query(values any) (url.Values, error) {
 			result.Set(fmt.Sprintf("ordering[%d][direction]", i), order.Direction)
 		}
 	}
+	if raw, ok := fields["ids"]; ok {
+		var ids []string
+		if err := json.Unmarshal(raw, &ids); err != nil {
+			return nil, argumentError("Could not encode folder IDs", err)
+		}
+		result.Del("ids")
+		for index, id := range ids {
+			result.Set(fmt.Sprintf("ids[%d]", index), id)
+		}
+	}
 	return result, nil
 }
 

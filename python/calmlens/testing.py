@@ -41,8 +41,8 @@ _MOCK_OUTCOMES = ("pending", "approved", "rejected", "failed")
 #: Where a mock upload ends up: ``pending`` (still processing), ``approved`` or ``rejected``
 #: (processing done with that decision) or ``failed`` (processing failed, retryable).
 MockAssetOutcome = Literal["pending", "approved", "rejected", "failed"]
-_INT_QUERY = {"pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
-_BOOL_QUERY = {"queue", "isFinal"}
+_INT_QUERY = {"pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
+_BOOL_QUERY = {"queue", "isFinal", "searchAll", "resolveOnly"}
 _JSON_QUERY = {"metadata", "processingOptions"}
 _MIB = 1024 * 1024
 
@@ -123,9 +123,13 @@ class MockRequest:
 def _decode_query(pairs: Iterable[tuple[str, str]]) -> dict[str, Any]:
     query: dict[str, Any] = {}
     ordering: dict[int, dict[str, str]] = {}
+    ids: dict[int, str] = {}
     for key, value in pairs:
         found = re.fullmatch(r"ordering\[(\d+)\]\[(\w+)\]", key)
-        if found:
+        selected_id = re.fullmatch(r"ids\[(\d+)\]", key)
+        if selected_id:
+            ids[int(selected_id.group(1))] = value
+        elif found:
             ordering.setdefault(int(found.group(1)), {})[found.group(2)] = value
         elif key in _INT_QUERY and re.fullmatch(r"-?[0-9]+", value):
             query[key] = int(value)
@@ -138,6 +142,8 @@ def _decode_query(pairs: Iterable[tuple[str, str]]) -> dict[str, Any]:
                 query[key] = value
         else:
             query[key] = value
+    if ids:
+        query["ids"] = [ids[index] for index in sorted(ids)]
     if ordering:
         query["ordering"] = [ordering[index] for index in sorted(ordering)]
     return query
@@ -432,8 +438,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if resource == "folders":
             folders = self.database_storage.folders
             if method == "GET":
-                return {"folders": sorted((f for f in folders.values() if f["projectId"] == self.project_id),
-                                          key=lambda f: f["name"])}
+                all_folders = [f for f in folders.values() if f["projectId"] == self.project_id]
+                found = [f for f in all_folders if ((query.get("searchAll") and query.get("search")) or f.get("parentId") == query.get("parentId")) and (not query.get("search") or query["search"].lower() in f["name"].lower())]
+                found.sort(key=lambda f: (f.get("createdAt", 0) if query.get("sort") == "createdAt" else f["name"], f["id"]), reverse=query.get("direction") == "DESC")
+                size = query.get("pageSize", 100)
+                start = query.get("pageIndex", 0) * size
+                page = [] if query.get("resolveOnly") else found[start:start + size]
+                ids = set(query.get("ids") or []) | {f["id"] for f in page}
+                if query.get("parentId"): ids.add(query["parentId"])
+                queue = list(ids)
+                while queue:
+                    parent = folders.get(queue.pop(), {}).get("parentId")
+                    if parent and parent not in ids: ids.add(parent); queue.append(parent)
+                return {"folders": page, "ancestors": [f for f in all_folders if f["id"] in ids and f not in page], "hasMore": not query.get("resolveOnly", False) and len(found) > start + size}
             if body.get("parentId"):
                 self._folder(body["parentId"])
             self._unique(body["name"], body.get("parentId"))

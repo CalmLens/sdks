@@ -124,7 +124,9 @@ module CalmLens
       params.each do |key, value|
         next if value.nil?
 
-        if key == 'ordering' && value.is_a?(Array)
+        if key == 'ids' && value.is_a?(Array)
+          value.each_with_index { |item, index| encoded["ids[#{index}]"] = item.to_s }
+        elsif key == 'ordering' && value.is_a?(Array)
           value.each_with_index do |order, index|
             raise invalid('Each ordering entry must be a Hash') unless order.is_a?(Hash)
 

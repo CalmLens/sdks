@@ -31,12 +31,14 @@ import type {
   EnsureLensesOptions,
   EnsureLensOptions,
   FolderIdOptions,
+  FolderPage,
   IterateAssetChildrenOptions,
   IterateAssetsOptions,
   Lens,
   ListAssetChildrenOptions,
   ListAssetsOptions,
   ListEventsOptions,
+  ListFoldersOptions,
   ModerateTextOptions,
   MoveAssetOptions,
   MoveFolderOptions,
@@ -456,9 +458,9 @@ export default class CalmLensServerClient {
 
   get folders() {
     return {
-      /** Lists every folder in the project. */
-      list: async (): Promise<Folder[]> =>
-        (await this.request<{ folders: Folder[] }>("GET", `${this.projectPath}/folders`)).folders,
+      /** Lists one page of child folders; fetch a branch when it is opened. */
+      list: async (options: ListFoldersOptions = {}): Promise<FolderPage> =>
+        this.request("GET", `${this.projectPath}/folders`, { query: options }),
 
       retrieve: async ({ folderId }: FolderIdOptions): Promise<Folder> =>
         this.request("GET", `/folders/${requireId(folderId, "Folder ID")}`),

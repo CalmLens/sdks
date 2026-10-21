@@ -116,9 +116,10 @@ class ClientTests(ClientTestCase):
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         self.assertEqual(self.calls, [])
 
-    def test_folder_list_unwraps_folders(self):
-        self.result = {"folders": [{"id": "f"}]}
-        self.assertEqual(self.client.folders.list(), [{"id": "f"}])
+    def test_folder_list_returns_page_and_sends_parent_query(self):
+        self.result = {"folders": [{"id": "f"}], "ancestors": [], "hasMore": False}
+        self.assertEqual(self.client.folders.list(parent_id="parent", page_size=2), self.result)
+        self.assertIn("parentId=parent", self.calls[-1].full_url)
 
     def test_payload_forms_and_url(self):
         for payload in ({"plainText": "abc"}, {"base64": "data:text/plain;base64,YWJj"}, {"data": b"abc"},

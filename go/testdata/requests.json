@@ -758,15 +758,48 @@
   },
   {
     "operation": "folders.list",
-    "options": {},
+    "options": {
+      "parentId": "folder-1",
+      "pageIndex": 1,
+      "pageSize": 25
+    },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/folders",
-      "query": {},
+      "query": {
+        "parentId": "folder-1",
+        "pageIndex": "1",
+        "pageSize": "25"
+      },
       "body": null
     },
     "response": {
-      "folders": []
+      "folders": [],
+      "ancestors": [],
+      "hasMore": false
+    }
+  },
+  {
+    "operation": "folders.list",
+    "options": {
+      "ids": [
+        "folder-1"
+      ],
+      "resolveOnly": true
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/folders",
+      "query": {
+        "ids[0]": "folder-1",
+        "resolveOnly": "true"
+      },
+      "body": null
+    },
+    "response": {
+      "folders": [],
+      "ancestors": [],
+      "hasMore": false
     }
   },
   {

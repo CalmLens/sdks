@@ -912,16 +912,24 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct FoldersClient<'a>(&'a ServerClient);
 impl FoldersClient<'_> {
-    /// Every folder in the project.
-    pub async fn list(&self) -> Result<Vec<Folder>> {
-        #[derive(serde::Deserialize)]
-        struct Response {
-            folders: Vec<Folder>,
+    /// One page of child folders.
+    pub async fn list(&self, options: ListFolders) -> Result<FolderPage> {
+        let mut query = Query::default();
+        query.opt("parentId", options.parent_id.as_ref());
+        query.opt("pageIndex", options.page_index);
+        query.opt("pageSize", options.page_size);
+        query.opt("search", options.search.as_ref());
+        query.opt("searchAll", options.search_all);
+        query.opt("resolveOnly", options.resolve_only);
+        query.opt("sort", options.sort.as_ref());
+        query.opt("direction", options.direction.as_ref());
+        for (index, folder_id) in options.ids.unwrap_or_default().iter().enumerate() {
+            query.push(&format!("ids[{index}]"), folder_id);
         }
         let request = self
             .0
-            .prepare(Method::GET, &self.0.project_path("folders")?, &[])?;
-        Ok(self.0.call::<Response>(request).await?.folders)
+            .prepare(Method::GET, &self.0.project_path("folders")?, &query.0)?;
+        self.0.call(request).await
     }
     /// Creates a folder.
     pub async fn create(&self, options: CreateFolder) -> Result<Folder> {

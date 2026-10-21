@@ -184,7 +184,7 @@ func TestMockSimulatesTransportFailures(t *testing.T) {
 	ctx := context.Background()
 	offline := errors.New("connection reset by peer")
 	c.FailNext(offline, context.DeadlineExceeded)
-	_, err = c.Folders.List(ctx)
+	_, err = c.Folders.List(ctx, calmlens.ListFoldersOptions{})
 	var sdk *calmlens.Error
 	if !errors.As(err, &sdk) || sdk.Code != "sdk/transport-error" || !errors.Is(err, offline) {
 		t.Fatalf("transport failure: %v", err)
@@ -193,7 +193,7 @@ func TestMockSimulatesTransportFailures(t *testing.T) {
 	if !errors.As(err, &sdk) || sdk.Code != "sdk/timeout" || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("timeout: %v", err)
 	}
-	if _, err = c.Folders.List(ctx); err != nil {
+	if _, err = c.Folders.List(ctx, calmlens.ListFoldersOptions{}); err != nil {
 		t.Fatalf("failure queue not drained: %v", err)
 	}
 	if got := len(c.Requests()); got != 3 {

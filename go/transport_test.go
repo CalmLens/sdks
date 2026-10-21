@@ -79,7 +79,7 @@ func TestTLSFailureIsWrapped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = client.Folders.List(context.Background())
+	_, err = client.Folders.List(context.Background(), ListFoldersOptions{})
 	expectSDKError(t, err, "sdk/transport-error")
 }
 

@@ -318,12 +318,12 @@ const decided = await client.assets.waitForDecision({ assetId: queued.id, timeou
 if (decided.moderation.status === "rejected") hidePhoto(decided.id);
 ```
 
-##### folders.list()
+##### folders.list(options)
 
-List all folders in the current project.
+Fetch one page of immediate child folders. Omit `parentId` for the project root. The response contains `folders`, visible `ancestors`, and `hasMore`; advance `pageIndex` to load more.
 
 ```typescript
-const folders = await client.folders.list();
+const page = await client.folders.list({ parentId: "folder-uuid", pageSize: 100 });
 ```
 
 ##### folders.retrieve(options)

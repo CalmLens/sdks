@@ -350,7 +350,7 @@ func TestResponsesAreLimitedAndKeepIntegerPrecision(t *testing.T) {
 func TestRequestsIdentifyTheSDKAndHideTheKey(t *testing.T) {
 	c, h := setup(t)
 	c.options.APIKey = "sk_live_secret"
-	if _, err := c.Folders.List(context.Background()); err != nil {
+	if _, err := c.Folders.List(context.Background(), ListFoldersOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := h.last().Header.Get("User-Agent"); !strings.HasPrefix(got, "calmlens-go/"+Version+" (go") {

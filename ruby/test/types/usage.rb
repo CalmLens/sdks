@@ -49,7 +49,7 @@ client.assets.delete(asset_id: updated['id'])
 folder = client.folders.create(name: 'Inbox', parent_id: nil)
 client.folders.update(folder_id: folder['id'], name: 'Archive')
 client.folders.move(folder_id: folder['id'], parent_id: nil)
-client.folders.list.map { |item| item['parentId'] }
+client.folders.list['folders'].map { |item| item['parentId'] }
 client.folders.retrieve(folder_id: folder['id'])
 client.folders.delete(folder_id: folder['id'])
 

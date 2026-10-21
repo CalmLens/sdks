@@ -86,7 +86,7 @@ Every request sends `User-Agent: calmlens-go/<Version> (<Go version>; <OS>/<arch
 | `assets.delete` | `Assets.Delete(ctx, AssetIDOptions)` (returns only `error`) |
 | `assets.move` | `Assets.Move(ctx, MoveAssetOptions)` |
 | `assets.createSignedUrl` | `Assets.CreateSignedURL(ctx, SignedURLOptions)` |
-| `folders.list` | `Folders.List(ctx)` |
+| `folders.list` | `Folders.List(ctx, ListFoldersOptions{})` |
 | `folders.retrieve/delete` | `Folders.Retrieve/Delete(ctx, FolderIDOptions)` |
 | `folders.create/update/move` | `Folders.Create/Update/Move(ctx, …FolderOptions)` |
 | `events.list` | `Events.List(ctx, ListEventsOptions)`; follow the cursor: `Events.ListAll(ListEventsOptions)` |
@@ -528,8 +528,8 @@ failures so you can test error handling without a network:
 
 ```go
 mock.FailNext(errors.New("connection reset"), context.DeadlineExceeded)
-_, err = mock.Folders.List(ctx) // *calmlens.Error, Code "sdk/transport-error"
-_, err = mock.Folders.List(ctx) // *calmlens.Error, Code "sdk/timeout"
+_, err = mock.Folders.List(ctx, ListFoldersOptions{}) // *calmlens.Error, Code "sdk/transport-error"
+_, err = mock.Folders.List(ctx, ListFoldersOptions{}) // *calmlens.Error, Code "sdk/timeout"
 
 for _, req := range mock.Requests() {
     // Method "POST", Path "/projects/project/assets" (relative to BaseURL,
@@ -560,3 +560,5 @@ App; no Go registry token is needed.
 `Text.Moderate` is a convenience wrapper around asset moderation: it supplies `text/plain` content and defaults the asset name to `text`, returning the same `*calmlens.Asset` described under [Moderation results](#moderation-results). `assets.create` queues processing; `assets.moderate` waits for classification. The old asset analyze method is removed.
 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.
+
+Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.

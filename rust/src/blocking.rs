@@ -265,7 +265,7 @@ impl AssetsClient<'_> {
 pub struct FoldersClient<'a>(&'a ServerClient);
 blocking_methods!(FoldersClient => folders {
     /// See [`crate::FoldersClient::list`].
-    fn list() -> Result<Vec<Folder>>;
+    fn list(options: ListFolders) -> Result<FolderPage>;
     /// See [`crate::FoldersClient::create`].
     fn create(options: CreateFolder) -> Result<Folder>;
     /// See [`crate::FoldersClient::retrieve`].
