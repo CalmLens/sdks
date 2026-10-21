@@ -37,14 +37,14 @@ const LENSES: EnsureLensOptions[] = [
  * "not decided yet", so it is never shown to other users. Failed processing is final.
  */
 const toStatus = (asset: Asset): ModerationStatus => {
-  if (asset.processing.status === "failed") return "error";
-  if (asset.moderation.status === "approved") return "approved";
-  if (asset.moderation.status === "rejected") return "rejected";
+  if (asset.classification.status === "failed") return "error";
+  if (asset.classification.moderation.decision === "approved") return "approved";
+  if (asset.classification.moderation.decision === "rejected") return "rejected";
   return "pending";
 };
 
 export const toOutcome = (asset: Asset): ModerationOutcome => {
-  const findings = Object.entries(asset.moderation.report?.categories ?? {})
+  const findings = Object.entries(asset.classification.moderation?.categories ?? {})
     .flatMap(([category, result]) =>
       // `not-evaluated` means "unknown", not "safe" — never treat it as a zero score.
       result &&
@@ -64,7 +64,7 @@ export const toOutcome = (asset: Asset): ModerationOutcome => {
     uploadPresetId: asset.uploadPresetId ?? null,
     status: toStatus(asset),
     // The policy took an action (alert, hide or purge) when the content matched it.
-    flagged: asset.moderation.action != null,
+    flagged: asset.classification.moderation.action != null,
     findings,
   };
 };
@@ -100,10 +100,10 @@ export const createCalmLensProvider = (options: {
     mode: "calmlens",
 
     async moderateText({ text, kind, externalId, username }) {
-      // `text.moderate` waits for the decision, which is fast for short text. CalmLens doesn't
+      // `text.classify` waits for the decision, which is fast for short text. CalmLens doesn't
       // keep the text after classifying it by default; our database has it. The SDK retries
       // network failures with an idempotency key, so a retry never creates a second asset.
-      const asset = await client.text.moderate({
+      const asset = await client.text.classify({
         name: `${kind}-${externalId}`,
         externalId,
         metadata: [

@@ -7,7 +7,7 @@ module CalmLens
   # (`asset_id:`) or the API's camelCase (`'assetId'`); keys inside `metadata` are sent unchanged.
   # Any method also accepts `request_options: { idempotency_key:, timeout:, open_timeout:, max_retries: }`.
   # Results are Hashes with the API's camelCase string keys. Fields and enum values added to the API
-  # later appear as they are, so compare `moderation.status` and similar values with known strings
+  # later appear as they are, so compare `classification.moderation.decision` and similar values with known strings
   # and treat anything else as not ready.
   class Assets < Resource
     SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata externalId externalUrl
@@ -15,7 +15,7 @@ module CalmLens
     MIN_MULTIPART_IMAGE_BYTES = 10 * 1024 * 1024
     MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024
     # Moderation statuses that carry a decision; {#wait_for_decision} returns once an asset has one,
-    # or once its processing status is in {FINISHED_PROCESSING_STATUSES}.
+    # or once its classification status is in {FINISHED_PROCESSING_STATUSES}.
     DECIDED_MODERATION_STATUSES = %w[approved rejected].freeze
     # Processing statuses after which no decision will arrive without a retry.
     FINISHED_PROCESSING_STATUSES = %w[failed].freeze
@@ -35,7 +35,7 @@ module CalmLens
     # Lists one page of assets.
     # @option options [String] :cursor from the previous page
     # @option options [Integer] :page_size
-    # @option options [String] :filter an RSQL filter such as `moderation.status==approved`
+    # @option options [String] :filter an RSQL filter such as `classification.moderation.decision==approved`
     # @option options [Array<Hash>] :ordering `[{field: 'createdAt', direction: 'DESC'}]`
     # @return [Hash] `{'items', 'total', 'hasMore', 'cursor', 'pageSize'}`
     def list(options = {})
@@ -88,8 +88,8 @@ module CalmLens
       end
     end
 
-    # Waits until an asset's `moderation.status` is `approved` or `rejected`, or its
-    # `processing.status` is `failed`, and returns the asset. It retrieves the asset, waiting 0.5
+    # Waits until an asset's `classification.moderation.decision` is `approved` or `rejected`, or its
+    # `classification.status` is `failed`, and returns the asset. It retrieves the asset, waiting 0.5
     # seconds before the second check and 1.5 times longer each time after that, up to 5 seconds.
     # Webhooks report decisions without polling.
     #
@@ -99,7 +99,7 @@ module CalmLens
     # @option options [Numeric] :timeout seconds to wait for a decision (default 60)
     # @return [Hash] the decided asset
     # @raise [TimeoutError] `sdk/timeout` when no decision arrives in time; `details` holds
-    #   `'assetId'` and the last `'processingStatus'` and `'moderationStatus'`.
+    #   `'assetId'` and the last `'classificationStatus'` and `'moderationStatus'`.
     def wait_for_decision(options)
       call(options) do |api, request|
         timeout = api.fetch('timeout', DEFAULT_DECISION_TIMEOUT)
@@ -121,7 +121,7 @@ module CalmLens
       end
     end
 
-    # Processes an asset whose `processing.status` is `failed` again.
+    # Processes an asset whose `classification.status` is `failed` again.
     # @option options [String] :asset_id
     # @return [Hash] the asset
     def retry(options)
@@ -131,7 +131,7 @@ module CalmLens
     end
 
     # Removes the stored content and returns the asset with `content.status` `removed` (reason
-    # `requested`); the record and moderation report are kept.
+    # `requested`); the record and classification results are kept.
     # @option options [String] :asset_id
     # @return [Hash] the asset
     def delete_content(options)
@@ -201,25 +201,25 @@ module CalmLens
 
     # Uploads content and waits for the moderation decision where the content type supports it.
     # Audio and video are always processed asynchronously. Takes the options of {#create}.
-    # @return [Hash] the asset; publish only when `moderation.status` is `approved` and
-    #   `moderation.action` is nil.
-    def moderate(options)
+    # @return [Hash] the asset; publish only when `classification.moderation.decision` is `approved` and
+    #   `classification.moderation.action` is nil.
+    def classify(options)
       call(options) do |api, request|
         content = api['content']
         if content.is_a?(Hash) && content.key?('plainText') && (!content['plainText'].is_a?(String) || content['plainText'].strip.empty?)
-          raise Internal.invalid('Text to moderate must be a non-empty string', ErrorCodes::INVALID_UPLOAD_PAYLOAD)
+          raise Internal.invalid('Text to classify must be a non-empty string', ErrorCodes::INVALID_UPLOAD_PAYLOAD)
         end
 
         submit(api, request, false)
       end
     end
 
-    # Uploads a later part of a multipart upload started with {#create} or {#moderate} and `part:`.
+    # Uploads a later part of a multipart upload started with {#create} or {#classify} and `part:`.
     # The queue mode chosen at the start applies; pass `queue:` only to override it.
     # @option options [String] :asset_id
     # @option options [Hash] :part `{data:, part_number:, is_final:}`; part numbers start at 2.
     # @option options [Boolean] :queue
-    # @return [Hash] the asset; `processing.status` stays `uploading` until the final part.
+    # @return [Hash] the asset; `classification.status` stays `uploading` until the final part.
     def upload_part(options)
       call(options) do |api, request|
         path = "/assets/#{Internal.segment(api['assetId'])}/part"
@@ -247,8 +247,8 @@ module CalmLens
       delay = DECISION_POLL_FIRST_DELAY
       loop do
         asset = retrieve('assetId' => asset_id, 'request_options' => request_options)
-        processing = asset.dig('processing', 'status')
-        moderation = asset.dig('moderation', 'status')
+        processing = asset.dig('classification', 'status')
+        moderation = asset.dig('classification', 'moderation', 'decision')
         return asset if DECIDED_MODERATION_STATUSES.include?(moderation) || FINISHED_PROCESSING_STATUSES.include?(processing)
 
         remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -256,7 +256,7 @@ module CalmLens
           raise TimeoutError.new(SdkErrorCodes::TIMEOUT,
                                  "Asset #{asset['id']} had no moderation decision after #{timeout}s " \
                                  "(processing #{processing}, moderation #{moderation})",
-                                 details: { 'assetId' => asset['id'], 'processingStatus' => processing,
+                                 details: { 'assetId' => asset['id'], 'classificationStatus' => processing,
                                             'moderationStatus' => moderation })
         end
 

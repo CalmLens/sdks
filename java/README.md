@@ -17,8 +17,8 @@ import com.calmlens.CalmLensServerClient;
 import com.calmlens.Models.*;
 
 try (var client = CalmLensServerClient.builder(System.getenv("CALMLENS_API_KEY"), System.getenv("CALMLENS_PROJECT_ID")).build()) {
-  Asset asset = client.text.moderate("Hello world");
-  if (asset.moderation().status() == AssetModerationStatus.APPROVED) System.out.println(asset.id());
+  Asset asset = client.text.classify("Hello world");
+  if (asset.classification().moderation().decision() == AssetModerationStatus.APPROVED) System.out.println(asset.id());
 
   Asset queued = client.assets.create(new SubmitAsset("photo.jpg", Content.file(Path.of("photo.jpg"), "image/jpeg"))
       .externalId("post-42").visibility(Visibility.PRIVATE));
@@ -32,42 +32,42 @@ Create one client per API key, share it across threads and close it on shutdown.
 
 | Resource | Methods |
 | --- | --- |
-| `client.assets` | `create`, `moderate`, `search`, `list`, `iterate`, `retrieve`, `waitForDecision`, `update`, `retry`, `deleteContent`, `delete`, `move`, `listChildren`, `iterateChildren`, `uploadPart`, `createSignedUrl` |
-| `client.text` | `moderate` |
+| `client.assets` | `create`, `classify`, `search`, `list`, `iterate`, `retrieve`, `waitForDecision`, `update`, `retry`, `deleteContent`, `delete`, `move`, `listChildren`, `iterateChildren`, `uploadPart`, `createSignedUrl` |
+| `client.text` | `classify` |
 | `client.folders` | `list`, `create`, `retrieve`, `update`, `move`, `delete` |
 | `client.events` | `list`, `pages` |
 | `client.cdn` | `getAssetUrl`, `serve` |
 | `client` | `ensureLens`, `ensureLenses` |
 
-`assets.create` queues processing and returns the asset while its `processing().status()` is `processing`; `assets.moderate` and `text.moderate` wait for classification. `text.moderate` supplies `text/plain` content and names the asset `text` unless you set a name. `assets.deleteContent` removes the stored bytes (the record and report stay, with `content().status()` `removed` and `content().removalReason()` `requested`); `assets.retry` processes an asset whose `processing().status()` is `failed` again; `assets.delete` removes everything.
+`assets.create` queues processing and returns the asset while its `classification().status()` is `processing`; `assets.classify` and `text.classify` wait for classification. `text.classify` supplies `text/plain` content and names the asset `text` unless you set a name. `assets.deleteContent` removes the stored bytes (the record and report stay, with `content().status()` `removed` and `content().removalReason()` `requested`); `assets.retry` processes an asset whose `classification().status()` is `failed` again; `assets.delete` removes everything.
 
-`assets.waitForDecision` retrieves an asset until its `moderation().status()` is `approved` or `rejected`, or its `processing().status()` is `failed`, and returns it. It checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5 seconds. If there's no decision within the timeout (60 seconds by default), it throws `sdk/timeout` with `assetId` and the last `processingStatus` and `moderationStatus` in `getDetails()`. Interrupting the thread stops it with `sdk/cancelled` and keeps the interrupt flag. Webhooks report decisions without polling.
+`assets.waitForDecision` retrieves an asset until its `moderation().status()` is `approved` or `rejected`, or its `classification().status()` is `failed`, and returns it. It checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5 seconds. If there's no decision within the timeout (60 seconds by default), it throws `sdk/timeout` with `assetId` and the last `classificationStatus` and `moderationStatus` in `getDetails()`. Interrupting the thread stops it with `sdk/cancelled` and keeps the interrupt flag. Webhooks report decisions without polling.
 
 ```java
 Asset queued = client.assets.create(new SubmitAsset("photo.jpg", Content.file(Path.of("photo.jpg"), "image/jpeg")));
 Asset decided = client.assets.waitForDecision(new WaitForDecision(queued.id()).timeout(Duration.ofSeconds(30)));
-if (decided.moderation().status() == AssetModerationStatus.REJECTED) hidePhoto(decided.id());
+if (decided.classification().moderation().decision() == AssetModerationStatus.REJECTED) hidePhoto(decided.id());
 ```
 
 Request options live in `com.calmlens.Models`: required fields have constructors and fluent setters configure the rest. Unset options are not sent. In update options, `Patch.value(value)` sets a field, `Patch.clear()` clears it, and leaving it unset keeps it.
 
-Optional analyses are turned on per request with `ProcessingOptions.features`. Every feature is off unless you enable it. OCR stores text in the image’s `content().extractedText()` and adds a text moderation pass to its combined report; person and face detection (beta) write their results to `asset.moderation().report().features()`, where each result has a `status` of `evaluated` (with `people()` or `faces()`, boxes as fractions of the image size) or `not-evaluated` (with a `reason()`):
+Optional analyses are turned on per request with `ProcessingOptions.features`. Every feature is off unless you enable it. OCR stores text in the image’s `content().extractedText()` and adds a text moderation pass to its combined report; person and face detection (beta) write their results to `asset.classification()`, where each result has a `status` of `evaluated` (with `people()` or `faces()`, boxes as fractions of the image size) or `not-evaluated` (with a `reason()`):
 
 ```java
 SubmitAsset photo = new SubmitAsset("photo.jpg", Content.file(Path.of("photo.jpg"), "image/jpeg"))
     .processingOptions(new ProcessingOptions().features(new ProcessingFeatures()
         .ocr(new FeatureOptions(true))
         .faceDetection(new FaceDetectionOptions().enabled(true).ageEstimation(true))));
-Asset asset = client.assets.moderate(photo);
-FaceDetectionResult faces = asset.moderation().report().features().faceDetection();
+Asset asset = client.assets.classify(photo);
+FaceDetectionResult faces = asset.classification().faceDetection();
 if ("evaluated".equals(faces.status())) faces.faces().forEach(face -> System.out.println(face.box() + " " + face.ageRange()));
 ```
 
 ## Responses
 
-Responses are records whose accessors keep the API's camelCase names: `asset.id()`, `asset.moderation().status()`, `asset.moderation().report().categories()`, `event.type()`. An asset's state is grouped in three records: `processing()` (`AssetProcessing`: where it is in the pipeline), `moderation()` (`AssetModeration`: the decision in force, the policy `action()`, which is set when content was flagged, and any reviewer decision) and `content()` (`AssetContent`: whether CalmLens holds the content, and its `format()`, `sizeInBytes()`, `checksums()`, `image()`, `previewImage()`, `extractedText()` and `safetyHold()`). Event and webhook snapshots (`EventAsset`) carry the processing, moderation and content statuses and the moderation action when the event was created. Optional values are `null` when the API omits them; lists inside responses are immutable. Timestamps are `java.time.Instant`. Nested objects are typed records (`AssetProcessing`, `AssetModeration`, `AssetContent`, `Checksums`, `ImageData`, `PreviewImage`, `SafetyHold`, `ExtractedText`, `FlaggedContentPolicy`, `ImageTransformOptions` and so on), and values from a fixed set are strings so values added later still read. Only metadata values and event fact values, where the API accepts any JSON, are untyped: they use `String`, `Long`, `Double`, `Boolean`, `List` and `Map`, so `9007199254740993` stays exact and `5` is `5L`, never `5.0`. `toString()` is readable and never includes the API key; `SignedUrl.toString()` hides the URL's signature.
+Responses are records whose accessors keep the API's camelCase names: `asset.id()`, `asset.classification().moderation().decision()`, `asset.classification().moderation().categories()`, `event.type()`. An asset's state is grouped in three records: `upload()` (`AssetUpload`: receipt of source content), `classification()` (`AssetClassification`: progress, completion time, detections and labels, with safety findings and decisions in `classification().moderation()`) and `content()` (`AssetContent`: whether CalmLens holds the content, and its `format()`, `sizeInBytes()`, `checksums()`, `image()`, `previewImage()`, `extractedText()` and `safetyHold()`). Event and webhook snapshots (`EventAsset`) carry the processing, moderation and content statuses and the moderation action when the event was created. Optional values are `null` when the API omits them; lists inside responses are immutable. Timestamps are `java.time.Instant`. Nested objects are typed records (`AssetClassification`, `AssetModeration`, `AssetContent`, `Checksums`, `ImageData`, `PreviewImage`, `SafetyHold`, `ExtractedText`, `FlaggedContentPolicy`, `ImageTransformOptions` and so on), and values from a fixed set are strings so values added later still read. Only metadata values and event fact values, where the API accepts any JSON, are untyped: they use `String`, `Long`, `Double`, `Boolean`, `List` and `Map`, so `9007199254740993` stays exact and `5` is `5L`, never `5.0`. `toString()` is readable and never includes the API key; `SignedUrl.toString()` hides the URL's signature.
 
-Responses read from newer API versions keep working: unknown fields are ignored, and an unknown status or visibility keeps its raw value (`moderation().status().value()`, `moderation().status().isKnown()` is `false`) instead of failing. Known statuses are `AssetProcessingStatus`, `AssetModerationStatus` and `AssetContentStatus` constants you can compare with `==`. Treat anything other than `AssetModerationStatus.APPROVED` as not publishable. `moderation().report()` is `null` until classification has produced one.
+Responses read from newer API versions keep working: unknown fields are ignored, and an unknown status or visibility keeps its raw value (`moderation().status().value()`, `moderation().status().isKnown()` is `false`) instead of failing. Known statuses are `AssetClassificationStatus`, `AssetModerationStatus` and `AssetContentStatus` constants you can compare with `==`. Treat anything other than `AssetModerationStatus.APPROVED` as not publishable. `moderation().report()` is `null` until classification has produced one.
 
 ## Uploads
 
@@ -83,7 +83,7 @@ client.assets.create(options, new RequestOptions().idempotencyKey(listing.id() +
 
 ## Upload presets
 
-Call `.uploadPresetId(id)` on `SubmitAsset` or `ModerateText` to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.
+Call `.uploadPresetId(id)` on `SubmitAsset` or `ClassifyText` to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.
 
 ```java
 Models.SignedUploadToken signed = client.uploadTokens.sign(
@@ -100,7 +100,7 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets). `MockCalm
 `assets.iterate` and `assets.iterateChildren` return an `AutoPager`, an `Iterable` that requests the next page only when needed:
 
 ```java
-for (Asset asset : client.assets.iterate(new ListAssets().filter("moderation.status==rejected").pageSize(100))) { ... }
+for (Asset asset : client.assets.iterate(new ListAssets().filter("classification.moderation.decision==rejected").pageSize(100))) { ... }
 client.assets.iterateChildren(new ListChildren(photoId)).stream().filter(child -> "plaintext-document".equals(child.type()));
 ```
 
@@ -223,7 +223,7 @@ Requests send `User-Agent: calmlens-java/<version> (Java <runtime version>)`; `C
 
 ## Naming compared with the JavaScript SDK
 
-The Java SDK follows the JavaScript SDK's names (`assets.moderate`, `cdn.serve`, `verifyWebhookSignature`, `createWebhookSignatureHeader(secret, timestamp, body)`, `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS`, `event.type()`), with these Java-specific differences:
+The Java SDK follows the JavaScript SDK's names (`assets.classify`, `cdn.serve`, `verifyWebhookSignature`, `createWebhookSignatureHeader(secret, timestamp, body)`, `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS`, `event.type()`), with these Java-specific differences:
 
 - Webhook helpers are static methods on `CalmLensServerClient`, and `parseWebhookEvent` takes the body, signature, timestamp and secret as arguments instead of an options object.
 - `cdn.serve` returns a closeable `CdnResponse` with a streamed body instead of a fetch `Response`.
@@ -242,7 +242,7 @@ mock.enqueue(200, Map.of("id", "asset-1", "processing", Map.of("status", "done")
 mock.enqueueError(ErrorCodes.ASSET_NOT_FOUND);            // HTTP 404 with the API's error body and a request ID
 mock.enqueueEvents("cursor-2", false, Map.of("id", "e1", "type", "asset.rejected", "assetId", "asset-1"));
 mock.enqueueCdn(200, "image/webp", bytes);
-Asset asset = mock.client.text.moderate("hello");
+Asset asset = mock.client.text.classify("hello");
 MockCalmLensServerClient.Request sent = mock.requests().get(0); // method(), path(), query(), header(...), bodyText()
 ```
 

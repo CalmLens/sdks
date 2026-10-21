@@ -88,7 +88,7 @@ async fn api_errors_carry_status_request_id_and_details() {
 async fn validation_happens_before_the_transport() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue(200, json!({"id":"one"}));
-    let blank = mock.assets().moderate(SubmitAsset::text(" ")).await;
+    let blank = mock.assets().classify(SubmitAsset::text(" ")).await;
     assert_eq!(blank.unwrap_err().code(), &"upload/invalid-payload");
     let unnamed = mock.assets().create(SubmitAsset::default()).await;
     assert_eq!(unnamed.unwrap_err().code(), &"upload/invalid-payload");
@@ -148,7 +148,7 @@ async fn binary_reader_and_stream_content_arrive_unchanged() {
             200,
             Asset::new(
                 "asset-1",
-                AssetProcessingStatus::Processing,
+                AssetClassificationStatus::Processing,
                 AssetModerationStatus::Pending,
             ),
         );
@@ -190,7 +190,7 @@ async fn binary_reader_and_stream_content_arrive_unchanged() {
         200,
         Asset::new(
             "asset-2",
-            AssetProcessingStatus::Processing,
+            AssetClassificationStatus::Processing,
             AssetModerationStatus::Pending,
         ),
     );
@@ -214,7 +214,7 @@ async fn files_stream_from_disk() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Processing,
+            AssetClassificationStatus::Processing,
             AssetModerationStatus::Pending,
         ),
     );
@@ -242,7 +242,7 @@ async fn owned_clients_share_the_mock_queue_and_request_log() {
         200,
         Asset::new(
             "first",
-            AssetProcessingStatus::Done,
+            AssetClassificationStatus::Completed,
             AssetModerationStatus::Approved,
         ),
     );
@@ -250,14 +250,17 @@ async fn owned_clients_share_the_mock_queue_and_request_log() {
         200,
         Asset::new(
             "second",
-            AssetProcessingStatus::Done,
+            AssetClassificationStatus::Completed,
             AssetModerationStatus::Rejected,
         ),
     );
     let first = owned.assets().retrieve(AssetId::new("a")).await.unwrap();
     let second = mock.assets().retrieve(AssetId::new("b")).await.unwrap();
     assert_eq!(first.id, "first");
-    assert_eq!(second.moderation.status, AssetModerationStatus::Rejected);
+    assert_eq!(
+        second.classification.moderation.decision,
+        AssetModerationStatus::Rejected
+    );
     let requests = mock.requests();
     assert_eq!(requests[0].url, "http://localhost:6110/v1/assets/a");
     assert_eq!(requests[1].path, "/v1/assets/b");
@@ -276,7 +279,7 @@ async fn list_assets_scopes_to_a_folder() {
         .list(ListAssets {
             cursor: Some("next-token".into()),
             page_size: Some(12),
-            filter: Some("moderation.status==approved".into()),
+            filter: Some("classification.moderation.decision==approved".into()),
             folder_id: Some("folder-1".into()),
             ..Default::default()
         })
@@ -287,7 +290,7 @@ async fn list_assets_scopes_to_a_folder() {
     assert_eq!(request.query_param("folderId"), Some("folder-1"));
     assert_eq!(
         request.query_param("filter"),
-        Some("moderation.status==approved")
+        Some("classification.moderation.decision==approved")
     );
     assert_eq!(request.query_param("cursor"), Some("next-token"));
 }
@@ -301,12 +304,12 @@ async fn iterate_follows_pages_until_has_more_is_false() {
             vec![
                 Asset::new(
                     "a",
-                    AssetProcessingStatus::Done,
+                    AssetClassificationStatus::Completed,
                     AssetModerationStatus::Approved,
                 ),
                 Asset::new(
                     "b",
-                    AssetProcessingStatus::Done,
+                    AssetClassificationStatus::Completed,
                     AssetModerationStatus::Approved,
                 ),
             ],
@@ -318,7 +321,7 @@ async fn iterate_follows_pages_until_has_more_is_false() {
         page_with_cursor(
             vec![Asset::new(
                 "c",
-                AssetProcessingStatus::Processing,
+                AssetClassificationStatus::Processing,
                 AssetModerationStatus::Pending,
             )],
             false,
@@ -328,7 +331,7 @@ async fn iterate_follows_pages_until_has_more_is_false() {
         .assets()
         .iterate(ListAssets {
             page_size: Some(2),
-            filter: Some("moderation.status==approved".into()),
+            filter: Some("classification.moderation.decision==approved".into()),
             ..Default::default()
         })
         .map_ok(|asset| asset.id)
@@ -349,10 +352,13 @@ async fn iterate_follows_pages_until_has_more_is_false() {
     assert_eq!(
         pages,
         [
-            ("".to_owned(), "moderation.status==approved".to_owned()),
+            (
+                "".to_owned(),
+                "classification.moderation.decision==approved".to_owned()
+            ),
             (
                 "next-token".to_owned(),
-                "moderation.status==approved".to_owned()
+                "classification.moderation.decision==approved".to_owned()
             )
         ]
     );
@@ -363,7 +369,7 @@ async fn iterate_follows_pages_until_has_more_is_false() {
         page_with_cursor(
             vec![Asset::new(
                 "child-1",
-                AssetProcessingStatus::Done,
+                AssetClassificationStatus::Completed,
                 AssetModerationStatus::Approved,
             )],
             true,
@@ -448,7 +454,7 @@ async fn reads_are_retried_after_unavailable_and_rate_limits() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Done,
+            AssetClassificationStatus::Completed,
             AssetModerationStatus::Approved,
         ),
     );
@@ -492,7 +498,7 @@ async fn uploads_retry_with_one_idempotency_key() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Processing,
+            AssetClassificationStatus::Processing,
             AssetModerationStatus::Pending,
         ),
     );
@@ -514,7 +520,7 @@ async fn uploads_retry_with_one_idempotency_key() {
         200,
         Asset::new(
             "asset-2",
-            AssetProcessingStatus::Processing,
+            AssetClassificationStatus::Processing,
             AssetModerationStatus::Pending,
         ),
     );
@@ -566,7 +572,7 @@ async fn multipart_parts_use_the_saved_queue_choice() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Uploading,
+            AssetClassificationStatus::Pending,
             AssetModerationStatus::Pending,
         ),
     );
@@ -591,7 +597,7 @@ async fn multipart_parts_use_the_saved_queue_choice() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Processing,
+            AssetClassificationStatus::Processing,
             AssetModerationStatus::Pending,
         ),
     );
@@ -613,7 +619,7 @@ async fn multipart_parts_use_the_saved_queue_choice() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Done,
+            AssetClassificationStatus::Completed,
             AssetModerationStatus::Approved,
         ),
     );
@@ -827,7 +833,7 @@ async fn patch_clear_is_distinct_from_omission() {
         200,
         Asset::new(
             "asset",
-            AssetProcessingStatus::Done,
+            AssetClassificationStatus::Completed,
             AssetModerationStatus::Approved,
         ),
     );
@@ -886,7 +892,7 @@ async fn pagination_stops_when_a_page_does_not_advance() {
 
 fn enqueue_status(
     mock: &MockServerClient,
-    processing: AssetProcessingStatus,
+    processing: AssetClassificationStatus,
     moderation: AssetModerationStatus,
     count: usize,
 ) {
@@ -903,13 +909,13 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
     let mock = MockServerClient::new().unwrap();
     enqueue_status(
         &mock,
-        AssetProcessingStatus::Processing,
+        AssetClassificationStatus::Processing,
         AssetModerationStatus::Pending,
         7,
     );
     enqueue_status(
         &mock,
-        AssetProcessingStatus::Done,
+        AssetClassificationStatus::Completed,
         AssetModerationStatus::Rejected,
         1,
     );
@@ -921,7 +927,10 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
         .unwrap();
     let waited = started.elapsed();
     assert_eq!(asset.id, "asset-1");
-    assert_eq!(asset.moderation.status, AssetModerationStatus::Rejected);
+    assert_eq!(
+        asset.classification.moderation.decision,
+        AssetModerationStatus::Rejected
+    );
     let requests: Vec<_> = mock
         .requests()
         .into_iter()
@@ -944,7 +953,7 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
     let mock = MockServerClient::new().unwrap();
     enqueue_status(
         &mock,
-        AssetProcessingStatus::Processing,
+        AssetClassificationStatus::Processing,
         AssetModerationStatus::Pending,
         10,
     );
@@ -960,7 +969,7 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
     assert_eq!(error.code(), &ErrorCode::Timeout);
     assert_eq!(
         Value::Object(error.details().clone()),
-        json!({"assetId": "asset-1", "processingStatus": "processing", "moderationStatus": "pending"})
+        json!({"assetId": "asset-1", "classificationStatus": "processing", "moderationStatus": "pending"})
     );
     // Checks at 0, 0.5, 1.25 and 2.375s, then a shortened wait so the last check is at 3s.
     assert_eq!(mock.requests().len(), 5);
@@ -976,7 +985,7 @@ async fn dropping_wait_for_decision_stops_retrieving() {
     let mock = MockServerClient::new().unwrap();
     enqueue_status(
         &mock,
-        AssetProcessingStatus::Processing,
+        AssetClassificationStatus::Processing,
         AssetModerationStatus::Pending,
         10,
     );

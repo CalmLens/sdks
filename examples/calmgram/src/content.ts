@@ -14,7 +14,7 @@ import { describeFindings, type ModerationOutcome } from "./moderation/types";
 import { rememberAsset, sandboxForAsset, saveSandbox } from "./sandbox";
 
 // All of Calmgram's moderation logic lives here. The pattern:
-//   text (captions, comments, bios) → moderate synchronously, refuse to save if rejected
+//   text (captions, comments, bios) → classify synchronously, refuse to save if rejected
 //   images                         → upload, mark pending, resolve via webhook or polling
 // With an upload preset, the browser uploads the photo straight to CalmLens with a token this
 // server signed, then submits the asset ID. Without JavaScript (or a preset), it posts the photo

@@ -21,7 +21,7 @@ form.addEventListener("submit", async (event) => {
   try {
     // Uploads straight to CalmLens and waits for the moderation decision.
     // The browser can only set the name and description; the preset controls the rest.
-    const asset = await client.assets.moderate({
+    const asset = await client.assets.classify({
       name: file.name,
       description: message,
       content: { data: file, type: file.type },

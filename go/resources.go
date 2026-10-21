@@ -58,8 +58,8 @@ func (s *AssetsService) Update(ctx context.Context, options UpdateAssetOptions) 
 	return s.assetRequest(ctx, "PATCH", options.AssetID, "", options)
 }
 
-// Retry processes an asset that failed to process (Processing.Status ProcessingStatusFailed)
-// again: processing returns to ProcessingStatusProcessing and moderation to
+// Retry processes an asset that failed to process (Processing.Status ClassificationStatusFailed)
+// again: processing returns to ClassificationStatusProcessing and moderation to
 // ModerationStatusPending.
 func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Asset, error) {
 	return s.assetRequest(ctx, "POST", options.AssetID, "/retry", nil)
@@ -75,10 +75,10 @@ const (
 
 // WaitForDecision retrieves an asset until it has a moderation decision (Moderation.Status
 // ModerationStatusApproved or ModerationStatusRejected) or its processing failed
-// (Processing.Status ProcessingStatusFailed), and returns that asset. It waits 0.5s before the
+// (Processing.Status ClassificationStatusFailed), and returns that asset. It waits 0.5s before the
 // second check and 1.5 times longer each time after that, up to 5s. When Timeout
 // (default DefaultDecisionTimeout) passes without a decision it returns a *Error with code
-// sdk/timeout and Details {"assetId", "processingStatus", "moderationStatus"} holding the last
+// sdk/timeout and Details {"assetId", "classificationStatus", "moderationStatus"} holding the last
 // statuses seen. Cancelling ctx
 // stops waiting with sdk/cancelled. Webhooks report decisions without polling.
 func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDecisionOptions) (*Asset, error) {
@@ -100,15 +100,15 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 			return nil, err
 		}
 		switch {
-		case asset.Moderation.Status == ModerationStatusApproved, asset.Moderation.Status == ModerationStatusRejected, asset.Processing.Status == ProcessingStatusFailed:
+		case asset.Classification.Moderation.Decision == ModerationStatusApproved, asset.Classification.Moderation.Decision == ModerationStatusRejected, asset.Classification.Status == ClassificationStatusFailed:
 			return asset, nil
 		}
 		remaining := deadline.Sub(s.c.now())
 		if remaining <= 0 {
 			return nil, &Error{
 				Code:    CodeSDKTimeout,
-				Message: "Asset " + asset.ID + " had no moderation decision after " + timeout.String() + " (processing " + asset.Processing.Status + ", moderation " + asset.Moderation.Status + ")",
-				Details: JSON{"assetId": asset.ID, "processingStatus": asset.Processing.Status, "moderationStatus": asset.Moderation.Status},
+				Message: "Asset " + asset.ID + " had no moderation decision after " + timeout.String() + " (processing " + asset.Classification.Status + ", moderation " + asset.Classification.Moderation.Decision + ")",
+				Details: JSON{"assetId": asset.ID, "classificationStatus": asset.Classification.Status, "moderationStatus": asset.Classification.Moderation.Decision},
 			}
 		}
 		if err = s.c.sleep(ctx, min(delay, remaining)); err != nil {
@@ -119,7 +119,7 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 }
 
 // DeleteContent removes the asset's stored content (source, preview and retained extracted
-// text) and keeps the record, metadata and moderation report. The returned asset has
+// text) and keeps the record, metadata and classification results. The returned asset has
 // Content.Status ContentStatusRemoved with RemovalReason ContentRemovalReasonRequested, and the
 // CDN no longer serves its content.
 func (s *AssetsService) DeleteContent(ctx context.Context, options AssetIDOptions) (*Asset, error) {
@@ -338,13 +338,13 @@ func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.
 	return response, nil
 }
 
-// Moderate moderates plain text and waits for the decision.
-func (s *TextService) Moderate(ctx context.Context, options ModerateTextOptions) (*Asset, error) {
+// Classify moderates plain text and waits for the decision.
+func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions) (*Asset, error) {
 	if strings.TrimSpace(options.Text) == "" {
-		return nil, invalid(CodeInvalidUploadPayload, "Text to moderate must be a non-empty string")
+		return nil, invalid(CodeInvalidUploadPayload, "Text to classify must be a non-empty string")
 	}
 	if options.Name == "" {
 		options.Name = "text"
 	}
-	return s.c.Assets.Moderate(ctx, SubmitAssetOptions{Name: options.Name, Content: &Content{Type: "text/plain", PlainText: &options.Text}, Description: options.Description, ProcessingOptions: options.ProcessingOptions, Metadata: options.Metadata, ExternalID: options.ExternalID, ExternalURL: options.ExternalURL, FolderID: options.FolderID, UploadPresetID: options.UploadPresetID, IdempotencyKey: options.IdempotencyKey})
+	return s.c.Assets.Classify(ctx, SubmitAssetOptions{Name: options.Name, Content: &Content{Type: "text/plain", PlainText: &options.Text}, Description: options.Description, ProcessingOptions: options.ProcessingOptions, Metadata: options.Metadata, ExternalID: options.ExternalID, ExternalURL: options.ExternalURL, FolderID: options.FolderID, UploadPresetID: options.UploadPresetID, IdempotencyKey: options.IdempotencyKey})
 }

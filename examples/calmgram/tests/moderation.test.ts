@@ -3,22 +3,23 @@ import { createCalmLensProvider, toOutcome } from "../src/moderation/calmlens";
 
 test("preserves pending and failed decisions without inventing safe scores", () => {
   const cases = [
-    { processing: "uploading", moderation: "pending", expected: "pending" },
+    { processing: "pending", moderation: "pending", expected: "pending" },
     { processing: "processing", moderation: "pending", expected: "pending" },
     { processing: "failed", moderation: "pending", expected: "error" },
-    { processing: "done", moderation: "rejected", expected: "rejected" },
-    { processing: "done", moderation: "quarantined", expected: "pending" },
+    { processing: "completed", moderation: "rejected", expected: "rejected" },
+    { processing: "completed", moderation: "quarantined", expected: "pending" },
   ];
   for (const { processing, moderation, expected } of cases) {
     const outcome = toOutcome({
       id: "asset",
       externalId: "post-1",
       uploadPresetId: "preset-1",
-      processing: { status: processing },
-      moderation: {
-        status: moderation,
-        action: "hide",
-        report: {
+      upload: { status: "completed" },
+      classification: {
+        status: processing,
+        moderation: {
+          decision: moderation,
+          action: "hide",
           categories: {
             violence: { status: "not-evaluated" },
             harassment: { status: "evaluated", score: 0.8 },
@@ -41,8 +42,11 @@ test("preserves pending and failed decisions without inventing safe scores", () 
 test("an asset the policy took no action on is not flagged", () => {
   const outcome = toOutcome({
     id: "asset",
-    processing: { status: "done" },
-    moderation: { status: "approved", action: null, report: { categories: {} } },
+    upload: { status: "completed" },
+    classification: {
+      status: "completed",
+      moderation: { decision: "approved", action: null, categories: {} },
+    },
   } as any);
   expect(outcome).toMatchObject({ status: "approved", flagged: false });
 });
@@ -60,14 +64,41 @@ test("waits for CalmLens's decision, and reports a post still pending when none 
       const status = remaining.length > 1 ? remaining.shift()! : remaining[0]!;
       return Response.json({
         id: assetId,
-        processing: { status: status === "rejected" ? "done" : "processing" },
-        moderation: {
-          status,
-          action: status === "rejected" ? "hide" : null,
-          report:
-            status === "rejected"
+        upload: { status: "completed" },
+        classification: {
+          status: status === "rejected" ? "completed" : "processing",
+          labels: (status === "rejected"
+            ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
+            : null
+          )?.labels,
+          personDetection: (status === "rejected"
+            ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
+            : null
+          )?.features?.personDetection,
+          faceDetection: (status === "rejected"
+            ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
+            : null
+          )?.features?.faceDetection,
+          moderation: {
+            decision: status,
+            action: status === "rejected" ? "hide" : null,
+            categories: (status === "rejected"
               ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-              : null,
+              : null
+            )?.categories,
+            score: (status === "rejected"
+              ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
+              : null
+            )?.score,
+            policy: (status === "rejected"
+              ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
+              : null
+            )?.policy,
+            timeline: (status === "rejected"
+              ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
+              : null
+            )?.media,
+          },
         },
       });
     },

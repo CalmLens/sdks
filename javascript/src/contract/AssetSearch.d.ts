@@ -1,12 +1,12 @@
 import * as zod from "zod";
 //#region packages/shared/src/AssetSearch.d.ts
 declare const ASSET_SEARCH_MATCH_FIELD_SCHEMA: zod.ZodEnum<{
+  "classification.moderation.decision": "classification.moderation.decision";
   "content.extension": "content.extension";
   "content.format": "content.format";
   description: "description";
   externalId: "externalId";
   id: "id";
-  "moderation.status": "moderation.status";
   name: "name";
   tags: "tags";
   transcript: "transcript";
@@ -77,38 +77,42 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       private: "private";
       public: "public";
     }>>>;
-    processing: zod.ZodObject<{
+    upload: zod.ZodObject<{
       status: zod.ZodEnum<{
-        done: "done";
-        failed: "failed";
-        processing: "processing";
+        completed: "completed";
         uploading: "uploading";
       }>;
       updatedAt: zod.ZodNullable<zod.ZodNumber>;
-      uploadPartsReceived: zod.ZodNullable<zod.ZodNumber>;
+      partsReceived: zod.ZodNullable<zod.ZodNumber>;
     }, zod.core.$strip>;
-    moderation: zod.ZodObject<{
+    classification: zod.ZodObject<{
       status: zod.ZodEnum<{
-        approved: "approved";
+        completed: "completed";
+        failed: "failed";
         pending: "pending";
-        rejected: "rejected";
+        processing: "processing";
       }>;
-      action: zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
-        hide: "hide";
-        purge: "purge";
-      }>>;
-      reviewerAction: zod.ZodNullable<zod.ZodEnum<{
-        approved: "approved";
-        rejected: "rejected";
-      }>>;
-      reviewerNote: zod.ZodNullable<zod.ZodString>;
-      reviewerUserId: zod.ZodNullable<zod.ZodString>;
-      reviewedAt: zod.ZodNullable<zod.ZodNumber>;
-      decidedAt: zod.ZodNullable<zod.ZodNumber>;
-      report: zod.ZodNullable<zod.ZodObject<{
-        processedAt: zod.ZodNumber;
-        categories: zod.ZodObject<{
+      updatedAt: zod.ZodNullable<zod.ZodNumber>;
+      completedAt: zod.ZodNullable<zod.ZodNumber>;
+      moderation: zod.ZodObject<{
+        decision: zod.ZodEnum<{
+          approved: "approved";
+          pending: "pending";
+          rejected: "rejected";
+        }>;
+        action: zod.ZodNullable<zod.ZodEnum<{
+          alert: "alert";
+          hide: "hide";
+          purge: "purge";
+        }>>;
+        reviewerAction: zod.ZodNullable<zod.ZodEnum<{
+          approved: "approved";
+          rejected: "rejected";
+        }>>;
+        reviewerNote: zod.ZodNullable<zod.ZodString>;
+        reviewerUserId: zod.ZodNullable<zod.ZodString>;
+        reviewedAt: zod.ZodNullable<zod.ZodNumber>;
+        categories: zod.ZodOptional<zod.ZodObject<{
           sexual: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
             status: zod.ZodLiteral<"evaluated">;
             likelihood: zod.ZodEnum<{
@@ -1675,10 +1679,9 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               }>;
             }, zod.core.$strict>], "status">>>;
           }, zod.core.$strict>], "status">;
-        }, zod.core.$strict>;
-        score: zod.ZodNumber;
-        notes: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
-        media: zod.ZodOptional<zod.ZodObject<{
+        }, zod.core.$strict>>;
+        score: zod.ZodOptional<zod.ZodNumber>;
+        timeline: zod.ZodOptional<zod.ZodObject<{
           durationSeconds: zod.ZodNumber;
           frameIntervalSeconds: zod.ZodOptional<zod.ZodNumber>;
           sampledFrames: zod.ZodNumber;
@@ -3262,77 +3265,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }, zod.core.$strict>;
           }, zod.core.$strict>>;
         }, zod.core.$strict>>;
-        labels: zod.ZodOptional<zod.ZodNullable<zod.ZodArray<zod.ZodObject<{
-          description: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
-          score: zod.ZodNumber;
-          topicalityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-          likelihood: zod.ZodEnum<{
-            likely: "likely";
-            possible: "possible";
-            unlikely: "unlikely";
-            "very-likely": "very-likely";
-            "very-unlikely": "very-unlikely";
-          }>;
-          knowledgeBaseId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
-        }, zod.core.$strip>>>>;
-        features: zod.ZodOptional<zod.ZodObject<{
-          personDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-            status: zod.ZodLiteral<"evaluated">;
-            stage: zod.ZodEnum<{
-              beta: "beta";
-              ga: "ga";
-            }>;
-            people: zod.ZodArray<zod.ZodObject<{
-              box: zod.ZodObject<{
-                left: zod.ZodNumber;
-                top: zod.ZodNumber;
-                width: zod.ZodNumber;
-                height: zod.ZodNumber;
-              }, zod.core.$strict>;
-              confidence: zod.ZodNumber;
-            }, zod.core.$strict>>;
-          }, zod.core.$strict>, zod.ZodObject<{
-            status: zod.ZodLiteral<"not-evaluated">;
-            stage: zod.ZodEnum<{
-              beta: "beta";
-              ga: "ga";
-            }>;
-            reason: zod.ZodEnum<{
-              "not-supported": "not-supported";
-              unavailable: "unavailable";
-            }>;
-          }, zod.core.$strict>], "status">>;
-          faceDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-            status: zod.ZodLiteral<"evaluated">;
-            stage: zod.ZodEnum<{
-              beta: "beta";
-              ga: "ga";
-            }>;
-            faces: zod.ZodArray<zod.ZodObject<{
-              box: zod.ZodObject<{
-                left: zod.ZodNumber;
-                top: zod.ZodNumber;
-                width: zod.ZodNumber;
-                height: zod.ZodNumber;
-              }, zod.core.$strict>;
-              confidence: zod.ZodNumber;
-              ageRange: zod.ZodOptional<zod.ZodObject<{
-                low: zod.ZodNumber;
-                high: zod.ZodNumber;
-              }, zod.core.$strict>>;
-            }, zod.core.$strict>>;
-          }, zod.core.$strict>, zod.ZodObject<{
-            status: zod.ZodLiteral<"not-evaluated">;
-            stage: zod.ZodEnum<{
-              beta: "beta";
-              ga: "ga";
-            }>;
-            reason: zod.ZodEnum<{
-              "not-supported": "not-supported";
-              unavailable: "unavailable";
-            }>;
-          }, zod.core.$strict>], "status">>;
-        }, zod.core.$strict>>;
         policy: zod.ZodOptional<zod.ZodObject<{
           score: zod.ZodNumber;
           categories: zod.ZodRecord<zod.ZodEnum<{
@@ -3532,7 +3464,76 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>>;
           }, zod.core.$strict>>;
         }, zod.core.$strict>>;
-      }, zod.core.$strict>>;
+      }, zod.core.$strip>;
+      personDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        people: zod.ZodArray<zod.ZodObject<{
+          box: zod.ZodObject<{
+            left: zod.ZodNumber;
+            top: zod.ZodNumber;
+            width: zod.ZodNumber;
+            height: zod.ZodNumber;
+          }, zod.core.$strict>;
+          confidence: zod.ZodNumber;
+        }, zod.core.$strict>>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>;
+      faceDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        faces: zod.ZodArray<zod.ZodObject<{
+          box: zod.ZodObject<{
+            left: zod.ZodNumber;
+            top: zod.ZodNumber;
+            width: zod.ZodNumber;
+            height: zod.ZodNumber;
+          }, zod.core.$strict>;
+          confidence: zod.ZodNumber;
+          ageRange: zod.ZodOptional<zod.ZodObject<{
+            low: zod.ZodNumber;
+            high: zod.ZodNumber;
+          }, zod.core.$strict>>;
+        }, zod.core.$strict>>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>;
+      labels: zod.ZodOptional<zod.ZodNullable<zod.ZodArray<zod.ZodObject<{
+        description: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
+        score: zod.ZodNumber;
+        topicalityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        likelihood: zod.ZodEnum<{
+          likely: "likely";
+          possible: "possible";
+          unlikely: "unlikely";
+          "very-likely": "very-likely";
+          "very-unlikely": "very-unlikely";
+        }>;
+        knowledgeBaseId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
+      }, zod.core.$strip>>>>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{
       status: zod.ZodEnum<{
@@ -3588,12 +3589,12 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>;
   score: zod.ZodNumber;
   matchedFields: zod.ZodArray<zod.ZodEnum<{
+    "classification.moderation.decision": "classification.moderation.decision";
     "content.extension": "content.extension";
     "content.format": "content.format";
     description: "description";
     externalId: "externalId";
     id: "id";
-    "moderation.status": "moderation.status";
     name: "name";
     tags: "tags";
     transcript: "transcript";

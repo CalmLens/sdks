@@ -77,7 +77,7 @@ final class Demo implements Calmmarket.Backend {
     if (photo.demoReviewerRejected) {
       // A reviewer's decision replaces the automated one; the policy action stays as it was.
       Map<String, Object> moderation = moderation(asset);
-      moderation.put("status", "rejected");
+      moderation.put("decision", "rejected");
       moderation.put("reviewerAction", "rejected");
       moderation.put("reviewerNote", "Simulated portal decision");
     }
@@ -116,8 +116,8 @@ final class Demo implements Calmmarket.Backend {
     event.put("title", "Asset rejected");
     event.put("assetId", photo.assetId);
     event.put("asset", Map.of("id", photo.assetId, "externalId", photo.externalId,
-        "processing", Map.of("status", "done"),
-        "moderation", moderationSnapshot("rejected", photo.moderationAction),
+        "upload", Map.of("status", "completed"),
+        "classification", Map.of("status", "completed", "moderation", moderationSnapshot("rejected", photo.moderationAction)),
         "content", Map.of("status", "stored")));
     event.put("facts", List.of(
         Map.of("key", "asset-name", "value", photo.name),
@@ -143,24 +143,27 @@ final class Demo implements Calmmarket.Backend {
     String processing = switch (decision) {
       case "pending" -> "processing";
       case "error" -> "failed";
-      default -> "done";
+      default -> "completed";
     };
-    asset.put("processing", Map.of("status", processing));
+    Map<String, Object> classification = new LinkedHashMap<>();
+    classification.put("status", processing);
+    asset.put("upload", Map.of("status", "completed"));
+    asset.put("classification", classification);
     Map<String, Object> moderation = new LinkedHashMap<>();
-    moderation.put("status", decision.equals("approved") || decision.equals("rejected") ? decision : "pending");
+    moderation.put("decision", decision.equals("approved") || decision.equals("rejected") ? decision : "pending");
     moderation.put("action", action);
-    moderation.put("report", report);
-    asset.put("moderation", moderation);
+    if (report != null) { moderation.putAll(report); moderation.remove("processedAt"); }
+    classification.put("moderation", moderation);
     asset.put("content", Map.of("status", "stored"));
     return asset;
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> moderation(Map<String, Object> asset) { return (Map<String, Object>) asset.get("moderation"); }
+  private static Map<String, Object> moderation(Map<String, Object> asset) { return (Map<String, Object>) ((Map<String, Object>) asset.get("classification")).get("moderation"); }
 
   private static Map<String, Object> moderationSnapshot(String status, String action) {
     Map<String, Object> moderation = new LinkedHashMap<>();
-    moderation.put("status", status);
+    moderation.put("decision", status);
     moderation.put("action", action);
     return moderation;
   }

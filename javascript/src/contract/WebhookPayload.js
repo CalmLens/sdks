@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-BfJcm_Af.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, E as metaStore, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-Cl2l0Vo_.js";
 import "./SharedConstants-Dn7ZJF5S.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-B5dqc8aj.js";
@@ -152,10 +152,10 @@ Object.fromEntries(MODERATION_POLICY_CATEGORIES.map((category) => [category, MIN
 //#endregion
 //#region packages/shared/src/Asset.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
-const ASSET_PROCESSING_STATUS_SCHEMA = zod.enum([
-	"uploading",
+const ASSET_CLASSIFICATION_STATUS_SCHEMA = zod.enum([
+	"pending",
 	"processing",
-	"done",
+	"completed",
 	"failed"
 ]);
 /** The moderation outcome in force: a reviewer's decision when there is one, else the automated one. */
@@ -303,16 +303,18 @@ const STORED_ASSET_SCHEMA = zod.object({
 		description: "Array of tags for the asset",
 		placeholder: "[\"tag1\", \"tag2\"]"
 	})])),
-	report: CLASSIFICATION_REPORT_SCHEMA.nullish().describe("Moderation report, set once classification finishes. See [Report format](/docs/guides/moderation-reports)."),
-	processingStatus: ASSET_PROCESSING_STATUS_SCHEMA,
-	processingUpdatedAt: zod.number().nullish(),
+	report: CLASSIFICATION_REPORT_SCHEMA.nullish().describe("Moderation report, set once classification finishes. See [Report format](/docs/guides/classification-results)."),
+	uploadStatus: zod.enum(["uploading", "completed"]).default("completed"),
+	uploadUpdatedAt: zod.number().nullish(),
+	classificationStatus: ASSET_CLASSIFICATION_STATUS_SCHEMA,
+	classificationUpdatedAt: zod.number().nullish(),
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
 	moderationAction: ASSET_MODERATION_ACTION_SCHEMA.nullish(),
 	reviewerAction: ASSET_REVIEWER_ACTION_SCHEMA.nullish(),
 	reviewerNote: saneStringField({ type: "large" }).nullish(),
 	reviewerUserId: saneStringField().nullish(),
 	reviewedAt: zod.number().nullish(),
-	decidedAt: zod.number().nullish(),
+	completedAt: zod.number().nullish(),
 	contentStatus: ASSET_CONTENT_STATUS_SCHEMA,
 	contentRemovalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullish(),
 	contentUpdatedAt: zod.number().nullish(),
@@ -329,26 +331,42 @@ const STORED_ASSET_SCHEMA = zod.object({
 })]));
 const PUBLIC_PREVIEW_IMAGE_SCHEMA = PREVIEW_IMAGE_SCHEMA.omit({ id: true });
 const epoch = (description) => zod.number().nullable().describe(`${description}, in milliseconds since the Unix epoch`);
-const ASSET_PROCESSING_SCHEMA = zod.object({
-	status: ASSET_PROCESSING_STATUS_SCHEMA.describe("Where the asset is in the pipeline: `uploading` while its content arrives, `processing`, then `done` or `failed`"),
-	updatedAt: epoch("When the processing status last changed"),
-	uploadPartsReceived: zod.number().int().nullable().describe("How many parts of a multipart upload have been received; `null` otherwise")
+const ASSET_UPLOAD_STATUS_SCHEMA = zod.enum(["uploading", "completed"]);
+const ASSET_UPLOAD_SCHEMA = zod.object({
+	status: ASSET_UPLOAD_STATUS_SCHEMA,
+	updatedAt: epoch("When upload state last changed"),
+	partsReceived: zod.number().int().nullable()
 }).meta(metaStore([docPropertyInfo({
-	description: "Processing state",
-	namedType: "AssetProcessing"
+	description: "Upload state",
+	namedType: "AssetUpload"
 })]));
+/** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
-	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force: `pending` until moderation finishes, then `approved` or `rejected`. A reviewer's decision takes precedence over the automated one."),
-	action: ASSET_MODERATION_ACTION_SCHEMA.nullable().describe("What your policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged. Kept after a reviewer decides."),
-	reviewerAction: ASSET_REVIEWER_ACTION_SCHEMA.nullable().describe("A reviewer's decision (`approved` or `rejected`), or `null` when no reviewer has decided"),
-	reviewerNote: zod.string().nullable().describe("The reviewer's note, or `null`"),
-	reviewerUserId: zod.string().nullable().describe("ID of the user who reviewed the asset, or `null`"),
+	decision: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force: pending, approved or rejected. A reviewer's decision takes precedence."),
+	action: ASSET_MODERATION_ACTION_SCHEMA.nullable(),
+	reviewerAction: ASSET_REVIEWER_ACTION_SCHEMA.nullable(),
+	reviewerNote: zod.string().nullable(),
+	reviewerUserId: zod.string().nullable(),
 	reviewedAt: epoch("When a reviewer decided"),
-	decidedAt: epoch("When the decision in force was made"),
-	report: CLASSIFICATION_REPORT_SCHEMA.nullable().describe("Moderation report, set once classification finishes. See [Report format](/docs/guides/moderation-reports).")
+	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
+	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),
+	timeline: CLASSIFICATION_REPORT_SCHEMA.shape.media,
+	policy: CLASSIFICATION_REPORT_SCHEMA.shape.policy
 }).meta(metaStore([docPropertyInfo({
-	description: "Moderation state",
+	description: "Moderation findings and decision",
 	namedType: "AssetModeration"
+})]));
+const ASSET_CLASSIFICATION_SCHEMA = zod.object({
+	status: ASSET_CLASSIFICATION_STATUS_SCHEMA,
+	updatedAt: epoch("When classification state last changed"),
+	completedAt: epoch("When classification completed"),
+	moderation: ASSET_MODERATION_SCHEMA,
+	personDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.personDetection,
+	faceDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.faceDetection,
+	labels: CLASSIFICATION_REPORT_SCHEMA.shape.labels
+}).meta(metaStore([docPropertyInfo({
+	description: "Classification results",
+	namedType: "AssetClassification"
 })]));
 const ASSET_CONTENT_SCHEMA = zod.object({
 	status: ASSET_CONTENT_STATUS_SCHEMA.describe("Whether CalmLens holds the content (source, preview and extracted text): `temporary` until processing finishes, `stored`, or `removed`"),
@@ -385,8 +403,8 @@ STORED_ASSET_SCHEMA.pick({
 	processingOptions: true,
 	visibility: true
 }).extend({
-	processing: ASSET_PROCESSING_SCHEMA,
-	moderation: ASSET_MODERATION_SCHEMA,
+	upload: ASSET_UPLOAD_SCHEMA,
+	classification: ASSET_CLASSIFICATION_SCHEMA,
 	content: ASSET_CONTENT_SCHEMA
 }).meta(metaStore([docPropertyInfo({
 	description: "An asset in the system",
@@ -399,20 +417,23 @@ STORED_ASSET_SCHEMA.pick({
 		createdAt: 17672256e5,
 		description: "Front view of a blue backpack",
 		tags: ["catalogue", "backpacks"],
-		processing: {
-			status: "done",
-			updatedAt: 1767225601e3,
-			uploadPartsReceived: null
+		upload: {
+			status: "completed",
+			updatedAt: 17672256e5,
+			partsReceived: null
 		},
-		moderation: {
-			status: "approved",
-			action: null,
-			reviewerAction: null,
-			reviewerNote: null,
-			reviewerUserId: null,
-			reviewedAt: null,
-			decidedAt: 1767225601e3,
-			report: null
+		classification: {
+			status: "completed",
+			updatedAt: 1767225601e3,
+			completedAt: 1767225601e3,
+			moderation: {
+				decision: "approved",
+				action: null,
+				reviewerAction: null,
+				reviewerNote: null,
+				reviewerUserId: null,
+				reviewedAt: null
+			}
 		},
 		content: {
 			status: "stored",
@@ -567,7 +588,7 @@ const ASSET_FLAGGED = defineEventType({
 		assetType: assetTypeField,
 		flaggedCategories: field(zod.array(zod.string()), {
 			label: "Categories",
-			description: "The matched parent policy categories. Inspect the asset's moderation report for qualifier detail.",
+			description: "The matched parent policy categories. Inspect the asset's classification results for qualifier detail.",
 			display: "list"
 		}),
 		moderationAction: field(ASSET_MODERATION_ACTION_SCHEMA.nullish(), {
@@ -666,7 +687,7 @@ const ASSET_FAILED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
-		previousStatus: field(ASSET_PROCESSING_STATUS_SCHEMA.nullish(), {
+		previousStatus: field(ASSET_CLASSIFICATION_STATUS_SCHEMA.nullish(), {
 			label: "Previous status",
 			description: "The asset's processing status before it failed, such as `processing`.",
 			display: "enum"
@@ -837,7 +858,7 @@ const ASSET_DELETED = defineEventType({
 const ASSET_CONTENT_REMOVED = defineEventType({
 	id: "asset.content-removed",
 	name: "Content removed",
-	description: "An asset's stored content was removed on request. The asset and its moderation report remain.",
+	description: "An asset's stored content was removed on request. The asset and its classification results remain.",
 	category: "assets",
 	severity: "low",
 	notify: false,
@@ -1241,11 +1262,14 @@ const EVENT_FACTS_SCHEMA = zod.array(EVENT_FACT_SCHEMA);
 const EVENT_ASSET_SCHEMA = zod.object({
 	id: zod.string().describe("Asset ID"),
 	externalId: zod.string().nullish().describe("The asset's `externalId`, if you set one"),
-	processing: zod.object({ status: ASSET_PROCESSING_STATUS_SCHEMA }).describe("The asset's processing status when the event was created"),
-	moderation: zod.object({
-		status: ASSET_MODERATION_STATUS_SCHEMA,
-		action: ASSET_MODERATION_ACTION_SCHEMA.nullable()
-	}).describe("The moderation decision and policy action when the event was created"),
+	upload: zod.object({ status: zod.enum(["uploading", "completed"]) }),
+	classification: zod.object({
+		status: ASSET_CLASSIFICATION_STATUS_SCHEMA,
+		moderation: zod.object({
+			decision: ASSET_MODERATION_STATUS_SCHEMA,
+			action: ASSET_MODERATION_ACTION_SCHEMA.nullable()
+		})
+	}),
 	content: zod.object({ status: ASSET_CONTENT_STATUS_SCHEMA }).describe("Whether CalmLens held the asset's content when the event was created")
 });
 const EVENT_FIELDS = {

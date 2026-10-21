@@ -36,10 +36,10 @@ const client = new CalmLensServerClient({
 });
 
 // Text (comments, captions, bios): waits for the decision
-const comment = await client.text.moderate({ text: "Great photo!", externalId: "comment-42" });
+const comment = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 
-if (comment.moderation.status === "approved") {
-  // publish it; if comment.moderation.action is "alert", also queue it for review
+if (comment.classification.moderation.decision === "approved") {
+  // publish it; if comment.classification.moderation.action is "alert", also queue it for review
 } else {
   // "rejected": don't publish it
 }
@@ -50,19 +50,19 @@ const image = await client.assets.create({
   content: { data: file, type: "image/jpeg" },
   externalId: "post-7",
 });
-console.log(image.processing.status, image.moderation.status); // "processing" "pending"
+console.log(image.classification.status, image.classification.moderation.decision); // "processing" "pending"
 ```
 
-| `processing.status` | `moderation.status` | `moderation.action` | Meaning |
+| `classification.status` | `classification.moderation.decision` | `classification.moderation.action` | Meaning |
 | --- | --- | --- | --- |
-| `done` | `approved` | `null` | Safe to show. |
-| `done` | `approved` | `alert` | Show it, but your policy asked to be alerted. |
-| `done` | `rejected` | `hide` or `purge` | Your policy hid or purged it. Don't show it. |
+| `completed` | `approved` | `null` | Safe to show. |
+| `completed` | `approved` | `alert` | Show it, but your policy asked to be alerted. |
+| `completed` | `rejected` | `hide` or `purge` | Your policy hid or purged it. Don't show it. |
 | `uploading` or `processing` | `pending` | `null` | Still being received or classified. |
 | `failed` | `pending` | `null` | Processing failed; see `assets.retry`. |
 
-A reviewer's decision (`moderation.reviewerAction`) takes precedence over the automated one in
-`moderation.status`; `moderation.action` keeps what your policy did.
+A reviewer's decision (`classification.moderation.reviewerAction`) takes precedence over the automated one in
+`classification.moderation.decision`; `classification.moderation.action` keeps what your policy did.
 
 See [How CalmLens works](https://calmlens.com/docs/how-it-works) and [Testing your integration](https://calmlens.com/docs/guides/testing) for test inputs that trigger rejections safely.
 
@@ -131,36 +131,36 @@ const asset = await client.assets.create({
 const asset = await client.assets.create({
   name: "website-content",
   url: "https://example.com/page",
-  description: "Web page to moderate"
+  description: "Web page to classify"
 });
 ```
 
-##### assets.moderate(options) and text.moderate(options)
+##### assets.classify(options) and text.classify(options)
 
-Submit an asset and wait for classification to finish. Accepts the same options as `assets.create()` for text, images, documents, and URLs. `text.moderate({ text, name?, externalId?, ... })` is a shortcut that sends `text` as `text/plain` content named `text` by default.
+Submit an asset and wait for classification to finish. Accepts the same options as `assets.create()` for text, images, documents, and URLs. `text.classify({ text, name?, externalId?, ... })` is a shortcut that sends `text` as `text/plain` content named `text` by default.
 
 ```typescript
-async assets.moderate(options: SubmitAssetOptions): Promise<Asset>
-async text.moderate(options: ModerateTextOptions): Promise<Asset>
+async assets.classify(options: SubmitAssetOptions): Promise<Asset>
+async text.classify(options: ClassifyTextOptions): Promise<Asset>
 ```
 
 Both resolve to the stored `Asset`, a plain object with camelCase keys exactly as the API returns it:
 
 ```typescript
-const asset = await client.text.moderate({ text: "Great photo!", externalId: "comment-42" });
+const asset = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 asset.id;            // string
-asset.processing.status;  // "uploading" | "processing" | "done" | "failed"; audio and video keep processing in the background
-asset.moderation.status;  // "pending" | "approved" | "rejected"
-asset.moderation.action;  // "alert" | "hide" | "purge", what your policy did with flagged content; null when nothing was flagged
-asset.moderation.report?.score;                         // number, the overall score
-asset.moderation.report?.categories.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
+asset.classification.status;  // "pending" | "processing" | "completed" | "failed"; audio and video keep processing in the background
+asset.classification.moderation.decision;  // "pending" | "approved" | "rejected"
+asset.classification.moderation.action;  // "alert" | "hide" | "purge", what your policy did with flagged content; null when nothing was flagged
+asset.classification.moderation?.score;                         // number, the overall score
+asset.classification.moderation?.categories.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
 asset.content.status;     // "temporary" | "stored" | "removed"
 asset.content.removalReason; // "policy" | "retention" | "requested" | "parent-removed" | "disposed" | null
 asset.type;               // "plaintext-document" for text
 asset.createdAt;          // milliseconds since the Unix epoch
 ```
 
-Always present: `id`, `projectId`, `name`, `type`, `createdAt`, `updatedAt`, `processing`, `moderation` and `content` (with their `status` fields). Other fields may be `null`: `moderation.report` until classification finishes (and when processing failed), `moderation.action` when nothing was flagged, the `moderation.reviewer*` fields until a reviewer decides, `externalId`, `description`, `metadata`, `folderId`, `visibility` and `processingOptions` when you did not set them, and `content.format`, `content.sizeInBytes`, `content.image`, `content.previewImage` and `content.extractedText` when they do not apply to the content. Content is `temporary` until processing finishes and then `removed` (reason `retention`) unless you set `processingOptions.keepContentAfterProcessing`. Inside a report, a category's `score` and `likelihood` exist only when its `status` is `evaluated` or `partial` (see [Moderation Reports](#moderation-reports)).
+Always present: `id`, `projectId`, `name`, `type`, `createdAt`, `updatedAt`, `upload`, `classification` and `content`. Classification contains its progress, completion time and results grouped by capability. `classification.moderation.categories` and `score` are absent until findings are available; optional detections appear only when requested. Moderation decisions and reviewer details sit under `classification.moderation`. Content is removed after classification unless `processingOptions.keepContentAfterProcessing` is enabled. Check each category’s evaluation `status` before reading its score.
 
 ##### assets.retrieve(options)
 
@@ -173,8 +173,8 @@ async assets.retrieve(options: { assetId: string }): Promise<Asset>
 **Example:**
 ```typescript
 const asset = await client.assets.retrieve({ assetId: "asset-uuid-here" });
-console.log(asset.moderation.status);
-console.log(asset.moderation.report); // Classification results
+console.log(asset.classification.moderation.decision);
+console.log(asset.classification.moderation); // Classification results
 ```
 
 ##### ensureLens(options)
@@ -236,14 +236,14 @@ const result = await client.assets.list({
 
 console.log(`Received ${result.items.length} assets`);
 result.items.forEach(asset => {
-  console.log(`${asset.name}: ${asset.moderation.status}`);
+  console.log(`${asset.name}: ${asset.classification.moderation.decision}`);
 });
 ```
 
 To read every matching asset, iterate instead of paging by hand. Pages are fetched as you go using continuation cursors. Inserting or deleting other assets does not shift the cursor position. To page manually, pass `nextCursor` as `cursor` with the same filters and ordering until it is null. Lists are not snapshots; assets may still be deleted or change filter membership during traversal.
 
 ```typescript
-for await (const asset of client.assets.iterate({ filter: "moderation.status==rejected", pageSize: 100 })) {
+for await (const asset of client.assets.iterate({ filter: "classification.moderation.decision==rejected", pageSize: 100 })) {
   console.log(asset.id);
 }
 ```
@@ -296,26 +296,26 @@ await client.assets.move({
 
 ##### assets.retry(options)
 
-Process an asset whose processing failed (`processing.status` `failed`) again. It returns to
+Process an asset whose processing failed (`classification.status` `failed`) again. It returns to
 `processing` and is moderated like a new upload, so handle the result the same way (webhook or polling). Its content must still be stored:
 otherwise this throws `asset/content-unavailable`, and you need to upload it again.
 
 ```typescript
 const asset = await client.assets.retry({ assetId: "asset-uuid" });
-// asset.processing.status === "processing"
+// asset.classification.status === "processing"
 ```
 
 ##### assets.waitForDecision(options)
 
-Wait for an asset's moderation decision and get the decided asset: it returns once `moderation.status`
-is `approved` or `rejected`, or `processing.status` is `failed`. The SDK checks the asset every few seconds and rejects with `sdk/timeout` if there's no decision within
+Wait for an asset's moderation decision and get the decided asset: it returns once `classification.moderation.decision`
+is `approved` or `rejected`, or `classification.status` is `failed`. The SDK checks the asset every few seconds and rejects with `sdk/timeout` if there's no decision within
 `timeoutMs` (default 60000). Pass `signal` to stop waiting early (`sdk/cancelled`). Use it after
 `assets.create`, or with an asset ID you stored earlier. Webhooks report decisions without polling.
 
 ```typescript
 const queued = await client.assets.create({ name: "photo.jpg", content: { blob, type: "image/jpeg" } });
 const decided = await client.assets.waitForDecision({ assetId: queued.id, timeoutMs: 30_000 });
-if (decided.moderation.status === "rejected") hidePhoto(decided.id);
+if (decided.classification.moderation.decision === "rejected") hidePhoto(decided.id);
 ```
 
 ##### folders.list(options)
@@ -411,7 +411,7 @@ Private CDN content cannot be read directly with API keys. Use a short-lived sig
 
 Use `create` with `part` to start multipart uploads, and `uploadPart` for subsequent chunks. `partNumber` defaults to `1` and `isFinal` defaults to `false` when starting an upload.
 
-The queue mode is chosen when the upload starts and saved by CalmLens: an upload started with `create` is queued when its final part arrives, one started with `moderate` waits for the decision. Later parts can come from another process that only knows the asset ID. Pass `queue` to `uploadPart` to override the saved choice for the final part. Pass `totalSizeInBytes` when you start the upload if you know the file's size, so CalmLens rejects an upload that could never finish before you send the rest.
+The queue mode is chosen when the upload starts and saved by CalmLens: an upload started with `create` is queued when its final part arrives, one started with `classify` waits for the decision. Later parts can come from another process that only knows the asset ID. Pass `queue` to `uploadPart` to override the saved choice for the final part. Pass `totalSizeInBytes` when you start the upload if you know the file's size, so CalmLens rejects an upload that could never finish before you send the rest.
 
 Image upload sizes use distinct direct and multipart paths:
 
@@ -455,7 +455,7 @@ const completed = await client.assets.uploadPart({
 
 **Example (single-call synchronous analysis):**
 ```typescript
-const analyzed = await client.assets.moderate({
+const analyzed = await client.assets.classify({
   name: "large-image.png",
   part: {
     base64: finalPartBase64,
@@ -463,7 +463,7 @@ const analyzed = await client.assets.moderate({
     isFinal: true
   }
 });
-console.log(analyzed.moderation.status);
+console.log(analyzed.classification.moderation.decision);
 ```
 
 #### Static Methods
@@ -500,13 +500,13 @@ const client = new CalmLensAppClient({
   token: () => fetch("/api/upload-token", { method: "POST" }).then((r) => r.json()).then((b) => b.token),
 });
 
-const asset = await client.assets.moderate({ name: file.name, content: { data: file, type: file.type } });
+const asset = await client.assets.classify({ name: file.name, content: { data: file, type: file.type } });
 // asset.status (the moderation status) is present when the preset shows decisions to uploaders
 ```
 
 **Options:** `uploadPresetId` (required), `token` (a string, or a function that returns one or a promise of one), plus `baseUrl`, `fetch`, `uploadFetch`, `timeoutMs`, `uploadTimeoutMs`, `maxRetries`, `maxResponseBytes` and `signal` as for `CalmLensServerClient`. Passing `apiKey` throws `sdk/invalid-config`.
 
-The client has `assets.create`, `assets.moderate`, `assets.uploadPart` and `assets.retrieve`, for its own uploads, and each returns an `UploadedAsset`. It fetches a new token for each upload and reuses that token for the upload's parts and status checks.
+The client has `assets.create`, `assets.classify`, `assets.uploadPart` and `assets.retrieve`, for its own uploads, and each returns an `UploadedAsset`. It fetches a new token for each upload and reuses that token for the upload's parts and status checks.
 
 The same client works in React Native and Expo apps. Mobile apps send no `Origin` header, so use a preset that requires a token and leave its allowed sites empty. Pass the picked file's bytes, for example `content: { buffer: await new File(uri).arrayBuffer(), type }` with `expo-file-system`. See the [Calmsnap example](https://github.com/CalmLens/sdks/tree/main/examples/mobile-uploads-expo).
 
@@ -520,7 +520,7 @@ const { token, expiresAt } = await client.uploadTokens.sign({
 });
 ```
 
-Server uploads can also pass `uploadPresetId` to `assets.create` or `assets.moderate` to apply a preset's folder, visibility, file types and size limit. See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
+Server uploads can also pass `uploadPresetId` to `assets.create` or `assets.classify` to apply a preset's folder, visibility, file types and size limit. See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
 
 ## Asset Types
 
@@ -537,8 +537,9 @@ Assets can be of the following types:
 
 An asset's state is split in three:
 
-- `processing.status`: `uploading` (a multipart upload is accepting more parts), `processing`, then `done` or `failed`
-- `moderation.status`: `pending` until moderation finishes, then `approved` or `rejected`. A reviewer's decision (`moderation.reviewerAction`) takes precedence over the automated one. `moderation.action` is what your policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged; an `alert` leaves the asset `approved`.
+- `upload.status`: `uploading` while source content is arriving, then `completed`
+- `classification.status`: `pending`, `processing`, `completed` or `failed`
+- `classification.moderation.decision`: `pending` until moderation finishes, then `approved` or `rejected`. A reviewer's decision (`classification.moderation.reviewerAction`) takes precedence over the automated one. `classification.moderation.action` is what your policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged; an `alert` leaves the asset `approved`.
 - `content.status`: `temporary` (kept only until processing finishes), `stored` or `removed`, with `content.removalReason` `policy` (purged), `retention` (`keepContentAfterProcessing` off), `requested`, `parent-removed` or `disposed`
 
 ## Moderation Reports
@@ -554,7 +555,7 @@ if (violence?.status === 'evaluated' || violence?.status === 'partial') {
 }
 ```
 
-See the [moderation report guide](https://calmlens.com/docs/guides/moderation-reports) for aggregation, provider coverage, OCR merging, and policy actions. General Sexual Content moderation does not estimate age or provide dedicated CSAM detection.
+See the [classification results guide](https://calmlens.com/docs/guides/classification-results) for aggregation, provider coverage, OCR merging, and policy actions. General Sexual Content moderation does not estimate age or provide dedicated CSAM detection.
 
 ## Asset Visibility
 
@@ -610,10 +611,10 @@ Upload content is checked before it is sent with the same codes the API uses, su
 
 The client retries a request when repeating it is safe: reads (`GET`), and creates and uploads, which always carry an `Idempotency-Key` header. It retries failures that happened before any response, `429`, `502`, `503`, `504` and `idempotency/request-in-progress`, up to `maxRetries` times (default 2) with jittered exponential backoff, waiting for `Retry-After` when the API sends one (up to 60 seconds; longer waits are returned to you as the error's `retryAfter`). Other writes, such as `assets.move`, and uploads of a `ReadableStream`, which the first attempt consumed, are never retried.
 
-`assets.create`, `assets.moderate`, `text.moderate` and `assets.uploadPart` generate a new key for each call and reuse it for their own retries, so a retry returns the original response instead of creating a second asset. To retry safely across processes or restarts, pass your own key:
+`assets.create`, `assets.classify`, `text.classify` and `assets.uploadPart` generate a new key for each call and reuse it for their own retries, so a retry returns the original response instead of creating a second asset. To retry safely across processes or restarts, pass your own key:
 
 ```typescript
-await client.text.moderate({
+await client.text.classify({
   text: comment.body,
   externalId: `comment-${comment.id}`,
   idempotencyKey: `comment-${comment.id}`,
@@ -624,7 +625,7 @@ The API keeps a response for 24 hours. Reusing a key for a different request fai
 
 ## Forward compatibility
 
-The SDK does not validate responses against its types, so fields and values added to the API later reach your code unchanged. `AssetProcessingStatus`, `AssetModerationStatus`, `AssetModerationAction`, `AssetReviewerAction`, `AssetContentStatus`, `AssetContentRemovalReason`, `AssetType` and `AssetVisibility` include `string` for that reason: handle values you don't know (for example, treat an unknown status as "not ready"). Event types and fact keys are typed for the ones this version knows; keep a default branch when you switch on them.
+The SDK does not validate responses against its types, so fields and values added to the API later reach your code unchanged. `AssetClassificationStatus`, `AssetModerationStatus`, `AssetModerationAction`, `AssetReviewerAction`, `AssetContentStatus`, `AssetContentRemovalReason`, `AssetType` and `AssetVisibility` include `string` for that reason: handle values you don't know (for example, treat an unknown status as "not ready"). Event types and fact keys are typed for the ones this version knows; keep a default branch when you switch on them.
 
 ## Testing
 
@@ -645,16 +646,16 @@ const client = new MockCalmLensServerClient({
 
 It behaves like the API where tests depend on it: errors carry the API's code, HTTP `status`, a `requestId` and `headers`; `assets.list` applies `ordering`, `folderId` and simple `filter` expressions (comparisons joined by `;` and `,`; anything else throws `sdk/invalid-argument` rather than returning wrong results); `assets.search` matches names, IDs, external IDs, descriptions and tags; multipart parts must arrive in order and the queue mode chosen at the start applies to the final part; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `approved`) set where queued and waited-for uploads end up (`pending`, `approved`, `rejected` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, and `assets.deleteContent` removes it with reason `requested`; a reused `idempotencyKey` replays the first result; and `cdn.serve` returns CDN-like responses with JSON error bodies. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
 
-Every call is recorded in `client.calls` as `{ operation, options }`, where `operation` is the method path (`"text.moderate"`, `"assets.retrieve"`, `"events.list"`, ...) and `options` is the object you passed. `client.callsTo(operation)` filters them. To test failure handling, `client.failNextRequest()` makes the next call throw the same `CalmLensError` the real client throws when the network fails (`sdk/transport-error`); pass `"timeout"` for `sdk/timeout`, or any `Error` to throw it as is, and `{ operation }` to fail only that method. Each queued failure is used once.
+Every call is recorded in `client.calls` as `{ operation, options }`, where `operation` is the method path (`"text.classify"`, `"assets.retrieve"`, `"events.list"`, ...) and `options` is the object you passed. `client.callsTo(operation)` filters them. To test failure handling, `client.failNextRequest()` makes the next call throw the same `CalmLensError` the real client throws when the network fails (`sdk/transport-error`); pass `"timeout"` for `sdk/timeout`, or any `Error` to throw it as is, and `{ operation }` to fail only that method. Each queued failure is used once.
 
 ```typescript
 const client = new MockCalmLensServerClient({ apiKey: createMockApiKey(), projectId, timeoutMs: 5_000 });
 
-client.failNextRequest("timeout", { operation: "text.moderate" });
+client.failNextRequest("timeout", { operation: "text.classify" });
 await expect(postComment(client, "hello")).rejects.toMatchObject({ code: "sdk/timeout" });
 
 await postComment(client, "hello");
-expect(client.callsTo("text.moderate")[0]?.options).toMatchObject({ text: "hello" });
+expect(client.callsTo("text.classify")[0]?.options).toMatchObject({ text: "hello" });
 ```
 
 To test a webhook handler, build a signed delivery the way CalmLens sends it:
@@ -802,7 +803,7 @@ Set `timeoutMs` (default 120000), `uploadTimeoutMs`, `maxRetries` or `signal` on
 
 Requests send `User-Agent: calmlens-js/<version> (<runtime>/<version>)` from server runtimes; `SDK_VERSION` exports the version. Core model types (`Asset`, `Folder`, `Lens`, `AssetPage`, `EventsPage`, `ClassificationReport`) and request types are exported from the package root.
 
-`text.moderate` is a convenience wrapper around asset moderation: it supplies `text/plain` content and defaults the asset name to `text`. `assets.create` queues processing; `assets.moderate` waits for classification.
+`text.classify` is a convenience wrapper around asset moderation: it supplies `text/plain` content and defaults the asset name to `text`. `assets.create` queues processing; `assets.classify` waits for classification.
 
 ## Releasing
 
@@ -831,4 +832,4 @@ The entry also exports `generateTestTextCode` and `detectTestTrigger` for text
 test inputs. Use your project's test input key; another project's key does not
 activate its test signals.
 
-Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.

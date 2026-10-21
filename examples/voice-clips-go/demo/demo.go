@@ -46,7 +46,7 @@ func (b *Backend) ServerClient() *calmlens.ServerClient { return b.Mock.ServerCl
 // audio/video report.
 func (b *Backend) Settle(assetID, choice string, video bool) {
 	b.Mock.WithStorage(func(db *calmlenstest.InMemoryDatabaseStorage, _ *calmlenstest.InMemoryImageStorage) {
-		if stored := db.Assets[assetID]; stored != nil && Section(stored, "processing")["status"] == calmlens.ProcessingStatusProcessing {
+		if stored := db.Assets[assetID]; stored != nil && Section(stored, "classification")["status"] == calmlens.ClassificationStatusProcessing {
 			apply(stored, choice, video)
 		}
 	})
@@ -64,9 +64,9 @@ func Section(stored calmlens.JSON, key string) calmlens.JSON {
 }
 
 func apply(stored calmlens.JSON, choice string, video bool) {
-	processing, moderation := Section(stored, "processing"), Section(stored, "moderation")
+	processing, moderation := Section(stored, "classification"), Section(Section(stored, "classification"), "moderation")
 	if choice == "error" {
-		processing["status"] = calmlens.ProcessingStatusFailed
+		processing["status"] = calmlens.ClassificationStatusFailed
 		return
 	}
 	ranges := [][2]float64{{0, 30}, {29, Duration}}
@@ -98,18 +98,19 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 		media["sampledFrames"] = 98
 	}
 	// The policy's action: none for a clean clip, alert to publish a flagged one, hide to reject.
-	processing["status"] = calmlens.ProcessingStatusDone
-	moderation["status"], moderation["action"] = calmlens.ModerationStatusApproved, nil
+	processing["status"] = calmlens.ClassificationStatusCompleted
+	moderation["decision"], moderation["action"] = calmlens.ModerationStatusApproved, nil
 	switch choice {
 	case "flagged":
 		moderation["action"] = calmlens.ModerationActionAlert
 	case "rejected":
-		moderation["status"], moderation["action"] = calmlens.ModerationStatusRejected, calmlens.ModerationActionHide
+		moderation["decision"], moderation["action"] = calmlens.ModerationStatusRejected, calmlens.ModerationActionHide
 	}
-	moderation["report"] = calmlens.JSON{
-		"processedAt": time.Now().UnixMilli(), "score": top,
-		"labels": []any{}, "categories": categories, "media": media,
-	}
+	processing["completedAt"] = time.Now().UnixMilli()
+	moderation["score"] = top
+	moderation["categories"] = categories
+	moderation["timeline"] = media
+
 }
 
 func categoryResult(score float64) calmlens.JSON {

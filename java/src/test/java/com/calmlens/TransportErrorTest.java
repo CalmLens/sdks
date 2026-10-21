@@ -207,7 +207,7 @@ class TransportErrorTest {
   @Test void nonObjectResponsesAreInvalid() {
     for (String body : List.of("[]", "\"text\"", "null")) {
       var client = CalmLensServerClient.builder("key", "project").transport(request -> Fixtures.json(200, body)).build();
-      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(ApiException.class, () -> client.assets.moderate(Models.SubmitAsset.text("hi"))).getCode(), body);
+      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(ApiException.class, () -> client.assets.classify(Models.SubmitAsset.text("hi"))).getCode(), body);
       assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(ApiException.class, () -> client.folders.list(new Models.ListFolders())).getCode(), body);
       assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(ApiException.class, () -> client.ensureLens(new Models.LensDefinition().identifier("thumb"))).getCode(), body);
     }

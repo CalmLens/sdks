@@ -131,10 +131,10 @@ func signedRequest(t *testing.T, body string, now time.Time) *http.Request {
 
 func TestParseAndVerifyWebhookRequest(t *testing.T) {
 	now := time.Unix(1760000000, 0)
-	body := `{"id":"event-1","type":"asset.rejected","createdAt":1760000000000,"projectId":"p","data":{"severity":"low","title":"t","assetId":"a","asset":{"id":"a","externalId":null,"processing":{"status":"done"},"moderation":{"status":"rejected","action":"hide"},"content":{"status":"removed"}},"facts":[{"key":"limit","value":9007199254740993},{"key":"test","value":true}]}}`
+	body := `{"id": "event-1", "type": "asset.rejected", "createdAt": 1760000000000, "projectId": "p", "data": {"severity": "low", "title": "t", "assetId": "a", "asset": {"id": "a", "externalId": null, "content": {"status": "removed"}, "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"action": "hide", "decision": "rejected"}}}, "facts": [{"key": "limit", "value": 9007199254740993}, {"key": "test", "value": true}]}}`
 	req := signedRequest(t, body, now)
 	event, err := VerifyWebhookRequest(req, "secret", WithNow(now))
-	if err != nil || event.ID != "event-1" || *event.Data.AssetID != "a" || !event.Data.Facts.IsTest() || event.Data.Asset.Processing.Status != ProcessingStatusDone || event.Data.Asset.Moderation.Status != ModerationStatusRejected || *event.Data.Asset.Moderation.Action != ModerationActionHide || event.Data.Asset.Content.Status != ContentStatusRemoved || event.Data.Asset.ExternalID != nil {
+	if err != nil || event.ID != "event-1" || *event.Data.AssetID != "a" || !event.Data.Facts.IsTest() || event.Data.Asset.Classification.Status != ClassificationStatusCompleted || event.Data.Asset.Classification.Moderation.Decision != ModerationStatusRejected || *event.Data.Asset.Classification.Moderation.Action != ModerationActionHide || event.Data.Asset.Content.Status != ContentStatusRemoved || event.Data.Asset.ExternalID != nil {
 		t.Fatal(event, err)
 	}
 	if limit, ok := event.Data.Facts[0].Int64(); !ok || limit != 9007199254740993 {

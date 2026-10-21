@@ -59,7 +59,7 @@ describe("CalmLensAppClient", () => {
     let issued = 0;
     const { client, sent } = createPresetClient(() => `clut_token-${++issued}`);
     await client.assets.create({ name: "a.png", content: image });
-    await client.assets.moderate({ name: "b.png", content: image });
+    await client.assets.classify({ name: "b.png", content: image });
 
     expect(sent.map(({ method, path, upload }) => `${method} ${path} ${upload}`)).toEqual([
       `POST /v1/upload-presets/${PRESET_ID}/assets content`,
@@ -109,8 +109,8 @@ describe("CalmLensAppClient", () => {
   it("has only upload methods and no way to sign tokens", () => {
     const { client } = createPresetClient();
     expect(Object.keys(client.assets).sort()).toEqual([
+      "classify",
       "create",
-      "moderate",
       "retrieve",
       "uploadPart",
     ]);

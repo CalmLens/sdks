@@ -5,7 +5,7 @@ import { createMockApiKey, MockCalmLensServerClient } from "../src/testing";
 
 const projectId = "123e4567-e89b-12d3-a456-426614174000";
 
-describe("assets.moderate", () => {
+describe("assets.classify", () => {
   test("text convenience uses the same synchronous asset path", async () => {
     let query: URLSearchParams | undefined;
     const client = new CalmLensServerClient({
@@ -15,13 +15,13 @@ describe("assets.moderate", () => {
         query = new URL(String(url)).searchParams;
         return Response.json({
           id: "asset",
-          processing: { status: "done" },
-          moderation: { status: "approved" },
+          upload: { status: "completed" },
+          classification: { status: "completed", moderation: { decision: "approved" } },
         });
       },
     });
-    const asset = await client.text.moderate({ text: "hello" });
-    expect(asset.moderation.status).toBe("approved");
+    const asset = await client.text.classify({ text: "hello" });
+    expect(asset.classification.moderation.decision).toBe("approved");
     expect(query?.get("queue")).toBe("false");
     expect(query?.get("name")).toBe("text");
     expect(query?.get("contentType")).toBe("text/plain");
@@ -33,20 +33,20 @@ describe("assets.moderate", () => {
       requests.push({ url: new URL(String(input)), init });
       return Response.json({
         id: "asset-id",
-        processing: { status: "done" },
-        moderation: { status: "approved" },
+        upload: { status: "completed" },
+        classification: { status: "completed", moderation: { decision: "approved" } },
       });
     };
     const client = new CalmLensServerClient({ apiKey: "test-api-key", projectId, uploadFetch });
 
-    const asset = await client.assets.moderate({
+    const asset = await client.assets.classify({
       name: "text",
       externalId: "comment-42",
       metadata: [{ id: "kind", value: "comment" }],
       content: { plainText: "Lovely photo!", type: "text/plain" },
     });
 
-    expect(asset.moderation.status).toBe("approved");
+    expect(asset.classification.moderation.decision).toBe("approved");
     expect(requests).toHaveLength(1);
     const [{ url, init }] = requests;
     expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
@@ -68,13 +68,13 @@ describe("assets.moderate", () => {
         name = new URL(String(input)).searchParams.get("name");
         return Response.json({
           id: "asset-id",
-          processing: { status: "done" },
-          moderation: { status: "approved" },
+          upload: { status: "completed" },
+          classification: { status: "completed", moderation: { decision: "approved" } },
         });
       },
     });
 
-    await client.assets.moderate({
+    await client.assets.classify({
       name: "comment-42",
       content: { plainText: "hi", type: "text/plain" },
     });
@@ -92,7 +92,7 @@ describe("assets.moderate", () => {
     });
 
     const error = await client.assets
-      .moderate({ name: "text", content: { plainText: "   ", type: "text/plain" } })
+      .classify({ name: "text", content: { plainText: "   ", type: "text/plain" } })
       .catch((e) => e);
 
     expect(error).toBeInstanceOf(CalmLensError);
@@ -106,14 +106,14 @@ describe("assets.moderate", () => {
       mockOptions: { analyzedOutcome: "rejected" },
     });
 
-    const asset = await client.assets.moderate({
+    const asset = await client.assets.classify({
       name: "text",
       externalId: "c-1",
       content: { plainText: "unsafe content", type: "text/plain" },
     });
 
     expect(asset.type).toBe("plaintext-document");
-    expect(asset.moderation.status).toBe("rejected");
+    expect(asset.classification.moderation.decision).toBe("rejected");
     expect(asset.externalId).toBe("c-1");
   });
 });

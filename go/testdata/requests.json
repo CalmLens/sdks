@@ -1,6 +1,6 @@
 [
   {
-    "operation": "text.moderate",
+    "operation": "text.classify",
     "options": {
       "text": "héllo 🌍",
       "metadata": [
@@ -24,21 +24,24 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
   {
-    "operation": "assets.moderate",
+    "operation": "assets.classify",
     "options": {
       "name": "text",
       "content": {
@@ -66,16 +69,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -111,21 +117,24 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
   {
-    "operation": "assets.moderate",
+    "operation": "assets.classify",
     "options": {
       "name": "note.txt",
       "content": {
@@ -146,16 +155,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -182,16 +194,19 @@
         {
           "asset": {
             "id": "asset-1",
-            "processing": {
-              "status": "done"
-            },
-            "moderation": {
-              "status": "approved",
-              "action": null
-            },
             "content": {
               "status": "removed",
               "removalReason": "retention"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "approved",
+                "action": null
+              }
             }
           },
           "score": 0.85,
@@ -207,14 +222,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "moderation.status==approved"
+      "filter": "classification.moderation.decision==approved"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets/page",
       "query": {
         "pageSize": "20",
-        "filter": "moderation.status==approved"
+        "filter": "classification.moderation.decision==approved"
       },
       "body": null
     },
@@ -222,16 +237,19 @@
       "items": [
         {
           "id": "asset-1",
-          "processing": {
-            "status": "done"
-          },
-          "moderation": {
-            "status": "approved",
-            "action": null
-          },
           "content": {
             "status": "removed",
             "removalReason": "retention"
+          },
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "moderation": {
+              "decision": "approved",
+              "action": null
+            }
           }
         }
       ],
@@ -263,16 +281,19 @@
         {
           "asset": {
             "id": "asset-1",
-            "processing": {
-              "status": "done"
-            },
-            "moderation": {
-              "status": "approved",
-              "action": null
-            },
             "content": {
               "status": "removed",
               "removalReason": "retention"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "approved",
+                "action": null
+              }
             }
           },
           "score": 0.85,
@@ -298,7 +319,7 @@
           "direction": "ASC"
         }
       ],
-      "filter": "moderation.status==approved,name==\"a&b #1\""
+      "filter": "classification.moderation.decision==approved,name==\"a&b #1\""
     },
     "request": {
       "method": "GET",
@@ -309,7 +330,7 @@
         "ordering[0][direction]": "DESC",
         "ordering[1][field]": "id",
         "ordering[1][direction]": "ASC",
-        "filter": "moderation.status==approved,name==\"a&b #1\""
+        "filter": "classification.moderation.decision==approved,name==\"a&b #1\""
       },
       "body": null
     },
@@ -317,16 +338,19 @@
       "items": [
         {
           "id": "asset-1",
-          "processing": {
-            "status": "done"
-          },
-          "moderation": {
-            "status": "approved",
-            "action": null
-          },
           "content": {
             "status": "removed",
             "removalReason": "retention"
+          },
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "moderation": {
+              "decision": "approved",
+              "action": null
+            }
           }
         }
       ],
@@ -359,16 +383,19 @@
       "items": [
         {
           "id": "asset-1",
-          "processing": {
-            "status": "done"
-          },
-          "moderation": {
-            "status": "approved",
-            "action": null
-          },
           "content": {
             "status": "removed",
             "removalReason": "retention"
+          },
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "moderation": {
+              "decision": "approved",
+              "action": null
+            }
           }
         }
       ],
@@ -390,16 +417,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -416,16 +446,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -447,16 +480,19 @@
       "items": [
         {
           "id": "asset-1",
-          "processing": {
-            "status": "done"
-          },
-          "moderation": {
-            "status": "approved",
-            "action": null
-          },
           "content": {
             "status": "removed",
             "removalReason": "retention"
+          },
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "moderation": {
+              "decision": "approved",
+              "action": null
+            }
           }
         }
       ],
@@ -495,16 +531,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -526,16 +565,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -557,16 +599,19 @@
       "items": [
         {
           "id": "asset-1",
-          "processing": {
-            "status": "done"
-          },
-          "moderation": {
-            "status": "approved",
-            "action": null
-          },
           "content": {
             "status": "removed",
             "removalReason": "retention"
+          },
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "moderation": {
+              "decision": "approved",
+              "action": null
+            }
           }
         }
       ],
@@ -588,16 +633,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -614,16 +662,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -656,16 +707,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },
@@ -743,16 +797,19 @@
     },
     "response": {
       "id": "asset-1",
-      "processing": {
-        "status": "done"
-      },
-      "moderation": {
-        "status": "approved",
-        "action": null
-      },
       "content": {
         "status": "removed",
         "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "decision": "approved",
+          "action": null
+        }
       }
     }
   },

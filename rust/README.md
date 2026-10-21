@@ -8,8 +8,8 @@ use calmlens::{models::*, ServerClient};
 #[tokio::main]
 async fn main() -> calmlens::Result<()> {
     let client = ServerClient::new("your-api-key", "your-project-id")?;
-    let asset = client.assets().moderate(SubmitAsset::text("Hello world")).await?;
-    if asset.moderation.status == AssetModerationStatus::Approved {
+    let asset = client.assets().classify(SubmitAsset::text("Hello world")).await?;
+    if asset.classification.moderation.decision == AssetModerationStatus::Approved {
         println!("{}", asset.id);
     }
     let queued = client
@@ -66,7 +66,7 @@ let client = calmlens::ServerClient::builder(api_key, project_id)
 
 ## Waiting for a decision
 
-`assets().wait_for_decision(WaitForDecision::new(asset_id))` retrieves a queued asset until it is decided (moderation status `approved` or `rejected`, or processing status `failed`) and returns it. It checks again after 0.5 s, waiting 1.5 times longer each time up to 5 s, and fails with `sdk/timeout` if there's no decision within the timeout (60 s by default, or `.timeout(duration)`). The error's `details()` carry `assetId` and the last `processingStatus` and `moderationStatus`. Drop the future to stop waiting; the blocking client's method blocks until the decision or the timeout. `Asset::is_decided` tells you whether an asset's outcome is final. Webhooks report decisions without polling.
+`assets().wait_for_decision(WaitForDecision::new(asset_id))` retrieves a queued asset until it is decided (moderation status `approved` or `rejected`, or classification status `failed`) and returns it. It checks again after 0.5 s, waiting 1.5 times longer each time up to 5 s, and fails with `sdk/timeout` if there's no decision within the timeout (60 s by default, or `.timeout(duration)`). The error's `details()` carry `assetId` and the last `classificationStatus` and `moderationStatus`. Drop the future to stop waiting; the blocking client's method blocks until the decision or the timeout. `Asset::is_decided` tells you whether an asset's outcome is final. Webhooks report decisions without polling.
 
 ```rust
 let queued = client.assets().create(SubmitAsset::text("Hello world")).await?;
@@ -74,7 +74,7 @@ let decided = client
     .assets()
     .wait_for_decision(WaitForDecision::new(queued.id).timeout(Duration::from_secs(30)))
     .await?;
-if decided.moderation.status == AssetModerationStatus::Rejected {
+if decided.classification.moderation.decision == AssetModerationStatus::Rejected {
     hide(&decided.id);
 }
 ```
@@ -83,7 +83,7 @@ if decided.moderation.status == AssetModerationStatus::Rejected {
 
 GET and HEAD requests, uploads and multipart parts are retried up to `max_retries` times (2 by default) after transport failures and timeouts, `429`, `502`, `503` and `504` responses, and `idempotency/request-in-progress`. The client waits for `Retry-After` when the API sends it (and gives up when it asks for more than 60 seconds), and otherwise for a random delay of up to 0.5 s, 1 s, 2 s and so on, capped at 8 s.
 
-Each upload (`assets().create`, `assets().moderate`, `text().moderate`) and each part (`assets().upload_part`) is sent with a new `Idempotency-Key`, reused across the client's own retries, so a retried request returns the original response instead of creating a second asset. Set `idempotency_key` on `SubmitAsset`, `UploadPart` or `ModerateText` to reuse a key across processes. Other writes (folders, updates, deletes) are sent once. Uploads from a reader or stream are read once, so they are never retried.
+Each upload (`assets().create`, `assets().classify`, `text().classify`) and each part (`assets().upload_part`) is sent with a new `Idempotency-Key`, reused across the client's own retries, so a retried request returns the original response instead of creating a second asset. Set `idempotency_key` on `SubmitAsset`, `UploadPart` or `ClassifyText` to reuse a key across processes. Other writes (folders, updates, deletes) are sent once. Uploads from a reader or stream are read once, so they are never retried.
 
 ## Uploads
 
@@ -100,10 +100,10 @@ Readers, streams and files are sent as they are read, so a file is never held in
 
 For a multipart upload, start with `SubmitAsset::multipart(name, content.part(1, is_final))` and send later parts with `assets().upload_part(UploadPart { asset_id, part: content.part(n, is_final), .. })`. Non-final parts must be at least 5 MiB. Set `total_size_in_bytes` on the first request when you know the file's size; CalmLens then refuses an upload that could never finish and parts that overshoot or fall short. CalmLens saves the `queue` choice when the upload starts, so any process or client that knows the asset ID can send the remaining parts; set `queue` on a part only to override it.
 
-Optional analyses are off unless a request turns them on in `ProcessingOptions::features`. Person and face detection are in beta; their results are informational, never change the moderation decision, and are returned in `asset.moderation.report.features`:
+Optional analyses are off unless a request turns them on in `ProcessingOptions::features`. Person and face detection are in beta; their results are informational, never change the moderation decision, and are returned in `asset.classification.personDetection` and `asset.classification.faceDetection`:
 
 ```rust
-let asset = client.assets().moderate(SubmitAsset {
+let asset = client.assets().classify(SubmitAsset {
     processing_options: Some(ProcessingOptions {
         features: Some(ProcessingFeatures {
             ocr: Some(FeatureOptions::enabled()),
@@ -114,12 +114,12 @@ let asset = client.assets().moderate(SubmitAsset {
     }),
     ..SubmitAsset::new("photo.jpg", Content::file("photo.jpg", "image/jpeg")?)
 }).await?;
-let faces = asset.moderation.report.and_then(|r| r.features).and_then(|f| f.face_detection).and_then(|f| f.faces);
+let faces = asset.classification.face_detection.and_then(|f| f.faces);
 ```
 
 ## Upload presets
 
-Set `upload_preset_id` on `SubmitAsset` (or `ModerateText`) to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request; `blocking::ServerClient` and `MockServerClient` have `upload_tokens()` too.
+Set `upload_preset_id` on `SubmitAsset` (or `ClassifyText`) to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request; `blocking::ServerClient` and `MockServerClient` have `upload_tokens()` too.
 
 ```rust
 let signed = client.upload_tokens().sign(SignUploadToken {
@@ -197,20 +197,20 @@ SDK codes: `sdk/transport-error` (the request could not be sent or the response 
 
 ## Models
 
-Rust fields are snake_case; the wire JSON is camelCase. Response models are `#[non_exhaustive]` and keep fields this version doesn't know in `extra`. Every enumerated value (`AssetProcessingStatus`, `AssetModerationStatus`, `AssetContentStatus`, `AssetType`, `Visibility`, `Likelihood`, `ClassificationCategory`, `EventType`, `ImageFormat` and the rest) keeps values it doesn't know in an `Unknown(String)` variant, and `Transform::Unknown` keeps transform types it doesn't know with their options as received. Only metadata values and event fact values are plain JSON (`serde_json::Value`), because the API accepts any JSON there. New API fields and values therefore never fail decoding. Build response models for tests with `Asset::new`, `AssetPage::new`, `Folder::new`, `Event::new` and `EventsPage::new`, or `Default::default()` and field assignment.
+Rust fields are snake_case; the wire JSON is camelCase. Response models are `#[non_exhaustive]` and keep fields this version doesn't know in `extra`. Every enumerated value (`AssetClassificationStatus`, `AssetModerationStatus`, `AssetContentStatus`, `AssetType`, `Visibility`, `Likelihood`, `ClassificationCategory`, `EventType`, `ImageFormat` and the rest) keeps values it doesn't know in an `Unknown(String)` variant, and `Transform::Unknown` keeps transform types it doesn't know with their options as received. Only metadata values and event fact values are plain JSON (`serde_json::Value`), because the API accepts any JSON there. New API fields and values therefore never fail decoding. Build response models for tests with `Asset::new`, `AssetPage::new`, `Folder::new`, `Event::new` and `EventsPage::new`, or `Default::default()` and field assignment.
 
-`assets().moderate(SubmitAsset)` and `text().moderate(ModerateText)` return an `Asset`. Its state is in three parts:
+`assets().classify(SubmitAsset)` and `text().classify(ClassifyText)` return an `Asset`. Its state is in three parts:
 
-- `processing`: `status` (`uploading`, `processing`, `done` or `failed`), `updated_at` and `upload_parts_received`.
-- `moderation`: `status` (`pending`, `approved` or `rejected`; a reviewer's decision takes precedence over the automated one), `action` (what your policy did with flagged content: `alert`, `hide` or `purge`, or `None` when nothing was flagged), `note`, the reviewer's `reviewer_action`, `reviewer_note`, `reviewer_user_id` and `reviewed_at`, `decided_at` and the `report`.
+- `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `decision` (`pending`, `approved` or `rejected`), `action`, category scores, policy assessment, an optional `timeline` and reviewer details. A reviewer decision does not change `completedAt`.
 - `content`: `status` (`temporary` until processing finishes, `stored` or `removed`), `removal_reason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updated_at`, `safety_hold`, `format` (the MIME type), `extension`, `size_in_bytes`, `checksums`, `image`, `preview_image` and `extracted_text`.
 
 Treat an unknown moderation status as not approved:
 
 ```rust
-let asset = client.text().moderate(ModerateText::new("Hello world")).await?;
-let publishable = asset.moderation.status == AssetModerationStatus::Approved;
-let flagged = asset.moderation.action.is_some();
+let asset = client.text().classify(ClassifyText::new("Hello world")).await?;
+let publishable = asset.classification.moderation.decision == AssetModerationStatus::Approved;
+let flagged = asset.classification.moderation.action.is_some();
 ```
 
 `ensure_lens` and `ensure_lenses` create or update named lenses and return them in request order; definitions the client has already ensured are answered from its cache.
@@ -231,7 +231,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
     match calmlens::construct_webhook_event(&body, &headers, &secret) {
         Ok(event) => {
             if let Some(asset) = &event.data.asset {
-                println!("{} {} {}", event.event_type, asset.id, asset.moderation.status);
+                println!("{} {} {}", event.event_type, asset.id, asset.classification.moderation.decision);
             }
             StatusCode::NO_CONTENT
         }
@@ -241,7 +241,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
 }
 ```
 
-actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.data.asset` is an `EventAsset`, a snapshot of the asset when the event was created: `id`, `external_id`, `processing.status`, `moderation.status`, `moderation.action` and `content.status`.
+actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.data.asset` is an `EventAsset`, a snapshot of the asset when the event was created: `id`, `external_id`, `classification.status`, `classification.moderation.decision`, `classification.moderation.action` and `content.status`.
 
 ## Offline testing
 
@@ -256,8 +256,8 @@ calmlens = { version = "0.1", features = ["testing"] }
 use calmlens::{models::*, testing::MockServerClient};
 
 let mock = MockServerClient::new()?;
-mock.enqueue(200, Asset::new("asset-1", AssetProcessingStatus::Done, AssetModerationStatus::Approved));
-let asset = mock.assets().moderate(SubmitAsset::text("hello")).await?;
+mock.enqueue(200, Asset::new("asset-1", AssetClassificationStatus::Completed, AssetModerationStatus::Approved));
+let asset = mock.assets().classify(SubmitAsset::text("hello")).await?;
 assert_eq!(mock.last_request().unwrap().body, b"hello");
 ```
 
@@ -273,6 +273,6 @@ cargo check --no-default-features
 
 The tests enable the `blocking` and `testing` features through a dev-dependency on the crate itself. CI tests the minimum (1.88, matching `rust-version` and the locked dependencies) and current stable compilers. `bun packages/sdk-contract/generate.ts` regenerates the request, path and webhook fixtures in `testdata/` and the error-code list in `src/codes.rs`. Run `bun run test:sdk:e2e` from the repository root to test all six SDKs against the local backend.
 
-Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
 Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.

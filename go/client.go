@@ -19,7 +19,7 @@ import (
 // Default limits. Each one can be changed through Options.
 const (
 	// DefaultTimeout bounds each attempt of a JSON API call, including reading the response.
-	// Uploads (Create, Moderate, UploadPart) and CDN.Serve are not bounded by it; they rely on
+	// Uploads (Create, Classify, UploadPart) and CDN.Serve are not bounded by it; they rely on
 	// the connect and response-header timeouts plus the context you pass.
 	DefaultTimeout = 120 * time.Second
 	// DefaultConnectTimeout bounds dialing and the TLS handshake of the default transport.

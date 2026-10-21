@@ -1,5 +1,5 @@
-import { i as EventFacts, o as EventType } from "./EventCatalog-s-bZ7p6b.js";
-import { t as Event } from "./Event-CgbG2Sau.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-CaXrihFR.js";
+import { t as Event } from "./Event-CfVBoE4O.js";
 import * as zod from "zod";
 //#region packages/shared/src/WebhookPayload.d.ts
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
@@ -18,25 +18,31 @@ declare const WEBHOOK_EVENT_DATA_SCHEMA: zod.ZodObject<{
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
     externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-    processing: zod.ZodObject<{
+    upload: zod.ZodObject<{
       status: zod.ZodEnum<{
-        done: "done";
-        failed: "failed";
-        processing: "processing";
+        completed: "completed";
         uploading: "uploading";
       }>;
     }, zod.core.$strip>;
-    moderation: zod.ZodObject<{
+    classification: zod.ZodObject<{
       status: zod.ZodEnum<{
-        approved: "approved";
+        completed: "completed";
+        failed: "failed";
         pending: "pending";
-        rejected: "rejected";
+        processing: "processing";
       }>;
-      action: zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
-        hide: "hide";
-        purge: "purge";
-      }>>;
+      moderation: zod.ZodObject<{
+        decision: zod.ZodEnum<{
+          approved: "approved";
+          pending: "pending";
+          rejected: "rejected";
+        }>;
+        action: zod.ZodNullable<zod.ZodEnum<{
+          alert: "alert";
+          hide: "hide";
+          purge: "purge";
+        }>>;
+      }, zod.core.$strip>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{
       status: zod.ZodEnum<{
@@ -69,25 +75,31 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
     asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       id: zod.ZodString;
       externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-      processing: zod.ZodObject<{
+      upload: zod.ZodObject<{
         status: zod.ZodEnum<{
-          done: "done";
-          failed: "failed";
-          processing: "processing";
+          completed: "completed";
           uploading: "uploading";
         }>;
       }, zod.core.$strip>;
-      moderation: zod.ZodObject<{
+      classification: zod.ZodObject<{
         status: zod.ZodEnum<{
-          approved: "approved";
+          completed: "completed";
+          failed: "failed";
           pending: "pending";
-          rejected: "rejected";
+          processing: "processing";
         }>;
-        action: zod.ZodNullable<zod.ZodEnum<{
-          alert: "alert";
-          hide: "hide";
-          purge: "purge";
-        }>>;
+        moderation: zod.ZodObject<{
+          decision: zod.ZodEnum<{
+            approved: "approved";
+            pending: "pending";
+            rejected: "rejected";
+          }>;
+          action: zod.ZodNullable<zod.ZodEnum<{
+            alert: "alert";
+            hide: "hide";
+            purge: "purge";
+          }>>;
+        }, zod.core.$strip>;
       }, zod.core.$strip>;
       content: zod.ZodObject<{
         status: zod.ZodEnum<{
@@ -115,25 +127,31 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
     asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       id: zod.ZodString;
       externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-      processing: zod.ZodObject<{
+      upload: zod.ZodObject<{
         status: zod.ZodEnum<{
-          done: "done";
-          failed: "failed";
-          processing: "processing";
+          completed: "completed";
           uploading: "uploading";
         }>;
       }, zod.core.$strip>;
-      moderation: zod.ZodObject<{
+      classification: zod.ZodObject<{
         status: zod.ZodEnum<{
-          approved: "approved";
+          completed: "completed";
+          failed: "failed";
           pending: "pending";
-          rejected: "rejected";
+          processing: "processing";
         }>;
-        action: zod.ZodNullable<zod.ZodEnum<{
-          alert: "alert";
-          hide: "hide";
-          purge: "purge";
-        }>>;
+        moderation: zod.ZodObject<{
+          decision: zod.ZodEnum<{
+            approved: "approved";
+            pending: "pending";
+            rejected: "rejected";
+          }>;
+          action: zod.ZodNullable<zod.ZodEnum<{
+            alert: "alert";
+            hide: "hide";
+            purge: "purge";
+          }>>;
+        }, zod.core.$strip>;
       }, zod.core.$strip>;
       content: zod.ZodObject<{
         status: zod.ZodEnum<{

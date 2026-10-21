@@ -9,7 +9,7 @@ export type ContentKind = "post-image" | "caption" | "comment" | "bio";
 export interface CategoryFinding {
   /** CalmLens category ID, e.g. "harassment". */
   category: string;
-  /** 0–1 score from the moderation report. */
+  /** 0–1 score from the classification results. */
   score: number;
 }
 

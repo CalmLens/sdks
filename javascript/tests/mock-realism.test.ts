@@ -56,9 +56,9 @@ describe("MockCalmLensServerClient errors", () => {
 describe("MockCalmLensServerClient listing", () => {
   it("applies ordering and simple RSQL filters, and refuses filters it can't evaluate", async () => {
     const client = createClient();
-    await client.assets.moderate(text("b-approved"));
+    await client.assets.classify(text("b-approved"));
     await client.assets.create(text("a-pending"));
-    await client.assets.moderate(text("c-approved"));
+    await client.assets.classify(text("c-approved"));
 
     const newestFirst = await client.assets.list();
     expect(newestFirst.items.map((asset) => asset.name)).toEqual([
@@ -68,7 +68,7 @@ describe("MockCalmLensServerClient listing", () => {
     ]);
 
     const approvedByName = await client.assets.list({
-      filter: "moderation.status==approved",
+      filter: "classification.moderation.decision==approved",
       ordering: [{ field: "createdAt", direction: "ASC" }],
     });
     expect(approvedByName.items.map((asset) => asset.name)).toEqual(["b-approved", "c-approved"]);
@@ -77,14 +77,15 @@ describe("MockCalmLensServerClient listing", () => {
     const either = await client.assets.list({ filter: "name==a-pending,name==c-approved" });
     expect(either.items.map((asset) => asset.name).sort()).toEqual(["a-pending", "c-approved"]);
     const both = await client.assets.list({
-      filter: "moderation.status==approved;name!=b-approved",
+      filter: "classification.moderation.decision==approved;name!=b-approved",
     });
     expect(both.items.map((asset) => asset.name)).toEqual(["c-approved"]);
 
     expect(
       await caught(
         client.assets.list({
-          filter: "(moderation.status==approved,moderation.status==pending);name==x",
+          filter:
+            "(classification.moderation.decision==approved,classification.moderation.decision==pending);name==x",
         }),
       ),
     ).toMatchObject({ code: "sdk/invalid-argument" });
@@ -153,11 +154,11 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
 
   it("applies the queue mode saved at the start and enforces part order", async () => {
     const client = createClient();
-    const started = await client.assets.moderate({
+    const started = await client.assets.classify({
       name: "doc.pdf",
       part: { uint8Array: firstPart, type: "application/pdf" },
     });
-    expect(started.processing.status).toBe("uploading");
+    expect(started.upload.status).toBe("uploading");
     expect(
       await caught(
         client.assets.uploadPart({
@@ -171,9 +172,9 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
       assetId: started.id,
       part: { uint8Array: [1], partNumber: 2, isFinal: true },
     });
-    // Started with moderate, so the saved choice is to wait for the decision.
-    expect(finished.processing.status).toBe("done");
-    expect(finished.moderation.status).toBe("approved");
+    // Started with classify, so the saved choice is to wait for the decision.
+    expect(finished.classification.status).toBe("completed");
+    expect(finished.classification.moderation.decision).toBe("approved");
     expect(
       await caught(
         client.assets.uploadPart({

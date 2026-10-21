@@ -19,7 +19,7 @@ const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
 /**
  * The CalmLens client for browsers and React Native apps. It uploads through an upload preset,
  * with an upload token from your server when the preset requires one, and never holds an API
- * key. It can upload (`assets.create`, `assets.moderate`, `assets.uploadPart`) and check its own
+ * key. It can upload (`assets.create`, `assets.classify`, `assets.uploadPart`) and check its own
  * uploads (`assets.retrieve`). Every method throws `CalmLensError` on failure.
  */
 export default class CalmLensAppClient {
@@ -97,7 +97,7 @@ export default class CalmLensAppClient {
         this.submit(options, true),
 
       /** Uploads a file and waits for its moderation decision. */
-      moderate: (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
+      classify: (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
         this.submit(options, false),
 
       /**

@@ -18,13 +18,13 @@ import (
 // integers keep their precision.
 type JSON = map[string]any
 
-// Processing status values of AssetProcessing.Status and EventAssetProcessing.Status: where the
+// Processing status values of AssetClassification.Status and EventAssetClassification.Status: where the
 // asset is in the pipeline. Status is a plain string so values added later still decode.
 const (
-	ProcessingStatusUploading  = "uploading"
-	ProcessingStatusProcessing = "processing"
-	ProcessingStatusDone       = "done"
-	ProcessingStatusFailed     = "failed"
+	ClassificationStatusPending    = "pending"
+	ClassificationStatusProcessing = "processing"
+	ClassificationStatusCompleted  = "completed"
+	ClassificationStatusFailed     = "failed"
 )
 
 // Moderation status values of AssetModeration.Status and EventAssetModeration.Status: the
@@ -116,46 +116,46 @@ type Asset struct {
 	// Visibility is VisibilityPrivate or VisibilityPublic.
 	Visibility *string `json:"visibility"`
 	// Processing is where the asset is in the pipeline.
-	Processing AssetProcessing `json:"processing"`
+	Upload AssetUpload `json:"upload"`
 	// Moderation is the moderation decision and report.
-	Moderation AssetModeration `json:"moderation"`
+	Classification AssetClassification `json:"classification"`
 	// Content describes the asset's content and whether CalmLens still holds it.
 	Content AssetContent `json:"content"`
 	// Raw contains the entire asset, including fields added to the API after this SDK.
 	Raw JSON `json:"-"`
 }
 
-// AssetProcessing is the processing state of an asset.
-type AssetProcessing struct {
-	// Status is one of the ProcessingStatus constants.
-	Status string `json:"status"`
-	// UpdatedAt is when Status last changed, in unix milliseconds.
-	UpdatedAt *int64 `json:"updatedAt"`
-	// UploadPartsReceived is how many parts of a multipart upload have been received; nil
-	// for other uploads.
-	UploadPartsReceived *int `json:"uploadPartsReceived"`
+// AssetUpload tracks receipt of source content.
+type AssetUpload struct {
+	Status        string `json:"status"`
+	UpdatedAt     *int64 `json:"updatedAt"`
+	PartsReceived *int   `json:"partsReceived"`
 }
 
-// AssetModeration is the moderation state of an asset. Status is the decision in force: a
-// reviewer's decision takes precedence over the automated one.
+// AssetClassification contains progress and results for each capability.
+type AssetClassification struct {
+	Status          string                 `json:"status"`
+	UpdatedAt       *int64                 `json:"updatedAt"`
+	CompletedAt     *int64                 `json:"completedAt"`
+	Moderation      AssetModeration        `json:"moderation"`
+	PersonDetection *PersonDetectionResult `json:"personDetection,omitempty"`
+	FaceDetection   *FaceDetectionResult   `json:"faceDetection,omitempty"`
+	Labels          []ClassificationLabel  `json:"labels,omitempty"`
+}
+
+// AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	// Status is one of the ModerationStatus constants.
-	Status string `json:"status"`
-	// Action is what the policy did with flagged content (ModerationActionAlert,
-	// ModerationActionHide or ModerationActionPurge), or nil when nothing was flagged. It is
-	// kept after a reviewer decides.
-	Action *string `json:"action"`
-	// ReviewerAction is a reviewer's decision (a ReviewerAction constant), or nil when no
-	// reviewer has decided.
-	ReviewerAction *string `json:"reviewerAction"`
-	ReviewerNote   *string `json:"reviewerNote"`
-	ReviewerUserID *string `json:"reviewerUserId"`
-	// ReviewedAt is when a reviewer decided, in unix milliseconds.
-	ReviewedAt *int64 `json:"reviewedAt"`
-	// DecidedAt is when the decision in force was made, in unix milliseconds.
-	DecidedAt *int64 `json:"decidedAt"`
-	// Report is the moderation report, set once classification finishes.
-	Report *ClassificationReport `json:"report"`
+	Decision       string                     `json:"decision"`
+	Action         *string                    `json:"action"`
+	ReviewerAction *string                    `json:"reviewerAction"`
+	ReviewerNote   *string                    `json:"reviewerNote"`
+	ReviewerUserID *string                    `json:"reviewerUserId"`
+	ReviewedAt     *int64                     `json:"reviewedAt"`
+	Categories     map[string]CategoryResult  `json:"categories,omitempty"`
+	Score          *float64                   `json:"score,omitempty"`
+	Timeline       *MediaClassificationReport `json:"timeline,omitempty"`
+	Policy         *ReportPolicy              `json:"policy,omitempty"`
+	Raw            JSON                       `json:"-"`
 }
 
 // AssetContent describes an asset's content: its format and properties, and whether CalmLens
@@ -292,22 +292,6 @@ type FaceDetectionFeatureOptions struct {
 type MetadataItem struct {
 	ID    string `json:"id"`
 	Value any    `json:"value"`
-}
-
-// ClassificationReport is the moderation report of an asset.
-type ClassificationReport struct {
-	Media       *MediaClassificationReport `json:"media,omitempty"`
-	ProcessedAt int64                      `json:"processedAt"`
-	Score       float64                    `json:"score"`
-	Notes       *string                    `json:"notes"`
-	Labels      []ClassificationLabel      `json:"labels"`
-	Categories  map[string]CategoryResult  `json:"categories"`
-	// Features holds the results of the processing features the upload turned on.
-	Features *ProcessingFeatureResults `json:"features,omitempty"`
-	// Policy is what the project's policy made of the report when the asset was decided.
-	Policy *ReportPolicy `json:"policy,omitempty"`
-	// Raw contains the entire report, including provider-specific fields.
-	Raw JSON `json:"-"`
 }
 
 // ReportPolicy holds each assessed category's policy score and action, and the highest score.
@@ -600,7 +584,7 @@ type Order struct {
 }
 
 // ListAssetsOptions selects a page of assets. Filter is an RSQL expression over the asset's
-// fields, with nested fields by path, such as "moderation.status==approved;content.format==image/png".
+// fields, with nested fields by path, such as "classification.moderation.decision==approved;content.format==image/png".
 type ListAssetsOptions struct {
 	Cursor   string  `json:"cursor,omitempty"`
 	PageSize int     `json:"pageSize,omitempty"`
@@ -652,7 +636,7 @@ type Content struct {
 	IsFinal     bool
 }
 
-// SubmitAssetOptions describes an asset to create or moderate. Supply exactly one of
+// SubmitAssetOptions describes an asset to create or classify. Supply exactly one of
 // Content, Part (first part of a multipart upload) or URL.
 type SubmitAssetOptions struct {
 	Name              string             `json:"name"`
@@ -879,8 +863,8 @@ type CDNServeOptions struct {
 // Ptr conveniently supplies optional scalar fields.
 func Ptr[T any](value T) *T { return &value }
 
-// ModerateTextOptions moderates plain text. Name defaults to "text".
-type ModerateTextOptions struct {
+// ClassifyTextOptions moderates plain text. Name defaults to "text".
+type ClassifyTextOptions struct {
 	Text              string
 	Name              string
 	Description       *string
@@ -919,7 +903,7 @@ const (
 	MatchedFieldType             = "type"
 	MatchedFieldContentFormat    = "content.format"
 	MatchedFieldContentExtension = "content.extension"
-	MatchedFieldModerationStatus = "moderation.status"
+	MatchedFieldModerationStatus = "classification.moderation.decision"
 	MatchedFieldVisual           = "visual"
 	MatchedFieldTranscript       = "transcript"
 )
@@ -965,8 +949,8 @@ func (a *Asset) UnmarshalJSON(data []byte) error {
 }
 
 // UnmarshalJSON decodes the report and keeps every field in Raw.
-func (r *ClassificationReport) UnmarshalJSON(data []byte) error {
-	type plain ClassificationReport
+func (r *AssetModeration) UnmarshalJSON(data []byte) error {
+	type plain AssetModeration
 	return withRaw(data, (*plain)(r), &r.Raw)
 }
 

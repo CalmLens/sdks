@@ -291,10 +291,10 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 	}
 	item.Status = clipStatus(asset)
 	// The policy took an action (alert, hide or purge) when the content matched it.
-	item.Flagged = asset.Moderation.Action != nil
+	item.Flagged = asset.Classification.Moderation.Action != nil
 	item.Duration, item.Segments = 0, nil
-	if report := asset.Moderation.Report; report != nil && report.Media != nil {
-		item.Duration, item.Segments = timeline(report.Media)
+	if report := asset.Classification.Moderation; report.Timeline != nil {
+		item.Duration, item.Segments = timeline(report.Timeline)
 	}
 	item.Error = ""
 	if item.Status != clipApproved {
@@ -316,13 +316,13 @@ const (
 // app doesn't know count as still pending, so the clip never plays before an approval.
 func clipStatus(asset *calmlens.Asset) string {
 	switch {
-	case asset.Processing.Status == calmlens.ProcessingStatusFailed:
+	case asset.Classification.Status == calmlens.ClassificationStatusFailed:
 		return clipError
-	case asset.Moderation.Status == calmlens.ModerationStatusApproved:
+	case asset.Classification.Moderation.Decision == calmlens.ModerationStatusApproved:
 		return clipApproved
-	case asset.Moderation.Status == calmlens.ModerationStatusRejected:
+	case asset.Classification.Moderation.Decision == calmlens.ModerationStatusRejected:
 		return clipRejected
-	case asset.Processing.Status == calmlens.ProcessingStatusUploading:
+	case asset.Classification.Status == calmlens.ClassificationStatusPending:
 		return clipUploading
 	default:
 		return clipPending

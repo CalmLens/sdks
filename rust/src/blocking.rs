@@ -10,7 +10,7 @@
 //!
 //! fn main() -> calmlens::Result<()> {
 //!     let client = ServerClient::new("your-api-key", "your-project-id")?;
-//!     let asset = client.assets().moderate(SubmitAsset::text("Hello world"))?;
+//!     let asset = client.assets().classify(SubmitAsset::text("Hello world"))?;
 //!     for asset in client.assets().iterate(ListAssets::default()) {
 //!         println!("{}", asset?.id);
 //!     }
@@ -220,8 +220,8 @@ pub struct AssetsClient<'a>(&'a ServerClient);
 blocking_methods!(AssetsClient => assets {
     /// See [`crate::AssetsClient::create`].
     fn create(options: SubmitAsset) -> Result<Asset>;
-    /// See [`crate::AssetsClient::moderate`].
-    fn moderate(options: SubmitAsset) -> Result<Asset>;
+    /// See [`crate::AssetsClient::classify`].
+    fn classify(options: SubmitAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::upload_part`].
     fn upload_part(options: UploadPart) -> Result<Asset>;
     /// See [`crate::AssetsClient::search`].
@@ -296,8 +296,8 @@ impl EventsClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct TextClient<'a>(&'a ServerClient);
 blocking_methods!(TextClient => text {
-    /// See [`crate::TextClient::moderate`].
-    fn moderate(options: ModerateText) -> Result<Asset>;
+    /// See [`crate::TextClient::classify`].
+    fn classify(options: ClassifyText) -> Result<Asset>;
 });
 
 /// Signs upload tokens. See [`crate::UploadTokensClient`].

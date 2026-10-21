@@ -269,8 +269,8 @@ describe("multipart binary field names", () => {
       urls.push(new URL(String(input)));
       return Response.json({
         id: assetId,
-        processing: { status: "uploading" },
-        moderation: { status: "pending" },
+        upload: { status: "uploading" },
+        classification: { status: "pending", moderation: { decision: "pending" } },
       });
     };
     const client = new CalmLensServerClient({

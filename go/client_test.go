@@ -85,7 +85,7 @@ func (h *harness) body() JSON {
 func TestTextAndRawUploads(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	_, err := c.Assets.Moderate(ctx, SubmitAssetOptions{Name: "text", Content: &Content{Type: "text/plain", PlainText: Ptr("héllo 🌍")}, Metadata: []MetadataItem{{ID: "x", Value: false}}, ProcessingOptions: &ProcessingOptions{KeepContentAfterProcessing: Ptr(false)}})
+	_, err := c.Assets.Classify(ctx, SubmitAssetOptions{Name: "text", Content: &Content{Type: "text/plain", PlainText: Ptr("héllo 🌍")}, Metadata: []MetadataItem{{ID: "x", Value: false}}, ProcessingOptions: &ProcessingOptions{KeepContentAfterProcessing: Ptr(false)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestTextAndRawUploads(t *testing.T) {
 			t.Fatal("payload mismatch")
 		}
 	}
-	_, err = c.Assets.Moderate(ctx, SubmitAssetOptions{Name: "site", URL: "https://example.com", Metadata: []MetadataItem{{ID: "a", Value: 1}}})
+	_, err = c.Assets.Classify(ctx, SubmitAssetOptions{Name: "site", URL: "https://example.com", Metadata: []MetadataItem{{ID: "a", Value: 1}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,12 +332,12 @@ func TestLocalFailuresAreSDKErrors(t *testing.T) {
 
 func TestResponsesAreLimitedAndKeepIntegerPrecision(t *testing.T) {
 	c, h := setup(t)
-	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "moderation": JSON{"status": "future-status", "report": JSON{"categories": JSON{"x": JSON{"status": "future-status"}}}}}
+	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"decision": "future-status", "categories": JSON{"x": JSON{"status": "future-status"}}}}}
 	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Moderation.Status != "future-status" || asset.Moderation.Report.Categories["x"].Status != "future-status" {
+	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Classification.Moderation.Decision != "future-status" || asset.Classification.Moderation.Categories["x"].Status != "future-status" {
 		t.Fatalf("%#v", asset.Raw)
 	}
 	c.options.MaxResponseBytes = 16
@@ -370,12 +370,12 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 		{status: 200, result: JSON{"items": []JSON{{"id": "1"}, {"id": "2"}}, "hasMore": true, "nextCursor": "next-token"}},
 		{status: 200, result: JSON{"items": []JSON{{"id": "3"}}, "hasMore": false}},
 	}
-	it := c.Assets.ListAll(ListAssetsOptions{PageSize: 2, Filter: Ptr("moderation.status==approved")})
+	it := c.Assets.ListAll(ListAssetsOptions{PageSize: 2, Filter: Ptr("classification.moderation.decision==approved")})
 	ids := []string{}
 	for it.Next(ctx) {
 		ids = append(ids, it.Asset().ID)
 	}
-	if it.Err() != nil || fmt.Sprint(ids) != "[1 2 3]" || h.calls[1].URL.Query().Get("cursor") != "next-token" || h.calls[1].URL.Query().Get("filter") != "moderation.status==approved" {
+	if it.Err() != nil || fmt.Sprint(ids) != "[1 2 3]" || h.calls[1].URL.Query().Get("cursor") != "next-token" || h.calls[1].URL.Query().Get("filter") != "classification.moderation.decision==approved" {
 		t.Fatal(ids, it.Err())
 	}
 	h.calls = nil
@@ -541,23 +541,58 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 }
 func TestUnknownCoverageAndReportFields(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"moderation":{"report":{"provider":"x","categories":{"violence":{"status":"not-evaluated","reason":"unsupported"}}}}}`), &a)
-	if err != nil || a.Moderation.Report.Categories["violence"].Score != nil || a.Moderation.Report.Raw["provider"] != "x" {
+	err := json.Unmarshal([]byte(`{"classification": {"moderation": {"provider":"x","categories": {"violence": {"status": "not-evaluated", "reason": "unsupported"}}}}}`), &a)
+	if err != nil || a.Classification.Moderation.Categories["violence"].Score != nil || a.Classification.Moderation.Raw["provider"] != "x" {
 		t.Fatal(a, err)
 	}
 }
 
 func TestReportFeatureResultsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"moderation":{"report":{"categories":{},"features":{
-		"personDetection":{"status":"not-evaluated","stage":"beta","reason":"unavailable"},
-		"faceDetection":{"status":"evaluated","stage":"beta","faces":[
-			{"box":{"left":-0.01,"top":0.2,"width":0.3,"height":0.4},"confidence":0.99,"ageRange":{"low":21,"high":30}},
-			{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"confidence":0.8}]}}}}}`), &a)
+	err := json.Unmarshal([]byte(`{
+  "classification": {
+    "moderation": {
+      "categories": {}
+    },
+    "personDetection": {
+      "status": "not-evaluated",
+      "stage": "beta",
+      "reason": "unavailable"
+    },
+    "faceDetection": {
+      "status": "evaluated",
+      "stage": "beta",
+      "faces": [
+        {
+          "box": {
+            "left": -0.01,
+            "top": 0.2,
+            "width": 0.3,
+            "height": 0.4
+          },
+          "confidence": 0.99,
+          "ageRange": {
+            "low": 21,
+            "high": 30
+          }
+        },
+        {
+          "box": {
+            "left": 0.5,
+            "top": 0.5,
+            "width": 0.1,
+            "height": 0.1
+          },
+          "confidence": 0.8
+        }
+      ]
+    }
+  }
+}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	people, faces := a.Moderation.Report.Features.PersonDetection, a.Moderation.Report.Features.FaceDetection
+	people, faces := a.Classification.PersonDetection, a.Classification.FaceDetection
 	if people.Status != "not-evaluated" || people.Reason != "unavailable" || people.People != nil {
 		t.Fatalf("person detection: %+v", people)
 	}
@@ -582,11 +617,11 @@ func TestWaitForDecisionChecksUntilDecided(t *testing.T) {
 	c, h := setup(t)
 	fakeClock(c, h)
 	state := func(processing, moderation string) reply {
-		return reply{status: 200, result: JSON{"id": "a", "processing": JSON{"status": processing}, "moderation": JSON{"status": moderation}}}
+		return reply{status: 200, result: JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": processing, "moderation": JSON{"decision": moderation}}}}
 	}
-	h.next = []reply{state(ProcessingStatusUploading, ModerationStatusPending), state(ProcessingStatusProcessing, ModerationStatusPending), state(ProcessingStatusDone, ModerationStatusRejected)}
+	h.next = []reply{state(ClassificationStatusPending, ModerationStatusPending), state(ClassificationStatusProcessing, ModerationStatusPending), state(ClassificationStatusCompleted, ModerationStatusRejected)}
 	asset, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
-	if err != nil || asset.ID != "a" || asset.Moderation.Status != ModerationStatusRejected {
+	if err != nil || asset.ID != "a" || asset.Classification.Moderation.Decision != ModerationStatusRejected {
 		t.Fatal(asset, err)
 	}
 	if len(h.calls) != 3 || fmt.Sprint(h.slept) != "[500ms 750ms]" {
@@ -599,9 +634,9 @@ func TestWaitForDecisionChecksUntilDecided(t *testing.T) {
 	}
 	// Failed processing ends the wait with moderation still pending.
 	h.calls = nil
-	h.next = []reply{state(ProcessingStatusProcessing, ModerationStatusPending), state(ProcessingStatusFailed, ModerationStatusPending)}
+	h.next = []reply{state(ClassificationStatusProcessing, ModerationStatusPending), state(ClassificationStatusFailed, ModerationStatusPending)}
 	asset, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
-	if err != nil || asset.Processing.Status != ProcessingStatusFailed || len(h.calls) != 2 {
+	if err != nil || asset.Classification.Status != ClassificationStatusFailed || len(h.calls) != 2 {
 		t.Fatal(asset, err, len(h.calls))
 	}
 }
@@ -609,10 +644,10 @@ func TestWaitForDecisionChecksUntilDecided(t *testing.T) {
 func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	c, h := setup(t)
 	fakeClock(c, h)
-	h.result = JSON{"id": "a", "processing": JSON{"status": ProcessingStatusProcessing}, "moderation": JSON{"status": ModerationStatusPending}}
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"decision": ModerationStatusPending}}}
 	_, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: 2 * time.Second})
 	var failure *Error
-	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || failure.Details["processingStatus"] != ProcessingStatusProcessing || failure.Details["moderationStatus"] != ModerationStatusPending {
+	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || failure.Details["classificationStatus"] != ClassificationStatusProcessing || failure.Details["moderationStatus"] != ModerationStatusPending {
 		t.Fatal(err)
 	}
 	// The last wait is cut short so the final check lands on the deadline.
@@ -640,7 +675,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 
 func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 	c, h := setup(t)
-	h.result = JSON{"id": "a", "processing": JSON{"status": ProcessingStatusProcessing}, "moderation": JSON{"status": ModerationStatusPending}}
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"decision": ModerationStatusPending}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// Cancel while waiting between checks; the real sleep then returns the context error.

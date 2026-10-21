@@ -5,9 +5,9 @@ import type {
   CalmLensAppClientOptions,
   CalmLensServerClientOptions,
   CdnTransform,
+  ClassifyTextOptions,
   ConnectionOptions,
   LensTransform,
-  ModerateTextOptions,
   SubmitAssetOptions,
   WaitForAssetDecisionOptions,
 } from "./CalmLensTypes";
@@ -111,10 +111,10 @@ export const toTextAssetOptions = ({
   text,
   name,
   ...options
-}: ModerateTextOptions): SubmitAssetOptions => {
+}: ClassifyTextOptions): SubmitAssetOptions => {
   if (typeof text !== "string" || !text.trim())
     throw new CalmLensError(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
-      message: "Text to moderate must be a non-empty string",
+      message: "Text to classify must be a non-empty string",
     });
   return { ...options, name: name ?? "text", content: { plainText: text, type: "text/plain" } };
 };
@@ -258,13 +258,13 @@ export const stringifyQuery = (query: Record<string, unknown>): string => {
 };
 
 /**
- * Whether an asset has a moderation decision (`moderation.status` `approved` or `rejected`) or
+ * Whether an asset has a moderation decision (`classification.moderation.decision` `approved` or `rejected`) or
  * failed processing; `assets.waitForDecision` returns at the first such state.
  */
-export const isAssetDecided = (asset: Pick<Asset, "processing" | "moderation">): boolean =>
-  asset.moderation.status === "approved" ||
-  asset.moderation.status === "rejected" ||
-  asset.processing.status === "failed";
+export const isAssetDecided = (asset: Pick<Asset, "classification">): boolean =>
+  asset.classification.moderation.decision === "approved" ||
+  asset.classification.moderation.decision === "rejected" ||
+  asset.classification.status === "failed";
 
 const DECISION_POLL_FIRST_DELAY_MS = 500;
 const DECISION_POLL_MAX_DELAY_MS = 5_000;
@@ -297,11 +297,11 @@ export const pollForDecision = async (
     const remaining = deadline - now();
     if (remaining <= 0) {
       throw new CalmLensError(SDK_ERROR_CODES.TIMEOUT, {
-        message: `Asset ${asset.id} had no moderation decision after ${timeoutMs}ms (processing ${asset.processing.status}, moderation ${asset.moderation.status})`,
+        message: `Asset ${asset.id} had no moderation decision after ${timeoutMs}ms (processing ${asset.classification.status}, moderation ${asset.classification.moderation.decision})`,
         details: {
           assetId: asset.id,
-          processingStatus: asset.processing.status,
-          moderationStatus: asset.moderation.status,
+          classificationStatus: asset.classification.status,
+          moderationStatus: asset.classification.moderation.decision,
         },
       });
     }

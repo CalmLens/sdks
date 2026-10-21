@@ -113,13 +113,13 @@ class DemoFlowTests(unittest.TestCase):
 
 class LiveTests(unittest.TestCase):
     def test_unknown_statuses_and_refresh_failures_stay_closed(self):
-        for processing, moderation in (("processing", "pending"), ("uploading", "pending"), ("done", "unknown"),
-                                       ("done", None)):
+        for processing, moderation in (("processing", "pending"), ("pending", "pending"), ("completed", "unknown"),
+                                       ("completed", None)):
             client = MockCalmLensServerClient()
             board = live_board(client)
             board.submit("https://example.com/", "Hello")
             stored = client.database_storage.assets[board.links[0]["asset_id"]]
-            stored["processing"]["status"], stored["moderation"]["status"] = processing, moderation
+            stored["classification"]["status"], stored["classification"]["moderation"]["decision"] = processing, moderation
             board.refresh()
             self.assertEqual(board.links[0]["status"], "pending")
             self.assertEqual(clickable(board), [])
@@ -127,7 +127,7 @@ class LiveTests(unittest.TestCase):
         board = live_board(client)
         board.submit("https://example.com/", "Hello")
         stored = client.database_storage.assets[board.links[0]["asset_id"]]
-        stored["processing"]["status"], stored["moderation"]["status"] = "done", "approved"
+        stored["classification"]["status"], stored["classification"]["moderation"]["decision"] = "completed", "approved"
         client.enqueue_error(ConnectionResetError("reset"))
         with self.assertLogs(level="WARNING"):
             board.refresh()
@@ -233,7 +233,7 @@ class HandlerTests(unittest.TestCase):
 
     def test_live_handler_ignores_demo_outcomes(self):
         choices = []
-        moderator = SimpleNamespace(demo=False, check_note=lambda link_id, note, choice: choices.append(choice) or {"id": "n", "moderation": {"status": "rejected"}})
+        moderator = SimpleNamespace(demo=False, check_note=lambda link_id, note, choice: choices.append(choice) or {"id": "n", "classification": {"moderation": {"decision": "rejected"}}})
         board = Board(moderator)
         self.request(board, "POST", "/links", {"url": "https://example.com/", "note": "Hi", "csrf": board.csrf_token, "demo_result": "rejected"})
         self.assertEqual(choices, ["approved"])

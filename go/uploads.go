@@ -91,11 +91,11 @@ func (s *AssetsService) Create(ctx context.Context, options SubmitAssetOptions) 
 	return s.submit(ctx, options, true)
 }
 
-// Moderate submits an asset and waits for classification where supported (audio and video
+// Classify submits an asset and waits for classification where supported (audio and video
 // always return pending).
-func (s *AssetsService) Moderate(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
+func (s *AssetsService) Classify(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
 	if options.Content != nil && options.Content.PlainText != nil && strings.TrimSpace(*options.Content.PlainText) == "" {
-		return nil, invalid(CodeInvalidUploadPayload, "Text to moderate must be a non-empty string")
+		return nil, invalid(CodeInvalidUploadPayload, "Text to classify must be a non-empty string")
 	}
 	return s.submit(ctx, options, false)
 }

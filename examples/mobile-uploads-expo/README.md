@@ -16,7 +16,7 @@ never holds an API key: a tiny token server signs a single-use upload token for 
  1. Pick a photo
  2. POST /upload-token  ───────────►  client.uploadTokens.sign({ uploadPresetId, externalId })
                         ◄───────────  { token, expiresAt }   (signed locally, no CalmLens request)
- 3. assets.moderate()  ── Authorization: Bearer <token> ──►  CalmLens
+ 3. assets.classify()  ── Authorization: Bearer <token> ──►  CalmLens
                        ◄── { id, status: "pending" } ──────
  4. assets.retrieve() every 1.5 s until "approved" or "rejected"
 ```
@@ -28,7 +28,7 @@ never holds an API key: a tiny token server signs a single-use upload token for 
   `new CalmLensAppClient({ uploadPresetId, token })`. The `token` function fetches a new token for
   each upload, and `assets.retrieve` reuses the token the upload started with.
 - [`App.tsx`](App.tsx) picks a photo with `expo-image-picker`, reads it with `expo-file-system`
-  and uploads it with `assets.moderate`. Photos are checked after they're stored, so the first
+  and uploads it with `assets.classify`. Photos are checked after they're stored, so the first
   answer is usually `pending`; the app shows **Still checking** and polls `assets.retrieve`
   until CalmLens decides. After 60 seconds it stops and offers **Check again**.
 - Errors show a message for the person using the app and the error code for you. The app handles

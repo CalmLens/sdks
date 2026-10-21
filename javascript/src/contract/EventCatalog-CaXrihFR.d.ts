@@ -396,17 +396,17 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       previousStatus: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        done: "done";
+        completed: "completed";
         failed: "failed";
+        pending: "pending";
         processing: "processing";
-        uploading: "uploading";
       }>>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      previousStatus?: "done" | "failed" | "processing" | "uploading" | null | undefined;
+      previousStatus?: "completed" | "failed" | "pending" | "processing" | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -436,10 +436,10 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       previousStatus: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        done: "done";
+        completed: "completed";
         failed: "failed";
+        pending: "pending";
         processing: "processing";
-        uploading: "uploading";
       }>>>;
     }, zod.core.$strip>;
   };

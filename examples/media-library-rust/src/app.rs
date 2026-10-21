@@ -22,7 +22,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{middleware, Form, Router};
 use calmlens::models::{
-    Asset, AssetContentStatus, AssetModerationStatus, AssetPage, AssetProcessingStatus,
+    Asset, AssetClassificationStatus, AssetContentStatus, AssetModerationStatus, AssetPage,
     AssetSearchResponse, EventFact, Folder, MetadataItem, WebhookEventData, WebhookEventPayload,
 };
 use calmlens::ErrorCode;
@@ -906,7 +906,7 @@ async fn move_asset(
         .await
 }
 
-/// Removes the stored file. The record, its metadata and moderation report stay; the CDN
+/// Removes the stored file. The record, its metadata and classification results stay; the CDN
 /// stops serving the content.
 async fn remove_file(
     State(state): State<SharedState>,
@@ -1243,10 +1243,10 @@ impl Decision {
 /// The asset's decision. Statuses this SDK version does not know count as pending, so they are
 /// never delivered.
 pub fn decision(asset: &Asset) -> Decision {
-    if asset.processing.status == AssetProcessingStatus::Failed {
+    if asset.classification.status == AssetClassificationStatus::Failed {
         return Decision::Failed;
     }
-    match asset.moderation.status {
+    match asset.classification.moderation.decision {
         AssetModerationStatus::Approved => Decision::Approved,
         AssetModerationStatus::Rejected => Decision::Rejected,
         _ => Decision::Pending,

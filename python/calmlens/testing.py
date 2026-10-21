@@ -224,7 +224,7 @@ class MockOptions(TypedDict, total=False):
     #: Outcome of assets submitted with ``create`` (and queued multipart uploads). Defaults to
     #: ``pending``.
     queued_outcome: MockAssetOutcome
-    #: Outcome of assets submitted with ``moderate`` and ``text.moderate``. Defaults to
+    #: Outcome of assets submitted with ``classify`` and ``text.classify``. Defaults to
     #: ``approved``.
     analyzed_outcome: MockAssetOutcome
     signed_url_base_url: str
@@ -312,9 +312,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             asset: EventAsset | None = None
             if stored is not None:
                 asset = {"id": stored["id"], "externalId": stored.get("externalId"),
-                         "processing": {"status": stored["processing"]["status"]},
-                         "moderation": {"status": stored["moderation"]["status"],
-                                        "action": stored["moderation"]["action"]},
+                         "upload": {"status": stored["upload"]["status"]},
+                         "classification": {'status': stored['classification']['status'], 'moderation': {'decision': stored['classification']['moderation']['decision'], 'action': stored['classification']['moderation']['action']}},
                          "content": {"status": stored["content"]["status"]}}
             now = self.now()
             event: Event = {"id": self.create_id(), "projectId": self.project_id, "userId": None, "type": type,
@@ -502,11 +501,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         asset.update(
             id=self.create_id(), projectId=self.project_id, folderId=options.get("folderId"), type=kind,
             visibility=options.get("visibility", "private"), createdAt=now, updatedAt=now,
-            processing={"status": "processing" if final else "uploading", "updatedAt": now,
-                        "uploadPartsReceived": 1 if multipart else None},
-            moderation={"status": "pending", "action": None, "note": None, "reviewerAction": None,
-                        "reviewerNote": None, "reviewerUserId": None, "reviewedAt": None, "decidedAt": None,
-                        "report": None},
+            upload={"status": "completed" if final else "uploading", "updatedAt": now, "partsReceived": 1 if multipart else None},
+            classification={'status': 'processing' if final else 'pending', 'updatedAt': now, 'completedAt': None, 'moderation': {'decision': 'pending', 'action': None, 'reviewerAction': None, 'reviewerNote': None, 'reviewerUserId': None, 'reviewedAt': None}},
             content={"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                      "safetyHold": None, "format": mime or None,
                      "extension": None, "sizeInBytes": len(raw) if raw_upload and raw is not None else None,
@@ -526,10 +522,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """Move ``asset`` to ``outcome`` like the pipeline would: a decision finishes processing,
         and finished processing removes content kept only temporarily."""
         decided = outcome in ("approved", "rejected")
-        status = "done" if decided else "failed" if outcome == "failed" else "processing"
-        asset["processing"].update(status=status, updatedAt=now)
-        asset["moderation"].update(status=outcome if decided else "pending", decidedAt=now if decided else None)
-        if status == "done" and asset["content"]["status"] == "temporary":
+        status = "completed" if decided else "failed" if outcome == "failed" else "processing"
+        asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None)
+        asset["upload"].update(status="completed", updatedAt=now)
+        asset["classification"]["moderation"].update(decision=outcome if decided else "pending")
+        if status == "completed" and asset["content"]["status"] == "temporary":
             self._remove_content(asset, "retention", now)
         asset["updatedAt"] = now
 
@@ -540,7 +537,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _upload_part(self, asset: dict[str, Any], query: dict[str, Any], raw: bytes | None, now: int) -> None:
         upload = self._uploads.get(asset["id"])
-        if upload is None or asset["processing"]["status"] != "uploading":
+        if upload is None or asset["upload"]["status"] != "uploading":
             raise _Failure(error_codes.UPLOAD_NOT_OPEN)
         stored = self.image_storage.content[asset["id"]]
         number = query.get("partNumber")
@@ -555,7 +552,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             raise _Failure(error_codes.UPLOAD_SIZE_MISMATCH)
         stored["parts"][number] = raw or b""
         asset["content"]["sizeInBytes"] = size
-        asset["processing"]["uploadPartsReceived"] = number
+        asset["upload"]["partsReceived"] = number
         if final:
             queue = query["queue"] if "queue" in query else upload["queue"]
             del self._uploads[asset["id"]]
@@ -584,7 +581,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body['resource']}?{urlencode(selector)}",
                     "expiresAt": now + body["expiresInSeconds"] * 1000}
         if suffix == "retry":
-            if asset["processing"]["status"] != "failed":
+            if asset["classification"]["status"] != "failed":
                 raise _Failure(error_codes.ASSET_NOT_RETRYABLE)
             if asset["content"]["status"] == "removed":
                 raise _Failure(error_codes.ASSET_CONTENT_UNAVAILABLE)

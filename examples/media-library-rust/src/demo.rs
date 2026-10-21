@@ -13,10 +13,9 @@ use crate::library::{NewUpload, DEMO_PROJECT_ID};
 use crate::messages::{rejected, Failure};
 use axum::http::StatusCode;
 use calmlens::models::{
-    Asset, AssetContentRemovalReason, AssetContentStatus, AssetModerationAction,
-    AssetModerationStatus, AssetPage, AssetProcessingStatus, AssetReviewerAction, AssetSearchMatch,
-    AssetSearchResponse, ClassificationReport, Folder, MetadataItem, ProcessingOptions,
-    SearchMatchField, Visibility,
+    Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus,
+    AssetModerationAction, AssetModerationStatus, AssetPage, AssetReviewerAction, AssetSearchMatch,
+    AssetSearchResponse, Folder, MetadataItem, ProcessingOptions, SearchMatchField, Visibility,
 };
 use calmlens::{Bytes, Error, ErrorCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -73,27 +72,28 @@ impl DemoStore {
     /// Pending demo uploads take their selected outcome once the review delay has passed.
     pub fn settle(&mut self) {
         for entry in &mut self.assets {
-            if entry.asset.processing.status == AssetProcessingStatus::Processing
+            if entry.asset.classification.status == AssetClassificationStatus::Processing
                 && entry.submitted_at.elapsed() >= DEMO_REVIEW_DELAY
             {
                 let asset = &mut entry.asset;
-                asset.processing.status = match entry.outcome {
-                    Decision::Failed => AssetProcessingStatus::Failed,
-                    _ => AssetProcessingStatus::Done,
+                asset.classification.status = match entry.outcome {
+                    Decision::Failed => AssetClassificationStatus::Failed,
+                    _ => AssetClassificationStatus::Completed,
                 };
-                asset.processing.updated_at = Some(now_ms());
+                asset.classification.updated_at = Some(now_ms());
                 // Rejected uploads are hidden by the simulated policy; approved ones matched nothing.
                 match entry.outcome {
-                    Decision::Approved => asset.moderation.status = AssetModerationStatus::Approved,
+                    Decision::Approved => {
+                        asset.classification.moderation.decision = AssetModerationStatus::Approved
+                    }
                     Decision::Rejected => {
-                        asset.moderation.status = AssetModerationStatus::Rejected;
-                        asset.moderation.action = Some(AssetModerationAction::Hide);
+                        asset.classification.moderation.decision = AssetModerationStatus::Rejected;
+                        asset.classification.moderation.action = Some(AssetModerationAction::Hide);
                     }
                     Decision::Failed | Decision::Pending => {}
                 }
                 if entry.outcome != Decision::Failed {
-                    asset.moderation.decided_at = Some(now_ms());
-                    asset.moderation.report = Some(ClassificationReport::default());
+                    asset.classification.completed_at = Some(now_ms());
                 }
             }
         }
@@ -252,7 +252,7 @@ impl DemoStore {
         }
         let mut asset = Asset::new(
             format!("demo-asset-{}", random_hex(6)),
-            AssetProcessingStatus::Processing,
+            AssetClassificationStatus::Processing,
             AssetModerationStatus::Pending,
         );
         asset.name = Some(upload.name);
@@ -387,14 +387,13 @@ impl DemoStore {
     pub fn review(&mut self, id: &str, action: AssetReviewerAction) -> bool {
         match self.entry_mut(id) {
             Ok(entry) => {
-                let moderation = &mut entry.asset.moderation;
-                moderation.status = match action {
+                let moderation = &mut entry.asset.classification.moderation;
+                moderation.decision = match action {
                     AssetReviewerAction::Rejected => AssetModerationStatus::Rejected,
                     _ => AssetModerationStatus::Approved,
                 };
                 moderation.reviewer_action = Some(action);
                 moderation.reviewed_at = Some(now_ms());
-                moderation.decided_at = moderation.reviewed_at;
                 true
             }
             Err(_) => false,

@@ -101,14 +101,14 @@ func get(a *app, path string) *httptest.ResponseRecorder {
 // decideAsset writes a clip state into a stored asset, as CalmLens would record it: a decision
 // once processing is done, or failed processing.
 func decideAsset(stored calmlens.JSON, status string) {
-	processing, moderation := demo.Section(stored, "processing"), demo.Section(stored, "moderation")
+	processing, moderation := demo.Section(stored, "classification"), demo.Section(demo.Section(stored, "classification"), "moderation")
 	switch status {
 	case clipError:
-		processing["status"] = calmlens.ProcessingStatusFailed
+		processing["status"] = calmlens.ClassificationStatusFailed
 	case clipRejected:
-		processing["status"], moderation["status"], moderation["action"] = calmlens.ProcessingStatusDone, calmlens.ModerationStatusRejected, calmlens.ModerationActionHide
+		processing["status"], moderation["decision"], moderation["action"] = calmlens.ClassificationStatusCompleted, calmlens.ModerationStatusRejected, calmlens.ModerationActionHide
 	default:
-		processing["status"], moderation["status"], moderation["action"] = calmlens.ProcessingStatusDone, calmlens.ModerationStatusApproved, nil
+		processing["status"], moderation["decision"], moderation["action"] = calmlens.ClassificationStatusCompleted, calmlens.ModerationStatusApproved, nil
 	}
 }
 
@@ -394,7 +394,7 @@ func TestTimelineFromReportMedia(t *testing.T) {
 	item := liveClip(t, a, mock)
 	stored := mock.DatabaseStorage.Assets[item.ID]
 	decideAsset(stored, "rejected")
-	demo.Section(stored, "moderation")["report"] = calmlens.JSON{"score": 0.91, "categories": calmlens.JSON{}, "media": calmlens.JSON{
+	demo.Section(demo.Section(stored, "classification"), "moderation")["timeline"] = calmlens.JSON{
 		"durationSeconds": 60, "sampledFrames": 0, "audioTranscribed": false,
 		"segments": []any{
 			calmlens.JSON{"source": "clip", "startSeconds": 29, "endSeconds": 60, "categories": calmlens.JSON{
@@ -406,7 +406,7 @@ func TestTimelineFromReportMedia(t *testing.T) {
 				"harassment": calmlens.JSON{"status": "partial", "score": 0.45, "likelihood": "possible"},
 			}},
 		},
-	}}
+	}
 	page := get(a, "/").Body.String()
 	if item.Duration != 60 || len(item.Segments) != 2 {
 		t.Fatal(item.Duration, item.Segments)
@@ -452,7 +452,7 @@ func TestRetryFailedClip(t *testing.T) {
 	if rec := post(a, "/retry", form); rec.Code != 303 {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
-	if item.Status != "pending" || demo.Section(a.demo.Mock.DatabaseStorage.Assets[item.ID], "processing")["status"] != calmlens.ProcessingStatusProcessing {
+	if item.Status != "pending" || demo.Section(a.demo.Mock.DatabaseStorage.Assets[item.ID], "classification")["status"] != calmlens.ClassificationStatusProcessing {
 		t.Fatal("retry did not return the clip to pending")
 	}
 	decide(item)
@@ -533,7 +533,7 @@ func TestSlowCalmLensCallsDoNotBlockOtherRequests(t *testing.T) {
 		close(entered)
 		<-release
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"id":"slow","processing":{"status":"done"},"moderation":{"status":"approved","action":null},"externalId":"clip_slow"}`))
+		w.Write([]byte(`{"id": "slow", "externalId": "clip_slow", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"action": null, "decision": "approved"}}}`))
 	}))
 	defer server.Close()
 	a, err := newApp(config{APIKey: "key", ProjectID: "project", UploadPresetID: testPreset, SDKDir: sdkDir(t), BaseURL: server.URL})
@@ -740,7 +740,7 @@ func sign(body string) string {
 	return calmlens.SignWebhookPayload([]byte(body), webhookTimestamp, "secret")
 }
 func event(id, kind, assetID, facts string) string {
-	return fmt.Sprintf(`{ "id": %q, "type": %q, "data": { "assetId": %q, "asset": {"id": %q, "processing": {"status": "done"}, "moderation": {"status": "approved", "action": null}, "content": {"status": "stored"}}, "facts": %s } }`, id, kind, assetID, assetID, facts)
+	return fmt.Sprintf(`{ "id": %q, "type": %q, "data": { "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"decision":"approved", "action":null}}, "content": {"status": "stored"}}, "facts": %s } }`, id, kind, assetID, assetID, facts)
 }
 func retrieves(mock *calmlenstest.MockServerClient) int {
 	n := 0

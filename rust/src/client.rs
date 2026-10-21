@@ -710,7 +710,7 @@ impl AssetsClient<'_> {
         self.0.submit(options, true).await
     }
     /// Uploads an asset and waits for its moderation decision.
-    pub async fn moderate(&self, options: SubmitAsset) -> Result<Asset> {
+    pub async fn classify(&self, options: SubmitAsset) -> Result<Asset> {
         if let Some(Content {
             payload: Payload::Text(text),
             ..
@@ -718,7 +718,7 @@ impl AssetsClient<'_> {
         {
             if text.trim().is_empty() {
                 return Err(invalid_payload(
-                    "Text to moderate must be a non-empty string",
+                    "Text to classify must be a non-empty string",
                 ));
             }
         }
@@ -793,9 +793,9 @@ impl AssetsClient<'_> {
         self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
     }
     /// Retrieves the asset until it is decided ([`Asset::is_decided`]: moderation status
-    /// `approved` or `rejected`, or processing status `failed`) and returns it. It checks again
+    /// `approved` or `rejected`, or classification status `failed`) and returns it. It checks again
     /// after 0.5 seconds, waiting 1.5 times longer each time up to 5 seconds, and fails with
-    /// `sdk/timeout` and details `{assetId, processingStatus, moderationStatus}` when
+    /// `sdk/timeout` and details `{assetId, classificationStatus, moderationStatus}` when
     /// `options.timeout` (60 seconds by default) passes without a decision. Drop the future to
     /// stop waiting. Webhooks report decisions without polling.
     pub async fn wait_for_decision(&self, options: WaitForDecision) -> Result<Asset> {
@@ -812,11 +812,11 @@ impl AssetsClient<'_> {
             let remaining = deadline
                 .map(|deadline| deadline.saturating_duration_since(tokio::time::Instant::now()));
             if remaining == Some(Duration::ZERO) {
-                let processing = asset.processing.status.as_str();
-                let moderation = asset.moderation.status.as_str();
+                let processing = asset.classification.status.as_str();
+                let moderation = asset.classification.moderation.decision.as_str();
                 let mut details = serde_json::Map::new();
                 details.insert("assetId".into(), asset.id.clone().into());
-                details.insert("processingStatus".into(), processing.into());
+                details.insert("classificationStatus".into(), processing.into());
                 details.insert("moderationStatus".into(), moderation.into());
                 return Err(Error::new(
                     ErrorCode::Timeout,
@@ -1072,10 +1072,10 @@ impl UploadTokensClient<'_> {
 pub struct TextClient<'a>(&'a ServerClient);
 impl TextClient<'_> {
     /// Moderates text as a `text/plain` asset named `text` unless `name` is set.
-    pub async fn moderate(&self, options: ModerateText) -> Result<Asset> {
+    pub async fn classify(&self, options: ClassifyText) -> Result<Asset> {
         self.0
             .assets()
-            .moderate(SubmitAsset {
+            .classify(SubmitAsset {
                 name: options.name.unwrap_or_else(|| "text".into()),
                 content: Some(Content::text(options.text)),
                 description: options.description,

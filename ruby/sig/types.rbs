@@ -26,7 +26,7 @@ module CalmLens
   # ---- Assets (Asset.ts) ----------------------------------------------------------------------
 
   # Where the asset is in the pipeline.
-  type asset_processing_status = "uploading" | "processing" | "done" | "failed"
+  type asset_classification_status = "pending" | "processing" | "completed" | "failed"
   # The moderation decision in force: a reviewer's when there is one, else the automated one.
   type asset_moderation_status = "pending" | "approved" | "rejected"
   # What the policy did with flagged content (never `ignore`, unlike `flagged_content_action`).
@@ -89,23 +89,27 @@ module CalmLens
   # `type: "string"` carries the text in `content`; `type: "document"` stores it under `id`.
   type extracted_text = { "type" => "string" | "document", ?"content" => String, ?"id" => String }
 
-  # ASSET_PROCESSING_SCHEMA. Epoch times are milliseconds.
-  type asset_processing = {
-    "status" => asset_processing_status,
+  type asset_upload = { "status" => "uploading" | "completed", "updatedAt" => Integer?, "partsReceived" => Integer? }
+  type asset_classification = {
+    "status" => asset_classification_status,
     "updatedAt" => Integer?,
-    # Parts of a multipart upload received so far; null otherwise.
-    "uploadPartsReceived" => Integer?
+    "completedAt" => Integer?,
+    "moderation" => asset_moderation,
+    ?"personDetection" => person_detection_result,
+    ?"faceDetection" => face_detection_result,
+    ?"labels" => Array[classification_label]?
   }
-  # ASSET_MODERATION_SCHEMA. `action` is kept after a reviewer decides.
   type asset_moderation = {
-    "status" => asset_moderation_status,
+    "decision" => asset_moderation_status,
     "action" => asset_moderation_action?,
     "reviewerAction" => asset_reviewer_action?,
     "reviewerNote" => String?,
     "reviewerUserId" => String?,
     "reviewedAt" => Integer?,
-    "decidedAt" => Integer?,
-    "report" => classification_report?
+    ?"categories" => classification_categories,
+    ?"score" => number,
+    ?"timeline" => media_report,
+    ?"policy" => report_policy
   }
   # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
   type asset_content = {
@@ -140,8 +144,8 @@ module CalmLens
     ?"tags" => Array[String]?,
     ?"processingOptions" => processing_options?,
     ?"visibility" => asset_visibility?,
-    "processing" => asset_processing,
-    "moderation" => asset_moderation,
+    "upload" => asset_upload,
+    "classification" => asset_classification,
     "content" => asset_content
   }
 
@@ -294,17 +298,6 @@ module CalmLens
     "categories" => Hash[String, { "score" => number, "action" => String }]
   }
 
-  type classification_report = {
-    "processedAt" => Integer,
-    "categories" => classification_categories,
-    "score" => number,
-    ?"notes" => String?,
-    ?"media" => media_report,
-    ?"labels" => Array[classification_label]?,
-    ?"features" => processing_feature_results,
-    ?"policy" => report_policy
-  }
-
   # ---- Pages and search (Page.ts, AssetSearch.ts) --------------------------------------------
 
   type order_direction = "ASC" | "DESC"
@@ -321,7 +314,7 @@ module CalmLens
 
   type asset_search_mode = "keyword" | "semantic" | "hybrid"
   type asset_search_match_field = "name" | "id" | "externalId" | "description" | "tags" | "type" | "content.format" |
-                                  "content.extension" | "moderation.status" | "visual" | "transcript"
+                                  "content.extension" | "classification.moderation.decision" | "visual" | "transcript"
   type asset_search_result = { "asset" => asset, "score" => number, "matchedFields" => Array[asset_search_match_field] }
   type asset_search_response = {
     "query" => String,
@@ -463,8 +456,8 @@ module CalmLens
   type event_asset = {
     "id" => String,
     ?"externalId" => String?,
-    "processing" => { "status" => asset_processing_status },
-    "moderation" => { "status" => asset_moderation_status, "action" => asset_moderation_action? },
+    "upload" => { "status" => "uploading" | "completed" },
+    "classification" => { "status" => asset_classification_status, "moderation" => { "decision" => asset_moderation_status, "action" => asset_moderation_action? } },
     "content" => { "status" => asset_content_status }
   }
   type event = {
@@ -511,7 +504,7 @@ module CalmLens
     ?cursor: String,
     ?page_size: Integer,
     ?ordering: Array[order_input],
-    # An RSQL filter such as `moderation.status==approved`.
+    # An RSQL filter such as `classification.moderation.decision==approved`.
     ?filter: String?,
     ?folder_id: String?,
     ?request_options: request_options
@@ -559,7 +552,7 @@ module CalmLens
                    | { part_number: Integer, base64: String, ?is_final: bool, ?size_in_bytes: Integer }
                    | { part_number: Integer, data: String | Transport::_Reader, ?is_final: bool, ?size_in_bytes: Integer }
 
-  # Options of {Assets#create} and {Assets#moderate}: the shared asset fields with exactly one of
+  # Options of {Assets#create} and {Assets#classify}: the shared asset fields with exactly one of
   # `content:` (a whole file), `part:` (the first part of a multipart upload) or `url:` (a page or
   # file CalmLens fetches).
   type upload_options = {
@@ -604,7 +597,7 @@ module CalmLens
                         }
   type upload_part_options = { asset_id: String, part: upload_part, ?queue: bool, ?request_options: request_options }
 
-  # Options of {Text#moderate}: the text, with the shared asset fields. `name` defaults to `text`.
+  # Options of {Text#classify}: the text, with the shared asset fields. `name` defaults to `text`.
   type moderate_text_options = {
     text: String,
     ?name: String,
@@ -678,8 +671,8 @@ module CalmLens
     ?asset: {
       id: String,
       ?external_id: String?,
-      processing: { status: asset_processing_status },
-      moderation: { status: asset_moderation_status, action: asset_moderation_action? },
+      upload: { status: "uploading" | "completed" },
+      classification: { status: asset_classification_status, moderation: { decision: asset_moderation_status, action: asset_moderation_action? } },
       content: { status: asset_content_status }
     }?,
     ?facts: Array[event_fact_input],

@@ -145,7 +145,7 @@ module CalmLens
     def move: (move_asset_options options) -> asset
     def create_signed_url: (create_signed_url_options options) -> signed_url
     def create: (upload_options options) -> asset
-    def moderate: (upload_options options) -> asset
+    def classify: (upload_options options) -> asset
     def upload_part: (upload_part_options options) -> asset
   end
 
@@ -169,7 +169,7 @@ module CalmLens
 
   class Text < Resource
     private def initialize: (untyped session, Assets assets) -> void
-    def moderate: (moderate_text_options options) -> asset
+    def classify: (moderate_text_options options) -> asset
   end
 
   class Events < Resource
@@ -215,7 +215,7 @@ module CalmLens
 
   # require 'calmlens/testing'
   module Testing
-    # The mock's in-memory records. Change them to arrange a test, such as setting an asset's `moderation.status`.
+    # The mock's in-memory records. Change them to arrange a test, such as setting an asset's `classification.moderation.decision`.
     class State < Struct[untyped]
       attr_accessor assets: Hash[String, asset]
       attr_accessor folders: Hash[String, folder]

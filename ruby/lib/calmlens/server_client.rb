@@ -9,7 +9,7 @@ module CalmLens
   # @example
   #   client = CalmLens::ServerClient.new(api_key: ENV.fetch('CALMLENS_API_KEY'),
   #                                 project_id: ENV.fetch('CALMLENS_PROJECT_ID'))
-  #   asset = client.text.moderate(text: 'Hello world')
+  #   asset = client.text.classify(text: 'Hello world')
   #   client.close
   class ServerClient
     DEFAULT_BASE_URL = 'https://api.calmlens.com/v1'

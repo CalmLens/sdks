@@ -65,7 +65,7 @@ class ClientTestCase(unittest.TestCase):
 
 class ClientTests(ClientTestCase):
     def test_text_utf8_and_metadata(self):
-        self.client.assets.moderate({'metadata': [{'id': 'x', 'value': False}], 'processingOptions': {'keepContentAfterProcessing': False}, 'name': 'text', 'content': {'plainText': 'héllo 🌍', 'type': 'text/plain'}})
+        self.client.assets.classify({'metadata': [{'id': 'x', 'value': False}], 'processingOptions': {'keepContentAfterProcessing': False}, 'name': 'text', 'content': {'plainText': 'héllo 🌍', 'type': 'text/plain'}})
         req = self.calls[-1]
         self.assertEqual(req.data, "héllo 🌍".encode())
         self.assertEqual(req.headers["X-api-key"], "key")
@@ -78,10 +78,10 @@ class ClientTests(ClientTestCase):
         self.assertEqual(json.loads(self.query()["processingOptions"][0]), {"keepContentAfterProcessing": False})
         for text in ("", " \n", None, 3):
             with self.assertRaises(CalmLensError):
-                self.client.assets.moderate({'name': 'text', 'content': {'plainText': text, 'type': 'text/plain'}})
+                self.client.assets.classify({'name': 'text', 'content': {'plainText': text, 'type': 'text/plain'}})
 
     def test_keyword_arguments_match_options_dicts(self):
-        self.client.assets.moderate(name="n", external_id="e1", processing_options={"keep_content_after_processing": False},
+        self.client.assets.classify(name="n", external_id="e1", processing_options={"keep_content_after_processing": False},
                                     metadata=[{"id": "snake_key", "value": 1}],
                                     content={"plain_text": "hi", "type": "text/plain"})
         query = self.query()
@@ -98,7 +98,7 @@ class ClientTests(ClientTestCase):
     def test_upload_preset_id_is_sent_as_a_query_parameter(self):
         self.client.assets.create(name="n", upload_preset_id="preset-1", content={"plainText": "hi", "type": "text/plain"})
         self.assertEqual(self.query()["uploadPresetId"], ["preset-1"])
-        self.client.assets.moderate({"name": "n", "uploadPresetId": "preset-2",
+        self.client.assets.classify({"name": "n", "uploadPresetId": "preset-2",
                                      "content": {"plainText": "hi", "type": "text/plain"}})
         self.assertEqual(self.query()["uploadPresetId"], ["preset-2"])
 
@@ -128,7 +128,7 @@ class ClientTests(ClientTestCase):
             self.assertEqual(self.bodies[-1], b"abc")
             self.assertEqual(self.query()["queue"], ["true"])
             self.assertEqual(self.calls[-1].headers["Content-length"], "3")
-        self.client.assets.moderate({"name": "site", "url": "https://example.com", "metadata": [{"id": "a", "value": 1}]})
+        self.client.assets.classify({"name": "site", "url": "https://example.com", "metadata": [{"id": "a", "value": 1}]})
         self.assertEqual(json.loads(self.calls[-1].data)["metadata"], [{"id": "a", "value": 1}])
         self.assertTrue(urlsplit(self.calls[-1].full_url).path.endswith("/assets"))
 
@@ -168,7 +168,7 @@ class ClientTests(ClientTestCase):
 
     def test_multipart_sends_total_size_and_no_part_queue(self):
         size = 5 * 1024 * 1024
-        self.result = {"id": "a", "processing": {"status": "uploading", "updatedAt": 1, "uploadPartsReceived": 1}}
+        self.result = {"id": "a", "upload": {"status": "uploading", "updatedAt": 1, "partsReceived": 1}, "classification": {"status": "pending", "updatedAt": 1}}
         self.client.assets.create({"name": "x.png", "totalSizeInBytes": 2 * size,
                                    "part": {"type": "image/png", "data": b"x" * size}})
         self.assertEqual((self.query()["partNumber"], self.query()["isFinal"]), (["1"], ["false"]))
@@ -362,10 +362,10 @@ class PaginationTests(ClientTestCase):
         pages = [{"items": [{"id": "a"}, {"id": "b"}], "hasMore": True, "nextCursor": "next-token"},
                  {"items": [{"id": "c"}], "hasMore": False}]
         self.script = [(page,) for page in pages]
-        ids = [asset["id"] for asset in self.client.assets.iter(page_size=2, filter="moderation.status==approved")]
+        ids = [asset["id"] for asset in self.client.assets.iter(page_size=2, filter="classification.moderation.decision==approved")]
         self.assertEqual(ids, ["a", "b", "c"])
         self.assertEqual([self.query(i).get("cursor") for i in (0, 1)], [None, ["next-token"]])
-        self.assertEqual(self.query(1)["filter"], ["moderation.status==approved"])
+        self.assertEqual(self.query(1)["filter"], ["classification.moderation.decision==approved"])
 
     def test_children_iter_walks_every_page(self):
         self.script = [({"items": [{"id": "c1"}], "hasMore": True, "nextCursor": "next-token"},), ({"items": [{"id": "c2"}], "hasMore": False},)]
@@ -382,8 +382,8 @@ class PaginationTests(ClientTestCase):
 
 class WaitForDecisionTests(ClientTestCase):
     def test_retrieves_the_asset_until_it_has_a_decision(self):
-        pending = {"id": "asset-1", "processing": {"status": "processing"}, "moderation": {"status": "pending"}}
-        decided = {"id": "asset-1", "processing": {"status": "done"}, "moderation": {"status": "rejected"}}
+        pending = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'decision': 'pending'}}}
+        decided = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'completed', 'moderation': {'decision': 'rejected'}}}
         self.script = [(pending,), (pending,), (decided,)]
         asset = self.client.assets.wait_for_decision(asset_id="asset-1")
         self.assertEqual(asset, decided)
@@ -391,29 +391,29 @@ class WaitForDecisionTests(ClientTestCase):
         self.assertEqual(self.sleeps, [0.5, 0.75])
 
     def test_stops_when_processing_failed(self):
-        failed = {"id": "asset-1", "processing": {"status": "failed"}, "moderation": {"status": "pending"}}
-        self.script = [({"id": "asset-1", "processing": {"status": "processing"}, "moderation": {"status": "pending"}},),
+        failed = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'failed', 'moderation': {'decision': 'pending'}}}
+        self.script = [({"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'decision': 'pending'}}},),
                        (failed,)]
         self.assertEqual(self.client.assets.wait_for_decision(asset_id="asset-1"), failed)
         self.assertEqual(len(self.calls), 2)
 
     def test_backs_off_to_five_seconds_and_times_out_at_the_deadline(self):
         self.client._clock = lambda: sum(self.sleeps)
-        self.result = {"id": "asset-1", "processing": {"status": "processing"}, "moderation": {"status": "pending"}}
+        self.result = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'decision': 'pending'}}}
         with self.assertRaises(CalmLensError) as raised:
             self.client.assets.wait_for_decision({"assetId": "asset-1", "timeout": 20})
         self.assertEqual(raised.exception.code, error_codes.SDK_TIMEOUT)
         self.assertEqual(raised.exception.details,
-                         {"assetId": "asset-1", "processingStatus": "processing", "moderationStatus": "pending"})
+                         {"assetId": "asset-1", "classificationStatus": "processing", "moderationStatus": "pending"})
         self.assertEqual(self.sleeps, [0.5, 0.75, 1.125, 1.6875, 2.53125, 3.796875, 5.0, 4.609375])
         self.assertEqual(len(self.calls), 9)
 
     def test_zero_timeout_checks_once(self):
-        self.result = {"id": "asset-1", "processing": {"status": "uploading"}, "moderation": {"status": "pending"}}
+        self.result = {"id": "asset-1", "upload": {"status": "uploading"}, "classification": {'status': 'pending', 'moderation': {'decision': 'pending'}}}
         with self.assertRaises(CalmLensError) as raised:
             self.client.assets.wait_for_decision(asset_id="asset-1", timeout=0)
         self.assertEqual((raised.exception.code, raised.exception.details),
-                         (error_codes.SDK_TIMEOUT, {"assetId": "asset-1", "processingStatus": "uploading",
+                         (error_codes.SDK_TIMEOUT, {"assetId": "asset-1", "classificationStatus": "pending",
                                                     "moderationStatus": "pending"}))
         self.assertEqual((len(self.calls), self.sleeps), (1, []))
 

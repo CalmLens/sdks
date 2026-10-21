@@ -17,20 +17,20 @@ moderation:
   it between folders with `assets().move_asset`.
 - **Listing.** Each folder lists 12 images a page with `assets().list`, using `cursor`,
   `folder_id` and a `filter` built only from fixed values: `parentId==null`, optionally with
-  one status: `moderation.status==approved` or `moderation.status==rejected`,
-  `moderation.status==pending;processing.status!=failed` for images in review, or
-  `processing.status==failed`. See
+  one status: `classification.moderation.decision==approved` or `classification.moderation.decision==rejected`,
+  `classification.moderation.decision==pending;classification.status!=failed` for images in review, or
+  `classification.status==failed`. See
   [Pagination and filtering](https://calmlens.com/docs/guides/pagination-and-filtering).
 - **Search.** Describe an image in natural language with `assets().search` in `hybrid`,
   `keyword` or `semantic` mode. Results show `semanticStatus` and each item's `matchedFields`.
   Search never returns rejected, safety-held or removed content.
-- **Delivery.** Only an image whose `moderation.status` is `approved` and whose
+- **Delivery.** Only an image whose `classification.moderation.decision` is `approved` and whose
   `content.status` is `stored` gets a thumbnail or a download. Each request retrieves the asset's current state, calls `ensure_lens` for a 320px
   square thumbnail lens (`calmlibrary-thumb`) or a 1600px web lens (`calmlibrary-web`), and
   redirects to a 60-second signed URL from `assets().create_signed_url`. Pending, rejected and
   failed images never get either.
 - **Lifecycle.** **Remove file** calls `assets().delete_content`: the record, its metadata and
-  moderation report stay, `content.status` becomes `removed`, and the CDN stops serving the
+  classification results stay, `content.status` becomes `removed`, and the CDN stops serving the
   content. **Delete** calls
   `assets().delete` and removes the asset.
 - **Moderation decisions.** Verified webhooks for `asset.approved` and `asset.rejected` (sent for

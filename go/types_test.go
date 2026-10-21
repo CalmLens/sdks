@@ -9,30 +9,122 @@ import (
 
 func TestAssetTypedFieldsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1",
-		"processing":{"status":"done","updatedAt":1760000000500,"uploadPartsReceived":3},
-		"content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,
-			"checksums":{"sha256":"abc","md5":null},
-			"image":{"perceptualHash":"ph","width":640,"height":480},
-			"previewImage":{"fileFormat":"webp","thumbhash":"th","averageColor":"#fff","width":128,"height":96},
-			"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},
-			"extractedText":{"type":"document","id":"doc-1"}},
-		"processingOptions":{"keepContentAfterProcessing":true,"flaggedContentPolicy":{"action":"hide"},"features":{"ocr":{"enabled":true},"faceDetection":{"enabled":true,"ageEstimation":false}}},
-		"moderation":{"status":"approved","action":"purge","reviewerAction":"approved","reviewerNote":"Fine","reviewerUserId":"user-1","reviewedAt":1760000000700,"decidedAt":1760000000700,
-		"report":{"score":0.9,"categories":{
-			"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{
-				"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},
-				"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},
-			"hate":{"status":"not-evaluated","reason":"unavailable"}},
-			"labels":[{"description":"Beach","score":0.7,"topicalityScore":0.6,"likelihood":"likely","knowledgeBaseId":"/m/0b3yr"},{"description":"Sky","score":0.5,"likelihood":"possible"}]}}}`), &a)
+	err := json.Unmarshal([]byte(`{
+  "id": "a",
+  "uploadPresetId": "preset-1",
+  "content": {
+    "status": "removed",
+    "removalReason": "policy",
+    "updatedAt": 1760000000600,
+    "format": "image/png",
+    "extension": "png",
+    "sizeInBytes": 2048,
+    "checksums": {
+      "sha256": "abc",
+      "md5": null
+    },
+    "image": {
+      "perceptualHash": "ph",
+      "width": 640,
+      "height": 480
+    },
+    "previewImage": {
+      "fileFormat": "webp",
+      "thumbhash": "th",
+      "averageColor": "#fff",
+      "width": 128,
+      "height": 96
+    },
+    "safetyHold": {
+      "placedAt": 1760000000000,
+      "reason": "suspected-illegal-content",
+      "disposedAt": null
+    },
+    "extractedText": {
+      "type": "document",
+      "id": "doc-1"
+    }
+  },
+  "processingOptions": {
+    "keepContentAfterProcessing": true,
+    "flaggedContentPolicy": {
+      "action": "hide"
+    },
+    "features": {
+      "ocr": {
+        "enabled": true
+      },
+      "faceDetection": {
+        "enabled": true,
+        "ageEstimation": false
+      }
+    }
+  },
+  "upload": {
+    "status": "completed",
+    "updatedAt": 1760000000500,
+    "partsReceived": 3
+  },
+  "classification": {
+    "status": "completed",
+    "updatedAt": 1760000000500,
+    "moderation": {
+      "action": "purge",
+      "reviewerAction": "approved",
+      "reviewerNote": "Fine",
+      "reviewerUserId": "user-1",
+      "reviewedAt": 1760000000700,
+      "decision": "approved",
+      "categories": {
+        "sexual": {
+          "status": "evaluated",
+          "score": 0.9,
+          "likelihood": "very-likely",
+          "qualifiers": {
+            "sexual-nudity": {
+              "status": "evaluated",
+              "someScore": 0.8,
+              "allScore": 0.5,
+              "likelihood": "likely"
+            },
+            "sexual-fictional": {
+              "status": "not-evaluated",
+              "reason": "not-supported"
+            }
+          }
+        },
+        "hate": {
+          "status": "not-evaluated",
+          "reason": "unavailable"
+        }
+      },
+      "score": 0.9
+    },
+    "completedAt": 1760000000700,
+    "labels": [
+      {
+        "description": "Beach",
+        "score": 0.7,
+        "topicalityScore": 0.6,
+        "likelihood": "likely",
+        "knowledgeBaseId": "/m/0b3yr"
+      },
+      {
+        "description": "Sky",
+        "score": 0.5,
+        "likelihood": "possible"
+      }
+    ]
+  }
+}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p := a.Processing; p.Status != ProcessingStatusDone || *p.UpdatedAt != 1760000000500 || *p.UploadPartsReceived != 3 {
+	if p := a.Classification; p.Status != ClassificationStatusCompleted || *p.UpdatedAt != 1760000000500 || *a.Upload.PartsReceived != 3 {
 		t.Fatalf("processing: %+v", p)
 	}
-	if m := a.Moderation; m.Status != ModerationStatusApproved || *m.Action != ModerationActionPurge || *m.ReviewerAction != ReviewerActionApproved ||
-		*m.ReviewerNote != "Fine" || *m.ReviewerUserID != "user-1" || *m.ReviewedAt != 1760000000700 || *m.DecidedAt != 1760000000700 {
+	if m := a.Classification.Moderation; m.Decision != ModerationStatusApproved || *m.Action != ModerationActionPurge || *m.ReviewerAction != ReviewerActionApproved ||
+		*m.ReviewerNote != "Fine" || *m.ReviewerUserID != "user-1" || *m.ReviewedAt != 1760000000700 || *a.Classification.CompletedAt != 1760000000700 {
 		t.Fatalf("moderation: %+v", m)
 	}
 	content := a.Content
@@ -60,7 +152,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 		!o.Features.FaceDetection.Enabled || *o.Features.FaceDetection.AgeEstimation {
 		t.Fatalf("processing options: %+v", o)
 	}
-	report := a.Moderation.Report
+	report := a.Classification.Moderation
 	sexual := report.Categories[CategorySexual]
 	nudity, fictional := sexual.Qualifiers[QualifierSexualNudity], sexual.Qualifiers[QualifierSexualFictional]
 	if nudity.Status != ResultEvaluated || *nudity.SomeScore != 0.8 || *nudity.AllScore != 0.5 || nudity.Likelihood != LikelihoodLikely {
@@ -72,7 +164,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if hate := report.Categories[CategoryHate]; hate.Reason != ReasonUnavailable || hate.Score != nil || hate.Qualifiers != nil {
 		t.Fatalf("hate: %+v", hate)
 	}
-	labels := report.Labels
+	labels := a.Classification.Labels
 	if len(labels) != 2 || labels[0].Description != "Beach" || labels[0].Score != 0.7 || *labels[0].TopicalityScore != 0.6 ||
 		labels[0].Likelihood != LikelihoodLikely || *labels[0].KnowledgeBaseID != "/m/0b3yr" || labels[1].TopicalityScore != nil || labels[1].KnowledgeBaseID != nil {
 		t.Fatalf("labels: %+v", labels)
@@ -113,9 +205,9 @@ func TestProcessingOptionsEncodeOnlySetFields(t *testing.T) {
 	}
 }
 
-func TestModerateTextForwardsUploadPreset(t *testing.T) {
+func TestClassifyTextForwardsUploadPreset(t *testing.T) {
 	c, h := setup(t)
-	if _, err := c.Text.Moderate(context.Background(), ModerateTextOptions{Text: "hi", UploadPresetID: Ptr("preset-1")}); err != nil {
+	if _, err := c.Text.Classify(context.Background(), ClassifyTextOptions{Text: "hi", UploadPresetID: Ptr("preset-1")}); err != nil {
 		t.Fatal(err)
 	}
 	if got := h.last().URL.Query().Get("uploadPresetId"); got != "preset-1" {
@@ -219,10 +311,70 @@ func TestEnsureLensSendsTypedTransforms(t *testing.T) {
 
 func TestEventFactsDecode(t *testing.T) {
 	var page EventsPage
-	err := json.Unmarshal([]byte(`{"events":[{"id":"e","type":"asset.flagged","severity":"high","asset":{"id":"a","processing":{"status":"done"},"moderation":{"status":"rejected","action":"hide"},"content":{"status":"stored"}},
-		"facts":[{"key":"asset-name","value":"cat.jpg","url":"/assets/a"},{"key":"flagged-categories","value":["sexual","hate"]},{"key":"moderation-action","value":null}]},
-		{"id":"u","type":"usage.limit-reached","severity":"high","facts":[{"key":"limit","value":9007199254740993},{"key":"used","value":10},{"key":"owner-user-id","value":"user-1"}]}],
-		"cursor":"c","hasMore":false}`), &page)
+	err := json.Unmarshal([]byte(`{
+  "events": [
+    {
+      "id": "e",
+      "type": "asset.flagged",
+      "severity": "high",
+      "asset": {
+        "id": "a",
+        "content": {
+          "status": "stored"
+        },
+        "upload": {
+          "status": "completed"
+        },
+        "classification": {
+          "status": "completed",
+          "moderation": {
+            "action": "hide",
+            "decision": "rejected"
+          }
+        }
+      },
+      "facts": [
+        {
+          "key": "asset-name",
+          "value": "cat.jpg",
+          "url": "/assets/a"
+        },
+        {
+          "key": "flagged-categories",
+          "value": [
+            "sexual",
+            "hate"
+          ]
+        },
+        {
+          "key": "moderation-action",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "u",
+      "type": "usage.limit-reached",
+      "severity": "high",
+      "facts": [
+        {
+          "key": "limit",
+          "value": 9007199254740993
+        },
+        {
+          "key": "used",
+          "value": 10
+        },
+        {
+          "key": "owner-user-id",
+          "value": "user-1"
+        }
+      ]
+    }
+  ],
+  "cursor": "c",
+  "hasMore": false
+}`), &page)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,8 +394,8 @@ func TestEventFactsDecode(t *testing.T) {
 	if list, ok := categories.Strings(); !ok || !reflect.DeepEqual(list, []string{"sexual", "hate"}) {
 		t.Fatalf("%+v", categories)
 	}
-	if asset := flagged.Asset; asset.ID != "a" || asset.Processing.Status != ProcessingStatusDone || asset.Moderation.Status != ModerationStatusRejected ||
-		*asset.Moderation.Action != ModerationActionHide || asset.Content.Status != ContentStatusStored || flagged.Facts.IsTest() {
+	if asset := flagged.Asset; asset.ID != "a" || asset.Classification.Status != ClassificationStatusCompleted || asset.Classification.Moderation.Decision != ModerationStatusRejected ||
+		*asset.Classification.Moderation.Action != ModerationActionHide || asset.Content.Status != ContentStatusStored || flagged.Facts.IsTest() {
 		t.Fatalf("%+v", flagged)
 	}
 	var usage UsageLimitReachedFacts

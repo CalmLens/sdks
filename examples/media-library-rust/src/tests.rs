@@ -219,12 +219,12 @@ fn asset(id: &str, decision: &str) -> Value {
     let (processing, moderation) = match decision {
         "failed" => ("failed", "pending"),
         "pending" => ("processing", "pending"),
-        decided => ("done", decided),
+        decided => ("completed", decided),
     };
     json!({"id": id, "name": format!("{id}.png"), "folderId": "folder-1",
            "projectId": "project-1", "externalId": format!("calmlibrary:{id}"),
-           "processing": {"status": processing},
-           "moderation": {"status": moderation, "action": null},
+           "upload": {"status": "completed"},
+           "classification": {"status": processing, "moderation": {"decision": moderation, "action": null}},
            "content": {"status": "stored"}})
 }
 
@@ -240,8 +240,8 @@ fn event(id: &str, event_type: &str, asset_id: &str, facts: Value) -> String {
     json!({
         "id": id, "type": event_type, "createdAt": 1_760_000_000_000u64, "projectId": "project-1",
         "data": {"severity": "high", "title": "t", "description": null, "assetId": asset_id,
-                 "asset": {"id": asset_id, "processing": {"status": "done"},
-                           "moderation": {"status": "approved", "action": null},
+                 "asset": {"id": asset_id, "upload": {"status": "completed"},
+                           "classification": {"status": "completed", "moderation": {"decision": "approved", "action": null}},
                            "content": {"status": "stored"}},
                  "facts": facts}
     })
@@ -589,7 +589,7 @@ async fn live_listing_paginates_and_filters_the_folder() {
     assert_eq!(list.query_param("pageSize"), Some("12"));
     assert_eq!(
         list.query_param("filter"),
-        Some("parentId==null;moderation.status==approved")
+        Some("parentId==null;classification.moderation.decision==approved")
     );
     let page = response.html();
     assert!(page.contains(r#"href="/?cursor=next-token&amp;folder=folder-1&amp;status=approved""#));
@@ -603,11 +603,11 @@ async fn listing_filters_only_accept_known_statuses() {
     // A failed upload has no decision, so it is listed under "failed", never "pending".
     assert_eq!(
         list_filter("failed"),
-        "parentId==null;processing.status==failed"
+        "parentId==null;classification.status==failed"
     );
     assert_eq!(
         list_filter("pending"),
-        "parentId==null;moderation.status==pending;processing.status!=failed"
+        "parentId==null;classification.moderation.decision==pending;classification.status!=failed"
     );
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
@@ -889,7 +889,7 @@ async fn removing_the_file_stops_thumbnails_and_keeps_the_record() {
         calmlens::models::AssetContentStatus::Removed
     );
     assert_eq!(
-        record.moderation.status,
+        record.classification.moderation.decision,
         calmlens::models::AssetModerationStatus::Approved
     );
     assert_eq!(
@@ -1144,9 +1144,21 @@ async fn webhooks_for_assets_the_library_did_not_upload_are_ignored() {
     // An asset in the project without this library's catalogue ID.
     mock.enqueue(
         200,
-        json!({"id": "asset-2", "processing": {"status": "done"},
-               "moderation": {"status": "rejected", "action": "hide"},
-               "projectId": "project-1", "externalId": "crm-4411"}),
+        json!({
+          "id": "asset-2",
+          "projectId": "project-1",
+          "externalId": "crm-4411",
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "moderation": {
+              "action": "hide",
+              "decision": "rejected"
+            }
+          }
+        }),
     );
     let body = event("event-1", "asset.rejected", "asset-2", json!([]));
     assert_eq!(

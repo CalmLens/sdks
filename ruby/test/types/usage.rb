@@ -7,16 +7,16 @@ require 'calmlens/testing'
 
 client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', timeout: 30)
 
-asset = client.text.moderate(text: 'Hello', name: 'greeting', external_id: 'post-1',
+asset = client.text.classify(text: 'Hello', name: 'greeting', external_id: 'post-1',
                              processing_options: { flagged_content_policy: { action: 'hide' } })
-status = asset['moderation']['status']
-processing = asset['processing']['status']
-action = asset['moderation']['action']
+status = asset['classification']['moderation']['decision']
+processing = asset['classification']['status']
+action = asset['classification']['moderation']['action']
 removal = asset['content']['removalReason']
 format = asset['content']['format']
 sexual = asset.dig('moderation', 'report', 'categories', 'sexual')
 score = sexual && sexual['status'] == 'evaluated' ? sexual['score'] : nil
-faces = asset.dig('moderation', 'report', 'features', 'faceDetection', 'faces') || []
+faces = asset.dig('classification', 'faceDetection', 'faces') || []
 ages = faces.map { |face| face['ageRange']&.fetch('low') }
 
 uploaded = client.assets.create(name: 'photo.jpg', content: { type: 'image/jpeg', data: File.open('photo.jpg', 'rb') },
@@ -24,22 +24,22 @@ uploaded = client.assets.create(name: 'photo.jpg', content: { type: 'image/jpeg'
                                 processing_options: { features: { face_detection: { enabled: true, age_estimation: true },
                                                                   ocr: { enabled: true } } },
                                 request_options: { idempotency_key: 'upload-1', timeout: 60 })
-first = client.assets.moderate(name: 'big.png', part: { type: 'image/png', base64: 'AAAA', is_final: false },
+first = client.assets.classify(name: 'big.png', part: { type: 'image/png', base64: 'AAAA', is_final: false },
                                total_size_in_bytes: 12_000_000)
 client.assets.upload_part(asset_id: first['id'], part: { part_number: 2, data: 'bytes', is_final: true }, queue: true)
-client.assets.moderate(name: 'page', url: 'https://example.com')
+client.assets.classify(name: 'page', url: 'https://example.com')
 
-page = client.assets.list(page_size: 20, filter: 'moderation.status==approved', ordering: [{ field: 'createdAt', direction: 'DESC' }])
+page = client.assets.list(page_size: 20, filter: 'classification.moderation.decision==approved', ordering: [{ field: 'createdAt', direction: 'DESC' }])
 names = page['items'].map { |item| item['name'] }
 more = page['hasMore']
-client.assets.each(filter: 'moderation.status==rejected') { |item| item['id'] }
+client.assets.each(filter: 'classification.moderation.decision==rejected') { |item| item['id'] }
 children = client.assets.each_child(asset_id: uploaded['id']).to_a
 results = client.assets.search(query: 'cat', mode: 'semantic', limit: 5)
 matched = results['items'].map { |result| [result['asset']['id'], result['score'], result['matchedFields']] }
 updated = client.assets.update(asset_id: uploaded['id'], tags: %w[a b], description: nil)
 client.assets.move(asset_id: updated['id'], folder_id: nil)
 client.assets.retry(asset_id: updated['id'])
-client.assets.wait_for_decision(asset_id: uploaded['id'], timeout: 30)['moderation']['status']
+client.assets.wait_for_decision(asset_id: uploaded['id'], timeout: 30)['classification']['moderation']['decision']
 client.assets.delete_content(asset_id: updated['id'])['content']['updatedAt']
 signed = client.assets.create_signed_url(asset_id: updated['id'],
                                          transform: { type: 'imageTransform', options: { width: 200, fit: 'cover' } })
@@ -79,7 +79,7 @@ rescue CalmLens::NotFoundError => e
 end
 
 webhook = CalmLens.parse_webhook_event(payload: '{}', signature: 'v1=x', timestamp: '1', secret: 'whsec')
-webhook_action = webhook.data['asset']&.dig('moderation', 'action')
+webhook_action = webhook.data['asset']&.dig('classification', 'moderation', 'action')
 webhook_test = webhook.test?
 client.close
 
@@ -89,7 +89,7 @@ CalmLens::MockServerClient.new(analyzed_outcome: { 'moderation' => { 'status' =>
 mock.enqueue_event(type: 'asset.approved', asset_id: 'asset-1', facts: [{ key: 'asset-name', value: 'beach.jpg' }],
                    asset: { id: 'asset-1', processing: { status: 'done' }, moderation: { status: 'approved', action: nil },
                             content: { status: 'removed' } })
-mock.state.assets.each_value { |item| item['moderation']['status'] }
+mock.state.assets.each_value { |item| item['classification']['moderation']['decision'] }
 mock.enqueue(status: 503, body: { code: 'server/unavailable' }).requests.map(&:path)
 
 [status, processing, action, removal, format, score, ages, names, more, children, matched, expires, lens_width, url, bytes,

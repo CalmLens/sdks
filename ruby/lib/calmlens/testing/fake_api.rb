@@ -18,7 +18,7 @@ module CalmLens
     end
 
     # In-memory records behind {MockServerClient}. Change them to arrange a test, such as setting an
-    # asset's `moderation.status`.
+    # asset's `classification.moderation.decision`.
     #
     # @!attribute assets [Hash{String => Hash}] assets by ID, with API field names.
     # @!attribute folders [Hash{String => Hash}] folders by ID.
@@ -37,7 +37,7 @@ module CalmLens
       # Search match fields and where each one's value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
-                        'status' => %w[moderation status] }.freeze
+                        'status' => %w[classification moderation decision] }.freeze
       MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
 
@@ -291,9 +291,10 @@ module CalmLens
       def apply_outcome(asset, outcome)
         processing, moderation = AssetRecord.statuses(outcome)
         now = @now.call
-        asset['processing'].merge!('status' => processing, 'updatedAt' => now)
-        asset['moderation'].merge!('status' => moderation, 'decidedAt' => processing == 'done' ? now : nil)
-        remove_content(asset, 'retention', now) if processing == 'done' && asset['content']['status'] == 'temporary'
+        asset['classification'].merge!('status' => processing, 'updatedAt' => now, 'completedAt' => processing == 'completed' ? now : nil)
+        asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
+        asset['classification']['moderation'].merge!('decision' => moderation)
+        remove_content(asset, 'retention', now) if processing == 'completed' && asset['content']['status'] == 'temporary'
         asset['updatedAt'] = now
         asset
       end
@@ -317,7 +318,7 @@ module CalmLens
         fail!(ErrorCodes::ASSET_NOT_FOUND) unless item && item['projectId'] == @project_id
         case [method, parts[2]]
         in ['GET', nil] then item
-        in ['PATCH', nil] then touch(item.merge!(json.except('id', 'projectId', 'processing', 'moderation', 'content')))
+        in ['PATCH', nil] then touch(item.merge!(json.except('id', 'projectId', 'upload', 'classification', 'content')))
         in ['DELETE', nil]
           @state.assets.delete(id)
           @state.content.delete(id)
@@ -327,7 +328,7 @@ module CalmLens
           touch(item)
         in ['GET', 'children'] then page(project_assets.select { |child| child['parentId'] == id }, query)
         in ['POST', 'retry']
-          fail!(ErrorCodes::ASSET_NOT_RETRYABLE) unless item['processing']['status'] == 'failed'
+          fail!(ErrorCodes::ASSET_NOT_RETRYABLE) unless item['classification']['status'] == 'failed'
           fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
           # Like the API: back to processing, to be moderated again.
           apply_outcome(item, 'pending')
@@ -354,7 +355,7 @@ module CalmLens
 
       def part(item, query, body)
         upload = @state.uploads[item['id']]
-        fail!(ErrorCodes::UPLOAD_NOT_OPEN) unless upload && item['processing']['status'] == 'uploading'
+        fail!(ErrorCodes::UPLOAD_NOT_OPEN) unless upload && item['upload']['status'] == 'uploading'
         number = query['partNumber']
         fail!(ErrorCodes::INVALID_UPLOAD_PART_NUMBER) unless number.is_a?(Integer) && number >= 2
 
@@ -363,7 +364,7 @@ module CalmLens
         size = stored['parts'].values.sum(&:bytesize)
         fail!(ErrorCodes::MULTIPART_IMAGE_TOO_LARGE) if item['type'] == 'image' && size > MAX_MULTIPART_IMAGE
         item['content']['sizeInBytes'] = size
-        item['processing']['uploadPartsReceived'] = number
+        item['upload']['partsReceived'] = number
         return touch(item) unless query['isFinal']
 
         @state.uploads.delete(item['id'])
@@ -481,7 +482,7 @@ module CalmLens
 
         item = project_assets.find { |asset| asset['id'] == identifier || asset['externalId'] == identifier }
         return text(404, 'Asset not found') unless item && %w[content preview].include?(resource)
-        return text(403, 'Asset is held') if item['moderation'].values_at('status', 'action') == %w[rejected hide]
+        return text(403, 'Asset is held') if item['classification']['moderation'].values_at('decision', 'action') == %w[rejected hide]
 
         stored = @state.content[item['id']]
         return text(404, 'Asset content not found') unless stored
@@ -504,8 +505,8 @@ module CalmLens
       module_function
 
       # Processing and moderation status for each outcome.
-      OUTCOMES = { 'pending' => %w[processing pending], 'approved' => %w[done approved],
-                   'rejected' => %w[done rejected], 'failed' => %w[failed pending] }.freeze
+      OUTCOMES = { 'pending' => %w[processing pending], 'approved' => %w[completed approved],
+                   'rejected' => %w[completed rejected], 'failed' => %w[failed pending] }.freeze
 
       def statuses(outcome)
         OUTCOMES.fetch(outcome) do
@@ -516,16 +517,15 @@ module CalmLens
 
       # The outcome of analyzed fields: `failed` when they fail processing, else their moderation status.
       def outcome_of(fields)
-        fields.dig('processing', 'status') == 'failed' ? 'failed' : fields.dig('moderation', 'status') || 'approved'
+        fields.dig('classification', 'status') == 'failed' ? 'failed' : fields.dig('classification', 'moderation', 'decision') || 'approved'
       end
 
       def sections(now:, open:, keep:, format:, size:)
         {
-          'processing' => { 'status' => open ? 'uploading' : 'processing', 'updatedAt' => now,
-                            'uploadPartsReceived' => open ? 1 : nil },
-          'moderation' => { 'status' => 'pending', 'action' => nil, 'reviewerAction' => nil,
-                            'reviewerNote' => nil, 'reviewerUserId' => nil, 'reviewedAt' => nil, 'decidedAt' => nil,
-                            'report' => nil },
+          'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
+          'classification' => { 'status' => open ? 'pending' : 'processing', 'updatedAt' => now, 'completedAt' => nil,
+            'moderation' => { 'decision' => 'pending', 'action' => nil, 'reviewerAction' => nil,
+                             'reviewerNote' => nil, 'reviewerUserId' => nil, 'reviewedAt' => nil } },
           'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
                          'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
                          'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'previewImage' => nil,

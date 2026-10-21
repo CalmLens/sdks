@@ -5,15 +5,15 @@ Calmthread is a **pre-moderated** thread: anything the moderation policy flags i
 for a person to review before anyone sees it.
 
 - Each reply has a display name and a message. Both are moderated as separate text assets.
-- A clean reply publishes immediately: every field's `moderation.status` is `approved` and its
-  `moderation.action` is `nil` (the policy took no action).
+- A clean reply publishes immediately: every field's `classification.moderation.decision` is `approved` and its
+  `classification.moderation.action` is `nil` (the policy took no action).
 - A flagged reply is **held**. The thread shows a "held for review" placeholder, never its
   name or text, and the **Held for review** panel lists its asset IDs.
 - A moderator reviews held assets in the CalmLens portal. Approving a held asset releases
   the reply into the thread. Rejecting it keeps the reply out for good, and the app then
   deletes the reply's stored content from CalmLens. The asset record and its moderation
   report remain.
-- Pending, unknown and unreachable results, and fields whose `processing.status` is `failed`,
+- Pending, unknown and unreachable results, and fields whose `classification.status` is `failed`,
   never publish.
 
 ## Run locally
@@ -70,7 +70,7 @@ local API. Live SDK requests time out after 30 seconds. No API key is sent to th
 Each field is moderated synchronously, with a per-asset policy override:
 
 ```ruby
-asset = client.text.moderate(
+asset = client.text.classify(
   name: 'Calmthread reply',
   external_id: "#{reply_id}:text",
   processing_options: { keep_content_after_processing: true, flagged_content_policy: { action: 'hide' } },
@@ -105,7 +105,7 @@ outcomes (`decided-by` is `automated`); the app skips those, because it already 
 automated report when the reply was posted. Other events are skipped.
 
 For each decision about a local reply, the app retrieves the asset with
-`client.assets.retrieve` and acts on its **current** `moderation.status`, not on the event's
+`client.assets.retrieve` and acts on its **current** `classification.moderation.decision`, not on the event's
 snapshot:
 
 - Status `approved`: the app also retrieves the reply's other field. The reply is published

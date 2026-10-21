@@ -112,7 +112,7 @@ class CalmmarketTest {
 
   static String event(String id, String type, String assetId, String facts) {
     return "{\"id\":\"" + id + "\",\"type\":\"" + type + "\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"t\","
-        + "\"description\":null,\"assetId\":\"" + assetId + "\",\"asset\":{\"id\":\"" + assetId + "\",\"processing\":{\"status\":\"done\"},\"moderation\":{\"status\":\"approved\",\"action\":null},\"content\":{\"status\":\"stored\"}},\"facts\":" + facts + "}}";
+        + "\"description\":null,\"assetId\":\"" + assetId + "\",\"asset\":{\"id\":\"" + assetId + "\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"approved\",\"action\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":" + facts + "}}";
   }
 
   static String html(Calmmarket.Response response) { return new String(response.body(), StandardCharsets.UTF_8); }
@@ -144,21 +144,24 @@ class CalmmarketTest {
     Map<String, Object> asset = new LinkedHashMap<>();
     asset.put("id", id);
     if (externalId != null) asset.put("externalId", externalId);
-    asset.put("processing", Map.of("status", switch (decision) {
+    Map<String, Object> classification = new LinkedHashMap<>();
+    classification.put("status", switch (decision) {
       case "pending" -> "processing";
       case "error" -> "failed";
-      default -> "done";
-    }));
+      default -> "completed";
+    });
+    asset.put("upload", Map.of("status", "completed"));
+    asset.put("classification", classification);
     Map<String, Object> moderation = new LinkedHashMap<>();
-    moderation.put("status", decision.equals("pending") || decision.equals("error") ? "pending" : decision);
+    moderation.put("decision", decision.equals("pending") || decision.equals("error") ? "pending" : decision);
     boolean flagged = report != null && Boolean.TRUE.equals(report.get(FLAGGED));
     moderation.put("action", flagged ? (decision.equals("rejected") ? "hide" : "alert") : null);
     if (report != null) {
       Map<String, Object> body = new LinkedHashMap<>(report);
       body.remove(FLAGGED);
-      moderation.put("report", body);
+      moderation.putAll(body);
     }
-    asset.put("moderation", moderation);
+    classification.put("moderation", moderation);
     asset.put("content", Map.of("status", "stored"));
     return asset;
   }
@@ -256,8 +259,8 @@ class CalmmarketTest {
 
   @Test
   void combinedCategoriesPreserveUnavailableResults() {
-    ClassificationReport report = model(report(true, Map.of("violence", evaluated(0.91),
-        "hate", partial(0.4), "self-harm", notEvaluated("not-supported"))), ClassificationReport.class);
+    AssetModeration report = model(report(true, Map.of("violence", evaluated(0.91),
+        "hate", partial(0.4), "self-harm", notEvaluated("not-supported"))), AssetModeration.class);
     Map<String, Calmmarket.CategoryRow> rows = new LinkedHashMap<>();
     for (Calmmarket.CategoryRow row : Calmmarket.explain(report)) rows.put(row.key(), row);
     assertEquals(0.91, rows.get("violence").score());
@@ -292,7 +295,7 @@ class CalmmarketTest {
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertFalse(html(get(app, "/")).contains("<article class=\"card\">"));
     // An errored photo is not polled again; a later decision arrives by event. Approve it:
-    listing.photos.get(1).processing = AssetProcessingStatus.DONE;
+    listing.photos.get(1).processing = AssetClassificationStatus.COMPLETED;
     listing.photos.get(1).moderation = AssetModerationStatus.APPROVED;
     assertTrue(listing.visible());
     listing.photos.get(1).moderation = AssetModerationStatus.REJECTED;

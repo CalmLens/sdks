@@ -12,7 +12,7 @@ import threading
 import uuid
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-from calmlens import Asset, CalmLensServerClient, CalmLensError, CalmLensTransportError, ClassificationReport
+from calmlens import Asset, CalmLensServerClient, CalmLensError, CalmLensTransportError, AssetModeration
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 6401
@@ -70,14 +70,14 @@ def validate_url(value: str) -> str:
 def link_status(asset: Asset) -> str:
     """A shared link's state from its asset: the moderation decision once there is one, ``error``
     when processing failed, else ``pending``. A status this app doesn't know stays pending."""
-    if asset["processing"]["status"] == "failed":
+    if asset["classification"]["status"] == "failed":
         return "error"
-    status = asset["moderation"]["status"]
+    status = asset["classification"]["moderation"]["decision"]
     return status if status in ("approved", "rejected") else "pending"
 
 
-def explain(report: ClassificationReport | None) -> dict:
-    """Reads a moderation report without inventing scores: a not-evaluated category (or a
+def explain(report: AssetModeration | None) -> dict:
+    """Reads a classification results without inventing scores: a not-evaluated category (or a
     status this app doesn't know) is unknown, never zero."""
     found: list[tuple[str, float]] = []
     unknown: list[str] = []
@@ -106,7 +106,7 @@ class Moderator:
         self.client = client
 
     def check_note(self, link_id: str, note: str, demo_result: str) -> Asset:
-        return self.client.text.moderate(
+        return self.client.text.classify(
             name="Calmboard note", external_id=external_id(link_id, "note"), text=note,
             processing_options={"keepContentAfterProcessing": False},
         )
@@ -181,7 +181,7 @@ class Board:
             note_asset = self.moderator.check_note(link["id"], note, demo_result)
             with self.lock:
                 link["note_asset_id"] = note_asset["id"]
-            note_status = note_asset["moderation"]["status"]
+            note_status = note_asset["classification"]["moderation"]["decision"]
             if note_status != "approved":
                 with self.lock:
                     link["status"] = "note-rejected"
@@ -205,8 +205,8 @@ class Board:
             except CalmLensError as error:
                 logging.warning("Could not refresh %s: %s (request %s)", asset_id, error.code, error.request_id)
                 continue
-            moderation = asset["moderation"]
-            report = moderation["report"]
+            moderation = asset["classification"]["moderation"]
+            report = moderation
             # Flagged means the policy took an action (alert, hide or purge) on the page.
             update = {"status": link_status(asset), "flagged": moderation["action"] is not None}
             if update["status"] in ("approved", "rejected") and (update["flagged"] or update["status"] == "rejected"):
@@ -222,7 +222,7 @@ class Board:
             logging.warning("Could not list parts of %s: %s", asset_id, error.code)
             return []
         findings = [{"name": child.get("name") or child.get("type"), "type": child.get("type"),
-                     "status": child["moderation"]["status"], "found": explain(child["moderation"]["report"])["found"]}
+                     "status": child["classification"]["moderation"]["decision"], "found": explain(child["classification"]["moderation"])["found"]}
                     for child in children]
         # The parts that caused the decision first; the rest stay in the API's order (newest first).
         findings.sort(key=lambda part: part["status"] != "rejected")

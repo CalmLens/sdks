@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <pre>{@code
  * var mock = new MockCalmLensServerClient();
- * mock.enqueue(200, Map.of("id", "asset-1", "processing", Map.of("status", "done"),
+ * mock.enqueue(200, Map.of("id", "asset-1", "processing", Map.of("status", "completed"),
  *     "moderation", Map.of("status", "approved"), "content", Map.of("status", "removed")));
  * mock.enqueueError(ErrorCodes.ASSET_NOT_FOUND);            // HTTP 404 with the API's error body
  * mock.enqueue("GET", "/events", 200, Map.of("events", List.of(event), "cursor", "c1", "hasMore", false));

@@ -104,13 +104,13 @@ macro_rules! string_enum {
 
 string_enum! {
     /// Where an asset is in the pipeline.
-    AssetProcessingStatus {
+    AssetClassificationStatus {
         /// The content is still arriving, e.g. a multipart upload receiving parts.
-        Uploading = "uploading",
+        Pending = "pending",
         /// The content is being processed and classified.
         Processing = "processing",
         /// Processing finished.
-        Done = "done",
+        Completed = "completed",
         /// Processing failed; the asset can be retried.
         Failed = "failed",
     }
@@ -280,7 +280,7 @@ string_enum! {
 }
 
 string_enum! {
-    /// A moderation policy category, the key of [`ClassificationReport::categories`].
+    /// A moderation policy category, the key of [`AssetModeration::categories`].
     ClassificationCategory {
         /// Sexual content.
         Sexual = "sexual",
@@ -555,7 +555,7 @@ string_enum! {
         /// The content's file extension.
         ContentExtension = "content.extension",
         /// The moderation status.
-        ModerationStatus = "moderation.status",
+        ModerationStatus = "classification.moderation.decision",
         /// The visual content.
         Visual = "visual",
         /// The audio transcript.
@@ -622,11 +622,11 @@ pub struct ProcessingOptions {
 }
 
 /// Optional analyses to run on an asset, keyed by feature. The API rejects unknown features.
-/// Results of person and face detection are in [`ClassificationReport::features`].
+/// Results of person and face detection are in [`AssetClassification::face_detection`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessingFeatures {
-    /// Extract image text into a child asset and moderate it as text. Applies to images,
+    /// Extract image text into a child asset and classify it as text. Applies to images,
     /// including those extracted from documents and websites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ocr: Option<FeatureOptions>,
@@ -864,7 +864,7 @@ impl<'de> Deserialize<'de> for Content {
 }
 
 /// Options for [`AssetsClient::create`](crate::AssetsClient::create) and
-/// [`moderate`](crate::AssetsClient::moderate). Supply exactly one of `content`, `part` (the
+/// [`classify`](crate::AssetsClient::classify). Supply exactly one of `content`, `part` (the
 /// first part of a multipart upload) or `url`.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1038,7 +1038,7 @@ pub struct ListAssets {
     /// Items per page, 1 to 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// A filter such as `moderation.status==approved`.
+    /// A filter such as `classification.moderation.decision==approved`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
     /// Sort orders.
@@ -1061,7 +1061,7 @@ pub struct ListChildren {
     /// Items per page, 1 to 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// A filter such as `moderation.status==approved`.
+    /// A filter such as `classification.moderation.decision==approved`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
     /// Sort orders.
@@ -1319,10 +1319,10 @@ pub struct Asset {
     pub visibility: Option<Visibility>,
     /// Where the asset is in the pipeline.
     #[serde(default)]
-    pub processing: AssetProcessing,
+    pub upload: AssetUpload,
     /// The moderation decision, policy action and report.
     #[serde(default)]
-    pub moderation: AssetModeration,
+    pub classification: AssetClassification,
     /// Whether CalmLens holds the content, and its details.
     #[serde(default)]
     pub content: AssetContent,
@@ -1331,22 +1331,26 @@ pub struct Asset {
     pub extra: HashMap<String, Value>,
 }
 impl Asset {
-    /// An asset with `id`, processing status `processing` and moderation status `moderation`,
+    /// An asset with `id`, classification status `processing` and moderation status `moderation`,
     /// e.g. for a mock response.
     pub fn new(
         id: impl Into<String>,
-        processing: AssetProcessingStatus,
+        processing: AssetClassificationStatus,
         moderation: AssetModerationStatus,
     ) -> Self {
         Self {
             id: id.into(),
-            processing: AssetProcessing {
-                status: processing,
-                ..AssetProcessing::default()
+            upload: AssetUpload {
+                status: "completed".into(),
+                ..AssetUpload::default()
             },
-            moderation: AssetModeration {
-                status: moderation,
-                ..AssetModeration::default()
+            classification: AssetClassification {
+                status: processing,
+                moderation: AssetModeration {
+                    decision: moderation,
+                    ..AssetModeration::default()
+                },
+                ..AssetClassification::default()
             },
             ..Self::default()
         }
@@ -1355,62 +1359,97 @@ impl Asset {
     /// processing failed.
     pub fn is_decided(&self) -> bool {
         matches!(
-            self.moderation.status,
+            self.classification.moderation.decision,
             AssetModerationStatus::Approved | AssetModerationStatus::Rejected
-        ) || self.processing.status == AssetProcessingStatus::Failed
+        ) || self.classification.status == AssetClassificationStatus::Failed
     }
 }
 
-/// Where an asset is in the pipeline.
+/// Source upload progress.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct AssetProcessing {
-    /// `uploading` while the content arrives, `processing`, then `done` or `failed`.
+pub struct AssetUpload {
+    /// Classification or upload progress.
     #[serde(default)]
-    pub status: AssetProcessingStatus,
-    /// When the processing status last changed, in milliseconds since the Unix epoch.
+    pub status: String,
+    /// When the state last changed, in milliseconds since the Unix epoch.
     #[serde(default)]
     pub updated_at: Option<u64>,
-    /// How many parts of a multipart upload have been received.
+    /// Number of multipart parts received; absent for other uploads.
     #[serde(default)]
-    pub upload_parts_received: Option<u32>,
+    pub parts_received: Option<u32>,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
 
-/// An asset's moderation state.
+/// Classification progress and capability results.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetClassification {
+    /// Classification or upload progress.
+    #[serde(default)]
+    pub status: AssetClassificationStatus,
+    /// When the state last changed, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// When classification completed, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub completed_at: Option<u64>,
+    /// Content-safety findings and the decision in force.
+    #[serde(default)]
+    pub moderation: AssetModeration,
+    /// Person detections when requested.
+    #[serde(default)]
+    pub person_detection: Option<PersonDetectionResult>,
+    /// Face detections when requested.
+    #[serde(default)]
+    pub face_detection: Option<FaceDetectionResult>,
+    /// Detected content labels.
+    #[serde(default)]
+    pub labels: Option<Vec<ClassificationLabel>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Content-safety findings and decision.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetModeration {
-    /// The decision in force: `pending` until moderation finishes, then `approved` or
-    /// `rejected`. A reviewer's decision takes precedence over the automated one.
+    /// The moderation decision in force, with reviewer decisions taking precedence.
     #[serde(default)]
-    pub status: AssetModerationStatus,
-    /// What the policy did with flagged content, or `None` when nothing was flagged. Kept after a
-    /// reviewer decides.
+    pub decision: AssetModerationStatus,
+    /// The policy action, or none when no content was flagged.
     #[serde(default)]
     pub action: Option<AssetModerationAction>,
-    /// A reviewer's decision, or `None` when no reviewer has decided.
+    /// The reviewer decision, if any.
     #[serde(default)]
     pub reviewer_action: Option<AssetReviewerAction>,
-    /// The reviewer's note.
+    /// The reviewer-provided note.
     #[serde(default)]
     pub reviewer_note: Option<String>,
     /// The user who reviewed the asset.
     #[serde(default)]
     pub reviewer_user_id: Option<String>,
-    /// When a reviewer decided, in milliseconds since the Unix epoch.
+    /// When the reviewer decided, in milliseconds since the Unix epoch.
     #[serde(default)]
     pub reviewed_at: Option<u64>,
-    /// When the decision in force was made, in milliseconds since the Unix epoch.
+    /// Content-safety category scores and qualifiers.
     #[serde(default)]
-    pub decided_at: Option<u64>,
-    /// The moderation report, set once classification finishes.
+    pub categories: HashMap<ClassificationCategory, CategoryResult>,
+    /// The highest category score.
     #[serde(default)]
-    pub report: Option<ClassificationReport>,
+    pub score: Option<f64>,
+    /// Timed moderation evidence from audio or video.
+    #[serde(default)]
+    pub timeline: Option<MediaClassificationReport>,
+    /// The saved policy assessment and settings snapshot.
+    #[serde(default)]
+    pub policy: Option<ReportPolicy>,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -1454,40 +1493,6 @@ pub struct AssetContent {
     /// Text extracted from the content.
     #[serde(default)]
     pub extracted_text: Option<ExtractedText>,
-    /// Fields this SDK version does not know.
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-/// A moderation report.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct ClassificationReport {
-    /// The overall score.
-    #[serde(default)]
-    pub score: Option<f64>,
-    /// Notes.
-    #[serde(default)]
-    pub notes: Option<String>,
-    /// Results by category.
-    #[serde(default)]
-    pub categories: HashMap<ClassificationCategory, CategoryResult>,
-    /// Milliseconds since the Unix epoch.
-    #[serde(default)]
-    pub processed_at: Option<u64>,
-    /// Labels.
-    #[serde(default)]
-    pub labels: Option<Vec<ClassificationLabel>>,
-    /// Audio and video results.
-    #[serde(default)]
-    pub media: Option<MediaClassificationReport>,
-    /// Results of the features requested in [`ProcessingOptions::features`].
-    #[serde(default)]
-    pub features: Option<ProcessingFeatureResults>,
-    /// What the project's policy made of the report when the asset was decided.
-    #[serde(default)]
-    pub policy: Option<ReportPolicy>,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -2077,12 +2082,12 @@ pub struct EventAsset {
     /// Your ID for the asset, if you set one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
-    /// The processing status when the event was created.
+    /// The classification status when the event was created.
     #[serde(default)]
-    pub processing: EventAssetProcessing,
+    pub upload: EventAssetUpload,
     /// The moderation decision and policy action when the event was created.
     #[serde(default)]
-    pub moderation: EventAssetModeration,
+    pub classification: EventAssetClassification,
     /// Whether CalmLens held the content when the event was created.
     #[serde(default)]
     pub content: EventAssetContent,
@@ -2091,23 +2096,27 @@ pub struct EventAsset {
     pub extra: HashMap<String, Value>,
 }
 impl EventAsset {
-    /// A snapshot of asset `id` with processing status `processing`, moderation status
+    /// A snapshot of asset `id` with classification status `processing`, moderation status
     /// `moderation` and content status `content`, e.g. for a mock event.
     pub fn new(
         id: impl Into<String>,
-        processing: AssetProcessingStatus,
+        processing: AssetClassificationStatus,
         moderation: AssetModerationStatus,
         content: AssetContentStatus,
     ) -> Self {
         Self {
             id: id.into(),
-            processing: EventAssetProcessing {
-                status: processing,
-                ..EventAssetProcessing::default()
+            upload: EventAssetUpload {
+                status: "completed".into(),
+                ..EventAssetUpload::default()
             },
-            moderation: EventAssetModeration {
-                status: moderation,
-                ..EventAssetModeration::default()
+            classification: EventAssetClassification {
+                status: processing,
+                moderation: EventAssetModeration {
+                    decision: moderation,
+                    ..EventAssetModeration::default()
+                },
+                ..EventAssetClassification::default()
             },
             content: EventAssetContent {
                 status: content,
@@ -2118,14 +2127,17 @@ impl EventAsset {
     }
 }
 
-/// An asset's processing status in an [`EventAsset`].
+/// An asset's classification status in an [`EventAsset`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct EventAssetProcessing {
-    /// The processing status.
+pub struct EventAssetClassification {
     #[serde(default)]
-    pub status: AssetProcessingStatus,
+    /// The moderation decision and policy action.
+    pub moderation: EventAssetModeration,
+    /// The classification status.
+    #[serde(default)]
+    pub status: AssetClassificationStatus,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -2136,9 +2148,9 @@ pub struct EventAssetProcessing {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct EventAssetModeration {
-    /// The moderation status.
+    /// The moderation decision.
     #[serde(default)]
-    pub status: AssetModerationStatus,
+    pub decision: AssetModerationStatus,
     /// What the policy did with flagged content, or `None` when nothing was flagged.
     #[serde(default)]
     pub action: Option<AssetModerationAction>,
@@ -2907,10 +2919,10 @@ pub struct ImageTransformOptions {
     pub extra: HashMap<String, Value>,
 }
 
-/// Options for [`TextClient::moderate`](crate::TextClient::moderate).
+/// Options for [`TextClient::classify`](crate::TextClient::classify).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ModerateText {
+pub struct ClassifyText {
     /// The text; must not be blank.
     pub text: String,
     /// The asset name; defaults to `text`.
@@ -2941,7 +2953,7 @@ pub struct ModerateText {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotency_key: Option<String>,
 }
-impl ModerateText {
+impl ClassifyText {
     /// Moderates `text`.
     pub fn new(text: impl Into<String>) -> Self {
         Self {
@@ -3078,4 +3090,17 @@ pub struct ListFolders {
     /// ASC or DESC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direction: Option<String>,
+}
+
+/// Upload progress in an event snapshot.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EventAssetUpload {
+    /// Classification or upload progress.
+    #[serde(default)]
+    pub status: String,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }

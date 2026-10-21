@@ -50,7 +50,7 @@ module Calmthread
         targets.each do |field|
           id = ids.fetch(field)
           decision = type == 'asset.approved' ? 'approved' : 'rejected'
-          client.state.assets.fetch(id)['moderation'].merge!('status' => decision, 'reviewerAction' => decision,
+          client.state.assets.fetch(id)['classification']['moderation'].merge!('decision' => decision, 'reviewerAction' => decision,
                                                              'reviewerUserId' => 'demo-reviewer')
           client.enqueue_event(type: type, asset_id: id, title: EVENT_LABELS[type], facts: [
                                  { key: 'asset-type', value: 'text' },
@@ -80,7 +80,7 @@ module Calmthread
         return outcome if outcome == 'failed'
 
         # A rejected field is one the `hide` policy acted on.
-        { 'moderation' => { 'status' => outcome, 'action' => outcome == 'rejected' ? 'hide' : nil, 'report' => { 'categories' => {} } } }
+        { 'classification' => { 'moderation' => { 'decision' => outcome, 'action' => outcome == 'rejected' ? 'hide' : nil, 'categories' => {} } } }
       end
     end
   end

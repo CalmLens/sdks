@@ -66,11 +66,11 @@ describe("React Native", () => {
     });
     const bytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
 
-    const uploaded = await client.assets.moderate({
+    const uploaded = await client.assets.classify({
       name: "photo.png",
       content: { uint8Array: bytes, type: "image/png" },
     });
-    await client.assets.moderate({
+    await client.assets.classify({
       name: "photo.png",
       content: { base64: "AQID", type: "image/png" },
     });

@@ -122,7 +122,7 @@ public final class Calmmarket {
   /** Which part of a rejected photo led to the rejection. */
   enum Driver {
     NONE("Not rejected"),
-    AUTOMATED("The combined image and text moderation report"),
+    AUTOMATED("The combined image and text classification results"),
     REVIEWER("A reviewer's decision");
     final String label;
     Driver(String label) { this.label = label; }
@@ -139,12 +139,12 @@ public final class Calmmarket {
     final String name, mime, assetId;
     /** The {@code externalId} sent with the upload: {@code <listing-id>:photo-<number>}. */
     final String externalId;
-    AssetProcessingStatus processing;
+    AssetClassificationStatus processing;
     /** The decision in force, a reviewer's when there is one. */
     AssetModerationStatus moderation;
     /** What the policy did with flagged content ({@code alert}, {@code hide} or {@code purge}); null when it matched nothing. */
     String moderationAction;
-    ClassificationReport report;
+    AssetModeration report;
     /** The reviewer's note, or else automated moderation's reason for a rejection. */
     String rejectionNote;
     Ocr ocr = Ocr.NOT_CHECKED;
@@ -165,7 +165,7 @@ public final class Calmmarket {
 
     boolean decided() { return decided(moderation); }
     static boolean decided(AssetModerationStatus status) { return status == AssetModerationStatus.APPROVED || status == AssetModerationStatus.REJECTED; }
-    boolean processingFailed() { return processing == AssetProcessingStatus.FAILED; }
+    boolean processingFailed() { return processing == AssetClassificationStatus.FAILED; }
     /** Only an explicit approval with a current decision counts; an unknown status never does. */
     boolean approved() { return moderation == AssetModerationStatus.APPROVED && !processingFailed() && refreshError == null; }
     boolean failed() { return moderation == AssetModerationStatus.REJECTED || processingFailed(); }
@@ -489,7 +489,7 @@ public final class Calmmarket {
     boolean flagged = false;
     for (Map.Entry<String, String> field : TEXT_FIELDS.entrySet()) {
       String externalId = id + ":" + field.getKey();
-      Asset asset = textClient.text.moderate(new ModerateText(values.get(field.getKey()))
+      Asset asset = textClient.text.classify(new ClassifyText(values.get(field.getKey()))
           .name(field.getValue())
           .externalId(externalId)
           // Kept so a reviewer can read a flagged listing in the CalmLens portal.
@@ -576,13 +576,13 @@ public final class Calmmarket {
   }
 
   /** Flagged means the policy took an action (alert, hide or purge) on the asset. */
-  static boolean flagged(Asset asset) { return asset.moderation() != null && asset.moderation().action() != null; }
+  static boolean flagged(Asset asset) { return asset.classification().moderation() != null && asset.classification().moderation().action() != null; }
 
-  static AssetModerationStatus moderationStatus(Asset asset) { return asset.moderation() == null ? null : asset.moderation().status(); }
+  static AssetModerationStatus moderationStatus(Asset asset) { return asset.classification().moderation() == null ? null : asset.classification().moderation().decision(); }
 
-  static AssetProcessingStatus processingStatus(Asset asset) { return asset.processing() == null ? null : asset.processing().status(); }
+  static AssetClassificationStatus classificationStatus(Asset asset) { return asset.classification() == null ? null : asset.classification().status(); }
 
-  static ClassificationReport report(Asset asset) { return asset.moderation() == null ? null : asset.moderation().report(); }
+  static AssetModeration report(Asset asset) { return asset.classification().moderation() == null ? null : asset.classification().moderation(); }
 
   // ---------------------------------------------------------------- Explaining photo decisions
 
@@ -592,7 +592,7 @@ public final class Calmmarket {
     return policyActed ? Driver.AUTOMATED : Driver.REVIEWER;
   }
 
-  static List<CategoryRow> explain(ClassificationReport merged) {
+  static List<CategoryRow> explain(AssetModeration merged) {
     if (merged == null || merged.categories() == null) return List.of();
     LinkedHashSet<String> keys = new LinkedHashSet<>(CATEGORIES);
     keys.addAll(new TreeSet<>(merged.categories().keySet()));
@@ -613,8 +613,8 @@ public final class Calmmarket {
   // ---------------------------------------------------------------- Photo decisions
 
   private static void applyPhoto(Photo photo, Asset asset) {
-    AssetModeration moderation = asset.moderation();
-    photo.processing = processingStatus(asset);
+    AssetModeration moderation = asset.classification().moderation();
+    photo.processing = classificationStatus(asset);
     photo.moderation = moderationStatus(asset);
     photo.moderationAction = moderation == null ? null : moderation.action();
     photo.report = report(asset);

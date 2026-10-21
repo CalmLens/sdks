@@ -76,24 +76,28 @@ const (
 // EventAsset is a snapshot of an asset's processing, moderation and content status when the
 // event was created.
 type EventAsset struct {
-	ID         string               `json:"id"`
-	ExternalID *string              `json:"externalId,omitempty"`
-	Processing EventAssetProcessing `json:"processing"`
-	Moderation EventAssetModeration `json:"moderation"`
-	Content    EventAssetContent    `json:"content"`
+	ID             string                   `json:"id"`
+	ExternalID     *string                  `json:"externalId,omitempty"`
+	Upload         EventAssetUpload         `json:"upload"`
+	Classification EventAssetClassification `json:"classification"`
+	Content        EventAssetContent        `json:"content"`
 }
 
-// EventAssetProcessing is the asset's processing status when the event was created.
-type EventAssetProcessing struct {
-	// Status is one of the ProcessingStatus constants.
+// EventAssetClassification is the asset's classification status when the event was created.
+type EventAssetUpload struct {
+	Status string `json:"status"`
+}
+
+type EventAssetClassification struct {
+	Moderation EventAssetModeration `json:"moderation"`
+	// Status is one of the ClassificationStatus constants.
 	Status string `json:"status"`
 }
 
 // EventAssetModeration is the asset's moderation decision and policy action when the event was
 // created.
 type EventAssetModeration struct {
-	// Status is one of the ModerationStatus constants.
-	Status string `json:"status"`
+	Decision string `json:"decision"`
 	// Action is ModerationActionAlert, ModerationActionHide or ModerationActionPurge, or nil
 	// when nothing was flagged.
 	Action *string `json:"action"`
@@ -244,7 +248,7 @@ type AssetDecisionFacts struct {
 type AssetFailedFacts struct {
 	AssetName *string `json:"asset-name"`
 	AssetType *string `json:"asset-type"`
-	// PreviousStatus is the processing status (a ProcessingStatus constant) before the failure.
+	// PreviousStatus is the classification status (a ClassificationStatus constant) before the failure.
 	PreviousStatus *string `json:"previous-status"`
 }
 

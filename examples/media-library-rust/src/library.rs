@@ -295,7 +295,7 @@ impl Library {
         }
     }
 
-    /// Removes the stored file. The record, its metadata and moderation report stay.
+    /// Removes the stored file. The record, its metadata and classification results stay.
     pub async fn delete_content(&self, id: &str) -> Result<Asset, Failure> {
         match self {
             Library::Live(client) => Ok(client.assets().delete_content(AssetId::new(id)).await?),
@@ -359,10 +359,10 @@ impl Library {
 /// `STATUS_FILTERS`. Any other value lists every status.
 pub fn list_filter(status: &str) -> String {
     let status = match status {
-        "approved" => "moderation.status==approved",
-        "rejected" => "moderation.status==rejected",
-        "pending" => "moderation.status==pending;processing.status!=failed",
-        "failed" => "processing.status==failed",
+        "approved" => "classification.moderation.decision==approved",
+        "rejected" => "classification.moderation.decision==rejected",
+        "pending" => "classification.moderation.decision==pending;classification.status!=failed",
+        "failed" => "classification.status==failed",
         _ => return "parentId==null".into(),
     };
     format!("parentId==null;{status}")

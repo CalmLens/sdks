@@ -110,7 +110,7 @@ for anything still pending.
 
 ```
                  ┌────────────── text: caption, comment, bio ───────────────┐
- user ──► Calmgram server ──► client.text.moderate({ text })                 (waits)
+ user ──► Calmgram server ──► client.text.classify({ text })                 (waits)
                  │                 └─► approved → save · rejected → tell the user why
                  │
                  └────────────── photo: the browser uploads, the server approves ───┐
@@ -121,7 +121,7 @@ for anything still pending.
                  .assets.create({ content: { data: file } }) ──► CalmLens (returns undecided)
   3. browser ──► POST /posts { postId, assetId, caption }
                  server: assets.retrieve(assetId) must have externalId "post-<id>" and
-                 come through the preset · moderate the caption · save post as pending
+                 come through the preset · classify the caption · save post as pending
                             ▲                               │
       webhook: asset.approved / asset.rejected   or poll: assets.retrieve
                             └──────── approved → show in feed via CDN lens URL
@@ -135,14 +135,14 @@ which checks the caption and forwards the photo with `client.assets.create`. The
 CalmLens's **moderation policy** (set in the portal) turns each report into an action. The app
 only needs a few fields:
 
-| `moderation.status` | `moderation.action` | Calmgram does |
+| `classification.moderation.decision` | `classification.moderation.action` | Calmgram does |
 | --- | --- | --- |
 | `approved` | `null` | Publish |
 | `approved` | `alert` | Publish and add to the moderation queue |
-| `rejected` | `hide` or `purge` | Don't publish; tell the author which category matched (from `moderation.report`) |
+| `rejected` | `hide` or `purge` | Don't publish; tell the author which category matched (from `classification.moderation`) |
 | `pending` | — | Show only to the author with a "Checking…" placeholder |
 
-When `processing.status` is `failed`, Calmgram doesn't publish and asks the author to retry.
+When `classification.status` is `failed`, Calmgram doesn't publish and asks the author to retry.
 
 ### Where to look
 

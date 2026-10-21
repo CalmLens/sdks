@@ -23,20 +23,20 @@ class MockTests(unittest.TestCase):
 
     def test_asset_lifecycle_and_storage(self):
         c = self.client
-        a = c.assets.moderate({'name': 'text', 'content': {'plainText': 'hello', 'type': 'text/plain'}})
-        self.assertEqual((a["processing"]["status"], a["moderation"]["status"], a["moderation"]["decidedAt"]),
-                         ("done", "approved", 123))
+        a = c.assets.classify({'name': 'text', 'content': {'plainText': 'hello', 'type': 'text/plain'}})
+        self.assertEqual((a["classification"]["status"], a["classification"]["moderation"]["decision"], a["classification"]["completedAt"]),
+                         ("completed", "approved", 123))
         self.assertEqual((a["content"]["format"], a["content"]["sizeInBytes"]), ("text/plain", 5))
         self.assertEqual(a["createdAt"], 123)
         self.assertEqual(c.assets.retrieve({"assetId": a["id"]}), a)
         self.assertEqual(len(c.assets.list()["items"]), 1)
-        a["moderation"]["status"] = "rejected"
-        self.assertEqual(c.assets.retrieve({"assetId": a["id"]})["moderation"]["status"], "approved")
+        a["classification"]["moderation"]["decision"] = "rejected"
+        self.assertEqual(c.assets.retrieve({"assetId": a["id"]})["classification"]["moderation"]["decision"], "approved")
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.retry({"assetId": a["id"]})
         self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.ASSET_NOT_RETRYABLE, 409))
         # Processing finished, so the temporarily held content is gone and cannot be processed again.
-        c.database_storage.assets[a["id"]]["processing"]["status"] = "failed"
+        c.database_storage.assets[a["id"]]["classification"]["status"] = "failed"
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.retry({"assetId": a["id"]})
         self.assertEqual(raised.exception.code, error_codes.ASSET_CONTENT_UNAVAILABLE)
@@ -47,31 +47,31 @@ class MockTests(unittest.TestCase):
 
     def test_content_kept_only_until_processing_finishes_is_removed(self):
         c = MockCalmLensServerClient(api_key=DOWNLOAD, mock_options={"now": lambda: 123})
-        temporary = c.assets.moderate(name="a.txt", content={"plainText": "bye", "type": "text/plain"})
+        temporary = c.assets.classify(name="a.txt", content={"plainText": "bye", "type": "text/plain"})
         self.assertEqual((temporary["content"]["status"], temporary["content"]["removalReason"],
                           temporary["content"]["updatedAt"]), ("removed", "retention", 123))
         self.assertNotIn(temporary["id"], c.image_storage.content)
         self.assertEqual(c.cdn.serve({"assetIdentifier": temporary["id"]}).status, 404)
-        kept = c.assets.moderate(name="b.txt", content={"plainText": "keep", "type": "text/plain"},
+        kept = c.assets.classify(name="b.txt", content={"plainText": "keep", "type": "text/plain"},
                                  processing_options={"keepContentAfterProcessing": True})
         self.assertEqual((kept["content"]["status"], kept["content"]["removalReason"]), ("stored", None))
         self.assertEqual(c.cdn.serve({"assetIdentifier": kept["id"]}).read(), b"keep")
         queued = c.assets.create(name="c.txt", content={"plainText": "wait", "type": "text/plain"})
-        self.assertEqual((queued["processing"]["status"], queued["content"]["status"]), ("processing", "temporary"))
+        self.assertEqual((queued["classification"]["status"], queued["content"]["status"]), ("processing", "temporary"))
         self.assertEqual(c.cdn.serve({"assetIdentifier": queued["id"]}).read(), b"wait")
 
     def test_configured_outcomes_and_retrying_a_failed_asset(self):
         c = MockCalmLensServerClient(mock_options={"now": lambda: 7, "queued_outcome": "failed",
                                                    "analyzed_outcome": "rejected"})
-        rejected = c.assets.moderate(name="a.txt", content={"plainText": "no", "type": "text/plain"})
-        self.assertEqual((rejected["processing"]["status"], rejected["moderation"]["status"],
-                          rejected["moderation"]["decidedAt"]), ("done", "rejected", 7))
+        rejected = c.assets.classify(name="a.txt", content={"plainText": "no", "type": "text/plain"})
+        self.assertEqual((rejected["classification"]["status"], rejected["classification"]["moderation"]["decision"],
+                          rejected["classification"]["completedAt"]), ("completed", "rejected", 7))
         failed = c.assets.create(name="b.txt", content={"plainText": "retry me", "type": "text/plain"})
-        self.assertEqual((failed["processing"]["status"], failed["moderation"]["status"], failed["content"]["status"]),
+        self.assertEqual((failed["classification"]["status"], failed["classification"]["moderation"]["decision"], failed["content"]["status"]),
                          ("failed", "pending", "temporary"))
         self.assertIn(failed["id"], c.image_storage.content)
         retried = c.assets.retry(asset_id=failed["id"])
-        self.assertEqual((retried["processing"]["status"], retried["moderation"]["status"]), ("processing", "pending"))
+        self.assertEqual((retried["classification"]["status"], retried["classification"]["moderation"]["decision"]), ("processing", "pending"))
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.retry(asset_id=failed["id"])
         self.assertEqual(raised.exception.code, error_codes.ASSET_NOT_RETRYABLE)
@@ -106,14 +106,14 @@ class MockTests(unittest.TestCase):
         c.folders.move({"folderId": child["id"], "parentId": None})
         c.folders.delete({"folderId": root["id"]})
         self.assertEqual(len(c.folders.list()["folders"]), 1)
-        a = c.assets.moderate({'name': 'text', 'content': {'plainText': 'hi', 'type': 'text/plain'}})
+        a = c.assets.classify({'name': 'text', 'content': {'plainText': 'hi', 'type': 'text/plain'}})
         self.assertEqual(c.assets.move({"assetId": a["id"], "folderId": child["id"]})["folderId"], child["id"])
         with self.assertRaises(CalmLensError):
             c.folders.delete({"folderId": child["id"]})
 
     def test_private_cdn_grants_and_response_headers(self):
         c = self.client
-        a = c.assets.moderate({'name': 'text', 'content': {'plainText': 'hello', 'type': 'text/plain'},
+        a = c.assets.classify({'name': 'text', 'content': {'plainText': 'hello', 'type': 'text/plain'},
                                'processingOptions': {'keepContentAfterProcessing': True}})
         with c.cdn.serve({"assetIdentifier": a["id"]}) as denied:
             self.assertEqual(denied.status, 403)
@@ -130,14 +130,14 @@ class MockTests(unittest.TestCase):
         c = MockCalmLensServerClient(api_key=DOWNLOAD, mock_options={"now": lambda: 456})
         a = c.assets.create({"name": "a.txt", "content": {"plainText": "keep me", "type": "text/plain"}})
         stored = c.database_storage.assets[a["id"]]
-        stored["moderation"]["report"] = {"processedAt": 1, "categories": {}, "score": 0.0}
+        stored["classification"]["moderation"] = {"processedAt": 1, "categories": {}, "score": 0.0}
         stored["content"]["extractedText"] = {"type": "string", "content": "keep me"}
         self.assertEqual(c.cdn.serve({"assetIdentifier": a["id"]}).read(), b"keep me")
         removed = c.assets.delete_content(asset_id=a["id"])
         self.assertEqual((removed["id"], removed["content"]["status"], removed["content"]["removalReason"],
                           removed["content"]["updatedAt"], removed["content"]["extractedText"]),
                          (a["id"], "removed", "requested", 456, None))
-        self.assertEqual(c.assets.retrieve({"assetId": a["id"]})["moderation"]["report"],
+        self.assertEqual(c.assets.retrieve({"assetId": a["id"]})["classification"]["moderation"],
                          {"processedAt": 1, "categories": {}, "score": 0.0})
         self.assertNotIn(a["id"], c.image_storage.content)
         self.assertEqual(c.cdn.serve({"assetIdentifier": a["id"]}).status, 404)
@@ -146,20 +146,20 @@ class MockTests(unittest.TestCase):
     def test_wait_for_decision_reads_storage_without_real_waiting(self):
         c = self.client
         pending = c.assets.create({"name": "a.txt", "content": {"plainText": "hi", "type": "text/plain"}})
-        self.assertEqual(pending["moderation"]["status"], "pending")
+        self.assertEqual(pending["classification"]["moderation"]["decision"], "pending")
         with self.assertRaises(CalmLensError) as raised:
             c.assets.wait_for_decision(asset_id=pending["id"])
         self.assertEqual((raised.exception.code, raised.exception.details),
-                         (error_codes.SDK_TIMEOUT, {"assetId": pending["id"], "processingStatus": "processing",
+                         (error_codes.SDK_TIMEOUT, {"assetId": pending["id"], "classificationStatus": "processing",
                                                     "moderationStatus": "pending"}))
         self.assertGreater(len(c.requests), 2)
         self.assertEqual({(r.method, r.path) for r in c.requests[1:]}, {("GET", f"/assets/{pending['id']}")})
-        c.database_storage.assets[pending["id"]]["moderation"]["status"] = "rejected"
+        c.database_storage.assets[pending["id"]]["classification"]["moderation"]["decision"] = "rejected"
         decided = c.assets.wait_for_decision({"assetId": pending["id"]})
-        self.assertEqual((decided["id"], decided["moderation"]["status"]), (pending["id"], "rejected"))
+        self.assertEqual((decided["id"], decided["classification"]["moderation"]["decision"]), (pending["id"], "rejected"))
         failed = c.assets.create({"name": "b.txt", "content": {"plainText": "hi", "type": "text/plain"}})
-        c.database_storage.assets[failed["id"]]["processing"]["status"] = "failed"
-        self.assertEqual(c.assets.wait_for_decision(asset_id=failed["id"])["processing"]["status"], "failed")
+        c.database_storage.assets[failed["id"]]["classification"]["status"] = "failed"
+        self.assertEqual(c.assets.wait_for_decision(asset_id=failed["id"])["classification"]["status"], "failed")
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.wait_for_decision(asset_id="missing")
         self.assertEqual(raised.exception.code, error_codes.ASSET_NOT_FOUND)
@@ -167,9 +167,9 @@ class MockTests(unittest.TestCase):
     def test_delete_removes_record_and_content(self):
         c = self.client
         a = c.assets.create({"name": "site", "url": "https://example.com/page"})
-        other = c.assets.moderate({"name": "b", "content": {"plainText": "other", "type": "text/plain"},
+        other = c.assets.classify({"name": "b", "content": {"plainText": "other", "type": "text/plain"},
                                    "processingOptions": {"keepContentAfterProcessing": True}})
-        self.assertEqual((a["type"], a["processing"]["status"], a["moderation"]["status"], a["externalUrl"]),
+        self.assertEqual((a["type"], a["classification"]["status"], a["classification"]["moderation"]["decision"], a["externalUrl"]),
                          ("website", "processing", "pending", "https://example.com/page"))
         self.assertIsNone(c.assets.delete({"assetId": a["id"]}))
         self.assertEqual((c.requests[-1].method, c.requests[-1].path), ("DELETE", f"/assets/{a['id']}"))
@@ -200,14 +200,14 @@ class MockTests(unittest.TestCase):
         c = self.client
         queued = c.assets.create({"name": "x.png", "totalSizeInBytes": 2 * size,
                                   "part": {"type": "image/png", "data": b"x" * size}})
-        self.assertEqual((queued["processing"]["status"], queued["processing"]["uploadPartsReceived"]), ("uploading", 1))
+        self.assertEqual((queued["upload"]["status"], queued["upload"]["partsReceived"]), ("uploading", 1))
         result = c.assets.upload_part({"assetId": queued["id"], "part": {"data": b"y" * size, "partNumber": 2, "isFinal": True}})
-        self.assertEqual((result["processing"]["status"], result["moderation"]["status"],
-                          result["processing"]["uploadPartsReceived"], result["content"]["sizeInBytes"]),
+        self.assertEqual((result["classification"]["status"], result["classification"]["moderation"]["decision"],
+                          result["upload"]["partsReceived"], result["content"]["sizeInBytes"]),
                          ("processing", "pending", 2, 2 * size))
-        waited = c.assets.moderate({"name": "y.png", "part": {"type": "image/png", "data": b"x" * size}})
+        waited = c.assets.classify({"name": "y.png", "part": {"type": "image/png", "data": b"x" * size}})
         self.assertEqual(c.assets.upload_part(asset_id=waited["id"], part={"data": b"y" * size, "partNumber": 2,
-                                                                          "isFinal": True})["moderation"]["status"],
+                                                                          "isFinal": True})["classification"]["moderation"]["decision"],
                          "approved")
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.upload_part(asset_id=waited["id"], part={"data": b"z", "partNumber": 3, "isFinal": True})
@@ -245,17 +245,14 @@ class MockFeedSearchAndListTests(unittest.TestCase):
         start = c.events.list()
         self.assertEqual(start["events"], [])
         self.tick()
-        asset = c.text.moderate(text="hello")
+        asset = c.text.classify(text="hello")
         first = c.enqueue_event("asset.approved", asset_id=asset["id"],
                                 facts=[{"key": "decided-by", "value": "automated"}])
         self.tick()
         second = c.enqueue_event("asset.approved", asset_id=asset["id"])
         page = c.events.list(after=start["cursor"], limit=1)
         self.assertEqual(([e["id"] for e in page["events"]], page["hasMore"]), ([first["id"]], True))
-        self.assertEqual(page["events"][0]["asset"], {"id": asset["id"], "externalId": None,
-                                                      "processing": {"status": "done"},
-                                                      "moderation": {"status": "approved", "action": None},
-                                                      "content": {"status": "removed"}})
+        self.assertEqual(page["events"][0]["asset"], {'id': asset['id'], 'externalId': None, 'content': {'status': 'removed'}, 'upload': {'status': 'completed'}, 'classification': {'status': 'completed', 'moderation': {'decision': 'approved', 'action': None}}})
         self.assertEqual(page["events"][0]["facts"], [{"key": "decided-by", "value": "automated"}])
         self.assertEqual([e["id"] for e in c.events.iter(after=start["cursor"], limit=1)], [first["id"], second["id"]])
         last = c.events.list(after=page["cursor"])
@@ -279,24 +276,24 @@ class MockFeedSearchAndListTests(unittest.TestCase):
         for name in ("b", "a", "c"):
             self.tick()
             c.assets.create(name=name, content={"plainText": name, "type": "text/plain"})
-        c.database_storage.assets["id-1"]["moderation"]["status"] = "rejected"
-        c.database_storage.assets["id-2"]["processing"]["status"] = "failed"
+        c.database_storage.assets["id-1"]["classification"]["moderation"]["decision"] = "rejected"
+        c.database_storage.assets["id-2"]["classification"]["status"] = "failed"
         self.assertEqual([a["name"] for a in c.assets.list()["items"]], ["c", "a", "b"])  # newest first
         names = [a["name"] for a in c.assets.list(ordering=[{"field": "createdAt", "direction": "ASC"}])["items"]]
         self.assertEqual(names, ["b", "a", "c"])
         names = [a["name"] for a in c.assets.list(ordering=[{"field": "createdAt", "direction": "DESC"}])["items"]]
         self.assertEqual(names[0], "c")
-        self.assertEqual([a["name"] for a in c.assets.list(filter="moderation.status==pending")["items"]], ["c", "b"])
-        self.assertEqual([a["name"] for a in c.assets.list(filter="moderation.status==rejected,name==c")["items"]],
+        self.assertEqual([a["name"] for a in c.assets.list(filter="classification.moderation.decision==pending")["items"]], ["c", "b"])
+        self.assertEqual([a["name"] for a in c.assets.list(filter="classification.moderation.decision==rejected,name==c")["items"]],
                          ["c", "a"])
-        self.assertEqual([a["name"] for a in c.assets.list(filter="moderation.status==pending;name=in=(a,b)")["items"]],
+        self.assertEqual([a["name"] for a in c.assets.list(filter="classification.moderation.decision==pending;name=in=(a,b)")["items"]],
                          ["b"])
-        self.assertEqual([a["name"] for a in c.assets.list(filter="processing.status==failed")["items"]], ["c"])
+        self.assertEqual([a["name"] for a in c.assets.list(filter="classification.status==failed")["items"]], ["c"])
         self.assertEqual([a["name"] for a in c.assets.list(filter="content.format==text/plain;name!=c")["items"]],
                          ["a", "b"])
         self.assertEqual([a["name"] for a in c.assets.iter(page_size=1, filter="name!=b")], ["c", "a"])
         with self.assertRaises(NotImplementedError):
-            c.assets.list(filter="(name==a,name==b);moderation.status==pending")
+            c.assets.list(filter="(name==a,name==b);classification.moderation.decision==pending")
 
 
 class MockConfigurationAndCaptureTests(unittest.TestCase):
@@ -312,7 +309,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
 
     def test_captures_requests(self):
         c = MockCalmLensServerClient(project_id="p1", mock_options={"create_id": lambda: "a1"})
-        c.assets.moderate(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})
+        c.assets.classify(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})
         c.assets.update({"assetId": "a1", "tags": ["x"]})
         c.events.list(after="1_cursor", limit=5)
         c.cdn.serve({"assetIdentifier": "a1", "lens": "thumb"}).close()
@@ -339,7 +336,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c.enqueue_error(timeout).enqueue_error(reset).enqueue_error(api).enqueue_error(http.client.IncompleteRead(b""))
         for expected, cause in ((CalmLensTimeoutError, timeout), (CalmLensTransportError, reset)):
             with self.assertRaises(expected) as raised:
-                c.text.moderate(text="hello")
+                c.text.classify(text="hello")
             self.assertIs(raised.exception.__cause__, cause)
         with self.assertRaises(CalmLensAPIError) as raised:
             c.events.list()
@@ -349,7 +346,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         with self.assertRaises(CalmLensTransportError):
             c.cdn.serve({"assetIdentifier": "a1"})
         self.assertEqual(c.database_storage.assets, {})
-        self.assertEqual(c.text.moderate(text="hello")["moderation"]["status"], "approved")
+        self.assertEqual(c.text.classify(text="hello")["classification"]["moderation"]["decision"], "approved")
         self.assertEqual(len(c.requests), 5)
         c.enqueue_error(CalmLensError(error_codes.ASSET_NOT_FOUND))
         with self.assertRaises(CalmLensAPIError) as raised:

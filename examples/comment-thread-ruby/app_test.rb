@@ -34,12 +34,13 @@ module TestHelpers
   # (processing failed) or the moderation status once processing is done. A flagged field is one
   # the policy acted on: `hide` when rejected, `alert` otherwise.
   def asset(id, status, flagged: false)
-    processing = { 'pending' => 'processing', 'uploading' => 'uploading', 'error' => 'failed' }.fetch(status, 'done')
-    moderation = processing == 'done' ? status : 'pending'
-    { 'id' => id, 'processing' => { 'status' => processing },
-      'moderation' => { 'status' => moderation, 'action' => flagged ? (status == 'rejected' ? 'hide' : 'alert') : nil,
-                        'report' => { 'categories' => {} } },
+    classification = { 'pending' => 'processing', 'uploading' => 'pending', 'error' => 'failed' }.fetch(status, 'completed')
+    moderation = classification == 'completed' ? status : 'pending'
+    { 'id' => id, 'upload' => { 'status' => status == 'uploading' ? 'uploading' : 'completed' },
+      'classification' => { 'status' => classification, 'moderation' => { 'decision' => moderation,
+        'action' => flagged ? (status == 'rejected' ? 'hide' : 'alert') : nil, 'categories' => {} } },
       'content' => { 'status' => 'stored' } }
+
   end
 
   # Approval and rejection events default to a reviewer's decision; pass decided_by: 'automated'
@@ -56,7 +57,7 @@ module TestHelpers
   end
 
   def event_asset(asset_id, moderation)
-    { 'id' => asset_id, 'processing' => { 'status' => 'done' }, 'moderation' => { 'status' => moderation, 'action' => nil },
+    { 'id' => asset_id, 'upload' => { 'status' => 'completed' }, 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => moderation, 'action' => nil } },
       'content' => { 'status' => 'stored' } }
   end
 
@@ -159,10 +160,9 @@ class SubmissionTest < Minitest::Test
         assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| item.body == 'Secret text' })
       end
     end
-    approved = { 'processing' => { 'status' => 'done' }, 'moderation' => { 'status' => 'approved', 'action' => nil } }
+    approved = { 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'approved', 'action' => nil } } }
     [approved, approved.merge('id' => ''), [],
-     { 'id' => 't', 'processing' => { 'status' => 'done' },
-       'moderation' => { 'status' => 'rejected', 'action' => nil, 'report' => nil } }].each_with_index do |text, index|
+     { 'id' => 't', 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'rejected', 'action' => nil } } }].each_with_index do |text, index|
       app, = live_app(asset('n', 'approved'), text)
       result = app.discussion.submit('Ada', 'Hello')
       # Only the last response is a well-formed rejection, which holds rather than publishes.
@@ -194,7 +194,7 @@ class SubmissionTest < Minitest::Test
     held = app.discussion.replies.find { |reply| reply[:text] == 'T-name-held' }
     assert_equal [:name], held[:held_fields]
     stored = app.discussion.moderator.client.state.assets.fetch(held[:asset_ids][:name])
-    assert_equal ["#{held[:id]}:name", 'rejected'], [stored['externalId'], stored.dig('moderation', 'status')]
+    assert_equal ["#{held[:id]}:name", 'rejected'], [stored['externalId'], stored.dig('classification', 'moderation', 'decision')]
     assert_equal 'sdk/transport-error', assert_raises(CalmLens::Error) { app.discussion.submit('Ada', 'Hi', 'unavailable') }.code
     capture_io { assert_equal 502, post_reply(app, demo_result: 'unavailable').first }
     page = home(app)

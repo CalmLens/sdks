@@ -20,8 +20,8 @@ test("rejects redirects before credentials reach another origin on every transpo
       forwarded++;
       return Response.json({
         id: "a",
-        processing: { status: "done" },
-        moderation: { status: "approved" },
+        upload: { status: "completed" },
+        classification: { status: "completed", moderation: { decision: "approved" } },
       });
     },
   });
@@ -33,7 +33,7 @@ test("rejects redirects before credentials reach another origin on every transpo
       cdnBaseUrl: source.url.toString(),
     });
     for (const call of [
-      () => client.assets.moderate(upload),
+      () => client.assets.classify(upload),
       () => client.assets.retrieve({ assetId: "a" }),
       () => client.cdn.serve({ assetIdentifier: "a", init: { redirect: "follow" } }),
     ]) {
@@ -52,7 +52,7 @@ test("invalid successful uploads and generic HTTP failures have typed diagnostic
       ...options,
       uploadFetch: (async () => new Response(body, { status: 200 })) as typeof fetch,
     });
-    await expect(client.assets.moderate(upload)).rejects.toMatchObject({
+    await expect(client.assets.classify(upload)).rejects.toMatchObject({
       code: "sdk/invalid-response",
       status: 200,
     });
@@ -61,7 +61,7 @@ test("invalid successful uploads and generic HTTP failures have typed diagnostic
     ...options,
     uploadFetch: (async () => new Response("oops", { status: 502 })) as typeof fetch,
   });
-  await expect(client.assets.moderate(upload)).rejects.toMatchObject({
+  await expect(client.assets.classify(upload)).rejects.toMatchObject({
     code: "sdk/http-error",
     status: 502,
   });
@@ -73,7 +73,7 @@ test("scoped cancellation applies to REST, uploads and CDN without changing defa
   const client = new CalmLensServerClient(options);
   const scoped = client.withRequestOptions({ signal: abort.signal });
   for (const call of [
-    () => scoped.assets.moderate(upload),
+    () => scoped.assets.classify(upload),
     () => scoped.assets.retrieve({ assetId: "a" }),
     () => scoped.cdn.serve({ assetIdentifier: "a" }),
   ]) {
@@ -101,7 +101,7 @@ test("request deadlines include delayed response bodies", async () => {
       baseUrl: server.url.toString(),
       timeoutMs: 30,
     });
-    await expect(client.assets.moderate(upload)).rejects.toMatchObject({ code: "sdk/timeout" });
+    await expect(client.assets.classify(upload)).rejects.toMatchObject({ code: "sdk/timeout" });
     await expect(client.assets.retrieve({ assetId: "a" })).rejects.toMatchObject({
       code: "sdk/timeout",
     });
@@ -131,8 +131,8 @@ const brokenBodyFetch = (cause: Error) =>
 const transportCalls = (client: CalmLensServerClient) => [
   () => client.assets.retrieve({ assetId: "a" }),
   () => client.events.list({ after: "cursor" }),
-  () => client.assets.moderate(upload),
-  () => client.text.moderate({ text: "hello" }),
+  () => client.assets.classify(upload),
+  () => client.text.classify({ text: "hello" }),
 ];
 
 test("network failures are wrapped as sdk/transport-error with the original cause", async () => {

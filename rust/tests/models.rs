@@ -5,82 +5,135 @@ use serde_json::json;
 #[test]
 fn asset_nested_fields_decode_into_typed_models() {
     let wire = json!({
-        "id": "asset-1",
-        "type": "image",
-        "processingOptions": { "flaggedContentPolicy": { "action": "purge" } },
-        "processing": { "status": "done", "updatedAt": 5, "uploadPartsReceived": 3 },
-        "content": {
-            "status": "removed",
-            "removalReason": "parent-removed",
-            "updatedAt": 6,
-            "format": "image/png",
-            "extension": "png",
-            "sizeInBytes": 42,
-            "checksums": { "sha256": "abc", "md5": null },
-            "image": { "perceptualHash": "ph", "width": 10, "height": 20 },
-            "previewImage": { "fileFormat": "webp", "thumbhash": "th", "averageColor": "#000", "width": 4, "height": 8 },
-            "safetyHold": { "placedAt": 1, "reason": "suspected-illegal-content", "disposedAt": null },
-            "extractedText": { "type": "document", "id": "doc-1" }
+      "id": "asset-1",
+      "type": "image",
+      "processingOptions": {
+        "flaggedContentPolicy": {
+          "action": "purge"
+        }
+      },
+      "content": {
+        "status": "removed",
+        "removalReason": "parent-removed",
+        "updatedAt": 6,
+        "format": "image/png",
+        "extension": "png",
+        "sizeInBytes": 42,
+        "checksums": {
+          "sha256": "abc",
+          "md5": null
         },
+        "image": {
+          "perceptualHash": "ph",
+          "width": 10,
+          "height": 20
+        },
+        "previewImage": {
+          "fileFormat": "webp",
+          "thumbhash": "th",
+          "averageColor": "#000",
+          "width": 4,
+          "height": 8
+        },
+        "safetyHold": {
+          "placedAt": 1,
+          "reason": "suspected-illegal-content",
+          "disposedAt": null
+        },
+        "extractedText": {
+          "type": "document",
+          "id": "doc-1"
+        }
+      },
+      "upload": {
+        "status": "completed",
+        "updatedAt": 5,
+        "partsReceived": 3
+      },
+      "classification": {
+        "status": "completed",
+        "updatedAt": 5,
         "moderation": {
-        "status": "rejected",
-        "action": "hide",
-        "reviewerAction": "rejected",
-        "reviewerNote": "confirmed",
-        "reviewerUserId": "user-9",
-        "reviewedAt": 7,
-        "decidedAt": 8,
-        "report": {
-            "processedAt": 1,
-            "score": 0.9,
-            "categories": {
-                "sexual": {
-                    "status": "evaluated",
-                    "likelihood": "likely",
-                    "score": 0.9,
-                    "qualifiers": {
-                        "sexual-nudity": { "status": "evaluated", "score": 0.8, "likelihood": "possible" },
-                        "sexual-fictional": { "status": "not-evaluated", "reason": "unavailable" }
-                    }
+          "action": "hide",
+          "reviewerAction": "rejected",
+          "reviewerNote": "confirmed",
+          "reviewerUserId": "user-9",
+          "reviewedAt": 7,
+          "decision": "rejected",
+          "categories": {
+            "sexual": {
+              "status": "evaluated",
+              "likelihood": "likely",
+              "score": 0.9,
+              "qualifiers": {
+                "sexual-nudity": {
+                  "status": "evaluated",
+                  "score": 0.8,
+                  "likelihood": "possible"
                 },
-                "violence": { "status": "not-evaluated", "reason": "not-supported" }
+                "sexual-fictional": {
+                  "status": "not-evaluated",
+                  "reason": "unavailable"
+                }
+              }
             },
-            "labels": [{ "description": "beach", "score": 0.7, "likelihood": "very-likely" }],
-            "media": {
-                "durationSeconds": 3,
-                "sampledFrames": 1,
-                "audioTranscribed": false,
-                "segments": [{
-                    "source": "frame-text",
-                    "startSeconds": 0,
-                    "endSeconds": 1,
-                    "categories": { "hate": { "status": "partial", "likelihood": "unlikely", "score": 0.1 } }
-                }]
+            "violence": {
+              "status": "not-evaluated",
+              "reason": "not-supported"
             }
-        }
-        }
+          },
+          "score": 0.9,
+          "timeline": {
+            "durationSeconds": 3,
+            "sampledFrames": 1,
+            "audioTranscribed": false,
+            "segments": [
+              {
+                "source": "frame-text",
+                "startSeconds": 0,
+                "endSeconds": 1,
+                "categories": {
+                  "hate": {
+                    "status": "partial",
+                    "likelihood": "unlikely",
+                    "score": 0.1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "completedAt": 8,
+        "labels": [
+          {
+            "description": "beach",
+            "score": 0.7,
+            "likelihood": "very-likely"
+          }
+        ]
+      }
     });
     let asset: Asset = serde_json::from_value(wire).unwrap();
 
     assert_eq!(asset.asset_type, Some(AssetType::Image));
     assert_eq!(
         (
-            &asset.processing.status,
-            asset.processing.updated_at,
-            asset.processing.upload_parts_received
+            &asset.classification.status,
+            asset.classification.updated_at,
+            asset.upload.parts_received
         ),
-        (&AssetProcessingStatus::Done, Some(5), Some(3))
+        (&AssetClassificationStatus::Completed, Some(5), Some(3))
     );
-    let moderation = &asset.moderation;
+    let moderation = &asset.classification.moderation;
     assert_eq!(
         (
-            &moderation.status,
+            &moderation.decision,
             &moderation.action,
             &moderation.reviewer_action,
             moderation.reviewer_note.as_deref(),
             moderation.reviewer_user_id.as_deref(),
             moderation.reviewed_at,
-            moderation.decided_at
+            asset.classification.completed_at
         ),
         (
             &AssetModerationStatus::Rejected,
@@ -154,7 +207,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         FlaggedContentAction::Purge
     );
 
-    let report = moderation.report.as_ref().unwrap();
+    let report = &asset.classification.moderation;
     let sexual = &report.categories[&ClassificationCategory::Sexual];
     assert_eq!(sexual.status, Some(EvaluationStatus::Evaluated));
     assert_eq!(sexual.likelihood, Some(Likelihood::Likely));
@@ -172,10 +225,10 @@ fn asset_nested_fields_decode_into_typed_models() {
         Some(NotEvaluatedReason::NotSupported)
     );
     assert_eq!(
-        report.labels.as_ref().unwrap()[0].likelihood,
+        asset.classification.labels.as_ref().unwrap()[0].likelihood,
         Likelihood::VeryLikely
     );
-    let segment = &report.media.as_ref().unwrap().segments[0];
+    let segment = &report.timeline.as_ref().unwrap().segments[0];
     assert_eq!(segment.source, MediaSegmentSource::FrameText);
     assert_eq!(
         segment.categories[&ClassificationCategory::Hate].status,
@@ -186,21 +239,41 @@ fn asset_nested_fields_decode_into_typed_models() {
 #[test]
 fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     let wire = json!({
-        "id": "asset-1",
-        "type": "hologram",
-        "processing": { "status": "paused" },
-        "content": { "status": "archived", "removalReason": "expired" },
+      "id": "asset-1",
+      "type": "hologram",
+      "content": {
+        "status": "archived",
+        "removalReason": "expired"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "paused",
         "moderation": {
-            "status": "escalated",
-            "action": "quarantine",
-            "reviewerAction": "deferred",
-            "report": {
-                "categories": {
-                    "spam": { "status": "skipped", "likelihood": "certain", "qualifiers": { "bots": { "status": "evaluated" } } }
-                },
-                "labels": [{ "description": "x", "score": 1, "likelihood": "certain" }]
+          "action": "quarantine",
+          "reviewerAction": "deferred",
+          "decision": "escalated",
+          "categories": {
+            "spam": {
+              "status": "skipped",
+              "likelihood": "certain",
+              "qualifiers": {
+                "bots": {
+                  "status": "evaluated"
+                }
+              }
             }
-        }
+          }
+        },
+        "labels": [
+          {
+            "description": "x",
+            "score": 1,
+            "likelihood": "certain"
+          }
+        ]
+      }
     });
     let asset: Asset = serde_json::from_value(wire.clone()).unwrap();
     assert_eq!(
@@ -209,15 +282,15 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     );
     assert_eq!(
         (
-            &asset.processing.status,
-            &asset.moderation.status,
-            &asset.moderation.action,
-            &asset.moderation.reviewer_action,
+            &asset.classification.status,
+            &asset.classification.moderation.decision,
+            &asset.classification.moderation.action,
+            &asset.classification.moderation.reviewer_action,
             &asset.content.status,
             &asset.content.removal_reason
         ),
         (
-            &AssetProcessingStatus::Unknown("paused".into()),
+            &AssetClassificationStatus::Unknown("paused".into()),
             &AssetModerationStatus::Unknown("escalated".into()),
             &Some(AssetModerationAction::Unknown("quarantine".into())),
             &Some(AssetReviewerAction::Unknown("deferred".into())),
@@ -226,7 +299,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         )
     );
     assert!(!asset.is_decided());
-    let spam = &asset.moderation.report.as_ref().unwrap().categories
+    let spam = &&asset.classification.moderation.categories
         [&ClassificationCategory::Unknown("spam".into())];
     assert_eq!(
         spam.status,
@@ -239,10 +312,13 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         .contains_key(&ModerationQualifier::Unknown("bots".into())));
     let reencoded = serde_json::to_value(&asset).unwrap();
     assert_eq!(reencoded["type"], "hologram");
-    assert_eq!(reencoded["moderation"]["action"], "quarantine");
+    assert_eq!(
+        reencoded["classification"]["moderation"]["action"],
+        "quarantine"
+    );
     assert_eq!(reencoded["content"]["removalReason"], "expired");
     assert_eq!(
-        reencoded["moderation"]["report"]["categories"]["spam"]["likelihood"],
+        reencoded["classification"]["moderation"]["categories"]["spam"]["likelihood"],
         "certain"
     );
 }
@@ -262,21 +338,48 @@ fn flagged_content_policy_encodes_as_an_object() {
 #[test]
 fn events_decode_typed_type_severity_and_asset_snapshot() {
     let page: EventsPage = serde_json::from_value(json!({
-        "events": [
-            {
-                "id": "e1", "type": "asset.flagged", "severity": "high", "title": "t",
-                "asset": {
-                    "id": "a1", "externalId": "x1",
-                    "processing": { "status": "done" },
-                    "moderation": { "status": "rejected", "action": "hide" },
-                    "content": { "status": "removed" }
-                },
-                "facts": [{ "key": "flagged-categories", "value": ["sexual"] }]
+      "events": [
+        {
+          "id": "e1",
+          "type": "asset.flagged",
+          "severity": "high",
+          "title": "t",
+          "asset": {
+            "id": "a1",
+            "externalId": "x1",
+            "content": {
+              "status": "removed"
             },
-            { "id": "e2", "type": "billing.charged", "severity": "critical", "title": "t", "facts": [] }
-        ],
-        "cursor": "c",
-        "hasMore": false
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "action": "hide",
+                "decision": "rejected"
+              }
+            }
+          },
+          "facts": [
+            {
+              "key": "flagged-categories",
+              "value": [
+                "sexual"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "e2",
+          "type": "billing.charged",
+          "severity": "critical",
+          "title": "t",
+          "facts": []
+        }
+      ],
+      "cursor": "c",
+      "hasMore": false
     }))
     .unwrap();
     let flagged = &page.events[0];
@@ -287,15 +390,15 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
         (
             asset.id.as_str(),
             asset.external_id.as_deref(),
-            &asset.processing.status,
-            &asset.moderation.status,
-            &asset.moderation.action,
+            &asset.classification.status,
+            &asset.classification.moderation.decision,
+            &asset.classification.moderation.action,
             &asset.content.status
         ),
         (
             "a1",
             Some("x1"),
-            &AssetProcessingStatus::Done,
+            &AssetClassificationStatus::Completed,
             &AssetModerationStatus::Rejected,
             &Some(AssetModerationAction::Hide),
             &AssetContentStatus::Removed

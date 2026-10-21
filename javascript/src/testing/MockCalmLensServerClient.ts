@@ -18,6 +18,7 @@ import type {
   CalmLensServerClientOptions,
   CdnAssetUrlOptions,
   CdnServeOptions,
+  ClassifyTextOptions,
   CreateAssetSignedUrlOptions,
   CreateFolderOptions,
   DeleteAssetContentOptions,
@@ -33,7 +34,6 @@ import type {
   ListAssetsOptions,
   ListEventsOptions,
   ListFoldersOptions,
-  ModerateTextOptions,
   MoveAssetOptions,
   MoveFolderOptions,
   RetrieveAssetOptions,
@@ -97,7 +97,7 @@ export interface MockCalmLensServerClientOptions extends CalmLensServerClientOpt
     now?: () => number;
     /** Outcome of `assets.create` (and queued multipart uploads). Defaults to `pending`. */
     queuedOutcome?: MockAssetOutcome;
-    /** Outcome of `assets.moderate` and `text.moderate`. Defaults to `approved`. */
+    /** Outcome of `assets.classify` and `text.classify`. Defaults to `approved`. */
     analyzedOutcome?: MockAssetOutcome;
     signedUrlBaseUrl?: string;
   };
@@ -117,7 +117,7 @@ export interface MockCalmLensOperationOptions {
   "assets.update": UpdateAssetOptions;
   "assets.listChildren": ListAssetChildrenOptions;
   "assets.create": SubmitAssetOptions;
-  "assets.moderate": SubmitAssetOptions;
+  "assets.classify": SubmitAssetOptions;
   "assets.uploadPart": UploadAssetPartOptions;
   "assets.createSignedUrl": CreateAssetSignedUrlOptions;
   "assets.move": MoveAssetOptions;
@@ -125,7 +125,7 @@ export interface MockCalmLensOperationOptions {
   "assets.waitForDecision": WaitForAssetDecisionOptions;
   "assets.deleteContent": DeleteAssetContentOptions;
   "assets.delete": DeleteAssetOptions;
-  "text.moderate": ModerateTextOptions;
+  "text.classify": ClassifyTextOptions;
   "cdn.serve": CdnServeOptions;
   "events.list": ListEventsOptions;
   "folders.list": ListFoldersOptions;
@@ -474,9 +474,9 @@ export class MockCalmLensServerClient {
 
   get text() {
     return {
-      moderate: async (options: ModerateTextOptions): Promise<Asset> => {
-        this.begin("text.moderate", options);
-        return this.moderateAsset(toTextAssetOptions(options), "text.moderate");
+      classify: async (options: ClassifyTextOptions): Promise<Asset> => {
+        this.begin("text.classify", options);
+        return this.moderateAsset(toTextAssetOptions(options), "text.classify");
       },
     };
   }
@@ -577,9 +577,9 @@ export class MockCalmLensServerClient {
         );
       },
 
-      moderate: async (options: SubmitAssetOptions): Promise<Asset> => {
-        this.begin("assets.moderate", options);
-        return this.moderateAsset(options, "assets.moderate");
+      classify: async (options: SubmitAssetOptions): Promise<Asset> => {
+        this.begin("assets.classify", options);
+        return this.moderateAsset(options, "assets.classify");
       },
 
       /** Continues a multipart upload: parts must arrive in order while it is `uploading`. */
@@ -595,10 +595,10 @@ export class MockCalmLensServerClient {
             isFinal: part.isFinal,
           });
           if (!validation.ok) throw this.invalidPayload(validation.error);
-          if (asset.processing.status !== "uploading") {
+          if (asset.upload.status !== "uploading") {
             throw this.apiError(API_ERROR_CODES.UPLOAD_NOT_OPEN);
           }
-          const expectedPartNumber = (asset.processing.uploadPartsReceived ?? 1) + 1;
+          const expectedPartNumber = (asset.upload.partsReceived ?? 1) + 1;
           if (part.partNumber !== expectedPartNumber) {
             throw this.apiError(API_ERROR_CODES.INVALID_UPLOAD_PART_NUMBER, {
               details: { expectedPartNumber },
@@ -611,8 +611,8 @@ export class MockCalmLensServerClient {
           const now = this.now();
           const received: Asset = {
             ...asset,
-            processing: { ...asset.processing, uploadPartsReceived: part.partNumber },
             updatedAt: now,
+            upload: { ...asset.upload, updatedAt: now, partsReceived: part.partNumber },
           };
           return this.databaseStorage.updateAsset(
             part.isFinal
@@ -658,7 +658,7 @@ export class MockCalmLensServerClient {
       retry: async (options: RetryAssetOptions): Promise<Asset> => {
         this.begin("assets.retry", options);
         const asset = await this.findOwnAsset(options?.assetId);
-        if (asset.processing.status !== "failed") {
+        if (asset.classification.status !== "failed") {
           throw this.apiError(API_ERROR_CODES.ASSET_NOT_RETRYABLE);
         }
         if (asset.content.status === "removed") {
@@ -940,7 +940,7 @@ export class MockCalmLensServerClient {
       "plainText" in options.content &&
       (typeof options.content.plainText !== "string" || !options.content.plainText.trim())
     ) {
-      throw this.invalidPayload("Text to moderate must be a non-empty string");
+      throw this.invalidPayload("Text to classify must be a non-empty string");
     }
     return this.withIdempotency(operation, options, () => this.createAsset(options, false));
   }
@@ -1000,21 +1000,6 @@ export class MockCalmLensServerClient {
       metadata: options.metadata,
       processingOptions: options.processingOptions,
       visibility: options.visibility ?? "private",
-      processing: {
-        status: isOpenUpload ? "uploading" : "processing",
-        updatedAt: now,
-        uploadPartsReceived: "part" in options ? (options.part.partNumber ?? 1) : null,
-      },
-      moderation: {
-        status: "pending",
-        action: null,
-        reviewerAction: null,
-        reviewerNote: null,
-        reviewerUserId: null,
-        reviewedAt: null,
-        decidedAt: null,
-        report: null,
-      },
       content: {
         status: keepContent ? "stored" : "temporary",
         removalReason: null,
@@ -1027,6 +1012,24 @@ export class MockCalmLensServerClient {
         image: null,
         previewImage: null,
         extractedText: null,
+      },
+      upload: {
+        status: isOpenUpload ? "uploading" : "completed",
+        updatedAt: now,
+        partsReceived: "part" in options ? (options.part.partNumber ?? 1) : null,
+      },
+      classification: {
+        status: isOpenUpload ? "pending" : "processing",
+        updatedAt: now,
+        completedAt: null,
+        moderation: {
+          decision: "pending",
+          action: null,
+          reviewerAction: null,
+          reviewerNote: null,
+          reviewerUserId: null,
+          reviewedAt: null,
+        },
       },
     };
 
@@ -1053,18 +1056,17 @@ export class MockCalmLensServerClient {
   private async applyOutcome(asset: Asset, outcome: MockAssetOutcome): Promise<Asset> {
     const now = this.now();
     const decided = outcome === "approved" || outcome === "rejected";
-    const processingStatus = decided ? "done" : outcome === "failed" ? "failed" : "processing";
-    const removeContent = processingStatus === "done" && asset.content.status === "temporary";
+    const classificationStatus = decided
+      ? "completed"
+      : outcome === "failed"
+        ? "failed"
+        : "processing";
+    const removeContent =
+      classificationStatus === "completed" && asset.content.status === "temporary";
     if (removeContent) await this.imageStorage.deleteContent(asset.id);
     return {
       ...asset,
       updatedAt: now,
-      processing: { ...asset.processing, status: processingStatus, updatedAt: now },
-      moderation: {
-        ...asset.moderation,
-        status: decided ? outcome : "pending",
-        decidedAt: decided ? now : null,
-      },
       content: removeContent
         ? {
             ...asset.content,
@@ -1074,6 +1076,14 @@ export class MockCalmLensServerClient {
             extractedText: null,
           }
         : asset.content,
+      upload: { ...asset.upload, status: "completed", updatedAt: now },
+      classification: {
+        ...asset.classification,
+        status: classificationStatus,
+        updatedAt: now,
+        completedAt: decided ? now : null,
+        moderation: { ...asset.classification.moderation, decision: decided ? outcome : "pending" },
+      },
     };
   }
 

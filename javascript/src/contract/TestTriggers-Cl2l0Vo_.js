@@ -8320,7 +8320,6 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	processedAt: zod.number(),
 	categories: CATEGORIES_SCHEMA,
 	score: zod.number(),
-	notes: saneStringField().nullish(),
 	media: zod.object({
 		durationSeconds: zod.number().positive(),
 		frameIntervalSeconds: zod.number().positive().optional(),

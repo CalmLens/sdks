@@ -9,7 +9,7 @@ The whole integration is in [`app.js`](app.js):
 ```js
 const client = new CalmLensAppClient({ uploadPresetId: "your-upload-preset-id" });
 
-const asset = await client.assets.moderate({
+const asset = await client.assets.classify({
   name: file.name,
   description: message,
   content: { data: file, type: file.type },
@@ -20,7 +20,7 @@ if (asset.status === "rejected") {
 }
 ```
 
-`assets.moderate` waits for the decision. Errors with an `upload-preset/*` code, such as
+`assets.classify` waits for the decision. Errors with an `upload-preset/*` code, such as
 `upload-preset/daily-limit-reached` and `upload-preset/content-type-not-allowed`, are turned into
 friendly messages.
 

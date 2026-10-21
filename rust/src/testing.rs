@@ -191,9 +191,9 @@ impl MockTransport {
 /// let mock = MockServerClient::new()?;
 /// mock.enqueue(
 ///     200,
-///     Asset::new("asset-1", AssetProcessingStatus::Done, AssetModerationStatus::Approved),
+///     Asset::new("asset-1", AssetClassificationStatus::Completed, AssetModerationStatus::Approved),
 /// );
-/// let asset = mock.assets().moderate(SubmitAsset::text("hello")).await?;
+/// let asset = mock.assets().classify(SubmitAsset::text("hello")).await?;
 /// assert_eq!(asset.id, "asset-1");
 /// assert_eq!(mock.last_request().unwrap().body, b"hello");
 /// # Ok(()) }

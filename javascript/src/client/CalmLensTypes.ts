@@ -1,17 +1,18 @@
 import type * as zod from "zod";
 import type {
+  AssetClassificationStatus as KnownAssetClassificationStatus,
   AssetContentRemovalReason as KnownAssetContentRemovalReason,
   AssetContentStatus as KnownAssetContentStatus,
   AssetModerationAction as KnownAssetModerationAction,
   AssetModerationStatus as KnownAssetModerationStatus,
-  AssetProcessingStatus as KnownAssetProcessingStatus,
   AssetReviewerAction as KnownAssetReviewerAction,
   AssetType as KnownAssetType,
   AssetVisibility as KnownAssetVisibility,
   Asset as SharedAsset,
+  AssetClassification as SharedAssetClassification,
   AssetContent as SharedAssetContent,
   AssetModeration as SharedAssetModeration,
-  AssetProcessing as SharedAssetProcessing,
+  AssetUpload as SharedAssetUpload,
 } from "../contract/Asset.js";
 import type { AssetBinaryPayloadInput } from "../contract/AssetPayload.js";
 import type {
@@ -38,7 +39,7 @@ import type {
 // others, so handle unknown values (for example as "not ready").
 
 /** Where the asset is in the pipeline: `uploading`, `processing`, then `done` or `failed`. */
-export type AssetProcessingStatus = KnownAssetProcessingStatus | (string & {});
+export type AssetClassificationStatus = KnownAssetClassificationStatus | (string & {});
 /** The moderation decision in force: `pending`, then `approved` or `rejected`. */
 export type AssetModerationStatus = KnownAssetModerationStatus | (string & {});
 /** What the policy did with flagged content: `alert`, `hide` or `purge`. */
@@ -55,15 +56,16 @@ export type AssetType = KnownAssetType | (string & {});
 export type AssetVisibility = KnownAssetVisibility | (string & {});
 
 /** An asset's processing state. */
-export type AssetProcessing = Omit<SharedAssetProcessing, "status"> & {
-  status: AssetProcessingStatus;
+export type AssetClassification = Omit<SharedAssetClassification, "status" | "moderation"> & {
+  status: AssetClassificationStatus;
+  moderation: AssetModeration;
 };
 /** An asset's moderation state. */
 export type AssetModeration = Omit<
   SharedAssetModeration,
-  "status" | "action" | "reviewerAction"
+  "decision" | "action" | "reviewerAction"
 > & {
-  status: AssetModerationStatus;
+  decision: AssetModerationStatus;
   action: AssetModerationAction | null;
   reviewerAction: AssetReviewerAction | null;
 };
@@ -73,15 +75,18 @@ export type AssetContent = Omit<SharedAssetContent, "status" | "removalReason"> 
   removalReason: AssetContentRemovalReason | null;
 };
 
+export type AssetUpload = SharedAssetUpload;
+export type AssetUploadStatus = SharedAssetUpload["status"];
+
 /** An asset as the API returns it. Fields the API adds later are present at runtime too. */
 export type Asset = Omit<
   SharedAsset,
-  "type" | "visibility" | "processing" | "moderation" | "content"
+  "type" | "visibility" | "upload" | "classification" | "content"
 > & {
   type: AssetType;
   visibility?: AssetVisibility | null;
-  processing: AssetProcessing;
-  moderation: AssetModeration;
+  upload: AssetUpload;
+  classification: AssetClassification;
   content: AssetContent;
 };
 
@@ -381,7 +386,7 @@ export interface UploadAssetPartOptions extends IdempotencyOptions {
   part: MultipartUploadPartOptions;
   /**
    * Overrides the queue mode saved when the upload started, for this upload's final part.
-   * Leave it unset to use the saved choice (`create` queues, `moderate` waits).
+   * Leave it unset to use the saved choice (`create` queues, `classify` waits).
    */
   queue?: boolean;
 }
@@ -459,7 +464,7 @@ export interface VerifyWebhookSignatureOptions {
   now?: Date | number;
 }
 
-export interface ModerateTextOptions
+export interface ClassifyTextOptions
   extends Omit<SubmitAssetCommonOptions, "name" | "visibility" | "isFinal"> {
   text: string;
   name?: string;

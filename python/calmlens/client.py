@@ -34,7 +34,7 @@ from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, Calm
 from .types import (Asset, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
-                    MetadataItem, ModerateTextOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
+                    MetadataItem, ClassifyTextOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
                     SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, SubmitAssetOptions,
                     UpdateAssetOptions, UpdateFolderOptions, UploadPartOptions,
@@ -898,8 +898,8 @@ class UploadTokens:
         return {"token": f"clut_{body}.{signature}", "expiresAt": expires_at}
 
 
-#: :meth:`Assets.wait_for_decision` stops at these ``moderation.status`` values, or when
-#: ``processing.status`` is ``failed``.
+#: :meth:`Assets.wait_for_decision` stops at these ``classification.moderation.decision`` values, or when
+#: ``classification.status`` is ``failed``.
 _DECIDED_MODERATION_STATUSES = ("approved", "rejected")
 _DECISION_POLL_FIRST_DELAY = 0.5
 _DECISION_POLL_MAX_DELAY = 5.0
@@ -910,7 +910,7 @@ _SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", 
 
 
 class Assets:
-    """``client.assets``: upload, moderate, list and manage assets."""
+    """``client.assets``: upload, classify, list and manage assets."""
 
     def __init__(self, client: CalmLensServerClient):
         self._c = client
@@ -927,7 +927,7 @@ class Assets:
              page_size: int = _UNSET, ordering: List[Ordering] = _UNSET, filter: str = _UNSET,
              folder_id: str = _UNSET) -> AssetPage:
         """One page of the project's assets (``cursor`` resumes a previous page; ``filter`` is RSQL,
-        e.g. ``moderation.status==approved``). Use :meth:`iter` to walk every page."""
+        e.g. ``classification.moderation.decision==approved``). Use :meth:`iter` to walk every page."""
         merged = _merge(options, cursor=cursor, page_size=page_size, ordering=ordering, filter=filter,
                         folder_id=folder_id)
         return cast(AssetPage, self._c._request("GET", self._c._project("assets/page"), query=merged))
@@ -957,12 +957,12 @@ class Assets:
 
     def wait_for_decision(self, options: WaitForDecisionOptions | None = None, /, *, asset_id: str = _UNSET,
                           timeout: float = _UNSET) -> Asset:
-        """Retrieve an asset until ``moderation.status`` is ``approved`` or ``rejected``, or
-        ``processing.status`` is ``failed``, and return that asset.
+        """Retrieve an asset until ``classification.moderation.decision`` is ``approved`` or ``rejected``, or
+        ``classification.status`` is ``failed``, and return that asset.
 
         Checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5
         seconds between checks. Raises :class:`CalmLensError` with ``sdk/timeout`` and
-        ``details`` ``{"assetId", "processingStatus", "moderationStatus"}`` (the last statuses
+        ``details`` ``{"assetId", "classificationStatus", "moderationStatus"}`` (the last statuses
         seen) when there is no decision within ``timeout`` seconds (default 60). Webhooks
         report decisions without polling.
         """
@@ -976,17 +976,17 @@ class Assets:
         delay = _DECISION_POLL_FIRST_DELAY
         while True:
             asset = self.retrieve(wanted)
-            processing_status = (asset.get("processing") or {}).get("status")
-            moderation_status = (asset.get("moderation") or {}).get("status")
-            if moderation_status in _DECIDED_MODERATION_STATUSES or processing_status == "failed":
+            classification_status = asset["classification"]["status"]
+            moderation_status = asset["classification"]["moderation"]["decision"]
+            if moderation_status in _DECIDED_MODERATION_STATUSES or classification_status == "failed":
                 return asset
             remaining = deadline - self._c._clock()
             if remaining <= 0:
                 raise CalmLensError(
                     error_codes.SDK_TIMEOUT,
                     f"Asset {asset.get('id')} had no moderation decision after {limit:g}s "
-                    f"(processing {processing_status}, moderation {moderation_status})",
-                    {"assetId": asset.get("id"), "processingStatus": processing_status,
+                    f"(processing {classification_status}, moderation {moderation_status})",
+                    {"assetId": asset.get("id"), "classificationStatus": classification_status,
                      "moderationStatus": moderation_status})
             self._c._sleep(min(delay, remaining))
             delay = min(_DECISION_POLL_MAX_DELAY, delay * 1.5)
@@ -1040,7 +1040,7 @@ class Assets:
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
         return self._submit(merged, True, idempotency_key)
 
-    def moderate(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
+    def classify(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                  part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,
                  processing_options: ProcessingOptions = _UNSET, visibility: Visibility = _UNSET,
                  metadata: List[MetadataItem] = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
@@ -1055,7 +1055,7 @@ class Assets:
         payload = merged.get("content")
         if isinstance(payload, Mapping) and "plainText" in payload and (
                 not isinstance(payload["plainText"], str) or not payload["plainText"].strip()):
-            raise _invalid("Text to moderate must be a non-empty string", error_codes.INVALID_UPLOAD_PAYLOAD)
+            raise _invalid("Text to classify must be a non-empty string", error_codes.INVALID_UPLOAD_PAYLOAD)
         return self._submit(merged, False, idempotency_key)
 
     def _submit(self, options: dict[str, Any], queue: bool, idempotency_key: str | None) -> Asset:
@@ -1105,7 +1105,7 @@ class Assets:
         """Send the next part of a multipart upload (``partNumber`` 2, 3, ...; parts are
         sequential and all but the final one are at least 5 MiB).
 
-        The final part is classified with the ``create``/``moderate`` choice saved when the
+        The final part is classified with the ``create``/``classify`` choice saved when the
         upload started; pass ``queue`` only to override it.
         """
         merged = _merge(options, asset_id=asset_id, part=part, queue=queue)
@@ -1149,14 +1149,14 @@ class Assets:
                                             body={"folderId": merged["folderId"]}))
 
     def retry(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
-        """Reprocess an asset whose ``processing.status`` is ``failed`` and whose content is
+        """Reprocess an asset whose ``classification.status`` is ``failed`` and whose content is
         still held (``content.status`` is not ``removed``)."""
         merged = _merge(options, asset_id=asset_id)
         return cast(Asset, self._c._request("POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/retry"))
 
     def delete_content(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Remove stored content (source, preview and retained extracted text) but keep the
-        asset record, metadata and moderation report. The returned asset's ``content.status`` is
+        asset record, metadata and classification results. The returned asset's ``content.status`` is
         ``removed`` and the CDN no longer serves its content."""
         merged = _merge(options, asset_id=asset_id)
         return cast(Asset, self._c._request("DELETE", "/assets/" + _id(merged.get("assetId"), "assetId") + "/content"))
@@ -1346,21 +1346,21 @@ class CDNResponse:
 
 
 class Text:
-    """``client.text``: moderate plain text."""
+    """``client.text``: classify plain text."""
 
     def __init__(self, client: CalmLensServerClient):
         self._c = client
 
-    def moderate(self, options: ModerateTextOptions | None = None, /, *, text: str = _UNSET, name: str = _UNSET,
+    def classify(self, options: ClassifyTextOptions | None = None, /, *, text: str = _UNSET, name: str = _UNSET,
                  description: str = _UNSET, processing_options: ProcessingOptions = _UNSET,
                  metadata: List[MetadataItem] = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
                  folder_id: str | None = _UNSET, idempotency_key: str | None = None) -> Asset:
-        """Moderate UTF-8 text and wait for the decision (asset name defaults to ``text``)."""
+        """Classify UTF-8 text and wait for the decision (asset name defaults to ``text``)."""
         merged = _merge(options, text=text, name=name, description=description, processing_options=processing_options,
                         metadata=metadata, external_id=external_id, external_url=external_url, folder_id=folder_id)
         value = merged.pop("text", None)
         if not isinstance(value, str) or not value.strip():
-            raise _invalid("Text to moderate must be a non-empty string", error_codes.INVALID_UPLOAD_PAYLOAD)
+            raise _invalid("Text to classify must be a non-empty string", error_codes.INVALID_UPLOAD_PAYLOAD)
         merged.setdefault("name", "text")
         merged["content"] = {"plainText": value, "type": "text/plain"}
-        return self._c.assets.moderate(cast(SubmitAssetOptions, merged), idempotency_key=idempotency_key)
+        return self._c.assets.classify(cast(SubmitAssetOptions, merged), idempotency_key=idempotency_key)

@@ -22,8 +22,8 @@ describe("client identity and secrets", () => {
     const { fetchImpl, requests } = recordingFetch(() =>
       Response.json({
         id: "a",
-        processing: { status: "done" },
-        moderation: { status: "approved" },
+        upload: { status: "completed" },
+        classification: { status: "completed", moderation: { decision: "approved" } },
       }),
     );
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
@@ -66,8 +66,8 @@ describe("browser guard", () => {
     const { fetchImpl, requests } = recordingFetch(() =>
       Response.json({
         id: "a",
-        processing: { status: "done" },
-        moderation: { status: "approved" },
+        upload: { status: "completed" },
+        classification: { status: "completed", moderation: { decision: "approved" } },
       }),
     );
     const client = new CalmLensServerClient({
@@ -109,9 +109,12 @@ describe("responses", () => {
     const { fetchImpl } = recordingFetch(() =>
       Response.json({
         id: "a",
-        processing: { status: "paused" },
-        moderation: { status: "escalated", action: "quarantine" },
         content: { status: "archived", removalReason: null },
+        upload: { status: "completed" },
+        classification: {
+          status: "paused",
+          moderation: { decision: "escalated", action: "quarantine" },
+        },
       }),
     );
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
@@ -119,8 +122,11 @@ describe("responses", () => {
       name: "a.txt",
       content: { plainText: "hi", type: "text/plain" },
     });
-    expect(asset.processing.status).toBe("paused");
-    expect(asset.moderation).toMatchObject({ status: "escalated", action: "quarantine" });
+    expect(asset.classification.status).toBe("paused");
+    expect(asset.classification.moderation).toMatchObject({
+      decision: "escalated",
+      action: "quarantine",
+    });
     expect(asset.content.status).toBe("archived");
   });
 
@@ -128,9 +134,9 @@ describe("responses", () => {
     const { fetchImpl } = recordingFetch(() =>
       Response.json({
         id: "a",
-        processing: { status: "done" },
-        moderation: { status: "approved" },
         description: "x".repeat(1000),
+        upload: { status: "completed" },
+        classification: { status: "completed", moderation: { decision: "approved" } },
       }),
     );
     const client = new CalmLensServerClient({
@@ -166,7 +172,10 @@ describe("pagination", () => {
       const pageIndex = [null, "next-a", "next-b"].indexOf(
         new URL(request.url).searchParams.get("cursor"),
       );
-      const items = pages[pageIndex]!.map((id) => ({ id, moderation: { status: "approved" } }));
+      const items = pages[pageIndex]!.map((id) => ({
+        id,
+        classification: { moderation: { decision: "approved" } },
+      }));
       return Response.json({
         items,
         hasMore: pageIndex < pages.length - 1,
@@ -179,7 +188,7 @@ describe("pagination", () => {
     const ids: string[] = [];
     for await (const asset of client.assets.iterate({
       pageSize: 2,
-      filter: "moderation.status==approved",
+      filter: "classification.moderation.decision==approved",
     })) {
       ids.push(asset.id);
     }
@@ -191,7 +200,9 @@ describe("pagination", () => {
       "next-b",
     ]);
     expect(
-      listUrls.every((url) => url.searchParams.get("filter") === "moderation.status==approved"),
+      listUrls.every(
+        (url) => url.searchParams.get("filter") === "classification.moderation.decision==approved",
+      ),
     ).toBe(true);
 
     const children: string[] = [];
@@ -237,8 +248,8 @@ describe("deadlines for large transfers", () => {
     const server = delayedServer(150, () =>
       JSON.stringify({
         id: "a",
-        processing: { status: "processing" },
-        moderation: { status: "pending" },
+        upload: { status: "completed" },
+        classification: { status: "processing", moderation: { decision: "pending" } },
       }),
     );
     try {
@@ -294,8 +305,8 @@ describe("assets.waitForDecision", () => {
   const assetResponse = (processing: string, moderation = "pending") =>
     Response.json({
       id: "asset-1",
-      processing: { status: processing },
-      moderation: { status: moderation },
+      upload: { status: "completed" },
+      classification: { status: processing, moderation: { decision: moderation } },
     });
 
   test("checks the asset until it has a decision, then returns the decided asset", async () => {
@@ -307,7 +318,10 @@ describe("assets.waitForDecision", () => {
     const { fetchImpl, requests } = recordingFetch(() => assetResponse(...states.shift()!));
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
     const asset = await client.assets.waitForDecision({ assetId: "asset-1" });
-    expect(asset).toMatchObject({ id: "asset-1", moderation: { status: "rejected" } });
+    expect(asset).toMatchObject({
+      id: "asset-1",
+      classification: { moderation: { decision: "rejected" } },
+    });
     expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
       "/v1/assets/asset-1",
       "/v1/assets/asset-1",
@@ -324,8 +338,8 @@ describe("assets.waitForDecision", () => {
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
     const asset = await client.assets.waitForDecision({ assetId: "asset-1" });
     expect(asset).toMatchObject({
-      processing: { status: "failed" },
-      moderation: { status: "pending" },
+      upload: { status: "completed" },
+      classification: { status: "failed", moderation: { decision: "pending" } },
     });
     expect(requests).toHaveLength(2);
   });
@@ -338,7 +352,11 @@ describe("assets.waitForDecision", () => {
       .catch((caught: CalmLensError) => caught);
     expect(error).toMatchObject({
       code: "sdk/timeout",
-      details: { assetId: "asset-1", processingStatus: "processing", moderationStatus: "pending" },
+      details: {
+        assetId: "asset-1",
+        classificationStatus: "processing",
+        moderationStatus: "pending",
+      },
     });
   });
 

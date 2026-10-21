@@ -34,7 +34,7 @@ import java.util.Objects;
  * timestamps are {@link Instant}s. Only metadata values and event fact values, where the API
  * accepts any JSON, are untyped: {@code String}, {@code Long}, {@code Double}, {@code Boolean},
  * {@code List} and {@code Map}. Unknown
- * response fields are ignored, and unknown {@link AssetProcessingStatus}, {@link
+ * response fields are ignored, and unknown {@link AssetClassificationStatus}, {@link
  * AssetModerationStatus}, {@link AssetContentStatus} or {@link Visibility} values keep their raw
  * value instead of failing.
  */
@@ -84,48 +84,48 @@ public final class Models {
   // ------------------------------------------------------------------ Values
 
   /**
-   * Where an asset is in the pipeline ({@code processing.status}). Known values are the constants
+   * Where an asset is in the pipeline ({@code classification.status}). Known values are the constants
    * below and can be compared with {@code ==}; a status this SDK version does not know is kept with
    * its raw {@link #value()} and {@link #isKnown()} returns false.
    */
-  @JsonAdapter(AssetProcessingStatus.Adapter.class)
-  public static final class AssetProcessingStatus {
+  @JsonAdapter(AssetClassificationStatus.Adapter.class)
+  public static final class AssetClassificationStatus {
     /** The content is still arriving, such as the parts of a multipart upload. */
-    public static final AssetProcessingStatus UPLOADING = new AssetProcessingStatus("uploading");
+    public static final AssetClassificationStatus PENDING = new AssetClassificationStatus("pending");
     /** Queued or being classified. */
-    public static final AssetProcessingStatus PROCESSING = new AssetProcessingStatus("processing");
-    /** Processing finished; see {@code moderation.status} for the decision. */
-    public static final AssetProcessingStatus DONE = new AssetProcessingStatus("done");
+    public static final AssetClassificationStatus PROCESSING = new AssetClassificationStatus("processing");
+    /** Processing finished; see {@code classification.moderation.decision} for the decision. */
+    public static final AssetClassificationStatus COMPLETED = new AssetClassificationStatus("completed");
     /** Processing failed; {@code assets.retry} processes the asset again. */
-    public static final AssetProcessingStatus FAILED = new AssetProcessingStatus("failed");
-    private static final Map<String, AssetProcessingStatus> KNOWN = Map.of(
-        "uploading", UPLOADING, "processing", PROCESSING, "done", DONE, "failed", FAILED);
+    public static final AssetClassificationStatus FAILED = new AssetClassificationStatus("failed");
+    private static final Map<String, AssetClassificationStatus> KNOWN = Map.of(
+        "pending", PENDING, "processing", PROCESSING, "completed", COMPLETED, "failed", FAILED);
     private final String value;
 
-    private AssetProcessingStatus(String value) { this.value = value; }
+    private AssetClassificationStatus(String value) { this.value = value; }
 
     /**
-     * @param value the API value, such as {@code "done"}
+     * @param value the API value, such as {@code "completed"}
      * @return the matching constant, or a new instance keeping an unknown value
      */
-    public static AssetProcessingStatus of(String value) {
-      AssetProcessingStatus known = KNOWN.get(Objects.requireNonNull(value, "value"));
-      return known != null ? known : new AssetProcessingStatus(value);
+    public static AssetClassificationStatus of(String value) {
+      AssetClassificationStatus known = KNOWN.get(Objects.requireNonNull(value, "value"));
+      return known != null ? known : new AssetClassificationStatus(value);
     }
 
-    /** @return the API value, such as {@code "done"} */
+    /** @return the API value, such as {@code "completed"} */
     public String value() { return value; }
 
     /** @return whether this SDK version knows the value */
     public boolean isKnown() { return KNOWN.containsKey(value); }
 
-    @Override public boolean equals(Object other) { return other instanceof AssetProcessingStatus status && status.value.equals(value); }
+    @Override public boolean equals(Object other) { return other instanceof AssetClassificationStatus status && status.value.equals(value); }
     @Override public int hashCode() { return value.hashCode(); }
     @Override public String toString() { return value; }
 
-    static final class Adapter extends TypeAdapter<AssetProcessingStatus> {
-      @Override public void write(JsonWriter out, AssetProcessingStatus status) throws IOException { if (status == null) out.nullValue(); else out.value(status.value); }
-      @Override public AssetProcessingStatus read(JsonReader in) throws IOException {
+    static final class Adapter extends TypeAdapter<AssetClassificationStatus> {
+      @Override public void write(JsonWriter out, AssetClassificationStatus status) throws IOException { if (status == null) out.nullValue(); else out.value(status.value); }
+      @Override public AssetClassificationStatus read(JsonReader in) throws IOException {
         if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
         return of(in.nextString());
       }
@@ -133,8 +133,8 @@ public final class Models {
   }
 
   /**
-   * The moderation decision in force ({@code moderation.status}): a reviewer's decision when there
-   * is one, otherwise the automated one. Unknown values are kept like {@link AssetProcessingStatus}.
+   * The moderation decision in force ({@code classification.moderation.decision}): a reviewer's decision when there
+   * is one, otherwise the automated one. Unknown values are kept like {@link AssetClassificationStatus}.
    * Treat anything other than {@link #APPROVED} as not publishable.
    */
   @JsonAdapter(AssetModerationStatus.Adapter.class)
@@ -180,7 +180,7 @@ public final class Models {
 
   /**
    * Whether CalmLens holds an asset's content ({@code content.status}): its source, preview and
-   * extracted text. Unknown values are kept like {@link AssetProcessingStatus}.
+   * extracted text. Unknown values are kept like {@link AssetClassificationStatus}.
    */
   @JsonAdapter(AssetContentStatus.Adapter.class)
   public static final class AssetContentStatus {
@@ -223,7 +223,7 @@ public final class Models {
     }
   }
 
-  /** Who can read an asset's content through the CDN. Unknown values are kept like {@link AssetProcessingStatus}. */
+  /** Who can read an asset's content through the CDN. Unknown values are kept like {@link AssetClassificationStatus}. */
   @JsonAdapter(Visibility.Adapter.class)
   public static final class Visibility {
     /** Anyone with the CDN URL. */
@@ -386,7 +386,7 @@ public final class Models {
   /**
    * Optional analyses to run on an asset, keyed by feature. Each feature is off unless its {@code
    * enabled} is true. Results of person and face detection appear in {@link
-   * ClassificationReport#features()}; OCR stores extracted text on the image asset.
+   * AssetClassification#faceDetection()}; OCR stores extracted text on the image asset.
    *
    * @param ocr extract text onto the image asset and add text moderation
    * @param personDetection (beta) locate people in images
@@ -854,7 +854,7 @@ public final class Models {
     }
   }
 
-  /** Options for {@code assets.create} and {@code assets.moderate}: a name and one of content, part or url. */
+  /** Options for {@code assets.create} and {@code assets.classify}: a name and one of content, part or url. */
   public static final class SubmitAsset {
     private String name;
     private Content content;
@@ -943,8 +943,8 @@ public final class Models {
    */
   public record SignedUploadToken(String token, long expiresAt) {}
 
-  /** Options for {@code text.moderate}. */
-  public static final class ModerateText {
+  /** Options for {@code text.classify}. */
+  public static final class ClassifyText {
     private String text;
     private String name;
     private String description;
@@ -956,21 +956,21 @@ public final class Models {
     private String uploadPresetId;
 
     /** Empty options. */
-    public ModerateText() {}
+    public ClassifyText() {}
 
-    /** @param text the text to moderate */
-    public ModerateText(String text) { this.text = text; }
+    /** @param text the text to classify */
+    public ClassifyText(String text) { this.text = text; }
 
-    public ModerateText text(String value) { text = value; return this; }
-    public ModerateText name(String value) { name = value; return this; }
-    public ModerateText description(String value) { description = value; return this; }
-    public ModerateText processingOptions(ProcessingOptions value) { processingOptions = value; return this; }
-    public ModerateText metadata(List<MetadataItem> value) { metadata = value; return this; }
-    public ModerateText externalId(String value) { externalId = value; return this; }
-    public ModerateText externalUrl(String value) { externalUrl = value; return this; }
-    public ModerateText folderId(Patch<String> value) { folderId = value; return this; }
+    public ClassifyText text(String value) { text = value; return this; }
+    public ClassifyText name(String value) { name = value; return this; }
+    public ClassifyText description(String value) { description = value; return this; }
+    public ClassifyText processingOptions(ProcessingOptions value) { processingOptions = value; return this; }
+    public ClassifyText metadata(List<MetadataItem> value) { metadata = value; return this; }
+    public ClassifyText externalId(String value) { externalId = value; return this; }
+    public ClassifyText externalUrl(String value) { externalUrl = value; return this; }
+    public ClassifyText folderId(Patch<String> value) { folderId = value; return this; }
     /** @param value the upload preset to apply @return these options */
-    public ModerateText uploadPresetId(String value) { uploadPresetId = value; return this; }
+    public ClassifyText uploadPresetId(String value) { uploadPresetId = value; return this; }
 
     String textValue() { return text; }
 
@@ -1048,7 +1048,7 @@ public final class Models {
     public ListAssets() {}
     public ListAssets cursor(String value) { cursor = value; return this; }
     public ListAssets pageSize(Integer value) { pageSize = value; return this; }
-    /** @param value a filter such as {@code moderation.status==approved} @return these options */
+    /** @param value a filter such as {@code classification.moderation.decision==approved} @return these options */
     public ListAssets filter(String value) { filter = value; return this; }
     public ListAssets ordering(List<Order> value) { ordering = value; return this; }
     @Override public String toString() { return describe(this); }
@@ -1342,8 +1342,8 @@ public final class Models {
    * @param tags tags
    * @param processingOptions processing options
    * @param visibility CDN visibility
-   * @param processing where the asset is in the pipeline
-   * @param moderation the moderation decision, policy action, reviewer decision and report
+   * @param upload receipt of source content
+   * @param classification progress and capability results
    * @param content whether CalmLens holds the content, and its details
    */
   public record Asset(
@@ -1353,7 +1353,7 @@ public final class Models {
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, String externalId, String externalUrl, List<String> tags,
       ProcessingOptions processingOptions, Visibility visibility,
-      AssetProcessing processing, AssetModeration moderation, AssetContent content) {
+      AssetUpload upload, AssetClassification classification, AssetContent content) {
     /** Copies collections so the record stays immutable. */
     public Asset {
       metadata = list(metadata);
@@ -1361,35 +1361,26 @@ public final class Models {
     }
   }
 
-  /**
-   * An asset's processing state.
-   *
-   * @param status {@code uploading}, {@code processing}, then {@code done} or {@code failed}
-   * @param updatedAt when the processing status last changed
-   * @param uploadPartsReceived parts of a multipart upload received so far; null otherwise
-   */
-  public record AssetProcessing(AssetProcessingStatus status,
-      @JsonAdapter(Json.EpochMillis.class) Instant updatedAt, Integer uploadPartsReceived) {}
+  /** Receipt of source content and multipart progress. */
+  public record AssetUpload(String status, @JsonAdapter(Json.EpochMillis.class) Instant updatedAt, Integer partsReceived) {}
 
-  /**
-   * An asset's moderation state. The asset was flagged when {@code action} is set.
-   *
-   * @param status the decision in force; a reviewer's decision takes precedence over the automated one
-   * @param action what the policy did with flagged content: {@code alert}, {@code hide} or {@code
-   *     purge}; null when nothing was flagged. Kept after a reviewer decides
-   * @param reviewerAction a reviewer's decision, {@code approved} or {@code rejected}; null when no
-   *     reviewer has decided
-   * @param reviewerNote the reviewer's note
-   * @param reviewerUserId the user who reviewed the asset
-   * @param reviewedAt when a reviewer decided
-   * @param decidedAt when the decision in force was made
-   * @param report classification report; null until classification produced one
-   */
-  public record AssetModeration(AssetModerationStatus status, String action,
+  /** Classification progress and results grouped by capability. */
+  public record AssetClassification(AssetClassificationStatus status,
+      @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
+      @JsonAdapter(Json.EpochMillis.class) Instant completedAt,
+      AssetModeration moderation, PersonDetectionResult personDetection,
+      FaceDetectionResult faceDetection, List<ClassificationLabel> labels) {
+    public AssetClassification { labels = list(labels); }
+  }
+
+  /** Content-safety findings, policy assessment and reviewer decision. */
+  public record AssetModeration(AssetModerationStatus decision, String action,
       String reviewerAction, String reviewerNote, String reviewerUserId,
       @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt,
-      @JsonAdapter(Json.EpochMillis.class) Instant decidedAt,
-      ClassificationReport report) {}
+      Map<String, CategoryResult> categories, Double score,
+      MediaClassificationReport timeline, ReportPolicy policy) {
+    public AssetModeration { categories = map(categories); }
+  }
 
   /**
    * An asset's content state and details.
@@ -1412,26 +1403,6 @@ public final class Models {
       SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
       ImageData image, PreviewImage previewImage, ExtractedText extractedText) {}
 
-  /**
-   * A classification report. Whether the asset was flagged is {@link AssetModeration#action()}.
-   *
-   * @param score highest category score
-   * @param notes notes
-   * @param categories results by category, such as {@code harassment}
-   * @param processedAt when classification finished
-   * @param labels detected labels
-   * @param media audio and video results
-   * @param features results of the optional features requested in {@code processingOptions.features}
-   * @param policy what the project's policy made of the report when the asset was decided
-   */
-  public record ClassificationReport(
-      Double score, String notes, Map<String, CategoryResult> categories,
-      @JsonAdapter(Json.EpochMillis.class) Instant processedAt,
-      List<ClassificationLabel> labels, MediaClassificationReport media, ProcessingFeatureResults features,
-      ReportPolicy policy) {
-    /** Copies collections so the record stays immutable. */
-    public ClassificationReport { categories = map(categories); labels = list(labels); }
-  }
 
   /**
    * Each assessed category's policy score and action, and the highest policy score.
@@ -1726,21 +1697,23 @@ public final class Models {
    *
    * @param id asset ID
    * @param externalId the asset's external ID
-   * @param processing processing status at the time
-   * @param moderation moderation decision and policy action at the time
+   * @param upload upload status at the time
+   * @param classification classification status and moderation decision at the time
    * @param content content status at the time
    */
-  public record EventAsset(String id, String externalId, EventAssetProcessing processing, EventAssetModeration moderation, EventAssetContent content) {}
+  public record EventAsset(String id, String externalId, EventAssetUpload upload, EventAssetClassification classification, EventAssetContent content) {}
 
-  /** @param status the asset's processing status */
-  public record EventAssetProcessing(AssetProcessingStatus status) {}
+  /** @param status the asset's classification status */
+  public record EventAssetUpload(String status) {}
+
+  public record EventAssetClassification(AssetClassificationStatus status, EventAssetModeration moderation) {}
 
   /**
-   * @param status the moderation decision in force
+   * @param decision the moderation decision in force
    * @param action what the policy did with flagged content ({@code alert}, {@code hide} or {@code
    *     purge}), or null when nothing was flagged
    */
-  public record EventAssetModeration(AssetModerationStatus status, String action) {}
+  public record EventAssetModeration(AssetModerationStatus decision, String action) {}
 
   /** @param status whether CalmLens held the content */
   public record EventAssetContent(AssetContentStatus status) {}

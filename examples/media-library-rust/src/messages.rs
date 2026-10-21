@@ -82,7 +82,7 @@ impl Notice {
             Notice::DetailsSaved => "Details saved.",
             Notice::AssetMoved => "Asset moved.",
             Notice::FileRemoved => {
-                "File removed. The record, metadata and moderation report remain; the CDN no longer serves it."
+                "File removed. The record, metadata and classification results remain; the CDN no longer serves it."
             }
             Notice::AssetDeleted => "Asset deleted.",
             Notice::ReviewSimulated => {

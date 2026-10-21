@@ -46,12 +46,12 @@ func TestJavaScriptContract(t *testing.T) {
 			ctx := context.Background()
 			var err error
 			switch fixture.Operation {
-			case "text.moderate":
-				_, err = c.Text.Moderate(ctx, decodeOptions[ModerateTextOptions](t, fixture.Options))
+			case "text.classify":
+				_, err = c.Text.Classify(ctx, decodeOptions[ClassifyTextOptions](t, fixture.Options))
 			case "assets.create":
 				_, err = c.Assets.Create(ctx, contractSubmit(t, fixture.Options))
-			case "assets.moderate":
-				_, err = c.Assets.Moderate(ctx, contractSubmit(t, fixture.Options))
+			case "assets.classify":
+				_, err = c.Assets.Classify(ctx, contractSubmit(t, fixture.Options))
 			case "assets.search":
 				_, err = c.Assets.Search(ctx, decodeOptions[SearchAssetsOptions](t, fixture.Options))
 			case "assets.list":

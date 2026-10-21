@@ -10,7 +10,7 @@ import threading
 import time
 import uuid
 
-from calmlens import Asset, ClassificationReport
+from calmlens import Asset
 from calmlens.testing import MockCalmLensServerClient
 
 from app import Moderator
@@ -18,7 +18,7 @@ from app import Moderator
 DEMO_DELAY_SECONDS = 2.0
 
 
-def demo_report(result: str) -> ClassificationReport:
+def demo_report(result: str) -> dict:
     """Synthetic reports for the demo. Nothing is classified."""
     now = int(time.time() * 1000)
     if result == "approved":
@@ -37,10 +37,11 @@ def demo_report(result: str) -> ClassificationReport:
 def decide(asset: dict, result: str):
     """Finishes processing with a demo outcome: a flagged page is approved with the policy action
     ``alert``, a rejected one is hidden, a clean one matched nothing."""
-    asset["processing"]["status"] = "done"
-    asset["moderation"].update(status="approved" if result == "flagged" else result,
+    asset["classification"]["status"] = "completed"
+    asset["classification"]["moderation"].update(decision="approved" if result == "flagged" else result,
                                action={"flagged": "alert", "rejected": "hide"}.get(result),
-                               report=demo_report(result))
+                               **{k: v for k, v in demo_report(result).items() if k != "processedAt"})
+    asset["classification"]["completedAt"] = int(time.time() * 1000)
 
 
 class DemoModerator(Moderator):
@@ -57,7 +58,7 @@ class DemoModerator(Moderator):
         asset = super().check_note(link_id, note, demo_result)
         if demo_result == "note-rejected":
             for stored in (self.mock.database_storage.assets[asset["id"]], asset):
-                stored["moderation"].update(status="rejected", action="hide")
+                stored["classification"]["moderation"].update(decision="rejected", action="hide")
         return asset
 
     def submit_link(self, link_id: str, url: str, demo_result: str) -> Asset:
@@ -76,14 +77,14 @@ class DemoModerator(Moderator):
         assets = self.mock.database_storage.assets
         asset = assets[asset_id]
         if result == "error":
-            asset["processing"]["status"] = "failed"
+            asset["classification"]["status"] = "failed"
             return
         decide(asset, result)
         for name, kind, child_result in (("Page text", "plaintext-document", result), ("Header image", "image", "approved")):
             child_id = str(uuid.uuid4())
             assets[child_id] = {"id": child_id, "projectId": asset["projectId"], "parentId": asset_id, "name": name,
                                 "type": kind, "createdAt": asset["createdAt"],
-                                "processing": {"status": "processing"}, "moderation": {}, "content": {"status": "stored"}}
+                                "upload": {"status": "completed"}, "classification": {"status": "processing", "moderation": {}}, "content": {"status": "stored"}}
             decide(assets[child_id], child_result)
 
     def retrieve(self, asset_id: str) -> Asset:

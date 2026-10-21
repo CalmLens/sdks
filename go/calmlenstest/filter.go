@@ -15,14 +15,14 @@ var filterFields = map[string]bool{
 	"id": true, "name": true, "type": true, "visibility": true, "parentId": true,
 	"folderId": true, "externalId": true, "externalUrl": true, "createdAt": true, "updatedAt": true,
 	"tags": true, "description": true, "userId": true,
-	"processing.status": true, "processing.updatedAt": true,
-	"moderation.status": true, "moderation.action": true, "moderation.reviewerAction": true,
-	"moderation.reviewedAt": true, "moderation.decidedAt": true,
+	"classification.status": true, "classification.updatedAt": true,
+	"classification.moderation.decision": true, "classification.moderation.action": true, "classification.moderation.reviewerAction": true,
+	"classification.moderation.reviewedAt": true, "moderation.completedAt": true,
 	"content.status": true, "content.removalReason": true, "content.format": true,
 	"content.extension": true, "content.sizeInBytes": true,
 }
 
-// lookup returns the value at a dotted field path, such as "moderation.status", or nil.
+// lookup returns the value at a dotted field path, such as "classification.moderation.decision", or nil.
 func lookup(asset calmlens.JSON, path string) any {
 	var value any = asset
 	for _, key := range strings.Split(path, ".") {

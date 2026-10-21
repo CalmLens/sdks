@@ -5,8 +5,8 @@
 //! use calmlens::{models::*, ServerClient};
 //!
 //! let client = ServerClient::new("your-api-key", "your-project-id")?;
-//! let asset = client.assets().moderate(SubmitAsset::text("Hello world")).await?;
-//! if asset.moderation.status == AssetModerationStatus::Approved {
+//! let asset = client.assets().classify(SubmitAsset::text("Hello world")).await?;
+//! if asset.classification.moderation.decision == AssetModerationStatus::Approved {
 //!     println!("{}", asset.id);
 //! }
 //! # Ok(()) }

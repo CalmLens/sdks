@@ -1,6 +1,6 @@
 # Calmclips — Go voice notes and video clips
 
-A browser app using the [CalmLens Go SDK](../../go/README.md) to moderate
+A browser app using the [CalmLens Go SDK](../../go/README.md) to classify
 **voice notes and short video clips** before anyone can play them. Clips of up to 50 MiB
 go **straight from the browser to CalmLens** through an
 [upload preset](https://calmlens.com/docs/guides/upload-presets), so large media
@@ -26,7 +26,7 @@ refuses to start, so a missing secret never silently runs the demo instead of li
 by MIME type (the type the browser reports in live mode): WAV, MP3, FLAC, AAC, M4A,
 Ogg/Vorbis, Opus, AIFF and WMA audio, and MP4, MOV, WebM, Matroska, AVI, MPEG, MPEG-TS and
 WMV video. It does not decode media, so the 120-second limit is enforced by CalmLens: a
-longer, corrupt or unsupported clip ends with processing status `failed`.
+longer, corrupt or unsupported clip ends with classification status `failed`.
 
 ## Demo mode
 
@@ -114,7 +114,7 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   `Moderation.Action` is set (the policy chose `alert`). While a clip is pending, the page reloads every three seconds (never during
   an upload) and the server calls `Assets.Retrieve`; verified webhooks update a clip
   sooner.
-- **Timeline.** `moderation.report.media` provides `durationSeconds` and `segments`. Native analysis
+- **Timeline.** `classification.moderation.timeline` provides `durationSeconds` and `segments`. Native analysis
   uses overlapping 30-second chunks (`source: "clip"`). Each segment lists the categories
   that were evaluated (or partially evaluated) with a score of at least 0.4 ("possible").
   A `not-evaluated` category is never shown as a zero score. Ranges are approximate.
@@ -172,7 +172,7 @@ logged in the activity panel and changes nothing.
 - [upload.js](upload.js): the browser upload through the preset, single-request or
   multipart, with per-part progress.
 - `upload` and `send`: the demo's simulated server upload.
-- `refresh` and `timeline`: SDK retrieval and turning `moderation.report.media` into segment rows.
+- `refresh` and `timeline`: SDK retrieval and turning `classification.moderation.timeline` into segment rows.
 - `media`: fresh approval check, the signed URL cache, live short-lived signed playback
   and streamed demo playback.
 - `retry`, `remove`: `Assets.Retry` and `Assets.Delete`.

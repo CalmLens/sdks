@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class RobustnessTest {
-  private static final String APPROVED = Fixtures.assetJson("asset", "done", "approved");
+  private static final String APPROVED = Fixtures.assetJson("asset", "completed", "approved");
 
   /** Records requests and answers from {@code replies} in order; retries do not sleep but record delays. */
   private static final class Scripted implements Transport {
@@ -117,7 +117,7 @@ class RobustnessTest {
   @Test void multipartPartsUseTheSavedQueueChoiceUnlessOverridden() {
     var transport = new Scripted(reply(200, Fixtures.assetJson("asset", "uploading", "pending")), reply(200, APPROVED), reply(200, APPROVED));
     CalmLensServerClient client = transport.client();
-    client.assets.moderate(new Models.SubmitAsset().name("big.pdf").totalSizeInBytes(5242885L)
+    client.assets.classify(new Models.SubmitAsset().name("big.pdf").totalSizeInBytes(5242885L)
         .part(Models.Content.bytes(new byte[5 * 1024 * 1024], "application/pdf").partNumber(1).isFinal(false)));
     client.assets.uploadPart(new Models.UploadPart("asset", Models.Content.text("final").partNumber(2).isFinal(true)));
     client.assets.uploadPart(new Models.UploadPart("asset", Models.Content.text("final").partNumber(2).isFinal(true)).queue(true));
@@ -170,8 +170,8 @@ class RobustnessTest {
         for (String id : List.of("one", "two"))
           futures.add(executor.submit(() -> parts
               ? client.assets.uploadPart(new Models.UploadPart(id, Models.Content.text("final").partNumber(2).isFinal(true)))
-              : client.assets.moderate(Models.SubmitAsset.text("hello"))));
-        for (var future : futures) assertEquals(Models.AssetModerationStatus.APPROVED, future.get(3, TimeUnit.SECONDS).moderation().status());
+              : client.assets.classify(Models.SubmitAsset.text("hello"))));
+        for (var future : futures) assertEquals(Models.AssetModerationStatus.APPROVED, future.get(3, TimeUnit.SECONDS).classification().moderation().decision());
       } finally {
         executor.shutdownNow();
       }
@@ -188,17 +188,17 @@ class RobustnessTest {
   }
 
   @Test void unknownValuesAndLargeNumbersSurviveDecoding() {
-    String body = "{\"id\":\"asset\",\"processing\":{\"status\":\"paused\"},\"moderation\":{\"status\":\"escalated\",\"action\":\"quarantine\"},"
+    String body = "{\"id\":\"asset\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"paused\",\"moderation\":{\"decision\":\"escalated\",\"action\":\"quarantine\"}},"
         + "\"content\":{\"status\":\"archived\",\"removalReason\":\"expired\"},\"visibility\":\"unlisted\",\"futureField\":{\"a\":1},"
         + "\"metadata\":[{\"id\":\"big\",\"value\":9007199254740993},{\"id\":\"small\",\"value\":5},{\"id\":\"ratio\",\"value\":0.5}],"
         + "\"createdAt\":1700000000123}";
     Models.Asset asset = new Scripted(reply(200, body)).client().assets.retrieve(new Models.AssetId("asset"));
-    assertEquals("paused", asset.processing().status().value());
-    assertFalse(asset.processing().status().isKnown());
-    assertEquals("escalated", asset.moderation().status().value());
-    assertFalse(asset.moderation().status().isKnown());
-    assertNotEquals(Models.AssetModerationStatus.APPROVED, asset.moderation().status());
-    assertEquals("quarantine", asset.moderation().action());
+    assertEquals("paused", asset.classification().status().value());
+    assertFalse(asset.classification().status().isKnown());
+    assertEquals("escalated", asset.classification().moderation().decision().value());
+    assertFalse(asset.classification().moderation().decision().isKnown());
+    assertNotEquals(Models.AssetModerationStatus.APPROVED, asset.classification().moderation().decision());
+    assertEquals("quarantine", asset.classification().moderation().action());
     assertEquals("archived", asset.content().status().value());
     assertFalse(asset.content().status().isKnown());
     assertEquals("expired", asset.content().removalReason());
@@ -208,7 +208,7 @@ class RobustnessTest {
     assertEquals(0.5, asset.metadata().get(2).value());
     assertEquals(java.time.Instant.ofEpochMilli(1700000000123L), asset.createdAt());
     assertSame(Models.AssetModerationStatus.APPROVED, Models.AssetModerationStatus.of("approved"));
-    assertSame(Models.AssetProcessingStatus.FAILED, Models.AssetProcessingStatus.of("failed"));
+    assertSame(Models.AssetClassificationStatus.FAILED, Models.AssetClassificationStatus.of("failed"));
     assertSame(Models.AssetContentStatus.REMOVED, Models.AssetContentStatus.of("removed"));
     assertThrows(UnsupportedOperationException.class, () -> asset.metadata().add(new Models.MetadataItem("x", 1)));
   }
@@ -228,13 +228,13 @@ class RobustnessTest {
 
   @Test void iteratorsFollowPagesAndTheEventCursor() {
     var assets = new Scripted(
-        reply(200, "{\"items\":[" + Fixtures.assetJson("a", "done", "approved") + "," + Fixtures.assetJson("b", "done", "approved") + "],\"nextCursor\":\"next-token\",\"pageSize\":2,\"total\":3,\"hasMore\":true}"),
+        reply(200, "{\"items\":[" + Fixtures.assetJson("a", "completed", "approved") + "," + Fixtures.assetJson("b", "completed", "approved") + "],\"nextCursor\":\"next-token\",\"pageSize\":2,\"total\":3,\"hasMore\":true}"),
         reply(200, "{\"items\":[" + Fixtures.assetJson("c", "processing", "pending") + "],\"nextCursor\":null,\"pageSize\":2,\"total\":3,\"hasMore\":false}"));
     CalmLensServerClient client = assets.client();
-    assertEquals(List.of("a", "b", "c"), client.assets.iterate(new Models.ListAssets().pageSize(2).filter("moderation.status==approved")).stream().map(Models.Asset::id).toList());
+    assertEquals(List.of("a", "b", "c"), client.assets.iterate(new Models.ListAssets().pageSize(2).filter("classification.moderation.decision==approved")).stream().map(Models.Asset::id).toList());
     assertNull(query(assets.requests.get(0)).get("cursor"));
     assertEquals("next-token", query(assets.requests.get(1)).get("cursor"));
-    assertEquals("moderation.status==approved", query(assets.requests.get(1)).get("filter"));
+    assertEquals("classification.moderation.decision==approved", query(assets.requests.get(1)).get("filter"));
 
     var events = new Scripted(
         reply(200, "{\"events\":[{\"id\":\"e1\",\"type\":\"asset.flagged\",\"facts\":[]}],\"cursor\":\"c1\",\"hasMore\":true}"),
@@ -252,7 +252,7 @@ class RobustnessTest {
     assertEquals(List.of("c0", "c1"), events.requests.stream().map(request -> query(request).get("after")).toList());
     assertEquals(List.of(), events.client().events.list(new Models.ListEvents()).events().get(0).facts());
 
-    var children = new Scripted(reply(200, "{\"items\":[" + Fixtures.assetJson("child", "done", "approved") + "],\"hasMore\":false}"));
+    var children = new Scripted(reply(200, "{\"items\":[" + Fixtures.assetJson("child", "completed", "approved") + "],\"hasMore\":false}"));
     assertEquals(List.of("child"), children.client().assets.iterateChildren(new Models.ListChildren("parent")).stream().map(Models.Asset::id).toList());
     assertEquals("/v1/assets/parent/children", children.requests.get(0).uri().getRawPath());
   }
@@ -320,12 +320,12 @@ class RobustnessTest {
   @Test void transportErrorsPreserveCauseAndInterrupt() {
     IOException cause = new IOException("offline");
     var error = assertThrows(TransportException.class, () -> CalmLensServerClient.builder("key", "project").maxRetries(0)
-        .transport(request -> { throw cause; }).build().assets.moderate(Models.SubmitAsset.text("hello")));
+        .transport(request -> { throw cause; }).build().assets.classify(Models.SubmitAsset.text("hello")));
     assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, error.getCode());
     assertSame(cause, error.getCause());
     var interrupted = CalmLensServerClient.builder("key", "project").transport(request -> { throw new InterruptedException(); }).build();
     try {
-      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CalmLensException.class, () -> interrupted.assets.moderate(Models.SubmitAsset.text("hello"))).getCode());
+      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CalmLensException.class, () -> interrupted.assets.classify(Models.SubmitAsset.text("hello"))).getCode());
       assertTrue(Thread.currentThread().isInterrupted());
     } finally {
       Thread.interrupted();
@@ -335,10 +335,10 @@ class RobustnessTest {
   @Test void waitForDecisionPollsWithGrowingDelaysUntilTheAssetIsDecided() {
     String pending = Fixtures.assetJson("asset", "processing", "pending");
     var transport = new Scripted(reply(200, pending), reply(200, pending), reply(200, pending), reply(200, pending), reply(200, pending),
-        reply(200, pending), reply(200, pending), reply(200, pending), reply(200, Fixtures.assetJson("asset", "done", "rejected")));
+        reply(200, pending), reply(200, pending), reply(200, pending), reply(200, Fixtures.assetJson("asset", "completed", "rejected")));
     Models.Asset asset = transport.client().assets.waitForDecision(new Models.WaitForDecision("asset"));
     assertEquals("asset", asset.id());
-    assertEquals(Models.AssetModerationStatus.REJECTED, asset.moderation().status());
+    assertEquals(Models.AssetModerationStatus.REJECTED, asset.classification().moderation().decision());
     assertEquals(9, transport.requests.size());
     for (Transport.Request request : transport.requests) {
       assertEquals("GET", request.method());
@@ -353,7 +353,7 @@ class RobustnessTest {
     CalmLensException error = assertThrows(CalmLensException.class,
         () -> transport.client().assets.waitForDecision(new Models.WaitForDecision("asset").timeout(Duration.ZERO)));
     assertEquals(ErrorCodes.SDK_TIMEOUT, error.getCode());
-    assertEquals(Map.of("assetId", "asset", "processingStatus", "processing", "moderationStatus", "pending"), error.getDetails());
+    assertEquals(Map.of("assetId", "asset", "classificationStatus", "processing", "moderationStatus", "pending"), error.getDetails());
     assertEquals(1, transport.requests.size());
 
     var unsent = new Scripted(reply(200, APPROVED));
@@ -381,7 +381,7 @@ class RobustnessTest {
   }
 
   @Test void nativeResponseModelsRetainDocumentAndHoldFields() {
-    Map<String, Object> held = Fixtures.asset("asset", "done", "approved");
+    Map<String, Object> held = Fixtures.asset("asset", "completed", "approved");
     held.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", "document text"),
         "safetyHold", Map.of("placedAt", 100, "disposedAt", 200, "reason", "suspected-illegal-content")));
     Models.Asset asset = new Scripted(reply(200, Fixtures.JSON.toJson(held))).client().assets.retrieve(new Models.AssetId("asset"));

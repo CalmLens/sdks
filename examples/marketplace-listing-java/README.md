@@ -7,9 +7,9 @@ on it offers something the marketplace does not allow.
 
 Calmmarket uploads every listing photo with OCR enabled. Image moderation considers readable text directly; OCR also extracts text and adds a separate text moderation pass.
 
-1. The title and description are moderated synchronously with `text.moderate`. If either is not approved, no photo is uploaded.
+1. The title and description are moderated synchronously with `text.classify`. If either is not approved, no photo is uploaded.
 2. Up to four photos are uploaded privately with `assets.create` and `processingOptions.features.ocr.enabled: true`.
-3. The page polls `assets.retrieve` for each photo and reads its combined `moderation.report` and `content.extractedText`. No text child is created or queried. The combined report does not identify which moderation pass caused a rejection.
+3. The page polls `assets.retrieve` for each photo and reads its combined `classification.moderation` and `content.extractedText`. No text child is created or queried. The combined report does not identify which moderation pass caused a rejection.
 4. A listing goes live only when its text and every photo are approved. A pending, rejected, unknown or failed photo holds the listing. Approved photos use a CDN lens with a 60-second signed URL.
 
 An `evaluated` or `partial` category has a score. A `not-evaluated` result has a reason and no score; it is never treated as zero. See the [OCR guide](https://calmlens.com/docs/guides/ocr) for merging and retention.
@@ -19,7 +19,7 @@ An `evaluated` or `partial` category has a score. A `not-evaluated` result has a
 A seller can withdraw a listing at any time. It leaves the market at once, and the app calls
 `assets.deleteContent` for every photo, which also removes its extracted text. This is the retention
 choice of this example: the stored bytes (the photo and the text read from it) are removed
-(`content.status` becomes `removed`) and the CDN stops serving them, while the asset records and their moderation reports stay in
+(`content.status` becomes `removed`) and the CDN stops serving them, while the asset records and their classification results stay in
 CalmLens for audit and for any later dispute. The title and description assets keep their
 text so a reviewer can still read the listing in the portal. A removal that fails can be
 retried from the page; content under a safety hold cannot be removed and is left alone. Use

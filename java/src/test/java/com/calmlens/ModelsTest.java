@@ -11,29 +11,81 @@ import org.junit.jupiter.api.Test;
 class ModelsTest {
   @Test void assetNestedObjectsDecodeIntoTypedRecords() {
     Models.Asset asset = Json.GSON.fromJson("""
-        {"id": "asset-1", "uploadPresetId": "preset-1",
-         "processing": {"status": "done", "updatedAt": 1700000000100, "uploadPartsReceived": 3},
-         "moderation": {"status": "approved", "action": "hide", "reviewerAction": "approved",
-           "reviewerNote": "fine", "reviewerUserId": "user-2", "reviewedAt": 1700000000200, "decidedAt": 1700000000300,
-           "report": {"score": 0.7, "categories": {"harassment": {"status": "evaluated", "score": 0.7}}}},
-         "content": {"status": "removed", "removalReason": "retention", "updatedAt": 1700000000400,
-           "safetyHold": null, "format": "image/png", "extension": "png", "sizeInBytes": 9007199254740993,
-           "checksums": {"sha256": "abc", "md5": null}, "image": {"perceptualHash": "p", "width": 4, "height": 3},
-           "previewImage": {"fileFormat": "webp", "thumbhash": "t", "averageColor": "#fff", "width": 2, "height": 1},
-           "extractedText": null},
-         "processingOptions": {"keepContentAfterProcessing": true, "flaggedContentPolicy": {"action": "purge"}}}
+        {
+  "id": "asset-1",
+  "uploadPresetId": "preset-1",
+  "content": {
+    "status": "removed",
+    "removalReason": "retention",
+    "updatedAt": 1700000000400,
+    "safetyHold": null,
+    "format": "image/png",
+    "extension": "png",
+    "sizeInBytes": 9007199254740993,
+    "checksums": {
+      "sha256": "abc",
+      "md5": null
+    },
+    "image": {
+      "perceptualHash": "p",
+      "width": 4,
+      "height": 3
+    },
+    "previewImage": {
+      "fileFormat": "webp",
+      "thumbhash": "t",
+      "averageColor": "#fff",
+      "width": 2,
+      "height": 1
+    },
+    "extractedText": null
+  },
+  "processingOptions": {
+    "keepContentAfterProcessing": true,
+    "flaggedContentPolicy": {
+      "action": "purge"
+    }
+  },
+  "upload": {
+    "status": "completed",
+    "updatedAt": 1700000000100,
+    "partsReceived": 3
+  },
+  "classification": {
+    "status": "completed",
+    "updatedAt": 1700000000100,
+    "moderation": {
+      "action": "hide",
+      "reviewerAction": "approved",
+      "reviewerNote": "fine",
+      "reviewerUserId": "user-2",
+      "reviewedAt": 1700000000200,
+      "decision": "approved",
+      "categories": {
+        "harassment": {
+          "status": "evaluated",
+          "score": 0.7
+        }
+      },
+      "score": 0.7
+    },
+    "completedAt": 1700000000300
+  }
+}
         """, Models.Asset.class);
     assertEquals("preset-1", asset.uploadPresetId());
-    assertEquals(new Models.AssetProcessing(Models.AssetProcessingStatus.DONE, Instant.ofEpochMilli(1700000000100L), 3), asset.processing());
-    Models.AssetModeration moderation = asset.moderation();
-    assertSame(Models.AssetModerationStatus.APPROVED, moderation.status());
+    assertSame(Models.AssetClassificationStatus.COMPLETED, asset.classification().status());
+    assertEquals(Instant.ofEpochMilli(1700000000100L), asset.classification().updatedAt());
+    assertEquals(3, asset.upload().partsReceived());
+    Models.AssetModeration moderation = asset.classification().moderation();
+    assertSame(Models.AssetModerationStatus.APPROVED, moderation.decision());
     assertEquals("hide", moderation.action());
     assertEquals("approved", moderation.reviewerAction());
     assertEquals("fine", moderation.reviewerNote());
     assertEquals("user-2", moderation.reviewerUserId());
     assertEquals(Instant.ofEpochMilli(1700000000200L), moderation.reviewedAt());
-    assertEquals(Instant.ofEpochMilli(1700000000300L), moderation.decidedAt());
-    assertEquals(0.7, moderation.report().categories().get("harassment").score());
+    assertEquals(Instant.ofEpochMilli(1700000000300L), asset.classification().completedAt());
+    assertEquals(0.7, moderation.categories().get("harassment").score());
     Models.AssetContent content = asset.content();
     assertSame(Models.AssetContentStatus.REMOVED, content.status());
     assertEquals("retention", content.removalReason());
@@ -52,13 +104,31 @@ class ModelsTest {
 
   @Test void eventAssetSnapshotsDecodeTheirNestedStatuses() {
     Models.Event event = Json.GSON.fromJson("""
-        {"id": "event-1", "type": "asset.rejected", "asset": {"id": "asset-1", "externalId": "ext-1",
-          "processing": {"status": "done"}, "moderation": {"status": "rejected", "action": "purge"},
-          "content": {"status": "removed"}}}
+        {
+  "id": "event-1",
+  "type": "asset.rejected",
+  "asset": {
+    "id": "asset-1",
+    "externalId": "ext-1",
+    "content": {
+      "status": "removed"
+    },
+    "upload": {
+      "status": "completed"
+    },
+    "classification": {
+      "status": "completed",
+      "moderation": {
+        "action": "purge",
+        "decision": "rejected"
+      }
+    }
+  }
+}
         """, Models.Event.class);
     assertEquals(new Models.EventAsset("asset-1", "ext-1",
-        new Models.EventAssetProcessing(Models.AssetProcessingStatus.DONE),
-        new Models.EventAssetModeration(Models.AssetModerationStatus.REJECTED, "purge"),
+        new Models.EventAssetUpload("completed"),
+        new Models.EventAssetClassification(Models.AssetClassificationStatus.COMPLETED, new Models.EventAssetModeration(Models.AssetModerationStatus.REJECTED, "purge")),
         new Models.EventAssetContent(Models.AssetContentStatus.REMOVED)), event.asset());
   }
 

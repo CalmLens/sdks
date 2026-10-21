@@ -90,8 +90,8 @@ type Options struct {
 	// QueuedOutcome is the Outcome constant of queued uploads (Assets.Create and queued
 	// multipart uploads; default OutcomePending).
 	QueuedOutcome string
-	// AnalyzedOutcome is the Outcome constant of moderated uploads (Assets.Moderate and
-	// Text.Moderate; default OutcomeApproved). Finished processing removes content unless the
+	// AnalyzedOutcome is the Outcome constant of moderated uploads (Assets.Classify and
+	// Text.Classify; default OutcomeApproved). Finished processing removes content unless the
 	// upload set ProcessingOptions.KeepContentAfterProcessing.
 	AnalyzedOutcome  string
 	CDNBaseURL       string
@@ -728,9 +728,11 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	if a["visibility"] == nil {
 		a["visibility"] = calmlens.VisibilityPrivate
 	}
-	processing := calmlens.JSON{"status": calmlens.ProcessingStatusProcessing, "updatedAt": now, "uploadPartsReceived": nil}
+	processing := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "updatedAt": now, "completedAt": nil}
+	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	if open {
-		processing["status"] = calmlens.ProcessingStatusUploading
+		processing["status"] = calmlens.ClassificationStatusPending
+		uploadState["status"] = "uploading"
 	}
 	contentStatus := calmlens.ContentStatusTemporary
 	if keep, _ := asJSON(options["processingOptions"])["keepContentAfterProcessing"].(bool); keep {
@@ -741,10 +743,11 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 		"format": nil, "extension": nil, "sizeInBytes": nil, "checksums": nil, "image": nil,
 		"previewImage": nil, "extractedText": nil,
 	}
-	a["processing"] = processing
-	a["moderation"] = calmlens.JSON{
-		"status": calmlens.ModerationStatusPending, "action": nil, "note": nil, "reviewerAction": nil,
-		"reviewerNote": nil, "reviewerUserId": nil, "reviewedAt": nil, "decidedAt": nil, "report": nil,
+	a["upload"] = uploadState
+	a["classification"] = processing
+	processing["moderation"] = calmlens.JSON{
+		"decision": calmlens.ModerationStatusPending, "action": nil, "reviewerAction": nil,
+		"reviewerNote": nil, "reviewerUserId": nil, "reviewedAt": nil,
 	}
 	a["content"] = content
 	if options["url"] != nil {
@@ -757,7 +760,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 		m.ImageStorage.Content[id] = &StoredContent{Type: mime, Parts: map[int][]byte{1: raw}}
 	}
 	if multipart {
-		processing["uploadPartsReceived"] = 1
+		uploadState["partsReceived"] = 1
 		state := &upload{queue: queue}
 		if total := q.Get("totalSizeInBytes"); total != "" {
 			size, err := strconv.ParseInt(total, 10, 64)
@@ -807,19 +810,21 @@ func section(a calmlens.JSON, name string) calmlens.JSON {
 // finished processing removes content kept only temporarily (keepContentAfterProcessing off).
 func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome string, now int64) {
 	decided := outcome == OutcomeApproved || outcome == OutcomeRejected
-	processing, moderation, content := section(a, "processing"), section(a, "moderation"), section(a, "content")
+	processing, moderation, content := section(a, "classification"), section(section(a, "classification"), "moderation"), section(a, "content")
 	processing["updatedAt"] = now
-	moderation["status"] = calmlens.ModerationStatusPending
-	moderation["decidedAt"] = nil
+	section(a, "upload")["status"] = "completed"
+	section(a, "upload")["updatedAt"] = now
+	moderation["decision"] = calmlens.ModerationStatusPending
+	processing["completedAt"] = nil
 	switch {
 	case decided:
-		processing["status"] = calmlens.ProcessingStatusDone
-		moderation["status"] = outcome
-		moderation["decidedAt"] = now
+		processing["status"] = calmlens.ClassificationStatusCompleted
+		moderation["decision"] = outcome
+		processing["completedAt"] = now
 	case outcome == OutcomeFailed:
-		processing["status"] = calmlens.ProcessingStatusFailed
+		processing["status"] = calmlens.ClassificationStatusFailed
 	default:
-		processing["status"] = calmlens.ProcessingStatusProcessing
+		processing["status"] = calmlens.ClassificationStatusProcessing
 	}
 	a["updatedAt"] = now
 	if decided && content["status"] == calmlens.ContentStatusTemporary {
@@ -870,7 +875,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		}
 		return calmlens.JSON{"url": m.options.SignedURLBaseURL + "/assets/" + id + "/" + text(body["resource"]) + "?" + params.Encode(), "expiresAt": now + int64(number(body["expiresInSeconds"])*1000)}, nil
 	case method == "POST" && suffix == "retry":
-		if section(a, "processing")["status"] != calmlens.ProcessingStatusFailed {
+		if section(a, "classification")["status"] != calmlens.ClassificationStatusFailed {
 			return nil, fail(calmlens.CodeAssetNotRetryable)
 		}
 		if section(a, "content")["status"] == calmlens.ContentStatusRemoved {
@@ -901,15 +906,15 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, raw []byte, now int64) error {
 	state := m.uploads[id]
 	stored := m.ImageStorage.Content[id]
-	processing := section(a, "processing")
-	if state == nil || stored == nil || processing["status"] != calmlens.ProcessingStatusUploading {
+	processing := section(a, "upload")
+	if state == nil || stored == nil || processing["status"] != "uploading" {
 		return fail(calmlens.CodeUploadNotOpen)
 	}
 	if size := q.Get("sizeInBytes"); size != "" && size != strconv.Itoa(len(raw)) {
 		return fail(calmlens.CodeInvalidUploadPayload)
 	}
 	part, _ := strconv.Atoi(q.Get("partNumber"))
-	expected := int(number(processing["uploadPartsReceived"])) + 1
+	expected := int(number(processing["partsReceived"])) + 1
 	if part != expected {
 		failure := fail(calmlens.CodeInvalidUploadPartNumber).(*apiError)
 		failure.details = calmlens.JSON{"expectedPartNumber": expected}
@@ -926,7 +931,7 @@ func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, 
 	}
 	stored.Parts[part] = raw
 	section(a, "content")["sizeInBytes"] = size
-	processing["uploadPartsReceived"] = part
+	processing["partsReceived"] = part
 	if !final {
 		return nil
 	}
@@ -1204,7 +1209,7 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission")
 	}
 	stored := m.ImageStorage.Content[text(asset["id"])]
-	if stored == nil || section(asset, "processing")["status"] == calmlens.ProcessingStatusUploading {
+	if stored == nil || section(asset, "upload")["status"] == "uploading" {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetContentUnavailable)
 	}
 	indices := []int{}

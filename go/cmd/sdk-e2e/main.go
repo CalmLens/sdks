@@ -33,9 +33,9 @@ func decode[T any](raw json.RawMessage, call func(T) (any, error)) (any, error) 
 func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 	ctx := context.Background()
 	switch cmd.Operation {
-	case "text.moderate":
-		return decode(cmd.Options, func(o sdk.ModerateTextOptions) (any, error) { return c.Text.Moderate(ctx, o) })
-	case "assets.create", "assets.moderate":
+	case "text.classify":
+		return decode(cmd.Options, func(o sdk.ClassifyTextOptions) (any, error) { return c.Text.Classify(ctx, o) })
+	case "assets.create", "assets.classify":
 		return decode(cmd.Options, func(options sdk.SubmitAssetOptions) (any, error) {
 			var content struct {
 				Content *sdk.Content
@@ -48,7 +48,7 @@ func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 			if cmd.Operation == "assets.create" {
 				return c.Assets.Create(ctx, options)
 			}
-			return c.Assets.Moderate(ctx, options)
+			return c.Assets.Classify(ctx, options)
 		})
 	case "assets.retrieve":
 		return decode(cmd.Options, func(o sdk.AssetIDOptions) (any, error) { return c.Assets.Retrieve(ctx, o) })

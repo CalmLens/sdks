@@ -53,7 +53,7 @@ export interface PickedPhoto {
 export const uploadPhoto = async (photo: PickedPhoto): Promise<UploadedAsset> => {
   // Read the picked file's bytes. The SDK sends them as they are.
   const buffer = await new File(photo.uri).arrayBuffer();
-  return requireClient().assets.moderate({
+  return requireClient().assets.classify({
     name: photo.name,
     content: { buffer, type: photo.type },
   });

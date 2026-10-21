@@ -344,7 +344,7 @@ fn detail(
             html,
             r#"<p class="hint">{}</p>"#,
             h(if removed {
-                "The file was removed. The record, metadata and moderation report remain; the CDN no longer serves it."
+                "The file was removed. The record, metadata and classification results remain; the CDN no longer serves it."
             } else {
                 "No thumbnail or download until the image is approved."
             })
@@ -395,7 +395,7 @@ fn detail(
     if !removed {
         let _ = write!(
             html,
-            r#"<form action="/assets/{id}/remove-file" method="post">{csrf}<h3>Remove file</h3><p class="hint">Deletes the stored file only. The record, metadata and moderation report stay.</p><label><input type="checkbox" name="confirm" value="yes" required>Remove this file</label><button class="danger" type="submit">Remove file</button></form>"#
+            r#"<form action="/assets/{id}/remove-file" method="post">{csrf}<h3>Remove file</h3><p class="hint">Deletes the stored file only. The record, metadata and classification results stay.</p><label><input type="checkbox" name="confirm" value="yes" required>Remove this file</label><button class="danger" type="submit">Remove file</button></form>"#
         );
     }
     let _ = write!(

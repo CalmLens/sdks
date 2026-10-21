@@ -26,9 +26,9 @@
 
 ### Minor Changes
 
-- 3fa1cdf: `Asset` groups its state into `processing`, `moderation` and `content`. `processing.status` is `uploading`, `processing`, `done` or `failed`; `moderation` has the decision in force (`status`: `pending`, `approved` or `rejected`), what your policy did (`action`: `alert`, `hide`, `purge` or `null`), the automated `note`, the reviewer's decision (`reviewerAction`, `reviewerNote`, `reviewerUserId`, `reviewedAt`), `decidedAt` and the `report`; `content` has whether CalmLens holds the content (`status`: `temporary`, `stored` or `removed`, with a `removalReason`), the safety hold, `format`, `extension`, `sizeInBytes`, `checksums`, `image`, `previewImage` and `extractedText`. Event asset snapshots carry `processing.status`, `moderation.status`, `moderation.action` and `content.status`.
+- 3fa1cdf: `Asset` groups its state into `processing`, `moderation` and `content`. `classification.status` is `uploading`, `processing`, `done` or `failed`; `moderation` has the decision in force (`status`: `pending`, `approved` or `rejected`), what your policy did (`action`: `alert`, `hide`, `purge` or `null`), the automated `note`, the reviewer's decision (`reviewerAction`, `reviewerNote`, `reviewerUserId`, `reviewedAt`), `completedAt` and the `report`; `content` has whether CalmLens holds the content (`status`: `temporary`, `stored` or `removed`, with a `removalReason`), the safety hold, `format`, `extension`, `sizeInBytes`, `checksums`, `image`, `previewImage` and `extractedText`. Event asset snapshots carry `classification.status`, `classification.moderation.decision`, `classification.moderation.action` and `content.status`.
 
-  This is a breaking change: the top-level `status`, `moderationAction`, `rejectionNote`, `report`, `safetyHold`, `storageDeletedAt`, `fileFormat`, `fileExtension`, `sizeInBytes`, `checksums`, `imageData`, `previewImage`, `extractedText` and `uploadPartsReceived` fields, `report.flagged`, `documentData` and the `AssetStatus` type are gone; a flagged asset is one whose `moderation.action` is not `null`. Filter lists with `moderation.status`, `processing.status` or `content.status`. `assets.waitForDecision` returns once `moderation.status` is `approved` or `rejected`, or `processing.status` is `failed`. `MockCalmLensServerClient` takes `mockOptions.queuedOutcome` and `analyzedOutcome` (`pending`, `approved`, `rejected` or `failed`) in place of `queuedStatus` and `analyzedStatus`, and removes content after processing unless `keepContentAfterProcessing` is set.
+  This is a breaking change: the top-level `status`, `moderationAction`, `rejectionNote`, `report`, `safetyHold`, `storageDeletedAt`, `fileFormat`, `fileExtension`, `sizeInBytes`, `checksums`, `imageData`, `previewImage`, `extractedText` and `uploadPartsReceived` fields, `report.flagged`, `documentData` and the `AssetStatus` type are gone; a flagged asset is one whose `classification.moderation.action` is not `null`. Filter lists with `classification.moderation.decision`, `classification.status` or `content.status`. `assets.waitForDecision` returns once `classification.moderation.decision` is `approved` or `rejected`, or `classification.status` is `failed`. `MockCalmLensServerClient` takes `mockOptions.queuedOutcome` and `analyzedOutcome` (`pending`, `approved`, `rejected` or `failed`) in place of `queuedStatus` and `analyzedStatus`, and removes content after processing unless `keepContentAfterProcessing` is set.
 
 ## 0.13.0
 
@@ -46,7 +46,7 @@
 
   Every public request and response type is now exported and precise, including checksums, image and document data, preview images, safety holds, extracted text, report labels and qualifiers, event asset snapshots and `SearchAssetsOptions`. `LensTransform` accepts only typed image transforms, and the testing client's recorded calls are typed per operation.
 
-- 8a18b7b: The SDK has two clients, each with its own import. `CalmLensServerClient` from `@calmlens/sdk/server` replaces `CalmLensClient` on your server: it takes your API key and has every method, plus `uploadTokens.sign` and webhook verification. `CalmLensAppClient` from `@calmlens/sdk/app` uploads from browsers and React Native apps through an upload preset with `uploadPresetId` and an optional `token`; it has `assets.create`, `assets.moderate`, `assets.uploadPart` and `assets.retrieve`, and refuses an API key. The app import leaves out server-only code such as webhook verification.
+- 8a18b7b: The SDK has two clients, each with its own import. `CalmLensServerClient` from `@calmlens/sdk/server` replaces `CalmLensClient` on your server: it takes your API key and has every method, plus `uploadTokens.sign` and webhook verification. `CalmLensAppClient` from `@calmlens/sdk/app` uploads from browsers and React Native apps through an upload preset with `uploadPresetId` and an optional `token`; it has `assets.create`, `assets.classify`, `assets.uploadPart` and `assets.retrieve`, and refuses an API key. The app import leaves out server-only code such as webhook verification.
 
   This is a breaking change: `@calmlens/sdk` now exports only types, `CalmLensError`, error codes and `SDK_VERSION`. Replace `import { CalmLensClient } from "@calmlens/sdk"` with `import { CalmLensServerClient } from "@calmlens/sdk/server"`, and `MockCalmLensClient` with `MockCalmLensServerClient` from `@calmlens/sdk/testing`. Webhook helpers such as `verifyWebhookSignature` and `parseWebhookEvent` move to `@calmlens/sdk/server`.
 
@@ -87,7 +87,7 @@
 
   **New:**
 
-  - Reads, and creates and uploads, which now send an `Idempotency-Key`, are retried after network failures, `429`, `502`, `503`, `504` and `idempotency/request-in-progress`, with jittered backoff that honours `Retry-After`. Configure with `maxRetries` (default 2). Pass `idempotencyKey` to `assets.create`, `assets.moderate`, `text.moderate` or `assets.uploadPart` to retry safely across processes.
+  - Reads, and creates and uploads, which now send an `Idempotency-Key`, are retried after network failures, `429`, `502`, `503`, `504` and `idempotency/request-in-progress`, with jittered backoff that honours `Retry-After`. Configure with `maxRetries` (default 2). Pass `idempotencyKey` to `assets.create`, `assets.classify`, `text.classify` or `assets.uploadPart` to retry safely across processes.
   - `CalmLensError` exposes `requestId`, `headers` and `retryAfter`, and `isNotFound()` and `isRetryable()`. `instanceof CalmLensError` and the new `CalmLensError.isCalmLensError()` recognise errors from both the ES module and CommonJS builds. `CALMLENS_ERROR_CODES` lists every documented code.
   - `parseWebhookEvent` verifies a delivery and returns the parsed event. Webhook helpers can read the signature and timestamp from `headers`.
   - `assets.iterate`, `assets.iterateChildren` and `events.pages` page through results for you.
@@ -107,7 +107,7 @@
 
 ### Minor Changes
 
-- d65c25f: Add `assets.deleteContent({ assetId })`, which removes an asset's stored content (source, preview and retained extracted text) and returns the asset with `storageDeletedAt` set, keeping its record and moderation report, and `assets.delete({ assetId })`, which deletes the asset record with its content. `MockCalmLensClient` implements both, records them as `assets.deleteContent` and `assets.delete`, and stops serving the removed content from `cdn.serve`. The `DeleteAssetOptions` and `DeleteAssetContentOptions` types are exported.
+- d65c25f: Add `assets.deleteContent({ assetId })`, which removes an asset's stored content (source, preview and retained extracted text) and returns the asset with `storageDeletedAt` set, keeping its record and classification results, and `assets.delete({ assetId })`, which deletes the asset record with its content. `MockCalmLensClient` implements both, records them as `assets.deleteContent` and `assets.delete`, and stops serving the removed content from `cdn.serve`. The `DeleteAssetOptions` and `DeleteAssetContentOptions` types are exported.
 
 ### Patch Changes
 
@@ -149,7 +149,7 @@
 
   The mock now rejects missing IDs, names, content and part options with `CalmLensError` code `upload/invalid-payload`, and unknown assets with `asset/not-found`, as the real client does. Previously it threw plain `Error`s without a code.
 
-  The README now covers paging through `events.list`, the shape returned by `assets.moderate` and `text.moderate`, and the webhook header constants. It also fixes the webhook body example, which now shows `facts`.
+  The README now covers paging through `events.list`, the shape returned by `assets.classify` and `text.classify`, and the webhook header constants. It also fixes the webhook body example, which now shows `facts`.
 
 - d854cf3: Move the CLI to the standalone `calmlens` package. Use `npx calmlens` or install the standalone binary for local webhook development. Export webhook delivery helpers for CLI integrations.
 
@@ -159,7 +159,7 @@
 
 - e08ebc2: Add a media test-code generator and typed timestamped audio/video classification reports. Audio and video uploads are always processed asynchronously.
 - e08ebc2: Rename the npm package to `@calmlens/sdk`. Update installation and import paths, including the `@calmlens/sdk/testing` entry point. The `calmlens` CLI command stays the same.
-- e08ebc2: BREAKING: Replace `assets.analyze()` with `assets.moderate()` without a compatibility alias. Both `assets.create()` and `assets.moderate()` take the same asset options; create queues processing and moderate waits for classification. Keep `text.moderate()` as a convenience wrapper around `assets.moderate()`. Update mocks, examples, documentation, and cross-language contracts.
+- e08ebc2: BREAKING: Replace `assets.analyze()` with `assets.classify()` without a compatibility alias. Both `assets.create()` and `assets.classify()` take the same asset options; create queues processing and classify waits for classification. Keep `text.classify()` as a convenience wrapper around `assets.classify()`. Update mocks, examples, documentation, and cross-language contracts.
 - e08ebc2: Breaking: webhook deliveries (now sent by `webhook` connectors) use a new body and signature. The body is `{ id, type, createdAt, projectId, data }` (exported as the `WebhookEventPayload` type) and deliveries carry `x-calmlens-timestamp` plus `x-calmlens-signature: v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`; the `x-calmlens-delivery-attempt` header is gone. `verifyWebhookSignature` now takes `{ payload, signature, timestamp, secret, toleranceSeconds?, now? }` (replacing `signatureHex`) and rejects deliveries whose timestamp is more than 5 minutes from now. `calmlens listen` forwards events in the new format. The header names and tolerance are exported as `WEBHOOK_DELIVERY_HEADER`, `WEBHOOK_TIMESTAMP_HEADER`, `WEBHOOK_SIGNATURE_HEADER` and `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS`.
 
 ### Patch Changes
@@ -210,7 +210,7 @@
 
 - b302afc: Fix installing the SDK outside the CalmLens repository. Previous releases imported unpublished internal modules (`shared/...`) and packages missing from `dependencies`, so `require`, Node ESM `import` and bundlers failed, and TypeScript types silently became `any`. The SDK is now bundled with its internal code included, declares `zod`, `sendable-error` and `json-schema-to-ts` as dependencies, marks `esm/` as ES modules for Node, and ships CommonJS type declarations for `require` users.
 
-  Add `client.assets.moderate({ text })` for moderating comments, captions, bios and other short text. It waits for the decision and is also available on `MockCalmLensClient`. The README quick start now covers text first, how to read `status` and `report.flagged`, and where to find the project ID.
+  Add `client.assets.classify({ text })` for moderating comments, captions, bios and other short text. It waits for the decision and is also available on `MockCalmLensClient`. The README quick start now covers text first, how to read `status` and `report.flagged`, and where to find the project ID.
 
 ## 0.0.25
 

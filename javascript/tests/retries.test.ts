@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { type CalmLensError, CalmLensServerClient } from "../src/server";
 
 const projectId = "project-1";
-const asset = { id: "asset-1", processing: { status: "done" }, moderation: { status: "approved" } };
+const asset = {
+  id: "asset-1",
+  upload: { status: "completed" },
+  classification: { status: "completed", moderation: { decision: "approved" } },
+};
 const text = { name: "note.txt", content: { plainText: "hello", type: "text/plain" } };
 
 /** A fetch that answers from `responses` in order and records each request. */
@@ -72,7 +76,7 @@ describe("retries", () => {
     const client = new CalmLensServerClient({ apiKey: "key", projectId, fetch: fetchImpl });
     await client.assets.create(text);
     await client.assets.create(text);
-    await client.text.moderate({ text: "hi", idempotencyKey: "comment-42" });
+    await client.text.classify({ text: "hi", idempotencyKey: "comment-42" });
     const keys = requests.map((request) => request.headers.get("idempotency-key"));
     expect(keys[0]).not.toBe(keys[1]);
     expect(keys[2]).toBe("comment-42");

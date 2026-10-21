@@ -83,7 +83,7 @@ module Calmthread
     # ties each asset back to its reply and field.
     def moderate_reply(reply_id, fields, _demo_result = nil)
       FIELDS.each_with_object({}) do |(field, asset_name), assets|
-        asset = client_for(reply_id).text.moderate(
+        asset = client_for(reply_id).text.classify(
           name: asset_name,
           external_id: Calmthread.external_id(reply_id, field),
           processing_options: PROCESSING_OPTIONS,
@@ -104,10 +104,10 @@ module Calmthread
   # The asset's `moderation` or `processing` object, or {} when the response has none.
   def self.section(asset, key) = asset.is_a?(Hash) && asset[key].is_a?(Hash) ? asset[key] : {}
 
-  def self.status(asset) = section(asset, 'moderation')['status']
-  def self.processing_failed?(asset) = section(asset, 'processing')['status'] == 'failed'
+  def self.status(asset) = section(section(asset, 'classification'), 'moderation')['decision']
+  def self.processing_failed?(asset) = section(asset, 'classification')['status'] == 'failed'
   # Flagged means the policy took an action (alert, hide or purge) on the field.
-  def self.flagged?(asset) = !section(asset, 'moderation')['action'].nil?
+  def self.flagged?(asset) = !section(section(asset, 'classification'), 'moderation')['action'].nil?
 
   # :clean publishes, :held waits for a reviewer, :failed never publishes.
   # An approved but flagged field is held too: only an unflagged approval is clean.

@@ -15,9 +15,9 @@ const deliveryBody = (type: string, facts: { key: string; value: unknown }[] = [
       asset: {
         id: "asset-1",
         externalId: null,
-        processing: { status: "done" },
-        moderation: { status: "approved", action: null },
         content: { status: "stored" },
+        upload: { status: "completed" },
+        classification: { status: "completed", moderation: { decision: "approved", action: null } },
       },
       facts,
       createdAt: 1760000000000,

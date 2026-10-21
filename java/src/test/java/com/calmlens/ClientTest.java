@@ -72,7 +72,7 @@ class ClientTest {
     assertTrue(version.find());
     assertEquals(version.group(1), CalmLensServerClient.VERSION);
     String[] agent = {null};
-    client(request -> { agent[0] = request.headers().get("User-Agent"); return Fixtures.json(200, Fixtures.assetJson("a", "done", "approved")); })
+    client(request -> { agent[0] = request.headers().get("User-Agent"); return Fixtures.json(200, Fixtures.assetJson("a", "completed", "approved")); })
         .assets.retrieve(new Models.AssetId("a"));
     assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (Java " + Runtime.version() + ")", agent[0]);
   }
@@ -168,9 +168,9 @@ class ClientTest {
   private static void assertEventAsset(JsonObject expected, Models.EventAsset asset) {
     assertEquals(string(expected, "id"), asset.id());
     assertEquals(string(expected, "externalId"), asset.externalId());
-    assertEquals(string(expected.getAsJsonObject("processing"), "status"), asset.processing().status().value());
-    assertEquals(string(expected.getAsJsonObject("moderation"), "status"), asset.moderation().status().value());
-    assertEquals(string(expected.getAsJsonObject("moderation"), "action"), asset.moderation().action());
+    assertEquals(string(expected.getAsJsonObject("classification"), "status"), asset.classification().status().value());
+    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "decision"), asset.classification().moderation().decision().value());
+    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "action"), asset.classification().moderation().action());
     assertEquals(string(expected.getAsJsonObject("content"), "status"), asset.content().status().value());
   }
 
@@ -262,7 +262,7 @@ class ClientTest {
           () -> client(request -> Fixtures.json(200, body)).assets.retrieve(new Models.AssetId("asset-1")), body);
       assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, noStatus.getCode(), body);
     }
-    Map<String, Object> described = Fixtures.asset("asset-1", "done", "approved");
+    Map<String, Object> described = Fixtures.asset("asset-1", "completed", "approved");
     described.put("description", "x".repeat(4096));
     String large = Fixtures.JSON.toJson(described);
     ApiException tooLarge = assertThrows(ApiException.class, () -> CalmLensServerClient.builder("key", "project").maxResponseBytes(1024)

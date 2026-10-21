@@ -4,17 +4,17 @@ A community link board built with the [CalmLens Python SDK](../../python/README.
 Members share a link with a short note. CalmLens fetches the linked page and moderates it,
 including the text and images it finds there, before anyone can click the link.
 
-1. The note is moderated synchronously with `text.moderate`. If it is not approved, the page
+1. The note is moderated synchronously with `text.classify`. If it is not approved, the page
    is never submitted.
 2. The page is submitted as a remote URL with `assets.create(url=...)`. CalmLens queues it,
    fetches it and moderates it as a `website` asset. Nothing is retained after processing,
    because the board never serves the page itself.
 3. While the page is being checked, the board shows the address as plain text and refreshes
-   every few seconds, reading the decision (`moderation.status`) with `assets.retrieve`. Only an
+   every few seconds, reading the decision (`classification.moderation.decision`) with `assets.retrieve`. Only an
    `approved` page becomes a link (`rel="noopener noreferrer nofollow ugc"`); a page whose
-   `processing.status` is `failed` is never linked.
-4. For a rejected or flagged page (one the policy took an action on, so `moderation.action` is
-   set), the board explains the decision from the moderation report (`moderation.report`):
+   `classification.status` is `failed` is never linked.
+4. For a rejected or flagged page (one the policy took an action on, so `classification.moderation.action` is
+   set), the board explains the decision from the classification results (`classification.moderation`):
    the categories that scored at least 40%, and the categories that were **not evaluated**,
    which are shown as unknown rather than as a zero score. It lists the page's extracted parts
    with `assets.iter_children`, so you can see whether the page text or an image carried the

@@ -23,9 +23,9 @@ pub async fn invoke(
     options: Value,
 ) -> calmlens::Result<Value> {
     match operation {
-        "text.moderate" => output(client.text().moderate(input(options)?).await),
+        "text.classify" => output(client.text().classify(input(options)?).await),
         "assets.create" => output(client.assets().create(input(options)?).await),
-        "assets.moderate" => output(client.assets().moderate(input(options)?).await),
+        "assets.classify" => output(client.assets().classify(input(options)?).await),
         "assets.search" => output(client.assets().search(input(options)?).await),
         "assets.list" => output(client.assets().list(input(options)?).await),
         "assets.retrieve" => output(client.assets().retrieve(input(options)?).await),

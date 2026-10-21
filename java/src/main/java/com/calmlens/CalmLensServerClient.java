@@ -48,8 +48,8 @@ import javax.crypto.spec.SecretKeySpec;
  *
  * <pre>{@code
  * try (var client = CalmLensServerClient.builder(apiKey, projectId).build()) {
- *   Asset asset = client.text.moderate("Hello world");
- *   if (asset.moderation().status() == AssetModerationStatus.APPROVED) publish();
+ *   Asset asset = client.text.classify("Hello world");
+ *   if (asset.classification().moderation().decision() == AssetModerationStatus.APPROVED) publish();
  * }
  * }</pre>
  *
@@ -634,8 +634,8 @@ public final class CalmLensServerClient implements AutoCloseable {
           ? null : Json.GSON.fromJson(value, type);
       if (result == null) throw new JsonParseException("Expected a JSON " + (type.isArray() ? "array" : "object"));
       if (result instanceof Models.Asset asset && (asset.id() == null || asset.id().isEmpty()
-          || asset.processing() == null || asset.processing().status() == null || asset.moderation() == null || asset.moderation().status() == null))
-        throw new JsonParseException("Expected an asset with an id, a processing status and a moderation status");
+          || asset.upload() == null || asset.upload().status() == null || asset.classification() == null || asset.classification().status() == null || asset.classification().moderation() == null || asset.classification().moderation().decision() == null))
+        throw new JsonParseException("Expected an asset with an id, a classification status and a moderation status");
       return result;
     } catch (JsonParseException | IllegalStateException | IllegalArgumentException | NullPointerException cause) {
       throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Invalid response model: " + cause.getMessage(), null, reply.status(), reply.headers(), cause);
@@ -768,7 +768,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Assets() {}
 
     /**
-     * Uploads an asset and queues it for processing; it returns while its {@code processing.status}
+     * Uploads an asset and queues it for processing; it returns while its {@code classification.status}
      * is {@code processing} ({@code uploading} for the first part of a multipart upload). The
      * upload carries an {@code Idempotency-Key}, so it is retried safely.
      *
@@ -800,18 +800,18 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @param options name and content, part or url
      * @return the classified asset
      */
-    public Models.Asset moderate(Models.SubmitAsset options) { return moderate(options, null); }
+    public Models.Asset classify(Models.SubmitAsset options) { return classify(options, null); }
 
     /**
      * @param options name and content, part or url
      * @param requestOptions idempotency key and timeout for this call
      * @return the classified asset
      */
-    public Models.Asset moderate(Models.SubmitAsset options, RequestOptions requestOptions) {
+    public Models.Asset classify(Models.SubmitAsset options, RequestOptions requestOptions) {
       if (options != null) {
         JsonObject o = Models.encode(options);
         if (o.has("content") && o.getAsJsonObject("content").has("plainText") && str(o.getAsJsonObject("content"), "plainText", "").isBlank())
-          throw payloadError("Text to moderate must be a non-empty string");
+          throw payloadError("Text to classify must be a non-empty string");
       }
       return submit(options, false, requestOptions);
     }
@@ -842,15 +842,15 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Retrieves the asset until its {@code moderation.status} is {@code approved} or {@code
-     * rejected}, or its {@code processing.status} is {@code failed}, and returns it. It waits 0.5 seconds before the second check and 1.5 times
+     * Retrieves the asset until its {@code classification.moderation.decision} is {@code approved} or {@code
+     * rejected}, or its {@code classification.status} is {@code failed}, and returns it. It waits 0.5 seconds before the second check and 1.5 times
      * longer each time after that, up to 5 seconds, never past the timeout (60 seconds by default).
      * Webhooks report decisions without polling.
      *
      * @param options the asset and timeout
      * @return the decided asset
      * @throws CalmLensException {@link ErrorCodes#SDK_TIMEOUT} when the timeout passes without a
-     *     decision, with {@code assetId} and the last {@code processingStatus} and {@code
+     *     decision, with {@code assetId} and the last {@code classificationStatus} and {@code
      *     moderationStatus} in its details; {@link
      *     ErrorCodes#SDK_CANCELLED} when the thread is interrupted (the interrupt flag is kept)
      */
@@ -870,10 +870,10 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (isDecided(asset)) return asset;
         long remaining = limitNanos - (nanoTime.getAsLong() - started);
         if (remaining <= 0) {
-          String processing = asset.processing().status().value(), moderation = asset.moderation().status().value();
+          String processing = asset.classification().status().value(), moderation = asset.classification().moderation().decision().value();
           Map<String, Object> details = new LinkedHashMap<>();
           details.put("assetId", asset.id());
-          details.put("processingStatus", processing);
+          details.put("classificationStatus", processing);
           details.put("moderationStatus", moderation);
           throw new CalmLensException(ErrorCodes.SDK_TIMEOUT, "Asset " + asset.id() + " had no moderation decision after "
               + limit.toMillis() + "ms (processing " + processing + ", moderation " + moderation + ")", details, null);
@@ -889,9 +889,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     private static boolean isDecided(Models.Asset asset) {
-      Models.AssetModerationStatus moderation = asset.moderation().status();
+      Models.AssetModerationStatus moderation = asset.classification().moderation().decision();
       return moderation == Models.AssetModerationStatus.APPROVED || moderation == Models.AssetModerationStatus.REJECTED
-          || asset.processing().status() == Models.AssetProcessingStatus.FAILED;
+          || asset.classification().status() == Models.AssetClassificationStatus.FAILED;
     }
 
     /** @param options the asset and the fields to change @return the updated asset */
@@ -901,7 +901,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Processes an asset whose {@code processing.status} is {@code failed} again; its moderation
+     * Processes an asset whose {@code classification.status} is {@code failed} again; its moderation
      * returns to {@code pending}. Its content must still be held.
      *
      * @param options the asset
@@ -954,7 +954,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * applies unless {@link Models.UploadPart#queue(Boolean)} overrides it.
      *
      * @param options the asset and the part
-     * @return the asset; its {@code processing.status} is {@code uploading} until the final part
+     * @return the asset; its {@code classification.status} is {@code uploading} until the final part
      */
     public Models.Asset uploadPart(Models.UploadPart options) { return uploadPart(options, null); }
 
@@ -1005,20 +1005,20 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @param text the text
      * @return the classified text asset
      */
-    public Models.Asset moderate(String text) { return moderate(new Models.ModerateText(text)); }
+    public Models.Asset classify(String text) { return classify(new Models.ClassifyText(text)); }
 
     /** @param options the text, name and metadata @return the classified text asset */
-    public Models.Asset moderate(Models.ModerateText options) { return moderate(options, null); }
+    public Models.Asset classify(Models.ClassifyText options) { return classify(options, null); }
 
     /**
      * @param options the text, name and metadata
      * @param requestOptions idempotency key and timeout for this call
      * @return the classified text asset
      */
-    public Models.Asset moderate(Models.ModerateText options, RequestOptions requestOptions) {
+    public Models.Asset classify(Models.ClassifyText options, RequestOptions requestOptions) {
       if (options == null || options.textValue() == null || options.textValue().isBlank())
-        throw payloadError("Text to moderate must be a non-empty string");
-      return assets.moderate(options.toSubmitAsset(), requestOptions);
+        throw payloadError("Text to classify must be a non-empty string");
+      return assets.classify(options.toSubmitAsset(), requestOptions);
     }
   }
 

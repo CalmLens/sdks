@@ -31,9 +31,9 @@ func main() {
         ProjectID: os.Getenv("CALMLENS_PROJECT_ID"),
     })
     if err != nil { log.Fatal(err) }
-    asset, err := client.Assets.Moderate(context.Background(), calmlens.SubmitAssetOptions{Name: "text", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("Great photo!")}, ExternalID: calmlens.Ptr("comment-42")})
+    asset, err := client.Assets.Classify(context.Background(), calmlens.SubmitAssetOptions{Name: "text", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("Great photo!")}, ExternalID: calmlens.Ptr("comment-42")})
     if err != nil { log.Fatal(err) }
-    fmt.Println(asset.Moderation.Status)
+    fmt.Println(asset.Classification.Moderation.Decision)
 }
 ```
 
@@ -74,7 +74,7 @@ Every request sends `User-Agent: calmlens-go/<Version> (<Go version>; <OS>/<arch
 
 | JavaScript | Go |
 | --- | --- |
-| `assets.create/moderate` | `Assets.Create/Moderate(ctx, SubmitAssetOptions)` |
+| `assets.create/classify` | `Assets.Create/Classify(ctx, SubmitAssetOptions)` |
 | `assets.retrieve/retry` | `Assets.Retrieve/Retry(ctx, AssetIDOptions)` |
 | `assets.waitForDecision` | `Assets.WaitForDecision(ctx, WaitForDecisionOptions)` |
 | `assets.update` | `Assets.Update(ctx, UpdateAssetOptions)` |
@@ -113,10 +113,10 @@ signed, err := client.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{
 })
 ```
 
-`Create` queues processing; `Text.Moderate` and `Assets.Moderate` wait for classification.
+`Create` queues processing; `Text.Classify` and `Assets.Classify` wait for classification.
 `WaitForDecision` retrieves an asset until its `Moderation.Status` is `approved` or `rejected`,
 or its `Processing.Status` is `failed`, and returns that asset, checking every few seconds. It
-returns `sdk/timeout`, with `Details` `{"assetId", "processingStatus", "moderationStatus"}`, if
+returns `sdk/timeout`, with `Details` `{"assetId", "classificationStatus", "moderationStatus"}`, if
 there is no decision within `Timeout` (default
 `DefaultDecisionTimeout`, 60s); cancel `ctx` to stop early (`sdk/cancelled`). Webhooks
 report decisions without polling:
@@ -124,7 +124,7 @@ report decisions without polling:
 ```go
 queued, err := client.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.jpg", Content: &calmlens.Content{Type: "image/jpeg", Data: file}})
 decided, err := client.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: 30 * time.Second})
-if err == nil && decided.Moderation.Status == calmlens.ModerationStatusRejected {
+if err == nil && decided.Classification.Moderation.Decision == calmlens.ModerationStatusRejected {
     hidePhoto(decided.ID)
 }
 ```
@@ -142,7 +142,7 @@ deduplicate batches/concurrent calls, and invalidate prior definitions by identi
 lazily:
 
 ```go
-it := client.Assets.ListAll(calmlens.ListAssetsOptions{PageSize: 100, Filter: calmlens.Ptr("moderation.status==approved")})
+it := client.Assets.ListAll(calmlens.ListAssetsOptions{PageSize: 100, Filter: calmlens.Ptr("classification.moderation.decision==approved")})
 for it.Next(ctx) {
     fmt.Println(it.Asset().ID)
 }
@@ -159,38 +159,30 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 }
 ```
 
-### Moderation results
+### Classification results
 
-`Assets.Moderate`, `Assets.Create`, and `Text.Moderate` return `(*calmlens.Asset, error)`.
+`Assets.Classify`, `Assets.Create`, and `Text.Classify` return `(*calmlens.Asset, error)`.
 `Asset` is a typed struct with exported Go field names (`ID`, `Processing`, `Moderation`,
 `Content`, ...); it decodes from, and marshals back to, the API's camelCase JSON keys (`id`,
 `processing`, `moderation`, `content`, ...). The state is in three nested structs:
 
-- `Processing` (`AssetProcessing`): `Status` is where the asset is in the pipeline
-  (`calmlens.ProcessingStatusUploading`, `ProcessingStatusProcessing`, `ProcessingStatusDone` or
-  `ProcessingStatusFailed`), with `UpdatedAt` and `UploadPartsReceived` for multipart uploads.
-- `Moderation` (`AssetModeration`): `Status` is the decision in force
-  (`ModerationStatusPending`, `ModerationStatusApproved` or `ModerationStatusRejected`; a
-  reviewer's decision takes precedence). `Action` is what the policy did with flagged content
-  (`alert`, `hide` or `purge`, `nil` when nothing was flagged), `Note` the automated rejection
-  reason, `ReviewerAction`, `ReviewerNote`, `ReviewerUserID` and `ReviewedAt` a reviewer's
-  decision, `DecidedAt` when the decision in force was made, and `Report` the moderation report.
+- `Upload` (`AssetUpload`): `Status` is `uploading` or `completed`; `PartsReceived` counts multipart parts while they arrive, and `UpdatedAt` records the latest upload state change.
+- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection` and `Labels` sit alongside `Moderation`, which holds `Decision`, `Action`, `Categories`, `Score`, `Timeline`, `Policy` and reviewer details. Reviewer actions do not change classification completion time.
 - `Content` (`AssetContent`): `Status` is whether CalmLens holds the content
   (`ContentStatusTemporary` until processing finishes, `ContentStatusStored` or
   `ContentStatusRemoved`, with `RemovalReason`), plus `Format` (MIME type), `Extension`,
   `SizeInBytes`, `Checksums`, `Image`, `PreviewImage`, `SafetyHold` and `ExtractedText`.
 
 Fields that may be missing are pointers, maps, or slices and are `nil` when absent:
-`Moderation.Report` is `nil` until classification finishes (always after `Create`, and after
-`Moderate` if processing failed), and optional fields such as `Content.SizeInBytes`,
-`FolderID`, `ExternalID`, `Description`, `Moderation.Action` and `Moderation.Note` are `nil`
+`Classification.Moderation.Categories` is `nil` until classification produces findings, and optional fields such as `Content.SizeInBytes`,
+`FolderID`, `ExternalID`, `Description`, `Classification.Moderation.Action` are `nil`
 when unset. Inside a report, `Categories` is keyed by category name and each
 `CategoryResult.Score` is `*float64`:
 
 ```go
-asset, err := client.Text.Moderate(ctx, calmlens.ModerateTextOptions{Text: comment})
+asset, err := client.Text.Classify(ctx, calmlens.ClassifyTextOptions{Text: comment})
 if err != nil { return err }
-if asset.Moderation.Status == calmlens.ModerationStatusApproved && asset.Moderation.Action == nil {
+if asset.Classification.Moderation.Decision == calmlens.ModerationStatusApproved && asset.Classification.Moderation.Action == nil {
     publish(comment)
 }
 ```
@@ -201,7 +193,7 @@ report `Labels` (`[]ClassificationLabel`) and category `Qualifiers`
 (`map[string]QualifierResult`, keyed by the `Qualifier...` constants). Enumerations such as
 the processing, moderation and content statuses, `Type`, `Visibility`, `Moderation.Action`,
 `Likelihood` and result `Status` are plain strings with exported constants
-(`ProcessingStatus...`, `ModerationStatus...`, `ContentStatus...`, `ContentRemovalReason...`,
+(`ClassificationStatus...`, `ModerationStatus...`, `ContentStatus...`, `ContentRemovalReason...`,
 `AssetType...`, `ModerationAction...`, `Likelihood...`, `ResultEvaluated`, `Category...`), so
 values added to the API later still decode; treat an unknown status as
 "not approved". `Asset`, reports, category results and events expose `Raw` with every field
@@ -213,7 +205,7 @@ reading it.
 Processing options are typed; unset fields are not sent:
 
 ```go
-asset, err := client.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{
+asset, err := client.Assets.Classify(ctx, calmlens.SubmitAssetOptions{
     Name:    "photo.jpg",
     Content: &calmlens.Content{Data: file, Type: "image/jpeg"},
     ProcessingOptions: &calmlens.ProcessingOptions{
@@ -264,13 +256,13 @@ Each non-final part must be at least 5MiB. Multipart images must total 10–20Mi
 direct images must be below 10MiB (enforced by the API). Split original bytes before
 base64 encoding chunks; `io.NewSectionReader` gives each part of a file without reading
 it into memory. Multipart readers require exact `SizeInBytes`. Send parts sequentially.
-The queue mode chosen when the upload started (`Create` queues, `Moderate` waits) is saved
+The queue mode chosen when the upload started (`Create` queues, `Classify` waits) is saved
 by CalmLens, so any client or process can send the remaining parts with only the asset ID;
 set `UploadAssetPartOptions.Queue` to override it for the final part.
 
 ## Upload presets
 
-Set `UploadPresetID` on `SubmitAssetOptions` (or `ModerateTextOptions`) to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.
+Set `UploadPresetID` on `SubmitAssetOptions` (or `ClassifyTextOptions`) to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.
 
 ```go
 signed, err := client.UploadTokens.Sign(ctx, calmlens.SignUploadTokenOptions{
@@ -289,7 +281,7 @@ The SDK retries, with jittered exponential backoff (0.5 s, 1 s, … up to 8 s), 
 `MaxRetries` times when it is safe to:
 
 - `GET` and `HEAD` requests, and
-- `Create`, `Moderate`, `Text.Moderate` and `UploadPart`, which always send an
+- `Create`, `Classify`, `Text.Classify` and `UploadPart`, which always send an
   `Idempotency-Key` header. The SDK generates one per call and reuses it for its own
   retries; CalmLens returns the saved response instead of running the request twice.
 
@@ -486,7 +478,7 @@ mock, err := calmlenstest.NewServerClient(calmlenstest.Options{
     Now: func() int64 { return 123 },
     CreateID: func() string { return "asset-1" },
 })
-asset, err := mock.Assets.Moderate(ctx, calmlens.SubmitAssetOptions{Name: "text", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("Hello")}})
+asset, err := mock.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("Hello")}})
 ```
 
 The mock embeds the real client and runs its validation, encoding and error handling
@@ -494,7 +486,7 @@ over an in-memory transport. Its `Options` accept the same `APIKey`, `ProjectID`
 `BaseURL`, `CDNBaseURL`, `Timeout` and `MaxRetries` as `calmlens.Options` (validated the
 same way), plus database/content storage, deterministic IDs/timestamps, upload outcomes
 (`QueuedOutcome`, default `OutcomePending`, for `Create`; `AnalyzedOutcome`, default
-`OutcomeApproved`, for `Moderate`; each `OutcomePending`, `OutcomeApproved`, `OutcomeRejected`
+`OutcomeApproved`, for `Classify`; each `OutcomePending`, `OutcomeApproved`, `OutcomeRejected`
 or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:
 
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
@@ -502,7 +494,7 @@ or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters 
 - `Assets.List` and `ListChildren` apply RSQL filters (`==`, `!=`, `=in=`, `=out=`,
   comparisons, `;`, `,`, parentheses), ordering, `FolderID` and paging.
 - `Assets.Search` matches keywords in name, ID, external ID, description and tags.
-- A decided upload finishes processing (`done`); like the API, its content is then removed
+- A decided upload finishes processing (`completed`); like the API, its content is then removed
   (`Content.Status` `removed`, `RemovalReason` `retention`) and no longer served unless the
   upload set `KeepContentAfterProcessing`. `Retry` needs failed processing and content that
   was not removed.
@@ -557,8 +549,8 @@ public tag and requests the version from the Go module proxy. It uses the SDK sy
 App; no Go registry token is needed.
 
 
-`Text.Moderate` is a convenience wrapper around asset moderation: it supplies `text/plain` content and defaults the asset name to `text`, returning the same `*calmlens.Asset` described under [Moderation results](#moderation-results). `assets.create` queues processing; `assets.moderate` waits for classification. The old asset analyze method is removed.
+`Text.Classify` is a convenience wrapper around asset moderation: it supplies `text/plain` content and defaults the asset name to `text`, returning the same `*calmlens.Asset` described under [Classification results](#moderation-results). `assets.create` queues processing; `assets.classify` waits for classification. The old asset analyze method is removed.
 
-Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
 Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.

@@ -11,7 +11,11 @@ const createClient = (projectId = "project-1") => {
     return Response.json(
       request.url.includes("/assets/page")
         ? page
-        : { id: "a", processing: { status: "uploading" }, moderation: { status: "pending" } },
+        : {
+            id: "a",
+            upload: { status: "uploading" },
+            classification: { status: "pending", moderation: { decision: "pending" } },
+          },
     );
   };
   const client = new CalmLensServerClient({

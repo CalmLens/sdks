@@ -40,7 +40,7 @@ fn serve_assets(count: usize, delay: Duration) -> (String, thread::JoinHandle<Ve
             let (_, body) = read_request(&mut stream);
             bodies.push(body);
             thread::sleep(delay);
-            let response = r#"{"id":"asset","processing":{"status":"done"},"moderation":{"status":"approved"}}"#;
+            let response = r#"{"id": "asset", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"decision": "approved"}}}"#;
             let _ = write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -64,12 +64,15 @@ async fn blocking_client_can_be_created_and_dropped_inside_tokio() {
         .unwrap();
     let worker_client = client.clone();
     let asset = tokio::task::spawn_blocking(move || {
-        worker_client.assets().moderate(SubmitAsset::text("hello"))
+        worker_client.assets().classify(SubmitAsset::text("hello"))
     })
     .await
     .unwrap()
     .unwrap();
-    assert_eq!(asset.moderation.status, AssetModerationStatus::Approved);
+    assert_eq!(
+        asset.classification.moderation.decision,
+        AssetModerationStatus::Approved
+    );
     drop(client);
     assert_eq!(worker.join().unwrap(), [b"hello".to_vec()]);
 
@@ -87,7 +90,7 @@ fn blocking_wait_for_decision_returns_a_failed_asset_as_decided() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Processing,
+            AssetClassificationStatus::Processing,
             AssetModerationStatus::Pending,
         ),
     );
@@ -95,7 +98,7 @@ fn blocking_wait_for_decision_returns_a_failed_asset_as_decided() {
         200,
         Asset::new(
             "asset-1",
-            AssetProcessingStatus::Failed,
+            AssetClassificationStatus::Failed,
             AssetModerationStatus::Pending,
         ),
     );
@@ -104,7 +107,10 @@ fn blocking_wait_for_decision_returns_a_failed_asset_as_decided() {
         .wait_for_decision(WaitForDecision::new("asset-1").timeout(Duration::from_secs(5)))
         .unwrap();
     assert_eq!(asset.id, "asset-1");
-    assert_eq!(asset.processing.status, AssetProcessingStatus::Failed);
+    assert_eq!(
+        asset.classification.status,
+        AssetClassificationStatus::Failed
+    );
     assert_eq!(mock.requests().len(), 2);
     assert!(mock
         .requests()
@@ -120,7 +126,7 @@ fn blocking_iterators_and_reads() {
         let mut page = AssetPage::new(
             vec![Asset::new(
                 "a",
-                AssetProcessingStatus::Done,
+                AssetClassificationStatus::Completed,
                 AssetModerationStatus::Approved,
             )],
             true,
@@ -133,7 +139,7 @@ fn blocking_iterators_and_reads() {
         AssetPage::new(
             vec![Asset::new(
                 "b",
-                AssetProcessingStatus::Done,
+                AssetClassificationStatus::Completed,
                 AssetModerationStatus::Approved,
             )],
             false,
@@ -249,14 +255,41 @@ async fn uploads_are_not_cut_off_by_the_api_call_timeout() {
 #[test]
 fn unknown_enum_values_and_fields_decode() {
     let asset: Asset = serde_json::from_str(
-        r#"{"id":"asset","visibility":"unlisted","newField":{"a":1},
-            "content":{"status":"temporary","extractedText":{"content":"document text"},"futureContent":true},
-            "moderation":{"status":"quarantined",
-            "report":{"labels":[{"description":"cat"}],"media":{"segments":[{"source":"frame"}]},"futureScore":2}}}"#,
+        r#"{
+  "id": "asset",
+  "visibility": "unlisted",
+  "newField": {
+    "a": 1
+  },
+  "content": {
+    "status": "temporary",
+    "extractedText": {
+      "content": "document text"
+    },
+    "futureContent": true
+  },
+  "classification": {
+    "moderation": { "futureScore": 2,
+      "decision": "quarantined",
+      "timeline": {
+        "segments": [
+          {
+            "source": "frame"
+          }
+        ]
+      }
+    },
+    "labels": [
+      {
+        "description": "cat"
+      }
+    ]
+  }
+}"#,
     )
     .unwrap();
     assert_eq!(
-        asset.moderation.status,
+        asset.classification.moderation.decision,
         AssetModerationStatus::Unknown("quarantined".into())
     );
     assert_eq!(
@@ -269,23 +302,23 @@ fn unknown_enum_values_and_fields_decode() {
         asset.content.extracted_text.unwrap().content.as_deref(),
         Some("document text")
     );
-    let report = asset.moderation.report.unwrap();
-    assert_eq!(report.labels.unwrap()[0].description, "cat");
-    assert_eq!(report.media.unwrap().segments[0].source, "frame");
+    let report = asset.classification.moderation;
+    assert_eq!(asset.classification.labels.unwrap()[0].description, "cat");
+    assert_eq!(report.timeline.unwrap().segments[0].source, "frame");
     assert_eq!(report.extra["futureScore"], 2);
     let round_trip = serde_json::to_value(Asset::new(
         "a",
-        AssetProcessingStatus::Done,
+        AssetClassificationStatus::Completed,
         AssetModerationStatus::Unknown("quarantined".into()),
     ))
     .unwrap();
     assert_eq!(
         (
-            &round_trip["processing"]["status"],
-            &round_trip["moderation"]["status"]
+            &round_trip["classification"]["status"],
+            &round_trip["classification"]["moderation"]["decision"]
         ),
         (
-            &serde_json::json!("done"),
+            &serde_json::json!("completed"),
             &serde_json::json!("quarantined")
         )
     );
@@ -315,16 +348,16 @@ fn processing_features_serialize_as_the_api_expects() {
 
 #[test]
 fn report_feature_results_decode() {
-    let report: ClassificationReport = serde_json::from_str(
-        r#"{"features":{
+    let report: AssetClassification = serde_json::from_str(
+        r#"{
             "personDetection":{"status":"not-evaluated","stage":"beta","reason":"not-supported"},
             "faceDetection":{"status":"evaluated","stage":"beta","faces":[
                 {"box":{"left":-0.02,"top":0.2,"width":0.3,"height":0.4},"confidence":0.99,"ageRange":{"low":21,"high":30}},
                 {"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"confidence":0.8}
-            ]}}}"#,
+            ]}}"#,
     )
     .unwrap();
-    let features = report.features.unwrap();
+    let features = report;
     let people = features.person_detection.unwrap();
     assert_eq!(people.status, Some(FeatureResultStatus::NotEvaluated));
     assert_eq!(people.reason, Some(FeatureNotEvaluatedReason::NotSupported));

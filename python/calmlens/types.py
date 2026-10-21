@@ -12,21 +12,21 @@ from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Unio
 __all__ = [
     "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "CategoryPolicyScore", "ReportPolicy",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "AssetModeration", "AssetModerationAction", "AssetModerationStatus", "AssetPage", "AssetProcessing",
-    "AssetProcessingStatus", "AssetReviewerAction", "AssetSearchMatch", "AssetSearchMatchField",
+    "AssetModeration", "AssetModerationAction", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
+    "AssetClassificationStatus", "AssetReviewerAction", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
-    "ClassificationCategory", "ClassificationLabel", "ClassificationReport", "Content", "CreateFolderOptions",
+    "ClassificationCategory", "ClassificationLabel", "Content", "CreateFolderOptions",
     "CustomTransform", "DetectedFace", "DetectedPerson", "EnsureLensesOptions",
     "EvaluatedCategoryResult", "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult",
     "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
-    "EventAssetProcessing", "EventFact", "EventFactKey", "EventFactValue",
+    "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExtractedText", "FaceDetectionFeatureOptions",
     "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "ImageData", "ImageTransform",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
-    "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ModerateTextOptions", "ModerationAction",
+    "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
     "ModerationQualifier", "MoveAssetOptions", "MoveFolderOptions", "NotEvaluatedCategoryResult",
     "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",
     "Ordering", "PartContent", "PartialCategoryResult", "PersonDetectionFeatureOptions", "PersonDetectionResult",
@@ -40,14 +40,14 @@ __all__ = [
 
 # ---- Enum-like values -----------------------------------------------------------------------
 
-#: Where an asset is in the pipeline (``processing.status``). New statuses may be added.
-AssetProcessingStatus = Union[Literal["uploading", "processing", "done", "failed"], str]
-#: The moderation decision in force (``moderation.status``). New statuses may be added; never
+#: Where an asset is in the pipeline (``classification.status``). New statuses may be added.
+AssetClassificationStatus = Union[Literal["pending", "processing", "completed", "failed"], str]
+#: The moderation decision in force (``classification.moderation.decision``). New statuses may be added; never
 #: treat an unknown one as approved.
 AssetModerationStatus = Union[Literal["pending", "approved", "rejected"], str]
-#: What the policy did with flagged content (``moderation.action``). New actions may be added.
+#: What the policy did with flagged content (``classification.moderation.action``). New actions may be added.
 AssetModerationAction = Union[Literal["alert", "hide", "purge"], str]
-#: A reviewer's decision (``moderation.reviewerAction``). New values may be added.
+#: A reviewer's decision (``classification.moderation.reviewerAction``). New values may be added.
 AssetReviewerAction = Union[Literal["approved", "rejected"], str]
 #: Whether CalmLens holds the content (``content.status``). New statuses may be added.
 AssetContentStatus = Union[Literal["temporary", "stored", "removed"], str]
@@ -104,7 +104,7 @@ CdnResource = Literal["content", "preview"]
 SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
 AssetSearchMatchField = Union[Literal["name", "id", "externalId", "description", "tags", "type", "content.format",
-                                      "content.extension", "moderation.status", "visual", "transcript"], str]
+                                      "content.extension", "classification.moderation.decision", "visual", "transcript"], str]
 #: State of the project's semantic search index. New values may be added.
 SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], str]
 #: Event types. New types may be added; ignore ones you don't handle.
@@ -183,7 +183,7 @@ class FlaggedContentPolicy(TypedDict):
 
 
 class OcrFeatureOptions(TypedDict):
-    """Extract image text into a child asset and moderate it as text."""
+    """Extract image text into a child asset and classify it as text."""
     enabled: bool
 
 
@@ -414,20 +414,6 @@ class ReportPolicy(_ReportPolicyRequired, total=False):
     decision: ReportPolicyDecision
 
 
-class _ClassificationReportRequired(TypedDict):
-    processedAt: int
-    categories: ClassificationCategories
-    score: float
-
-
-class ClassificationReport(_ClassificationReportRequired, total=False):
-    notes: Optional[str]
-    media: MediaClassificationReport
-    labels: Optional[list[ClassificationLabel]]
-    features: ProcessingFeatureResults
-    policy: ReportPolicy
-
-
 # ---- Assets -----------------------------------------------------------------------------------
 
 class Checksums(TypedDict, total=False):
@@ -478,30 +464,40 @@ class StoredExtractedText(TypedDict):
 ExtractedText = Union[InlineExtractedText, StoredExtractedText]
 
 
-class AssetProcessing(TypedDict):
-    """Processing state: ``uploading`` while content arrives, ``processing``, then ``done`` or
-    ``failed``."""
-    status: AssetProcessingStatus
-    #: When the processing status last changed, in milliseconds since the Unix epoch.
+class AssetUpload(TypedDict):
+    """Receiving content, including multipart progress."""
+    status: Literal["uploading", "completed"]
     updatedAt: Optional[int]
-    #: How many parts of a multipart upload have been received; ``None`` otherwise.
-    uploadPartsReceived: Optional[int]
+    partsReceived: Optional[int]
 
 
-class AssetModeration(TypedDict):
-    """Moderation state. ``status`` is the decision in force: a reviewer's decision takes
-    precedence over the automated one. ``action`` is what the policy did with flagged content
-    (``None`` when nothing was flagged) and is kept after a reviewer decides."""
-    status: AssetModerationStatus
+class _AssetModerationRequired(TypedDict):
+    decision: AssetModerationStatus
     action: Optional[AssetModerationAction]
     reviewerAction: Optional[AssetReviewerAction]
     reviewerNote: Optional[str]
     reviewerUserId: Optional[str]
-    #: When a reviewer decided, in milliseconds since the Unix epoch.
     reviewedAt: Optional[int]
-    #: When the decision in force was made, in milliseconds since the Unix epoch.
-    decidedAt: Optional[int]
-    report: Optional[ClassificationReport]
+
+
+class AssetModeration(_AssetModerationRequired, total=False):
+    categories: ClassificationCategories
+    score: float
+    timeline: MediaClassificationReport
+    policy: ReportPolicy
+
+
+class _AssetClassificationRequired(TypedDict):
+    status: AssetClassificationStatus
+    updatedAt: Optional[int]
+    completedAt: Optional[int]
+    moderation: AssetModeration
+
+
+class AssetClassification(_AssetClassificationRequired, total=False):
+    personDetection: PersonDetectionResult
+    faceDetection: FaceDetectionResult
+    labels: Optional[list[ClassificationLabel]]
 
 
 class AssetContent(TypedDict):
@@ -528,8 +524,8 @@ class _AssetRequired(TypedDict):
     name: str
     type: AssetType
     createdAt: int
-    processing: AssetProcessing
-    moderation: AssetModeration
+    upload: AssetUpload
+    classification: AssetClassification
     content: AssetContent
 
 
@@ -699,12 +695,17 @@ class EventFact(_EventFactRequired, total=False):
     url: str
 
 
-class EventAssetProcessing(TypedDict):
-    status: AssetProcessingStatus
+class EventAssetUpload(TypedDict):
+    status: Literal["uploading", "completed"]
+
+
+class EventAssetClassification(TypedDict):
+    status: AssetClassificationStatus
+    moderation: EventAssetModeration
 
 
 class EventAssetModeration(TypedDict):
-    status: AssetModerationStatus
+    decision: AssetModerationStatus
     action: Optional[AssetModerationAction]
 
 
@@ -714,8 +715,8 @@ class EventAssetContent(TypedDict):
 
 class _EventAssetRequired(TypedDict):
     id: str
-    processing: EventAssetProcessing
-    moderation: EventAssetModeration
+    upload: EventAssetUpload
+    classification: EventAssetClassification
     content: EventAssetContent
 
 
@@ -836,11 +837,11 @@ class CreateFolderOptions(_CreateFolderRequired, total=False):
     parentId: Optional[str]
 
 
-class _ModerateTextRequired(TypedDict):
+class _ClassifyTextRequired(TypedDict):
     text: str
 
 
-class ModerateTextOptions(_ModerateTextRequired, total=False):
+class ClassifyTextOptions(_ClassifyTextRequired, total=False):
     name: str
     description: str
     processingOptions: ProcessingOptions

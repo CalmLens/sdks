@@ -5,14 +5,14 @@ Ruby 3.1+ server-side client for CalmLens moderation, uploads, events, webhooks 
 ```ruby
 require 'calmlens'
 client = CalmLens::ServerClient.new(api_key: ENV.fetch('CALMLENS_API_KEY'), project_id: ENV.fetch('CALMLENS_PROJECT_ID'))
-result = client.assets.moderate(name: 'text', content: {plain_text: 'Hello world', type: 'text/plain'})
+result = client.assets.classify(name: 'text', content: {plain_text: 'Hello world', type: 'text/plain'})
 asset = client.assets.create(name: 'note.txt', content: {data: 'Hello', type: 'text/plain'})
 client.close
 ```
 
 Install from RubyGems: `gem install calmlens`, or add `gem "calmlens"` to your Gemfile. The gem has no runtime dependencies and ships YARD documentation and RBS signatures in `sig/` (see [Types](#types)).
 
-Resources cover every API operation: assets create/moderate/search/list/each/retrieve/wait_for_decision/update/retry/delete_content/delete/move/list_children/each_child/upload_part/create_signed_url; folders list/create/retrieve/update/move/delete; text moderation; events list/each/each_page; CDN URL building and serving; and `ensure_lens`/`ensure_lenses`. `CalmLens::VERSION` holds the gem version.
+Resources cover every API operation: assets create/classify/search/list/each/retrieve/wait_for_decision/update/retry/delete_content/delete/move/list_children/each_child/upload_part/create_signed_url; folders list/create/retrieve/update/move/delete; text moderation; events list/each/each_page; CDN URL building and serving; and `ensure_lens`/`ensure_lenses`. `CalmLens::VERSION` holds the gem version.
 
 ## Options
 
@@ -29,34 +29,34 @@ Any method also accepts `request_options:`:
 
 ## Types
 
-`sig/` holds RBS signatures for every public method, with record types for each option Hash and response (in `sig/types.rbs`): `CalmLens::asset` (with `asset_processing`, `asset_moderation` and `asset_content`), `classification_report` (categories, qualifiers, labels, media segments and `features` results), `processing_options_input`, `folder`, `lens`, `event`, `events_page`, `asset_page`, `asset_search_response`, `signed_url`, `webhook_event_data` and the rest. Steep and other RBS tools check your calls and the response keys you read:
+`sig/` holds RBS signatures for every public method, with record types for each option Hash and response (in `sig/types.rbs`): `CalmLens::asset` (with `asset_classification`, `asset_moderation` and `asset_content`), `classification_report` (categories, qualifiers, labels, media segments and `features` results), `processing_options_input`, `folder`, `lens`, `event`, `events_page`, `asset_page`, `asset_search_response`, `signed_url`, `webhook_event_data` and the rest. Steep and other RBS tools check your calls and the response keys you read:
 
 ```ruby
-asset = client.text.moderate(text: 'Hello', processing_options: { features: { face_detection: { enabled: true } } })
-asset['moderation']['status']                                              # CalmLens::asset_moderation_status
+asset = client.text.classify(text: 'Hello', processing_options: { features: { face_detection: { enabled: true } } })
+asset['classification']['moderation']['decision']                                              # CalmLens::asset_moderation_status
 asset.dig('moderation', 'report', 'features', 'faceDetection', 'faces')    # Array[CalmLens::detected_face]?
 ```
 
 The signatures describe snake_case Symbol option keys; camelCase and String keys still work at runtime but are not typed. Results whose fields depend on `status` (category, qualifier and feature results) are typed as one record with those fields optional: check `status`, then read `score` or `reason`. `metadata` values and API error `details` are any JSON (`CalmLens::json_value`).
 
-## Moderation results
+## Classification results
 
-`assets.moderate` and `text.moderate` return the asset, whose state is in three parts:
+`assets.classify` and `text.classify` return the asset, whose state is in three parts:
 
-- `processing`: `status` is `uploading`, `processing`, `done` or `failed` (retry with `assets.retry`), with `updatedAt` and, during a multipart upload, `uploadPartsReceived`.
-- `moderation`: `status` is the decision in force, `pending`, `approved` or `rejected` (a reviewer's decision wins over the automated one). `action` is what your policy did with flagged content (`alert`, `hide` or `purge`), or nil when nothing was flagged; it stays after a reviewer decides. `note` explains an automated rejection; `reviewerAction`, `reviewerNote`, `reviewerUserId` and `reviewedAt` describe a review; `decidedAt` is when the decision in force was made; `report` is the moderation report.
+- `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `decision` (`pending`, `approved` or `rejected`), `action`, category scores, policy assessment, an optional `timeline` and reviewer details. A reviewer decision does not change `completedAt`.
 - `content`: `status` is `temporary` (held until processing finishes), `stored` (kept with `keep_content_after_processing: true`) or `removed`, with `removalReason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`). It also holds `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image`, `previewImage`, `extractedText` and `safetyHold`.
 
-Publish only when `asset['moderation']['status']` is `approved` and `asset['moderation']['action']` is nil. New statuses, visibilities and fields may appear in later API versions: the SDK returns them unchanged, so treat any value you do not recognise as not ready.
+Publish only when `asset['classification']['moderation']['decision']` is `approved` and `asset['classification']['moderation']['action']` is nil. New statuses, visibilities and fields may appear in later API versions: the SDK returns them unchanged, so treat any value you do not recognise as not ready.
 
 ### Waiting for a decision
 
-`assets.wait_for_decision` waits for a queued asset's decision and returns the asset once `moderation.status` is `approved` or `rejected`, or `processing.status` is `failed`. It retrieves the asset every few seconds and raises `CalmLens::TimeoutError` with code `sdk/timeout` if there's no decision within `timeout:` seconds (default 60); `details` holds `'assetId'` and the last `'processingStatus'` and `'moderationStatus'`. Use it after `assets.create`, or with an asset ID you stored earlier. Webhooks report decisions without polling.
+`assets.wait_for_decision` waits for a queued asset's decision and returns the asset once `classification.moderation.decision` is `approved` or `rejected`, or `classification.status` is `failed`. It retrieves the asset every few seconds and raises `CalmLens::TimeoutError` with code `sdk/timeout` if there's no decision within `timeout:` seconds (default 60); `details` holds `'assetId'` and the last `'classificationStatus'` and `'moderationStatus'`. Use it after `assets.create`, or with an asset ID you stored earlier. Webhooks report decisions without polling.
 
 ```ruby
 queued = client.assets.create(name: 'photo.jpg', content: {data: File.open('photo.jpg', 'rb'), type: 'image/jpeg'})
 decided = client.assets.wait_for_decision(asset_id: queued['id'], timeout: 30)
-hide_photo(decided['id']) if decided['moderation']['status'] == 'rejected'
+hide_photo(decided['id']) if decided['classification']['moderation']['decision'] == 'rejected'
 ```
 
 `timeout:` covers the whole wait; `request_options: {timeout:}` still limits each request. The call only sleeps and sends requests, so you can stop it early by stopping its thread.
@@ -71,7 +71,7 @@ File.open('video.mp4', 'rb') do |file|
 end
 ```
 
-Multipart uploads start with `part:` on `create`/`moderate` and continue with `upload_part`. The queue mode chosen at the start is saved with the upload, so later parts can come from another process; pass `queue:` to `upload_part` only to override it. Pass `total_size_in_bytes:` at the start when you know the file size. See [Multipart uploads](https://calmlens.com/docs/guides/multipart-uploads).
+Multipart uploads start with `part:` on `create`/`classify` and continue with `upload_part`. The queue mode chosen at the start is saved with the upload, so later parts can come from another process; pass `queue:` to `upload_part` only to override it. Pass `total_size_in_bytes:` at the start when you know the file size. See [Multipart uploads](https://calmlens.com/docs/guides/multipart-uploads).
 
 `cdn.serve` fetches content with the API key. With a block it yields a `CalmLens::Response` whose body streams; without one it returns the response with the body read. Error statuses are returned, not raised.
 
@@ -96,7 +96,7 @@ client.cdn.get_asset_url(asset_identifier: asset_id, transform: {type: 'imageTra
 
 ## Upload presets
 
-Pass `upload_preset_id:` to `assets.create` or `assets.moderate` to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.
+Pass `upload_preset_id:` to `assets.create` or `assets.classify` to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.
 
 ```ruby
 signed = client.upload_tokens.sign(
@@ -111,7 +111,7 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets). `CalmLens
 
 ## Pagination
 
-`assets.each`, `assets.each_child`, `events.each` and `events.each_page` fetch pages as you iterate and return an Enumerator without a block, so `client.assets.each(filter: 'moderation.status==approved').lazy.first(5)` stops after the pages it needs.
+`assets.each`, `assets.each_child`, `events.each` and `events.each_page` fetch pages as you iterate and return an Enumerator without a block, so `client.assets.each(filter: 'classification.moderation.decision==approved').lazy.first(5)` stops after the pages it needs.
 
 ## Events feed
 
@@ -200,10 +200,10 @@ Reuse one client: it keeps up to 8 idle keep-alive connections per host, is safe
 ```ruby
 require 'calmlens/testing'
 mock = CalmLens::MockServerClient.new
-asset = mock.assets.moderate(name: 'note', content: {plain_text: 'hello', type: 'text/plain'},
+asset = mock.assets.classify(name: 'note', content: {plain_text: 'hello', type: 'text/plain'},
                              processing_options: {keep_content_after_processing: true})
 mock.assets.retrieve(asset_id: asset['id']).dig('moderation', 'status') # => "approved"
-mock.assets.list(filter: 'moderation.status==approved')['items'].length        # => 1
+mock.assets.list(filter: 'classification.moderation.decision==approved')['items'].length        # => 1
 mock.cdn.serve(asset_identifier: asset['id']).body                      # => "hello"
 
 mock.enqueue(status: 503, body: {code: 'server/unavailable', message: 'Busy'}) # answers the next request
@@ -215,12 +215,12 @@ request.method # => "GET"
 request.path   # => "/assets/project-1/<id>/content" (relative to base_url or cdn_base_url)
 ```
 
-`MockServerClient` runs the real client's validation, encoding, retries and error handling, then answers from an in-memory stand-in for the API and CDN. Uploads create assets you can retrieve, list, search, move and delete, and `assets.wait_for_decision` checks the stored asset's processing and moderation status; folders, multipart uploads, idempotency keys, lenses and the events feed behave like the API's; errors carry the API's codes, HTTP statuses and body shape; and `cdn.serve` returns stored bytes with real headers. Like the API, content is removed (`removalReason` `retention`) once processing is `done` unless the upload sets `keep_content_after_processing: true`. List filters support `==` and `!=` (with `*` wildcards) joined by `;` and `,`, on top-level and nested names such as `moderation.status`, `processing.status`, `content.status` and `content.format`; other RSQL operators raise rather than being ignored. It does not classify content: `moderate` gives `analyzed_outcome:` and `create` gives `queued_outcome:`. An outcome is `pending` (still processing), `approved` or `rejected` (processing done with that decision) or `failed` (processing failed, retryable). `analyzed_outcome:` can also be fields to deep-merge into the asset, such as `{'moderation' => {'status' => 'rejected', 'action' => 'hide'}}` (the outcome follows `moderation.status`), or a callable that receives the asset and returns either. Change records through `mock.state` to arrange a test. Queued responses and errors are used first, in order.
+`MockServerClient` runs the real client's validation, encoding, retries and error handling, then answers from an in-memory stand-in for the API and CDN. Uploads create assets you can retrieve, list, search, move and delete, and `assets.wait_for_decision` checks the stored asset's processing and moderation status; folders, multipart uploads, idempotency keys, lenses and the events feed behave like the API's; errors carry the API's codes, HTTP statuses and body shape; and `cdn.serve` returns stored bytes with real headers. Like the API, content is removed (`removalReason` `retention`) once classification is `completed` unless the upload sets `keep_content_after_processing: true`. List filters support `==` and `!=` (with `*` wildcards) joined by `;` and `,`, on top-level and nested names such as `classification.moderation.decision`, `classification.status`, `content.status` and `content.format`; other RSQL operators raise rather than being ignored. It does not classify content: `classify` gives `analyzed_outcome:` and `create` gives `queued_outcome:`. An outcome is `pending` (still processing), `approved` or `rejected` (processing done with that decision) or `failed` (processing failed, retryable). `analyzed_outcome:` can also be fields to deep-merge into the asset, such as `{'moderation' => {'status' => 'rejected', 'action' => 'hide'}}` (the outcome follows `classification.moderation.decision`), or a callable that receives the asset and returns either. Change records through `mock.state` to arrange a test. Queued responses and errors are used first, in order.
 
 ## Development
 
 Native tests (Ruby 3.1+, Bundler 2.6+): `bundle install && bundle exec ruby -Ilib -e 'Dir["test/*_test.rb"].each { |file| require_relative file }'`, and lint with `bundle exec rubocop`. `lib/calmlens/error_codes.rb` and the files in `testdata/` are generated by `bun packages/sdk-contract/generate.ts` from the repository root. Container/backend checks: `bun run test:sdk:e2e`. Type-check the signatures with `gem install steep && steep check` (see `Steepfile`) and `rbs -I sig validate`. Release by setting `CalmLens::VERSION` in `lib/calmlens/version.rb`.
 
-Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `moderation.report`; removing its content also removes the extracted text.
+Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
 Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.

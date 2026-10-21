@@ -120,8 +120,14 @@ fn the_blocking_and_mock_clients_sign_with_their_own_key() {
 #[tokio::test]
 async fn upload_preset_id_is_sent_as_a_query_parameter_and_in_url_bodies() {
     let mock = MockServerClient::new().unwrap();
-    mock.enqueue(200, json!({"id": "a", "moderation": {"status": "pending"}}));
-    mock.enqueue(200, json!({"id": "b", "moderation": {"status": "pending"}}));
+    mock.enqueue(
+        200,
+        json!({"id": "a", "classification": {"moderation": {"decision": "pending"}}}),
+    );
+    mock.enqueue(
+        200,
+        json!({"id": "b", "classification": {"moderation": {"decision": "pending"}}}),
+    );
     mock.assets()
         .create(SubmitAsset {
             upload_preset_id: Some("preset-1".into()),

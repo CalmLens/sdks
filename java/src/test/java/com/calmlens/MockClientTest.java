@@ -54,8 +54,8 @@ class MockClientTest {
         .enqueue("GET", "/assets/asset-1", 200, Fixtures.asset("asset-1", "failed", "pending"));
     Models.Asset asset = decided.client.assets.waitForDecision(new Models.WaitForDecision("asset-1"));
     assertEquals("asset-1", asset.id());
-    assertSame(Models.AssetProcessingStatus.FAILED, asset.processing().status());
-    assertSame(Models.AssetModerationStatus.PENDING, asset.moderation().status());
+    assertSame(Models.AssetClassificationStatus.FAILED, asset.classification().status());
+    assertSame(Models.AssetModerationStatus.PENDING, asset.classification().moderation().decision());
     assertEquals(2, decided.requests().size());
     assertEquals(0, decided.remainingResponses());
 
@@ -67,16 +67,16 @@ class MockClientTest {
         () -> pending.client.assets.waitForDecision(new Models.WaitForDecision("asset-1").timeout(Duration.ofSeconds(10))));
     assertTrue(Duration.ofNanos(System.nanoTime() - started).compareTo(Duration.ofSeconds(5)) < 0);
     assertEquals(ErrorCodes.SDK_TIMEOUT, error.getCode());
-    assertEquals(Map.of("assetId", "asset-1", "processingStatus", "processing", "moderationStatus", "pending"), error.getDetails());
+    assertEquals(Map.of("assetId", "asset-1", "classificationStatus", "processing", "moderationStatus", "pending"), error.getDetails());
     assertEquals(7, pending.requests().size());
     assertEquals(1, pending.remainingResponses());
   }
 
   @Test void mocksRetryLikeTheRealClientWithoutWaiting() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueueError(ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS)
-        .enqueue(200, Fixtures.asset("asset-1", "done", "approved"));
+        .enqueue(200, Fixtures.asset("asset-1", "completed", "approved"));
     long started = System.nanoTime();
-    assertEquals("asset-1", mock.client.text.moderate("hello").id());
+    assertEquals("asset-1", mock.client.text.classify("hello").id());
     assertTrue(Duration.ofNanos(System.nanoTime() - started).compareTo(Duration.ofMillis(900)) < 0);
     assertEquals(2, mock.requests().size());
     assertEquals(mock.requests().get(0).header("Idempotency-Key"), mock.requests().get(1).header("Idempotency-Key"));
@@ -121,8 +121,8 @@ class MockClientTest {
         "personDetection", Map.of("status", "evaluated", "stage", "beta", "people", List.of(Map.of("box", box, "confidence", 0.9))),
         "faceDetection", Map.of("status", "not-evaluated", "stage", "beta", "reason", "unavailable")));
     MockCalmLensServerClient mock = new MockCalmLensServerClient()
-        .enqueue(200, withReport(Fixtures.asset("asset-1", "done", "approved"), report))
-        .enqueue(200, withReport(Fixtures.asset("asset-2", "done", "approved"), Map.of("features", Map.of(
+        .enqueue(200, withReport(Fixtures.asset("asset-1", "completed", "approved"), report))
+        .enqueue(200, withReport(Fixtures.asset("asset-2", "completed", "approved"), Map.of("features", Map.of(
             "faceDetection", Map.of("status", "evaluated", "stage", "beta", "faces",
                 List.of(Map.of("box", box, "confidence", 0.99, "ageRange", Map.of("low", 21, "high", 30))))))));
     Models.ProcessingOptions options = new Models.ProcessingOptions().keepContentAfterProcessing(false)
@@ -130,32 +130,32 @@ class MockClientTest {
             .ocr(new Models.FeatureOptions().enabled(true))
             .personDetection(new Models.FeatureOptions(true))
             .faceDetection(new Models.FaceDetectionOptions().enabled(true).ageEstimation(true)));
-    Models.Asset asset = mock.client.assets.moderate(new Models.SubmitAsset("photo.png", Models.Content.bytes(new byte[] {1}, "image/png"))
+    Models.Asset asset = mock.client.assets.classify(new Models.SubmitAsset("photo.png", Models.Content.bytes(new byte[] {1}, "image/png"))
         .processingOptions(options));
     assertEquals(
         com.google.gson.JsonParser.parseString("{\"keepContentAfterProcessing\":false,\"features\":{\"ocr\":{\"enabled\":true},"
             + "\"personDetection\":{\"enabled\":true},\"faceDetection\":{\"enabled\":true,\"ageEstimation\":true}}}"),
         com.google.gson.JsonParser.parseString(mock.requests().get(0).query().get("processingOptions")));
 
-    Models.PersonDetectionResult people = asset.moderation().report().features().personDetection();
+    Models.PersonDetectionResult people = asset.classification().personDetection();
     assertEquals("evaluated", people.status());
     assertEquals("beta", people.stage());
     assertEquals(new Models.DetectedPerson(new Models.BoundingBox(0.1, 0.2, 0.3, 0.4), 0.9), people.people().get(0));
     assertEquals(1, people.people().size());
-    Models.FaceDetectionResult skipped = asset.moderation().report().features().faceDetection();
+    Models.FaceDetectionResult skipped = asset.classification().faceDetection();
     assertEquals("not-evaluated", skipped.status());
     assertEquals("unavailable", skipped.reason());
     assertNull(skipped.faces());
 
     Models.Asset faces = mock.client.assets.retrieve(new Models.AssetId("asset-2"));
-    assertNull(faces.moderation().report().features().personDetection());
+    assertNull(faces.classification().personDetection());
     assertEquals(List.of(new Models.DetectedFace(new Models.BoundingBox(0.1, 0.2, 0.3, 0.4), 0.99, new Models.AgeRange(21, 30))),
-        faces.moderation().report().features().faceDetection().faces());
+        faces.classification().faceDetection().faces());
   }
 
   @Test void deleteContentThenDeleteAsset() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient()
-        .enqueue(200, removedContent(Fixtures.asset("asset 1", "done", "approved")))
+        .enqueue(200, removedContent(Fixtures.asset("asset 1", "completed", "approved")))
         .enqueue(200, Map.of());
     Models.Asset removed = mock.client.assets.deleteContent(new Models.AssetId("asset 1"));
     assertSame(Models.AssetContentStatus.REMOVED, removed.content().status());
@@ -179,30 +179,33 @@ class MockClientTest {
 
     var refused = new java.net.ConnectException("Connection refused");
     mock.enqueueFailure(refused).enqueueTimeout();
-    assertSame(refused, assertThrows(TransportException.class, () -> mock.client.text.moderate("hello")).getCause());
-    assertInstanceOf(RequestTimeoutException.class, assertThrows(CalmLensException.class, () -> mock.client.text.moderate("hello")));
+    assertSame(refused, assertThrows(TransportException.class, () -> mock.client.text.classify("hello")).getCause());
+    assertInstanceOf(RequestTimeoutException.class, assertThrows(CalmLensException.class, () -> mock.client.text.classify("hello")));
 
     mock.enqueueEvents("c1", false);
     assertEquals("c1", mock.client.events.list(new Models.ListEvents().after("c0").limit(10)).cursor());
-    var moderate = mock.requests().get(0);
-    assertEquals("POST", moderate.method());
-    assertEquals("/v1/projects/project-9/assets", moderate.path());
-    assertEquals("content", moderate.header("x-calmlens-upload"));
-    assertEquals("false", moderate.query().get("queue"));
-    assertEquals("hello", moderate.bodyText());
-    assertEquals("ignored-key", moderate.header("x-api-key"));
-    assertFalse(moderate.toString().contains("ignored-key"));
+    var classify = mock.requests().get(0);
+    assertEquals("POST", classify.method());
+    assertEquals("/v1/projects/project-9/assets", classify.path());
+    assertEquals("content", classify.header("x-calmlens-upload"));
+    assertEquals("false", classify.query().get("queue"));
+    assertEquals("hello", classify.bodyText());
+    assertEquals("ignored-key", classify.header("x-api-key"));
+    assertFalse(classify.toString().contains("ignored-key"));
     var events = mock.requests().get(2);
     assertEquals("/v1/projects/project-9/events", events.path());
     assertEquals(Map.of("after", "c0", "limit", "10"), events.query());
     assertNull(events.bodyText());
-    byte[] captured = moderate.body();
+    byte[] captured = classify.body();
     captured[0] = 0;
     assertEquals("hello", new String(mock.requests().get(0).body(), StandardCharsets.UTF_8));
   }
 
   private static Map<String, Object> withReport(Map<String, Object> asset, Map<String, Object> report) {
-    asset.put("moderation", Map.of("status", "approved", "report", report));
+    Map<String, Object> classification = new java.util.LinkedHashMap<>((Map<String, Object>) asset.get("classification"));
+    classification.put("moderation", Map.of("decision", "approved"));
+    if (report.containsKey("features")) classification.putAll((Map<String, Object>) report.get("features"));
+    asset.put("classification", classification);
     return asset;
   }
 

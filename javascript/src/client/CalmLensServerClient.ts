@@ -24,6 +24,7 @@ import type {
   CalmLensServerClientOptions,
   CdnAssetUrlOptions,
   CdnServeOptions,
+  ClassifyTextOptions,
   CreateAssetSignedUrlOptions,
   CreateFolderOptions,
   DeleteAssetContentOptions,
@@ -39,7 +40,6 @@ import type {
   ListAssetsOptions,
   ListEventsOptions,
   ListFoldersOptions,
-  ModerateTextOptions,
   MoveAssetOptions,
   MoveFolderOptions,
   RequestOptions,
@@ -240,8 +240,8 @@ export default class CalmLensServerClient {
        * Moderates text and waits for the decision. Sends `text` as `text/plain` content named
        * `text` unless you pass `name`.
        */
-      moderate: async (options: ModerateTextOptions): Promise<Asset> =>
-        this.buildAssets().moderate(toTextAssetOptions(options)),
+      classify: async (options: ClassifyTextOptions): Promise<Asset> =>
+        this.buildAssets().classify(toTextAssetOptions(options)),
     };
   }
 
@@ -287,7 +287,7 @@ export default class CalmLensServerClient {
       iterate: (options: IterateAssetsOptions = {}): AsyncGenerator<Asset, void, undefined> =>
         this.iteratePages((cursor) => this.buildAssets().list({ ...options, cursor })),
 
-      /** Retrieves an asset with its status and moderation report. */
+      /** Retrieves an asset with its status and classification results. */
       retrieve: async ({ assetId }: RetrieveAssetOptions): Promise<Asset> =>
         this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`),
 
@@ -325,14 +325,14 @@ export default class CalmLensServerClient {
        * Uploads an asset and waits for its moderation decision. Audio and video still finish
        * in the background. Retried safely with an `Idempotency-Key`.
        */
-      moderate: async (options: SubmitAssetOptions): Promise<Asset> => {
+      classify: async (options: SubmitAssetOptions): Promise<Asset> => {
         if (
           options &&
           "content" in options &&
           "plainText" in options.content &&
           (typeof options.content.plainText !== "string" || !options.content.plainText.trim())
         ) {
-          throw invalidPayload("Text to moderate must be a non-empty string");
+          throw invalidPayload("Text to classify must be a non-empty string");
         }
         return this.submitAsset(options, false);
       },
@@ -374,7 +374,7 @@ export default class CalmLensServerClient {
         }),
 
       /**
-       * Processes an asset that failed (processing status `failed`) again. It returns to
+       * Processes an asset that failed (classification status `failed`) again. It returns to
        * `processing` and is
        * moderated like a new upload; its content must still be stored.
        */
@@ -382,8 +382,8 @@ export default class CalmLensServerClient {
         this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/retry`),
 
       /**
-       * Waits until an asset's `moderation.status` is `approved` or `rejected`, or its
-       * `processing.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
+       * Waits until an asset's `classification.moderation.decision` is `approved` or `rejected`, or its
+       * `classification.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
        * decision within `timeoutMs` (default 60000). Webhooks report decisions without polling.
        */
       waitForDecision: async ({
@@ -397,7 +397,7 @@ export default class CalmLensServerClient {
 
       /**
        * Removes an asset's stored content (source, preview and retained extracted text) while
-       * keeping the asset record, metadata and moderation report. The returned asset has
+       * keeping the asset record, metadata and classification results. The returned asset has
        * `storageDeletedAt` set; the CDN no longer serves it.
        */
       deleteContent: async ({ assetId }: DeleteAssetContentOptions): Promise<Asset> =>
