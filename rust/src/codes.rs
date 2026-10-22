@@ -90,7 +90,7 @@ error_codes! {
     UploadPresetContentTypeNotAllowed = "upload-preset/content-type-not-allowed", 415;
     /// `upload-preset/too-large` (HTTP 413): This file is larger than the upload preset allows.
     UploadPresetTooLarge = "upload-preset/too-large", 413;
-    /// `upload-preset/daily-limit-reached` (HTTP 429): This upload preset has reached its daily upload limit. Try again after midnight UTC, or raise the limit in the portal.
+    /// `upload-preset/daily-limit-reached` (HTTP 429): You have reached this upload preset's daily upload limit. Try again after midnight UTC.
     UploadPresetDailyLimitReached = "upload-preset/daily-limit-reached", 429;
     /// `upload-preset/origin-not-allowed` (HTTP 403): This site isn't allowed to upload through this upload preset.
     UploadPresetOriginNotAllowed = "upload-preset/origin-not-allowed", 403;

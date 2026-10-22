@@ -517,7 +517,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	UPLOAD_PRESET_DAILY_LIMIT_REACHED: new ErrorCode({
 		id: "upload-preset/daily-limit-reached",
-		defaultMessage: "This upload preset has reached its daily upload limit. Try again after midnight UTC, or raise the limit in the portal.",
+		defaultMessage: "You have reached this upload preset's daily upload limit. Try again after midnight UTC.",
 		status: 429
 	}),
 	UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: new ErrorCode({

@@ -995,7 +995,7 @@ const USAGE_SPEND_LIMIT_REACHED = defineEventType({
 const UPLOAD_PRESET_DAILY_LIMIT_REACHED = defineEventType({
 	id: "upload-preset.daily-limit-reached",
 	name: "Preset daily limit reached",
-	description: "An upload preset used its daily upload allowance; its uploads pause until it resets.",
+	description: "A client reached an upload preset's daily upload limit; that client's uploads pause until it resets.",
 	category: "usage",
 	severity: "low",
 	notify: false,
