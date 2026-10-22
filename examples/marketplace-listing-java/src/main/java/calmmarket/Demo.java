@@ -86,7 +86,7 @@ final class Demo implements Calmmarket.Backend {
   }
 
   @Override public CalmLensServerClient textAsset(String assetId, String externalId, boolean flagged) {
-    return mock().enqueue(200, asset(assetId, "approved", externalId, flagged ? "alert" : null, null)).client;
+    return mock().enqueue(200, asset(assetId, "approved", externalId, flagged ? "flag" : null, null)).client;
   }
 
   @Override public CalmLensServerClient contentRemoval(String assetId) {

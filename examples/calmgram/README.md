@@ -14,7 +14,7 @@ people can see it.
   served and resized by the CalmLens CDN.
 - **Captions, comments and bios** are checked before they're saved. Rejected text is never shown,
   and the author is told why.
-- **Borderline content** that your policy marks "alert" is published but lands in a **moderation
+- **Borderline content** that your policy flags is published but lands in a **moderation
   queue** for a human to look at.
 
 Try it at **[example.calmlens.com](https://example.calmlens.com)**. It's a single Cloudflare Worker

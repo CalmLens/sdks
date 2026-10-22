@@ -99,7 +99,7 @@ type EventAssetClassification struct {
 // created.
 type EventAssetModeration struct {
 	Decision string `json:"decision"`
-	// Action is ModerationActionAlert, ModerationActionHide or ModerationActionPurge, or nil
+	// Action is ModerationActionFlag, ModerationActionHide or ModerationActionPurge, or nil
 	// when nothing was flagged.
 	Action *string `json:"action"`
 }
@@ -231,7 +231,7 @@ const (
 // AssetDecisionFacts are the facts of EventAssetApproved and EventAssetRejected, which report the
 // asset's outcome whether automated moderation or a reviewer decided it. DecidedBy is
 // DecidedByAutomated or DecidedByReviewer. ModerationAction is the action applied to flagged
-// content ("alert", "hide" or "purge"), or nil when nothing was flagged or a reviewer decided.
+// content ("flag", "hide" or "purge"), or nil when nothing was flagged or a reviewer decided.
 // ReviewerUserID, ReviewerName and Note are set only for reviewer decisions; ReviewerUserID is nil
 // when an API key made the decision, and ReviewerName stays in the portal and is nil on webhook
 // deliveries.

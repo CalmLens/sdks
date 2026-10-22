@@ -16,7 +16,7 @@ const IMAGE_DELAY_MS = 2500;
 const DEMO_ASSET_TTL_SECONDS = 2 * 24 * 60 * 60;
 
 // [pattern, category, score]. Scores ≥ 0.8 are rejected ("hide"); 0.5–0.8 are approved
-// but flagged ("alert"), mirroring the two outcomes a real CalmLens policy can produce.
+// but flagged ("flag"), mirroring the two outcomes a real CalmLens policy can produce.
 const TEXT_RULES: Array<[RegExp, string, number]> = [
   [/\b(i('| wi)ll|gonna) (kill|hurt) you\b/i, "violence", 0.93],
   [/\bkys\b|\bkill yourself\b/i, "harassment", 0.96],

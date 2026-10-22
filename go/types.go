@@ -84,11 +84,11 @@ const (
 )
 
 // Moderation action values. FlaggedContentPolicy.Action takes any of them; AssetModeration.Action,
-// EventAssetModeration.Action and the moderation-action fact are ModerationActionAlert,
-// ModerationActionHide or ModerationActionPurge (an ignored match leaves them nil).
+// EventAssetModeration.Action and the moderation-action fact are ModerationActionFlag,
+// ModerationActionHide or ModerationActionPurge (an allowed match leaves them nil).
 const (
-	ModerationActionIgnore = "ignore"
-	ModerationActionAlert  = "alert"
+	ModerationActionAllow = "allow"
+	ModerationActionFlag  = "flag"
 	ModerationActionHide   = "hide"
 	ModerationActionPurge  = "purge"
 )

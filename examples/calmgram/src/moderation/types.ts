@@ -28,7 +28,7 @@ export interface ModerationOutcome {
    * `pending` → still being classified. `error` → classification failed; treat as not shown.
    */
   status: ModerationStatus;
-  /** `true` on an approved item means the policy chose "alert": publish, but queue for review. */
+  /** `true` on an approved item means the policy chose "flag": publish, but queue for review. */
   flagged: boolean;
   /** Evaluated categories, highest score first. */
   findings: CategoryFinding[];

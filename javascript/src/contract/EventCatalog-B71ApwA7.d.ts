@@ -142,7 +142,7 @@ declare const EVENT_TYPE_INFO: {
       }>>>>;
       flaggedCategories: EventFieldDefinition<zod.ZodArray<zod.ZodString>>;
       moderationAction: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
+        flag: "flag";
         hide: "hide";
         purge: "purge";
       }>>>>;
@@ -152,7 +152,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       flaggedCategories: string[];
-      moderationAction?: "alert" | "hide" | "purge" | null | undefined;
+      moderationAction?: "flag" | "hide" | "purge" | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -183,7 +183,7 @@ declare const EVENT_TYPE_INFO: {
       }>>>;
       flaggedCategories: zod.ZodArray<zod.ZodString>;
       moderationAction: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
+        flag: "flag";
         hide: "hide";
         purge: "purge";
       }>>>;
@@ -220,7 +220,7 @@ declare const EVENT_TYPE_INFO: {
         reviewer: "reviewer";
       }>>;
       moderationAction: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
+        flag: "flag";
         hide: "hide";
         purge: "purge";
       }>>>>;
@@ -238,7 +238,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       decidedBy: "automated" | "reviewer";
-      moderationAction?: "alert" | "hide" | "purge" | null | undefined;
+      moderationAction?: "flag" | "hide" | "purge" | null | undefined;
       reviewAction?: "approve" | "hide" | "purge" | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
@@ -276,7 +276,7 @@ declare const EVENT_TYPE_INFO: {
         reviewer: "reviewer";
       }>;
       moderationAction: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
+        flag: "flag";
         hide: "hide";
         purge: "purge";
       }>>>;
@@ -321,7 +321,7 @@ declare const EVENT_TYPE_INFO: {
         reviewer: "reviewer";
       }>>;
       moderationAction: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
+        flag: "flag";
         hide: "hide";
         purge: "purge";
       }>>>>;
@@ -339,7 +339,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       decidedBy: "automated" | "reviewer";
-      moderationAction?: "alert" | "hide" | "purge" | null | undefined;
+      moderationAction?: "flag" | "hide" | "purge" | null | undefined;
       reviewAction?: "approve" | "hide" | "purge" | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
@@ -377,7 +377,7 @@ declare const EVENT_TYPE_INFO: {
         reviewer: "reviewer";
       }>;
       moderationAction: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
+        flag: "flag";
         hide: "hide";
         purge: "purge";
       }>>>;

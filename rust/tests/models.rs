@@ -324,12 +324,12 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
 #[test]
 fn flagged_content_policy_encodes_as_an_object() {
     let options = ProcessingOptions {
-        flagged_content_policy: Some(FlaggedContentPolicy::new(FlaggedContentAction::Alert)),
+        flagged_content_policy: Some(FlaggedContentPolicy::new(FlaggedContentAction::Flag)),
         ..Default::default()
     };
     assert_eq!(
         serde_json::to_value(options).unwrap(),
-        json!({ "flaggedContentPolicy": { "action": "alert" } })
+        json!({ "flaggedContentPolicy": { "action": "flag" } })
     );
 }
 

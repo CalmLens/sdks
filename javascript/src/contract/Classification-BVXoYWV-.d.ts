@@ -1,10 +1,649 @@
-import "./ModerationPolicyDimensions-BjAcaZKu.js";
 import * as zod from "zod";
+//#region packages/shared/src/ModerationPolicyDimensions.d.ts
+declare const MODERATION_QUALIFIER_INFO: {
+  readonly "personal-information-contact": {
+    readonly category: "personal-information";
+    readonly displayName: "Private contact details";
+    readonly description: "Supplied private personal email addresses, phone numbers or other direct personal contact details, or direct requests to reveal those kinds of details.";
+    readonly exclusions: "Public business or official contacts, ordinary names, broad locations, placeholders, redacted values.";
+  };
+  readonly "personal-information-email": {
+    readonly category: "personal-information";
+    readonly displayName: "Private email addresses";
+    readonly description: "A supplied private personal email address, or a direct request to reveal one.";
+    readonly exclusions: "Public business or official email addresses, example.com placeholders, redacted addresses.";
+  };
+  readonly "personal-information-phone": {
+    readonly category: "personal-information";
+    readonly displayName: "Private phone numbers";
+    readonly description: "A supplied private personal telephone or mobile number, or a direct request to reveal one.";
+    readonly exclusions: "Public business or official phone numbers, redacted values, ordinary numbers.";
+  };
+  readonly "personal-information-government-id": {
+    readonly category: "personal-information";
+    readonly displayName: "Government identifiers";
+    readonly description: "A supplied personal passport, national identity, national insurance, social security or similar government-issued identifier, or a direct request to reveal one.";
+    readonly exclusions: "Public organisation identifiers, ordinary names or numbers, redacted identifiers, clearly fictional placeholders.";
+  };
+  readonly "personal-information-financial": {
+    readonly category: "personal-information";
+    readonly displayName: "Financial identifiers";
+    readonly description: "A supplied private personal bank account, payment-card or other sensitive financial account identifier, or a direct request to reveal one.";
+    readonly exclusions: "Public business payment destinations without a personal privacy link, prices, ordinary numbers, redacted values, clear placeholders.";
+  };
+  readonly "personal-information-location": {
+    readonly category: "personal-information";
+    readonly displayName: "Precise personal location";
+    readonly description: "A supplied precise home address or current personal location, including coordinates or a live location tied to a person, or a direct request to reveal those kinds of locations.";
+    readonly exclusions: "Broad locations, public venues without a private or current-person link, fictional placeholders, redaction and generic requests without a precise personal-location target.";
+  };
+  readonly "personal-information-identifiers": {
+    readonly category: "personal-information";
+    readonly displayName: "Sensitive identifiers";
+    readonly description: "Supplied government IDs, national insurance or social security numbers, passport numbers, bank account or payment-card identifiers tied to a person, or direct requests to reveal those kinds of identifiers.";
+    readonly exclusions: "Ordinary names, dates or numbers without identifier context, public organisation identifiers, redacted values and clear placeholders.";
+  };
+  readonly "personal-information-credentials": {
+    readonly category: "personal-information";
+    readonly displayName: "Credentials and secrets";
+    readonly description: "Supplied private passwords, access tokens, API secrets, authentication codes or recovery credentials for an account, or direct requests to reveal those kinds of credentials.";
+    readonly exclusions: "Public usernames alone, instructions to create a strong password without a supplied secret, redacted values and explicitly non-functional sample credentials.";
+  };
+  readonly "personal-information-request": {
+    readonly category: "personal-information";
+    readonly displayName: "Requests for private details";
+    readonly description: "The message or a supplied chat turn explicitly asks someone to disclose private contact details, precise personal location, sensitive identifiers or credentials.";
+    readonly exclusions: "Generic privacy discussion, public business contacts, a narrator merely recording someone else's request, and requests for an ordinary name or broad location alone.";
+  };
+  readonly "personal-information-self-disclosure": {
+    readonly category: "personal-information";
+    readonly displayName: "Own details";
+    readonly description: "The speaker supplies their own private personal details.";
+    readonly exclusions: "Unknown ownership, third-party details, and requests without supplied values. Do not invent ownership.";
+  };
+  readonly "personal-information-third-party": {
+    readonly category: "personal-information";
+    readonly displayName: "Other people’s details";
+    readonly description: "The supplied private details are explicitly attributed to someone other than the speaker.";
+    readonly exclusions: "Unknown ownership, the speaker's own details and requests without supplied values. Do not invent ownership.";
+  };
+  readonly "personal-information-historical": {
+    readonly category: "personal-information";
+    readonly displayName: "Historical";
+    readonly description: "Actual qualifying content explicitly attributed to a historical event.";
+    readonly exclusions: "A date or past tense alone, or a separate current instance.";
+  };
+  readonly "personal-information-documentary": {
+    readonly category: "personal-information";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Actual qualifying content explicitly presented as factual reporting, testimony or documentation of a real-world event or utterance.";
+    readonly exclusions: "Neutral wording, third-person narration or quotation marks alone; fictional or invented teaching examples without real-world reporting.";
+  };
+  readonly "personal-information-educational": {
+    readonly category: "personal-information";
+    readonly displayName: "Educational";
+    readonly description: "Actual qualifying content used in a supported lesson, clinical explanation or academic study.";
+    readonly exclusions: "Neutral description alone or an unsupported educational label on a separate active harmful request.";
+  };
+  readonly "personal-information-fictional": {
+    readonly category: "personal-information";
+    readonly displayName: "Fictional";
+    readonly description: "Actual qualifying content explicitly represented in fiction, a story, game or illustration.";
+    readonly exclusions: "No actual qualifying content, generic references to an omitted passage, or an unsupported claim of fiction.";
+  };
+  readonly "personal-information-support-prevention": {
+    readonly category: "personal-information";
+    readonly displayName: "Support and prevention";
+    readonly description: "Actual qualifying content presented solely to seek or provide support, prevent harm, explicitly oppose abuse or aid recovery.";
+    readonly exclusions: "A separate active harmful request or attack, generic safety advice without qualifying content, or neutral description without a supported prevention or support purpose.";
+  };
+  readonly "profanity-mild": {
+    readonly category: "profanity";
+    readonly displayName: "Mild profanity";
+    readonly description: "Actual mild swear words or exclamations, such as damn or hell when used profanely, judged in the supplied language.";
+    readonly exclusions: "Innocent literal or religious meanings, strong profanity, generic references to swearing and ambiguous abbreviations.";
+  };
+  readonly "profanity-strong": {
+    readonly category: "profanity";
+    readonly displayName: "Strong profanity";
+    readonly description: "Actual strong swear words or vulgar expressions, including clearly recognisable obfuscated forms, judged in the supplied language.";
+    readonly exclusions: "Mild exclamations alone, formal medical or anatomical terms, innocent substrings, generic references to profanity and ambiguous symbols.";
+  };
+  readonly "profanity-slurs": {
+    readonly category: "profanity";
+    readonly displayName: "Offensive slurs";
+    readonly description: "Actual conventional offensive identity slurs, including quoted or reclaimed uses; this lexical finding does not itself establish an identity attack.";
+    readonly exclusions: "An omitted or unspecified slur, neutral identity terms without a conventional offensive meaning and ambiguous words without supported slur meaning.";
+  };
+  readonly "profanity-obfuscated": {
+    readonly category: "profanity";
+    readonly displayName: "Obfuscated profanity";
+    readonly description: "A swear word or offensive slur that remains clearly recognisable despite masking, spacing, character substitutions or deliberate misspelling.";
+    readonly exclusions: "Uninterpretable symbols, innocent abbreviations, ordinary words or names with accidental substrings, and an unspecified censored passage.";
+  };
+  readonly "profanity-historical": {
+    readonly category: "profanity";
+    readonly displayName: "Historical";
+    readonly description: "Actual qualifying content explicitly attributed to a historical event.";
+    readonly exclusions: "A date or past tense alone, or a separate current instance.";
+  };
+  readonly "profanity-documentary": {
+    readonly category: "profanity";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Actual qualifying content explicitly presented as factual reporting, testimony or documentation of a real-world event or utterance.";
+    readonly exclusions: "Neutral wording, third-person narration or quotation marks alone; fictional or invented teaching examples without real-world reporting.";
+  };
+  readonly "profanity-educational": {
+    readonly category: "profanity";
+    readonly displayName: "Educational";
+    readonly description: "Actual qualifying content used in a supported lesson, clinical explanation or academic study.";
+    readonly exclusions: "Neutral description alone or an unsupported educational label on a separate active harmful request.";
+  };
+  readonly "profanity-fictional": {
+    readonly category: "profanity";
+    readonly displayName: "Fictional";
+    readonly description: "Actual qualifying content explicitly represented in fiction, a story, game or illustration.";
+    readonly exclusions: "No actual qualifying content, generic references to an omitted passage, or an unsupported claim of fiction.";
+  };
+  readonly "profanity-support-prevention": {
+    readonly category: "profanity";
+    readonly displayName: "Support and prevention";
+    readonly description: "Actual qualifying content presented solely to seek or provide support, prevent harm, explicitly oppose abuse or aid recovery.";
+    readonly exclusions: "A separate active harmful request or attack, generic safety advice without qualifying content, or neutral description without a supported prevention or support purpose.";
+  };
+  readonly "sexual-nudity": {
+    readonly category: "sexual";
+    readonly displayName: "Nudity";
+    readonly description: "Explicitly exposed intimate sexual anatomy.";
+    readonly exclusions: "Swimwear, revealing clothing and diagrams without exposed sexual anatomy. Actual exposed sexual anatomy in a clinical or medical diagram still qualifies; educational framing is separate.";
+  };
+  readonly "sexual-activity": {
+    readonly category: "sexual";
+    readonly displayName: "Sexual activity";
+    readonly description: "A depicted or described sexual act, including sexual assault.";
+    readonly exclusions: "Ordinary affection, non-sexual touching and general sexual-health education alone.";
+  };
+  readonly "sexual-explicit-language": {
+    readonly category: "sexual";
+    readonly displayName: "Explicit sexual language";
+    readonly description: "Graphic sexual descriptions or explicitly erotic dialogue.";
+    readonly exclusions: "Untargeted profanity, anatomical terms and non-erotic medical or educational language alone.";
+  };
+  readonly "sexual-solicitation": {
+    readonly category: "sexual";
+    readonly displayName: "Sexual solicitation";
+    readonly description: "A sexual request, offer or advertisement performed by the message itself or a supplied chat turn. A narrator describing someone else's sexual offer is not making that offer.";
+    readonly exclusions: "Dating, ordinary romance, accepting money or vague offers without sexual content. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "sexual-revealing-clothing": {
+    readonly category: "sexual";
+    readonly displayName: "Revealing clothing";
+    readonly description: "People shown in swimwear, underwear or lingerie-style clothing, or other clothing that exposes much of the body, with no exposed sexual anatomy, sexual act or explicit erotic display. Fitness clothing counts only when it exposes much of the body.";
+    readonly exclusions: "Exposed sexual anatomy, a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.";
+    readonly inputs: readonly ["image"];
+  };
+  readonly "sexual-historical": {
+    readonly category: "sexual";
+    readonly displayName: "Historical";
+    readonly description: "Qualifying content explicitly attributed to a supported past historical event.";
+    readonly exclusions: "An ordinary past-tense account, date, old-looking setting or historical topic alone; an unrelated current threat or request.";
+  };
+  readonly "sexual-documentary": {
+    readonly category: "sexual";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+  };
+  readonly "sexual-educational": {
+    readonly category: "sexual";
+    readonly displayName: "Educational";
+    readonly description: "Qualifying content presented to teach or inform: a lesson, course or textbook material, a health, safety or clinical explanation, or academic study of the subject.";
+    readonly exclusions: "An educational label on a harmful request, working instructions or an endorsement; erotic, gratuitous or graphic detail beyond what the teaching needs; an academic tone alone.";
+  };
+  readonly "sexual-discussion": {
+    readonly category: "sexual";
+    readonly displayName: "Non-graphic discussion";
+    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose.";
+  };
+  readonly "sexual-fictional": {
+    readonly category: "sexual";
+    readonly displayName: "Fictional";
+    readonly description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.";
+    readonly exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request.";
+  };
+  readonly "sexual-support-prevention": {
+    readonly category: "sexual";
+    readonly displayName: "Sexual harm support or prevention";
+    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.";
+    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive.";
+  };
+  readonly "violence-attack": {
+    readonly category: "violence";
+    readonly displayName: "Physical attack";
+    readonly description: "A depicted or described physical attack against another person or animal.";
+    readonly exclusions: "An injury or death without evidence of an attack; a threat, plan or encouragement alone; solely intentional self-injury.";
+  };
+  readonly "violence-threat": {
+    readonly category: "violence";
+    readonly displayName: "Threat of violence";
+    readonly description: "A direct, conditional or clearly implied threat of physical harm against another person or animal.";
+    readonly exclusions: "A completed attack, figurative language or solely self-directed threats.";
+  };
+  readonly "violence-preparation": {
+    readonly category: "violence";
+    readonly displayName: "Preparation or instructions";
+    readonly description: "A concrete plan or request to physically harm another person made by the author (including the speaker of a supplied chat turn), or actionable harmful instructions actually supplied in the material. A narrator merely documenting someone else's plan or request is not making it.";
+    readonly exclusions: "A depiction, threat or praise alone; neutral reporting, prevention or lawful safety advice. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "violence-encouragement": {
+    readonly category: "violence";
+    readonly displayName: "Encouragement of violence";
+    readonly description: "The author (including the speaker of a supplied chat turn) urges, endorses, praises or promotes physical violence. A narrator quoting someone else's words to report or condemn them is not encouraging violence.";
+    readonly exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "violence-injury": {
+    readonly category: "violence";
+    readonly displayName: "Injury";
+    readonly description: "An actual bodily injury within independently qualifying Violence, such as an injury inflicted in an attack or shown with explicit disturbing bodily detail. Injury is descriptive and never establishes the parent category on its own.";
+    readonly exclusions: "An injury or medical condition without an independently qualifying attack, death, threat or graphic bodily depiction, regardless of severity; threats, plans, risks, weapons or pain without an actual injury; figurative language; solely intentional self-injury.";
+  };
+  readonly "violence-violent-death": {
+    readonly category: "violence";
+    readonly displayName: "Violent death";
+    readonly description: "A depicted or described death caused by an attack, killing, accident or other physical trauma, or a dead body showing signs of violence. An attacker or intent to harm is not required.";
+    readonly exclusions: "A death from illness, old age or an unstated cause; a sudden or untimely death with no attack, accident or trauma stated; threats, plans, death wishes, risks or abstract discussion alone; figurative language; solely suicide.";
+  };
+  readonly "violence-natural-death": {
+    readonly category: "violence";
+    readonly displayName: "Natural or non-violent death";
+    readonly description: "A depicted or described death from natural causes, illness, old age or an unstated cause, including a statement that someone has died or passed away, or a body with no signs of violence. A death is non-violent when no attack, accident or trauma is stated, even if it was sudden, untimely or unexplained.";
+    readonly exclusions: "A death that is stated to be caused by an attack, killing, accident or other physical trauma; death wishes, risks or abstract discussion of mortality alone; figurative language; solely suicide.";
+  };
+  readonly "violence-graphic": {
+    readonly category: "violence";
+    readonly displayName: "Graphic detail";
+    readonly description: "Severe bodily injury or death shown or described with explicit disturbing bodily detail, such as exposed organs, dismemberment or gore.";
+    readonly exclusions: "A threat or mention of violence without explicit disturbing bodily detail; inferred or unseen injuries; solely intentional self-injury or suicide.";
+  };
+  readonly "violence-weapon": {
+    readonly category: "violence";
+    readonly displayName: "Weapon without an attack";
+    readonly description: "A firearm, knife or other weapon shown or described only as an object. Nobody is attacked, injured, killed or threatened with it, and it is not aimed, pointed or brandished at anyone.";
+    readonly exclusions: "Any supported attack, graphic bodily harm, death or threat, including an armed standoff, a weapon aimed or swung at someone, or a person posed to use it; ordinary tools, toys or props with no violent association.";
+    readonly inputs: readonly ["image"];
+  };
+  readonly "violence-sport": {
+    readonly category: "violence";
+    readonly displayName: "Combat sport or training";
+    readonly description: "Recognizable consensual combat sport or protective training, such as boxing, martial arts, wrestling, fencing or self-defence practice, without graphic bodily detail or abusive conduct.";
+    readonly exclusions: "Graphic bodily detail, death, an attack outside the sport, abusive conduct or a non-consensual fight dressed as sport. A non-graphic sports injury alone does not invalidate the sport context.";
+    readonly inputs: readonly ["image"];
+  };
+  readonly "violence-historical": {
+    readonly category: "violence";
+    readonly displayName: "Historical";
+    readonly description: "Qualifying content explicitly attributed to a supported past historical event.";
+    readonly exclusions: "An ordinary past-tense account, date, old-looking setting or historical topic alone; an unrelated current threat or request.";
+  };
+  readonly "violence-documentary": {
+    readonly category: "violence";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+  };
+  readonly "violence-educational": {
+    readonly category: "violence";
+    readonly displayName: "Educational";
+    readonly description: "Qualifying content presented to teach or inform: a lesson, course or textbook material, a health, safety or clinical explanation, or academic study of the subject.";
+    readonly exclusions: "An educational label on a harmful request, working instructions or an endorsement; erotic, gratuitous or graphic detail beyond what the teaching needs; an academic tone alone.";
+  };
+  readonly "violence-discussion": {
+    readonly category: "violence";
+    readonly displayName: "Non-graphic discussion";
+    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose.";
+  };
+  readonly "violence-fictional": {
+    readonly category: "violence";
+    readonly displayName: "Fictional";
+    readonly description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.";
+    readonly exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request.";
+  };
+  readonly "violence-support-prevention": {
+    readonly category: "violence";
+    readonly displayName: "Support or prevention";
+    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.";
+    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive.";
+  };
+  readonly "self-harm-thoughts": {
+    readonly category: "self-harm";
+    readonly displayName: "Thoughts or desire";
+    readonly description: "Current or recurring thoughts of intentional self-injury or suicide, or an explicitly expressed desire to die.";
+    readonly exclusions: "General sadness, figurative language, neutral statistics, resolved past thoughts or prevention alone. An image without readable disclosure does not establish thoughts.";
+  };
+  readonly "self-harm-preparation": {
+    readonly category: "self-harm";
+    readonly displayName: "Intent or preparation";
+    readonly description: "Expressed intent, preparation or a plan for intentional self-injury or suicide.";
+    readonly exclusions: "General distress, an injury without self-directed intent or a report or prevention discussion without any represented intent, preparation or plan.";
+  };
+  readonly "self-harm-act": {
+    readonly category: "self-harm";
+    readonly displayName: "Depicted or reported act";
+    readonly description: "A depicted or described act of intentional self-injury or suicide.";
+    readonly exclusions: "Accidental injuries, healed scars, recovery or an injury with unknown cause alone.";
+  };
+  readonly "self-harm-methods": {
+    readonly category: "self-harm";
+    readonly displayName: "Methods or instructions";
+    readonly description: "Actionable methods, requests or practical instructions for intentional self-injury or suicide.";
+    readonly exclusions: "Prevention, support, recovery or non-actionable discussion without harmful methods.";
+  };
+  readonly "self-harm-encouragement": {
+    readonly category: "self-harm";
+    readonly displayName: "Encouragement";
+    readonly description: "The author (including the speaker of a supplied chat turn) urges, endorses, praises or promotes intentional self-injury or suicide. A narrator reporting or condemning another person's encouragement is not endorsing it.";
+    readonly exclusions: "Support, prevention, condemnation or reporting without endorsement. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "self-harm-historical": {
+    readonly category: "self-harm";
+    readonly displayName: "Historical";
+    readonly description: "Qualifying content explicitly attributed to a supported historical event.";
+    readonly exclusions: "Ordinary past tense, a date or an old-looking setting alone; a separate current harmful request or endorsement.";
+  };
+  readonly "self-harm-documentary": {
+    readonly category: "self-harm";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+  };
+  readonly "self-harm-educational": {
+    readonly category: "self-harm";
+    readonly displayName: "Educational";
+    readonly description: "Qualifying content presented to teach or inform: a lesson, course or textbook material, a health, safety or clinical explanation, or academic study of the subject.";
+    readonly exclusions: "An educational label on a harmful request, working instructions or an endorsement; erotic, gratuitous or graphic detail beyond what the teaching needs; an academic tone alone.";
+  };
+  readonly "self-harm-fictional": {
+    readonly category: "self-harm";
+    readonly displayName: "Fictional";
+    readonly description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.";
+    readonly exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request.";
+  };
+  readonly "self-harm-support-prevention": {
+    readonly category: "self-harm";
+    readonly displayName: "Support or prevention";
+    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.";
+    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive.";
+  };
+  readonly "harassment-abuse": {
+    readonly category: "harassment";
+    readonly displayName: "Insults or humiliation";
+    readonly description: "Personal degradation, humiliation or bullying that seeks to harm a recipient psychologically, imposes an abusive power dynamic or objectifies a person.";
+    readonly exclusions: 'Expressions of dislike or anger alone (including "I hate you" or "i hate u"), ordinary disagreement or criticism of conduct or competence, untargeted profanity or neutral reporting without personal degradation, threats, intimidation or bullying. Mild name-calling such as fool, dummy or silly without degradation, exclusion or repeated targeting is Mild mockery or teasing; affectionate teasing between people on good terms is neither.';
+  };
+  readonly "harassment-mild": {
+    readonly category: "harassment";
+    readonly displayName: "Mild mockery or teasing";
+    readonly description: "Light ridicule, teasing, sarcasm or a mocking nickname aimed at an identifiable person, including a public figure, that stops short of degradation, and collective name-calling of a group that is not a protected identity group (a club, a team’s fans, a political party or its members), such as calling them idiots or morons, without threats or intimidation. Mild name-calling such as fool, dummy or silly aimed at a person, without degradation, exclusion or repeated targeting, is this form. It counts so that a policy can allow or restrict it. Actual quoted, reported or fictional instances also count.";
+    readonly exclusions: 'Insults aimed at a specific person that degrade or humiliate them, attacks on a person\'s worth, slurs, threats, intimidation, sexual remarks, bullying campaigns or victim mockery: assess those as Insults or humiliation or the matching form. Name-calling of a protected identity group belongs under Hate. Criticism of an argument, decision, policy or conduct without mocking the people, self-deprecation and untargeted jokes. Affectionate or playful teasing between people on good terms, signalled by warmth such as "love you", laughter or a laughing emoji, a fond tone or a fondly described friend or family member, even with a mild word such as goofball, silly or dork. Telling someone not to call another person a name.';
+  };
+  readonly "harassment-intimidation": {
+    readonly category: "harassment";
+    readonly displayName: "Targeted intimidation";
+    readonly description: "Serious abusive intimidation directed at a person or identifiable group.";
+    readonly exclusions: "Ordinary disagreement, lawful accountability, reporting or criticism without abusive intimidation.";
+  };
+  readonly "harassment-threat": {
+    readonly category: "harassment";
+    readonly displayName: "Threats";
+    readonly description: "A direct, conditional or clearly implied personal threat or coercive intimidation against an identifiable recipient; broad intergroup violent rhetoric alone belongs under Hate or Violence.";
+    readonly exclusions: "Figurative speech; lawful arrest or prosecution without abusive intimidation. A concrete threat quoted or described in a report still has this form; its framing is separate.";
+  };
+  readonly "harassment-sexual": {
+    readonly category: "harassment";
+    readonly displayName: "Sexual harassment";
+    readonly description: "Targeted unwanted sexual remarks, sexual humiliation, coercive advances or sexually abusive intimidation.";
+    readonly exclusions: "Consensual sexual dialogue, ordinary romance or sexual content without targeted harassment.";
+  };
+  readonly "harassment-encouragement": {
+    readonly category: "harassment";
+    readonly displayName: "Encouraging harassment";
+    readonly description: "The author (including the speaker of a supplied chat turn) urges, organises, praises or endorses targeted personal abuse. A narrator reporting third-party abuse is not encouraging it.";
+    readonly exclusions: "Reporting, condemnation or lawful requests for accountability without endorsing abuse. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "harassment-historical": {
+    readonly category: "harassment";
+    readonly displayName: "Historical";
+    readonly description: "Qualifying content explicitly attributed to a supported historical event.";
+    readonly exclusions: "Ordinary past tense, a date or an old-looking setting alone; a separate current harmful request or endorsement.";
+  };
+  readonly "harassment-documentary": {
+    readonly category: "harassment";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+  };
+  readonly "harassment-educational": {
+    readonly category: "harassment";
+    readonly displayName: "Educational";
+    readonly description: "Qualifying content used in a lesson, safety explanation, clinical explanation or academic study.";
+    readonly exclusions: "An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material.";
+  };
+  readonly "harassment-fictional": {
+    readonly category: "harassment";
+    readonly displayName: "Fictional";
+    readonly description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.";
+    readonly exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request.";
+  };
+  readonly "harassment-support-prevention": {
+    readonly category: "harassment";
+    readonly displayName: "Awareness, support or prevention";
+    readonly description: "Qualifying content presented solely to raise awareness of bullying or abuse, give prevention or safety guidance, or seek or provide support to someone targeted, such as an anti-bullying campaign or a person asking for help.";
+    readonly exclusions: "A separate direct abusive attack, advice to retaliate, or an awareness label on content that itself abuses a person. A reported abusive instance used to seek help or prevent abuse is not a separate direct attack.";
+  };
+  readonly "hate-abuse": {
+    readonly category: "hate";
+    readonly displayName: "Identity-based insults or slurs";
+    readonly description: "An identity-based insult or slur against people represented in the content, including a concrete attack quoted or reported by a narrator.";
+    readonly exclusions: "Identity mentions, untargeted profanity or quoted vocabulary without an identity-based attack on people. An actual identity-based attack quoted in reporting still has this form; framing is separate.";
+  };
+  readonly "hate-slurs": {
+    readonly category: "hate";
+    readonly displayName: "Offensive slurs";
+    readonly description: "Qualifying identity-based attacks that use actual conventional offensive identity epithets recognised as slurs in the supplied language, including clearly recognisable censored or obfuscated spellings. Require the offensive slur itself, rather than treating every group insult or historical outgroup name as a slur. Actual conventional slurs remain slurs when quoted, reported, historical, fictional or educational; the narrator need not endorse them.";
+    readonly exclusions: "An omitted or unspecified slur; neutral identity vocabulary; generic derogatory descriptions such as calling another people barbarians or uncivilised; historical group-name etymology without a conventional offensive identity epithet; ambiguous spellings. These descriptions may qualify as identity abuse without this narrower slur form. Merely discussing vocabulary without a represented identity-based attack does not establish Hate; assess actual offensive words separately under Profanity.";
+  };
+  readonly "hate-dehumanization": {
+    readonly category: "hate";
+    readonly displayName: "Dehumanization";
+    readonly description: "The author (including the speaker of a supplied chat turn) personally claims or endorses that protected people are subhuman, animals, vermin or objects. An unendorsed third-party quotation inside a narrative report does not satisfy this active-stance qualifier.";
+    readonly exclusions: "Literal descriptions, unrelated metaphors, neutral reporting or condemnation without endorsement. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "hate-inferiority": {
+    readonly category: "hate";
+    readonly displayName: "Claims of inferiority";
+    readonly description: "An assertion represented in the content that people are inherently inferior because of a supported protected identity, including a concrete quoted or reported assertion.";
+    readonly exclusions: "Differences in income, opportunity, treatment, representation, dating preferences or social outcomes without an assertion of inherent inferiority. Criticism of beliefs or conduct or identity mentions without a qualifying inferiority claim. Reporting a concrete inferiority claim retains the factual form; framing is separate.";
+  };
+  readonly "hate-exclusion": {
+    readonly category: "hate";
+    readonly displayName: "Exclusion or discrimination";
+    readonly description: "The author (including the speaker of a supplied chat turn) personally advocates or endorses denying rights to or excluding people because of protected identity. An unendorsed third-party quotation inside a narrative report does not satisfy this active-stance qualifier.";
+    readonly exclusions: "Neutral reporting, criticism of policy or lawful distinctions without an identity-based attack. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "hate-threat": {
+    readonly category: "hate";
+    readonly displayName: "Threats or incitement";
+    readonly description: "The author (including the speaker of a supplied chat turn) personally threatens or endorses serious harm because of protected identity. A narrator quoting another person's threat to report, document or condemn it does not satisfy this active-stance qualifier, even if the quotation contains an imperative call for harm.";
+    readonly exclusions: "Unrelated threats, unsupported identity-based motive, neutral reporting, condemnation or lawful accountability. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "hate-historical": {
+    readonly category: "hate";
+    readonly displayName: "Historical";
+    readonly description: "Qualifying content explicitly attributed to a supported past historical event.";
+    readonly exclusions: "An ordinary past-tense account, date, old-looking setting or historical topic alone; an unrelated current threat or request.";
+  };
+  readonly "hate-documentary": {
+    readonly category: "hate";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+  };
+  readonly "hate-educational": {
+    readonly category: "hate";
+    readonly displayName: "Educational";
+    readonly description: "Qualifying content used in a lesson, safety explanation, clinical explanation or academic study.";
+    readonly exclusions: "An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material.";
+  };
+  readonly "hate-fictional": {
+    readonly category: "hate";
+    readonly displayName: "Fictional";
+    readonly description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.";
+    readonly exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request.";
+  };
+  readonly "hate-counterspeech": {
+    readonly category: "hate";
+    readonly displayName: "Counterspeech";
+    readonly description: "Concrete identity-based attacks quoted, paraphrased or described to reject, challenge or oppose their prejudice, including defending the people targeted and explaining why discriminatory claims are wrong. Judge the supported stance and attribution in context; a classroom format or explicit anti-hate label is not required.";
+    readonly exclusions: "Mere quotation, neutral documentation or victim support without challenging the represented prejudice; an unrelated statement opposing hate that leaves a separate identity-based attack endorsed or directly expressed. For All, every qualifying attack must be countered, not every sentence: ordinary political criticism, criticism of discriminatory conduct and benign surrounding discussion do not break coverage. Do not invent an attack from a generic reference to hateful content that is not supplied.";
+  };
+  readonly "hate-support-prevention": {
+    readonly category: "hate";
+    readonly displayName: "Awareness, support or prevention";
+    readonly description: "Qualifying content used to raise awareness, give practical prevention or safety guidance, or seek or provide support to people targeted by hate. Challenging a prejudiced claim is assessed separately as Counterspeech; both qualifiers may apply when the material also supports victims or provides prevention guidance.";
+    readonly exclusions: "A separate directly expressed identity attack or endorsement, or an awareness label on content that itself attacks a protected group. A concrete reported or condemned attack used to counter hate is not a separate direct attack.";
+  };
+  readonly "criminal-activity-demonstration": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Depicted or reported activity";
+    readonly description: "A depiction or account of a concrete criminal or seriously dangerous act, including a factual report of an actual act.";
+    readonly exclusions: "A topic mention, ordinary objects, abstract policy debate or unsupported inference without a concrete criminal or seriously dangerous act.";
+  };
+  readonly "criminal-activity-preparation": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Intent or preparation";
+    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. A concrete intent, preparation or plan for a criminal or seriously dangerous act expressed by the author (including the speaker of a supplied chat turn). A narrator documenting another person's past or third-party plan is not expressing that intent.";
+    readonly exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "criminal-activity-request": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Requests for assistance";
+    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. A request by the author (including the speaker of a supplied chat turn) for help carrying out a concrete criminal or seriously dangerous act. A later refusal does not erase that request. A narrator merely reporting a third-party request is not making it.";
+    readonly exclusions: "Lawful assistance, neutral reporting, prevention or requests without a concrete criminal or seriously dangerous act. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "criminal-activity-instructions": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Instructions or facilitation";
+    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act.";
+    readonly exclusions: "Prevention, lawful safety advice, ordinary tools or non-actionable reporting alone. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
+  };
+  readonly "criminal-activity-promotion": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Recruitment or promotion";
+    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. The author (including the speaker of a supplied chat turn) recruits for, endorses or promotes a concrete criminal or seriously dangerous act. A narrator's unendorsed account of another person's promotion is not itself promotion.";
+    readonly exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+  };
+  readonly "criminal-activity-substances": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Drugs and controlled substances";
+    readonly description: "Illegal drugs or controlled substances: their use, preparation, purchase, sale, production or trafficking, including prescription medicines obtained, sold or used outside lawful medical supply.";
+    readonly exclusions: "Medication prescribed and used as directed, lawful medical supply, ordinary pharmacy, research or educational scenes without an actual illegal-drug instance, lawful alcohol and tobacco, and crimes that do not involve drugs. An actual illegal-drug instance remains detectable in reporting, harm reduction or recovery; framing is separate.";
+  };
+  readonly "criminal-activity-grooming": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Grooming and exploitation";
+    readonly description: "Concrete manipulation to prepare a child or vulnerable person for sexual exploitation or abuse, including sexual demands, rewards conditional on sexual compliance, or secrecy, isolation or private-contact tactics with a supported exploitative purpose. Explicit sexual words are not required when that purpose is evidenced. Actual reported or fictional grooming also counts.";
+    readonly exclusions: "Ordinary friendly contact, consensual adult relationships, gifts, mentoring, private messaging or secrecy alone; infer neither age nor exploitative intent from appearance. Generic grooming warnings or references to an omitted case without concrete exploitative conduct. Hair care and animal grooming.";
+  };
+  readonly "criminal-activity-csam": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Child sexual abuse material";
+    readonly description: "Child sexual abuse material or child sexual exploitation material, whether merely named or referred to or present as an actual instance of it being created, possessed, viewed, sought, bought, sold, shared, distributed or profited from, including requests and plans. A bare mention counts so that a policy can restrict it; conduct qualifiers such as Demonstration or Request record an actual instance. Reported, historical, fictional, educational and preventive instances also count.";
+    readonly exclusions: "Adult sexual material; do not infer a child's age from appearance, clothing or body. Lawful non-sexual images of children. Child abuse that is not sexual material, and grooming conduct without material, are separate forms. The words must refer to sexual material involving children; do not infer it from unrelated words.";
+    readonly inputs: readonly ["text"];
+  };
+  readonly "criminal-activity-alcohol": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Alcohol";
+    readonly description: "Depicted or concretely described drinking, serving, purchasing, selling, making or advertising alcoholic drinks, including lawful adult activity and actual reported, historical or fictional instances.";
+    readonly exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. The word alcohol alone, generic health or prevention discussion without an actual qualifying instance, non-alcoholic drinks, hand sanitiser, disinfectants, laboratory alcohol and ordinary medicine. Do not infer alcohol from an ambiguous cup or bottle.";
+  };
+  readonly "criminal-activity-tobacco": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Tobacco and vaping";
+    readonly description: "Depicted or concretely described smoking, vaping, chewing tobacco, or purchasing, selling, making or advertising tobacco, nicotine or vaping products, including lawful adult activity and actual reported, historical or fictional instances.";
+    readonly exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. Generic health or prevention discussion without an actual qualifying instance, cessation treatment such as nicotine patches or gum used as directed, smoke without a supported tobacco or vaping source, and illegal-drug use without a separate tobacco or vaping instance.";
+  };
+  readonly "criminal-activity-gambling": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Gambling";
+    readonly description: "Depicted or concretely described betting or wagering money or something of real value on an uncertain outcome, casino gambling, paid lotteries, or selling or advertising those services, including lawful adult activity and actual reported, historical or fictional instances.";
+    readonly exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. Ordinary games, sports, playing cards or dice without stakes, free competitions without a wager, investing without gambling conduct, figurative bets and generic risk or prevention discussion without an actual gambling instance. Do not infer gambling from a casino-like setting alone.";
+  };
+  readonly "criminal-activity-fraud": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Fraud and scams";
+    readonly description: "Fraud, scams or phishing: a deceptive message that seeks money, account access, credentials or personal details, such as an advance-fee or romance scam, a fake prize, invoice or delivery notice, impersonation of a bank or official, or counterfeit goods or payment fraud, whether carried out, planned, requested, taught or promoted.";
+    readonly exclusions: "Generic warnings or prevention advice without a concrete scam, a genuine request for payment or details, or crimes without deception for gain. A concrete reported scam or a displayed phishing example retains this form; framing is separate.";
+  };
+  readonly "criminal-activity-sexual-solicitation": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Sexual solicitation";
+    readonly description: "An explicit request, offer or advertisement for consensual adult sexual activity or sexual services, including paid services. This policy category includes solicitation without inferring that it is illegal.";
+    readonly exclusions: "Dating, ordinary romance, discussion of sex work without solicitation, vague offers without sexual content, coercion, trafficking, exploitation or sexual activity involving minors. Separate criminal assistance is not covered by this qualifier.";
+  };
+  readonly "criminal-activity-graffiti": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Graffiti";
+    readonly description: "Graffiti, tagging or spray-painted markings on walls, vehicles or other property, or people applying them, shown, planned or requested. Permission is rarely visible, so authorised murals and street art count too.";
+    readonly exclusions: "Painting or drawing on canvas, paper or screens; removal, cleaning or prevention of graffiti; other property damage.";
+    readonly inputs: readonly ["image"];
+  };
+  readonly "criminal-activity-historical": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Historical";
+    readonly description: "Qualifying content explicitly attributed to a supported historical event.";
+    readonly exclusions: "Ordinary past tense, a date or an old-looking setting alone; a separate current harmful request or endorsement.";
+  };
+  readonly "criminal-activity-documentary": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Reporting or documentary";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+  };
+  readonly "criminal-activity-educational": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Educational";
+    readonly description: "Qualifying content used in a lesson, safety explanation, clinical explanation or academic study.";
+    readonly exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose; do not infer education from neutral wording or an explanation of what someone is doing. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material.";
+  };
+  readonly "criminal-activity-discussion": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Non-graphic discussion";
+    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose.";
+  };
+  readonly "criminal-activity-fictional": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Fictional";
+    readonly description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.";
+    readonly exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request.";
+  };
+  readonly "criminal-activity-support-prevention": {
+    readonly category: "criminal-activity";
+    readonly displayName: "Harm reduction, recovery or prevention";
+    readonly description: "Qualifying content presented solely to prevent crime or reduce harm, seek or provide victim support, explicitly oppose a represented criminal attack or threat, or aid recovery: for example anti-scam guidance describing an actual scam, support after fraud or stalking, and harm reduction or addiction recovery describing illegal drug use. The underlying qualifying act must be present; generic safety advice alone does not create criminal content.";
+    readonly exclusions: "Practical assistance, instructions, concealment advice, promotion or sales facilitating crime or harmful acts; a supportive label on content that itself carries out, requests or encourages the act. Protective steps such as contacting support or reporting a scam are not criminal assistance.";
+  };
+};
+type ModerationQualifier = keyof typeof MODERATION_QUALIFIER_INFO;
+//#endregion
 //#region packages/shared/src/PolicyRule.d.ts
 declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
-  alert: "alert";
+  allow: "allow";
+  flag: "flag";
   hide: "hide";
-  ignore: "ignore";
   purge: "purge";
 }>;
 type FlaggedContentAction = zod.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
@@ -34,9 +673,11 @@ declare const CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA: zod.ZodEnum<{
   unavailable: "unavailable";
 }>;
 type ClassificationNotEvaluatedReason = zod.infer<typeof CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA>;
-declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
+declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "criminal-activity-alcohol": "criminal-activity-alcohol";
+  "criminal-activity-csam": "criminal-activity-csam";
   "criminal-activity-demonstration": "criminal-activity-demonstration";
+  "criminal-activity-discussion": "criminal-activity-discussion";
   "criminal-activity-documentary": "criminal-activity-documentary";
   "criminal-activity-educational": "criminal-activity-educational";
   "criminal-activity-fictional": "criminal-activity-fictional";
@@ -60,10 +701,12 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "harassment-fictional": "harassment-fictional";
   "harassment-historical": "harassment-historical";
   "harassment-intimidation": "harassment-intimidation";
+  "harassment-mild": "harassment-mild";
   "harassment-sexual": "harassment-sexual";
   "harassment-support-prevention": "harassment-support-prevention";
   "harassment-threat": "harassment-threat";
   "hate-abuse": "hate-abuse";
+  "hate-counterspeech": "hate-counterspeech";
   "hate-dehumanization": "hate-dehumanization";
   "hate-documentary": "hate-documentary";
   "hate-educational": "hate-educational";
@@ -71,6 +714,7 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "hate-fictional": "hate-fictional";
   "hate-historical": "hate-historical";
   "hate-inferiority": "hate-inferiority";
+  "hate-slurs": "hate-slurs";
   "hate-support-prevention": "hate-support-prevention";
   "hate-threat": "hate-threat";
   "personal-information-contact": "personal-information-contact";
@@ -109,6 +753,7 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "self-harm-support-prevention": "self-harm-support-prevention";
   "self-harm-thoughts": "self-harm-thoughts";
   "sexual-activity": "sexual-activity";
+  "sexual-discussion": "sexual-discussion";
   "sexual-documentary": "sexual-documentary";
   "sexual-educational": "sexual-educational";
   "sexual-explicit-language": "sexual-explicit-language";
@@ -119,6 +764,7 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
   "sexual-solicitation": "sexual-solicitation";
   "sexual-support-prevention": "sexual-support-prevention";
   "violence-attack": "violence-attack";
+  "violence-discussion": "violence-discussion";
   "violence-documentary": "violence-documentary";
   "violence-educational": "violence-educational";
   "violence-encouragement": "violence-encouragement";
@@ -151,6 +797,12 @@ declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum
     unavailable: "unavailable";
   }>;
 }, zod.core.$strict>], "status">>;
+/**
+ * Qualifier results keyed by qualifier. Keys from removed or renamed qualifiers are dropped rather
+ * than failing the report; known keys are still validated. Typed as the strict schema: the filter
+ * changes neither the accepted shape of known keys nor the JSON schema.
+ */
+declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: typeof STRICT_QUALIFIER_RESULTS_SCHEMA;
 type ClassificationQualifierResults = zod.infer<typeof CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA>;
 declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
   status: zod.ZodLiteral<"evaluated">;
@@ -164,7 +816,9 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
   score: zod.ZodNumber;
   qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
+    "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
+    "criminal-activity-discussion": "criminal-activity-discussion";
     "criminal-activity-documentary": "criminal-activity-documentary";
     "criminal-activity-educational": "criminal-activity-educational";
     "criminal-activity-fictional": "criminal-activity-fictional";
@@ -188,10 +842,12 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "harassment-fictional": "harassment-fictional";
     "harassment-historical": "harassment-historical";
     "harassment-intimidation": "harassment-intimidation";
+    "harassment-mild": "harassment-mild";
     "harassment-sexual": "harassment-sexual";
     "harassment-support-prevention": "harassment-support-prevention";
     "harassment-threat": "harassment-threat";
     "hate-abuse": "hate-abuse";
+    "hate-counterspeech": "hate-counterspeech";
     "hate-dehumanization": "hate-dehumanization";
     "hate-documentary": "hate-documentary";
     "hate-educational": "hate-educational";
@@ -199,6 +855,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
     "hate-inferiority": "hate-inferiority";
+    "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
     "hate-threat": "hate-threat";
     "personal-information-contact": "personal-information-contact";
@@ -237,6 +894,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "self-harm-support-prevention": "self-harm-support-prevention";
     "self-harm-thoughts": "self-harm-thoughts";
     "sexual-activity": "sexual-activity";
+    "sexual-discussion": "sexual-discussion";
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
     "sexual-explicit-language": "sexual-explicit-language";
@@ -247,6 +905,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-solicitation": "sexual-solicitation";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
+    "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
     "violence-educational": "violence-educational";
     "violence-encouragement": "violence-encouragement";
@@ -301,7 +960,9 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
   score: zod.ZodNumber;
   qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
+    "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
+    "criminal-activity-discussion": "criminal-activity-discussion";
     "criminal-activity-documentary": "criminal-activity-documentary";
     "criminal-activity-educational": "criminal-activity-educational";
     "criminal-activity-fictional": "criminal-activity-fictional";
@@ -325,10 +986,12 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "harassment-fictional": "harassment-fictional";
     "harassment-historical": "harassment-historical";
     "harassment-intimidation": "harassment-intimidation";
+    "harassment-mild": "harassment-mild";
     "harassment-sexual": "harassment-sexual";
     "harassment-support-prevention": "harassment-support-prevention";
     "harassment-threat": "harassment-threat";
     "hate-abuse": "hate-abuse";
+    "hate-counterspeech": "hate-counterspeech";
     "hate-dehumanization": "hate-dehumanization";
     "hate-documentary": "hate-documentary";
     "hate-educational": "hate-educational";
@@ -336,6 +999,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
     "hate-inferiority": "hate-inferiority";
+    "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
     "hate-threat": "hate-threat";
     "personal-information-contact": "personal-information-contact";
@@ -374,6 +1038,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "self-harm-support-prevention": "self-harm-support-prevention";
     "self-harm-thoughts": "self-harm-thoughts";
     "sexual-activity": "sexual-activity";
+    "sexual-discussion": "sexual-discussion";
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
     "sexual-explicit-language": "sexual-explicit-language";
@@ -384,6 +1049,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-solicitation": "sexual-solicitation";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
+    "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
     "violence-educational": "violence-educational";
     "violence-encouragement": "violence-encouragement";
@@ -434,7 +1100,9 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
   }>;
   qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
+    "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
+    "criminal-activity-discussion": "criminal-activity-discussion";
     "criminal-activity-documentary": "criminal-activity-documentary";
     "criminal-activity-educational": "criminal-activity-educational";
     "criminal-activity-fictional": "criminal-activity-fictional";
@@ -458,10 +1126,12 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "harassment-fictional": "harassment-fictional";
     "harassment-historical": "harassment-historical";
     "harassment-intimidation": "harassment-intimidation";
+    "harassment-mild": "harassment-mild";
     "harassment-sexual": "harassment-sexual";
     "harassment-support-prevention": "harassment-support-prevention";
     "harassment-threat": "harassment-threat";
     "hate-abuse": "hate-abuse";
+    "hate-counterspeech": "hate-counterspeech";
     "hate-dehumanization": "hate-dehumanization";
     "hate-documentary": "hate-documentary";
     "hate-educational": "hate-educational";
@@ -469,6 +1139,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
     "hate-inferiority": "hate-inferiority";
+    "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
     "hate-threat": "hate-threat";
     "personal-information-contact": "personal-information-contact";
@@ -507,6 +1178,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "self-harm-support-prevention": "self-harm-support-prevention";
     "self-harm-thoughts": "self-harm-thoughts";
     "sexual-activity": "sexual-activity";
+    "sexual-discussion": "sexual-discussion";
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
     "sexual-explicit-language": "sexual-explicit-language";
@@ -517,6 +1189,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-solicitation": "sexual-solicitation";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
+    "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
     "violence-educational": "violence-educational";
     "violence-encouragement": "violence-encouragement";
@@ -574,7 +1247,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -598,10 +1273,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -609,6 +1286,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -647,6 +1325,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -657,6 +1336,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -711,7 +1391,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -735,10 +1417,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -746,6 +1430,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -784,6 +1469,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -794,6 +1480,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -844,7 +1531,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -868,10 +1557,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -879,6 +1570,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -917,6 +1609,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -927,6 +1620,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -982,7 +1676,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1006,10 +1702,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1017,6 +1715,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -1055,6 +1754,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -1065,6 +1765,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -1119,7 +1820,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1143,10 +1846,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1154,6 +1859,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -1192,6 +1898,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -1202,6 +1909,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -1252,7 +1960,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1276,10 +1986,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1287,6 +1999,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -1325,6 +2038,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -1335,6 +2049,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -1390,7 +2105,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1414,10 +2131,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1425,6 +2144,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -1463,6 +2183,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -1473,6 +2194,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -1527,7 +2249,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1551,10 +2275,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1562,6 +2288,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -1600,6 +2327,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -1610,6 +2338,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -1660,7 +2389,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1684,10 +2415,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1695,6 +2428,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -1733,6 +2467,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -1743,6 +2478,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -1798,7 +2534,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1822,10 +2560,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1833,6 +2573,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -1871,6 +2612,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -1881,6 +2623,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -1935,7 +2678,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -1959,10 +2704,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -1970,6 +2717,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2008,6 +2756,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2018,6 +2767,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -2068,7 +2818,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -2092,10 +2844,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -2103,6 +2857,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2141,6 +2896,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2151,6 +2907,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -2206,7 +2963,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -2230,10 +2989,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -2241,6 +3002,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2279,6 +3041,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2289,6 +3052,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -2343,7 +3107,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -2367,10 +3133,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -2378,6 +3146,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2416,6 +3185,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2426,6 +3196,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -2476,7 +3247,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -2500,10 +3273,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -2511,6 +3286,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2549,6 +3325,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2559,6 +3336,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -2614,7 +3392,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -2638,10 +3418,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -2649,6 +3431,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2687,6 +3470,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2697,6 +3481,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -2751,7 +3536,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -2775,10 +3562,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -2786,6 +3575,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2824,6 +3614,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2834,6 +3625,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -2884,7 +3676,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -2908,10 +3702,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -2919,6 +3715,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -2957,6 +3754,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -2967,6 +3765,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -3022,7 +3821,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -3046,10 +3847,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -3057,6 +3860,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -3095,6 +3899,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -3105,6 +3910,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -3159,7 +3965,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -3183,10 +3991,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -3194,6 +4004,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -3232,6 +4043,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -3242,6 +4054,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -3292,7 +4105,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -3316,10 +4131,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -3327,6 +4144,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -3365,6 +4183,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -3375,6 +4194,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -3430,7 +4250,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -3454,10 +4276,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -3465,6 +4289,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -3503,6 +4328,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -3513,6 +4339,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -3567,7 +4394,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     score: zod.ZodNumber;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -3591,10 +4420,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -3602,6 +4433,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -3640,6 +4472,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -3650,6 +4483,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -3700,7 +4534,9 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
     }>;
     qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
+      "criminal-activity-discussion": "criminal-activity-discussion";
       "criminal-activity-documentary": "criminal-activity-documentary";
       "criminal-activity-educational": "criminal-activity-educational";
       "criminal-activity-fictional": "criminal-activity-fictional";
@@ -3724,10 +4560,12 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "harassment-fictional": "harassment-fictional";
       "harassment-historical": "harassment-historical";
       "harassment-intimidation": "harassment-intimidation";
+      "harassment-mild": "harassment-mild";
       "harassment-sexual": "harassment-sexual";
       "harassment-support-prevention": "harassment-support-prevention";
       "harassment-threat": "harassment-threat";
       "hate-abuse": "hate-abuse";
+      "hate-counterspeech": "hate-counterspeech";
       "hate-dehumanization": "hate-dehumanization";
       "hate-documentary": "hate-documentary";
       "hate-educational": "hate-educational";
@@ -3735,6 +4573,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
       "hate-inferiority": "hate-inferiority";
+      "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
@@ -3773,6 +4612,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-support-prevention": "self-harm-support-prevention";
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
+      "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
@@ -3783,6 +4623,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-solicitation": "sexual-solicitation";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
+      "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
       "violence-encouragement": "violence-encouragement";
@@ -3843,4 +4684,4 @@ declare const CLASSIFICATION_LABEL_SCHEMA: zod.ZodObject<{
 }, zod.core.$strip>;
 type ClassificationLabel = zod.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
 //#endregion
-export { ClassificationNotEvaluatedReason as a, FlaggedContentAction as c, ClassificationLabel as i, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t };
+export { ClassificationNotEvaluatedReason as a, FlaggedContentAction as c, ClassificationLabel as i, ModerationQualifier as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t };

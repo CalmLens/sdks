@@ -39,7 +39,7 @@ def decide(asset: dict, result: str):
     ``alert``, a rejected one is hidden, a clean one matched nothing."""
     asset["classification"]["status"] = "completed"
     asset["classification"]["moderation"].update(decision="approved" if result == "flagged" else result,
-                               action={"flagged": "alert", "rejected": "hide"}.get(result),
+                               action={"flagged": "flag", "rejected": "hide"}.get(result),
                                **{k: v for k, v in demo_report(result).items() if k != "processedAt"})
     asset["classification"]["completedAt"] = int(time.time() * 1000)
 

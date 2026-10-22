@@ -1,5 +1,5 @@
-import { i as EventFacts, o as EventType } from "./EventCatalog-Bfi4O8xq.js";
-import { t as Event } from "./Event-ZEpkmYvn.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-B71ApwA7.js";
+import { t as Event } from "./Event-Deaj9K_r.js";
 import * as zod from "zod";
 //#region packages/shared/src/WebhookPayload.d.ts
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
@@ -39,7 +39,7 @@ declare const WEBHOOK_EVENT_DATA_SCHEMA: zod.ZodObject<{
           rejected: "rejected";
         }>;
         action: zod.ZodNullable<zod.ZodEnum<{
-          alert: "alert";
+          flag: "flag";
           hide: "hide";
           purge: "purge";
         }>>;
@@ -97,7 +97,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
             rejected: "rejected";
           }>;
           action: zod.ZodNullable<zod.ZodEnum<{
-            alert: "alert";
+            flag: "flag";
             hide: "hide";
             purge: "purge";
           }>>;
@@ -150,7 +150,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
             rejected: "rejected";
           }>;
           action: zod.ZodNullable<zod.ZodEnum<{
-            alert: "alert";
+            flag: "flag";
             hide: "hide";
             purge: "purge";
           }>>;

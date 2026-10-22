@@ -46,7 +46,7 @@ AssetClassificationStatus = Union[Literal["pending", "processing", "completed", 
 #: treat an unknown one as approved.
 AssetModerationStatus = Union[Literal["pending", "approved", "rejected"], str]
 #: What the policy did with flagged content (``classification.moderation.action``). New actions may be added.
-AssetModerationAction = Union[Literal["alert", "hide", "purge"], str]
+AssetModerationAction = Union[Literal["flag", "hide", "purge"], str]
 #: A reviewer's decision (``classification.moderation.manualReviews[].decision``). New values may be added.
 AssetReviewerAction = Union[Literal["approved", "rejected"], str]
 #: Whether CalmLens holds the content (``content.status``). New statuses may be added.
@@ -60,7 +60,7 @@ AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "mult
 Visibility = Literal["public", "private"]
 #: What happens to content that crosses a policy threshold (request values for
 #: ``processingOptions.flaggedContentPolicy``).
-ModerationAction = Literal["ignore", "alert", "hide", "purge"]
+ModerationAction = Literal["allow", "flag", "hide", "purge"]
 #: Why an asset is under a safety hold. New reasons may be added.
 SafetyHoldReason = Union[Literal["suspected-illegal-content"], str]
 #: Moderation categories in ``report.categories``. New categories may be added.
@@ -256,8 +256,8 @@ class MetadataItem(TypedDict):
 
 
 class FlaggedContentPolicy(TypedDict):
-    """Overrides the project moderation action for one asset: ``ignore`` takes no action,
-    ``alert`` keeps delivery enabled, ``hide`` blocks delivery while retaining content and
+    """Overrides the project moderation action for one asset: ``allow`` takes no action,
+    ``flag`` keeps delivery enabled, ``hide`` blocks delivery while retaining content and
     ``purge`` deletes content."""
     action: ModerationAction
 

@@ -342,7 +342,7 @@ public final class Models {
   /**
    * What happens to flagged content for one asset, overriding the project's moderation action.
    *
-   * @param action {@code ignore} takes no action, {@code alert} keeps delivery enabled, {@code hide}
+   * @param action {@code allow} takes no action, {@code flag} keeps delivery enabled, {@code hide}
    *     blocks delivery while keeping the content, and {@code purge} deletes it
    */
   public record FlaggedContentPolicy(String action) {
@@ -1424,7 +1424,7 @@ public final class Models {
    * How strongly a category meets the policy and what the policy does with it.
    *
    * @param score policy score from 0 to 1
-   * @param action {@code ignore}, {@code alert}, {@code hide} or {@code purge}
+   * @param action {@code allow}, {@code flag}, {@code hide} or {@code purge}
    */
   public record CategoryPolicyScore(Double score, String action, CategoryPolicySource source,
       CategoryPolicySettingsSnapshot settings) {}
@@ -1722,7 +1722,7 @@ public final class Models {
 
   /**
    * @param decision the moderation decision in force
-   * @param action what the policy did with flagged content ({@code alert}, {@code hide} or {@code
+   * @param action what the policy did with flagged content ({@code flag}, {@code hide} or {@code
    *     purge}), or null when nothing was flagged
    */
   public record EventAssetModeration(AssetModerationStatus decision, String action) {}

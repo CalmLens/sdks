@@ -155,7 +155,7 @@ class CalmmarketTest {
     Map<String, Object> moderation = new LinkedHashMap<>();
     moderation.put("decision", decision.equals("pending") || decision.equals("error") ? "pending" : decision);
     boolean flagged = report != null && Boolean.TRUE.equals(report.get(FLAGGED));
-    moderation.put("action", flagged ? (decision.equals("rejected") ? "hide" : "alert") : null);
+    moderation.put("action", flagged ? (decision.equals("rejected") ? "hide" : "flag") : null);
     if (report != null) {
       Map<String, Object> body = new LinkedHashMap<>(report);
       body.remove(FLAGGED);

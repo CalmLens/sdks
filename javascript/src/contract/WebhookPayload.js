@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-DQ9tz8rV.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-CNzrwkvC.js";
 import "./SharedConstants-CdFPZV7z.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -67,8 +67,8 @@ const MINIMUM_MODERATION_THRESHOLD = .1;
 const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTION_SCHEMA });
 /** Ranks actions by strength: allowances must be softer than the category action, restrictions not. */
 const FLAGGED_CONTENT_ACTION_RANK = {
-	ignore: 0,
-	alert: 1,
+	allow: 0,
+	flag: 1,
 	hide: 2,
 	purge: 3
 };
@@ -76,7 +76,7 @@ const FLAGGED_CONTENT_ACTION_RANK = {
 const getPolicyRuleConflict = (kind, rule, categoryAction) => {
 	const rank = FLAGGED_CONTENT_ACTION_RANK[rule.action];
 	if (kind === "allowance") return rank < FLAGGED_CONTENT_ACTION_RANK[categoryAction] ? void 0 : "allowance-not-softer";
-	return rule.action !== "ignore" && rank >= FLAGGED_CONTENT_ACTION_RANK[categoryAction] ? void 0 : "restriction-weaker";
+	return rule.action !== "allow" && rank >= FLAGGED_CONTENT_ACTION_RANK[categoryAction] ? void 0 : "restriction-weaker";
 };
 const policyRuleKey = (rule) => policyConditionKey("some", ruleCondition(rule));
 const uniqueRules = (rules) => new Set(rules.map(policyRuleKey)).size === rules.length;
@@ -198,7 +198,7 @@ const ASSET_MODERATION_STATUS_SCHEMA = zod.enum([
 ]);
 /** What the policy did with flagged content. `null` when the policy matched nothing. */
 const ASSET_MODERATION_ACTION_SCHEMA = zod.enum([
-	"alert",
+	"flag",
 	"hide",
 	"purge"
 ]);
@@ -629,7 +629,7 @@ const ASSET_FLAGGED = defineEventType({
 		}),
 		moderationAction: field(ASSET_MODERATION_ACTION_SCHEMA.nullish(), {
 			label: "Moderation action",
-			description: "The action applied to the flagged content (`alert`, `hide` or `purge`).",
+			description: "The action applied to the flagged content (`flag`, `hide` or `purge`).",
 			display: "enum"
 		})
 	},
@@ -651,7 +651,7 @@ const decidedByField = field(zod.enum(["automated", "reviewer"]), {
 });
 const decisionModerationActionField = field(ASSET_MODERATION_ACTION_SCHEMA.nullish(), {
 	label: "Moderation action",
-	description: "What the policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged. A reviewer's decision keeps it.",
+	description: "What the policy did with flagged content (`flag`, `hide` or `purge`), or `null` when nothing was flagged. A reviewer's decision keeps it.",
 	display: "enum"
 });
 const ASSET_APPROVED = defineEventType({

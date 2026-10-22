@@ -102,7 +102,7 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 	moderation["decision"], moderation["action"] = calmlens.ModerationStatusApproved, nil
 	switch choice {
 	case "flagged":
-		moderation["action"] = calmlens.ModerationActionAlert
+		moderation["action"] = calmlens.ModerationActionFlag
 	case "rejected":
 		moderation["decision"], moderation["action"] = calmlens.ModerationStatusRejected, calmlens.ModerationActionHide
 	}

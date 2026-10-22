@@ -1,5 +1,5 @@
-import "./Asset-BDm64nrJ.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-Bfi4O8xq.js";
+import "./Asset-BE7qch9u.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-B71ApwA7.js";
 import "./Page-Bpd8G-D0.js";
 import * as zod from "zod";
 //#region packages/shared/src/Event.d.ts
@@ -27,7 +27,7 @@ declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
         rejected: "rejected";
       }>;
       action: zod.ZodNullable<zod.ZodEnum<{
-        alert: "alert";
+        flag: "flag";
         hide: "hide";
         purge: "purge";
       }>>;
@@ -100,7 +100,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
           rejected: "rejected";
         }>;
         action: zod.ZodNullable<zod.ZodEnum<{
-          alert: "alert";
+          flag: "flag";
           hide: "hide";
           purge: "purge";
         }>>;

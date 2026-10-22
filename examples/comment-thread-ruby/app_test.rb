@@ -38,7 +38,7 @@ module TestHelpers
     moderation = classification == 'completed' ? status : 'pending'
     { 'id' => id, 'upload' => { 'status' => status == 'uploading' ? 'uploading' : 'completed' },
       'classification' => { 'status' => classification, 'moderation' => { 'decision' => moderation,
-        'action' => flagged ? (status == 'rejected' ? 'hide' : 'alert') : nil, 'categories' => {} } },
+        'action' => flagged ? (status == 'rejected' ? 'hide' : 'flag') : nil, 'categories' => {} } },
       'content' => { 'status' => 'stored' } }
 
   end

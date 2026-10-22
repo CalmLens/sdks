@@ -132,8 +132,8 @@ string_enum! {
 string_enum! {
     /// What the moderation policy did with an asset's flagged content.
     AssetModerationAction {
-        /// Kept delivery enabled and alerted.
-        Alert = "alert",
+        /// Kept delivery enabled and flagged it.
+        Flag = "flag",
         /// Blocked delivery while keeping the content.
         Hide = "hide",
         /// Deleted the content.
@@ -213,9 +213,9 @@ string_enum! {
     /// What happens to content that crosses a moderation threshold.
     FlaggedContentAction {
         /// Take no action.
-        Ignore = "ignore",
-        /// Keep delivery enabled and alert.
-        Alert = "alert",
+        Allow = "allow",
+        /// Keep delivery enabled and flag it.
+        Flag = "flag",
         /// Block delivery while keeping the content.
         Hide = "hide",
         /// Delete the content.
@@ -1620,7 +1620,7 @@ pub struct CategoryPolicyScore {
     /// The policy score.
     #[serde(default)]
     pub score: f64,
-    /// `ignore`, `alert`, `hide` or `purge`.
+    /// `allow`, `flag`, `hide` or `purge`.
     #[serde(default)]
     pub action: String,
     /// The rule or threshold that decided the category.

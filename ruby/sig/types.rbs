@@ -29,8 +29,8 @@ module CalmLens
   type asset_classification_status = "pending" | "processing" | "completed" | "failed"
   # The moderation decision in force: a reviewer's when there is one, else the automated one.
   type asset_moderation_status = "pending" | "approved" | "rejected"
-  # What the policy did with flagged content (never `ignore`, unlike `flagged_content_action`).
-  type asset_moderation_action = "alert" | "hide" | "purge"
+  # What the policy did with flagged content (never `allow`, unlike `flagged_content_action`).
+  type asset_moderation_action = "flag" | "hide" | "purge"
   type asset_reviewer_action = "approved" | "rejected"
   # Whether CalmLens holds the content: only until processing finishes, retained, or deleted.
   type asset_content_status = "temporary" | "stored" | "removed"
@@ -38,7 +38,7 @@ module CalmLens
   type asset_type = "image" | "video" | "audio" | "plaintext-document" | "multimedia-document" | "website" | "file"
   type asset_visibility = "public" | "private"
   # FLAGGED_CONTENT_ACTION_SCHEMA in Project.ts.
-  type flagged_content_action = "ignore" | "alert" | "hide" | "purge"
+  type flagged_content_action = "allow" | "flag" | "hide" | "purge"
 
   # A custom metadata item. `value` is any JSON value you chose.
   type metadata_item = { "id" => String, "value" => json_value }

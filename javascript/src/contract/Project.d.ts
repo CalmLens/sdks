@@ -1,12 +1,11 @@
-import "./ModerationPolicyDimensions-BjAcaZKu.js";
-import { c as FlaggedContentAction } from "./Classification-BD4OwbF6.js";
+import { c as FlaggedContentAction } from "./Classification-BVXoYWV-.js";
 import * as zod from "zod";
 //#region packages/shared/src/Project.d.ts
 declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{
   action: zod.ZodEnum<{
-    alert: "alert";
+    allow: "allow";
+    flag: "flag";
     hide: "hide";
-    ignore: "ignore";
     purge: "purge";
   }>;
 }, zod.core.$strip>;

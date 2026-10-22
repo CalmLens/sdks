@@ -39,7 +39,7 @@ const client = new CalmLensServerClient({
 const comment = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 
 if (comment.classification.moderation.decision === "approved") {
-  // publish it; if comment.classification.moderation.action is "alert", also queue it for review
+  // publish it; if comment.classification.moderation.action is "flag", also queue it for review
 } else {
   // "rejected": don't publish it
 }
@@ -151,7 +151,7 @@ const asset = await client.text.classify({ text: "Great photo!", externalId: "co
 asset.id;            // string
 asset.classification.status;  // "pending" | "processing" | "completed" | "failed"; audio and video keep processing in the background
 asset.classification.moderation.decision;  // "pending" | "approved" | "rejected"
-asset.classification.moderation.action;  // "alert" | "hide" | "purge", what your policy did with flagged content; null when nothing was flagged
+asset.classification.moderation.action;  // "flag" | "hide" | "purge", what your policy did with flagged content; null when nothing was flagged
 asset.classification.moderation?.score;                         // number, the overall score
 asset.classification.moderation.categories?.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
 asset.content.status;     // "temporary" | "stored" | "removed"
