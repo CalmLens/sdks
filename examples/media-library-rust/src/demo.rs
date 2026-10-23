@@ -14,8 +14,9 @@ use crate::messages::{rejected, Failure};
 use axum::http::StatusCode;
 use calmlens::models::{
     Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus,
-    AssetModerationAction, AssetModerationStatus, AssetPage, AssetReviewerAction, AssetSearchMatch,
-    AssetSearchResponse, Folder, MetadataItem, ProcessingOptions, SearchMatchField, Visibility,
+    AssetModerationAction, AssetModerationStatus, AssetPage, AssetReview, AssetReviewerAction,
+    AssetSearchMatch, AssetSearchResponse, Folder, MetadataItem, ProcessingOptions,
+    SearchMatchField, Visibility,
 };
 use calmlens::{Bytes, Error, ErrorCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -392,8 +393,19 @@ impl DemoStore {
                     AssetReviewerAction::Rejected => AssetModerationStatus::Rejected,
                     _ => AssetModerationStatus::Approved,
                 };
-                moderation.reviewer_action = Some(action);
-                moderation.reviewed_at = Some(now_ms());
+                let mut review = AssetReview::default();
+                review.id = format!("demo-review-{}", random_hex(8));
+                review.action = match action {
+                    AssetReviewerAction::Rejected => "hide",
+                    _ => "approve",
+                }
+                .to_string();
+                review.decision = action;
+                review.note = Some("Simulated portal decision".to_string());
+                review.reviewer_user_id = Some("demo-reviewer".to_string());
+                review.reviewed_at = now_ms();
+                review.applied_to_asset = true;
+                moderation.manual_reviews.push(review);
                 true
             }
             Err(_) => false,
