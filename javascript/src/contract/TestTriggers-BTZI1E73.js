@@ -8317,7 +8317,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "harassment",
 		displayName: "Insults or humiliation",
 		description: "Personal degradation, humiliation or bullying that seeks to harm a recipient psychologically, imposes an abusive power dynamic or objectifies a person, including contemptuous name-calling such as idiot, moron, loser or pathetic aimed at a person or at a group that is not a protected identity group.",
-		exclusions: "Expressions of dislike or anger alone (including \"I hate you\" or \"i hate u\"), ordinary disagreement or criticism of conduct or competence, untargeted profanity or neutral reporting without personal degradation. Threats and intimidation are Threats or intimidation. Mild name-calling such as fool, dummy or silly without degradation, exclusion or repeated targeting is Mild mockery or teasing; affectionate teasing between people on good terms is neither."
+		exclusions: "Expressions of dislike or anger alone (including \"I hate you\" or \"i hate u\"), ordinary disagreement or criticism of conduct or competence, untargeted profanity or neutral reporting without personal degradation. Threats and intimidation are Threats or intimidation. Sarcasm, ironic praise or a mocking nickname for a person, including a public figure, that uses no contemptuous or degrading word, such as calling someone Mr Perfect, our genius or Captain Obvious, is Mild mockery or teasing and not an insult, however pointed the joke, unless it humiliates, excludes or repeatedly targets the person. Mild name-calling such as fool, dummy or silly without degradation, exclusion or repeated targeting is Mild mockery or teasing; affectionate teasing between people on good terms is neither."
 	},
 	"harassment-mild": {
 		category: "harassment",
