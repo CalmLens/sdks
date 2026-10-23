@@ -8316,26 +8316,26 @@ const MODERATION_QUALIFIER_INFO = {
 	"harassment-abuse": {
 		category: "harassment",
 		displayName: "Insults or humiliation",
-		description: "Personal degradation, humiliation or bullying that seeks to harm a recipient psychologically, imposes an abusive power dynamic or objectifies a person.",
-		exclusions: "Expressions of dislike or anger alone (including \"I hate you\" or \"i hate u\"), ordinary disagreement or criticism of conduct or competence, untargeted profanity or neutral reporting without personal degradation, threats, intimidation or bullying. Mild name-calling such as fool, dummy or silly without degradation, exclusion or repeated targeting is Mild mockery or teasing; affectionate teasing between people on good terms is neither."
+		description: "Personal degradation, humiliation or bullying that seeks to harm a recipient psychologically, imposes an abusive power dynamic or objectifies a person, including contemptuous name-calling such as idiot, moron, loser or pathetic aimed at a person or at a group that is not a protected identity group.",
+		exclusions: "Expressions of dislike or anger alone (including \"I hate you\" or \"i hate u\"), ordinary disagreement or criticism of conduct or competence, untargeted profanity or neutral reporting without personal degradation. Threats and intimidation are Threats or intimidation. Mild name-calling such as fool, dummy or silly without degradation, exclusion or repeated targeting is Mild mockery or teasing; affectionate teasing between people on good terms is neither."
 	},
 	"harassment-mild": {
 		category: "harassment",
 		displayName: "Mild mockery or teasing",
-		description: "Light ridicule, teasing, sarcasm or a mocking nickname aimed at an identifiable person, including a public figure, that stops short of degradation, and collective name-calling of a group that is not a protected identity group (a club, a team’s fans, a political party or its members), such as calling them idiots or morons, without threats or intimidation. Mild name-calling such as fool, dummy or silly aimed at a person, without degradation, exclusion or repeated targeting, is this form. It counts so that a policy can allow or restrict it. Actual quoted, reported or fictional instances also count.",
-		exclusions: "Insults aimed at a specific person that degrade or humiliate them, attacks on a person's worth, slurs, threats, intimidation, sexual remarks, bullying campaigns or victim mockery: assess those as Insults or humiliation or the matching form. Name-calling of a protected identity group belongs under Hate. Criticism of an argument, decision, policy or conduct without mocking the people, self-deprecation and untargeted jokes. Affectionate or playful teasing between people on good terms, signalled by warmth such as \"love you\", laughter or a laughing emoji, a fond tone or a fondly described friend or family member, even with a mild word such as goofball, silly or dork. Telling someone not to call another person a name."
+		description: "Light ridicule, teasing, sarcasm or a mocking nickname aimed at an identifiable person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), that stops short of contempt or degradation, without threats or intimidation. Mild name-calling such as fool, dummy or silly, without degradation, exclusion or repeated targeting, is this form. It counts so that a policy can allow or restrict it. Actual quoted, reported or fictional instances also count.",
+		exclusions: "Contemptuous name-calling such as idiot, moron, loser or pathetic, insults that degrade or humiliate a person or group, attacks on a person's worth, slurs, threats, intimidation, sexual remarks, bullying campaigns or victim mockery: assess those as Insults or humiliation or the matching form. Name-calling of a protected identity group belongs under Hate. Criticism of an argument, decision, policy or conduct without mocking the people, self-deprecation and untargeted jokes. Affectionate or playful teasing between people on good terms, signalled by warmth such as \"love you\", laughter or a laughing emoji, a fond tone or a fondly described friend or family member, even with a mild word such as goofball, silly or dork. Telling someone not to call another person a name."
 	},
-	"harassment-intimidation": {
+	"harassment-public-target": {
 		category: "harassment",
-		displayName: "Targeted intimidation",
-		description: "Serious abusive intimidation directed at a person or identifiable group.",
-		exclusions: "Ordinary disagreement, lawful accountability, reporting or criticism without abusive intimidation."
+		displayName: "Aimed at a public figure or group",
+		description: "The qualifying harassment is aimed at a public figure (an elected official or political candidate, a celebrity, a person with a large public following or a person in the news for their public role), an organisation or institution, or a group that is not a protected identity group (a club, a team’s fans, a political party or its members), rather than at a private individual.",
+		exclusions: "Private individuals, including a named or addressed member of the public, a fellow user, a classmate, a colleague or a family member; any minor, even a well-known one; people known only for an involuntary moment in the news; protected identity groups, which belong under Hate."
 	},
 	"harassment-threat": {
 		category: "harassment",
-		displayName: "Threats",
-		description: "A direct, conditional or clearly implied personal threat or coercive intimidation against an identifiable recipient; broad intergroup violent rhetoric alone belongs under Hate or Violence.",
-		exclusions: "Figurative speech; lawful arrest or prosecution without abusive intimidation. A concrete threat quoted or described in a report still has this form; its framing is separate."
+		displayName: "Threats or intimidation",
+		description: "A direct, conditional or clearly implied personal threat, or serious abusive or coercive intimidation, against an identifiable person or group; broad intergroup violent rhetoric alone belongs under Hate or Violence.",
+		exclusions: "Figurative speech; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation. A concrete threat quoted or described in a report still has this form; its framing is separate."
 	},
 	"harassment-sexual": {
 		category: "harassment",
