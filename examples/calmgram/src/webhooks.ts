@@ -3,14 +3,15 @@
 // under `data`, not on the delivery itself.
 
 /**
- * Events that can change an asset's decision. `asset.approved` and `asset.rejected` report every
- * outcome, from automated moderation or a reviewer.
+ * Events that can change an asset's moderation status. There is one event per status, sent for
+ * automated decisions and reviewer decisions alike.
  */
 const ASSET_DECISION_EVENTS = new Set([
-  "asset.flagged",
   "asset.failed",
-  "asset.approved",
-  "asset.rejected",
+  "asset.allowed",
+  "asset.age-restricted",
+  "asset.blocked",
+  "asset.purged",
 ]);
 
 interface WebhookFact {

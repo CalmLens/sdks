@@ -44,7 +44,6 @@ const post: Post = {
   createdAt: 0,
   assetId: "asset-1",
   status: "pending",
-  flagged: false,
   findings: [],
   checkedAt: 0,
 };
@@ -53,7 +52,7 @@ const comment: Comment = { ...post, id: "c1", postId: "p1", text: "hi", assetId:
 test("applies a decision only to the record whose asset and externalId it names", () => {
   expect(externalIdFor(post)).toBe("post-p1");
   expect(externalIdFor(comment)).toBe("comment-c1");
-  const decision = { status: "approved", flagged: false, findings: [] } as const;
+  const decision = { status: "allowed", findings: [] } as const;
 
   const wrongExternalId = { ...post };
   expect(
@@ -71,7 +70,7 @@ test("applies a decision only to the record whose asset and externalId it names"
   expect(applyOutcomeTo(matching, { ...decision, assetId: "asset-1", externalId: "post-p1" })).toBe(
     true,
   );
-  expect(matching.status).toBe("approved");
+  expect(matching.status).toBe("allowed");
 });
 
 test("counts the daily budget per UTC day and ignores invalid limits", () => {
@@ -114,7 +113,6 @@ test("attaches only the asset uploaded with this post's token through this app's
     externalId: "post-p1",
     uploadPresetId: "preset-1",
     status: "pending",
-    flagged: false,
     findings: [],
   } as const;
   expect(isUploadFor(asset, draft, "preset-1")).toBe(true);

@@ -40,7 +40,7 @@ fn serve_assets(count: usize, delay: Duration) -> (String, thread::JoinHandle<Ve
             let (_, body) = read_request(&mut stream);
             bodies.push(body);
             thread::sleep(delay);
-            let response = r#"{"id": "asset", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"decision": "approved"}}}"#;
+            let response = r#"{"id": "asset", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"status": "allowed"}}}"#;
             let _ = write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -70,8 +70,8 @@ async fn blocking_client_can_be_created_and_dropped_inside_tokio() {
     .unwrap()
     .unwrap();
     assert_eq!(
-        asset.classification.moderation.decision,
-        AssetModerationStatus::Approved
+        asset.classification.moderation.status,
+        AssetModerationStatus::Allowed
     );
     drop(client);
     assert_eq!(worker.join().unwrap(), [b"hello".to_vec()]);
@@ -127,7 +127,7 @@ fn blocking_iterators_and_reads() {
             vec![Asset::new(
                 "a",
                 AssetClassificationStatus::Completed,
-                AssetModerationStatus::Approved,
+                AssetModerationStatus::Allowed,
             )],
             true,
         );
@@ -140,7 +140,7 @@ fn blocking_iterators_and_reads() {
             vec![Asset::new(
                 "b",
                 AssetClassificationStatus::Completed,
-                AssetModerationStatus::Approved,
+                AssetModerationStatus::Allowed,
             )],
             false,
         ),
@@ -270,7 +270,7 @@ fn unknown_enum_values_and_fields_decode() {
   },
   "classification": {
     "moderation": { "futureScore": 2,
-      "decision": "quarantined",
+      "status": "quarantined",
       "timeline": {
         "segments": [
           {
@@ -289,7 +289,7 @@ fn unknown_enum_values_and_fields_decode() {
     )
     .unwrap();
     assert_eq!(
-        asset.classification.moderation.decision,
+        asset.classification.moderation.status,
         AssetModerationStatus::Unknown("quarantined".into())
     );
     assert_eq!(
@@ -315,7 +315,7 @@ fn unknown_enum_values_and_fields_decode() {
     assert_eq!(
         (
             &round_trip["classification"]["status"],
-            &round_trip["classification"]["moderation"]["decision"]
+            &round_trip["classification"]["moderation"]["status"]
         ),
         (
             &serde_json::json!("completed"),

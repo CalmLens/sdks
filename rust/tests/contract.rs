@@ -103,7 +103,22 @@ async fn path_safety_contracts() {
     assert_eq!(mock.requests().len(), 0);
     let client = calmlens::ServerClient::new("key", "project-1").unwrap();
     for cdn in paths["cdnUrls"].as_array().unwrap() {
-        let result = client.cdn().get_asset_url(&typed(cdn["options"].clone()));
+        let request: CdnRequest = typed(cdn["options"].clone());
+        // Every fixture option must reach the request; serde would otherwise ignore one silently.
+        // An invalid transform cannot be re-encoded, so it is checked by presence.
+        let decoded = serde_json::to_value(CdnRequest {
+            transform: None,
+            ..request.clone()
+        })
+        .unwrap();
+        for key in cdn["options"].as_object().unwrap().keys() {
+            let kept = match key.as_str() {
+                "transform" => request.transform.is_some(),
+                _ => decoded.get(key).is_some(),
+            };
+            assert!(kept, "unsupported CDN option {key}: {cdn}");
+        }
+        let result = client.cdn().get_asset_url(&request);
         match cdn["url"].as_str() {
             Some(url) => assert_eq!(url, result.unwrap(), "{cdn}"),
             None => assert_eq!(cdn["error"], result.unwrap_err().code().as_str(), "{cdn}"),
@@ -192,8 +207,7 @@ fn now() -> u64 {
 
 #[test]
 fn construct_webhook_event_verifies_headers_then_parses() {
-    let body =
-        r#"{"id":"event-1","type":"asset.rejected","data":{"assetId":"asset-1","facts":[]}}"#;
+    let body = r#"{"id":"event-1","type":"asset.blocked","data":{"assetId":"asset-1","facts":[]}}"#;
     let event =
         calmlens::construct_webhook_event(body, &signed_delivery(body, now()), "secret").unwrap();
     assert_eq!(
@@ -281,10 +295,10 @@ fn invalid_webhook_payloads() {
         "",
         "not json",
         "[]",
-        r#"{"type":"asset.flagged","data":{}}"#,
+        r#"{"type":"asset.classified","data":{}}"#,
         r#"{"id":"event-1","data":{}}"#,
-        r#"{"id":"event-1","type":"asset.flagged"}"#,
-        r#"{"id":"","type":"asset.flagged","data":{}}"#,
+        r#"{"id":"event-1","type":"asset.classified"}"#,
+        r#"{"id":"","type":"asset.classified","data":{}}"#,
     ] {
         assert_eq!(
             calmlens::parse_webhook_event(body).unwrap_err().code(),

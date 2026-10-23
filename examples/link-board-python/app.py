@@ -21,19 +21,23 @@ MAX_URL = 2048
 MAX_BODY = 16 * 1024
 MAX_LINKS = 50
 # Category scores at or above this are shown when explaining a decision. It is a display
-# choice for this page; the project's policy decides what is approved or rejected.
+# choice for this page; the project's policy decides each moderation status.
 SHOWN_SCORE = 0.4
 DEMO_RESULTS = {
-    "approved": "Approve the page",
-    "flagged": "Approve the page, but flag it",
-    "rejected": "Reject the page",
+    "allowed": "Allow the page",
+    "age-restricted": "Age-restrict the page",
+    "blocked": "Block the page",
+    "purged": "Purge the page",
     "error": "Processing error",
-    "note-rejected": "Reject the note",
+    "note-blocked": "Block the note",
 }
+# Moderation statuses once CalmLens has decided. Only `allowed` pages become links: the board has
+# no age gate, so it does not link `age-restricted` pages either.
+DECIDED_STATUSES = ("allowed", "age-restricted", "blocked", "purged")
 # Redirects carry one of these keys, never free text, so a crafted link cannot put words on the page.
 NOTICES = {
     "shared": "Shared. The page is being checked before the link goes live.",
-    "note-rejected": "Not shared: the note did not pass moderation.",
+    "note-not-allowed": "Not shared: the note did not pass moderation.",
     "note-unfinished": "Not shared: moderation did not complete. Please try again.",
     "removed": "Removed. CalmLens no longer keeps a record of the page or the note.",
 }
@@ -68,12 +72,12 @@ def validate_url(value: str) -> str:
 
 
 def link_status(asset: Asset) -> str:
-    """A shared link's state from its asset: the moderation decision once there is one, ``error``
-    when processing failed, else ``pending``. A status this app doesn't know stays pending."""
+    """A shared link's state from its asset: the moderation status once CalmLens has decided,
+    ``error`` when processing failed, else ``pending``. A status this app doesn't know stays pending."""
     if asset["classification"]["status"] == "failed":
         return "error"
-    status = asset["classification"]["moderation"]["decision"]
-    return status if status in ("approved", "rejected") else "pending"
+    status = asset["classification"]["moderation"]["status"]
+    return status if status in DECIDED_STATUSES else "pending"
 
 
 def explain(report: AssetModeration | None) -> dict:
@@ -135,7 +139,7 @@ class Moderator:
 
 def create_moderator(env=os.environ, demo: bool = False) -> Moderator:
     """Live moderation with credentials. Without them the app refuses to start unless demo
-    mode was asked for (--demo or CALMLENS_DEMO=1): it never quietly approves everything."""
+    mode was asked for (--demo or CALMLENS_DEMO=1): it never quietly allows everything."""
     api_key, project_id = env.get("CALMLENS_API_KEY", ""), env.get("CALMLENS_PROJECT_ID", "")
     if bool(api_key) != bool(project_id):
         raise ConfigurationError("Set both CALMLENS_API_KEY and CALMLENS_PROJECT_ID")
@@ -165,7 +169,7 @@ class Board:
             link = next((item for item in self.links if item["id"] == link_id), None)
             return dict(link) if link and part in ("note", "page") else None
 
-    def submit(self, url: str, note: str, demo_result: str = "approved") -> str:
+    def submit(self, url: str, note: str, demo_result: str = "allowed") -> str:
         url = validate_url(url)
         note = note.strip()
         if not note or len(note) > MAX_NOTE:
@@ -173,7 +177,7 @@ class Board:
         if demo_result not in DEMO_RESULTS:
             raise InvalidInput("Unknown demo result")
         link: dict = {"id": str(uuid.uuid4()), "url": url, "note": note, "status": "checking-note",
-                      "note_asset_id": None, "asset_id": None, "flagged": False, "explanation": None, "children": []}
+                      "note_asset_id": None, "asset_id": None, "explanation": None, "children": []}
         with self.lock:
             self.links.insert(0, link)
             del self.links[MAX_LINKS:]
@@ -181,11 +185,11 @@ class Board:
             note_asset = self.moderator.check_note(link["id"], note, demo_result)
             with self.lock:
                 link["note_asset_id"] = note_asset["id"]
-            note_status = note_asset["classification"]["moderation"]["decision"]
-            if note_status != "approved":
+            note_status = note_asset["classification"]["moderation"]["status"]
+            if note_status != "allowed":
                 with self.lock:
-                    link["status"] = "note-rejected"
-                return "note-rejected" if note_status == "rejected" else "note-unfinished"
+                    link["status"] = "note-not-allowed"
+                return "note-not-allowed" if note_status in DECIDED_STATUSES else "note-unfinished"
             asset = self.moderator.submit_link(link["id"], url, demo_result)
         except BaseException:
             with self.lock:
@@ -205,12 +209,10 @@ class Board:
             except CalmLensError as error:
                 logging.warning("Could not refresh %s: %s (request %s)", asset_id, error.code, error.request_id)
                 continue
-            moderation = asset["classification"]["moderation"]
-            report = moderation
-            # Flagged means the policy took an action (flag, hide or purge) on the page.
-            update = {"status": link_status(asset), "flagged": moderation["action"] is not None}
-            if update["status"] in ("approved", "rejected") and (update["flagged"] or update["status"] == "rejected"):
-                update["explanation"] = explain(report)
+            update = {"status": link_status(asset)}
+            # Any decided status other than `allowed` means the policy acted on the page.
+            if update["status"] in DECIDED_STATUSES and update["status"] != "allowed":
+                update["explanation"] = explain(asset["classification"]["moderation"])
                 update["children"] = self._child_findings(asset["id"])
             with self.lock:
                 link.update(update)
@@ -222,10 +224,10 @@ class Board:
             logging.warning("Could not list parts of %s: %s", asset_id, error.code)
             return []
         findings = [{"name": child.get("name") or child.get("type"), "type": child.get("type"),
-                     "status": child["classification"]["moderation"]["decision"], "found": explain(child["classification"]["moderation"])["found"]}
+                     "status": child["classification"]["moderation"]["status"], "found": explain(child["classification"]["moderation"])["found"]}
                     for child in children]
         # The parts that caused the decision first; the rest stay in the API's order (newest first).
-        findings.sort(key=lambda part: part["status"] != "rejected")
+        findings.sort(key=lambda part: part["status"] == "allowed")
         return findings
 
     def remove(self, link_id: str) -> str:
@@ -267,25 +269,29 @@ input,textarea,select{{border:1px solid #b9ccbf;background:#fcfdfb}}textarea{{mi
 .notice{{padding:16px 20px;border:1px solid #b9ccbf;background:#e9f2e8;border-radius:12px;margin-top:24px}}.empty{{padding:44px 22px;text-align:center;font-weight:650}}.empty span,.hint{{font-size:13px;color:#526e61;font-weight:400}}
 footer{{color:#526e61;font-size:12px;margin-top:32px}}@media(max-width:700px){{.layout{{grid-template-columns:1fr}}header{{align-items:flex-start;flex-direction:column}}}}
 </style></head><body><main><header><div class="wordmark">◉ Calmboard</div><span class="mode">{mode}</span></header>
-<h1>Share links.<br>We read the page first.</h1><p class="intro">A community link board built with the CalmLens Python SDK. CalmLens fetches each shared page and moderates it, including the text and images it finds there. A link becomes clickable only after the page is approved.</p>
+<h1>Share links.<br>We read the page first.</h1><p class="intro">A community link board built with the CalmLens Python SDK. CalmLens fetches each shared page and moderates it, including the text and images it finds there. A link becomes clickable only after the page is allowed.</p>
 {notice_html}<div class="layout"><section aria-label="Shared links"><h2>On the board</h2>{cards}</section>
 <section><form action="/links" method="post"><h2>Share a link</h2><input type="hidden" name="csrf" value="{self.csrf_token}">
 <label for="url">Link</label><input id="url" name="url" type="url" maxlength="{MAX_URL}" required placeholder="https://example.com/article">
 <label for="note">Why it is worth reading</label><textarea id="note" name="note" maxlength="{MAX_NOTE}" required></textarea>
-{selector}<button type="submit">Check &amp; share</button><p class="hint">Your note is checked straight away. The page is checked in the background; until it is approved, the link is shown as text only.</p></form></section></div>
+{selector}<button type="submit">Check &amp; share</button><p class="hint">Your note is checked straight away. The page is checked in the background; until it is allowed, the link is shown as text only.</p></form></section></div>
 <footer>Local learning example · the latest {MAX_LINKS} links live in memory · demo outcomes do not run moderation</footer></main></body></html>'''
         return html.encode("utf-8")
 
     def _card(self, link: dict) -> str:
-        status, flagged = link["status"], link["flagged"]
-        if status == "approved":
-            badge = '<span class="badge warn">Approved, flagged</span>' if flagged else '<span class="badge">Approved</span>'
+        status = link["status"]
+        if status == "allowed":
+            badge = '<span class="badge">Allowed</span>'
             target = f'<a class="url" href="{escape(link["url"])}" rel="noopener noreferrer nofollow ugc">{escape(link["url"])}</a>'
         else:
             label = {"pending": "Checking the page", "checking-note": "Checking the note",
-                     "note-rejected": "Not shared: note not approved", "rejected": "Not shared: page rejected",
+                     "note-not-allowed": "Not shared: note not allowed",
+                     "age-restricted": "Not linked: page age-restricted", "blocked": "Not shared: page blocked",
+                     "purged": "Not shared: page purged",
                      "error": "Not shared: the page could not be checked"}.get(status, "Checking the page")
-            badge = f'<span class="badge{" stop" if status in ("rejected", "error", "note-rejected") else ""}">{label}</span>'
+            tone = {"age-restricted": " warn", "blocked": " stop", "purged": " stop", "error": " stop",
+                    "note-not-allowed": " stop"}.get(status, "")
+            badge = f'<span class="badge{tone}">{label}</span>'
             target = f'<span class="url">{escape(link["url"])}</span>'
         why = ""
         explanation = link.get("explanation")
@@ -359,7 +365,7 @@ def make_handler(board: Board):
                     return
                 if path == "/links":
                     # A submitted demo outcome never affects live moderation.
-                    choice = fields.get("demo_result", ["approved"])[0] if board.moderator.demo else "approved"
+                    choice = fields.get("demo_result", ["allowed"])[0] if board.moderator.demo else "allowed"
                     notice = board.submit(fields.get("url", [""])[0], fields.get("note", [""])[0], choice)
                 else:
                     notice = board.remove(parts[1])

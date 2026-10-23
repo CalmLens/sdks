@@ -4,9 +4,9 @@ An Expo (React Native) app that uploads photos straight from the phone to CalmLe
 [upload preset](https://calmlens.com/docs/guides/upload-presets), then shows the decision. The app
 never holds an API key: a tiny token server signs a single-use upload token for each upload.
 
-| Approved | Rejected |
+| Allowed | Blocked |
 | --- | --- |
-| ![A landscape photo marked Approved](docs/approved.png) | ![A CalmLens violence test image marked Rejected](docs/rejected.png) |
+| ![A landscape photo marked as allowed](docs/approved.png) | ![A CalmLens violence test image marked as not shown](docs/rejected.png) |
 
 ## How it works
 
@@ -18,7 +18,7 @@ never holds an API key: a tiny token server signs a single-use upload token for 
                         ◄───────────  { token, expiresAt }   (signed locally, no CalmLens request)
  3. assets.classify()  ── Authorization: Bearer <token> ──►  CalmLens
                        ◄── { id, status: "pending" } ──────
- 4. assets.retrieve() every 1.5 s until "approved" or "rejected"
+ 4. assets.retrieve() every 1.5 s until the status is no longer "pending"
 ```
 
 - [`server/index.ts`](server/index.ts) holds the API key and returns a new token on
@@ -30,7 +30,9 @@ never holds an API key: a tiny token server signs a single-use upload token for 
 - [`App.tsx`](App.tsx) picks a photo with `expo-image-picker`, reads it with `expo-file-system`
   and uploads it with `assets.classify`. Photos are checked after they're stored, so the first
   answer is usually `pending`; the app shows **Still checking** and polls `assets.retrieve`
-  until CalmLens decides. After 60 seconds it stops and offers **Check again**.
+  until CalmLens decides. After 60 seconds it stops and offers **Check again**. Only `allowed`
+  photos can be shown. The app has no age check, so it treats `age-restricted` like `blocked` and
+  `purged`: not shown.
 - Errors show a message for the person using the app and the error code for you. The app handles
   every `upload-preset/*` and `upload-token/*` code, timeouts, network errors and an unreachable
   token server.
@@ -46,7 +48,7 @@ In the portal, open **Developer → Upload presets** and create a preset with:
 | --- | --- |
 | Who can upload? | **Users your server approves** (requires a token) |
 | File types | `image/*` |
-| Show the decision to the uploader | On, so the app can show approved or rejected |
+| Show the decision to the uploader | On, so the app can show the moderation status |
 | Allowed sites | **Leave empty.** Mobile apps send no `Origin` header, so a preset that lists sites refuses them with `upload-preset/origin-not-allowed` |
 
 The token is what keeps strangers out: anyone can read the preset ID from the app, but only your
@@ -93,7 +95,7 @@ Start the app in another, and press `i` to open it in the iOS Simulator with Exp
 bun run start
 ```
 
-Choose a photo. Normal photos come back approved; to see a rejection, upload a
+Choose a photo. Normal photos come back `allowed`; to see one that isn't, upload a
 [test image](https://calmlens.com/docs/guides/testing). Test images carry your project's secret
 test input key, so download the violence one from **Assets → Try test inputs** in your project
 (the local backend below writes one for its project instead). Add it to the simulator's photo

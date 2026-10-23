@@ -18,7 +18,7 @@ module CalmLens
     end
 
     # In-memory records behind {MockServerClient}. Change them to arrange a test, such as setting an
-    # asset's `classification.moderation.decision`.
+    # asset's `classification.moderation.status`.
     #
     # @!attribute assets [Hash{String => Hash}] assets by ID, with API field names.
     # @!attribute folders [Hash{String => Hash}] folders by ID.
@@ -37,7 +37,7 @@ module CalmLens
       # Search match fields and where each one's value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
-                        'status' => %w[classification moderation decision] }.freeze
+                        'classification.moderation.status' => %w[classification moderation status] }.freeze
       MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
 
@@ -279,22 +279,26 @@ module CalmLens
       def finish(asset, queue)
         return apply_outcome(asset, @queued_outcome) if queue
 
-        decision = @analyzed_outcome.respond_to?(:call) ? @analyzed_outcome.call(deep_copy(asset)) : @analyzed_outcome
-        return apply_outcome(asset, decision) unless decision.is_a?(Hash)
+        outcome = @analyzed_outcome.respond_to?(:call) ? @analyzed_outcome.call(deep_copy(asset)) : @analyzed_outcome
+        return apply_outcome(asset, outcome) unless outcome.is_a?(Hash)
 
-        fields = deep_copy(decision)
+        fields = deep_copy(outcome)
         AssetRecord.deep_merge!(apply_outcome(asset, AssetRecord.outcome_of(fields)), fields)
       end
 
-      # Moves an asset to an outcome like the pipeline would: a decision finishes processing, and
-      # finished processing removes content kept only temporarily.
+      # Moves an asset to an outcome like the pipeline would: a decision finishes processing, `purged`
+      # deletes the content, and finished processing removes content kept only temporarily.
       def apply_outcome(asset, outcome)
         processing, moderation = AssetRecord.statuses(outcome)
         now = @now.call
         asset['classification'].merge!('status' => processing, 'updatedAt' => now, 'completedAt' => processing == 'completed' ? now : nil)
         asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
-        asset['classification']['moderation'].merge!('decision' => moderation)
-        remove_content(asset, 'retention', now) if processing == 'completed' && asset['content']['status'] == 'temporary'
+        asset['classification']['moderation'].merge!('status' => moderation)
+        if moderation == 'purged' && asset['content']['status'] != 'removed'
+          remove_content(asset, 'policy', now)
+        elsif processing == 'completed' && asset['content']['status'] == 'temporary'
+          remove_content(asset, 'retention', now)
+        end
         asset['updatedAt'] = now
         asset
       end
@@ -482,7 +486,7 @@ module CalmLens
 
         item = project_assets.find { |asset| asset['id'] == identifier || asset['externalId'] == identifier }
         return text(404, 'Asset not found') unless item && %w[content preview].include?(resource)
-        return text(403, 'Asset is held') if item['classification']['moderation'].values_at('decision', 'action') == %w[rejected hide]
+        return text(403, 'Asset is held') if item['classification']['moderation']['status'] == 'blocked'
 
         stored = @state.content[item['id']]
         return text(404, 'Asset content not found') unless stored
@@ -505,8 +509,9 @@ module CalmLens
       module_function
 
       # Processing and moderation status for each outcome.
-      OUTCOMES = { 'pending' => %w[processing pending], 'approved' => %w[completed approved],
-                   'rejected' => %w[completed rejected], 'failed' => %w[failed pending] }.freeze
+      OUTCOMES = { 'pending' => %w[processing pending], 'allowed' => %w[completed allowed],
+                   'age-restricted' => %w[completed age-restricted], 'blocked' => %w[completed blocked],
+                   'purged' => %w[completed purged], 'failed' => %w[failed pending] }.freeze
 
       def statuses(outcome)
         OUTCOMES.fetch(outcome) do
@@ -517,14 +522,14 @@ module CalmLens
 
       # The outcome of analyzed fields: `failed` when they fail processing, else their moderation status.
       def outcome_of(fields)
-        fields.dig('classification', 'status') == 'failed' ? 'failed' : fields.dig('classification', 'moderation', 'decision') || 'approved'
+        fields.dig('classification', 'status') == 'failed' ? 'failed' : fields.dig('classification', 'moderation', 'status') || 'allowed'
       end
 
       def sections(now:, open:, keep:, format:, size:)
         {
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'updatedAt' => now, 'completedAt' => nil,
-                                'moderation' => { 'decision' => 'pending', 'action' => nil, 'manualReviews' => [] } },
+                                'moderation' => { 'status' => 'pending', 'manualReviews' => [] } },
           'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
                          'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
                          'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'previewImage' => nil,

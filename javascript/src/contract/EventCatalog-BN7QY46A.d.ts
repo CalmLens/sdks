@@ -114,8 +114,8 @@ declare const EVENT_TYPE_INFO: {
       fileFormat: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
-  readonly "asset.flagged": {
-    id: "asset.flagged";
+  readonly "asset.classified": {
+    id: "asset.classified";
     name: string;
     description: string;
     category: EventCategory;
@@ -141,18 +141,20 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       flaggedCategories: EventFieldDefinition<zod.ZodArray<zod.ZodString>>;
-      moderationAction: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>>>;
+      moderationStatus: EventFieldDefinition<zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
+        pending: "pending";
+        purged: "purged";
+      }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       flaggedCategories: string[];
-      moderationAction?: "flag" | "hide" | "purge" | null | undefined;
+      moderationStatus: "age-restricted" | "allowed" | "blocked" | "pending" | "purged";
     }>;
     factInfo: {
       label: string;
@@ -182,15 +184,17 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       flaggedCategories: zod.ZodArray<zod.ZodString>;
-      moderationAction: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>>;
+      moderationStatus: zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
+        pending: "pending";
+        purged: "purged";
+      }>;
     }, zod.core.$strip>;
   };
-  readonly "asset.approved": {
-    id: "asset.approved";
+  readonly "asset.allowed": {
+    id: "asset.allowed";
     name: string;
     description: string;
     category: EventCategory;
@@ -219,16 +223,7 @@ declare const EVENT_TYPE_INFO: {
         automated: "automated";
         reviewer: "reviewer";
       }>>;
-      moderationAction: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>>>;
-      reviewAction: EventFieldDefinition<zod.ZodOptional<zod.ZodEnum<{
-        approve: "approve";
-        hide: "hide";
-        purge: "purge";
-      }>>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
       reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
@@ -238,8 +233,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       decidedBy: "automated" | "reviewer";
-      moderationAction?: "flag" | "hide" | "purge" | null | undefined;
-      reviewAction?: "approve" | "hide" | "purge" | undefined;
+      flaggedCategories?: string[] | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
@@ -275,23 +269,14 @@ declare const EVENT_TYPE_INFO: {
         automated: "automated";
         reviewer: "reviewer";
       }>;
-      moderationAction: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>>;
-      reviewAction: zod.ZodOptional<zod.ZodEnum<{
-        approve: "approve";
-        hide: "hide";
-        purge: "purge";
-      }>>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
       reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
-  readonly "asset.rejected": {
-    id: "asset.rejected";
+  readonly "asset.age-restricted": {
+    id: "asset.age-restricted";
     name: string;
     description: string;
     category: EventCategory;
@@ -320,16 +305,7 @@ declare const EVENT_TYPE_INFO: {
         automated: "automated";
         reviewer: "reviewer";
       }>>;
-      moderationAction: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>>>;
-      reviewAction: EventFieldDefinition<zod.ZodOptional<zod.ZodEnum<{
-        approve: "approve";
-        hide: "hide";
-        purge: "purge";
-      }>>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
       reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
@@ -339,8 +315,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       decidedBy: "automated" | "reviewer";
-      moderationAction?: "flag" | "hide" | "purge" | null | undefined;
-      reviewAction?: "approve" | "hide" | "purge" | undefined;
+      flaggedCategories?: string[] | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
@@ -376,16 +351,171 @@ declare const EVENT_TYPE_INFO: {
         automated: "automated";
         reviewer: "reviewer";
       }>;
-      moderationAction: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>>;
-      reviewAction: zod.ZodOptional<zod.ZodEnum<{
-        approve: "approve";
-        hide: "hide";
-        purge: "purge";
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
+      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, zod.core.$strip>;
+  };
+  readonly "asset.blocked": {
+    id: "asset.blocked";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      assetName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      assetType: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>>;
+      decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        automated: "automated";
+        reviewer: "reviewer";
       }>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
+      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      assetName?: string | null | undefined;
+      assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      decidedBy: "automated" | "reviewer";
+      flaggedCategories?: string[] | undefined;
+      reviewerUserId?: string | null | undefined;
+      reviewerName?: string | null | undefined;
+      note?: string | null | undefined;
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      assetName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      assetType: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>;
+      decidedBy: zod.ZodEnum<{
+        automated: "automated";
+        reviewer: "reviewer";
+      }>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
+      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, zod.core.$strip>;
+  };
+  readonly "asset.purged": {
+    id: "asset.purged";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      assetName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      assetType: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>>;
+      decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        automated: "automated";
+        reviewer: "reviewer";
+      }>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
+      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      assetName?: string | null | undefined;
+      assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      decidedBy: "automated" | "reviewer";
+      flaggedCategories?: string[] | undefined;
+      reviewerUserId?: string | null | undefined;
+      reviewerName?: string | null | undefined;
+      note?: string | null | undefined;
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      assetName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      assetType: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>;
+      decidedBy: zod.ZodEnum<{
+        automated: "automated";
+        reviewer: "reviewer";
+      }>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
       reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -675,16 +805,18 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       automatedOutcome: EventFieldDefinition<zod.ZodEnum<{
-        approved: "approved";
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
         pending: "pending";
-        rejected: "rejected";
+        purged: "purged";
       }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      automatedOutcome: "approved" | "pending" | "rejected";
+      automatedOutcome: "age-restricted" | "allowed" | "blocked" | "pending" | "purged";
     }>;
     factInfo: {
       label: string;
@@ -714,9 +846,11 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       automatedOutcome: zod.ZodEnum<{
-        approved: "approved";
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
         pending: "pending";
-        rejected: "rejected";
+        purged: "purged";
       }>;
     }, zod.core.$strip>;
   };

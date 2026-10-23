@@ -40,7 +40,7 @@ type harness struct {
 
 func setup(t *testing.T) (*ServerClient, *harness) {
 	t.Helper()
-	h := &harness{result: JSON{"id": "a", "status": "approved"}, status: 200}
+	h := &harness{result: JSON{"id": "a", "status": "allowed"}, status: 200}
 	client, err := NewServerClient(Options{APIKey: "key", ProjectID: "p /?", HTTPClient: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		h.mu.Lock()
 		defer h.mu.Unlock()
@@ -332,12 +332,12 @@ func TestLocalFailuresAreSDKErrors(t *testing.T) {
 
 func TestResponsesAreLimitedAndKeepIntegerPrecision(t *testing.T) {
 	c, h := setup(t)
-	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"decision": "future-status", "categories": JSON{"x": JSON{"status": "future-status"}}}}}
+	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"status": "future-status", "categories": JSON{"x": JSON{"status": "future-status"}}}}}
 	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Classification.Moderation.Decision != "future-status" || asset.Classification.Moderation.Categories["x"].Status != "future-status" {
+	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Classification.Moderation.Status != "future-status" || asset.Classification.Moderation.Categories["x"].Status != "future-status" {
 		t.Fatalf("%#v", asset.Raw)
 	}
 	c.options.MaxResponseBytes = 16
@@ -370,12 +370,12 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 		{status: 200, result: JSON{"items": []JSON{{"id": "1"}, {"id": "2"}}, "hasMore": true, "nextCursor": "next-token"}},
 		{status: 200, result: JSON{"items": []JSON{{"id": "3"}}, "hasMore": false}},
 	}
-	it := c.Assets.ListAll(ListAssetsOptions{PageSize: 2, Filter: Ptr("classification.moderation.decision==approved")})
+	it := c.Assets.ListAll(ListAssetsOptions{PageSize: 2, Filter: Ptr("classification.moderation.status==allowed")})
 	ids := []string{}
 	for it.Next(ctx) {
 		ids = append(ids, it.Asset().ID)
 	}
-	if it.Err() != nil || fmt.Sprint(ids) != "[1 2 3]" || h.calls[1].URL.Query().Get("cursor") != "next-token" || h.calls[1].URL.Query().Get("filter") != "classification.moderation.decision==approved" {
+	if it.Err() != nil || fmt.Sprint(ids) != "[1 2 3]" || h.calls[1].URL.Query().Get("cursor") != "next-token" || h.calls[1].URL.Query().Get("filter") != "classification.moderation.status==allowed" {
 		t.Fatal(ids, it.Err())
 	}
 	h.calls = nil
@@ -617,11 +617,11 @@ func TestWaitForDecisionChecksUntilDecided(t *testing.T) {
 	c, h := setup(t)
 	fakeClock(c, h)
 	state := func(processing, moderation string) reply {
-		return reply{status: 200, result: JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": processing, "moderation": JSON{"decision": moderation}}}}
+		return reply{status: 200, result: JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": processing, "moderation": JSON{"status": moderation}}}}
 	}
-	h.next = []reply{state(ClassificationStatusPending, ModerationStatusPending), state(ClassificationStatusProcessing, ModerationStatusPending), state(ClassificationStatusCompleted, ModerationStatusRejected)}
+	h.next = []reply{state(ClassificationStatusPending, ModerationStatusPending), state(ClassificationStatusProcessing, ModerationStatusPending), state(ClassificationStatusCompleted, ModerationStatusAgeRestricted)}
 	asset, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
-	if err != nil || asset.ID != "a" || asset.Classification.Moderation.Decision != ModerationStatusRejected {
+	if err != nil || asset.ID != "a" || asset.Classification.Moderation.Status != ModerationStatusAgeRestricted {
 		t.Fatal(asset, err)
 	}
 	if len(h.calls) != 3 || fmt.Sprint(h.slept) != "[500ms 750ms]" {
@@ -644,7 +644,7 @@ func TestWaitForDecisionChecksUntilDecided(t *testing.T) {
 func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	c, h := setup(t)
 	fakeClock(c, h)
-	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"decision": ModerationStatusPending}}}
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"status": ModerationStatusPending}}}
 	_, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: 2 * time.Second})
 	var failure *Error
 	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || failure.Details["classificationStatus"] != ClassificationStatusProcessing || failure.Details["moderationStatus"] != ModerationStatusPending {
@@ -675,7 +675,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 
 func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 	c, h := setup(t)
-	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"decision": ModerationStatusPending}}}
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"status": ModerationStatusPending}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// Cancel while waiting between checks; the real sleep then returns the context error.

@@ -35,7 +35,8 @@ import java.util.Objects;
  * accepts any JSON, are untyped: {@code String}, {@code Long}, {@code Double}, {@code Boolean},
  * {@code List} and {@code Map}. Unknown
  * response fields are ignored, and unknown {@link AssetClassificationStatus}, {@link
- * AssetModerationStatus}, {@link AssetContentStatus} or {@link Visibility} values keep their raw
+ * AssetModerationStatus}, {@link AssetModerationDecision}, {@link AssetContentStatus} or {@link
+ * Visibility} values keep their raw
  * value instead of failing.
  */
 public final class Models {
@@ -94,7 +95,7 @@ public final class Models {
     public static final AssetClassificationStatus PENDING = new AssetClassificationStatus("pending");
     /** Queued or being classified. */
     public static final AssetClassificationStatus PROCESSING = new AssetClassificationStatus("processing");
-    /** Processing finished; see {@code classification.moderation.decision} for the decision. */
+    /** Processing finished; see {@code classification.moderation.status} for the decision. */
     public static final AssetClassificationStatus COMPLETED = new AssetClassificationStatus("completed");
     /** Processing failed; {@code assets.retry} processes the asset again. */
     public static final AssetClassificationStatus FAILED = new AssetClassificationStatus("failed");
@@ -133,25 +134,31 @@ public final class Models {
   }
 
   /**
-   * The moderation decision in force ({@code classification.moderation.decision}): a reviewer's decision when there
-   * is one, otherwise the automated one. Unknown values are kept like {@link AssetClassificationStatus}.
-   * Treat anything other than {@link #APPROVED} as not publishable.
+   * The moderation decision in force ({@code classification.moderation.status}), which also decides
+   * delivery: a reviewer's decision when there is one, otherwise the policy's. Unknown values are
+   * kept like {@link AssetClassificationStatus}. Show content publicly only when it is {@link
+   * #ALLOWED}.
    */
   @JsonAdapter(AssetModerationStatus.Adapter.class)
   public static final class AssetModerationStatus {
     /** No decision yet. */
     public static final AssetModerationStatus PENDING = new AssetModerationStatus("pending");
-    /** Approved by moderation or a reviewer. */
-    public static final AssetModerationStatus APPROVED = new AssetModerationStatus("approved");
-    /** Rejected by moderation or a reviewer. */
-    public static final AssetModerationStatus REJECTED = new AssetModerationStatus("rejected");
-    private static final Map<String, AssetModerationStatus> KNOWN = Map.of("pending", PENDING, "approved", APPROVED, "rejected", REJECTED);
+    /** Delivered to anyone with access. */
+    public static final AssetModerationStatus ALLOWED = new AssetModerationStatus("allowed");
+    /** Delivered only through signed URLs or API keys, like a private asset; show it only behind your own age gate. */
+    public static final AssetModerationStatus AGE_RESTRICTED = new AssetModerationStatus("age-restricted");
+    /** Blocked: not delivered; the content is kept. */
+    public static final AssetModerationStatus BLOCKED = new AssetModerationStatus("blocked");
+    /** Not delivered, and the stored content is deleted. */
+    public static final AssetModerationStatus PURGED = new AssetModerationStatus("purged");
+    private static final Map<String, AssetModerationStatus> KNOWN = Map.of("pending", PENDING, "allowed", ALLOWED,
+        "age-restricted", AGE_RESTRICTED, "blocked", BLOCKED, "purged", PURGED);
     private final String value;
 
     private AssetModerationStatus(String value) { this.value = value; }
 
     /**
-     * @param value the API value, such as {@code "approved"}
+     * @param value the API value, such as {@code "allowed"}
      * @return the matching constant, or a new instance keeping an unknown value
      */
     public static AssetModerationStatus of(String value) {
@@ -159,7 +166,7 @@ public final class Models {
       return known != null ? known : new AssetModerationStatus(value);
     }
 
-    /** @return the API value, such as {@code "approved"} */
+    /** @return the API value, such as {@code "allowed"} */
     public String value() { return value; }
 
     /** @return whether this SDK version knows the value */
@@ -172,6 +179,54 @@ public final class Models {
     static final class Adapter extends TypeAdapter<AssetModerationStatus> {
       @Override public void write(JsonWriter out, AssetModerationStatus status) throws IOException { if (status == null) out.nullValue(); else out.value(status.value); }
       @Override public AssetModerationStatus read(JsonReader in) throws IOException {
+        if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
+        return of(in.nextString());
+      }
+    }
+  }
+
+  /**
+   * A reviewer's decision in an asset's review history ({@code classification.moderation.manualReviews[].decision}).
+   * Unknown values are kept like {@link AssetClassificationStatus}.
+   */
+  @JsonAdapter(AssetModerationDecision.Adapter.class)
+  public static final class AssetModerationDecision {
+    /** Deliver to anyone with access. */
+    public static final AssetModerationDecision ALLOWED = new AssetModerationDecision("allowed");
+    /** Deliver only through signed URLs or API keys. */
+    public static final AssetModerationDecision AGE_RESTRICTED = new AssetModerationDecision("age-restricted");
+    /** Don't deliver; keep the content. */
+    public static final AssetModerationDecision BLOCKED = new AssetModerationDecision("blocked");
+    /** Don't deliver, and delete the stored content. */
+    public static final AssetModerationDecision PURGED = new AssetModerationDecision("purged");
+    private static final Map<String, AssetModerationDecision> KNOWN = Map.of("allowed", ALLOWED,
+        "age-restricted", AGE_RESTRICTED, "blocked", BLOCKED, "purged", PURGED);
+    private final String value;
+
+    private AssetModerationDecision(String value) { this.value = value; }
+
+    /**
+     * @param value the API value, such as {@code "blocked"}
+     * @return the matching constant, or a new instance keeping an unknown value
+     */
+    public static AssetModerationDecision of(String value) {
+      AssetModerationDecision known = KNOWN.get(Objects.requireNonNull(value, "value"));
+      return known != null ? known : new AssetModerationDecision(value);
+    }
+
+    /** @return the API value, such as {@code "blocked"} */
+    public String value() { return value; }
+
+    /** @return whether this SDK version knows the value */
+    public boolean isKnown() { return KNOWN.containsKey(value); }
+
+    @Override public boolean equals(Object other) { return other instanceof AssetModerationDecision decision && decision.value.equals(value); }
+    @Override public int hashCode() { return value.hashCode(); }
+    @Override public String toString() { return value; }
+
+    static final class Adapter extends TypeAdapter<AssetModerationDecision> {
+      @Override public void write(JsonWriter out, AssetModerationDecision decision) throws IOException { if (decision == null) out.nullValue(); else out.value(decision.value); }
+      @Override public AssetModerationDecision read(JsonReader in) throws IOException {
         if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
         return of(in.nextString());
       }
@@ -342,8 +397,9 @@ public final class Models {
   /**
    * What happens to flagged content for one asset, overriding the project's moderation action.
    *
-   * @param action {@code allow} takes no action, {@code flag} keeps delivery enabled, {@code hide}
-   *     blocks delivery while keeping the content, and {@code purge} deletes it
+   * @param action {@code allow} takes no action, {@code age-restrict} delivers the asset only through
+   *     signed URLs or API keys, {@code block} stops delivery while keeping the content, and {@code
+   *     purge} deletes it
    */
   public record FlaggedContentPolicy(String action) {
     /** No action set. */
@@ -1049,7 +1105,7 @@ public final class Models {
     public ListAssets() {}
     public ListAssets cursor(String value) { cursor = value; return this; }
     public ListAssets pageSize(Integer value) { pageSize = value; return this; }
-    /** @param value a filter such as {@code classification.moderation.decision==approved} @return these options */
+    /** @param value a filter such as {@code classification.moderation.status==allowed} @return these options */
     public ListAssets filter(String value) { filter = value; return this; }
     /** @param value lists only assets directly in this folder @return these options */
     public ListAssets folderId(String value) { folderId = value; return this; }
@@ -1286,6 +1342,7 @@ public final class Models {
     private String resource;
     private String lens;
     private transient Object transform;
+    private Boolean ageRestricted;
     private HttpOptions init;
     public CdnRequest() {}
     /** @param assetIdentifier an asset ID or external ID */
@@ -1304,6 +1361,16 @@ public final class Models {
     /** @param value transform steps, applied in order; at least one @return these options */
     public CdnRequest transform(List<Transform> value) { transform = value; return this; }
     Object transformValue() { return transform; }
+    /**
+     * Adds {@code ?ageRestricted=true} so the CDN serves a public asset whose moderation status is
+     * {@code age-restricted} from its public URL; without it such an asset needs a signed URL or an
+     * API key. Set it only where your app has already decided the viewer may see age-restricted
+     * content. False or unset adds nothing.
+     *
+     * @param value whether to request age-restricted content
+     * @return these options
+     */
+    public CdnRequest ageRestricted(Boolean value) { ageRestricted = value; return this; }
     /** @param value the request method and extra headers, such as {@code Range} @return these options */
     public CdnRequest init(HttpOptions value) { init = value; return this; }
     HttpOptions initValue() { return init; }
@@ -1376,12 +1443,20 @@ public final class Models {
     public AssetClassification { labels = list(labels); }
   }
 
-  /** One reviewer decision in an asset's review history. */
-  public record AssetReview(String id, String decision, String action, String note, String reviewerUserId,
+  /**
+   * One reviewer decision in an asset's review history.
+   *
+   * @param decision the reviewer's decision
+   */
+  public record AssetReview(String id, AssetModerationDecision decision, String note, String reviewerUserId,
       @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean appliedToAsset) {}
 
-  /** Content-safety findings, policy assessment and reviewer decision. */
-  public record AssetModeration(AssetModerationStatus decision, String action, List<AssetReview> manualReviews,
+  /**
+   * Content-safety findings, policy assessment and reviewer decision.
+   *
+   * @param status the moderation decision in force, which also decides delivery
+   */
+  public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
       Map<String, CategoryResult> categories, Double score,
       MediaClassificationReport timeline, ReportPolicy policy) {
     public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); }
@@ -1424,7 +1499,7 @@ public final class Models {
    * How strongly a category meets the policy and what the policy does with it.
    *
    * @param score policy score from 0 to 1
-   * @param action {@code allow}, {@code flag}, {@code hide} or {@code purge}
+   * @param action {@code allow}, {@code age-restrict}, {@code block} or {@code purge}
    */
   public record CategoryPolicyScore(Double score, String action, CategoryPolicySource source,
       CategoryPolicySettingsSnapshot settings) {}
@@ -1720,12 +1795,8 @@ public final class Models {
 
   public record EventAssetClassification(AssetClassificationStatus status, EventAssetModeration moderation) {}
 
-  /**
-   * @param decision the moderation decision in force
-   * @param action what the policy did with flagged content ({@code flag}, {@code hide} or {@code
-   *     purge}), or null when nothing was flagged
-   */
-  public record EventAssetModeration(AssetModerationStatus decision, String action) {}
+  /** @param status the moderation decision in force */
+  public record EventAssetModeration(AssetModerationStatus status) {}
 
   /** @param status whether CalmLens held the content */
   public record EventAssetContent(AssetContentStatus status) {}
@@ -1734,7 +1805,7 @@ public final class Models {
    * An event from the events feed.
    *
    * @param id event ID; deliveries of the same event share it
-   * @param type event type, such as {@code asset.flagged}
+   * @param type event type, such as {@code asset.blocked}
    * @param createdAt creation time
    * @param updatedAt last update time
    * @param projectId owning project
@@ -1789,7 +1860,7 @@ public final class Models {
    * The JSON body of a webhook delivery. Get it from {@code CalmLensServerClient.parseWebhookEvent}.
    *
    * @param id event ID; the same on every retry, so use it to skip duplicates
-   * @param type event type, such as {@code asset.flagged}
+   * @param type event type, such as {@code asset.blocked}
    * @param createdAt event creation time
    * @param projectId owning project
    * @param data event fields

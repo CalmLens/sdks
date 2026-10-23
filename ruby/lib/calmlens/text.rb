@@ -12,8 +12,8 @@ module CalmLens
     # Moderates a string as a `text/plain` asset and waits for the decision.
     # @option options [String] :text
     # @option options [String] :name defaults to `text`
-    # @return [Hash] the asset; publish only when `classification.moderation.decision` is `approved` and
-    #   `classification.moderation.action` is nil.
+    # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
+    #   `allowed`.
     def classify(options)
       api, request = call(options) { |*split| split }
       text = api['text']

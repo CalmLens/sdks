@@ -5,7 +5,7 @@ require 'calmlens'
 require 'net/http'
 
 class ServerClientTest < Minitest::Test
-  OK = '{"id":"asset","status":"approved"}'
+  OK = '{"id":"asset","status":"allowed"}'
 
   # A transport that answers with a scripted sequence and records each request.
   def scripted(*answers)
@@ -166,8 +166,8 @@ class ServerClientTest < Minitest::Test
   def test_unknown_response_values_are_returned_unchanged
     client, = scripted([200,
                         '{"id": "a", "visibility": "team", "newField": {"x": 1}, ' \
-                        '"classification": {"moderation": {"decision": "quarantined"}}}'])
-    assert_equal({ 'id' => 'a', 'classification' => { 'moderation' => { 'decision' => 'quarantined' } },
+                        '"classification": {"moderation": {"status": "quarantined"}}}'])
+    assert_equal({ 'id' => 'a', 'classification' => { 'moderation' => { 'status' => 'quarantined' } },
                    'visibility' => 'team', 'newField' => { 'x' => 1 } },
                  client.assets.retrieve(asset_id: 'a'))
   end
@@ -176,13 +176,13 @@ class ServerClientTest < Minitest::Test
     asset = lambda { |processing, moderation|
       [200,
        '{"id": "asset-1", "upload": {"status": "completed"}, ' \
-       "\"classification\": {\"status\": \"#{processing}\", \"moderation\": {\"decision\": \"#{moderation}\"}}}"]
+       "\"classification\": {\"status\": \"#{processing}\", \"moderation\": {\"status\": \"#{moderation}\"}}}"]
     }
-    client, sent = scripted(*Array.new(8) { asset.call('processing', 'pending') }, asset.call('completed', 'rejected'))
+    client, sent = scripted(*Array.new(8) { asset.call('processing', 'pending') }, asset.call('completed', 'blocked'))
     delays = []
     client.assets.define_singleton_method(:sleep) { |seconds| delays << seconds }
     assert_equal({ 'id' => 'asset-1', 'upload' => { 'status' => 'completed' },
-                   'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'rejected' } } },
+                   'classification' => { 'status' => 'completed', 'moderation' => { 'status' => 'blocked' } } },
                  client.assets.wait_for_decision(asset_id: 'asset-1'))
     assert_equal(['/v1/assets/asset-1'] * 9, sent.map { |request| URI(request.url).path })
     assert_equal [0.5, 0.75, 1.125, 1.6875, 2.53125, 3.796875, 5.0, 5.0], delays
@@ -191,7 +191,7 @@ class ServerClientTest < Minitest::Test
   def test_wait_for_decision_returns_failed_processing_without_a_decision
     client, sent = scripted([200,
                              '{"id": "asset-1", "upload": {"status": "completed"}, ' \
-                             '"classification": {"status": "failed", "moderation": {"decision": "pending"}}}'])
+                             '"classification": {"status": "failed", "moderation": {"status": "pending"}}}'])
     client.assets.define_singleton_method(:sleep) { |_| flunk 'waited after processing failed' }
     assert_equal 'failed', client.assets.wait_for_decision(asset_id: 'asset-1').dig('classification', 'status')
     assert_equal 1, sent.size
@@ -199,10 +199,10 @@ class ServerClientTest < Minitest::Test
 
   def test_wait_for_decision_raises_sdk_timeout_with_the_last_status_without_waiting_past_the_deadline
     client, sent = scripted([200, '{"id": "asset-1", "upload": {"status": "uploading"}, ' \
-                                  '"classification": {"status": "pending", "moderation": {"decision": "pending"}}}'],
+                                  '"classification": {"status": "pending", "moderation": {"status": "pending"}}}'],
                             [200,
                              '{"id": "asset-1", "upload": {"status": "completed"}, ' \
-                             '"classification": {"status": "processing", "moderation": {"decision": "pending"}}}'])
+                             '"classification": {"status": "processing", "moderation": {"status": "pending"}}}'])
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     error = assert_raises(CalmLens::TimeoutError) { client.assets.wait_for_decision(asset_id: 'asset-1', timeout: 0.2) }
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 0.45
@@ -224,14 +224,14 @@ class ServerClientTest < Minitest::Test
 end
 
 class WebhookTest < Minitest::Test
-  BODY = '{"id":"event-1","type":"asset.approved","createdAt":1,"projectId":"p",' \
+  BODY = '{"id":"event-1","type":"asset.allowed","createdAt":1,"projectId":"p",' \
          '"data":{"assetId":"a","facts":[{"key":"test","value":true}]}}'
 
   def sign(body = BODY, at = 1_700_000_000) = CalmLens.create_webhook_signature_header(payload: body, timestamp: at, secret: 'whsec')
 
   def test_parse_event_verifies_then_parses
     event = CalmLens.parse_webhook_event(payload: BODY, signature: sign, timestamp: '1700000000', secret: 'whsec', now: 1_700_000_000)
-    assert_equal ['event-1', 'asset.approved', 'a', true], [event.id, event.type, event.asset_id, event.test?]
+    assert_equal ['event-1', 'asset.allowed', 'a', true], [event.id, event.type, event.asset_id, event.test?]
     error = assert_raises(CalmLens::WebhookVerificationError) do
       CalmLens.parse_webhook_event(payload: "#{BODY} ", signature: sign, timestamp: '1700000000', secret: 'whsec', now: 1_700_000_000)
     end

@@ -28,7 +28,9 @@ form.addEventListener("submit", async (event) => {
     });
 
     // `status` is only returned when the preset shows decisions to the uploader.
-    if (asset.status === "rejected") {
+    // `blocked` and `purged` break the policy. Screenshots are only seen by your team, so
+    // `age-restricted` ones are accepted.
+    if (asset.status === "blocked" || asset.status === "purged") {
       result.textContent = "This image can't be posted. Please attach a different screenshot.";
     } else {
       result.textContent = "Thanks! We got your feedback.";

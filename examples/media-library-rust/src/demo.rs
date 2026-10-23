@@ -14,9 +14,8 @@ use crate::messages::{rejected, Failure};
 use axum::http::StatusCode;
 use calmlens::models::{
     Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus,
-    AssetModerationAction, AssetModerationStatus, AssetPage, AssetReview, AssetReviewerAction,
-    AssetSearchMatch, AssetSearchResponse, Folder, MetadataItem, ProcessingOptions,
-    SearchMatchField, Visibility,
+    AssetModerationDecision, AssetModerationStatus, AssetPage, AssetReview, AssetSearchMatch,
+    AssetSearchResponse, Folder, MetadataItem, ProcessingOptions, SearchMatchField, Visibility,
 };
 use calmlens::{Bytes, Error, ErrorCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -27,17 +26,21 @@ pub const MAX_DEMO_ASSETS: usize = 40;
 pub const MAX_DEMO_FOLDERS: usize = 30;
 
 /// Explicitly selected fake moderation outcomes for demo uploads.
-pub const DEMO_OUTCOMES: [(&str, &str); 3] = [
-    ("approved", "Approve"),
-    ("rejected", "Reject"),
+pub const DEMO_OUTCOMES: [(&str, &str); 5] = [
+    ("allowed", "Allow"),
+    ("age-restricted", "Age-restrict"),
+    ("blocked", "Block"),
+    ("purged", "Purge"),
     ("failed", "Processing error"),
 ];
 
 /// The decision a demo outcome value stands for; anything else is refused.
 pub fn demo_outcome(value: &str) -> Option<Decision> {
     match value {
-        "approved" => Some(Decision::Approved),
-        "rejected" => Some(Decision::Rejected),
+        "allowed" => Some(Decision::Allowed),
+        "age-restricted" => Some(Decision::AgeRestricted),
+        "blocked" => Some(Decision::Blocked),
+        "purged" => Some(Decision::Purged),
         "failed" => Some(Decision::Failed),
         _ => None,
     }
@@ -82,19 +85,23 @@ impl DemoStore {
                     _ => AssetClassificationStatus::Completed,
                 };
                 asset.classification.updated_at = Some(now_ms());
-                // Rejected uploads are hidden by the simulated policy; approved ones matched nothing.
-                match entry.outcome {
-                    Decision::Approved => {
-                        asset.classification.moderation.decision = AssetModerationStatus::Approved
-                    }
-                    Decision::Rejected => {
-                        asset.classification.moderation.decision = AssetModerationStatus::Rejected;
-                        asset.classification.moderation.action = Some(AssetModerationAction::Hide);
-                    }
-                    Decision::Failed | Decision::Pending => {}
-                }
-                if entry.outcome != Decision::Failed {
+                let status = match entry.outcome {
+                    Decision::Allowed => Some(AssetModerationStatus::Allowed),
+                    Decision::AgeRestricted => Some(AssetModerationStatus::AgeRestricted),
+                    Decision::Blocked => Some(AssetModerationStatus::Blocked),
+                    Decision::Purged => Some(AssetModerationStatus::Purged),
+                    Decision::Failed | Decision::Pending => None,
+                };
+                if let Some(status) = status {
+                    asset.classification.moderation.status = status;
                     asset.classification.completed_at = Some(now_ms());
+                }
+                // Like CalmLens, purging deletes the stored file; the record stays.
+                if entry.outcome == Decision::Purged {
+                    entry.file = None;
+                    asset.content.status = AssetContentStatus::Removed;
+                    asset.content.removal_reason = Some(AssetContentRemovalReason::Policy);
+                    asset.content.updated_at = Some(now_ms());
                 }
             }
         }
@@ -385,22 +392,15 @@ impl DemoStore {
     }
 
     /// A simulated portal decision on an asset. Returns whether the asset exists.
-    pub fn review(&mut self, id: &str, action: AssetReviewerAction) -> bool {
+    /// Only `blocked` is simulated, so the stored file is never deleted here.
+    pub fn review(&mut self, id: &str, decision: AssetModerationDecision) -> bool {
         match self.entry_mut(id) {
             Ok(entry) => {
                 let moderation = &mut entry.asset.classification.moderation;
-                moderation.decision = match action {
-                    AssetReviewerAction::Rejected => AssetModerationStatus::Rejected,
-                    _ => AssetModerationStatus::Approved,
-                };
+                moderation.status = AssetModerationStatus::from(decision.as_str());
                 let mut review = AssetReview::default();
                 review.id = format!("demo-review-{}", random_hex(8));
-                review.action = match action {
-                    AssetReviewerAction::Rejected => "hide",
-                    _ => "approve",
-                }
-                .to_string();
-                review.decision = action;
+                review.decision = decision;
                 review.note = Some("Simulated portal decision".to_string());
                 review.reviewer_user_id = Some("demo-reviewer".to_string());
                 review.reviewed_at = now_ms();
@@ -414,8 +414,8 @@ impl DemoStore {
 
     /// Simulated search: local, case-insensitive keyword matching over names, descriptions,
     /// tags and metadata values. There is no semantic matching offline, so `semantic` mode finds
-    /// nothing and `semanticStatus` is always `disabled`. Like CalmLens, results exclude
-    /// rejected, unfinished and removed content.
+    /// nothing and `semanticStatus` is always `disabled`. Like CalmLens, results exclude blocked,
+    /// purged and removed content; the demo also leaves out unfinished uploads.
     pub fn search(&self, query: &str, mode: &str, limit: usize) -> AssetSearchResponse {
         let terms: Vec<String> = query
             .split_whitespace()
@@ -426,7 +426,8 @@ impl DemoStore {
         if mode != "semantic" && !terms.is_empty() {
             for entry in &self.assets {
                 let asset = &entry.asset;
-                if decision(asset) != Decision::Approved || content_removed(asset) {
+                let listed = matches!(decision(asset), Decision::Allowed | Decision::AgeRestricted);
+                if !listed || content_removed(asset) {
                     continue;
                 }
                 let mut matched = Vec::new();

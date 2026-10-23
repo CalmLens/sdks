@@ -2,7 +2,19 @@
 // Asset type means the rest of the app doesn't care whether it's running against the
 // real API or the local demo simulator.
 
-export type ModerationStatus = "pending" | "approved" | "rejected" | "error";
+/**
+ * CalmLens's moderation status, plus `error` when processing failed. `allowed` photos are shown
+ * to everyone. `age-restricted` photos are published too, but shown only to viewers who turned on
+ * "Show sensitive media"; everyone else sees a blurred placeholder. Text has no sensitive view,
+ * so text that isn't `allowed` is never saved.
+ */
+export type ModerationStatus =
+  | "pending"
+  | "allowed"
+  | "age-restricted"
+  | "blocked"
+  | "purged"
+  | "error";
 
 export type ContentKind = "post-image" | "caption" | "comment" | "bio";
 
@@ -24,12 +36,11 @@ export interface ModerationOutcome {
   /** The upload preset the asset was uploaded through, when the provider knows it. */
   uploadPresetId?: string | null;
   /**
-   * `approved` → show it. `rejected` → the project policy chose hide/purge; don't show it.
-   * `pending` → still being classified. `error` → classification failed; treat as not shown.
+   * `allowed` → show it. `age-restricted` → show photos only to viewers who opted in, and a
+   * placeholder to everyone else. `blocked` or `purged` → don't show it. `pending` → still being
+   * classified. `error` → classification failed; treat as not shown.
    */
   status: ModerationStatus;
-  /** `true` on an approved item means the policy chose "flag": publish, but queue for review. */
-  flagged: boolean;
   /** Evaluated categories, highest score first. */
   findings: CategoryFinding[];
 }
@@ -65,8 +76,17 @@ export interface ModerationProvider {
     assetId: string,
     options: { timeoutMs: number; signal?: AbortSignal },
   ): Promise<ModerationOutcome>;
-  /** Only call this for approved assets — see the README section on CDN delivery. */
-  imageUrl(assetId: string, variant: "feed" | "thumb"): string;
+  /**
+   * Only call this for allowed assets, or with `ageRestricted` for age-restricted assets the
+   * viewer may see — see the README section on CDN delivery.
+   */
+  imageUrl(
+    assetId: string,
+    variant: "feed" | "thumb",
+    options?: { ageRestricted?: boolean },
+  ): string;
+  /** The asset's small blurred placeholder image, served whatever its moderation status. */
+  placeholderUrl(assetId: string): string;
   deleteAsset(assetId: string): Promise<void>;
   verifyWebhook(rawBody: string, signature: string, timestamp: string): Promise<boolean>;
 }

@@ -8,7 +8,7 @@ require_relative 'app'
 require_relative 'demo'
 
 module TestHelpers
-  HOLD_POLICY = { 'keepContentAfterProcessing' => true, 'flaggedContentPolicy' => { 'action' => 'hide' } }.freeze
+  HOLD_POLICY = { 'keepContentAfterProcessing' => true, 'flaggedContentPolicy' => { 'action' => 'block' } }.freeze
   CURSOR = { 'events' => [], 'cursor' => 'c0', 'hasMore' => false }.freeze
 
   def demo_app(**options)
@@ -22,31 +22,28 @@ module TestHelpers
     [Calmthread::App.new(Calmthread::Discussion.new(Calmthread::Moderator.new(client: mock)), webhooks: :manual, **options), mock]
   end
 
-  # A live app with one reply whose text was flagged and held (name-1 approved, text-1 rejected).
+  # A live app with one reply whose text was blocked and held (name-1 allowed, text-1 blocked).
   def held_app(**options)
-    app, mock = live_app(CURSOR, asset('name-1', 'approved'), asset('text-1', 'rejected', flagged: true), **options)
-    post_reply(app, name: 'Hidden Name', text: 'Held reply text')
+    app, mock = live_app(CURSOR, asset('name-1', 'allowed'), asset('text-1', 'blocked'), **options)
+    post_reply(app, name: 'Held Name', text: 'Held reply text')
     assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
     [app, mock]
   end
 
   # An asset with content stored. `status` is `pending` or `uploading` (still processing), `error`
-  # (processing failed) or the moderation status once processing is done. A flagged field is one
-  # the policy acted on: `hide` when rejected, `flag` otherwise.
-  def asset(id, status, flagged: false)
+  # (processing failed) or the moderation status once processing is done.
+  def asset(id, status)
     classification = { 'pending' => 'processing', 'uploading' => 'pending', 'error' => 'failed' }.fetch(status, 'completed')
     moderation = classification == 'completed' ? status : 'pending'
     { 'id' => id, 'upload' => { 'status' => status == 'uploading' ? 'uploading' : 'completed' },
-      'classification' => { 'status' => classification, 'moderation' => { 'decision' => moderation,
-        'action' => flagged ? (status == 'rejected' ? 'hide' : 'flag') : nil, 'categories' => {} } },
+      'classification' => { 'status' => classification, 'moderation' => { 'status' => moderation, 'categories' => {} } },
       'content' => { 'status' => 'stored' } }
-
   end
 
-  # Approval and rejection events default to a reviewer's decision; pass decided_by: 'automated'
+  # Moderation status events default to a reviewer's decision; pass decided_by: 'automated'
   # for an automated outcome.
   def decision_facts(type, facts, decided_by)
-    return facts unless %w[asset.approved asset.rejected].include?(type)
+    return facts unless Calmthread::EVENT_LABELS.key?(type)
 
     [{ 'key' => 'decided-by', 'value' => decided_by }, *facts]
   end
@@ -57,7 +54,7 @@ module TestHelpers
   end
 
   def event_asset(asset_id, moderation)
-    { 'id' => asset_id, 'upload' => { 'status' => 'completed' }, 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => moderation, 'action' => nil } },
+    { 'id' => asset_id, 'upload' => { 'status' => 'completed' }, 'classification' => { 'status' => 'completed', 'moderation' => { 'status' => moderation } },
       'content' => { 'status' => 'stored' } }
   end
 
@@ -95,8 +92,8 @@ class SubmissionTest < Minitest::Test
   include TestHelpers
 
   def test_every_field_of_every_reply_carries_the_hold_override_and_an_external_id
-    app, mock = live_app(CURSOR, asset('name-1', 'approved'), asset('text-1', 'approved'),
-                         asset('name-2', 'rejected', flagged: true), asset('text-2', 'approved'))
+    app, mock = live_app(CURSOR, asset('name-1', 'allowed'), asset('text-1', 'allowed'),
+                         asset('name-2', 'blocked'), asset('text-2', 'allowed'))
     assert_equal 303, post_reply(app).first
     assert_equal 303, post_reply(app, name: 'Second').first
     moderations = mock.requests.select { |item| item.method == 'POST' && item.path == '/projects/project-1/assets' }
@@ -110,7 +107,7 @@ class SubmissionTest < Minitest::Test
   end
 
   def test_clean_replies_publish_immediately
-    app, = live_app(CURSOR, asset('name-1', 'approved'), asset('text-1', 'approved'))
+    app, = live_app(CURSOR, asset('name-1', 'allowed'), asset('text-1', 'allowed'))
     _, headers, = post_reply(app, name: 'Ada', text: 'Ten minutes outside.')
     assert_equal '/?notice=published', headers['location']
     assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
@@ -119,22 +116,22 @@ class SubmissionTest < Minitest::Test
     assert_includes page, '>Ada<'
   end
 
-  def test_a_flagged_reply_is_held_and_its_text_is_never_rendered
+  def test_a_blocked_reply_is_held_and_its_text_is_never_rendered
     app, = held_app
     reply = app.discussion.replies.first
     assert_equal [:text], reply[:held_fields]
     page = home(app)
     refute_includes page, 'Held reply text'
-    refute_includes page, 'Hidden Name'
+    refute_includes page, 'Held Name'
     assert_includes page, 'aria-label="Reply held for review"'
     assert_includes page, 'text-1'
     assert_includes page, 'name-1'
     refute_includes app.discussion.activity.inspect, 'Held reply text'
-    refute_includes app.discussion.activity.inspect, 'Hidden Name'
+    refute_includes app.discussion.activity.inspect, 'Held Name'
   end
 
-  def test_a_flagged_name_holds_the_reply_but_still_sends_the_text_for_review
-    app, mock = live_app(CURSOR, asset('name-1', 'rejected', flagged: true), asset('text-1', 'approved'))
+  def test_a_blocked_name_holds_the_reply_but_still_sends_the_text_for_review
+    app, mock = live_app(CURSOR, asset('name-1', 'blocked'), asset('text-1', 'allowed'))
     post_reply(app, name: 'Rude Name', text: 'Fine words')
     assert_equal 'Fine words', mock.requests.last.body
     reply = app.discussion.replies.first
@@ -143,36 +140,38 @@ class SubmissionTest < Minitest::Test
     refute_includes home(app), 'Fine words'
   end
 
-  def test_an_approved_but_flagged_field_is_held_not_published
-    app, = live_app(CURSOR, asset('name-1', 'approved'), asset('text-1', 'approved', flagged: true))
-    post_reply(app, text: 'Borderline')
-    assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
-    refute_includes home(app), 'Borderline'
+  def test_age_restricted_and_purged_fields_hold_the_reply_too
+    %w[age-restricted purged].each do |status|
+      app, = live_app(CURSOR, asset('name-1', 'allowed'), asset('text-1', status))
+      post_reply(app, text: 'Borderline')
+      assert_equal [[:held, [:text]]], app.discussion.replies.map { |reply| [reply[:state], reply[:held_fields]] }, status
+      refute_includes home(app), 'Borderline'
+    end
   end
 
   def test_pending_unknown_and_malformed_results_fail_closed
-    ['pending', 'uploading', 'error', 'flagged', 'unknown', nil].each do |status|
+    ['pending', 'uploading', 'error', 'approved', 'unknown', nil].each do |status|
       # A failed name never sends the reply text; a failed text discards the reply.
-      [[asset('n', 'approved'), asset('t', status)], [asset('n', status)]].each do |responses|
+      [[asset('n', 'allowed'), asset('t', status)], [asset('n', status)]].each do |responses|
         app, mock = live_app(*responses)
         assert_equal :failed, app.discussion.submit('Ada', 'Secret text')
         assert_empty app.discussion.replies, "kept #{status.inspect}"
         assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| item.body == 'Secret text' })
       end
     end
-    approved = { 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'approved', 'action' => nil } } }
-    [approved, approved.merge('id' => ''), [],
-     { 'id' => 't', 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'rejected', 'action' => nil } } }].each_with_index do |text, index|
-      app, = live_app(asset('n', 'approved'), text)
+    allowed = { 'classification' => { 'status' => 'completed', 'moderation' => { 'status' => 'allowed' } } }
+    [allowed, allowed.merge('id' => ''), [],
+     { 'id' => 't', 'classification' => { 'status' => 'completed', 'moderation' => { 'status' => 'blocked' } } }].each_with_index do |text, index|
+      app, = live_app(asset('n', 'allowed'), text)
       result = app.discussion.submit('Ada', 'Hello')
-      # Only the last response is a well-formed rejection, which holds rather than publishes.
+      # Only the last response is a well-formed blocked result, which holds rather than publishes.
       assert_equal(index == 3 ? :held : :failed, result)
       refute_includes app.discussion.replies.map { |reply| reply[:state] }, :published
     end
   end
 
   def test_transport_failures_fail_closed_without_showing_the_error
-    app, mock = live_app(asset('name-1', 'approved'))
+    app, mock = live_app(asset('name-1', 'allowed'))
     mock.enqueue_error(Errno::ECONNRESET.new)
     error = assert_raises(CalmLens::ConnectionError) { app.discussion.submit('Ada', 'Hello') }
     assert_equal 'sdk/transport-error', error.code
@@ -194,7 +193,7 @@ class SubmissionTest < Minitest::Test
     held = app.discussion.replies.find { |reply| reply[:text] == 'T-name-held' }
     assert_equal [:name], held[:held_fields]
     stored = app.discussion.moderator.client.state.assets.fetch(held[:asset_ids][:name])
-    assert_equal ["#{held[:id]}:name", 'rejected'], [stored['externalId'], stored.dig('classification', 'moderation', 'decision')]
+    assert_equal ["#{held[:id]}:name", 'blocked'], [stored['externalId'], stored.dig('classification', 'moderation', 'status')]
     assert_equal 'sdk/transport-error', assert_raises(CalmLens::Error) { app.discussion.submit('Ada', 'Hi', 'unavailable') }.code
     capture_io { assert_equal 502, post_reply(app, demo_result: 'unavailable').first }
     page = home(app)
@@ -206,7 +205,7 @@ class SubmissionTest < Minitest::Test
     app = demo_app
     ['', '   ', 'x' * 41, "two\nlines"].each { |name| assert_raises(Calmthread::InputError) { app.discussion.submit(name, 'Hello') } }
     ['', '  ', 'x' * 1001].each { |text| assert_raises(Calmthread::InputError) { app.discussion.submit('Ada', text) } }
-    assert_raises(Calmthread::InputError) { app.discussion.submit('Ada', 'Hello', 'approved') }
+    assert_raises(Calmthread::InputError) { app.discussion.submit('Ada', 'Hello', 'allowed') }
     status, _, body = post_reply(app, name: '')
     assert_equal 400, status
     assert_includes body, 'Choose a display name'
@@ -239,11 +238,11 @@ end
 class ReviewTest < Minitest::Test
   include TestHelpers
 
-  def test_reviewer_approval_releases_the_reply_once_every_field_is_approved
+  def test_reviewer_allowing_releases_the_reply_once_every_field_is_allowed
     app, mock = held_app
     # The event snapshot is stale on purpose; the retrieved assets decide.
-    mock.enqueue(body: page_of(event('e1', 'asset.approved', 'text-1', [{ 'key' => 'reviewer-name', 'value' => 'Sam' }], snapshot: 'rejected')))
-        .enqueue(body: asset('text-1', 'approved', flagged: true)).enqueue(body: asset('name-1', 'approved'))
+    mock.enqueue(body: page_of(event('e1', 'asset.allowed', 'text-1', [{ 'key' => 'reviewer-name', 'value' => 'Sam' }], snapshot: 'blocked')))
+        .enqueue(body: asset('text-1', 'allowed')).enqueue(body: asset('name-1', 'allowed'))
     _, headers, = sync(app)
     assert_equal '/?notice=applied&count=1', headers['location']
     assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
@@ -253,17 +252,17 @@ class ReviewTest < Minitest::Test
     assert_equal 'c1', app.feed.cursor
   end
 
-  def test_approval_event_releases_nothing_unless_the_retrieved_assets_are_approved
+  def test_allowed_event_releases_nothing_unless_the_retrieved_assets_are_allowed
     app, mock = held_app
     reply_id = app.discussion.replies.first[:id]
-    mock.enqueue(body: page_of(event('e1', 'asset.approved', 'text-1', snapshot: 'approved')))
-        .enqueue(body: asset('text-1', 'rejected', flagged: true)) # rejected again since the event
-        .enqueue(body: page_of(event('e2', 'asset.approved', 'text-1'), cursor: 'c2'))
-        .enqueue(body: asset('text-1', 'approved')).enqueue(body: asset('name-1', 'pending')) # another field is not approved
-        .enqueue(body: page_of(event('e3', 'asset.approved', 'text-1'), cursor: 'c3'))
-        .enqueue(body: asset('wrong-id', 'approved')) # not the requested asset
-        .enqueue(body: page_of(event('e4', 'asset.approved', 'text-1'), cursor: 'c4'))
-        .enqueue(body: asset('text-1', 'approved').merge('externalId' => "#{reply_id}:name")) # another field's asset
+    mock.enqueue(body: page_of(event('e1', 'asset.allowed', 'text-1', snapshot: 'allowed')))
+        .enqueue(body: asset('text-1', 'blocked')) # blocked again since the event
+        .enqueue(body: page_of(event('e2', 'asset.allowed', 'text-1'), cursor: 'c2'))
+        .enqueue(body: asset('text-1', 'allowed')).enqueue(body: asset('name-1', 'pending')) # another field is not allowed
+        .enqueue(body: page_of(event('e3', 'asset.allowed', 'text-1'), cursor: 'c3'))
+        .enqueue(body: asset('wrong-id', 'allowed')) # not the requested asset
+        .enqueue(body: page_of(event('e4', 'asset.allowed', 'text-1'), cursor: 'c4'))
+        .enqueue(body: asset('text-1', 'allowed').merge('externalId' => "#{reply_id}:name")) # another field's asset
     4.times { sync(app) }
     assert_equal 'c4', app.feed.cursor
     assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
@@ -271,19 +270,19 @@ class ReviewTest < Minitest::Test
     assert_equal 0, mock.remaining_responses
   end
 
-  def test_reviewer_rejection_keeps_the_reply_out_and_deletes_its_stored_content
+  def test_reviewer_blocking_keeps_the_reply_out_and_deletes_its_stored_content
     app, mock = held_app
-    mock.enqueue(body: page_of(event('e1', 'asset.rejected', 'text-1', [{ 'key' => 'note', 'value' => 'Off topic' }])))
-        .enqueue(body: asset('text-1', 'rejected', flagged: true))
-        .enqueue(body: asset('name-1', 'approved').merge('content' => { 'status' => 'removed', 'removalReason' => 'requested' }))
-        .enqueue(body: asset('text-1', 'rejected').merge('content' => { 'status' => 'removed', 'removalReason' => 'requested' }))
+    mock.enqueue(body: page_of(event('e1', 'asset.blocked', 'text-1', [{ 'key' => 'note', 'value' => 'Off topic' }])))
+        .enqueue(body: asset('text-1', 'blocked'))
+        .enqueue(body: asset('name-1', 'allowed').merge('content' => { 'status' => 'removed', 'removalReason' => 'requested' }))
+        .enqueue(body: asset('text-1', 'blocked').merge('content' => { 'status' => 'removed', 'removalReason' => 'requested' }))
     sync(app)
     assert_equal [%w[GET /assets/text-1], %w[DELETE /assets/name-1/content], %w[DELETE /assets/text-1/content]],
                  calls(mock).last(3)
     assert_empty app.discussion.replies
     refute_includes home(app), 'Held reply text'
-    # A later approval of the same asset cannot bring it back: the reply is gone.
-    mock.enqueue(body: page_of(event('e2', 'asset.approved', 'text-1'), cursor: 'c2'))
+    # A later allowed decision on the same asset cannot bring it back: the reply is gone.
+    mock.enqueue(body: page_of(event('e2', 'asset.allowed', 'text-1'), cursor: 'c2'))
     before = mock.requests.size
     sync(app)
     assert_equal before + 1, mock.requests.size, 'only the events page was requested'
@@ -292,8 +291,8 @@ class ReviewTest < Minitest::Test
 
   def test_automated_decisions_neither_delete_nor_release_a_held_reply
     app, mock = held_app
-    mock.enqueue(body: page_of(event('a1', 'asset.rejected', 'text-1', snapshot: 'rejected', decided_by: 'automated'),
-                               event('a2', 'asset.approved', 'name-1', snapshot: 'approved', decided_by: 'automated')))
+    mock.enqueue(body: page_of(event('a1', 'asset.blocked', 'text-1', snapshot: 'blocked', decided_by: 'automated'),
+                               event('a2', 'asset.allowed', 'name-1', snapshot: 'allowed', decided_by: 'automated')))
     before = mock.requests.size
     sync(app)
     assert_equal before + 1, mock.requests.size, 'only the events page was requested'
@@ -301,10 +300,10 @@ class ReviewTest < Minitest::Test
     assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
   end
 
-  def test_rejection_event_deletes_nothing_when_the_asset_is_approved_again
+  def test_blocked_event_deletes_nothing_when_the_asset_is_allowed_again
     app, mock = held_app
-    mock.enqueue(body: page_of(event('e1', 'asset.rejected', 'text-1', snapshot: 'rejected')))
-        .enqueue(body: asset('text-1', 'approved')).enqueue(body: asset('name-1', 'approved'))
+    mock.enqueue(body: page_of(event('e1', 'asset.blocked', 'text-1', snapshot: 'blocked')))
+        .enqueue(body: asset('text-1', 'allowed')).enqueue(body: asset('name-1', 'allowed'))
     sync(app)
     refute(calls(mock).any? { |method, _| method == 'DELETE' })
     assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
@@ -312,14 +311,14 @@ class ReviewTest < Minitest::Test
 
   def test_a_failed_deletion_retries_the_page_without_publishing
     app, mock = held_app
-    rejection = page_of(event('e1', 'asset.rejected', 'text-1'))
-    mock.enqueue(body: rejection).enqueue(body: asset('text-1', 'rejected'))
+    blocked = page_of(event('e1', 'asset.blocked', 'text-1'))
+    mock.enqueue(body: blocked).enqueue(body: asset('text-1', 'blocked'))
         .enqueue(status: 500, body: { 'code' => 'server/error', 'message' => 'Down' })
     capture_io { assert_equal 502, sync(app).first }
     assert_equal 'c0', app.feed.cursor
     assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
-    mock.enqueue(body: rejection).enqueue(body: asset('text-1', 'rejected'))
-        .enqueue(body: asset('name-1', 'approved')).enqueue(body: asset('text-1', 'rejected'))
+    mock.enqueue(body: blocked).enqueue(body: asset('text-1', 'blocked'))
+        .enqueue(body: asset('name-1', 'allowed')).enqueue(body: asset('text-1', 'blocked'))
     assert_equal 303, sync(app).first
     assert_equal 'c1', app.feed.cursor
     assert_empty app.discussion.replies
@@ -328,10 +327,10 @@ class ReviewTest < Minitest::Test
 
   def test_replays_test_sends_and_unrelated_events_change_nothing
     app, mock = held_app
-    mock.enqueue(body: page_of(event('t1', 'asset.approved', 'text-1', [{ 'key' => 'test', 'value' => true }]),
-                               event('o1', 'asset.flagged', 'text-1'), event('o2', 'asset.approved', 'someone-else'),
+    mock.enqueue(body: page_of(event('t1', 'asset.allowed', 'text-1', [{ 'key' => 'test', 'value' => true }]),
+                               event('o1', 'asset.classified', 'text-1'), event('o2', 'asset.allowed', 'someone-else'),
                                more: true))
-        .enqueue(body: page_of(event('t1', 'asset.approved', 'text-1', [{ 'key' => 'test', 'value' => true }]), cursor: 'c2'))
+        .enqueue(body: page_of(event('t1', 'asset.allowed', 'text-1', [{ 'key' => 'test', 'value' => true }]), cursor: 'c2'))
     before = mock.requests.size
     sync(app)
     assert_equal before + 2, mock.requests.size, 'no asset was retrieved'
@@ -365,22 +364,22 @@ class ReviewTest < Minitest::Test
 
   def test_demo_reviewer_buttons_use_the_events_feed_path
     app = demo_app
-    app.discussion.submit('Ada', 'Approve me', 'held')
-    app.discussion.submit('Bo', 'Reject me', 'name-held')
-    approve, reject = app.discussion.replies.reverse
+    app.discussion.submit('Ada', 'Allow me', 'held')
+    app.discussion.submit('Bo', 'Block me', 'name-held')
+    allow, block = app.discussion.replies.reverse
     review = ->(reply, decision) { form(app, '/demo/review', { reply: reply[:id], decision: decision }).first }
-    assert_includes home(app), 'Simulate a reviewer approving it'
-    assert_equal 303, review.(approve, 'approve')
-    assert_equal 303, review.(reject, 'reject')
-    assert_equal [[approve[:id], :published]], app.discussion.replies.map { |reply| [reply[:id], reply[:state]] }
+    assert_includes home(app), 'Simulate a reviewer allowing it'
+    assert_equal 303, review.(allow, 'allow')
+    assert_equal 303, review.(block, 'block')
+    assert_equal [[allow[:id], :published]], app.discussion.replies.map { |reply| [reply[:id], reply[:state]] }
     content = app.discussion.moderator.client.state.content
-    assert_equal [false, false], reject[:asset_ids].values.map { |id| content.key?(id) }, 'rejected content was deleted'
+    assert_equal [false, false], block[:asset_ids].values.map { |id| content.key?(id) }, 'blocked content was deleted'
     page = home(app)
-    assert_includes page, 'Approve me'
-    refute_includes page, 'Reject me'
+    assert_includes page, 'Allow me'
+    refute_includes page, 'Block me'
     assert_includes page, '<dt>Reviewer</dt><dd>Demo reviewer</dd>'
-    assert_equal 400, review.(approve, 'approve'), 'a published reply is no longer held'
-    assert_equal 400, review.(reject, 'reject')
+    assert_equal 400, review.(allow, 'allow'), 'a published reply is no longer held'
+    assert_equal 400, review.(block, 'block')
     app.discussion.submit('Cy', 'Held', 'held')
     assert_equal 400, review.(app.discussion.replies.first, 'publish')
   end
@@ -400,13 +399,13 @@ class WebhookTest < Minitest::Test
 
   def delivery(id, type, asset_id, facts = [], decided_by: 'reviewer')
     JSON.generate('id' => id, 'type' => type, 'createdAt' => 1, 'projectId' => 'project-1',
-                  'data' => { 'assetId' => asset_id, 'asset' => event_asset(asset_id, 'approved'),
+                  'data' => { 'assetId' => asset_id, 'asset' => event_asset(asset_id, 'allowed'),
                               'facts' => decision_facts(type, facts, decided_by) })
   end
 
   def test_tampered_deliveries_are_rejected_and_verified_ones_are_acknowledged_before_any_request
     app, mock = held_app(webhook_secret: SECRET)
-    body = delivery('evt-1', 'asset.approved', 'text-1', [{ 'key' => 'reviewer-name', 'value' => 'Sam' }])
+    body = delivery('evt-1', 'asset.allowed', 'text-1', [{ 'key' => 'reviewer-name', 'value' => 'Sam' }])
     before = mock.requests.size
     assert_equal 401, deliver(app, body, signature: 'v1=bad').first
     signed = CalmLens.create_webhook_signature_header(payload: body, timestamp: Time.now.to_i, secret: SECRET)
@@ -417,7 +416,7 @@ class WebhookTest < Minitest::Test
     assert_equal 204, deliver(app, body, delivery: 'dlv-1').first
     assert_equal 204, deliver(app, body, delivery: 'dlv-1').first
     assert_equal before, mock.requests.size, 'the response did not wait for CalmLens'
-    mock.enqueue(body: asset('text-1', 'approved')).enqueue(body: asset('name-1', 'approved'))
+    mock.enqueue(body: asset('text-1', 'allowed')).enqueue(body: asset('name-1', 'allowed'))
     app.webhooks.drain
     assert_equal before + 2, mock.requests.size, 'a redelivery does not act again'
     assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
@@ -425,15 +424,15 @@ class WebhookTest < Minitest::Test
 
   def test_a_failed_webhook_is_retried_and_otherwise_left_to_the_events_feed
     app, mock = held_app(webhook_secret: SECRET)
-    body = delivery('evt-1', 'asset.rejected', 'text-1')
+    body = delivery('evt-1', 'asset.purged', 'text-1')
     assert_equal 204, deliver(app, body).first
     3.times { mock.enqueue_error(Errno::ECONNRESET.new) }
     _, err = capture_io { app.webhooks.drain }
     assert_includes err, 'sdk/transport-error'
     assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
     # The same event arrives through the feed and applies there.
-    mock.enqueue(body: page_of(event('evt-1', 'asset.rejected', 'text-1')))
-        .enqueue(body: asset('text-1', 'rejected')).enqueue(body: asset('name-1', 'approved')).enqueue(body: asset('text-1', 'rejected'))
+    mock.enqueue(body: page_of(event('evt-1', 'asset.purged', 'text-1')))
+        .enqueue(body: asset('text-1', 'purged')).enqueue(body: asset('name-1', 'allowed')).enqueue(body: asset('text-1', 'purged'))
     sync(app)
     assert_equal [%w[DELETE /assets/name-1/content], %w[DELETE /assets/text-1/content]], calls(mock).last(2)
     assert_empty app.discussion.replies
@@ -442,7 +441,7 @@ class WebhookTest < Minitest::Test
   def test_test_send_changes_nothing
     app, mock = held_app(webhook_secret: SECRET)
     before = mock.requests.size
-    assert_equal 204, deliver(app, delivery('evt-t', 'asset.rejected', 'text-1', [{ 'key' => 'test', 'value' => true }])).first
+    assert_equal 204, deliver(app, delivery('evt-t', 'asset.blocked', 'text-1', [{ 'key' => 'test', 'value' => true }])).first
     app.webhooks.drain
     assert_equal before, mock.requests.size
     assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
@@ -522,7 +521,7 @@ class RequestTest < Minitest::Test
 
   def test_live_handler_ignores_demo_overrides
     app, mock = live_app({ 'events' => [], 'cursor' => 'start', 'hasMore' => false },
-                         asset('n', 'approved'), asset('t', 'approved'))
+                         asset('n', 'allowed'), asset('t', 'allowed'))
     assert_equal 303, post_reply(app, demo_result: 'held').first
     assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
     assert_equal 'start', app.feed.cursor, 'the events cursor starts before the first moderation request'

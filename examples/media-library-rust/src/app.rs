@@ -72,11 +72,13 @@ pub const LICENCES: [(&str, &str); 4] = [
 ];
 
 /// Status filters for the folder listing. Only these fixed values are turned into a filter.
-pub const STATUS_FILTERS: [(&str, &str); 5] = [
+pub const STATUS_FILTERS: [(&str, &str); 7] = [
     ("", "All statuses"),
-    ("approved", "Approved"),
+    ("allowed", "Allowed"),
     ("pending", "In review"),
-    ("rejected", "Rejected"),
+    ("age-restricted", "Age-restricted"),
+    ("blocked", "Blocked"),
+    ("purged", "Purged"),
     ("failed", "Processing failed"),
 ];
 pub const SEARCH_MODES: [(&str, &str); 3] = [
@@ -91,17 +93,19 @@ const FACT_LABELS: [(&str, &str); 7] = [
     ("asset-name", "Asset"),
     ("decided-by", "Decided by"),
     ("previous-status", "Previous status"),
-    ("moderation-action", "Moderation action"),
+    ("moderation-status", "Moderation status"),
     ("flagged-categories", "Categories"),
     ("reviewer-name", "Reviewer"),
     ("note", "Note"),
 ];
-/// `asset.approved` and `asset.rejected` report every outcome, from automated moderation or a
-/// reviewer; their `decided-by` fact says which.
-const EVENT_LABELS: [(&str, &str); 4] = [
-    ("asset.flagged", "Flagged by automated moderation"),
-    ("asset.approved", "Approved"),
-    ("asset.rejected", "Rejected"),
+/// `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purged` report every
+/// outcome, from automated moderation or a reviewer; their `decided-by` fact says which.
+const EVENT_LABELS: [(&str, &str); 6] = [
+    ("asset.classified", "Classified"),
+    ("asset.allowed", "Allowed"),
+    ("asset.age-restricted", "Age-restricted"),
+    ("asset.blocked", "Blocked"),
+    ("asset.purged", "Purged"),
     ("asset.failed", "Processing failed"),
 ];
 
@@ -454,7 +458,7 @@ impl AppState {
 
     // ------------------------------------------------------------ delivery
 
-    /// Thumbnails and downloads. The asset's current state is retrieved first; only an approved
+    /// Thumbnails and downloads. The asset's current state is retrieved first; only an allowed
     /// asset whose file is still stored is delivered, and only through a lens.
     async fn media(&self, id: &str, lens: &str) -> Response {
         if !valid_id(id) {
@@ -471,7 +475,7 @@ impl AppState {
         if !deliverable(&asset) {
             return text(
                 StatusCode::FORBIDDEN,
-                "This image is not approved or its file was removed",
+                "This image is not allowed or its file was removed",
             );
         }
         match self.library.deliver(&asset, lens).await {
@@ -624,9 +628,10 @@ impl AppState {
             && catalogue_id(asset).is_some()
     }
 
-    /// Demo only: a simulated portal rejection, applied through the same code as a webhook.
-    async fn simulate_rejection(&self, asset_id: &str) -> Result<String, Failure> {
-        if !valid_id(asset_id) || !self.library.simulate_rejection(asset_id) {
+    /// Demo only: a simulated reviewer blocking an asset, applied through the same code as a
+    /// webhook.
+    async fn simulate_blocking(&self, asset_id: &str) -> Result<String, Failure> {
+        if !valid_id(asset_id) || !self.library.simulate_blocking(asset_id) {
             return Err(rejected(
                 StatusCode::CONFLICT,
                 "That asset is no longer in the library.",
@@ -647,7 +652,7 @@ impl AppState {
         ];
         let mut payload = WebhookEventPayload::default();
         payload.id = format!("demo-event-{}", random_hex(8));
-        payload.event_type = "asset.rejected".into();
+        payload.event_type = "asset.blocked".into();
         payload.project_id = Some(self.library.project_id().into());
         payload.data = data;
         self.apply_event(&payload, None).await?;
@@ -982,7 +987,7 @@ async fn demo_review(
         return not_found().await;
     }
     state
-        .submit(&form.csrf, state.simulate_rejection(form.asset.trim()))
+        .submit(&form.csrf, state.simulate_blocking(form.asset.trim()))
         .await
 }
 
@@ -1218,13 +1223,20 @@ fn event_label(event_type: &str) -> Option<&'static str> {
         .map(|(_, label)| *label)
 }
 
-/// What the library shows for an asset: its moderation decision, or failed processing.
+/// What the library shows for an asset: its moderation status, or failed processing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
     /// Still uploading, processing or waiting for a reviewer.
     Pending,
-    Approved,
-    Rejected,
+    /// Delivered.
+    Allowed,
+    /// CalmLens delivers it only through signed URLs or API keys, for an app that checks ages.
+    /// This team library has no age check, so it does not deliver it.
+    AgeRestricted,
+    /// Not delivered; the file is kept.
+    Blocked,
+    /// Not delivered, and the file was deleted.
+    Purged,
     /// Processing failed; there is no decision.
     Failed,
 }
@@ -1233,22 +1245,26 @@ impl Decision {
     pub fn as_str(self) -> &'static str {
         match self {
             Decision::Pending => "pending",
-            Decision::Approved => "approved",
-            Decision::Rejected => "rejected",
+            Decision::Allowed => "allowed",
+            Decision::AgeRestricted => "age-restricted",
+            Decision::Blocked => "blocked",
+            Decision::Purged => "purged",
             Decision::Failed => "failed",
         }
     }
 }
 
-/// The asset's decision. Statuses this SDK version does not know count as pending, so they are
-/// never delivered.
+/// The asset's moderation status. Statuses this SDK version does not know count as pending, so
+/// they are never delivered.
 pub fn decision(asset: &Asset) -> Decision {
     if asset.classification.status == AssetClassificationStatus::Failed {
         return Decision::Failed;
     }
-    match asset.classification.moderation.decision {
-        AssetModerationStatus::Approved => Decision::Approved,
-        AssetModerationStatus::Rejected => Decision::Rejected,
+    match asset.classification.moderation.status {
+        AssetModerationStatus::Allowed => Decision::Allowed,
+        AssetModerationStatus::AgeRestricted => Decision::AgeRestricted,
+        AssetModerationStatus::Blocked => Decision::Blocked,
+        AssetModerationStatus::Purged => Decision::Purged,
         _ => Decision::Pending,
     }
 }
@@ -1258,9 +1274,9 @@ pub fn content_removed(asset: &Asset) -> bool {
     asset.content.status == AssetContentStatus::Removed
 }
 
-/// Only an explicitly approved asset whose file is still stored is delivered.
+/// Only an explicitly allowed asset whose file is still stored is delivered.
 pub fn deliverable(asset: &Asset) -> bool {
-    decision(asset) == Decision::Approved && asset.content.status == AssetContentStatus::Stored
+    decision(asset) == Decision::Allowed && asset.content.status == AssetContentStatus::Stored
 }
 
 /// The catalogue ID this app issued for an asset, or `None` for an asset it did not upload.

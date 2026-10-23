@@ -3,9 +3,8 @@ import type {
   AssetClassificationStatus as KnownAssetClassificationStatus,
   AssetContentRemovalReason as KnownAssetContentRemovalReason,
   AssetContentStatus as KnownAssetContentStatus,
-  AssetModerationAction as KnownAssetModerationAction,
+  AssetModerationDecision as KnownAssetModerationDecision,
   AssetModerationStatus as KnownAssetModerationStatus,
-  AssetReviewerAction as KnownAssetReviewerAction,
   AssetType as KnownAssetType,
   AssetVisibility as KnownAssetVisibility,
   Asset as SharedAsset,
@@ -40,12 +39,13 @@ import type {
 
 /** Where the asset is in the pipeline: `uploading`, `processing`, then `done` or `failed`. */
 export type AssetClassificationStatus = KnownAssetClassificationStatus | (string & {});
-/** The moderation decision in force: `pending`, then `approved` or `rejected`. */
+/**
+ * The moderation decision in force, which also decides delivery: `pending`, then `allowed`,
+ * `age-restricted` (delivered only through signed URLs or API keys), `blocked` or `purged`.
+ */
 export type AssetModerationStatus = KnownAssetModerationStatus | (string & {});
-/** What the policy did with flagged content: `flag`, `hide` or `purge`. */
-export type AssetModerationAction = KnownAssetModerationAction | (string & {});
-/** A reviewer's decision: `approved` or `rejected`. */
-export type AssetReviewerAction = KnownAssetReviewerAction | (string & {});
+/** A reviewer's decision: `allowed`, `age-restricted`, `blocked` or `purged`. */
+export type AssetModerationDecision = KnownAssetModerationDecision | (string & {});
 /** Whether CalmLens holds the content: `temporary`, `stored` or `removed`. */
 export type AssetContentStatus = KnownAssetContentStatus | (string & {});
 /** Why the content was removed. */
@@ -61,16 +61,11 @@ export type AssetClassification = Omit<SharedAssetClassification, "status" | "mo
   moderation: AssetModeration;
 };
 /** An asset's moderation state. */
-export type AssetModeration = Omit<
-  SharedAssetModeration,
-  "decision" | "action" | "manualReviews"
-> & {
-  decision: AssetModerationStatus;
-  action: AssetModerationAction | null;
+export type AssetModeration = Omit<SharedAssetModeration, "status" | "manualReviews"> & {
+  status: AssetModerationStatus;
   manualReviews: Array<
-    Omit<SharedAssetModeration["manualReviews"][number], "decision" | "action"> & {
-      decision: AssetReviewerAction;
-      action: "approve" | "hide" | "purge" | (string & {});
+    Omit<SharedAssetModeration["manualReviews"][number], "decision"> & {
+      decision: AssetModerationDecision;
     }
   >;
 };
@@ -301,6 +296,12 @@ export interface CdnAssetUrlOptions {
   resource?: "content" | "preview";
   lens?: string;
   transform?: CdnTransform;
+  /**
+   * Adds `ageRestricted=true`, which lets the CDN serve a public asset whose moderation status is
+   * `age-restricted` from this URL. Without it, such an asset needs a signed URL or an API key. Set
+   * it only where your app has already decided the viewer may see age-restricted content.
+   */
+  ageRestricted?: boolean;
 }
 
 export interface CdnServeOptions extends CdnAssetUrlOptions {

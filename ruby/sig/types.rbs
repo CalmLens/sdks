@@ -27,18 +27,20 @@ module CalmLens
 
   # Where the asset is in the pipeline.
   type asset_classification_status = "pending" | "processing" | "completed" | "failed"
-  # The moderation decision in force: a reviewer's when there is one, else the automated one.
-  type asset_moderation_status = "pending" | "approved" | "rejected"
-  # What the policy did with flagged content (never `allow`, unlike `flagged_content_action`).
-  type asset_moderation_action = "flag" | "hide" | "purge"
-  type asset_reviewer_action = "approved" | "rejected"
+  # A moderation decision, which also decides delivery: served to anyone with access (`allowed`),
+  # only through signed URLs or API keys (`age-restricted`), not served (`blocked`), or not served
+  # with the stored content deleted (`purged`).
+  type asset_moderation_decision = "allowed" | "age-restricted" | "blocked" | "purged"
+  # The decision in force: `pending` until classification decides, then a reviewer's decision when
+  # there is one, else the policy's.
+  type asset_moderation_status = "pending" | asset_moderation_decision
   # Whether CalmLens holds the content: only until processing finishes, retained, or deleted.
   type asset_content_status = "temporary" | "stored" | "removed"
   type asset_content_removal_reason = "policy" | "retention" | "requested" | "parent-removed" | "disposed"
   type asset_type = "image" | "video" | "audio" | "plaintext-document" | "multimedia-document" | "website" | "file"
   type asset_visibility = "public" | "private"
-  # FLAGGED_CONTENT_ACTION_SCHEMA in Project.ts.
-  type flagged_content_action = "allow" | "flag" | "hide" | "purge"
+  # FLAGGED_CONTENT_ACTION_SCHEMA in PolicyRule.ts.
+  type flagged_content_action = "allow" | "age-restrict" | "block" | "purge"
 
   # A custom metadata item. `value` is any JSON value you chose.
   type metadata_item = { "id" => String, "value" => json_value }
@@ -100,18 +102,18 @@ module CalmLens
     ?"labels" => Array[classification_label]?
   }
   type asset_review = {
-    "action" => String,
     "id" => String,
-    "decision" => asset_reviewer_action,
+    "decision" => asset_moderation_decision,
     "note" => String?,
     "reviewerUserId" => String?,
+    ?"reviewerName" => String?,
+    ?"reviewerEmail" => String?,
     "reviewedAt" => Integer,
     "appliedToAsset" => bool
   }
   type asset_moderation = {
     "manualReviews" => Array[asset_review],
-    "decision" => asset_moderation_status,
-    "action" => asset_moderation_action?,
+    "status" => asset_moderation_status,
     ?"categories" => classification_categories,
     ?"score" => number,
     ?"timeline" => media_report,
@@ -277,7 +279,7 @@ module CalmLens
 
   type asset_search_mode = "keyword" | "semantic" | "hybrid"
   type asset_search_match_field = "name" | "id" | "externalId" | "description" | "tags" | "type" | "content.format" |
-                                  "content.extension" | "classification.moderation.decision" | "visual" | "transcript"
+                                  "content.extension" | "classification.moderation.status" | "visual" | "transcript"
   type asset_search_result = { "asset" => asset, "score" => number, "matchedFields" => Array[asset_search_match_field] }
   type asset_search_response = {
     "query" => String,
@@ -400,8 +402,8 @@ module CalmLens
 
   # EVENT_TYPES in EventCatalog.ts. Ignore types your code does not handle. Webhook, Slack and email
   # deliveries and the public events feed leave out facts that hold personal or account data.
-  type event_type = "asset.uploaded" | "asset.flagged" | "asset.approved" | "asset.rejected" |
-                    "asset.failed" | "asset.deleted" | "asset.content-removed" | "asset.retried" |
+  type event_type = "asset.uploaded" | "asset.classified" | "asset.allowed" | "asset.age-restricted" |
+                    "asset.blocked" | "asset.purged" | "asset.failed" | "asset.deleted" | "asset.content-removed" | "asset.retried" |
                     "asset.review-requested" | "usage.limit-reached" | "usage.spend-limit-reached" |
                     "upload-preset.daily-limit-reached" | "project.member-joined" | "project.member-removed" |
                     "project.member-role-changed" | "project.invitation-sent" | "api-key.created" |
@@ -421,7 +423,7 @@ module CalmLens
     ?"uploadPresetId" => String?,
     ?"externalId" => String?,
     "upload" => { "status" => "uploading" | "completed" },
-    "classification" => { "status" => asset_classification_status, "moderation" => { "decision" => asset_moderation_status, "action" => asset_moderation_action? } },
+    "classification" => { "status" => asset_classification_status, "moderation" => { "status" => asset_moderation_status } },
     "content" => { "status" => asset_content_status }
   }
   type event = {
@@ -468,7 +470,7 @@ module CalmLens
     ?cursor: String,
     ?page_size: Integer,
     ?ordering: Array[order_input],
-    # An RSQL filter such as `classification.moderation.decision==approved`.
+    # An RSQL filter such as `classification.moderation.status==allowed`.
     ?filter: String?,
     ?folder_id: String?,
     ?request_options: request_options
@@ -612,13 +614,17 @@ module CalmLens
     ?resource: "content" | "preview",
     # A lens runs before any additional transforms.
     ?lens: String,
-    ?transform: transform_input
+    ?transform: transform_input,
+    # Appends `?ageRestricted=true`, so a public `age-restricted` asset is served from this URL. Set it
+    # only where your app has already decided the viewer may see age-restricted content.
+    ?age_restricted: bool?
   }
   type serve_options = {
     asset_identifier: String,
     ?resource: "content" | "preview",
     ?lens: String,
     ?transform: transform_input,
+    ?age_restricted: bool?,
     ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] },
     ?request_options: request_options
   }
@@ -636,7 +642,7 @@ module CalmLens
       id: String,
       ?external_id: String?,
       upload: { status: "uploading" | "completed" },
-      classification: { status: asset_classification_status, moderation: { decision: asset_moderation_status, action: asset_moderation_action? } },
+      classification: { status: asset_classification_status, moderation: { status: asset_moderation_status } },
       content: { status: asset_content_status }
     }?,
     ?facts: Array[event_fact_input],

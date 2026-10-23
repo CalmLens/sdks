@@ -1,5 +1,5 @@
-import "./Asset-BQQXcQ7d.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-B71ApwA7.js";
+import "./Asset-D-dHYooV.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-BN7QY46A.js";
 import "./Page-Bpd8G-D0.js";
 import * as zod from "zod";
 //#region packages/shared/src/Event.d.ts
@@ -21,16 +21,13 @@ declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
       processing: "processing";
     }>;
     moderation: zod.ZodObject<{
-      decision: zod.ZodEnum<{
-        approved: "approved";
+      status: zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
         pending: "pending";
-        rejected: "rejected";
+        purged: "purged";
       }>;
-      action: zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>;
     }, zod.core.$strip>;
   }, zod.core.$strip>;
   content: zod.ZodObject<{
@@ -51,12 +48,14 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "api-key.revoked": "api-key.revoked";
     "appeal.resolved": "appeal.resolved";
     "appeal.submitted": "appeal.submitted";
-    "asset.approved": "asset.approved";
+    "asset.age-restricted": "asset.age-restricted";
+    "asset.allowed": "asset.allowed";
+    "asset.blocked": "asset.blocked";
+    "asset.classified": "asset.classified";
     "asset.content-removed": "asset.content-removed";
     "asset.deleted": "asset.deleted";
     "asset.failed": "asset.failed";
-    "asset.flagged": "asset.flagged";
-    "asset.rejected": "asset.rejected";
+    "asset.purged": "asset.purged";
     "asset.retried": "asset.retried";
     "asset.review-requested": "asset.review-requested";
     "asset.uploaded": "asset.uploaded";
@@ -94,16 +93,13 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
         processing: "processing";
       }>;
       moderation: zod.ZodObject<{
-        decision: zod.ZodEnum<{
-          approved: "approved";
+        status: zod.ZodEnum<{
+          "age-restricted": "age-restricted";
+          allowed: "allowed";
+          blocked: "blocked";
           pending: "pending";
-          rejected: "rejected";
+          purged: "purged";
         }>;
-        action: zod.ZodNullable<zod.ZodEnum<{
-          flag: "flag";
-          hide: "hide";
-          purge: "purge";
-        }>>;
       }, zod.core.$strip>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{

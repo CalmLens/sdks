@@ -269,7 +269,7 @@
   height: 14px;
   flex-shrink: 0;
 }
-.queue-status-approved {
+.queue-status-allowed {
   --status-tint: rgb(22 163 74 / 10%);
   --status-text: var(--success);
 }
@@ -277,8 +277,9 @@
   --status-tint: rgb(211 34 34 / 10%);
   --status-text: var(--danger);
 }
-.queue-status-flagged,
-.queue-status-rejected {
+.queue-status-age-restricted,
+.queue-status-blocked,
+.queue-status-purged {
   --status-tint: rgb(217 119 6 / 10%);
   --status-text: var(--warn);
 }

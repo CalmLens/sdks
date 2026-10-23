@@ -9,7 +9,7 @@ use crate::demo::DemoStore;
 use crate::messages::Failure;
 use calmlens::models::Content;
 use calmlens::models::{
-    Asset, AssetId, AssetPage, AssetReviewerAction, AssetSearchResponse, CreateFolder, Folder,
+    Asset, AssetId, AssetModerationDecision, AssetPage, AssetSearchResponse, CreateFolder, Folder,
     FolderId, ImageTransformOptions, LensDefinition, ListAssets, ListFolders, MetadataItem,
     MoveAsset, MoveFolder, Patch, ProcessingOptions, SearchAssets, SignedUrlOptions, SubmitAsset,
     Transform, UpdateAsset, UpdateFolder, Visibility,
@@ -40,7 +40,7 @@ pub struct NewUpload {
     pub demo_outcome: Decision,
 }
 
-/// How an approved image is delivered.
+/// How an allowed image is delivered.
 pub enum Delivery {
     /// Live: a short-lived signed CDN URL.
     Redirect(String),
@@ -344,11 +344,11 @@ impl Library {
         }
     }
 
-    /// Demo only: a simulated portal rejection. Returns whether the asset exists.
-    pub fn simulate_rejection(&self, id: &str) -> bool {
+    /// Demo only: a simulated reviewer blocking an asset. Returns whether the asset exists.
+    pub fn simulate_blocking(&self, id: &str) -> bool {
         match self {
             Library::Demo(store) => Self::with_store(store, |store| {
-                store.review(id, AssetReviewerAction::Rejected)
+                store.review(id, AssetModerationDecision::Blocked)
             }),
             Library::Live(_) => false,
         }
@@ -359,9 +359,11 @@ impl Library {
 /// `STATUS_FILTERS`. Any other value lists every status.
 pub fn list_filter(status: &str) -> String {
     let status = match status {
-        "approved" => "classification.moderation.decision==approved",
-        "rejected" => "classification.moderation.decision==rejected",
-        "pending" => "classification.moderation.decision==pending;classification.status!=failed",
+        "allowed" => "classification.moderation.status==allowed",
+        "age-restricted" => "classification.moderation.status==age-restricted",
+        "blocked" => "classification.moderation.status==blocked",
+        "purged" => "classification.moderation.status==purged",
+        "pending" => "classification.moderation.status==pending;classification.status!=failed",
         "failed" => "classification.status==failed",
         _ => return "parentId==null".into(),
     };

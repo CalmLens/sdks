@@ -23,7 +23,7 @@ import java.util.function.Supplier;
  * Calmmarket: a local marketplace where sellers often put prices, slogans, phone numbers and
  * claims inside their photos. Every photo is uploaded with OCR enabled, so CalmLens also moderates
  * the text it reads in the photo. A listing goes live only when its title, its description and
- * every photo are approved. Requests arrive through {@link #handle(Request)}, which {@link Main}
+ * every photo are allowed. Requests arrive through {@link #handle(Request)}, which {@link Main}
  * connects to the JDK's built-in HTTP server.
  *
  * <p>Requests are handled concurrently. No lock is held across a CalmLens call: network calls run
@@ -62,13 +62,13 @@ public final class Calmmarket {
   static final Map<String, String> DEMO_TEXT_RESULTS = new LinkedHashMap<>();
   static final Map<String, String> DEMO_PHOTO_RESULTS = new LinkedHashMap<>();
   static {
-    DEMO_TEXT_RESULTS.put("approved", "Title and description approved");
-    DEMO_TEXT_RESULTS.put("description-rejected", "Description rejected (no photo is uploaded)");
+    DEMO_TEXT_RESULTS.put("allowed", "Title and description allowed");
+    DEMO_TEXT_RESULTS.put("description-blocked", "Description blocked (no photo is uploaded)");
     DEMO_TEXT_RESULTS.put("unavailable", "CalmLens unavailable (nothing is published)");
-    DEMO_PHOTO_RESULTS.put("no-text", "Approved, no text found");
-    DEMO_PHOTO_RESULTS.put("clean-text", "Approved, text in it clean");
-    DEMO_PHOTO_RESULTS.put("text-rejected", "Text in photo rejected");
-    DEMO_PHOTO_RESULTS.put("visual-rejected", "Visually rejected, text clean");
+    DEMO_PHOTO_RESULTS.put("no-text", "Allowed, no text found");
+    DEMO_PHOTO_RESULTS.put("clean-text", "Allowed, text in it clean");
+    DEMO_PHOTO_RESULTS.put("text-blocked", "Blocked for the text in it");
+    DEMO_PHOTO_RESULTS.put("visual-blocked", "Blocked for visual content, text clean");
     DEMO_PHOTO_RESULTS.put("error", "Processing error");
   }
 
@@ -82,35 +82,36 @@ public final class Calmmarket {
   /** Registered fact keys and labels from packages/shared/src/EventCatalog.ts shown in the activity log. */
   static final Map<String, String> FACT_LABELS = Map.of(
       "asset-name", "Asset", "asset-type", "Asset type", "decided-by", "Decided by",
-      "previous-status", "Previous status", "moderation-action", "Moderation action",
+      "previous-status", "Previous status", "moderation-status", "Moderation status",
       "flagged-categories", "Categories", "reviewer-name", "Reviewer", "note", "Note");
   /**
-   * Events that can change a listing's decision. {@code asset.approved} and {@code asset.rejected}
-   * report every outcome, from automated moderation or a reviewer; their {@code decided-by} fact
+   * Events that can change a listing's decision. Each moderation status has its own event
+   * ({@code asset.allowed}, {@code asset.age-restricted}, {@code asset.blocked}, {@code
+   * asset.purged}), sent for automated moderation and reviewers alike; its {@code decided-by} fact
    * says which.
    */
   static final Map<String, String> EVENT_LABELS = Map.of(
-      "asset.flagged", "Flagged by automated moderation", "asset.approved", "Approved",
-      "asset.rejected", "Rejected", "asset.failed", "Processing failed");
+      "asset.classified", "Classified", "asset.allowed", "Allowed", "asset.age-restricted", "Age-restricted",
+      "asset.blocked", "Blocked", "asset.purged", "Purged", "asset.failed", "Processing failed");
 
   /**
    * Notices shown after a form posts. Redirects carry only a key, so the page never shows text
    * taken from the URL.
    */
   static final Map<String, String> NOTICES = Map.ofEntries(
-      Map.entry("submitted", "Submitted. The listing goes live when every photo, including any text in it, is approved."),
-      Map.entry("title-rejected", "Not published: the title did not pass the moderation policy."),
-      Map.entry("description-rejected", "Not published: the description did not pass the moderation policy."),
+      Map.entry("submitted", "Submitted. The listing goes live when every photo, including any text in it, is allowed."),
+      Map.entry("title-not-allowed", "Not published: the title did not pass the moderation policy."),
+      Map.entry("description-not-allowed", "Not published: the description did not pass the moderation policy."),
       Map.entry("moderation-incomplete", "Not published: moderation has not completed successfully. Please try again."),
       Map.entry("withdrawn", "Withdrawn. Its photos are no longer stored or served; their moderation records remain for audit."),
       Map.entry("withdrawn-pending", "Withdrawn. Some stored photos could not be removed yet; use Retry removal."),
       Map.entry("watching", "Watching for review decisions from now on. Check again after a reviewer acts."),
       Map.entry("no-decisions", "No new review decisions."),
       Map.entry("decisions-applied", "New review decisions were applied. See Review activity."),
-      Map.entry("simulated-review", "A simulated reviewer rejected photo 1. The listing is held."));
+      Map.entry("simulated-review", "A simulated reviewer blocked photo 1. The listing is held."));
 
   enum State {
-    IN_REVIEW("In review"), LIVE("Live"), HELD("Held: a photo was not approved"),
+    IN_REVIEW("In review"), LIVE("Live"), HELD("Held: a photo was not allowed"),
     REMOVED("Removed by a reviewer"), WITHDRAWN("Withdrawn by the seller");
     final String label;
     State(String label) { this.label = label; }
@@ -119,9 +120,9 @@ public final class Calmmarket {
   /** Whether extracted text is available on the retrieved image. */
   enum Ocr { NOT_CHECKED, NO_TEXT, FOUND }
 
-  /** Which part of a rejected photo led to the rejection. */
+  /** Who decided to hold a photo that is not allowed. */
   enum Driver {
-    NONE("Not rejected"),
+    NONE("Not held"),
     AUTOMATED("The combined image and text classification results"),
     REVIEWER("A reviewer's decision");
     final String label;
@@ -142,11 +143,11 @@ public final class Calmmarket {
     AssetClassificationStatus processing;
     /** The decision in force, a reviewer's when there is one. */
     AssetModerationStatus moderation;
-    /** What the policy did with flagged content ({@code flag}, {@code hide} or {@code purge}); null when it matched nothing. */
-    String moderationAction;
+    /** Whether a reviewer's decision is in force. */
+    boolean reviewed;
     AssetModeration report;
-    /** The reviewer's note, or else automated moderation's reason for a rejection. */
-    String rejectionNote;
+    /** The note of the reviewer's decision in force, if any. */
+    String reviewNote;
     Ocr ocr = Ocr.NOT_CHECKED;
     ExtractedText extractedText;
     String refreshError;
@@ -155,7 +156,7 @@ public final class Calmmarket {
     final Set<String> safetyHeld = new LinkedHashSet<>();
     // Demo mode only: the selected outcome, when the photo was submitted, and its bytes.
     final String demoResult;
-    volatile boolean demoReviewerRejected;
+    volatile boolean demoReviewerBlocked;
     volatile Instant submittedAt = Instant.now();
     volatile byte[] demoBytes;
 
@@ -164,14 +165,17 @@ public final class Calmmarket {
     }
 
     boolean decided() { return decided(moderation); }
-    static boolean decided(AssetModerationStatus status) { return status == AssetModerationStatus.APPROVED || status == AssetModerationStatus.REJECTED; }
+    static boolean decided(AssetModerationStatus status) { return status != null && status != AssetModerationStatus.PENDING; }
     boolean processingFailed() { return processing == AssetClassificationStatus.FAILED; }
-    /** Only an explicit approval with a current decision counts; an unknown status never does. */
-    boolean approved() { return moderation == AssetModerationStatus.APPROVED && !processingFailed() && refreshError == null; }
-    boolean failed() { return moderation == AssetModerationStatus.REJECTED || processingFailed(); }
+    /**
+     * Only {@code allowed} with a current decision is shown. This marketplace has no age gate, so
+     * {@code age-restricted} holds the photo like {@code blocked}, {@code purged} or an unknown status.
+     */
+    boolean allowed() { return moderation == AssetModerationStatus.ALLOWED && !processingFailed() && refreshError == null; }
+    boolean held() { return (decided() && moderation != AssetModerationStatus.ALLOWED) || processingFailed(); }
     /** The decision shown to the seller: {@code failed} when processing failed, else the moderation status. */
     String decision() { return processingFailed() ? "failed" : moderation == null ? "unknown" : moderation.value(); }
-    Driver driver() { return Calmmarket.driver(moderation, moderationAction != null); }
+    Driver driver() { return Calmmarket.driver(moderation, reviewed); }
     List<CategoryRow> categories() { return explain(report); }
     List<String> contentIds() { return List.of(assetId); }
     boolean owns(String id) { return id.equals(assetId); }
@@ -185,14 +189,13 @@ public final class Calmmarket {
     final List<Photo> photos;
     /** Guards the mutable state of this listing and its photos. Never held across a CalmLens call. */
     final ReentrantLock lock = new ReentrantLock();
-    boolean flagged, removed, withdrawn, removing;
+    boolean removed, withdrawn, removing;
     String removalError;
 
-    Listing(String id, String title, String description, String price, Map<String, String> textAssetIds, List<Photo> photos, boolean flagged) {
+    Listing(String id, String title, String description, String price, Map<String, String> textAssetIds, List<Photo> photos) {
       this.id = id; this.title = title; this.description = description; this.price = price;
       this.textAssetIds = Map.copyOf(textAssetIds);
       this.photos = List.copyOf(photos);
-      this.flagged = flagged;
     }
 
     <T> T locked(Supplier<T> action) {
@@ -200,12 +203,12 @@ public final class Calmmarket {
       try { return action.get(); } finally { lock.unlock(); }
     }
 
-    /** Live only when the text and every photo are approved; anything else holds the listing. */
+    /** Live only when the text and every photo are allowed; anything else holds the listing. */
     State state() {
       if (withdrawn) return State.WITHDRAWN;
       if (removed) return State.REMOVED;
-      if (!photos.isEmpty() && photos.stream().allMatch(Photo::approved)) return State.LIVE;
-      if (photos.stream().anyMatch(Photo::failed)) return State.HELD;
+      if (!photos.isEmpty() && photos.stream().allMatch(Photo::allowed)) return State.LIVE;
+      if (photos.stream().anyMatch(Photo::held)) return State.HELD;
       return State.IN_REVIEW;
     }
     boolean visible() { return state() == State.LIVE; }
@@ -253,13 +256,13 @@ public final class Calmmarket {
     /** Retrieves a photo with its extracted text. */
     CalmLensServerClient photo(Photo photo);
     /** Retrieves a title or description asset. */
-    CalmLensServerClient textAsset(String assetId, String externalId, boolean flagged);
+    CalmLensServerClient textAsset(String assetId, String externalId);
     CalmLensServerClient contentRemoval(String assetId);
-    /** Serves (demo) or signs (live) an approved photo. */
+    /** Serves (demo) or signs (live) an allowed photo. */
     CalmLensServerClient preview(Photo photo);
     /** The events feed; null when there is none. */
     CalmLensServerClient events();
-    /** Demo only: a feed holding one synthetic reviewer rejection of {@code photo}. */
+    /** Demo only: a feed holding one synthetic reviewer decision blocking {@code photo}. */
     CalmLensServerClient simulatedReview(Photo photo);
   }
 
@@ -271,7 +274,7 @@ public final class Calmmarket {
       public CalmLensServerClient textModeration(String demoChoice) { return client; }
       public CalmLensServerClient photoUploads(int photos) { return client; }
       public CalmLensServerClient photo(Photo photo) { return client; }
-      public CalmLensServerClient textAsset(String assetId, String externalId, boolean flagged) { return client; }
+      public CalmLensServerClient textAsset(String assetId, String externalId) { return client; }
       public CalmLensServerClient contentRemoval(String assetId) { return client; }
       public CalmLensServerClient preview(Photo photo) { return client; }
       public CalmLensServerClient events() { return client; }
@@ -447,7 +450,7 @@ public final class Calmmarket {
       String choice = demo() && parts.containsKey("demo_photo" + number) ? parts.get("demo_photo" + number).text() : "no-text";
       uploads.add(new Upload(photo.fileName(), photo.data(), choice));
     }
-    String textChoice = demo() && parts.containsKey("demo_text") ? parts.get("demo_text").text() : "approved";
+    String textChoice = demo() && parts.containsKey("demo_text") ? parts.get("demo_text").text() : "allowed";
     try {
       return redirect(submit(field(parts, "title"), field(parts, "description"), field(parts, "price"), uploads, textChoice));
     } catch (CalmLensException error) {
@@ -486,23 +489,21 @@ public final class Calmmarket {
     CalmLensServerClient textClient = backend.textModeration(textChoice);
     Map<String, String> values = Map.of("title", title, "description", description);
     Map<String, String> textAssetIds = new LinkedHashMap<>();
-    boolean flagged = false;
     for (Map.Entry<String, String> field : TEXT_FIELDS.entrySet()) {
       String externalId = id + ":" + field.getKey();
       Asset asset = textClient.text.classify(new ClassifyText(values.get(field.getKey()))
           .name(field.getValue())
           .externalId(externalId)
-          // Kept so a reviewer can read a flagged listing in the CalmLens portal.
+          // Kept so a reviewer can read a held listing in the CalmLens portal.
           .processingOptions(new ProcessingOptions().keepContentAfterProcessing(true)),
           // The listing's own key, so a retried submission never moderates the text twice.
           new RequestOptions().idempotencyKey(externalId));
-      if (moderationStatus(asset) != AssetModerationStatus.APPROVED) {
-        // No photo is uploaded for a listing whose text was not approved.
-        boolean rejected = moderationStatus(asset) == AssetModerationStatus.REJECTED;
-        record("held", "A listing was held: its " + field.getKey() + (rejected ? " was rejected" : " did not finish moderation") + ". Nothing was stored.", List.of());
-        return rejected ? field.getKey() + "-rejected" : "moderation-incomplete";
+      if (moderationStatus(asset) != AssetModerationStatus.ALLOWED) {
+        // No photo is uploaded for a listing whose text was not allowed.
+        boolean decided = Photo.decided(moderationStatus(asset)) && classificationStatus(asset) != AssetClassificationStatus.FAILED;
+        record("held", "A listing was held: its " + field.getKey() + (decided ? " was " + moderationStatus(asset).value() : " did not finish moderation") + ". Nothing was stored.", List.of());
+        return decided ? field.getKey() + "-not-allowed" : "moderation-incomplete";
       }
-      flagged |= flagged(asset);
       textAssetIds.put(field.getKey(), asset.id());
     }
 
@@ -534,7 +535,7 @@ public final class Calmmarket {
       }
       throw error;
     }
-    Listing listing = new Listing(id, title, description, amount, textAssetIds, photos, flagged);
+    Listing listing = new Listing(id, title, description, amount, textAssetIds, photos);
     stateLock.lock();
     try {
       if (listings.size() >= MAX_LISTINGS) throw full();
@@ -542,8 +543,8 @@ public final class Calmmarket {
     } finally {
       stateLock.unlock();
     }
-    record(flagged ? "flagged" : "submitted", "“" + title + "” was submitted with " + uploads.size()
-        + (uploads.size() == 1 ? " photo" : " photos") + (flagged ? " · its text is flagged for review" : "") + ". Photos are in review.", List.of());
+    record("submitted", "“" + title + "” was submitted with " + uploads.size()
+        + (uploads.size() == 1 ? " photo" : " photos") + ". Photos are in review.", List.of());
     return "submitted";
   }
 
@@ -575,10 +576,7 @@ public final class Calmmarket {
     return name.isEmpty() || name.length() > 100 ? "listing-photo-" + number : name;
   }
 
-  /** Flagged means the policy took an action (flag, hide or purge) on the asset. */
-  static boolean flagged(Asset asset) { return asset.classification().moderation() != null && asset.classification().moderation().action() != null; }
-
-  static AssetModerationStatus moderationStatus(Asset asset) { return asset.classification().moderation() == null ? null : asset.classification().moderation().decision(); }
+  static AssetModerationStatus moderationStatus(Asset asset) { return asset.classification().moderation() == null ? null : asset.classification().moderation().status(); }
 
   static AssetClassificationStatus classificationStatus(Asset asset) { return asset.classification() == null ? null : asset.classification().status(); }
 
@@ -586,10 +584,10 @@ public final class Calmmarket {
 
   // ---------------------------------------------------------------- Explaining photo decisions
 
-  /** The combined report does not identify which moderation pass caused a rejection. */
-  static Driver driver(AssetModerationStatus status, boolean policyActed) {
-    if (status != AssetModerationStatus.REJECTED) return Driver.NONE;
-    return policyActed ? Driver.AUTOMATED : Driver.REVIEWER;
+  /** The combined report does not identify which moderation pass decided the status. */
+  static Driver driver(AssetModerationStatus status, boolean reviewed) {
+    if (!Photo.decided(status) || status == AssetModerationStatus.ALLOWED) return Driver.NONE;
+    return reviewed ? Driver.REVIEWER : Driver.AUTOMATED;
   }
 
   static List<CategoryRow> explain(AssetModeration merged) {
@@ -616,9 +614,12 @@ public final class Calmmarket {
     AssetModeration moderation = asset.classification().moderation();
     photo.processing = classificationStatus(asset);
     photo.moderation = moderationStatus(asset);
-    photo.moderationAction = moderation == null ? null : moderation.action();
+    // Later applied reviews supersede earlier ones; the last applied one is in force.
+    AssetReview review = moderation == null ? null
+        : moderation.manualReviews().stream().filter(AssetReview::appliedToAsset).reduce((first, second) -> second).orElse(null);
+    photo.reviewed = review != null;
     photo.report = report(asset);
-    photo.rejectionNote = moderation == null || moderation.manualReviews().isEmpty() ? null : moderation.manualReviews().get(moderation.manualReviews().size() - 1).note();
+    photo.reviewNote = review == null ? null : review.note();
     photo.extractedText = asset.content() == null ? null : asset.content().extractedText();
     photo.ocr = !photo.decided() ? Ocr.NOT_CHECKED : photo.extractedText == null ? Ocr.NO_TEXT : Ocr.FOUND;
   }
@@ -667,9 +668,9 @@ public final class Calmmarket {
     if (listing.locked(() -> listing.withdrawn)) return text(410, "This listing was withdrawn");
     if (listing.locked(() -> listing.removed)) return text(403, "This listing was removed");
     if (!refreshPhoto(listing, photo)) return text(502, "Preview unavailable");
-    // Never serve or sign a photo that is pending, rejected, failed, or unknown.
+    // Never serve or sign a photo that is pending, age-restricted, blocked, purged, failed, or unknown.
     Photo current = photo;
-    if (!listing.locked(current::approved)) return text(403, "This photo is not approved");
+    if (!listing.locked(current::allowed)) return text(403, "This photo is not allowed");
     try {
       CalmLensServerClient client = backend.preview(photo);
       if (demo()) {
@@ -825,15 +826,11 @@ public final class Calmmarket {
       } else {
         String field = listing.textField(assetId);
         String externalId = listing.id + ":" + field;
-        CalmLensServerClient client = backend.textAsset(assetId, externalId, listing.locked(() -> listing.flagged));
+        CalmLensServerClient client = backend.textAsset(assetId, externalId);
         Asset asset = client.assets.retrieve(new AssetId(assetId));
         if (!externalId.equals(asset.externalId())) throw new NotOurs();
         outcome = listing.locked(() -> {
-          if (moderationStatus(asset) == AssetModerationStatus.APPROVED) {
-            // An approval never clears a flag another field may still carry.
-            listing.flagged |= flagged(asset);
-            return listing.flagged ? "keeps its review badge" : "is unchanged";
-          }
+          if (moderationStatus(asset) == AssetModerationStatus.ALLOWED) return "is unchanged";
           listing.removed = true;
           return "was taken down";
         });
@@ -862,12 +859,12 @@ public final class Calmmarket {
     return applied;
   }
 
-  /** Runs a synthetic portal rejection of the first photo through the same events-feed code as live mode. */
+  /** Runs a synthetic portal decision blocking the first photo through the same events-feed code as live mode. */
   private String simulateReview(String listingId) throws Rejected {
     Listing listing = find(listingId == null ? "" : listingId);
     if (listing == null || !listing.locked(listing::visible)) throw new Rejected(409, "That listing is no longer on the market.");
     Photo photo = listing.photos.get(0);
-    photo.demoReviewerRejected = true;
+    photo.demoReviewerBlocked = true;
     CalmLensServerClient feed = backend.simulatedReview(photo);
     if (!syncLock.tryLock()) throw new Rejected(409, "Review decisions are already being checked. Reload the page in a moment.");
     try {

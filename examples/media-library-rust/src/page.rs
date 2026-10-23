@@ -28,7 +28,7 @@ button.secondary{background:#e5e2f1;color:#28263a}button.danger{background:#a23b
 .tree a[aria-current]{background:#e5e2f1;font-weight:650}.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:end}.bar>*{flex:1;min-width:140px}.bar button{flex:0 0 auto;width:auto;margin:0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-top:14px}.card{padding:10px;text-decoration:none;color:inherit;display:block}.card[aria-current]{border-color:#7a5cc7;box-shadow:0 0 0 2px #cfc5ee}
 .thumb{aspect-ratio:1;border-radius:10px;background:#e9e6f4;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:#615e74;overflow:hidden;padding:8px}.thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.card strong{display:block;font-size:14px;margin-top:8px;overflow-wrap:anywhere}.approved{background:#dcefe5;color:#24573f}.pending{background:#e2e8f3;color:#344e78}.rejected,.error,.removed{background:#fbe1df;color:#8a3a31}.simulated{background:#fff0cc;color:#6b5013}
+.card strong{display:block;font-size:14px;margin-top:8px;overflow-wrap:anywhere}.allowed{background:#dcefe5;color:#24573f}.pending{background:#e2e8f3;color:#344e78}.restricted{background:#fff0cc;color:#6b5013}.blocked,.error,.removed{background:#fbe1df;color:#8a3a31}.simulated{background:#fff0cc;color:#6b5013}
 .empty{text-align:center;color:#615e74;padding:40px 16px;grid-column:1/-1}section{margin-top:22px}.pager{display:flex;gap:12px;justify-content:space-between;margin-top:14px;font-size:14px}
 .detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}dl{display:grid;grid-template-columns:max-content 1fr;gap:3px 12px;margin:6px 0 0;font-size:13px}dt{color:#615e74}dd{margin:0;overflow-wrap:anywhere}
 ol{list-style:none;padding:0;margin:0}ol li{border-top:1px solid #ebe8f3;padding:8px 0;font-size:14px}ol dl{font-size:12px;color:#615e74}
@@ -38,12 +38,12 @@ ol{list-style:none;padding:0;margin:0}ol li{border-top:1px solid #ebe8f3;padding
 pub(crate) fn render(app: &PageContext, view: &View) -> String {
     let mut html = String::with_capacity(16 * 1024);
     let csrf = format!(
-        r#"<input type="hidden" name="csrf" value="{}">"#,
+        r#"<input type="blocked" name="csrf" value="{}">"#,
         h(&app.csrf)
     );
     let _ = write!(
         html,
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Calmlibrary · Rust SDK example</title><style>{STYLE}</style></head><body><main><header><div class="wordmark">◫ Calmlibrary</div><span class="mode">{}</span></header><h1>Your team’s images.<br>Private until approved.</h1><p class="intro">A private media library: folders, credits and licences, natural-language search, thumbnails and web-size downloads through lenses, and file removal. A small, working example of the CalmLens Rust SDK.</p>"#,
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Calmlibrary · Rust SDK example</title><style>{STYLE}</style></head><body><main><header><div class="wordmark">◫ Calmlibrary</div><span class="mode">{}</span></header><h1>Your team’s images.<br>Private until allowed.</h1><p class="intro">A private media library: folders, credits and licences, natural-language search, thumbnails and web-size downloads through lenses, and file removal. A small, working example of the CalmLens Rust SDK.</p>"#,
         if app.demo {
             "Demo · simulated library"
         } else {
@@ -125,7 +125,7 @@ pub(crate) fn render(app: &PageContext, view: &View) -> String {
         if app.demo {
             html.push_str(r#" <span class="badge simulated">Simulated: local keyword matching over names, descriptions, tags and metadata. No semantic matching offline.</span>"#);
         }
-        html.push_str(r#"</p><p class="hint">Rejected, unfinished and removed images are never returned. <a href="/">Back to the library</a></p><div class="grid">"#);
+        html.push_str(r#"</p><p class="hint">Blocked, purged, unfinished and removed images are never returned. <a href="/">Back to the library</a></p><div class="grid">"#);
         if results.items.is_empty() {
             html.push_str(r#"<p class="empty">No matching images.</p>"#);
         }
@@ -160,7 +160,7 @@ pub(crate) fn render(app: &PageContext, view: &View) -> String {
         if let Some(id) = current {
             let _ = write!(
                 html,
-                r#"<input type="hidden" name="folder" value="{}">"#,
+                r#"<input type="blocked" name="folder" value="{}">"#,
                 h(id)
             );
         }
@@ -299,7 +299,7 @@ fn card(html: &mut String, asset: &Asset, folder: Option<&str>, selected: Option
             ""
         }
     );
-    // Only an approved image with a stored file gets a thumbnail.
+    // Only an allowed image with a stored file gets a thumbnail.
     if deliverable(asset) {
         let _ = write!(
             html,
@@ -346,7 +346,7 @@ fn detail(
             h(if removed {
                 "The file was removed. The record, metadata and classification results remain; the CDN no longer serves it."
             } else {
-                "No thumbnail or download until the image is approved."
+                "No thumbnail or download unless the image is allowed."
             })
         );
     }
@@ -368,10 +368,10 @@ fn detail(
         h(&asset.tags.clone().unwrap_or_default().join(", ")),
         h(asset.description.as_deref().unwrap_or("")),
     );
-    if app.demo && decision(asset) == Decision::Approved {
+    if app.demo && decision(asset) == Decision::Allowed {
         let _ = write!(
             html,
-            r#"<form action="/demo/review" method="post">{csrf}<input type="hidden" name="asset" value="{id}"><button class="secondary" type="submit">Simulate a reviewer rejecting it</button></form>"#
+            r#"<form action="/demo/review" method="post">{csrf}<input type="blocked" name="asset" value="{id}"><button class="secondary" type="submit">Simulate a reviewer blocking it</button></form>"#
         );
     }
     let _ = write!(
@@ -400,30 +400,36 @@ fn detail(
     }
     let _ = write!(
         html,
-        r#"<form action="/assets/{id}/delete" method="post">{csrf}<input type="hidden" name="return_folder" value="{}"><h3>Delete</h3><p class="hint">Deletes the asset record and its file.</p><label><input type="checkbox" name="confirm" value="yes" required>Delete this asset</label><button class="danger" type="submit">Delete</button></form></div></div></section>"#,
+        r#"<form action="/assets/{id}/delete" method="post">{csrf}<input type="blocked" name="return_folder" value="{}"><h3>Delete</h3><p class="hint">Deletes the asset record and its file.</p><label><input type="checkbox" name="confirm" value="yes" required>Delete this asset</label><button class="danger" type="submit">Delete</button></form></div></div></section>"#,
         h(current.unwrap_or(""))
     );
 }
 
 fn state_label(asset: &Asset) -> &'static str {
-    if content_removed(asset) {
+    let decision = decision(asset);
+    if content_removed(asset) && decision != Decision::Purged {
         return "File removed";
     }
-    match decision(asset) {
-        Decision::Approved => "Approved",
-        Decision::Rejected => "Rejected: not shown",
+    match decision {
+        Decision::Allowed => "Allowed",
+        Decision::AgeRestricted => "Age-restricted: not shown",
+        Decision::Blocked => "Blocked: not shown",
+        Decision::Purged => "Purged: file deleted",
         Decision::Failed => "Processing failed",
         Decision::Pending => "In review",
     }
 }
 
 fn badge(asset: &Asset) -> String {
-    let (class, label) = if content_removed(asset) {
+    let decision = decision(asset);
+    let (class, label) = if content_removed(asset) && decision != Decision::Purged {
         ("removed", "File removed")
     } else {
-        match decision(asset) {
-            Decision::Approved => ("approved", "Approved"),
-            Decision::Rejected => ("rejected", "Rejected"),
+        match decision {
+            Decision::Allowed => ("allowed", "Allowed"),
+            Decision::AgeRestricted => ("restricted", "Age-restricted"),
+            Decision::Blocked => ("blocked", "Blocked"),
+            Decision::Purged => ("blocked", "Purged"),
             Decision::Failed => ("error", "Error"),
             Decision::Pending => ("pending", "In review"),
         }

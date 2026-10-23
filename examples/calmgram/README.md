@@ -4,18 +4,22 @@ An Instagram-style photo app that shows how to add content moderation to a real 
 [CalmLens](https://calmlens.com). Every photo, caption, comment and bio is checked before other
 people can see it.
 
-| Feed | Rejected upload (author's view) | Moderation queue |
+| Feed | Blocked upload (author's view) | Moderation queue |
 | --- | --- | --- |
-| ![Feed](docs/feed.jpg) | ![Rejected post](docs/rejected-post.jpg) | ![Moderation queue](docs/moderation-queue.jpg) |
+| ![Feed](docs/feed.jpg) | ![Blocked post](docs/rejected-post.jpg) | ![Moderation queue](docs/moderation-queue.jpg) |
 
 - **Photos** go straight from the browser to CalmLens through an
   [upload preset](https://calmlens.com/docs/guides/upload-presets), with a single-use token the
   server signs. They stay private to their author while they're checked, then appear in the feed,
   served and resized by the CalmLens CDN.
-- **Captions, comments and bios** are checked before they're saved. Rejected text is never shown,
-  and the author is told why.
-- **Borderline content** that your policy flags is published but lands in a **moderation
-  queue** for a human to look at.
+- **Sensitive media:** photos CalmLens age-restricts are published, but shown only to visitors who
+  turn on **Show sensitive media** on their profile (an over-18 confirmation that stands in for a
+  real age check). Everyone else, including signed-out visitors, sees the photo's blurred
+  placeholder with a "Sensitive content" notice.
+- **Captions, comments and bios** are checked before they're saved. Text that isn't allowed is
+  never shown, and the author is told why.
+- The **moderation queue** lists every photo and text with its moderation status and category
+  scores.
 
 Try it at **[example.calmlens.com](https://example.calmlens.com)**. It's a single Cloudflare Worker
 ([Hono](https://hono.dev), server-rendered HTML, Workers KV, styled with [Tailwind CSS](https://tailwindcss.com)) with two small browser scripts: one for photo uploads, and one that asks before deletes in a native `<dialog>`. Every form also works without JavaScript. It uses Bun, TypeScript 7 and Biome (`bun run check`).
@@ -47,10 +51,11 @@ bun run dev:demo --port 6400
 
 Open http://localhost:6400 (you're given a random username straight away; change it from your profile) and try:
 
-- commenting `you idiot` (published but flagged), `i will hurt you` (rejected), or a
-  [test code](#testing-rejections-safely);
-- uploading one of the test images from the **New post** page (rejected) or any normal photo
-  (approved after ~2 seconds);
+- commenting `i will hurt you` (blocked) or a [test code](#testing-moderation-safely);
+- uploading one of the test images from the **New post** page (the sexual one is age-restricted,
+  the others blocked) or any normal photo (allowed after ~2 seconds);
+- turning on **Show sensitive media** on your profile to see the age-restricted photo instead of
+  its blurred placeholder, and off again;
 - the CalmLens moderation panel, open by default over every page. Click its header to collapse or reopen it.
 
 Demo mode is a stand-in, not a moderation model. Use live mode to see real decisions.
@@ -77,8 +82,8 @@ posting them to the Worker. Create the preset with these settings:
 | Who can upload | **Users your server approves**, so every upload needs a token Calmgram signed |
 | File types | `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `image/heic` |
 | Maximum file size | 10 MB |
-| Visibility | **Public**, so approved photos can be served from the CDN (Calmgram never builds a CDN URL before approval) |
-| Keep content after moderation | On, so approved photos can be served and resized by the CDN |
+| Visibility | **Public**, so allowed photos, opted-in age-restricted photos and placeholders can be served from the CDN (Calmgram never builds a content URL for anything else) |
+| Keep content after moderation | On, so allowed photos can be served and resized by the CDN |
 | Read text in images | On, to catch harmful text in screenshots and memes |
 | Show the decision to the uploader | Off. Calmgram's server reads the decision, not the browser |
 | Allowed sites | Your app's origins, such as `http://localhost:6400` and `https://<your-app>` |
@@ -88,11 +93,25 @@ Over the API, the two switches are the preset's `processingOptions`:
 form post also uploads through the preset from the server, so both paths follow the same rules. Without `CALMLENS_UPLOAD_PRESET_ID`, every photo is posted to the Worker and
 forwarded to CalmLens, as in demo mode.
 
+### Trying sensitive media
+
+With the *General community* policy, adult sexual content is age-restricted. Download the sexual
+test image from **New post** (with `CALMLENS_TEST_INPUT_KEY` set) and share it: once CalmLens
+age-restricts it, the post appears in the feed behind its blurred placeholder. Turn on **Show
+sensitive media** on your profile to see the photo itself. Subscribe the webhook to
+`asset.age-restricted` (below) so the post updates as soon as CalmLens decides.
+
+To try it against a CalmLens instance running locally from this repository, set
+`CALMLENS_API_URL=http://localhost:6110/v1` and `CALMLENS_CDN_URL=http://localhost:6130/v1` in
+`.dev.vars`, with an API key and project ID from your local portal. Webhooks reach a
+local app through `calmlens listen` (below).
+
 ### Webhooks (recommended)
 
 CalmLens tells your app when an image has been checked. In the portal, go to **Webhooks**, add
-`https://<your-app>/api/webhooks/calmlens`, subscribe to `asset.approved` and `asset.rejected` (sent for automated moderation outcomes and
-for reviewer decisions made in the portal), and put the secret in
+`https://<your-app>/api/webhooks/calmlens`, subscribe to `asset.allowed`, `asset.age-restricted`, `asset.blocked`, `asset.purged` and
+`asset.failed` (the status events are sent for automated decisions and for reviewer decisions made
+in the portal), and put the secret in
 `CALMLENS_WEBHOOK_SECRET`. The handler reads the asset ID from the delivery's `data.assetId`.
 
 For local development, forward events to the dev server with the SDK's CLI. It signs each event
@@ -111,9 +130,9 @@ for anything still pending.
 ```
                  ┌────────────── text: caption, comment, bio ───────────────┐
  user ──► Calmgram server ──► client.text.classify({ text })                 (waits)
-                 │                 └─► approved → save · rejected → tell the user why
+                 │                 └─► allowed → save · otherwise → tell the user why
                  │
-                 └────────────── photo: the browser uploads, the server approves ───┐
+                 └────────────── photo: the browser uploads, the server checks ────┐
   1. browser ──► POST /api/uploads ──► server checks the user,
                                        client.uploadTokens.sign({ uploadPresetId,
                                          externalId: "post-<id>" })      (local, no request)
@@ -123,26 +142,32 @@ for anything still pending.
                  server: assets.retrieve(assetId) must have externalId "post-<id>" and
                  come through the preset · classify the caption · save post as pending
                             ▲                               │
-      webhook: asset.approved / asset.rejected   or poll: assets.retrieve
-                            └──────── approved → show in feed via CDN lens URL
-                                      rejected → author sees "not published" notice
-                                      approved + flagged → shown, and queued for review
+      webhook: asset.allowed, asset.blocked, …   or poll: assets.retrieve
+                            └──────── allowed → show in feed via CDN lens URL
+                                      age-restricted → show in feed: the lens URL with
+                                        ageRestricted=true if the viewer opted in, otherwise
+                                        the /placeholder image and a notice
+                                      blocked, purged → author sees "not published" notice
 ```
 
 Without JavaScript, or without an upload preset, the form posts the photo to the server instead,
 which checks the caption and forwards the photo with `client.assets.create`. The rest is the same.
 
-CalmLens's **moderation policy** (set in the portal) turns each report into an action. The app
-only needs a few fields:
+CalmLens's **moderation policy** (set in the portal) turns each report into a moderation status,
+and a reviewer can change it later. The app only needs one field:
 
-| `classification.moderation.decision` | `classification.moderation.action` | Calmgram does |
-| --- | --- | --- |
-| `approved` | `null` | Publish |
-| `approved` | `flag` | Publish and add to the moderation queue |
-| `rejected` | `hide` or `purge` | Don't publish; tell the author which category matched (from `classification.moderation`) |
-| `pending` | — | Show only to the author with a "Checking…" placeholder |
+| `classification.moderation.status` | Calmgram does |
+| --- | --- |
+| `allowed` | Publish |
+| `age-restricted` | Publish behind a placeholder. The CDN refuses the plain URL, so viewers who turned on **Show sensitive media** get the URL with `ageRestricted=true`; everyone else, including signed-out visitors and the author with the setting off, gets the asset's blurred `/placeholder` image and a "Sensitive content" notice. The author also sees the status |
+| `blocked` | Don't publish; tell the author which category matched (from `classification.moderation`) |
+| `purged` | As `blocked`. CalmLens has also deleted the stored content |
+| `pending` | Show only to the author with a "Checking…" placeholder |
 
 When `classification.status` is `failed`, Calmgram doesn't publish and asks the author to retry.
+
+Text has no sensitive view: a caption, comment or bio that comes back `age-restricted` is refused
+like any other text that isn't `allowed`.
 
 ### Where to look
 
@@ -155,23 +180,28 @@ When `classification.status` is `failed`, Calmgram doesn't publish and asks the 
 | [`src/index.tsx`](src/index.tsx) | Routes, including the upload token endpoint, the webhook handler (signature check on the raw body, idempotent by event ID) and the moderation queue |
 | [`src/sandbox.ts`](src/sandbox.ts) | The public demo's per-visitor storage and 24-hour cleanup |
 | [`src/budget.ts`](src/budget.ts) | The public demo's daily CalmLens budget |
-| [`src/moderation/demo.ts`](src/moderation/demo.ts) | The demo-mode simulator |
+| [`src/moderation/demo.ts`](src/moderation/demo.ts) | The demo-mode simulator, including its stand-ins for the CDN's `ageRestricted=true` opt-in and blurred `/placeholder` image |
 
 ### Things worth copying
 
 - **Text is checked synchronously, images asynchronously.** Text is fast to classify, so the user
   gets an immediate answer. Images are queued so uploads return quickly.
-- **The browser uploads, the server approves.** Photos never pass through the Worker, and the
+- **The browser uploads, the server checks.** Photos never pass through the Worker, and the
   browser never sees an API key: it gets a single-use upload token for one photo. The token sets
   the asset's `externalId` to the post it was signed for, so when the browser submits an asset ID,
   the server fetches that asset and accepts it only if the `externalId` and upload preset match.
   The browser's word never publishes anything; only a CalmLens decision does.
 - **The no-JavaScript fallback checks the caption before uploading**, so a bad caption fails fast.
-  With browser uploads, a rejected caption deletes the photo that was just uploaded.
-- **CDN URLs are only built for approved images.** The CalmLens CDN serves public assets while
+  With browser uploads, a caption that isn't allowed deletes the photo that was just uploaded.
+- **CDN URLs are only built for published images.** The CalmLens CDN serves public assets while
   they are still pending, so Calmgram never sends an image URL to a browser until CalmLens has
-  approved it, and it uses CalmLens's random asset ID in URLs rather than its own (guessable)
-  post IDs.
+  allowed or age-restricted it, and it uses CalmLens's random asset ID in URLs rather than its own
+  (guessable) post IDs.
+- **Age-restricted photos opt in on the URL** (`cdn.getAssetUrl({ ..., ageRestricted: true })`),
+  and only for viewers whose setting allows it (`postMediaFor` in `src/content.ts`). An opted-in
+  URL works for anyone who has it, so if you need CalmLens itself to refuse everyone else, issue
+  short-lived signed URLs from your backend instead (see the
+  [age-restricted content guide](https://calmlens.com/docs/guides/age-restricted-content)).
 - **`not-evaluated` is not zero.** Only `evaluated` and `partial` category results have scores.
 - **Lenses** are named, versioned image presets. Calmgram defines `calmgram-feed` (1080px WebP)
   and `calmgram-thumb` (400px square) once with `ensureLenses`, so it needs no image-resizing code.
@@ -182,7 +212,7 @@ When `classification.status` is `failed`, Calmgram doesn't publish and asks the 
 - **Retries are safe.** The SDK retries network failures and throttling with an idempotency key,
   so a retried upload never creates a second asset.
 
-## Testing rejections safely
+## Testing moderation safely
 
 CalmLens recognises special test inputs, so you can test your "post removed" flow without uploading
 real harmful content.
@@ -197,7 +227,7 @@ Every test input contains an authentication tag generated with your project's se
 Calmgram is built to be deployed as a shared public demo, so each visitor gets a **private
 sandbox**, created on their first visit with a random username (no sign-up; crawlers don't get
 one). A session cookie keys one KV value holding their username, posts, comments, likes and
-bio. Nobody sees anyone else's uploads or rejected text, and the moderation queue shows shared illustrative examples alongside the
+bio. Nobody sees anyone else's uploads or text that wasn't allowed, and the moderation queue shows shared illustrative examples alongside the
 visitor's own content. Everyone shares a read-only example feed, rendered from the same fixed list as the landing page. These examples are never uploaded to CalmLens.
 
 An hourly cron deletes each sandbox 24 hours after its last use, along with its images and text

@@ -4,7 +4,7 @@
 // 1. Ask the Worker for an upload token. It checks who is asking and signs a single-use token.
 // 2. Upload the photo to CalmLens with that token. No API key is ever sent to the browser.
 // 3. Submit the form with the asset ID instead of the photo. The Worker fetches the asset from
-//    CalmLens to check it's the upload it signed for, and publishes it only once CalmLens approves.
+//    CalmLens to check it's the upload it signed for, and publishes it only once CalmLens allows it.
 //
 // Without JavaScript the form posts the photo to the Worker, which forwards it to CalmLens.
 

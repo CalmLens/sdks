@@ -8119,6 +8119,12 @@ const MODERATION_QUALIFIER_INFO = {
 		exclusions: "Exposed sexual anatomy, a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.",
 		inputs: ["image"]
 	},
+	"sexual-non-erotic-nudity": {
+		category: "sexual",
+		displayName: "Non-erotic nudity",
+		description: "Exposed anatomy in a non-erotic setting: breastfeeding, childbirth, medical or health care such as post-surgery images or self-examination, protest, or fine art such as a painting or sculpture.",
+		exclusions: "Erotic posing, sexual focus or arousal; a sexual act; photographs or generated images presented as art to show nudity; pornographic drawings; any person who appears to be a minor. An educational or artistic label alone does not make erotic nudity non-erotic."
+	},
 	"sexual-historical": {
 		category: "sexual",
 		displayName: "Historical",
@@ -8246,6 +8252,12 @@ const MODERATION_QUALIFIER_INFO = {
 		displayName: "Fictional",
 		description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.",
 		exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request."
+	},
+	"violence-fantasy": {
+		category: "violence",
+		displayName: "Fantasy or cartoon violence",
+		description: "Unrealistic or stylised violence, such as cartoon, fantasy or game combat, slapstick, or defeating creatures, monsters or characters, with no realistic injury or blood.",
+		exclusions: "Realistic violence against people, realistic blood or injury, killing presented realistically, torture or sexual violence, and any depiction or recreation of a real-world attack, war crime, genocide, terrorist attack or mass shooting, even when animated or in a game."
 	},
 	"violence-support-prevention": {
 		category: "violence",
@@ -8582,10 +8594,15 @@ const MODERATION_QUALIFIERS_BY_CATEGORY = MODERATION_QUALIFIERS.reduce((groups, 
 const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
 //#endregion
 //#region packages/shared/src/PolicyRule.ts
+/**
+* What a policy does with content: deliver it (`allow`), deliver it only through signed URLs or API
+* keys so your backend can limit it to adults (`age-restrict`), stop delivering it (`hide`), or
+* stop delivering it and delete its stored content (`purge`).
+*/
 const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([
 	"allow",
-	"flag",
-	"hide",
+	"age-restrict",
+	"block",
 	"purge"
 ]);
 const policyRuleSchema = (whenDescription, actionDescription) => zod.object({

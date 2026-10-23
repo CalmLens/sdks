@@ -11,8 +11,8 @@ from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, Calm
                      CalmLensValidationError, WebhookVerificationError)
 from .types import (
     AgeRange, Asset, AssetContent, AssetContentRemovalReason, AssetContentStatus, AssetIdOptions, AssetModeration,
-    AssetModerationAction, AssetModerationStatus, AssetPage, AssetClassification, AssetUpload, AssetClassificationStatus,
-    AssetReviewerAction, AssetSearchMatch, AssetSearchMatchField, AssetSearchResponse, AssetType, AssetUrlOptions, BinaryData, BoundingBox, CategoryResult, CdnResource, CdnTransform,
+    AssetModerationDecision, AssetModerationStatus, AssetPage, AssetClassification, AssetUpload, AssetClassificationStatus,
+    AssetSearchMatch, AssetSearchMatchField, AssetSearchResponse, AssetType, AssetUrlOptions, BinaryData, BoundingBox, CategoryResult, CdnResource, CdnTransform,
     Checksums, ClassificationCategories, ClassificationCategory, ClassificationLabel, Content,
     CreateFolderOptions, CustomTransform, DetectedFace, DetectedPerson, EnsureLensesOptions,
     EvaluatedCategoryResult, EvaluatedFaceDetectionResult, EvaluatedPersonDetectionResult, EvaluatedQualifierResult,
@@ -44,8 +44,8 @@ __all__ = [
     "create_webhook_headers", "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_SIGNATURE_HEADER", "WEBHOOK_TIMESTAMP_HEADER",
     "WEBHOOK_SIGNATURE_TOLERANCE_SECONDS",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "AssetModeration", "AssetModerationAction", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
-    "AssetClassificationStatus", "AssetReviewerAction", "AssetSearchMatch", "AssetSearchMatchField",
+    "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
+    "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
     "ClassificationCategory", "ClassificationLabel", "Content", "CreateFolderOptions",

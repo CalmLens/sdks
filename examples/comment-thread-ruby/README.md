@@ -1,18 +1,18 @@
 # Calmthread — Ruby pre-moderated discussion thread
 
 A small browser app using the [CalmLens Ruby SDK](../../ruby/README.md).
-Calmthread is a **pre-moderated** thread: anything the moderation policy flags is held
-for a person to review before anyone sees it.
+Calmthread is a **pre-moderated** thread: anything the moderation policy does not allow is
+held for a person to review before anyone sees it.
 
 - Each reply has a display name and a message. Both are moderated as separate text assets.
-- A clean reply publishes immediately: every field's `classification.moderation.decision` is `approved` and its
-  `classification.moderation.action` is `nil` (the policy took no action).
-- A flagged reply is **held**. The thread shows a "held for review" placeholder, never its
-  name or text, and the **Held for review** panel lists its asset IDs.
-- A moderator reviews held assets in the CalmLens portal. Approving a held asset releases
-  the reply into the thread. Rejecting it keeps the reply out for good, and the app then
-  deletes the reply's stored content from CalmLens. The asset record and its moderation
-  report remain.
+- A clean reply publishes immediately: every field's `classification.moderation.status` is `allowed`.
+- A reply with any field `blocked`, `age-restricted` or `purged` is **held**. The thread has no
+  age check, so it holds age-restricted fields too. The thread shows a "held for review"
+  placeholder, never its name or text, and the **Held for review** panel lists its asset IDs.
+- A moderator reviews held assets in the CalmLens portal. Allowing a held asset releases
+  the reply into the thread. Blocking, purging or age-restricting it keeps the reply out for
+  good, and the app then deletes the reply's stored content from CalmLens. The asset record
+  and its moderation report remain.
 - Pending, unknown and unreachable results, and fields whose `classification.status` is `failed`,
   never publish.
 
@@ -38,9 +38,9 @@ With `CALMLENS_DEMO=1`, the app loads [demo.rb](demo.rb), which uses the SDK's o
 `CalmLens::MockServerClient`, labelled **Demo** in the banner. The live code path never loads the
 mock. Choose an outcome before posting:
 
-- **Clean**: both fields are approved and the reply publishes.
-- **Flagged**: the reply text comes back rejected and the reply is held.
-- **Flagged display name**: the name comes back rejected and the reply is held.
+- **Clean**: both fields are allowed and the reply publishes.
+- **Blocked reply**: the reply text comes back blocked and the reply is held.
+- **Blocked display name**: the name comes back blocked and the reply is held.
 - **Processing error**: the reply text ends in `error`, so nothing is posted.
 - **CalmLens unavailable**: the request fails, so nothing is posted.
 
@@ -48,10 +48,10 @@ The mock stores each field as an asset, with the status your choice selects, and
 real client's validation and encoding. Nothing is classified: there is no keyword matching
 and no moderation model.
 
-A held demo reply offers **Simulate a reviewer approving it** and **Simulate a reviewer
-rejecting it**. Each button records a reviewer decision on the stored asset's moderation and adds an `asset.approved` or
-`asset.rejected` event to the mock's events feed. The app then reads the feed, retrieves the
-assets and deletes rejected content through the same code it uses in live mode.
+A held demo reply offers **Simulate a reviewer allowing it** and **Simulate a reviewer
+blocking it**. Each button records a reviewer decision on the stored asset's moderation and adds
+an `asset.allowed` or `asset.blocked` event to the mock's events feed. The app then reads the
+feed, retrieves the assets and deletes blocked content through the same code it uses in live mode.
 
 ## Live mode
 
@@ -73,7 +73,7 @@ Each field is moderated synchronously, with a per-asset policy override:
 asset = client.text.classify(
   name: 'Calmthread reply',
   external_id: "#{reply_id}:text",
-  processing_options: { keep_content_after_processing: true, flagged_content_policy: { action: 'hide' } },
+  processing_options: { keep_content_after_processing: true, flagged_content_policy: { action: 'block' } },
   text: text
 )
 ```
@@ -84,13 +84,13 @@ call uses moderation quota.
 
 ### Why the override is per asset
 
-The `hide` action rejects a flagged asset and blocks delivery. Content is removed after
-processing unless the upload keeps it, so every field is sent with
-`keep_content_after_processing: true`: a reviewer can read a held reply in the portal, and the
-app deletes the stored text once a reply is rejected. Setting the override on each asset makes
-this thread hold flagged replies
-regardless of the project-wide action, which may be `flag` (publish and flag for review) or `purge`
-(delete the content, leaving nothing to review) for the project's other uploads.
+The `block` action makes a flagged asset `blocked`: CalmLens keeps its content but does not
+deliver it. Content is removed after processing unless the upload keeps it, so every field is
+sent with `keep_content_after_processing: true`: a reviewer can read a held reply in the portal,
+and the app deletes the stored text once a reviewer keeps the reply out. Setting the override
+on each asset makes this thread hold flagged replies regardless of the project-wide action,
+which may be `age-restrict` (deliver only through signed URLs or API keys) or `purge` (delete
+the content, leaving nothing to review) for the project's other uploads.
 
 The override changes only what happens to a flagged asset. Your project's moderation policy
 still decides what counts as flagged: category thresholds and rules work as usual. With the
@@ -99,20 +99,21 @@ action to `allow`. See the moderation policies guide in the CalmLens docs.
 
 ## Review decisions
 
-The app follows reviewer decisions: `asset.approved` and `asset.rejected` events whose
-`decided-by` fact is `reviewer`. CalmLens also sends both events for automated moderation
-outcomes (`decided-by` is `automated`); the app skips those, because it already acted on the
-automated report when the reply was posted. Other events are skipped.
+The app follows reviewer decisions: `asset.allowed`, `asset.age-restricted`, `asset.blocked`
+and `asset.purged` events whose `decided-by` fact is `reviewer`. CalmLens also sends these
+events for automated moderation (`decided-by` is `automated`); the app skips those, because it
+already acted on the automated result when the reply was posted. Other events, such as
+`asset.classified`, are skipped.
 
 For each decision about a local reply, the app retrieves the asset with
-`client.assets.retrieve` and acts on its **current** `classification.moderation.decision`, not on the event's
-snapshot:
+`client.assets.retrieve` and acts on its **current** `classification.moderation.status`, not on
+the event's snapshot:
 
-- Status `approved`: the app also retrieves the reply's other field. The reply is published
-  only when every field is approved.
-- Status `rejected` after an `asset.rejected` event: the app calls
-  `client.assets.delete_content(asset_id:)` for each field, then forgets the reply. A later
-  approval of the same asset cannot bring it back.
+- Status `allowed`: the app also retrieves the reply's other field. The reply is published
+  only when every field is allowed.
+- Status `age-restricted`, `blocked` or `purged` after an event other than `asset.allowed`: the
+  app calls `client.assets.delete_content(asset_id:)` for each field, then forgets the reply. A
+  later `allowed` decision on the same asset cannot bring it back.
 - Anything else, or a response for a different asset or another reply's field (checked with
   its `externalId`): nothing changes.
 
@@ -169,8 +170,8 @@ shown. Only absolute HTTP(S) fact URLs become links. A test send (fact
   serves it with WEBrick, one thread per connection.
 - [index.html.erb](index.html.erb): server-rendered UI with no JavaScript or external
   assets. Every dynamic value goes through `h`.
-- [app_test.rb](app_test.rb): the override on every request, holding and hiding flagged
-  replies, release and rejection rules, content deletion, retries, replays, webhook
+- [app_test.rb](app_test.rb): the override on every request, holding and blocking flagged
+  replies, release and removal rules, content deletion, retries, replays, webhook
   tampering, test sends, fail-closed states, form tokens, request limits and the server.
 
 ```sh

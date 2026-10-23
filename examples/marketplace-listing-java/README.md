@@ -7,10 +7,10 @@ on it offers something the marketplace does not allow.
 
 Calmmarket uploads every listing photo with OCR enabled. Image moderation considers readable text directly; OCR also extracts text and adds a separate text moderation pass.
 
-1. The title and description are moderated synchronously with `text.classify`. If either is not approved, no photo is uploaded.
+1. The title and description are moderated synchronously with `text.classify`. If either is not `allowed`, no photo is uploaded.
 2. Up to four photos are uploaded privately with `assets.create` and `processingOptions.features.ocr.enabled: true`.
-3. The page polls `assets.retrieve` for each photo and reads its combined `classification.moderation` and `content.extractedText`. No text child is created or queried. The combined report does not identify which moderation pass caused a rejection.
-4. A listing goes live only when its text and every photo are approved. A pending, rejected, unknown or failed photo holds the listing. Approved photos use a CDN lens with a 60-second signed URL.
+3. The page polls `assets.retrieve` for each photo and reads its combined `classification.moderation` and `content.extractedText`. No text child is created or queried. The combined report does not identify which moderation pass decided the status.
+4. A listing goes live only when its text and every photo have the moderation status `allowed`. A pending, `age-restricted`, `blocked`, `purged`, unknown or failed photo holds the listing: this marketplace has no age gate, so it does not show age-restricted photos. Allowed photos use a CDN lens with a 60-second signed URL.
 
 An `evaluated` or `partial` category has a score. A `not-evaluated` result has a reason and no score; it is never treated as zero. See the [OCR guide](https://calmlens.com/docs/guides/ocr) for merging and retention.
 
@@ -57,13 +57,13 @@ to [Demo.java](src/main/java/calmmarket/Demo.java), which answers from the SDK's
 `MockCalmLensServerClient`; the live code path never uses the mock. Choose a result for the text and
 one for each photo:
 
-The choices simulate approval with or without extracted text, rejection for a text-bearing photo, rejection for visual content, and processing failures. The page displays the combined report without attributing its scores to one pass.
+The choices simulate an allowed photo with or without extracted text, a photo blocked for the text in it, a photo blocked for visual content, and processing failures. The page displays the combined report without attributing its scores to one pass.
 
 Each choice queues fake responses on a fresh mock, which then runs the real client's
 validation and encoding. Reports and extracted text are **synthetic** and labelled
 as such on the page. Nothing is classified. A demo photo stays pending for two seconds and
 takes the selected result when the page refreshes. A live demo listing offers **Simulate a
-reviewer rejecting photo 1**, which runs a synthetic `asset.rejected` event through the same
+reviewer blocking photo 1**, which runs a synthetic `asset.blocked` event through the same
 events-feed code as live mode. Withdrawing a demo listing removes the bytes the app kept, so
 its previews stop.
 
@@ -78,7 +78,7 @@ mvn -q compile exec:java
 The banner changes to **Live** and the demo selectors disappear. Each listing makes two
 synchronous text calls and one queued upload per photo, all with an `externalId` of
 `<listing-id>:<field>` (`title`, `description`, `photo-1` ...) and
-`keepContentAfterProcessing: true`, so a reviewer can see flagged content in the CalmLens
+`keepContentAfterProcessing: true`, so a reviewer can see held content in the CalmLens
 portal. The same value is the call's `Idempotency-Key`, so a retried upload never creates a second
 asset. Whenever the app retrieves an asset (polling, previews, events and webhooks), it checks
 that the asset's `externalId` points back to the listing that holds it; an asset that does not is
@@ -86,7 +86,7 @@ never used as that listing's decision. OCR is metered separately from image mode
 normal text moderation. Restarting the app clears only local state; it does **not** delete
 live assets.
 
-The first approved photo preview calls `ensureLens` for the `calmmarket-card` lens (a 640×480
+The first allowed photo preview calls `ensureLens` for the `calmmarket-card` lens (a 640×480
 WebP crop). Each preview retrieves the photo's current decision again before calling
 `assets.createSignedUrl` and redirecting to it. If the refresh fails, the photo is hidden.
 
@@ -102,8 +102,8 @@ placed in a link is never displayed.
 **Events feed (pull).** Click **Check for review decisions**. The first call to
 `events.list` without a cursor returns a cursor for "now". Later calls pass it as `after`,
 follow `hasMore`, and apply each `asset.*` event about a local listing by retrieving the
-current state; the event's snapshot is not trusted. An event about a photo refreshes its combined decision and extracted text. A rejected
-title or description takes the listing down. The cursor advances only after a whole page is
+current state; the event's snapshot is not trusted. An event about a photo refreshes its combined decision and extracted text. A title or
+description that is no longer `allowed` takes the listing down. The cursor advances only after a whole page is
 applied, so a failed retrieval retries the page. Events already applied are skipped, and
 events about a withdrawn listing change nothing.
 

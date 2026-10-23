@@ -33,7 +33,7 @@ func main() {
     if err != nil { log.Fatal(err) }
     asset, err := client.Assets.Classify(context.Background(), calmlens.SubmitAssetOptions{Name: "text", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("Great photo!")}, ExternalID: calmlens.Ptr("comment-42")})
     if err != nil { log.Fatal(err) }
-    fmt.Println(asset.Classification.Moderation.Decision)
+    fmt.Println(asset.Classification.Moderation.Status)
 }
 ```
 
@@ -114,8 +114,8 @@ signed, err := client.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{
 ```
 
 `Create` queues processing; `Text.Classify` and `Assets.Classify` wait for classification.
-`WaitForDecision` retrieves an asset until its `Moderation.Status` is `approved` or `rejected`,
-or its `Processing.Status` is `failed`, and returns that asset, checking every few seconds. It
+`WaitForDecision` retrieves an asset until its `Classification.Moderation.Status` is no longer
+`pending`, or its `Classification.Status` is `failed`, and returns that asset, checking every few seconds. It
 returns `sdk/timeout`, with `Details` `{"assetId", "classificationStatus", "moderationStatus"}`, if
 there is no decision within `Timeout` (default
 `DefaultDecisionTimeout`, 60s); cancel `ctx` to stop early (`sdk/cancelled`). Webhooks
@@ -124,8 +124,8 @@ report decisions without polling:
 ```go
 queued, err := client.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.jpg", Content: &calmlens.Content{Type: "image/jpeg", Data: file}})
 decided, err := client.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: 30 * time.Second})
-if err == nil && decided.Classification.Moderation.Decision == calmlens.ModerationStatusRejected {
-    hidePhoto(decided.ID)
+if err == nil && decided.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
+    blockPhoto(decided.ID)
 }
 ```
 
@@ -142,7 +142,7 @@ deduplicate batches/concurrent calls, and invalidate prior definitions by identi
 lazily:
 
 ```go
-it := client.Assets.ListAll(calmlens.ListAssetsOptions{PageSize: 100, Filter: calmlens.Ptr("classification.moderation.decision==approved")})
+it := client.Assets.ListAll(calmlens.ListAssetsOptions{PageSize: 100, Filter: calmlens.Ptr("classification.moderation.status==allowed")})
 for it.Next(ctx) {
     fmt.Println(it.Asset().ID)
 }
@@ -167,7 +167,7 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 `processing`, `moderation`, `content`, ...). The state is in three nested structs:
 
 - `Upload` (`AssetUpload`): `Status` is `uploading` or `completed`; `PartsReceived` counts multipart parts while they arrive, and `UpdatedAt` records the latest upload state change.
-- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection` and `Labels` sit alongside `Moderation`, which holds `Decision`, `Action`, `Categories`, `Score`, `Timeline`, `Policy` and reviewer details. Reviewer actions do not change classification completion time.
+- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection` and `Labels` sit alongside `Moderation`, which holds `Status`, `Categories`, `Score`, `Timeline`, `Policy` and reviewer details. Reviewer actions do not change classification completion time.
 - `Content` (`AssetContent`): `Status` is whether CalmLens holds the content
   (`ContentStatusTemporary` until processing finishes, `ContentStatusStored` or
   `ContentStatusRemoved`, with `RemovalReason`), plus `Format` (MIME type), `Extension`,
@@ -175,15 +175,20 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 
 Fields that may be missing are pointers, maps, or slices and are `nil` when absent:
 `Classification.Moderation.Categories` is `nil` until classification produces findings, and optional fields such as `Content.SizeInBytes`,
-`FolderID`, `ExternalID`, `Description`, `Classification.Moderation.Action` are `nil`
+`FolderID`, `ExternalID` and `Description` are `nil`
 when unset. Inside a report, `Categories` is keyed by category name and each
 `CategoryResult.Score` is `*float64`:
 
 ```go
 asset, err := client.Text.Classify(ctx, calmlens.ClassifyTextOptions{Text: comment})
 if err != nil { return err }
-if asset.Classification.Moderation.Decision == calmlens.ModerationStatusApproved && asset.Classification.Moderation.Action == nil {
+switch asset.Classification.Moderation.Status {
+case calmlens.ModerationStatusAllowed:
     publish(comment)
+case calmlens.ModerationStatusAgeRestricted:
+    publishBehindAgeGate(comment) // deliver only through signed URLs to verified adults
+default:
+    // pending, blocked, purged or a status added later: don't show it
 }
 ```
 
@@ -191,12 +196,12 @@ Every field of an asset and its report is typed: `Content.Checksums`, `Content.I
 `Content.PreviewImage`, `Content.SafetyHold`, `Content.ExtractedText`, `ProcessingOptions`,
 report `Labels` (`[]ClassificationLabel`) and category `Qualifiers`
 (`map[string]QualifierResult`, keyed by the `Qualifier...` constants). Enumerations such as
-the processing, moderation and content statuses, `Type`, `Visibility`, `Moderation.Action`,
+the processing, moderation and content statuses, `Type`, `Visibility`,
 `Likelihood` and result `Status` are plain strings with exported constants
 (`ClassificationStatus...`, `ModerationStatus...`, `ContentStatus...`, `ContentRemovalReason...`,
-`AssetType...`, `ModerationAction...`, `Likelihood...`, `ResultEvaluated`, `Category...`), so
+`ModerationDecision...`, `AssetType...`, `ModerationAction...`, `Likelihood...`, `ResultEvaluated`, `Category...`), so
 values added to the API later still decode; treat an unknown status as
-"not approved". `Asset`, reports, category results and events expose `Raw` with every field
+"not allowed". `Asset`, reports, category results and events expose `Raw` with every field
 the API sent, including ones added after this SDK version. Numbers in `Raw`, metadata
 values and fact values decode as `json.Number`, so large integers keep their precision. An
 absent category `Score` is `nil`, not a safe zero. Check the category's `Status` before
@@ -210,7 +215,7 @@ asset, err := client.Assets.Classify(ctx, calmlens.SubmitAssetOptions{
     Content: &calmlens.Content{Data: file, Type: "image/jpeg"},
     ProcessingOptions: &calmlens.ProcessingOptions{
         KeepContentAfterProcessing: calmlens.Ptr(true),
-        FlaggedContentPolicy:       &calmlens.FlaggedContentPolicy{Action: calmlens.ModerationActionHide},
+        FlaggedContentPolicy:       &calmlens.FlaggedContentPolicy{Action: calmlens.ModerationActionBlock},
         Features: &calmlens.ProcessingFeatures{
             FaceDetection: &calmlens.FaceDetectionFeatureOptions{Enabled: true, AgeEstimation: calmlens.Ptr(true)},
         },
@@ -325,17 +330,17 @@ if err := it.Err(); err != nil { return err }
 
 Each `Event` carries `Facts` (`calmlens.EventFacts`, a list of `{Key, Value, URL}`); there
 is no metadata object. `Type` is one of the `Event...` constants and `Asset` is a typed
-`*EventAsset` snapshot of the asset's `Processing.Status`, `Moderation.Status` and
-`Moderation.Action`, and `Content.Status` when the event was created. A fact's `Value` depends on its key, so read it with `Text`,
+`*EventAsset` snapshot of the asset's `Classification.Status`, `Classification.Moderation.Status`
+and `Content.Status` when the event was created. A fact's `Value` depends on its key, so read it with `Text`,
 `Int64`, `Bool` or `Strings`, or decode all of an event's facts into the typed struct for
 its type:
 
 ```go
 switch event.Type {
-case calmlens.EventAssetFlagged:
-    var facts calmlens.AssetFlaggedFacts
+case calmlens.EventAssetBlocked, calmlens.EventAssetPurged:
+    var facts calmlens.AssetDecisionFacts
     if err := event.Facts.Decode(&facts); err != nil { return err }
-    fmt.Println(facts.FlaggedCategories)
+    fmt.Println(facts.DecidedBy, facts.FlaggedCategories)
 }
 if event.Facts.IsTest() { /* a test send from the portal */ }
 ```
@@ -464,6 +469,11 @@ named form (`&calmlens.ImageGravity{Side: "face"}`, `&calmlens.ImageTrim{Border:
 and the detailed form. Other transform types take any `Options` value that encodes as a JSON
 object.
 
+A public asset whose moderation status is `age-restricted` is served from its public URL only
+when the URL carries `?ageRestricted=true`; otherwise it needs a signed URL or an API key. Set
+`AgeRestricted: true` on `CDNAssetURLOptions` (also used by `CDN.Serve`) to append it. Set it
+only where your app has already decided the viewer may see age-restricted content.
+
 ## Local webhook forwarding
 
 Use the standalone [CalmLens CLI](https://calmlens.com/docs/guides/local-development) for local development with any SDK. Install it separately through Homebrew, a platform download or npm.
@@ -486,8 +496,8 @@ over an in-memory transport. Its `Options` accept the same `APIKey`, `ProjectID`
 `BaseURL`, `CDNBaseURL`, `Timeout` and `MaxRetries` as `calmlens.Options` (validated the
 same way), plus database/content storage, deterministic IDs/timestamps, upload outcomes
 (`QueuedOutcome`, default `OutcomePending`, for `Create`; `AnalyzedOutcome`, default
-`OutcomeApproved`, for `Classify`; each `OutcomePending`, `OutcomeApproved`, `OutcomeRejected`
-or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:
+`OutcomeAllowed`, for `Classify`; each `OutcomePending`, `OutcomeAllowed`,
+`OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:
 
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
   `folder/not-empty`, ...) and error body, with an `X-Request-Id` on every response.
@@ -496,7 +506,8 @@ or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters 
 - `Assets.Search` matches keywords in name, ID, external ID, description and tags.
 - A decided upload finishes processing (`completed`); like the API, its content is then removed
   (`Content.Status` `removed`, `RemovalReason` `retention`) and no longer served unless the
-  upload set `KeepContentAfterProcessing`. `Retry` needs failed processing and content that
+  upload set `KeepContentAfterProcessing`. `OutcomePurged` always removes the content, with
+  `RemovalReason` `policy`. `Retry` needs failed processing and content that
   was not removed.
 - Multipart uploads keep the queue mode chosen at the start, check part numbers
   (`details.expectedPartNumber`) and `TotalSizeInBytes`.
@@ -504,15 +515,17 @@ or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters 
   `idempotency/key-reused`.
 - `EnqueueEvent` adds events to the feed, which `Events.List` and `ListAll` return after
   cursors taken earlier.
-- `CDN.Serve` answers with content type and length and supports single byte ranges.
+- `CDN.Serve` answers with content type and length and supports single byte ranges. Like a
+  private asset, an age-restricted asset needs the `assets:download` permission, unless it is
+  public and requested with `AgeRestricted: true`.
 - `Assets.WaitForDecision` checks the mock's storage, so change an asset's
-  `["moderation"].(calmlens.JSON)["status"]` with `WithStorage` to decide it while the call
+  `["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"]` with `WithStorage` to decide it while the call
   waits.
 
 It does not classify content, transform media or fetch URLs, and its signed URLs are not
 production URLs. Inspect or seed `DatabaseStorage` and `ImageStorage` between calls, or
 use `WithStorage` to change them while other goroutines send requests. `CreateMockAPIKey`
-accepts grants for private CDN permission tests. Retries are off by default in the mock
+accepts grants for private and age-restricted CDN permission tests. Retries are off by default in the mock
 (`MaxRetries` 0) so that `FailNext` fails exactly one call.
 
 Every request is captured, decoded, for assertions; `FailNext` queues transport

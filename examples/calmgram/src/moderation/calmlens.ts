@@ -36,11 +36,17 @@ const LENSES: EnsureLensOptions[] = [
  * CalmLens may add statuses in future. Anything this app doesn't know is treated as
  * "not decided yet", so it is never shown to other users. Failed processing is final.
  */
+const DECIDED: ReadonlySet<string> = new Set<ModerationStatus>([
+  "allowed",
+  "age-restricted",
+  "blocked",
+  "purged",
+]);
+
 const toStatus = (asset: Asset): ModerationStatus => {
   if (asset.classification.status === "failed") return "error";
-  if (asset.classification.moderation.decision === "approved") return "approved";
-  if (asset.classification.moderation.decision === "rejected") return "rejected";
-  return "pending";
+  const status = asset.classification.moderation.status;
+  return DECIDED.has(status) ? (status as ModerationStatus) : "pending";
 };
 
 export const toOutcome = (asset: Asset): ModerationOutcome => {
@@ -63,8 +69,6 @@ export const toOutcome = (asset: Asset): ModerationOutcome => {
     externalId: asset.externalId ?? null,
     uploadPresetId: asset.uploadPresetId ?? null,
     status: toStatus(asset),
-    // The policy took an action (flag, hide or purge) when the content matched it.
-    flagged: asset.classification.moderation.action != null,
     findings,
   };
 };
@@ -137,9 +141,10 @@ export const createCalmLensProvider = (options: {
         name: file.name || `${externalId}.${file.type.split("/")[1] ?? "img"}`,
         content: { data: file, type: file.type },
         externalId,
-        // Public so approved images can be served straight from the CDN. NOTE: the CDN
+        // Public so allowed images can be served straight from the CDN. NOTE: the CDN
         // serves public assets while they're still pending, so we never hand the URL to
-        // browsers until the asset is approved (see README → "CDN delivery"). With a preset,
+        // browsers until the asset is allowed or age-restricted (see README → "Things worth
+        // copying"). With a preset,
         // its folder, visibility, file types and size limit apply to this upload too.
         ...(options.uploadPresetId
           ? { uploadPresetId: options.uploadPresetId }
@@ -167,18 +172,28 @@ export const createCalmLensProvider = (options: {
       } catch (error) {
         // No decision yet: report it as still pending and let the caller ask again.
         if (CalmLensError.isCalmLensError(error) && error.code === "sdk/timeout") {
-          return { assetId, status: "pending", flagged: false, findings: [] };
+          return { assetId, status: "pending", findings: [] };
         }
         throw error;
       }
     },
 
-    imageUrl(assetId, variant) {
+    imageUrl(assetId, variant, { ageRestricted = false } = {}) {
       // Use the unguessable asset ID, not our externalId (post IDs appear in app URLs).
       return client.cdn.getAssetUrl({
         assetIdentifier: assetId,
         lens: variant === "feed" ? "calmgram-feed" : "calmgram-thumb",
+        // The CDN refuses an age-restricted asset's plain URL. `ageRestricted=true` opts in,
+        // so only build it for viewers this app has decided may see sensitive media.
+        ...(ageRestricted ? { ageRestricted: true } : {}),
       });
+    },
+
+    placeholderUrl(assetId) {
+      // A small blurred PNG rendered from the asset's ThumbHash. The CDN serves it for public
+      // assets whatever their moderation status (but never for purged ones).
+      const { cdnBaseUrl, projectId } = client.toJSON();
+      return `${cdnBaseUrl}/assets/${encodeURIComponent(projectId)}/${encodeURIComponent(assetId)}/placeholder`;
     },
 
     async deleteAsset(assetId) {

@@ -9,25 +9,27 @@ import {
   createPost,
   deleteComment,
   deletePost,
-  imageUrlFor,
+  isPublished,
   isVisibleTo,
   loadFeed,
   MAX_IMAGE_BYTES,
   MAX_POSTS_PER_SANDBOX,
   ModerationRejection,
+  postMediaFor,
   refreshPending,
   startUpload,
   syncAsset,
   toggleLike,
   UnknownUpload,
   updateBio,
+  viewerOf,
 } from "./content";
 import type { Env, ModerationFields, Sandbox } from "./data";
 import { EXAMPLE_AUTHORS, exampleContentType } from "./examples";
 import { getModeration, isLoopbackHost, ModerationNotConfigured } from "./moderation";
 import { describeCalmLensError } from "./moderation/calmlens";
-import { readDemoUpload } from "./moderation/demo";
-import { describeFindings } from "./moderation/types";
+import { readDemoPlaceholder, readDemoUpload } from "./moderation/demo";
+import { describeFindings, type ModerationStatus } from "./moderation/types";
 import { encodePng } from "./png";
 import {
   currentSandbox,
@@ -63,6 +65,7 @@ import {
   panelClass,
   QueueScores,
   QueueTypeIcon,
+  sensitiveMediaSettingHref,
   timeAgo,
 } from "./views";
 import { readWebhookDelivery } from "./webhooks";
@@ -164,14 +167,17 @@ const toError = (error: unknown) => {
 /** The home feed, also drawn underneath the moderation queue. */
 const feedView = async (c: AppContext, sandbox: Sandbox | null) => {
   const viewer = sandbox?.username ?? null;
+  const viewing = viewerOf(sandbox);
   const feed = await loadFeed(c.env, sandbox);
   const posts = await refreshPending(
     c.env,
     sandbox,
     feed.posts.filter((post) => isVisibleTo(post, viewer)),
   );
-  // Hide the viewer's rejected posts from the feed; they still see them on their profile.
-  const visible = posts.filter((post) => post.status !== "rejected" && post.status !== "error");
+  // The feed shows published posts (age-restricted ones behind a placeholder unless the viewer
+  // turned on sensitive media) and the viewer's own pending ones. Their blocked, purged or failed
+  // posts stay on their profile.
+  const visible = posts.filter((post) => isPublished(post) || post.status === "pending");
   return (
     <div class={FEED}>
       {visible.length === 0 && (
@@ -186,7 +192,7 @@ const feedView = async (c: AppContext, sandbox: Sandbox | null) => {
       {visible.map((post) => (
         <PostCard
           post={post}
-          imageUrl={imageUrlFor(c.env, post, "feed")}
+          {...mediaProps(postMediaFor(c.env, post, "feed", viewing))}
           comments={feed.comments.filter((comment) => comment.postId === post.id)}
           likes={feed.likesFor(post.id)}
           viewer={viewer}
@@ -195,6 +201,42 @@ const feedView = async (c: AppContext, sandbox: Sandbox | null) => {
     </div>
   );
 };
+
+/** PostCard's photo props from a post's media. */
+const mediaProps = (media: ReturnType<typeof postMediaFor>) => ({
+  imageUrl: media.url,
+  placeholderUrl: media.placeholderUrl,
+});
+
+/** PostImage's photo props from a post's media. */
+const thumbProps = (media: ReturnType<typeof postMediaFor>) => ({
+  url: media.url,
+  placeholderUrl: media.placeholderUrl,
+});
+
+/** The profile's "Show sensitive media" setting, with its over-18 confirmation. */
+const SensitiveMediaSetting = ({ enabled }: { enabled: boolean }) => (
+  <form
+    id="sensitive-media"
+    method="post"
+    action="/settings/sensitive-media"
+    class="mt-4 max-w-[360px] border-t border-line pt-3"
+  >
+    <label class="flex items-start gap-2">
+      <input type="checkbox" name="showSensitiveMedia" checked={enabled} class="mt-1" />
+      <span>
+        <strong>Show sensitive media</strong>
+        <br />I confirm I'm 18 or older. Photos CalmLens age-restricts are shown blurred until you
+        turn this on.
+      </span>
+    </label>
+    <div class={ROW}>
+      <button type="submit" class={buttonClass("secondary")}>
+        Save setting
+      </button>
+    </div>
+  </form>
+);
 
 app.get("/", async (c) => {
   const sandbox = await ensureSandbox(c);
@@ -363,12 +405,12 @@ app.get("/new", async (c) => {
       {moderation.uploadPresetId && <script type="module" src="/upload.js" />}
       <details class="mt-5 border-t border-line pt-3.5">
         <summary class="cursor-pointer font-semibold">
-          Want to see a post or comment get rejected?
+          Want to see a post or comment get blocked?
         </summary>
         <p>
           These harmless images are CalmLens <em>test triggers</em>: CalmLens classifies each one as
-          the named category, so you can test the rejection flow without uploading real harmful
-          content.
+          the named category, so you can see what happens to content that isn't allowed without
+          uploading real harmful content.
         </p>
         {TEST_INPUT_KEY_PATTERN.test(testInputKey) ? (
           <ul class="grid grid-cols-4 gap-2">
@@ -403,7 +445,9 @@ app.get("/new", async (c) => {
         )}
         {demo && (
           <p class="text-muted">
-            In demo mode, insults like “you idiot” are flagged for review and threats are rejected.
+            In demo mode, threats like “I'll hurt you” are blocked, and the sexual test image is
+            age-restricted: it's published behind a blurred placeholder unless you turn on{" "}
+            <a href={sensitiveMediaSettingHref(sandbox.username)}>Show sensitive media</a>.
           </p>
         )}
       </details>
@@ -484,7 +528,7 @@ app.get("/p/:id", async (c) => {
   const message = await takeFlash(c.env, sandbox);
   const comments = feed.comments.filter((comment) => comment.postId === post.id);
   const visible = comments
-    .filter((comment) => comment.status === "approved")
+    .filter((comment) => comment.status === "allowed")
     .sort((a, b) => a.createdAt - b.createdAt);
 
   return page(
@@ -494,13 +538,13 @@ app.get("/p/:id", async (c) => {
     <div class={FEED}>
       <PostCard
         post={post}
-        imageUrl={imageUrlFor(c.env, post, "feed")}
+        {...mediaProps(postMediaFor(c.env, post, "feed", viewerOf(sandbox)))}
         comments={comments}
         likes={feed.likesFor(post.id)}
         viewer={viewer}
         linkToPost={false}
       />
-      {post.status === "approved" && (
+      {isPublished(post) && (
         <section id="comments" class={cx(panelClass, "grid gap-2.5 p-3 max-sm:px-4")}>
           {visible.length === 0 && <p class="text-muted">No comments yet.</p>}
           {visible.map((comment) => (
@@ -577,7 +621,7 @@ app.post("/p/:id/comments", async (c) => {
   try {
     await addComment(c.env, sandbox, { postId, text });
   } catch (error) {
-    // The rejected comment stays in the box so its author can edit it.
+    // A comment that wasn't allowed stays in the box so its author can edit it.
     await flash(c.env, sandbox, { error: toError(error), draft: text });
   }
   return c.redirect(target, 303);
@@ -612,7 +656,8 @@ app.get("/u/:username", async (c) => {
     sandbox,
     authored.filter((post) => isVisibleTo(post, viewer)),
   );
-  const published = posts.filter((post) => post.status === "approved").length;
+  const published = posts.filter(isPublished).length;
+  const viewing = viewerOf(sandbox);
   const message = isOwner ? await takeFlash(c.env, sandbox) : null;
   const bio = isOwner ? (message?.draft ?? feed.bioFor(username)) : feed.bioFor(username);
 
@@ -656,6 +701,7 @@ app.get("/u/:username", async (c) => {
           ) : (
             bio && <p>{bio}</p>
           )}
+          {isOwner && sandbox && <SensitiveMediaSetting enabled={!!sandbox.showSensitiveMedia} />}
         </div>
       </header>
       {posts.length === 0 ? (
@@ -666,9 +712,13 @@ app.get("/u/:username", async (c) => {
             <a
               href={`/p/${post.id}`}
               class="block aspect-square overflow-hidden bg-subtle"
-              title={post.status === "approved" ? post.caption : `Status: ${post.status}`}
+              title={isPublished(post) ? post.caption : `Status: ${post.status}`}
             >
-              <PostImage post={post} variant="thumb" url={imageUrlFor(c.env, post, "thumb")} />
+              <PostImage
+                post={post}
+                variant="thumb"
+                {...thumbProps(postMediaFor(c.env, post, "thumb", viewing))}
+              />
             </a>
           ))}
         </div>
@@ -693,6 +743,16 @@ app.post("/bio", async (c) => {
     await flash(c.env, sandbox, { error: toError(error), draft: bio });
   }
   return c.redirect(target, 303);
+});
+
+// "Show sensitive media": the visitor confirms they are 18 or older. This stands in for your app's
+// real age check; only viewers with it on get age-restricted photos' `ageRestricted=true` URLs.
+app.post("/settings/sensitive-media", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  sandbox.showSensitiveMedia = (await c.req.formData()).get("showSensitiveMedia") === "on";
+  await saveSandbox(c.env, sandbox);
+  return c.redirect(sensitiveMediaSettingHref(sandbox.username), 303);
 });
 
 // Demo-only review tools: each visitor sees only their own sandbox. A production app
@@ -724,7 +784,7 @@ const moderationQueue = async (c: AppContext, sandbox: Sandbox | null) => {
                 <PostImage
                   post={entry.item}
                   variant="thumb"
-                  url={imageUrlFor(c.env, entry.item, "thumb")}
+                  {...thumbProps(postMediaFor(c.env, entry.item, "thumb", viewerOf(sandbox)))}
                 />
               ) : (
                 <span class="queue-text-preview" aria-hidden="true">
@@ -737,8 +797,8 @@ const moderationQueue = async (c: AppContext, sandbox: Sandbox | null) => {
               <span class="queue-row">
                 <span class="queue-name">
                   {entry.kind === "post"
-                    ? entry.item.exampleId && entry.item.status === "rejected"
-                      ? "Hidden example"
+                    ? entry.item.exampleId && entry.item.status !== "allowed"
+                      ? "Blocked example"
                       : entry.item.caption || "Photo"
                     : entry.item.text}
                 </span>
@@ -803,6 +863,8 @@ app.get("/moderation", (c) => c.redirect("/", 302));
 // CalmLens decides. After DECISION_WAIT_MS without one it answers `pending` and the page asks
 // again. Webhooks would update the post too; this is what keeps the open page live.
 const DECISION_WAIT_MS = 25_000;
+/** Decisions that keep a post from other users. Age-restricted posts are published. */
+const NOT_SHOWN = new Set<ModerationStatus>(["blocked", "purged"]);
 
 app.get("/api/posts/:id/status", async (c) => {
   const sandbox = await currentSandbox(c);
@@ -820,14 +882,14 @@ app.get("/api/posts/:id/status", async (c) => {
   }
   return c.json({
     status: decided.status,
-    flagged: decided.flagged,
-    reason: decided.status === "rejected" ? describeFindings(decided.findings) : null,
+    reason: NOT_SHOWN.has(decided.status) ? describeFindings(decided.findings) : null,
   });
 });
 
 // Configure in CalmLens: Portal → Webhooks → https://<your-app>/api/webhooks/calmlens
-// Subscribe to asset.approved and asset.rejected. They report every outcome, from automated
-// moderation or a reviewer in the portal; the decided-by fact says which.
+// Subscribe to asset.allowed, asset.age-restricted, asset.blocked, asset.purged and asset.failed.
+// There is one event per moderation status, from automated moderation or a reviewer in the
+// portal; the decided-by fact says which.
 app.post("/api/webhooks/calmlens", async (c) => {
   // Verify the exact raw body. Parsing and re-serialising JSON would change the signature.
   const rawBody = await c.req.text();
@@ -859,10 +921,22 @@ app.post("/api/webhooks/calmlens", async (c) => {
 // Demo mode's stand-in for the CalmLens CDN. With CalmLens configured, images are served
 // from cdn.calmlens.com and this route is unused.
 app.get("/demo-media/:assetId", async (c) => {
-  const upload = await readDemoUpload(c.env.CALMGRAM, c.req.param("assetId"));
+  const upload = await readDemoUpload(c.env.CALMGRAM, c.req.param("assetId"), {
+    ageRestricted: c.req.query("ageRestricted") === "true",
+  });
   if (!upload) return c.text("Not available", 403);
   return c.body(upload.bytes, 200, {
     "Content-Type": upload.mimeType,
+    "Cache-Control": "private, max-age=3600",
+  });
+});
+
+// Demo mode's stand-in for the CDN's `/placeholder` resource: a small blurred PNG.
+app.get("/demo-media/:assetId/placeholder", async (c) => {
+  const placeholder = await readDemoPlaceholder(c.env.CALMGRAM, c.req.param("assetId"));
+  if (!placeholder) return c.text("Not available", 403);
+  return c.body(new Uint8Array(placeholder).buffer, 200, {
+    "Content-Type": "image/png",
     "Cache-Control": "private, max-age=3600",
   });
 });

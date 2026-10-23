@@ -25,8 +25,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <pre>{@code
  * var mock = new MockCalmLensServerClient();
- * mock.enqueue(200, Map.of("id", "asset-1", "processing", Map.of("status", "completed"),
- *     "moderation", Map.of("status", "approved"), "content", Map.of("status", "removed")));
+ * mock.enqueue(200, Map.of("id", "asset-1", "upload", Map.of("status", "completed"),
+ *     "classification", Map.of("status", "completed",
+ *     "moderation", Map.of("status", "allowed")), "content", Map.of("status", "removed")));
  * mock.enqueueError(ErrorCodes.ASSET_NOT_FOUND);            // HTTP 404 with the API's error body
  * mock.enqueue("GET", "/events", 200, Map.of("events", List.of(event), "cursor", "c1", "hasMore", false));
  * }</pre>
@@ -36,8 +37,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * builder with {@code maxRetries(0)}. A request with an empty queue, or whose next response is
  * bound to another route, fails with {@link ErrorCodes#SDK_TRANSPORT_ERROR}.
  *
- * <p>{@code assets.waitForDecision} retrieves the asset from the queue until a response has a
- * decision. Its waits are skipped but still count towards its timeout, so a test of the timeout
+ * <p>{@code assets.waitForDecision} retrieves the asset from the queue until a response's
+ * {@code classification.moderation.status} is no longer {@code pending} or its classification failed. Its waits are skipped but still count towards its timeout, so a test of the timeout
  * finishes at once: queue one response per check.
  */
 public final class MockCalmLensServerClient implements AutoCloseable {

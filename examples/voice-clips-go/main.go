@@ -44,7 +44,7 @@ const (
 	maxEntries         = 12
 	// An upload token only needs to start the upload; its later parts stay authorized.
 	uploadTokenSeconds = 600
-	// Approved playback uses a short-lived signed URL; long enough to play and seek a
+	// Allowed playback uses a short-lived signed URL; long enough to play and seek a
 	// two-minute clip.
 	signedURLSeconds = 300
 	// A cached signed URL is reused while at least this much of its lifetime remains.
@@ -78,9 +78,12 @@ var categoryLabels = map[string]string{
 	calmlens.CategoryHarassment: "Harassment", calmlens.CategoryHate: "Hate", calmlens.CategoryCriminalActivity: "Criminal activity",
 }
 
-// Events that can change a clip's decision. EventAssetApproved and EventAssetRejected report every
-// outcome, from automated moderation or a reviewer.
-var webhookEvents = map[string]bool{calmlens.EventAssetApproved: true, calmlens.EventAssetRejected: true, calmlens.EventAssetFailed: true}
+// Events that can change a clip's decision. There is one event per moderation status, sent for
+// automated moderation and reviewer decisions alike.
+var webhookEvents = map[string]bool{
+	calmlens.EventAssetAllowed: true, calmlens.EventAssetAgeRestricted: true, calmlens.EventAssetBlocked: true,
+	calmlens.EventAssetPurged: true, calmlens.EventAssetFailed: true,
+}
 
 //go:embed index.html
 var pageSource string
@@ -115,7 +118,6 @@ type entry struct {
 	Size         int64
 	Parts        int
 	Status       string
-	Flagged      bool
 	Error        string
 	DemoResult   string
 	PendingSince time.Time
@@ -290,38 +292,36 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 		return err
 	}
 	item.Status = clipStatus(asset)
-	// The policy took an action (flag, hide or purge) when the content matched it.
-	item.Flagged = asset.Classification.Moderation.Action != nil
 	item.Duration, item.Segments = 0, nil
 	if report := asset.Classification.Moderation; report.Timeline != nil {
 		item.Duration, item.Segments = timeline(report.Timeline)
 	}
 	item.Error = ""
-	if item.Status != clipApproved {
+	if item.Status != clipAllowed {
 		item.signedURL = ""
 	}
 	return nil
 }
 
-// Clip states shown on the page, derived from the asset's processing and moderation status.
+// Clip states shown on the page, derived from the asset's processing and moderation status. A
+// decided clip shows its moderation status (allowed, age-restricted, blocked or purged). Only an
+// allowed clip plays: this app has no age check, so it does not play age-restricted clips either.
 const (
 	clipUploading = "uploading"
 	clipPending   = "pending"
-	clipApproved  = "approved"
-	clipRejected  = "rejected"
+	clipAllowed   = calmlens.ModerationStatusAllowed
 	clipError     = "error"
 )
 
 // clipStatus reads the clip's state from the asset. Failed processing is final; statuses this
-// app doesn't know count as still pending, so the clip never plays before an approval.
+// app doesn't know count as still pending, so the clip never plays before it is allowed.
 func clipStatus(asset *calmlens.Asset) string {
-	switch {
+	switch status := asset.Classification.Moderation.Status; {
 	case asset.Classification.Status == calmlens.ClassificationStatusFailed:
 		return clipError
-	case asset.Classification.Moderation.Decision == calmlens.ModerationStatusApproved:
-		return clipApproved
-	case asset.Classification.Moderation.Decision == calmlens.ModerationStatusRejected:
-		return clipRejected
+	case status == calmlens.ModerationStatusAllowed, status == calmlens.ModerationStatusAgeRestricted,
+		status == calmlens.ModerationStatusBlocked, status == calmlens.ModerationStatusPurged:
+		return status
 	case asset.Classification.Status == calmlens.ClassificationStatusPending:
 		return clipUploading
 	default:
@@ -423,7 +423,7 @@ func (a *app) demoChoice(r *http.Request) (string, bool) {
 	}
 	choice := r.FormValue("demo_result")
 	switch choice {
-	case "approved", "flagged", "rejected", "error":
+	case calmlens.ModerationStatusAllowed, calmlens.ModerationStatusAgeRestricted, calmlens.ModerationStatusBlocked, calmlens.ModerationStatusPurged, clipError:
 		return choice, true
 	}
 	return "", false
@@ -630,7 +630,7 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// send streams the clip privately and keeps the content so approved clips can be played back.
+// send streams the clip privately and keeps the content so allowed clips can be played back.
 // Large clips go through the SDK's sequential multipart upload. Every part is a section of
 // the uploaded file, so nothing is buffered in memory and the SDK can rewind a part to retry
 // it. The idempotency keys make those retries safe.
@@ -680,7 +680,7 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// A URL signed after a fresh approval is reused until it nears expiry. Refreshes and
+	// A URL signed after a fresh allowed retrieve is reused until it nears expiry. Refreshes and
 	// webhooks that report a different decision drop it.
 	if cached != "" {
 		http.Redirect(w, r, cached, http.StatusSeeOther)
@@ -694,8 +694,8 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	status, id, contentType := item.Status, item.ID, item.Type
 	a.mu.Unlock()
-	if status != clipApproved {
-		http.Error(w, "This clip is not approved", 403)
+	if status != clipAllowed {
+		http.Error(w, "This clip is not allowed", 403)
 		return
 	}
 	if a.demo != nil {
@@ -714,7 +714,7 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.Lock()
-	if item.Status == clipApproved {
+	if item.Status == clipAllowed {
 		item.signedURL, item.signedUntil = signed.URL, time.UnixMilli(signed.ExpiresAt)
 	}
 	a.mu.Unlock()
@@ -787,7 +787,7 @@ func (a *app) retry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.Lock()
-	item.Status, item.Flagged, item.Error = clipStatus(asset), false, ""
+	item.Status, item.Error = clipStatus(asset), ""
 	item.Duration, item.Segments = 0, nil
 	item.DemoResult, item.PendingSince = choice, time.Now()
 	a.mu.Unlock()

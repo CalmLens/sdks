@@ -5,9 +5,11 @@ import "encoding/json"
 // Event types. Type is a plain string so event types added later still decode.
 const (
 	EventAssetUploaded                 = "asset.uploaded"
-	EventAssetFlagged                  = "asset.flagged"
-	EventAssetApproved                 = "asset.approved"
-	EventAssetRejected                 = "asset.rejected"
+	EventAssetClassified               = "asset.classified"
+	EventAssetAllowed                  = "asset.allowed"
+	EventAssetAgeRestricted            = "asset.age-restricted"
+	EventAssetBlocked                  = "asset.blocked"
+	EventAssetPurged                   = "asset.purged"
 	EventAssetFailed                   = "asset.failed"
 	EventAssetDeleted                  = "asset.deleted"
 	EventAssetContentRemoved           = "asset.content-removed"
@@ -39,7 +41,7 @@ const (
 	FactAssetType           = "asset-type"
 	FactFileFormat          = "file-format"
 	FactDecidedBy           = "decided-by"
-	FactModerationAction    = "moderation-action"
+	FactModerationStatus    = "moderation-status"
 	FactFlaggedCategories   = "flagged-categories"
 	FactReviewerUserID      = "reviewer-user-id"
 	FactReviewerName        = "reviewer-name"
@@ -95,13 +97,10 @@ type EventAssetClassification struct {
 	Status string `json:"status"`
 }
 
-// EventAssetModeration is the asset's moderation decision and policy action when the event was
-// created.
+// EventAssetModeration is the asset's moderation status when the event was created.
 type EventAssetModeration struct {
-	Decision string `json:"decision"`
-	// Action is ModerationActionFlag, ModerationActionHide or ModerationActionPurge, or nil
-	// when nothing was flagged.
-	Action *string `json:"action"`
+	// Status is one of the ModerationStatus constants.
+	Status string `json:"status"`
 }
 
 // EventAssetContent is whether CalmLens held the asset's content when the event was created.
@@ -191,7 +190,7 @@ func (facts EventFacts) IsTest() bool {
 }
 
 // Decode copies fact values into out, a pointer to a struct whose json tags are fact keys,
-// such as *AssetFlaggedFacts. Facts without a matching field are ignored.
+// such as *AssetClassifiedFacts. Facts without a matching field are ignored.
 func (facts EventFacts) Decode(out any) error {
 	values := make(map[string]any, len(facts))
 	for _, fact := range facts {
@@ -214,12 +213,15 @@ type AssetUploadedFacts struct {
 	FileFormat *string `json:"file-format"`
 }
 
-// AssetFlaggedFacts are the facts of EventAssetFlagged.
-type AssetFlaggedFacts struct {
+// AssetClassifiedFacts are the facts of EventAssetClassified. FlaggedCategories are the parent
+// policy categories whose findings decided the status (empty when nothing was acted on), and
+// ModerationStatus is the status the policy decided (a ModerationStatus constant other than
+// pending); a reviewer's earlier decision on the asset keeps precedence.
+type AssetClassifiedFacts struct {
 	AssetName         *string  `json:"asset-name"`
 	AssetType         *string  `json:"asset-type"`
 	FlaggedCategories []string `json:"flagged-categories"`
-	ModerationAction  *string  `json:"moderation-action"`
+	ModerationStatus  string   `json:"moderation-status"`
 }
 
 // Values of FactDecidedBy.
@@ -228,21 +230,21 @@ const (
 	DecidedByReviewer  = "reviewer"
 )
 
-// AssetDecisionFacts are the facts of EventAssetApproved and EventAssetRejected, which report the
-// asset's outcome whether automated moderation or a reviewer decided it. DecidedBy is
-// DecidedByAutomated or DecidedByReviewer. ModerationAction is the action applied to flagged
-// content ("flag", "hide" or "purge"), or nil when nothing was flagged or a reviewer decided.
-// ReviewerUserID, ReviewerName and Note are set only for reviewer decisions; ReviewerUserID is nil
-// when an API key made the decision, and ReviewerName stays in the portal and is nil on webhook
-// deliveries.
+// AssetDecisionFacts are the facts of EventAssetAllowed, EventAssetAgeRestricted,
+// EventAssetBlocked and EventAssetPurged, one event per moderation status, whether automated
+// moderation or a reviewer set it. DecidedBy is DecidedByAutomated or DecidedByReviewer.
+// FlaggedCategories, when present, are the parent policy categories whose findings decided the
+// status. ReviewerUserID, ReviewerName and Note are set only for reviewer decisions;
+// ReviewerUserID is nil when an API key made the decision, and ReviewerName stays in the portal
+// and is nil on webhook deliveries.
 type AssetDecisionFacts struct {
-	AssetName        *string `json:"asset-name"`
-	AssetType        *string `json:"asset-type"`
-	DecidedBy        string  `json:"decided-by"`
-	ModerationAction *string `json:"moderation-action"`
-	ReviewerUserID   *string `json:"reviewer-user-id"`
-	ReviewerName     *string `json:"reviewer-name"`
-	Note             *string `json:"note"`
+	AssetName         *string  `json:"asset-name"`
+	AssetType         *string  `json:"asset-type"`
+	DecidedBy         string   `json:"decided-by"`
+	FlaggedCategories []string `json:"flagged-categories"`
+	ReviewerUserID    *string  `json:"reviewer-user-id"`
+	ReviewerName      *string  `json:"reviewer-name"`
+	Note              *string  `json:"note"`
 }
 
 // AssetFailedFacts are the facts of EventAssetFailed.

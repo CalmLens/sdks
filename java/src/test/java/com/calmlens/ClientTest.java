@@ -51,6 +51,12 @@ class ClientTest {
     for (JsonElement item : paths.getAsJsonArray("cdnUrls")) {
       JsonObject cdn = item.getAsJsonObject();
       JsonObject options = cdn.getAsJsonObject("options");
+      // Every fixture option must reach the request model, so a new option can't be silently ignored.
+      if (cdn.has("url")) {
+        java.util.Set<String> mapped = new java.util.HashSet<>(Models.encode(Fixtures.decode(options, Models.CdnRequest.class)).keySet());
+        mapped.add("transform");
+        assertTrue(mapped.containsAll(options.keySet()), cdn.toString());
+      }
       if (cdn.has("url")) assertEquals(cdn.get("url").getAsString(), client.cdn.getAssetUrl(Fixtures.decode(options, Models.CdnRequest.class)));
       // Options the typed transform model cannot hold are rejected while decoding them.
       else assertEquals(cdn.get("error").getAsString(), assertThrows(CalmLensException.class,
@@ -72,7 +78,7 @@ class ClientTest {
     assertTrue(version.find());
     assertEquals(version.group(1), CalmLensServerClient.VERSION);
     String[] agent = {null};
-    client(request -> { agent[0] = request.headers().get("User-Agent"); return Fixtures.json(200, Fixtures.assetJson("a", "completed", "approved")); })
+    client(request -> { agent[0] = request.headers().get("User-Agent"); return Fixtures.json(200, Fixtures.assetJson("a", "completed", "allowed")); })
         .assets.retrieve(new Models.AssetId("a"));
     assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (Java " + Runtime.version() + ")", agent[0]);
   }
@@ -169,15 +175,14 @@ class ClientTest {
     assertEquals(string(expected, "id"), asset.id());
     assertEquals(string(expected, "externalId"), asset.externalId());
     assertEquals(string(expected.getAsJsonObject("classification"), "status"), asset.classification().status().value());
-    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "decision"), asset.classification().moderation().decision().value());
-    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "action"), asset.classification().moderation().action());
+    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "status"), asset.classification().moderation().status().value());
     assertEquals(string(expected.getAsJsonObject("content"), "status"), asset.content().status().value());
   }
 
   @Test void invalidWebhookPayloads() {
-    for (String body : new String[] {"", "not json", "[]", "{\"type\":\"asset.flagged\",\"data\":{}}",
-        "{\"id\":\"event-1\",\"data\":{}}", "{\"id\":\"event-1\",\"type\":\"asset.flagged\"}",
-        "{\"id\":\"event-1\",\"type\":\"asset.flagged\",\"data\":{}}"}) {
+    for (String body : new String[] {"", "not json", "[]", "{\"type\":\"asset.classified\",\"data\":{}}",
+        "{\"id\":\"event-1\",\"data\":{}}", "{\"id\":\"event-1\",\"type\":\"asset.classified\"}",
+        "{\"id\":\"event-1\",\"type\":\"asset.classified\",\"data\":{}}"}) {
       CalmLensException error = assertThrows(CalmLensException.class, () -> CalmLensServerClient.readWebhookEvent(body), body);
       assertEquals(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, error.getCode(), body);
     }
@@ -257,12 +262,12 @@ class ClientTest {
     assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, malformed.getCode());
     // An asset without a processing or moderation status cannot be acted on.
     for (String body : new String[] {"{\"id\":\"asset-1\"}", "{\"id\":\"asset-1\",\"processing\":{\"status\":\"done\"}}",
-        "{\"id\":\"asset-1\",\"moderation\":{\"status\":\"approved\"}}", "{\"id\":\"asset-1\",\"processing\":{},\"moderation\":{\"status\":\"approved\"}}"}) {
+        "{\"id\":\"asset-1\",\"moderation\":{\"status\":\"allowed\"}}", "{\"id\":\"asset-1\",\"processing\":{},\"moderation\":{\"status\":\"allowed\"}}"}) {
       ApiException noStatus = assertThrows(ApiException.class,
           () -> client(request -> Fixtures.json(200, body)).assets.retrieve(new Models.AssetId("asset-1")), body);
       assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, noStatus.getCode(), body);
     }
-    Map<String, Object> described = Fixtures.asset("asset-1", "completed", "approved");
+    Map<String, Object> described = Fixtures.asset("asset-1", "completed", "allowed");
     described.put("description", "x".repeat(4096));
     String large = Fixtures.JSON.toJson(described);
     ApiException tooLarge = assertThrows(ApiException.class, () -> CalmLensServerClient.builder("key", "project").maxResponseBytes(1024)

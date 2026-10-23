@@ -62,6 +62,8 @@ string_enum! {
         SexualSolicitation = "sexual-solicitation",
         /// Sexual: Revealing clothing.
         SexualRevealingClothing = "sexual-revealing-clothing",
+        /// Sexual: Non-erotic nudity.
+        SexualNonEroticNudity = "sexual-non-erotic-nudity",
         /// Sexual: Historical.
         SexualHistorical = "sexual-historical",
         /// Sexual: Reporting or documentary.
@@ -104,6 +106,8 @@ string_enum! {
         ViolenceDiscussion = "violence-discussion",
         /// Violence: Fictional.
         ViolenceFictional = "violence-fictional",
+        /// Violence: Fantasy or cartoon violence.
+        ViolenceFantasy = "violence-fantasy",
         /// Violence: Support or prevention.
         ViolenceSupportPrevention = "violence-support-prevention",
         /// Self harm: Thoughts or desire.

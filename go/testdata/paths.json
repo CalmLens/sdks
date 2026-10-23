@@ -226,6 +226,35 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
+        "ageRestricted": true
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content?ageRestricted=true"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "ageRestricted": false
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "preview",
+        "lens": "thumbnail",
+        "transform": {
+          "type": "imageTransform",
+          "options": {
+            "width": 320
+          }
+        },
+        "ageRestricted": true
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/preview/@thumbnail,imageTransform[width=320]?ageRestricted=true"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
         "transform": []
       },
       "error": "sdk/invalid-argument"

@@ -26,7 +26,7 @@ final class Page {
       :focus-visible{outline:3px solid #b9772a;outline-offset:2px}.hint,small{font-size:12px;color:#62696f}
       .market{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{padding:12px}.card img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;background:#efe9dc}
       .card h3{font-size:16px;margin:10px 0 2px;overflow-wrap:anywhere}.price{font-weight:700}.card p{font-size:14px;color:#454c55;white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0}
-      .flagged{background:#fff0cc;color:#6b5013}.live{background:#dcefe5;color:#24573f}.held{background:#fbe1df;color:#8a3a31}.in-review{background:#e2e8f3;color:#344e78}
+      .live{background:#dcefe5;color:#24573f}.held{background:#fbe1df;color:#8a3a31}.in-review{background:#e2e8f3;color:#344e78}
       table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:8px 6px;border-top:1px solid #eee7d9;vertical-align:top}td form button{margin:0;padding:6px 10px;width:auto}
       .empty{text-align:center;color:#62696f;padding:48px 16px;grid-column:1/-1}section{margin-top:24px}ol{list-style:none;padding:0;margin:0}ol li{border-top:1px solid #eee7d9;padding:8px 0;font-size:14px}
       dl{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;margin:6px 0 0;font-size:12px;color:#62696f}dd{margin:0;overflow-wrap:anywhere}
@@ -45,7 +45,7 @@ final class Page {
         .append("<header><div class=\"wordmark\">◫ Calmmarket</div><span class=\"mode\">")
         .append(app.demo() ? "Demo · simulated decisions" : "Live · CalmLens moderation").append("</span></header>")
         .append("<h1>Read the whole photo,<br>not just the pixels.</h1><p class=\"intro\">Sellers put prices, slogans, phone numbers and claims inside their photos. ")
-        .append("Every photo is uploaded with OCR, so the text in it is moderated too. A listing goes live only when its title, its description and every photo are approved. ")
+        .append("Every photo is uploaded with OCR, so the text in it is moderated too. A listing goes live only when its title, its description and every photo are allowed. ")
         .append("A small, working example of the CalmLens Java SDK.</p>");
     if (!notice.isEmpty()) html.append("<p class=\"notice\" role=\"status\">").append(h(notice)).append("</p>");
 
@@ -72,14 +72,14 @@ final class Page {
       }
       html.append("</fieldset>");
     }
-    html.append("<p class=\"hint\">JPEG, PNG, GIF, or WebP, up to 4MiB each. Photos stay private until approved, and the text in them is read and moderated.</p>");
+    html.append("<p class=\"hint\">JPEG, PNG, GIF, or WebP, up to 4MiB each. Photos stay private until allowed, and the text in them is read and moderated.</p>");
     if (app.demo())
       html.append("<p class=\"hint\">Demo mode uses the SDK's offline mock with the results you choose. Reports and OCR text are synthetic. Nothing is classified.</p>");
     html.append("<button type=\"submit\">Submit for review</button></form><div>");
 
     html.append("<section aria-labelledby=\"market\" style=\"margin-top:0\"><h2 id=\"market\">On the market</h2><div class=\"market\">");
     List<Calmmarket.Listing> visible = listings.stream().filter(listing -> listing.locked(listing::visible)).toList();
-    if (visible.isEmpty()) html.append("<p class=\"empty\">No approved listings yet.</p>");
+    if (visible.isEmpty()) html.append("<p class=\"empty\">No allowed listings yet.</p>");
     for (Calmmarket.Listing listing : visible) listing.locked(() -> card(html, app, listing));
     html.append("</div></section>");
 
@@ -127,11 +127,10 @@ final class Page {
         html.append("<img src=\"").append(photoUrl(listing, photo)).append("\" alt=\"").append(h(listing.title)).append(", photo ").append(photo.number).append("\">");
       html.append("</div>");
     }
-    if (listing.flagged) html.append("<span class=\"badge flagged\">Text flagged for review</span>");
     if (app.demo())
       html.append("<form action=\"/demo/review\" method=\"post\">").append(csrf(app))
           .append("<input type=\"hidden\" name=\"listing\" value=\"").append(h(listing.id)).append("\">")
-          .append("<button class=\"secondary\" type=\"submit\">Simulate a reviewer rejecting photo 1</button></form>");
+          .append("<button class=\"secondary\" type=\"submit\">Simulate a reviewer blocking photo 1</button></form>");
     return html.append("</article>");
   }
 
@@ -158,7 +157,7 @@ final class Page {
   private static void photo(StringBuilder html, Calmmarket app, Calmmarket.Listing listing, Calmmarket.Photo photo) {
     String decision = photo.decision();
     html.append("<div class=\"photo\">");
-    if (photo.approved() && !listing.withdrawn && !listing.removed)
+    if (photo.allowed() && !listing.withdrawn && !listing.removed)
       html.append("<img src=\"").append(photoUrl(listing, photo)).append("\" alt=\"Photo ").append(photo.number).append(" of ").append(h(listing.title)).append("\">");
     html.append("<div><strong>Photo ").append(photo.number).append("</strong> <small>").append(h(photo.name)).append("</small>")
         .append("<dl><dt>Combined decision</dt><dd>").append(h(decision)).append("</dd>");
@@ -178,8 +177,8 @@ final class Page {
       default -> html.append("Checked once a decision arrives");
     }
     html.append("</dd>");
-    if (photo.driver() != Calmmarket.Driver.NONE) html.append("<dt>Rejected because of</dt><dd>").append(h(photo.driver().label)).append("</dd>");
-    if (photo.rejectionNote != null && !photo.rejectionNote.isEmpty()) html.append("<dt>Note</dt><dd>").append(h(photo.rejectionNote)).append("</dd>");
+    if (photo.driver() != Calmmarket.Driver.NONE) html.append("<dt>Held because of</dt><dd>").append(h(photo.driver().label)).append("</dd>");
+    if (photo.reviewNote != null && !photo.reviewNote.isEmpty()) html.append("<dt>Note</dt><dd>").append(h(photo.reviewNote)).append("</dd>");
     if (listing.withdrawn) {
       String removal = photo.contentRemoved.containsAll(photo.contentIds()) ? "Removed"
           : !photo.safetyHeld.isEmpty() ? "Kept under a safety hold" : "Not removed yet";

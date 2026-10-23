@@ -34,7 +34,7 @@ Any method also accepts `request_options:`:
 ```ruby
 asset = client.assets.classify(name: 'photo.jpg', content: {data: File.binread('photo.jpg'), type: 'image/jpeg'},
     processing_options: {features: {face_detection: {enabled: true}}})
-asset['classification']['moderation']['decision']                                              # CalmLens::asset_moderation_status
+asset['classification']['moderation']['status']                                                # CalmLens::asset_moderation_status
 asset.dig('classification', 'faceDetection', 'faces')    # Array[CalmLens::detected_face]?
 ```
 
@@ -45,19 +45,19 @@ The signatures describe snake_case Symbol option keys; camelCase and String keys
 `assets.classify` and `text.classify` return the asset, whose state is in three parts:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `decision` (`pending`, `approved` or `rejected`), `action`, category scores, policy assessment, an optional `timeline` and reviewer details. A reviewer decision does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status` (`pending`, `allowed`, `age-restricted`, `blocked` or `purged`), category scores, policy assessment, an optional `timeline` and `manualReviews`, each with the reviewer's `decision`. A reviewer decision does not change `completedAt`.
 - `content`: `status` is `temporary` (held until processing finishes), `stored` (kept with `keep_content_after_processing: true`) or `removed`, with `removalReason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`). It also holds `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image`, `previewImage`, `extractedText` and `safetyHold`.
 
-Publish only when `asset['classification']['moderation']['decision']` is `approved`. An approved asset with action `flag` may still need review. A reviewer's approval takes precedence even when the original policy action remains `hide` or `purge`; approval does not restore removed content. New statuses, visibilities and fields may appear in later API versions: the SDK returns them unchanged, so treat any value you do not recognise as not ready.
+The moderation status also decides delivery. Show content to everyone only when `asset['classification']['moderation']['status']` is `allowed`. CalmLens delivers an `age-restricted` asset only through signed URLs or API keys, so show it only behind your own age check. Don't show `blocked` assets (content kept, not delivered) or `purged` ones (content deleted, `removalReason` `policy`). A reviewer's decision takes precedence over the policy's; allowing a purged asset does not restore removed content. New statuses, visibilities and fields may appear in later API versions: the SDK returns them unchanged, so treat any value you do not recognise as not ready.
 
 ### Waiting for a decision
 
-`assets.wait_for_decision` waits for a queued asset's decision and returns the asset once `classification.moderation.decision` is `approved` or `rejected`, or `classification.status` is `failed`. It retrieves the asset every few seconds and raises `CalmLens::TimeoutError` with code `sdk/timeout` if there's no decision within `timeout:` seconds (default 60); `details` holds `'assetId'` and the last `'classificationStatus'` and `'moderationStatus'`. Use it after `assets.create`, or with an asset ID you stored earlier. Webhooks report decisions without polling.
+`assets.wait_for_decision` waits for a queued asset's decision and returns the asset once `classification.moderation.status` is no longer `pending`, or `classification.status` is `failed`. It retrieves the asset every few seconds and raises `CalmLens::TimeoutError` with code `sdk/timeout` if there's no decision within `timeout:` seconds (default 60); `details` holds `'assetId'` and the last `'classificationStatus'` and `'moderationStatus'`. Use it after `assets.create`, or with an asset ID you stored earlier. Webhooks report decisions without polling.
 
 ```ruby
 queued = client.assets.create(name: 'photo.jpg', content: {data: File.open('photo.jpg', 'rb'), type: 'image/jpeg'})
 decided = client.assets.wait_for_decision(asset_id: queued['id'], timeout: 30)
-hide_photo(decided['id']) if decided['classification']['moderation']['decision'] == 'rejected'
+show_photo(decided['id']) if decided['classification']['moderation']['status'] == 'allowed'
 ```
 
 `timeout:` covers the whole wait; `request_options: {timeout:}` still limits each request. The call only sleeps and sends requests, so you can stop it early by stopping its thread.
@@ -95,6 +95,8 @@ client.cdn.get_asset_url(asset_identifier: asset_id, transform: {type: 'imageTra
 # => ".../content/imageTransform[format=png,width=1024]" in both cases
 ```
 
+A public asset whose moderation status is `age-restricted` is served from its public URL only with `?ageRestricted=true`; otherwise it needs a signed URL or the API key. Pass `age_restricted: true` to `cdn.get_asset_url` (or `cdn.serve`) to add it after any lens or transform. Set it only where your app has already decided the viewer may see age-restricted content.
+
 ## Upload presets
 
 Pass `upload_preset_id:` to `assets.create` or `assets.classify` to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.
@@ -112,7 +114,7 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets). `CalmLens
 
 ## Pagination
 
-`assets.each`, `assets.each_child`, `events.each` and `events.each_page` fetch pages as you iterate and return an Enumerator without a block, so `client.assets.each(filter: 'classification.moderation.decision==approved').lazy.first(5)` stops after the pages it needs.
+`assets.each`, `assets.each_child`, `events.each` and `events.each_page` fetch pages as you iterate and return an Enumerator without a block, so `client.assets.each(filter: 'classification.moderation.status==allowed').lazy.first(5)` stops after the pages it needs.
 
 ## Events feed
 
@@ -203,20 +205,20 @@ require 'calmlens/testing'
 mock = CalmLens::MockServerClient.new
 asset = mock.assets.classify(name: 'note', content: {plain_text: 'hello', type: 'text/plain'},
                              processing_options: {keep_content_after_processing: true})
-mock.assets.retrieve(asset_id: asset['id']).dig('moderation', 'status') # => "approved"
-mock.assets.list(filter: 'classification.moderation.decision==approved')['items'].length        # => 1
+mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'status') # => "allowed"
+mock.assets.list(filter: 'classification.moderation.status==allowed')['items'].length    # => 1
 mock.cdn.serve(asset_identifier: asset['id']).body                      # => "hello"
 
 mock.enqueue(status: 503, body: {code: 'server/unavailable', message: 'Busy'}) # answers the next request
 mock.enqueue_error(Net::ReadTimeout.new)            # the next request raises CalmLens::TimeoutError
-mock.enqueue_event(type: 'asset.approved', asset_id: asset['id']) # joins the events feed
+mock.enqueue_event(type: 'asset.allowed', asset_id: asset['id'])  # joins the events feed
 
 request = mock.requests.last
 request.method # => "GET"
 request.path   # => "/assets/project-1/<id>/content" (relative to base_url or cdn_base_url)
 ```
 
-`MockServerClient` runs the real client's validation, encoding, retries and error handling, then answers from an in-memory stand-in for the API and CDN. Uploads create assets you can retrieve, list, search, move and delete, and `assets.wait_for_decision` checks the stored asset's processing and moderation status; folders, multipart uploads, idempotency keys, lenses and the events feed behave like the API's; errors carry the API's codes, HTTP statuses and body shape; and `cdn.serve` returns stored bytes with real headers. Like the API, content is removed (`removalReason` `retention`) once classification is `completed` unless the upload sets `keep_content_after_processing: true`. List filters support `==` and `!=` (with `*` wildcards) joined by `;` and `,`, on top-level and nested names such as `classification.moderation.decision`, `classification.status`, `content.status` and `content.format`; other RSQL operators raise rather than being ignored. It does not classify content: `classify` gives `analyzed_outcome:` and `create` gives `queued_outcome:`. An outcome is `pending` (still processing), `approved` or `rejected` (processing done with that decision) or `failed` (processing failed, retryable). `analyzed_outcome:` can also be fields to deep-merge into the asset, such as `{'moderation' => {'status' => 'rejected', 'action' => 'hide'}}` (the outcome follows `classification.moderation.decision`), or a callable that receives the asset and returns either. Change records through `mock.state` to arrange a test. Queued responses and errors are used first, in order.
+`MockServerClient` runs the real client's validation, encoding, retries and error handling, then answers from an in-memory stand-in for the API and CDN. Uploads create assets you can retrieve, list, search, move and delete, and `assets.wait_for_decision` checks the stored asset's processing and moderation status; folders, multipart uploads, idempotency keys, lenses and the events feed behave like the API's; errors carry the API's codes, HTTP statuses and body shape; and `cdn.serve` returns stored bytes with real headers. Like the API, content is removed (`removalReason` `retention`) once classification is `completed` unless the upload sets `keep_content_after_processing: true`; a `purged` outcome removes it with `removalReason` `policy`, and `cdn.serve` does not serve `blocked` assets. List filters support `==` and `!=` (with `*` wildcards) joined by `;` and `,`, on top-level and nested names such as `classification.moderation.status`, `classification.status`, `content.status` and `content.format`; other RSQL operators raise rather than being ignored. It does not classify content: `classify` gives `analyzed_outcome:` and `create` gives `queued_outcome:`. An outcome is `pending` (still processing), `allowed`, `age-restricted`, `blocked` or `purged` (processing done with that moderation status; the default for `classify` is `allowed`) or `failed` (processing failed, retryable). `analyzed_outcome:` can also be fields to deep-merge into the asset, such as `{'classification' => {'moderation' => {'status' => 'blocked'}}}` (the outcome follows `classification.moderation.status`), or a callable that receives the asset and returns either. Change records through `mock.state` to arrange a test. Queued responses and errors are used first, in order.
 
 ## Development
 

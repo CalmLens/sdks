@@ -4,17 +4,19 @@ A community link board built with the [CalmLens Python SDK](../../python/README.
 Members share a link with a short note. CalmLens fetches the linked page and moderates it,
 including the text and images it finds there, before anyone can click the link.
 
-1. The note is moderated synchronously with `text.classify`. If it is not approved, the page
+1. The note is moderated synchronously with `text.classify`. If it is not `allowed`, the page
    is never submitted.
 2. The page is submitted as a remote URL with `assets.create(url=...)`. CalmLens queues it,
    fetches it and moderates it as a `website` asset. Nothing is retained after processing,
    because the board never serves the page itself.
 3. While the page is being checked, the board shows the address as plain text and refreshes
-   every few seconds, reading the decision (`classification.moderation.decision`) with `assets.retrieve`. Only an
-   `approved` page becomes a link (`rel="noopener noreferrer nofollow ugc"`); a page whose
-   `classification.status` is `failed` is never linked.
-4. For a rejected or flagged page (one the policy took an action on, so `classification.moderation.action` is
-   set), the board explains the decision from the classification results (`classification.moderation`):
+   every few seconds, reading the moderation status (`classification.moderation.status`) with `assets.retrieve`. Only an
+   `allowed` page becomes a link (`rel="noopener noreferrer nofollow ugc"`). An `age-restricted` page
+   is delivered only through signed URLs or API keys and belongs behind your own age gate; the board
+   has none, so it shows the address as text. `blocked` and `purged` pages, and pages whose
+   `classification.status` is `failed`, are never linked.
+4. For an `age-restricted`, `blocked` or `purged` page (one the policy acted on), the board explains
+   the decision from the classification results (`classification.moderation`):
    the categories that scored at least 40%, and the categories that were **not evaluated**,
    which are shown as unknown rather than as a zero score. It lists the page's extracted parts
    with `assets.iter_children`, so you can see whether the page text or an image carried the
@@ -23,7 +25,7 @@ including the text and images it finds there, before anyone can click the link.
 
 Each link is saved before anything is sent to CalmLens, and both of its assets carry an
 `externalId` of `<link-id>:note` or `<link-id>:page`. Every asset, and every webhook or feed
-event about it, maps back to a link on the board, including links whose note was rejected.
+event about it, maps back to a link on the board, including links whose note was not allowed.
 
 ## Run locally
 
@@ -38,13 +40,13 @@ python app.py --demo
 ```
 
 Open **http://127.0.0.1:6401**. Without credentials the app refuses to start, so it can never
-quietly approve everything. `--demo` (or `CALMLENS_DEMO=1`) asks for a labelled demo mode
+quietly allow everything. `--demo` (or `CALMLENS_DEMO=1`) asks for a labelled demo mode
 instead. Demo mode lives in [demo.py](demo.py) and runs on the SDK's `MockCalmLensServerClient`,
 which live mode never imports; every call still goes through the real client's validation and
-encoding. Choose a demo outcome: **Approve the page**, **Approve the page, but flag it**,
-**Reject the page**, **Processing error** or **Reject the note**. The page stays pending for
-two seconds, then the app writes the selected decision, a synthetic report and two synthetic
-parts (page text and an image) into the mock. These are explicitly selected fake decisions;
+encoding. Choose a demo outcome: **Allow the page**, **Age-restrict the page**, **Block the page**,
+**Purge the page**, **Processing error** or **Block the note**. The page stays pending for
+two seconds, then the app writes the selected status, a synthetic report and two synthetic
+parts (page text and an image) into the mock. These are explicitly selected fake statuses;
 nothing is fetched or classified.
 
 The server listens on 127.0.0.1. Use `--port` to change the port.
@@ -72,7 +74,7 @@ asset = client.assets.create(
 CalmLens accepts only public HTTP(S) addresses: private IP addresses, localhost names and
 URL credentials are rejected, and redirects are checked. The app rejects the obvious cases
 before sending them. Pages are limited to 20 MB. Live requests use project quota, and the
-project's moderation policy decides what is approved, flagged or rejected.
+project's moderation policy decides each page's moderation status.
 `CALMLENS_API_URL` optionally points to a local API. Missing or partial credentials stop the
 app at startup.
 
@@ -86,7 +88,7 @@ redirect notices are fixed keys rather than text taken from the URL.
 - `Moderator` and `create_moderator`: every SDK call, and the fail-closed startup.
 - [demo.py](demo.py): the demo plan applied to the mock's stored asset.
 - `Board.submit` and `Board.refresh`: the note check, the queued URL submission and the
-  polling that only turns an `approved` page into a link.
+  polling that only turns an `allowed` page into a link.
 - `explain` and `Board._child_findings`: reading the report and the page's parts.
 - `Board.remove`: deleting the assets.
 - `make_handler`: bounded form requests (411 without a length, 413 when too large), a form
@@ -104,5 +106,6 @@ python -m unittest discover -v
 This is a **single-user learning example**. It keeps the latest 50 links in memory, which
 reset on restart, and polls from page loads instead of receiving webhooks. A production board
 needs member accounts (so only a link's author can remove it), persistent storage, webhooks
-for `asset.approved` and `asset.rejected` instead of polling, rate limits per member, and a
-moderator view for flagged links.
+for `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purged` instead of
+polling, rate limits per member, an age gate if it should show age-restricted pages, and a
+moderator view for links the policy acted on.

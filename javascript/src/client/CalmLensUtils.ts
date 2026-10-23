@@ -207,8 +207,19 @@ export const transformSelector = (transform: CdnTransform | undefined): string |
     ? transform
     : serializeTransform(transform);
 
-/** Appends a CDN lens (`/@name`) followed by any direct transform selector to an asset URL. */
+/**
+ * Appends a CDN lens (`/@name`) followed by any direct transform selector to an asset URL, and
+ * `?ageRestricted=true` when requested.
+ */
 export const appendCdnSelector = (
+  url: string,
+  options: { lens?: string; transform?: CdnTransform; ageRestricted?: boolean },
+): string => {
+  const path = appendCdnPathSelector(url, options);
+  return options.ageRestricted ? `${path}?ageRestricted=true` : path;
+};
+
+const appendCdnPathSelector = (
   url: string,
   options: { lens?: string; transform?: CdnTransform },
 ): string => {
@@ -258,13 +269,11 @@ export const stringifyQuery = (query: Record<string, unknown>): string => {
 };
 
 /**
- * Whether an asset has a moderation decision (`classification.moderation.decision` `approved` or `rejected`) or
- * failed processing; `assets.waitForDecision` returns at the first such state.
+ * Whether an asset has a moderation decision (`classification.moderation.status` is no longer
+ * `pending`) or failed processing; `assets.waitForDecision` returns at the first such state.
  */
 export const isAssetDecided = (asset: Pick<Asset, "classification">): boolean =>
-  asset.classification.moderation.decision === "approved" ||
-  asset.classification.moderation.decision === "rejected" ||
-  asset.classification.status === "failed";
+  asset.classification.moderation.status !== "pending" || asset.classification.status === "failed";
 
 const DECISION_POLL_FIRST_DELAY_MS = 500;
 const DECISION_POLL_MAX_DELAY_MS = 5_000;
@@ -297,11 +306,11 @@ export const pollForDecision = async (
     const remaining = deadline - now();
     if (remaining <= 0) {
       throw new CalmLensError(SDK_ERROR_CODES.TIMEOUT, {
-        message: `Asset ${asset.id} had no moderation decision after ${timeoutMs}ms (processing ${asset.classification.status}, moderation ${asset.classification.moderation.decision})`,
+        message: `Asset ${asset.id} had no moderation decision after ${timeoutMs}ms (processing ${asset.classification.status}, moderation ${asset.classification.moderation.status})`,
         details: {
           assetId: asset.id,
           classificationStatus: asset.classification.status,
-          moderationStatus: asset.classification.moderation.decision,
+          moderationStatus: asset.classification.moderation.status,
         },
       });
     }

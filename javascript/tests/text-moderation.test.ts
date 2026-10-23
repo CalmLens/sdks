@@ -16,12 +16,12 @@ describe("assets.classify", () => {
         return Response.json({
           id: "asset",
           upload: { status: "completed" },
-          classification: { status: "completed", moderation: { decision: "approved" } },
+          classification: { status: "completed", moderation: { status: "allowed" } },
         });
       },
     });
     const asset = await client.text.classify({ text: "hello" });
-    expect(asset.classification.moderation.decision).toBe("approved");
+    expect(asset.classification.moderation.status).toBe("allowed");
     expect(query?.get("queue")).toBe("false");
     expect(query?.get("name")).toBe("text");
     expect(query?.get("contentType")).toBe("text/plain");
@@ -34,7 +34,7 @@ describe("assets.classify", () => {
       return Response.json({
         id: "asset-id",
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { decision: "approved" } },
+        classification: { status: "completed", moderation: { status: "allowed" } },
       });
     };
     const client = new CalmLensServerClient({ apiKey: "test-api-key", projectId, uploadFetch });
@@ -46,7 +46,7 @@ describe("assets.classify", () => {
       content: { plainText: "Lovely photo!", type: "text/plain" },
     });
 
-    expect(asset.classification.moderation.decision).toBe("approved");
+    expect(asset.classification.moderation.status).toBe("allowed");
     expect(requests).toHaveLength(1);
     const [{ url, init }] = requests;
     expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
@@ -69,7 +69,7 @@ describe("assets.classify", () => {
         return Response.json({
           id: "asset-id",
           upload: { status: "completed" },
-          classification: { status: "completed", moderation: { decision: "approved" } },
+          classification: { status: "completed", moderation: { status: "allowed" } },
         });
       },
     });
@@ -103,7 +103,7 @@ describe("assets.classify", () => {
     const client = new MockCalmLensServerClient({
       apiKey: createMockApiKey(),
       projectId,
-      mockOptions: { analyzedOutcome: "rejected" },
+      mockOptions: { analyzedOutcome: "blocked" },
     });
 
     const asset = await client.assets.classify({
@@ -113,7 +113,7 @@ describe("assets.classify", () => {
     });
 
     expect(asset.type).toBe("plaintext-document");
-    expect(asset.classification.moderation.decision).toBe("rejected");
+    expect(asset.classification.moderation.status).toBe("blocked");
     expect(asset.externalId).toBe("c-1");
   });
 });

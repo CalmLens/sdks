@@ -1008,8 +1008,7 @@
       "caption": "Grandad passed away peacefully last night, with all of us around him.",
       "createdAt": -60000,
       "assetId": "example-obituary",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -1045,8 +1044,7 @@
       "caption": "The tomatoes are ripening. First harvest soon.",
       "createdAt": -120000,
       "assetId": "example-garden",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -1082,8 +1080,7 @@
       "caption": "You’re a pathetic loser and everyone here knows it.",
       "createdAt": -180000,
       "assetId": "example-insult",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -1119,8 +1116,7 @@
       "caption": "A short film about the Battle of Hastings and the people who died there.",
       "createdAt": -240000,
       "assetId": "example-battlefield",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -1156,8 +1152,7 @@
       "caption": "Your account has been locked. Confirm your card details to restore it.",
       "createdAt": -300000,
       "assetId": "example-scam",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -1193,8 +1188,7 @@
       "caption": "I’m struggling with thoughts of hurting myself. Can someone help me stay safe?",
       "createdAt": -360000,
       "assetId": "example-support",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "self-harm",
@@ -1230,8 +1224,7 @@
       "caption": "[Censored adult solicitation and explicit promotional content]",
       "createdAt": -420000,
       "assetId": "example-adult-ad",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "sexual",
@@ -1267,8 +1260,7 @@
       "caption": "A classroom handout discusses a historical conflict. [Violence details omitted.]",
       "createdAt": -480000,
       "assetId": "example-document-history",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -1304,8 +1296,7 @@
       "caption": "Uncensored close-ups of severe injuries after the attack.",
       "createdAt": -540000,
       "assetId": "example-graphic-clip",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "violence",
@@ -1341,8 +1332,7 @@
       "caption": "A public page with a tomato soup recipe and photos of the ingredients.",
       "createdAt": -600000,
       "assetId": "example-website-recipe",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -1378,8 +1368,7 @@
       "caption": "People from [protected group] should be driven out of this town.",
       "createdAt": -660000,
       "assetId": "example-hate-exclusion",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "hate",
@@ -1415,8 +1404,7 @@
       "caption": "We adopted this tiny troublemaker yesterday.",
       "createdAt": -720000,
       "assetId": "example-kitten",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -1452,8 +1440,7 @@
       "caption": "[Targeted personal abuse omitted.]",
       "createdAt": -780000,
       "assetId": "example-voice-abuse",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -1489,8 +1476,7 @@
       "caption": "Third loaf this week. Finally got the crust right.",
       "createdAt": -840000,
       "assetId": "example-bread",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -1526,8 +1512,7 @@
       "caption": "[Instructions to enter a password and payment details on a fake form omitted.]",
       "createdAt": -900000,
       "assetId": "example-document-scam",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -1563,8 +1548,7 @@
       "caption": "Talking about recovery and asking for help made a difference. [Sensitive details omitted.]",
       "createdAt": -960000,
       "assetId": "example-video-recovery",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "self-harm",
@@ -1600,8 +1584,7 @@
       "caption": "Police say two people were injured in a stabbing on the high street last night.",
       "createdAt": -1020000,
       "assetId": "example-news",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -1637,8 +1620,7 @@
       "caption": "[An offer to sell illegal drugs and ordering instructions omitted.]",
       "createdAt": -1080000,
       "assetId": "example-website-drugs",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -1674,8 +1656,7 @@
       "caption": "Happy 30th to my favourite person!",
       "createdAt": -1140000,
       "assetId": "example-birthday",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -1711,8 +1692,7 @@
       "caption": "[A request for payment details and a verification code omitted.]",
       "createdAt": -1200000,
       "assetId": "example-voice-scam",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -1748,8 +1728,7 @@
       "caption": "A museum display explains how soldiers were wounded in the First World War.",
       "createdAt": -1260000,
       "assetId": "example-museum",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -1785,8 +1764,7 @@
       "caption": "[An identity-based call for exclusion omitted.]",
       "createdAt": -1320000,
       "assetId": "example-video-hate",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "hate",
@@ -1822,8 +1800,7 @@
       "caption": "A long walk and this view. Worth every step.",
       "createdAt": -1380000,
       "assetId": "example-hike",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -1859,8 +1836,7 @@
       "caption": "DM me for pills. Next-day delivery, no questions asked.",
       "createdAt": -1440000,
       "assetId": "example-pills",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -1896,8 +1872,7 @@
       "caption": "A quick voice note: roast the tomatoes, add basil, and save a little pasta water.",
       "createdAt": -1500000,
       "assetId": "example-voice-recipe",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -1933,8 +1908,7 @@
       "caption": "You’re a worthless idiot. Nobody here wants you around.",
       "createdAt": -1560000,
       "assetId": "example-targeted-abuse",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -1970,8 +1944,7 @@
       "caption": "A peaceful landscape with a remembrance message for someone who died naturally.",
       "createdAt": -1620000,
       "assetId": "example-image-memorial",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -2007,8 +1980,7 @@
       "caption": "Raw footage from the front line, with close-ups of the wounded after the shelling.",
       "createdAt": -1680000,
       "assetId": "example-documentary",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "violence",
@@ -2044,8 +2016,7 @@
       "caption": "Four years, many late nights, and one very proud family.",
       "createdAt": -1740000,
       "assetId": "example-graduation",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2081,8 +2052,7 @@
       "caption": "To receive your refund, send your card number and security code in a reply.",
       "createdAt": -1800000,
       "assetId": "example-fake-refund",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -2118,8 +2088,7 @@
       "caption": "I’m having thoughts of hurting myself and need someone to sit with me.",
       "createdAt": -1860000,
       "assetId": "example-asking-help",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "self-harm",
@@ -2155,8 +2124,7 @@
       "caption": "[A caption humiliating a named person omitted.]",
       "createdAt": -1920000,
       "assetId": "example-image-harassment",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -2192,8 +2160,7 @@
       "caption": "Six weeks of growth in forty seconds. The first tomatoes are ready.",
       "createdAt": -1980000,
       "assetId": "example-video-garden",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2229,8 +2196,7 @@
       "caption": "Keep posting and I’ll find out where you live.",
       "createdAt": -2040000,
       "assetId": "example-threat",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -2266,8 +2232,7 @@
       "caption": "This archive interview describes a wartime air raid, without graphic images.",
       "createdAt": -2100000,
       "assetId": "example-archive",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -2303,8 +2268,7 @@
       "caption": "Prescription pills for sale without a prescription. Message for delivery.",
       "createdAt": -2160000,
       "assetId": "example-drug-ad",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -2340,8 +2304,7 @@
       "caption": "Meet Biscuit: eight weeks old and already in charge.",
       "createdAt": -2220000,
       "assetId": "example-puppy",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2377,8 +2340,7 @@
       "caption": "Your prize is waiting. Pay a release fee using gift cards to collect it.",
       "createdAt": -2280000,
       "assetId": "example-ticket-scam",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "criminal-activity",
@@ -2414,8 +2376,7 @@
       "caption": "A difficult week, but I reached out for help instead of hurting myself.",
       "createdAt": -2340000,
       "assetId": "example-recovery",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "self-harm",
@@ -2451,8 +2412,7 @@
       "caption": "Everyone should keep mocking Jamie until they leave this group.",
       "createdAt": -2400000,
       "assetId": "example-bullying",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -2488,8 +2448,7 @@
       "caption": "Lost my voice singing along. What a night.",
       "createdAt": -2460000,
       "assetId": "example-concert",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2525,8 +2484,7 @@
       "caption": "Delete that review or I’ll come to your workplace and make you regret it.",
       "createdAt": -2520000,
       "assetId": "example-intimidation",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -2562,8 +2520,7 @@
       "caption": "If thoughts of self-harm are getting louder, tell someone you trust. You deserve support.",
       "createdAt": -2580000,
       "assetId": "example-check-in",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2599,8 +2556,7 @@
       "caption": "I know where you live. You’ll pay for saying that.",
       "createdAt": -2640000,
       "assetId": "example-threatening-reply",
-      "status": "rejected",
-      "flagged": true,
+      "status": "blocked",
       "findings": [
         {
           "category": "harassment",
@@ -2636,8 +2592,7 @@
       "caption": "A rainy afternoon by the lake is still a good afternoon.",
       "createdAt": -2700000,
       "assetId": "example-rain",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2673,8 +2628,7 @@
       "caption": "In 1066 Harold was cut down at Hastings as the Norman cavalry broke the shield wall.",
       "createdAt": -2760000,
       "assetId": "example-history",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -2710,8 +2664,7 @@
       "caption": "The proposal needs stronger evidence before we approve it.",
       "createdAt": -2820000,
       "assetId": "example-criticism",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "harassment",
@@ -2747,8 +2700,7 @@
       "caption": "Today would have been Mum’s birthday. Missing her kindness.",
       "createdAt": -2880000,
       "assetId": "example-memorial",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -2784,8 +2736,7 @@
       "caption": "Missed the train, found a brilliant little bookshop instead.",
       "createdAt": -2940000,
       "assetId": "example-train",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2821,8 +2772,7 @@
       "caption": "An injured cyclist is recovering after yesterday’s road collision.",
       "createdAt": -3000000,
       "assetId": "example-news-update",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -2858,8 +2808,7 @@
       "caption": "I hate this new app layout. Please bring the old one back.",
       "createdAt": -3060000,
       "assetId": "example-dislike",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "harassment",
@@ -2895,8 +2844,7 @@
       "caption": "Our peer support meeting is open to anyone struggling with self-harm.",
       "createdAt": -3120000,
       "assetId": "example-support-group",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2932,8 +2880,7 @@
       "caption": "The café on Mill Road makes an excellent flat white.",
       "createdAt": -3180000,
       "assetId": "example-coffee",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -2969,8 +2916,7 @@
       "caption": "Firefighters rescued two people from a house fire this morning.",
       "createdAt": -3240000,
       "assetId": "example-fire-report",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -3006,8 +2952,7 @@
       "caption": "I hate you right now. I need some space.",
       "createdAt": -3300000,
       "assetId": "example-personal-dislike",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "harassment",
@@ -3043,8 +2988,7 @@
       "caption": "Slow-roast lamb shoulder: five hours at 150°C, then rest it for twenty minutes.",
       "createdAt": -3360000,
       "assetId": "example-recipe",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",
@@ -3080,8 +3024,7 @@
       "caption": "Our food arrived cold and the restaurant never replied.",
       "createdAt": -3420000,
       "assetId": "example-bad-service",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "harassment",
@@ -3117,8 +3060,7 @@
       "caption": "Remembering my great-grandad, killed at the Somme in 1916.",
       "createdAt": -3480000,
       "assetId": "example-remembrance",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "violence",
@@ -3154,8 +3096,7 @@
       "caption": "Honestly, I can’t stand this band’s new album.",
       "createdAt": -3540000,
       "assetId": "example-review",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "harassment",
@@ -3191,8 +3132,7 @@
       "caption": "Having a hard time? Our helpline is free to call, day or night.",
       "createdAt": -3600000,
       "assetId": "example-helpline",
-      "status": "approved",
-      "flagged": false,
+      "status": "allowed",
       "findings": [
         {
           "category": "sexual",

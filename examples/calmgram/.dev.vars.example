@@ -11,3 +11,8 @@ CALMLENS_PROJECT_ID=
 CALMLENS_UPLOAD_PRESET_ID=
 # Portal → Webhooks. Point a destination at https://<your-app>/api/webhooks/calmlens
 CALMLENS_WEBHOOK_SECRET=
+
+# Point Calmgram at a local CalmLens instance instead of production (`bun run dev` in the repo's
+# backend and CDN packages). Leave unset to use https://api.calmlens.com and cdn.calmlens.com.
+# CALMLENS_API_URL=http://localhost:6110/v1
+# CALMLENS_CDN_URL=http://localhost:6130/v1

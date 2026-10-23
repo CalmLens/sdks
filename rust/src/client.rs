@@ -729,7 +729,7 @@ impl AssetsClient<'_> {
     pub async fn upload_part(&self, options: UploadPart) -> Result<Asset> {
         self.0.upload_part(options).await
     }
-    /// Searches approved assets in natural language.
+    /// Searches accessible assets in natural language.
     pub async fn search(&self, options: SearchAssets) -> Result<AssetSearchResponse> {
         let mut query = Query::default();
         query.push("query", &options.query);
@@ -792,8 +792,8 @@ impl AssetsClient<'_> {
         let path = format!("/assets/{}", id(&options.asset_id)?);
         self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
     }
-    /// Retrieves the asset until it is decided ([`Asset::is_decided`]: moderation status
-    /// `approved` or `rejected`, or classification status `failed`) and returns it. It checks again
+    /// Retrieves the asset until it is decided ([`Asset::is_decided`]: moderation status no
+    /// longer `pending`, or classification status `failed`) and returns it. It checks again
     /// after 0.5 seconds, waiting 1.5 times longer each time up to 5 seconds, and fails with
     /// `sdk/timeout` and details `{assetId, classificationStatus, moderationStatus}` when
     /// `options.timeout` (60 seconds by default) passes without a decision. Drop the future to
@@ -813,7 +813,7 @@ impl AssetsClient<'_> {
                 .map(|deadline| deadline.saturating_duration_since(tokio::time::Instant::now()));
             if remaining == Some(Duration::ZERO) {
                 let processing = asset.classification.status.as_str();
-                let moderation = asset.classification.moderation.decision.as_str();
+                let moderation = asset.classification.moderation.status.as_str();
                 let mut details = serde_json::Map::new();
                 details.insert("assetId".into(), asset.id.clone().into());
                 details.insert("classificationStatus".into(), processing.into());
@@ -1096,7 +1096,8 @@ impl TextClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
-    /// The CDN URL of an asset's content or preview, optionally through a lens or transform.
+    /// The CDN URL of an asset's content or preview, optionally through a lens or transform, with
+    /// `?ageRestricted=true` when [`CdnRequest::age_restricted`] is `Some(true)`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource
@@ -1126,6 +1127,9 @@ impl CdnClient<'_> {
                 // Already path-safe: unreserved characters, percent escapes, brackets, `=` and `,`.
                 CdnTransform::Steps(_) => url.push_str(&value.selector()?),
             }
+        }
+        if options.age_restricted == Some(true) {
+            url.push_str("?ageRestricted=true");
         }
         Ok(url)
     }

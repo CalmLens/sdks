@@ -36,11 +36,12 @@ __all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetO
 
 _MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "queued_outcome",
                  "analyzed_outcome", "signed_url_base_url"}
-_MOCK_OUTCOMES = ("pending", "approved", "rejected", "failed")
+_MOCK_OUTCOMES = ("pending", "allowed", "age-restricted", "blocked", "purged", "failed")
 
-#: Where a mock upload ends up: ``pending`` (still processing), ``approved`` or ``rejected``
-#: (processing done with that decision) or ``failed`` (processing failed, retryable).
-MockAssetOutcome = Literal["pending", "approved", "rejected", "failed"]
+#: Where a mock upload ends up: ``pending`` (still processing), ``allowed``, ``age-restricted``,
+#: ``blocked`` or ``purged`` (processing done with that moderation status; ``purged`` also removes
+#: the content) or ``failed`` (processing failed, retryable).
+MockAssetOutcome = Literal["pending", "allowed", "age-restricted", "blocked", "purged", "failed"]
 _INT_QUERY = {"pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal", "searchAll", "resolveOnly"}
 _JSON_QUERY = {"metadata", "processingOptions"}
@@ -225,7 +226,7 @@ class MockOptions(TypedDict, total=False):
     #: ``pending``.
     queued_outcome: MockAssetOutcome
     #: Outcome of assets submitted with ``classify`` and ``text.classify``. Defaults to
-    #: ``approved``.
+    #: ``allowed``.
     analyzed_outcome: MockAssetOutcome
     signed_url_base_url: str
 
@@ -262,7 +263,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self.create_id: Callable[[], str] = options.get("create_id", lambda: str(uuid.uuid4()))
         self.now: Callable[[], int] = options.get("now", lambda: int(time.time() * 1000))
         self.queued_outcome: MockAssetOutcome = options.get("queued_outcome", "pending")
-        self.analyzed_outcome: MockAssetOutcome = options.get("analyzed_outcome", "approved")
+        self.analyzed_outcome: MockAssetOutcome = options.get("analyzed_outcome", "allowed")
         for outcome in (self.queued_outcome, self.analyzed_outcome):
             if outcome not in _MOCK_OUTCOMES:
                 raise _invalid(f"Unknown mock outcome {outcome!r}", error_codes.SDK_INVALID_CONFIG)
@@ -305,7 +306,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                       asset_id: str | None = None) -> Event:
         """Add an event to the feed returned by ``events.list`` (and ``events.iter``).
         ``facts`` are ``{"key", "value", "url"?}`` entries registered for ``type``. When
-        ``asset_id`` names a stored asset, the event carries a snapshot of its decision, as
+        ``asset_id`` names a stored asset, the event carries a snapshot of its status, as
         the API's events do."""
         with self._state_lock:
             stored = self.database_storage.assets.get(asset_id) if asset_id else None
@@ -314,7 +315,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 asset = {"id": stored["id"], "externalId": stored.get("externalId"),
                          "uploadPresetId": stored.get("uploadPresetId"),
                          "upload": {"status": stored["upload"]["status"]},
-                         "classification": {'status': stored['classification']['status'], 'moderation': {'decision': stored['classification']['moderation']['decision'], 'action': stored['classification']['moderation']['action']}},
+                         "classification": {'status': stored['classification']['status'], 'moderation': {'status': stored['classification']['moderation']['status']}},
                          "content": {"status": stored["content"]["status"]}}
             now = self.now()
             event: Event = {"id": self.create_id(), "projectId": self.project_id, "userId": None, "type": type,
@@ -366,7 +367,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if error is not None:
             raise error
         if cdn:
-            return self._serve_cdn(request.get_method(), url.path)
+            return self._serve_cdn(request.get_method(), url.path, query)
         key = next((v for k, v in headers.items() if k.lower() == "idempotency-key"), None)
         upload = next((v for k, v in headers.items() if k.lower() == "x-calmlens-upload"), "")
         fingerprint = hashlib.sha256(_json([request.get_method(), url.path, sorted(query.items(), key=str),
@@ -503,7 +504,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             id=self.create_id(), projectId=self.project_id, folderId=options.get("folderId"), type=kind,
             visibility=options.get("visibility", "private"), createdAt=now, updatedAt=now,
             upload={"status": "completed" if final else "uploading", "updatedAt": now, "partsReceived": 1 if multipart else None},
-            classification={'status': 'processing' if final else 'pending', 'updatedAt': now, 'completedAt': None, 'moderation': {'decision': 'pending', 'action': None, 'manualReviews': []}},
+            classification={'status': 'processing' if final else 'pending', 'updatedAt': now, 'completedAt': None, 'moderation': {'status': 'pending', 'manualReviews': []}},
             content={"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                      "safetyHold": None, "format": mime or None,
                      "extension": None, "sizeInBytes": len(raw) if raw_upload and raw is not None else None,
@@ -521,13 +522,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _apply_outcome(self, asset: dict[str, Any], outcome: str, now: int) -> None:
         """Move ``asset`` to ``outcome`` like the pipeline would: a decision finishes processing,
-        and finished processing removes content kept only temporarily."""
-        decided = outcome in ("approved", "rejected")
+        ``purged`` deletes the content, and finished processing removes content kept only
+        temporarily."""
+        decided = outcome not in ("pending", "failed")
         status = "completed" if decided else "failed" if outcome == "failed" else "processing"
         asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None)
         asset["upload"].update(status="completed", updatedAt=now)
-        asset["classification"]["moderation"].update(decision=outcome if decided else "pending")
-        if status == "completed" and asset["content"]["status"] == "temporary":
+        asset["classification"]["moderation"].update(status=outcome if decided else "pending")
+        if outcome == "purged":
+            self._remove_content(asset, "policy", now)
+        elif status == "completed" and asset["content"]["status"] == "temporary":
             self._remove_content(asset, "retention", now)
         asset["updatedAt"] = now
 
@@ -734,7 +738,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     # CDN ---------------------------------------------------------------------------------
 
-    def _serve_cdn(self, method: str, path: str) -> _Response:
+    def _serve_cdn(self, method: str, path: str, query: Mapping[str, Any]) -> _Response:
         segments = path.strip("/").split("/")
         if len(segments) < 4 or segments[0] != "assets":
             return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, status=404))
@@ -745,7 +749,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
                           and (a["id"] == identifier or a.get("externalId") == identifier)), None)
             if asset is None:
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
-            if asset["visibility"] != "public" and not self._can_download(asset.get("folderId")):
+            # Age-restricted assets are delivered like private ones (only with the download
+            # permission), unless a public one is requested with ``ageRestricted=true``.
+            age_restricted = asset["classification"]["moderation"].get("status") == "age-restricted"
+            is_private = asset["visibility"] != "public" or age_restricted
+            public_url_allowed = (asset["visibility"] == "public" and age_restricted
+                                  and query.get("ageRestricted") in (True, "true"))
+            if is_private and not public_url_allowed and not self._can_download(asset.get("folderId")):
                 return self._failure_response(_Failure("asset/api-key-missing-permission",
                                                        "The API key cannot download this asset", 403))
             stored = self.image_storage.content.get(asset["id"])
@@ -753,7 +763,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset content not found", 404))
             content = b"".join(v for _, v in sorted(stored["parts"].items()))
         headers = {"Content-Type": stored["type"], "Content-Length": str(len(content)),
-                   "Cache-Control": "public, max-age=31536000" if asset["visibility"] == "public" else "private, no-store",
+                   "Cache-Control": "private, no-store" if is_private else "public, max-age=31536000",
                    "ETag": '"' + hashlib.sha256(content).hexdigest()[:32] + '"'}
         return self._respond(200, headers=headers, body=b"" if method == "HEAD" else content)
 

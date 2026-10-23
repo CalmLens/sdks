@@ -36,48 +36,50 @@ def clickable(board):
 
 
 class DemoFlowTests(unittest.TestCase):
-    def test_link_is_clickable_only_after_the_page_is_approved(self):
+    def test_link_is_clickable_only_after_the_page_is_allowed(self):
         board, clock = demo_board()
-        board.submit("https://example.com/good", "Worth a read", "approved")
+        board.submit("https://example.com/good", "Worth a read", "allowed")
         board.refresh()
         self.assertEqual(board.links[0]["status"], "pending")
         self.assertEqual(clickable(board), [])
         clock.now = 5
         board.refresh()
-        self.assertEqual(board.links[0]["status"], "approved")
+        self.assertEqual(board.links[0]["status"], "allowed")
         self.assertEqual(clickable(board), [b"https://example.com/good"])
         self.assertIn(b'rel="noopener noreferrer nofollow ugc"', board.render())
 
-    def test_rejected_and_failed_pages_never_link_and_explain_the_decision(self):
+    def test_blocked_purged_and_failed_pages_never_link_and_explain_the_decision(self):
         board, clock = demo_board()
-        board.submit("https://example.com/bad", "Look", "rejected")
+        board.submit("https://example.com/bad", "Look", "blocked")
+        board.submit("https://example.com/worse", "Look", "purged")
         board.submit("https://example.com/broken", "Look", "error")
         clock.now = 5
         board.refresh()
-        broken, bad = board.links
-        self.assertEqual((bad["status"], broken["status"]), ("rejected", "error"))
+        broken, worse, bad = board.links
+        self.assertEqual((bad["status"], worse["status"], broken["status"]), ("blocked", "purged", "error"))
         self.assertEqual(clickable(board), [])
         self.assertEqual(bad["explanation"], {"found": [("criminal-activity", 0.92)], "unknown": ["sexual"]})
+        self.assertEqual(worse["explanation"], bad["explanation"])
         self.assertEqual([(child["type"], child["status"], [c for c, _ in child["found"]]) for child in bad["children"]],
-                         [("plaintext-document", "rejected", ["criminal-activity"]), ("image", "approved", [])])
+                         [("plaintext-document", "blocked", ["criminal-activity"]), ("image", "allowed", [])])
         self.assertIsNone(broken["explanation"])
 
-    def test_flagged_page_links_and_lists_its_findings(self):
+    def test_age_restricted_page_is_not_linked_and_lists_its_findings(self):
         board, clock = demo_board()
-        board.submit("https://example.com/edgy", "Look", "flagged")
+        board.submit("https://example.com/edgy", "Look", "age-restricted")
         clock.now = 5
         board.refresh()
         link = board.links[0]
-        self.assertEqual((link["status"], link["flagged"]), ("approved", True))
+        self.assertEqual(link["status"], "age-restricted")
         self.assertEqual(link["explanation"]["found"], [("criminal-activity", 0.64)])
-        self.assertEqual(clickable(board), [b"https://example.com/edgy"])
+        self.assertEqual(clickable(board), [])
 
-    def test_rejected_note_stops_before_the_page_is_submitted(self):
+    def test_blocked_note_stops_before_the_page_is_submitted(self):
         board, _ = demo_board()
-        self.assertEqual(board.submit("https://example.com/", "Hello", "note-rejected"), "note-rejected")
+        self.assertEqual(board.submit("https://example.com/", "Hello", "note-blocked"), "note-not-allowed")
         self.assertEqual([request.path for request in board.moderator.client.requests], ["/projects/mock-project/assets"])
         link = board.links[0]
-        self.assertEqual((link["status"], link["asset_id"]), ("note-rejected", None))
+        self.assertEqual((link["status"], link["asset_id"]), ("note-not-allowed", None))
         self.assertEqual(clickable(board), [])
 
     def test_page_is_submitted_as_a_queued_url_without_retention(self):
@@ -119,7 +121,7 @@ class LiveTests(unittest.TestCase):
             board = live_board(client)
             board.submit("https://example.com/", "Hello")
             stored = client.database_storage.assets[board.links[0]["asset_id"]]
-            stored["classification"]["status"], stored["classification"]["moderation"]["decision"] = processing, moderation
+            stored["classification"]["status"], stored["classification"]["moderation"]["status"] = processing, moderation
             board.refresh()
             self.assertEqual(board.links[0]["status"], "pending")
             self.assertEqual(clickable(board), [])
@@ -127,7 +129,7 @@ class LiveTests(unittest.TestCase):
         board = live_board(client)
         board.submit("https://example.com/", "Hello")
         stored = client.database_storage.assets[board.links[0]["asset_id"]]
-        stored["classification"]["status"], stored["classification"]["moderation"]["decision"] = "completed", "approved"
+        stored["classification"]["status"], stored["classification"]["moderation"]["status"] = "completed", "allowed"
         client.enqueue_error(ConnectionResetError("reset"))
         with self.assertLogs(level="WARNING"):
             board.refresh()
@@ -233,10 +235,10 @@ class HandlerTests(unittest.TestCase):
 
     def test_live_handler_ignores_demo_outcomes(self):
         choices = []
-        moderator = SimpleNamespace(demo=False, check_note=lambda link_id, note, choice: choices.append(choice) or {"id": "n", "classification": {"moderation": {"decision": "rejected"}}})
+        moderator = SimpleNamespace(demo=False, check_note=lambda link_id, note, choice: choices.append(choice) or {"id": "n", "classification": {"moderation": {"status": "blocked"}}})
         board = Board(moderator)
-        self.request(board, "POST", "/links", {"url": "https://example.com/", "note": "Hi", "csrf": board.csrf_token, "demo_result": "rejected"})
-        self.assertEqual(choices, ["approved"])
+        self.request(board, "POST", "/links", {"url": "https://example.com/", "note": "Hi", "csrf": board.csrf_token, "demo_result": "blocked"})
+        self.assertEqual(choices, ["allowed"])
 
     def test_unreachable_api_returns_502(self):
         board = live_board(MockCalmLensServerClient().enqueue_error(TimeoutError()))

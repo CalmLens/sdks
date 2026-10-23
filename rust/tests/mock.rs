@@ -125,7 +125,7 @@ async fn declared_payload_sizes_are_checked_for_first_and_later_parts() {
                         Asset::new(
                             "asset-1",
                             AssetClassificationStatus::Completed,
-                            AssetModerationStatus::Approved,
+                            AssetModerationStatus::Allowed,
                         ),
                     );
                 }
@@ -303,7 +303,7 @@ async fn owned_clients_share_the_mock_queue_and_request_log() {
         Asset::new(
             "first",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Approved,
+            AssetModerationStatus::Allowed,
         ),
     );
     mock.enqueue(
@@ -311,15 +311,15 @@ async fn owned_clients_share_the_mock_queue_and_request_log() {
         Asset::new(
             "second",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Rejected,
+            AssetModerationStatus::Blocked,
         ),
     );
     let first = owned.assets().retrieve(AssetId::new("a")).await.unwrap();
     let second = mock.assets().retrieve(AssetId::new("b")).await.unwrap();
     assert_eq!(first.id, "first");
     assert_eq!(
-        second.classification.moderation.decision,
-        AssetModerationStatus::Rejected
+        second.classification.moderation.status,
+        AssetModerationStatus::Blocked
     );
     let requests = mock.requests();
     assert_eq!(requests[0].url, "http://localhost:6110/v1/assets/a");
@@ -339,7 +339,7 @@ async fn list_assets_scopes_to_a_folder() {
         .list(ListAssets {
             cursor: Some("next-token".into()),
             page_size: Some(12),
-            filter: Some("classification.moderation.decision==approved".into()),
+            filter: Some("classification.moderation.status==allowed".into()),
             folder_id: Some("folder-1".into()),
             ..Default::default()
         })
@@ -350,7 +350,7 @@ async fn list_assets_scopes_to_a_folder() {
     assert_eq!(request.query_param("folderId"), Some("folder-1"));
     assert_eq!(
         request.query_param("filter"),
-        Some("classification.moderation.decision==approved")
+        Some("classification.moderation.status==allowed")
     );
     assert_eq!(request.query_param("cursor"), Some("next-token"));
 }
@@ -365,12 +365,12 @@ async fn iterate_follows_pages_until_has_more_is_false() {
                 Asset::new(
                     "a",
                     AssetClassificationStatus::Completed,
-                    AssetModerationStatus::Approved,
+                    AssetModerationStatus::Allowed,
                 ),
                 Asset::new(
                     "b",
                     AssetClassificationStatus::Completed,
-                    AssetModerationStatus::Approved,
+                    AssetModerationStatus::Allowed,
                 ),
             ],
             true,
@@ -391,7 +391,7 @@ async fn iterate_follows_pages_until_has_more_is_false() {
         .assets()
         .iterate(ListAssets {
             page_size: Some(2),
-            filter: Some("classification.moderation.decision==approved".into()),
+            filter: Some("classification.moderation.status==allowed".into()),
             ..Default::default()
         })
         .map_ok(|asset| asset.id)
@@ -414,11 +414,11 @@ async fn iterate_follows_pages_until_has_more_is_false() {
         [
             (
                 "".to_owned(),
-                "classification.moderation.decision==approved".to_owned()
+                "classification.moderation.status==allowed".to_owned()
             ),
             (
                 "next-token".to_owned(),
-                "classification.moderation.decision==approved".to_owned()
+                "classification.moderation.status==allowed".to_owned()
             )
         ]
     );
@@ -430,7 +430,7 @@ async fn iterate_follows_pages_until_has_more_is_false() {
             vec![Asset::new(
                 "child-1",
                 AssetClassificationStatus::Completed,
-                AssetModerationStatus::Approved,
+                AssetModerationStatus::Allowed,
             )],
             true,
         ),
@@ -461,11 +461,11 @@ async fn event_pages_follow_the_cursor() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue(
         200,
-        EventsPage::new(vec![Event::new("event-1", "asset.rejected")], "c1", true),
+        EventsPage::new(vec![Event::new("event-1", "asset.blocked")], "c1", true),
     );
     mock.enqueue(
         200,
-        EventsPage::new(vec![Event::new("event-2", "asset.approved")], "c2", false),
+        EventsPage::new(vec![Event::new("event-2", "asset.allowed")], "c2", false),
     );
     let pages: Vec<EventsPage> = mock
         .events()
@@ -515,7 +515,7 @@ async fn reads_are_retried_after_unavailable_and_rate_limits() {
         Asset::new(
             "asset-1",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Approved,
+            AssetModerationStatus::Allowed,
         ),
     );
     // The first reply is a 400: not retryable, so it fails straight away.
@@ -680,7 +680,7 @@ async fn multipart_parts_use_the_saved_queue_choice() {
         Asset::new(
             "asset-1",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Approved,
+            AssetModerationStatus::Allowed,
         ),
     );
     mock.assets()
@@ -857,7 +857,7 @@ async fn delete_content_keeps_the_record_and_delete_returns_nothing() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue(
         200,
-        json!({"id":"asset-9","moderation":{"status":"approved"},"content":{"status":"removed","removalReason":"requested","updatedAt":1700000000000u64}}),
+        json!({"id":"asset-9","moderation":{"status":"allowed"},"content":{"status":"removed","removalReason":"requested","updatedAt":1700000000000u64}}),
     );
     let asset = mock
         .assets()
@@ -894,7 +894,7 @@ async fn patch_clear_is_distinct_from_omission() {
         Asset::new(
             "asset",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Approved,
+            AssetModerationStatus::Allowed,
         ),
     );
     mock.assets()
@@ -936,7 +936,7 @@ async fn pagination_stops_when_a_page_does_not_advance() {
 
     mock.enqueue(
         200,
-        EventsPage::new(vec![Event::new("e", "asset.rejected")], "same", true),
+        EventsPage::new(vec![Event::new("e", "asset.blocked")], "same", true),
     );
     let pages: Vec<_> = mock
         .events()
@@ -976,7 +976,7 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
     enqueue_status(
         &mock,
         AssetClassificationStatus::Completed,
-        AssetModerationStatus::Rejected,
+        AssetModerationStatus::Blocked,
         1,
     );
     let started = tokio::time::Instant::now();
@@ -988,8 +988,8 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
     let waited = started.elapsed();
     assert_eq!(asset.id, "asset-1");
     assert_eq!(
-        asset.classification.moderation.decision,
-        AssetModerationStatus::Rejected
+        asset.classification.moderation.status,
+        AssetModerationStatus::Blocked
     );
     let requests: Vec<_> = mock
         .requests()

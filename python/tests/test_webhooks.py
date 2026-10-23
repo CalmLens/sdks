@@ -73,7 +73,7 @@ class WebhookTests(unittest.TestCase):
             BODY, headers={**headers, "X-CalmLens-Signature": "v1=" + "0" * 64}, secret=SECRET, now=NOW))
 
     def test_parse_webhook_event_verifies_then_parses(self):
-        body = json.dumps({"id": "evt_1", "type": "asset.rejected", "createdAt": 1, "projectId": "p",
+        body = json.dumps({"id": "evt_1", "type": "asset.blocked", "createdAt": 1, "projectId": "p",
                            "data": {"severity": "low", "title": "t", "description": None, "assetId": "a",
                                     "asset": None, "facts": [{"key": "decided-by", "value": "automated"}]}})
         headers = create_webhook_headers(body, "delivery-1", SECRET, timestamp=NOW)
@@ -98,12 +98,12 @@ class WebhookTests(unittest.TestCase):
         self.assertFalse(verify(now=None))  # the real clock: the 2023 vector has expired
 
     def test_payload_shape(self):
-        event = {"id": "e", "projectId": "p", "type": "asset.flagged", "severity": "high",
-                 "title": "Flagged", "description": "d", "assetId": "a", "facts": [],
+        event = {"id": "e", "projectId": "p", "type": "asset.classified", "severity": "high",
+                 "title": "Classified", "description": "d", "assetId": "a", "facts": [],
                  "userId": "u", "notify": True, "createdAt": 1, "updatedAt": 2, "readAt": None}
         self.assertEqual(to_webhook_event_payload(event), {
-            "id": "e", "type": "asset.flagged", "createdAt": 1, "projectId": "p",
-            "data": {"severity": "high", "title": "Flagged", "description": "d", "assetId": "a",
+            "id": "e", "type": "asset.classified", "createdAt": 1, "projectId": "p",
+            "data": {"severity": "high", "title": "Classified", "description": "d", "assetId": "a",
                      "asset": None, "facts": []},
         })
 

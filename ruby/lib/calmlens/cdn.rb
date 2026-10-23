@@ -10,6 +10,9 @@ module CalmLens
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash, Array<Hash>] :transform a selector such as `imageTransform[width=200]`,
     #   or structured steps: `{type: 'imageTransform', options: {width: 200}}` or an Array of them
+    # @option options [Boolean] :age_restricted true appends `?ageRestricted=true`, so a public asset whose
+    #   moderation status is `age-restricted` is served from this URL. Without it such an asset needs a signed
+    #   URL or the API key. Set it only where your app has already decided the viewer may see age-restricted content.
     # @return [String]
     def get_asset_url(options)
       call(options) { |api, _request| url(api) }
@@ -23,6 +26,7 @@ module CalmLens
     # not raised; check {Response#status}.
     #
     # @option options [String] :asset_identifier
+    # @option options [Boolean] :age_restricted see {#get_asset_url}
     # @option options [Hash] :init `{method: 'GET' | 'HEAD', headers: {...}}`
     # @yieldparam response [Response]
     # @return [Response, Object]
@@ -57,7 +61,10 @@ module CalmLens
       url += "/@#{Internal.segment(api['lens'])}" if api['lens']
       transform = api['transform']
       url += "#{api['lens'] ? ',' : '/'}#{Transforms.path(transform)}" unless transform.nil? || transform == ''
-      url
+      age_restricted = api.fetch('ageRestricted', false)
+      raise Internal.invalid('ageRestricted must be true or false') unless [true, false, nil].include?(age_restricted)
+
+      age_restricted ? "#{url}?ageRestricted=true" : url
     end
   end
 end

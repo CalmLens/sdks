@@ -7,16 +7,16 @@ module CalmLens
   # (`asset_id:`) or the API's camelCase (`'assetId'`); keys inside `metadata` are sent unchanged.
   # Any method also accepts `request_options: { idempotency_key:, timeout:, open_timeout:, max_retries: }`.
   # Results are Hashes with the API's camelCase string keys. Fields and enum values added to the API
-  # later appear as they are, so compare `classification.moderation.decision` and similar values with known strings
+  # later appear as they are, so compare `classification.moderation.status` and similar values with known strings
   # and treat anything else as not ready.
   class Assets < Resource
     SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata externalId externalUrl
                            folderId uploadPresetId].freeze
     MIN_MULTIPART_IMAGE_BYTES = 10 * 1024 * 1024
     MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024
-    # Moderation statuses that carry a decision; {#wait_for_decision} returns once an asset has one,
-    # or once its classification status is in {FINISHED_PROCESSING_STATUSES}.
-    DECIDED_MODERATION_STATUSES = %w[approved rejected].freeze
+    # The moderation status before a decision; {#wait_for_decision} returns once an asset has any
+    # other, or once its classification status is in {FINISHED_PROCESSING_STATUSES}.
+    PENDING_MODERATION_STATUS = 'pending'
     # Processing statuses after which no decision will arrive without a retry.
     FINISHED_PROCESSING_STATUSES = %w[failed].freeze
     DECISION_POLL_FIRST_DELAY = 0.5
@@ -35,7 +35,7 @@ module CalmLens
     # Lists one page of assets.
     # @option options [String] :cursor from the previous page
     # @option options [Integer] :page_size
-    # @option options [String] :filter an RSQL filter such as `classification.moderation.decision==approved`
+    # @option options [String] :filter an RSQL filter such as `classification.moderation.status==allowed`
     # @option options [Array<Hash>] :ordering `[{field: 'createdAt', direction: 'DESC'}]`
     # @return [Hash] `{'items', 'total', 'hasMore', 'cursor', 'pageSize'}`
     def list(options = {})
@@ -88,9 +88,10 @@ module CalmLens
       end
     end
 
-    # Waits until an asset's `classification.moderation.decision` is `approved` or `rejected`, or its
-    # `classification.status` is `failed`, and returns the asset. It retrieves the asset, waiting 0.5
-    # seconds before the second check and 1.5 times longer each time after that, up to 5 seconds.
+    # Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
+    # `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns
+    # the asset. It retrieves the asset, waiting 0.5 seconds before the second check and 1.5 times
+    # longer each time after that, up to 5 seconds.
     # Webhooks report decisions without polling.
     #
     # `timeout:` is the whole wait in seconds; `request_options: {timeout:}` still limits each request.
@@ -180,7 +181,8 @@ module CalmLens
     end
 
     # Uploads content and queues moderation; the call returns before classification finishes.
-    # Watch for `asset.approved` and `asset.rejected` events or retrieve the asset later.
+    # Watch for `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purged` events or
+    # retrieve the asset later.
     #
     # Give exactly one of `content:` (a whole file), `part:` (the first part of a multipart upload) or
     # `url:` (a web page or file to fetch). Content is `{type:, plain_text:}`, `{type:, base64:}` or
@@ -201,8 +203,8 @@ module CalmLens
 
     # Uploads content and waits for the moderation decision where the content type supports it.
     # Audio and video are always processed asynchronously. Takes the options of {#create}.
-    # @return [Hash] the asset; publish only when `classification.moderation.decision` is `approved` and
-    #   `classification.moderation.action` is nil.
+    # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
+    #   `allowed`. Serve `age-restricted` assets only behind your own age check, through signed URLs.
     def classify(options)
       call(options) do |api, request|
         content = api['content']
@@ -248,8 +250,8 @@ module CalmLens
       loop do
         asset = retrieve('assetId' => asset_id, 'request_options' => request_options)
         processing = asset.dig('classification', 'status')
-        moderation = asset.dig('classification', 'moderation', 'decision')
-        return asset if DECIDED_MODERATION_STATUSES.include?(moderation) || FINISHED_PROCESSING_STATUSES.include?(processing)
+        moderation = asset.dig('classification', 'moderation', 'status')
+        return asset if moderation != PENDING_MODERATION_STATUS || FINISHED_PROCESSING_STATUSES.include?(processing)
 
         remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
         unless remaining.positive?

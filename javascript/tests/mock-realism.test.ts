@@ -56,36 +56,36 @@ describe("MockCalmLensServerClient errors", () => {
 describe("MockCalmLensServerClient listing", () => {
   it("applies ordering and simple RSQL filters, and refuses filters it can't evaluate", async () => {
     const client = createClient();
-    await client.assets.classify(text("b-approved"));
+    await client.assets.classify(text("b-allowed"));
     await client.assets.create(text("a-pending"));
-    await client.assets.classify(text("c-approved"));
+    await client.assets.classify(text("c-allowed"));
 
     const newestFirst = await client.assets.list();
     expect(newestFirst.items.map((asset) => asset.name)).toEqual([
-      "c-approved",
+      "c-allowed",
       "a-pending",
-      "b-approved",
+      "b-allowed",
     ]);
 
-    const approvedByName = await client.assets.list({
-      filter: "classification.moderation.decision==approved",
+    const allowedByName = await client.assets.list({
+      filter: "classification.moderation.status==allowed",
       ordering: [{ field: "createdAt", direction: "ASC" }],
     });
-    expect(approvedByName.items.map((asset) => asset.name)).toEqual(["b-approved", "c-approved"]);
-    expect(approvedByName.hasMore).toBe(false);
+    expect(allowedByName.items.map((asset) => asset.name)).toEqual(["b-allowed", "c-allowed"]);
+    expect(allowedByName.hasMore).toBe(false);
 
-    const either = await client.assets.list({ filter: "name==a-pending,name==c-approved" });
-    expect(either.items.map((asset) => asset.name).sort()).toEqual(["a-pending", "c-approved"]);
+    const either = await client.assets.list({ filter: "name==a-pending,name==c-allowed" });
+    expect(either.items.map((asset) => asset.name).sort()).toEqual(["a-pending", "c-allowed"]);
     const both = await client.assets.list({
-      filter: "classification.moderation.decision==approved;name!=b-approved",
+      filter: "classification.moderation.status==allowed;name!=b-allowed",
     });
-    expect(both.items.map((asset) => asset.name)).toEqual(["c-approved"]);
+    expect(both.items.map((asset) => asset.name)).toEqual(["c-allowed"]);
 
     expect(
       await caught(
         client.assets.list({
           filter:
-            "(classification.moderation.decision==approved,classification.moderation.decision==pending);name==x",
+            "(classification.moderation.status==allowed,classification.moderation.status==pending);name==x",
         }),
       ),
     ).toMatchObject({ code: "sdk/invalid-argument" });
@@ -126,7 +126,7 @@ describe("MockCalmLensServerClient events", () => {
     const client = createClient();
     const { cursor: start } = await client.events.list();
     const first = client.enqueueEvent({ type: "asset.uploaded" });
-    const second = client.enqueueEvent({ type: "asset.approved", assetId: "asset-1" });
+    const second = client.enqueueEvent({ type: "asset.allowed", assetId: "asset-1" });
 
     const page = await client.events.list({ after: start, limit: 1 });
     expect(page.events.map((event) => event.id)).toEqual([first.id]);
@@ -197,7 +197,7 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
     });
     // Started with classify, so the saved choice is to wait for the decision.
     expect(finished.classification.status).toBe("completed");
-    expect(finished.classification.moderation.decision).toBe("approved");
+    expect(finished.classification.moderation.status).toBe("allowed");
     expect(
       await caught(
         client.assets.uploadPart({

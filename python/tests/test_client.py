@@ -362,10 +362,10 @@ class PaginationTests(ClientTestCase):
         pages = [{"items": [{"id": "a"}, {"id": "b"}], "hasMore": True, "nextCursor": "next-token"},
                  {"items": [{"id": "c"}], "hasMore": False}]
         self.script = [(page,) for page in pages]
-        ids = [asset["id"] for asset in self.client.assets.iter(page_size=2, filter="classification.moderation.decision==approved")]
+        ids = [asset["id"] for asset in self.client.assets.iter(page_size=2, filter="classification.moderation.status==allowed")]
         self.assertEqual(ids, ["a", "b", "c"])
         self.assertEqual([self.query(i).get("cursor") for i in (0, 1)], [None, ["next-token"]])
-        self.assertEqual(self.query(1)["filter"], ["classification.moderation.decision==approved"])
+        self.assertEqual(self.query(1)["filter"], ["classification.moderation.status==allowed"])
 
     def test_children_iter_walks_every_page(self):
         self.script = [({"items": [{"id": "c1"}], "hasMore": True, "nextCursor": "next-token"},), ({"items": [{"id": "c2"}], "hasMore": False},)]
@@ -382,8 +382,8 @@ class PaginationTests(ClientTestCase):
 
 class WaitForDecisionTests(ClientTestCase):
     def test_retrieves_the_asset_until_it_has_a_decision(self):
-        pending = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'decision': 'pending'}}}
-        decided = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'completed', 'moderation': {'decision': 'rejected'}}}
+        pending = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'status': 'pending'}}}
+        decided = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'completed', 'moderation': {'status': 'blocked'}}}
         self.script = [(pending,), (pending,), (decided,)]
         asset = self.client.assets.wait_for_decision(asset_id="asset-1")
         self.assertEqual(asset, decided)
@@ -391,15 +391,15 @@ class WaitForDecisionTests(ClientTestCase):
         self.assertEqual(self.sleeps, [0.5, 0.75])
 
     def test_stops_when_processing_failed(self):
-        failed = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'failed', 'moderation': {'decision': 'pending'}}}
-        self.script = [({"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'decision': 'pending'}}},),
+        failed = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'failed', 'moderation': {'status': 'pending'}}}
+        self.script = [({"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'status': 'pending'}}},),
                        (failed,)]
         self.assertEqual(self.client.assets.wait_for_decision(asset_id="asset-1"), failed)
         self.assertEqual(len(self.calls), 2)
 
     def test_backs_off_to_five_seconds_and_times_out_at_the_deadline(self):
         self.client._clock = lambda: sum(self.sleeps)
-        self.result = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'decision': 'pending'}}}
+        self.result = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'status': 'pending'}}}
         with self.assertRaises(CalmLensError) as raised:
             self.client.assets.wait_for_decision({"assetId": "asset-1", "timeout": 20})
         self.assertEqual(raised.exception.code, error_codes.SDK_TIMEOUT)
@@ -409,7 +409,7 @@ class WaitForDecisionTests(ClientTestCase):
         self.assertEqual(len(self.calls), 9)
 
     def test_zero_timeout_checks_once(self):
-        self.result = {"id": "asset-1", "upload": {"status": "uploading"}, "classification": {'status': 'pending', 'moderation': {'decision': 'pending'}}}
+        self.result = {"id": "asset-1", "upload": {"status": "uploading"}, "classification": {'status': 'pending', 'moderation': {'status': 'pending'}}}
         with self.assertRaises(CalmLensError) as raised:
             self.client.assets.wait_for_decision(asset_id="asset-1", timeout=0)
         self.assertEqual((raised.exception.code, raised.exception.details),

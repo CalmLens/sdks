@@ -38,10 +38,10 @@ const client = new CalmLensServerClient({
 // Text (comments, captions, bios): waits for the decision
 const comment = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 
-if (comment.classification.moderation.decision === "approved") {
-  // publish it; if comment.classification.moderation.action is "flag", also queue it for review
+if (comment.classification.moderation.status === "allowed") {
+  // publish it
 } else {
-  // "rejected": don't publish it
+  // "age-restricted": show it only behind your own age check; "blocked" or "purged": don't publish it
 }
 
 // Images and documents: queued, resolved by webhook or assets.retrieve()
@@ -50,21 +50,22 @@ const image = await client.assets.create({
   content: { data: file, type: "image/jpeg" },
   externalId: "post-7",
 });
-console.log(image.classification.status, image.classification.moderation.decision); // "processing" "pending"
+console.log(image.classification.status, image.classification.moderation.status); // "processing" "pending"
 ```
 
-| `classification.status` | `classification.moderation.decision` | `classification.moderation.action` | Meaning |
-| --- | --- | --- | --- |
-| `completed` | `approved` | `null` | Safe to show. |
-| `completed` | `approved` | `flag` | Show it, but your policy flagged it for review. |
-| `completed` | `rejected` | `hide` or `purge` | Your policy hid or purged it. Don't show it. |
-| `pending` or `processing` | `pending` | `null` | Still being received or classified; `upload.status` is `uploading` while parts are arriving. |
-| `failed` | `pending` | `null` | Processing failed; see `assets.retry`. |
+| `classification.status` | `classification.moderation.status` | Meaning |
+| --- | --- | --- |
+| `completed` | `allowed` | Safe to show. |
+| `completed` | `age-restricted` | Delivered only through signed URLs, API keys or URLs built with `ageRestricted: true`. Show it only to viewers your app has age-checked. |
+| `completed` | `blocked` | Your policy blocked it; the CDN doesn't deliver it. Don't show it. |
+| `completed` | `purged` | Your policy blocked it and deleted its content. Don't show it. |
+| `pending` or `processing` | `pending` | Still being received or classified; `upload.status` is `uploading` while parts are arriving. |
+| `failed` | `pending` | Processing failed; see `assets.retry`. |
 
-The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated one in
-`classification.moderation.decision`; `classification.moderation.action` keeps what your policy did.
+The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision in
+`classification.moderation.status`.
 
-See [How CalmLens works](https://calmlens.com/docs/how-it-works) and [Testing your integration](https://calmlens.com/docs/guides/testing) for test inputs that trigger rejections safely.
+See [How CalmLens works](https://calmlens.com/docs/how-it-works) and [Testing your integration](https://calmlens.com/docs/guides/testing) for test inputs that trigger each moderation status safely.
 
 ## API Reference
 
@@ -150,8 +151,7 @@ Both resolve to the stored `Asset`, a plain object with camelCase keys exactly a
 const asset = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 asset.id;            // string
 asset.classification.status;  // "pending" | "processing" | "completed" | "failed"; audio and video keep processing in the background
-asset.classification.moderation.decision;  // "pending" | "approved" | "rejected"
-asset.classification.moderation.action;  // "flag" | "hide" | "purge", what your policy did with flagged content; null when nothing was flagged
+asset.classification.moderation.status;  // "pending" | "allowed" | "age-restricted" | "blocked" | "purged"
 asset.classification.moderation?.score;                         // number, the overall score
 asset.classification.moderation.categories?.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
 asset.content.status;     // "temporary" | "stored" | "removed"
@@ -173,7 +173,7 @@ async assets.retrieve(options: { assetId: string }): Promise<Asset>
 **Example:**
 ```typescript
 const asset = await client.assets.retrieve({ assetId: "asset-uuid-here" });
-console.log(asset.classification.moderation.decision);
+console.log(asset.classification.moderation.status);
 console.log(asset.classification.moderation); // Classification results
 ```
 
@@ -236,14 +236,14 @@ const result = await client.assets.list({
 
 console.log(`Received ${result.items.length} assets`);
 result.items.forEach(asset => {
-  console.log(`${asset.name}: ${asset.classification.moderation.decision}`);
+  console.log(`${asset.name}: ${asset.classification.moderation.status}`);
 });
 ```
 
 To read every matching asset, iterate instead of paging by hand. Pages are fetched as you go using continuation cursors. Inserting or deleting other assets does not shift the cursor position. To page manually, pass `nextCursor` as `cursor` with the same filters and ordering until it is null. Lists are not snapshots; assets may still be deleted or change filter membership during traversal.
 
 ```typescript
-for await (const asset of client.assets.iterate({ filter: "classification.moderation.decision==rejected", pageSize: 100 })) {
+for await (const asset of client.assets.iterate({ filter: "classification.moderation.status==blocked", pageSize: 100 })) {
   console.log(asset.id);
 }
 ```
@@ -307,15 +307,15 @@ const asset = await client.assets.retry({ assetId: "asset-uuid" });
 
 ##### assets.waitForDecision(options)
 
-Wait for an asset's moderation decision and get the decided asset: it returns once `classification.moderation.decision`
-is `approved` or `rejected`, or `classification.status` is `failed`. The SDK checks the asset every few seconds and rejects with `sdk/timeout` if there's no decision within
+Wait for an asset's moderation decision and get the decided asset: it returns once `classification.moderation.status`
+is no longer `pending`, or `classification.status` is `failed`. The SDK checks the asset every few seconds and rejects with `sdk/timeout` if there's no decision within
 `timeoutMs` (default 60000). Pass `signal` to stop waiting early (`sdk/cancelled`). Use it after
 `assets.create`, or with an asset ID you stored earlier. Webhooks report decisions without polling.
 
 ```typescript
 const queued = await client.assets.create({ name: "photo.jpg", content: { blob, type: "image/jpeg" } });
 const decided = await client.assets.waitForDecision({ assetId: queued.id, timeoutMs: 30_000 });
-if (decided.classification.moderation.decision === "rejected") hidePhoto(decided.id);
+if (decided.classification.moderation.status !== "allowed") hidePhoto(decided.id);
 ```
 
 ##### folders.list(options)
@@ -397,6 +397,9 @@ const url = client.cdn.getAssetUrl({
   lens: "thumbnail",
 });
 
+// A public age-restricted asset, for a viewer your app has already age-checked
+const restrictedUrl = client.cdn.getAssetUrl({ assetIdentifier: assetId, ageRestricted: true });
+
 const response = await client.cdn.serve({
   assetIdentifier: assetId,
   resource: "content",
@@ -406,6 +409,10 @@ const response = await client.cdn.serve({
 `serve` returns the `Response` as soon as headers arrive, so you can stream the body (for example `return new Response(response.body, response)`); `timeoutMs` covers only the wait for headers. Non-2xx responses are returned rather than thrown. Pass `init` for extra `fetch` options such as `method: "HEAD"`.
 
 Private CDN content cannot be read directly with API keys. Use a short-lived signed URL for application clients.
+
+A public asset whose moderation status is `age-restricted` is served from its public URL only when the URL carries
+`ageRestricted=true`, which `ageRestricted: true` adds; otherwise it needs a signed URL or an API key. Set it only
+where your app has already decided the viewer may see age-restricted content.
 
 ##### Multipart upload flow
 
@@ -463,7 +470,7 @@ const analyzed = await client.assets.classify({
     isFinal: true
   }
 });
-console.log(analyzed.classification.moderation.decision);
+console.log(analyzed.classification.moderation.status);
 ```
 
 #### Static Methods
@@ -539,7 +546,7 @@ Upload, classification and content each have a status; moderation has its own de
 
 - `upload.status`: `uploading` while source content is arriving, then `completed`
 - `classification.status`: `pending`, `processing`, `completed` or `failed`
-- `classification.moderation.decision`: `pending` until moderation finishes, then `approved` or `rejected`. The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated one. `classification.moderation.action` is what your policy did with flagged content (`flag`, `hide` or `purge`), or `null` when nothing was flagged; `flag` leaves the asset `approved`.
+- `classification.moderation.status`: `pending` until moderation finishes, then `allowed`, `age-restricted` (delivered only through signed URLs, API keys or URLs built with `ageRestricted: true`), `blocked` (not delivered) or `purged` (not delivered, content deleted). The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision; each review's `decision` is one of the four decided statuses.
 - `content.status`: `temporary` (kept only until processing finishes), `stored` or `removed`, with `content.removalReason` `policy` (purged), `retention` (`keepContentAfterProcessing` off), `requested`, `parent-removed` or `disposed`
 
 ## Moderation Reports
@@ -625,7 +632,7 @@ The API keeps a response for 24 hours. Reusing a key for a different request fai
 
 ## Forward compatibility
 
-The SDK does not validate responses against its types, so fields and values added to the API later reach your code unchanged. `AssetClassificationStatus`, `AssetModerationStatus`, `AssetModerationAction`, `AssetReviewerAction`, `AssetContentStatus`, `AssetContentRemovalReason`, `AssetType` and `AssetVisibility` include `string` for that reason: handle values you don't know (for example, treat an unknown status as "not ready"). Event types and fact keys are typed for the ones this version knows; keep a default branch when you switch on them.
+The SDK does not validate responses against its types, so fields and values added to the API later reach your code unchanged. `AssetClassificationStatus`, `AssetModerationStatus`, `AssetModerationDecision`, `AssetContentStatus`, `AssetContentRemovalReason`, `AssetType` and `AssetVisibility` include `string` for that reason: handle values you don't know (for example, treat an unknown status as "not ready"). Event types and fact keys are typed for the ones this version knows; keep a default branch when you switch on them.
 
 ## Testing
 
@@ -644,7 +651,7 @@ const client = new MockCalmLensServerClient({
 
 `MockCalmLensServerClient` accepts the same options as `CalmLensServerClient` (`apiKey`, `projectId`, `baseUrl`, `cdnBaseUrl`, `timeoutMs`, ...) and validates them the same way, plus `mockOptions`. `cdn.getAssetUrl` uses `cdnBaseUrl` (default `mock://calmlens/v1`).
 
-It behaves like the API where tests depend on it: errors carry the API's code, HTTP `status`, a `requestId` and `headers`; `assets.list` applies `ordering`, `folderId` and simple `filter` expressions (comparisons joined by `;` and `,`; anything else throws `sdk/invalid-argument` rather than returning wrong results); `assets.search` matches names, IDs, external IDs, descriptions and tags; multipart parts must arrive in order and the queue mode chosen at the start applies to the final part; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `approved`) set where queued and waited-for uploads end up (`pending`, `approved`, `rejected` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, and `assets.deleteContent` removes it with reason `requested`; a reused `idempotencyKey` replays the first result; and `cdn.serve` returns CDN-like responses with JSON error bodies. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
+It behaves like the API where tests depend on it: errors carry the API's code, HTTP `status`, a `requestId` and `headers`; `assets.list` applies `ordering`, `folderId` and simple `filter` expressions (comparisons joined by `;` and `,`; anything else throws `sdk/invalid-argument` rather than returning wrong results); `assets.search` matches names, IDs, external IDs, descriptions and tags; multipart parts must arrive in order and the queue mode chosen at the start applies to the final part; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, `purged` removes it with reason `policy`, and `assets.deleteContent` removes it with reason `requested`; a reused `idempotencyKey` replays the first result; and `cdn.serve` returns CDN-like responses with JSON error bodies, serving private assets, and age-restricted ones requested without `ageRestricted: true`, only to keys with `assets:download`. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
 
 Every call is recorded in `client.calls` as `{ operation, options }`, where `operation` is the method path (`"text.classify"`, `"assets.retrieve"`, `"events.list"`, ...) and `options` is the object you passed. `client.callsTo(operation)` filters them. To test failure handling, `client.failNextRequest()` makes the next call throw the same `CalmLensError` the real client throws when the network fails (`sdk/transport-error`); pass `"timeout"` for `sdk/timeout`, or any `Error` to throw it as is, and `{ operation }` to fail only that method. Each queued failure is used once.
 
@@ -663,7 +670,7 @@ To test a webhook handler, build a signed delivery the way CalmLens sends it:
 ```typescript
 import { createWebhookHeaders, toWebhookEventPayload } from "@calmlens/sdk/testing";
 
-const event = client.enqueueEvent({ type: "asset.approved", assetId: asset.id });
+const event = client.enqueueEvent({ type: "asset.allowed", assetId: asset.id });
 const body = JSON.stringify(toWebhookEventPayload(event));
 const headers = await createWebhookHeaders({ secret, body, deliveryId: "delivery-1" });
 const response = await app.request("/api/webhooks/calmlens", { method: "POST", body, headers });
@@ -678,7 +685,7 @@ A `webhook` connector POSTs each event to your URL as JSON:
 ```json
 {
   "id": "…",
-  "type": "asset.flagged",
+  "type": "asset.blocked",
   "createdAt": 1760000000000,
   "projectId": "…",
   "data": {

@@ -13,13 +13,14 @@ import * as builders from "../src/testing/MockWebhooks";
 const event: Event = {
   id: "event-1",
   projectId: "123e4567-e89b-12d3-a456-426614174000",
-  type: "asset.flagged",
+  type: "asset.blocked",
   severity: "high",
-  title: "Asset flagged",
-  description: "Flagged by the harassment lens",
+  title: "Asset blocked",
+  description: "Blocked by your policy",
   assetId: "asset-1",
   facts: [
     { key: "asset-name", value: "photo.jpg" },
+    { key: "decided-by", value: "automated" },
     { key: "flagged-categories", value: ["harassment"] },
   ],
   createdAt: 1760000000000,

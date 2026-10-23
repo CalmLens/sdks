@@ -36,7 +36,6 @@ export interface ModerationFields {
   /** CalmLens asset ID — the key webhooks and the portal use. */
   assetId: string;
   status: ModerationStatus;
-  flagged: boolean;
   findings: CategoryFinding[];
   /** Last time we asked CalmLens for the status (polling fallback for missed webhooks). */
   checkedAt: number;
@@ -70,6 +69,11 @@ export interface Sandbox {
   id: string;
   username: string;
   bio: string;
+  /**
+   * "Show sensitive media": the visitor confirmed they are 18 or older and wants to see
+   * age-restricted photos. Off (undefined) by default. In your app, this is your real age check.
+   */
+  showSensitiveMedia?: boolean;
   createdAt: number;
   lastActiveAt: number;
   posts: Post[];
@@ -95,7 +99,6 @@ export const newId = () => crypto.randomUUID();
 
 export const applyOutcome = (target: ModerationFields, outcome: ModerationOutcome) => {
   target.status = outcome.status;
-  target.flagged = outcome.flagged;
   target.findings = outcome.findings;
   target.checkedAt = Date.now();
 };

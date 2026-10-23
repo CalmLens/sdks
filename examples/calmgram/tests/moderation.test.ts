@@ -1,12 +1,17 @@
 import { expect, test } from "bun:test";
 import { createCalmLensProvider, toOutcome } from "../src/moderation/calmlens";
+import { createDemoProvider } from "../src/moderation/demo";
+import { DEMO_TEST_INPUT_KEY, testTextCode } from "../src/testInputs";
 
 test("preserves pending and failed decisions without inventing safe scores", () => {
   const cases = [
     { processing: "pending", moderation: "pending", expected: "pending" },
     { processing: "processing", moderation: "pending", expected: "pending" },
     { processing: "failed", moderation: "pending", expected: "error" },
-    { processing: "completed", moderation: "rejected", expected: "rejected" },
+    { processing: "completed", moderation: "allowed", expected: "allowed" },
+    { processing: "completed", moderation: "age-restricted", expected: "age-restricted" },
+    { processing: "completed", moderation: "blocked", expected: "blocked" },
+    { processing: "completed", moderation: "purged", expected: "purged" },
     { processing: "completed", moderation: "quarantined", expected: "pending" },
   ];
   for (const { processing, moderation, expected } of cases) {
@@ -18,8 +23,7 @@ test("preserves pending and failed decisions without inventing safe scores", () 
       classification: {
         status: processing,
         moderation: {
-          decision: moderation,
-          action: "hide",
+          status: moderation,
           categories: {
             violence: { status: "not-evaluated" },
             harassment: { status: "evaluated", score: 0.8 },
@@ -29,7 +33,6 @@ test("preserves pending and failed decisions without inventing safe scores", () 
       },
     } as any);
     expect(outcome.status).toBe(expected);
-    expect(outcome.flagged).toBe(true);
     expect(outcome.externalId).toBe("post-1");
     expect(outcome.uploadPresetId).toBe("preset-1");
     expect(outcome.findings).toEqual([
@@ -39,21 +42,9 @@ test("preserves pending and failed decisions without inventing safe scores", () 
   }
 });
 
-test("an asset the policy took no action on is not flagged", () => {
-  const outcome = toOutcome({
-    id: "asset",
-    upload: { status: "completed" },
-    classification: {
-      status: "completed",
-      moderation: { decision: "approved", action: null, categories: {} },
-    },
-  } as any);
-  expect(outcome).toMatchObject({ status: "approved", flagged: false });
-});
-
 test("waits for CalmLens's decision, and reports a post still pending when none arrives", async () => {
   const statuses = new Map([
-    ["asset-decided", ["pending", "rejected"]],
+    ["asset-decided", ["pending", "blocked"]],
     ["asset-slow", ["pending"]],
   ]);
   const server = Bun.serve({
@@ -62,42 +53,15 @@ test("waits for CalmLens's decision, and reports a post still pending when none 
       const assetId = new URL(request.url).pathname.split("/").at(-1)!;
       const remaining = statuses.get(assetId)!;
       const status = remaining.length > 1 ? remaining.shift()! : remaining[0]!;
+      const decided = status !== "pending";
       return Response.json({
         id: assetId,
         upload: { status: "completed" },
         classification: {
-          status: status === "rejected" ? "completed" : "processing",
-          labels: (status === "rejected"
-            ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-            : null
-          )?.labels,
-          personDetection: (status === "rejected"
-            ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-            : null
-          )?.features?.personDetection,
-          faceDetection: (status === "rejected"
-            ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-            : null
-          )?.features?.faceDetection,
+          status: decided ? "completed" : "processing",
           moderation: {
-            decision: status,
-            action: status === "rejected" ? "hide" : null,
-            categories: (status === "rejected"
-              ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-              : null
-            )?.categories,
-            score: (status === "rejected"
-              ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-              : null
-            )?.score,
-            policy: (status === "rejected"
-              ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-              : null
-            )?.policy,
-            timeline: (status === "rejected"
-              ? { categories: { violence: { status: "evaluated", score: 0.9 } } }
-              : null
-            )?.media,
+            status,
+            categories: decided ? { violence: { status: "evaluated", score: 0.9 } } : {},
           },
         },
       });
@@ -111,7 +75,7 @@ test("waits for CalmLens's decision, and reports a post still pending when none 
     });
     expect(await provider.waitForDecision("asset-decided", { timeoutMs: 10_000 })).toMatchObject({
       assetId: "asset-decided",
-      status: "rejected",
+      status: "blocked",
       findings: [{ category: "violence", score: 0.9 }],
     });
     expect(await provider.waitForDecision("asset-slow", { timeoutMs: 0 })).toMatchObject({
@@ -121,4 +85,16 @@ test("waits for CalmLens's decision, and reports a post still pending when none 
   } finally {
     server.stop(true);
   }
+});
+
+test("demo mode age-restricts sexual test text, blocks other matches and allows the rest", async () => {
+  // Text moderation never touches storage.
+  const demo = createDemoProvider({} as KVNamespace);
+  const moderate = async (text: string) =>
+    (await demo.moderateText({ text, kind: "caption", externalId: "post-1", username: "u" }))
+      .status;
+  expect(await moderate(await testTextCode("sexual", DEMO_TEST_INPUT_KEY))).toBe("age-restricted");
+  expect(await moderate(await testTextCode("harassment", DEMO_TEST_INPUT_KEY))).toBe("blocked");
+  expect(await moderate("I'll hurt you")).toBe("blocked");
+  expect(await moderate("The tomatoes are ripening.")).toBe("allowed");
 });

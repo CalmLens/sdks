@@ -34,8 +34,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -92,8 +91,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -140,8 +138,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -178,8 +175,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -217,8 +213,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "decision": "approved",
-                "action": null
+                "status": "allowed"
               }
             }
           },
@@ -235,7 +230,7 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.decision==approved",
+      "filter": "classification.moderation.status==allowed",
       "folderId": "folder-1"
     },
     "request": {
@@ -243,7 +238,7 @@
       "path": "/v1/projects/project-1/assets/page",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.decision==approved",
+        "filter": "classification.moderation.status==allowed",
         "folderId": "folder-1"
       },
       "body": null
@@ -262,8 +257,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "decision": "approved",
-              "action": null
+              "status": "allowed"
             }
           }
         }
@@ -306,8 +300,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "decision": "approved",
-                "action": null
+                "status": "allowed"
               }
             }
           },
@@ -334,7 +327,7 @@
           "direction": "ASC"
         }
       ],
-      "filter": "classification.moderation.decision==approved,name==\"a&b #1\""
+      "filter": "classification.moderation.status==allowed,name==\"a&b #1\""
     },
     "request": {
       "method": "GET",
@@ -345,7 +338,7 @@
         "ordering[0][direction]": "DESC",
         "ordering[1][field]": "id",
         "ordering[1][direction]": "ASC",
-        "filter": "classification.moderation.decision==approved,name==\"a&b #1\""
+        "filter": "classification.moderation.status==allowed,name==\"a&b #1\""
       },
       "body": null
     },
@@ -363,8 +356,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "decision": "approved",
-              "action": null
+              "status": "allowed"
             }
           }
         }
@@ -408,8 +400,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "decision": "approved",
-              "action": null
+              "status": "allowed"
             }
           }
         }
@@ -442,8 +433,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -471,8 +461,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -505,8 +494,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "decision": "approved",
-              "action": null
+              "status": "allowed"
             }
           }
         }
@@ -556,8 +544,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null,
+          "status": "allowed",
           "categories": {
             "violence": {
               "status": "evaluated",
@@ -576,7 +563,7 @@
             "categories": {
               "violence": {
                 "score": 0.9,
-                "action": "hide",
+                "action": "block",
                 "source": {
                   "kind": "allowance",
                   "index": 0,
@@ -596,13 +583,13 @@
                         "violence-educational"
                       ],
                       "match": "all",
-                      "action": "hide"
+                      "action": "block"
                     },
                     {
                       "when": [
                         "violence-historical"
                       ],
-                      "action": "hide"
+                      "action": "block"
                     }
                   ],
                   "restrictions": [
@@ -653,8 +640,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -687,8 +673,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "decision": "approved",
-              "action": null
+              "status": "allowed"
             }
           }
         }
@@ -721,8 +706,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -750,8 +734,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -795,8 +778,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }
@@ -885,8 +867,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "decision": "approved",
-          "action": null
+          "status": "allowed"
         }
       }
     }

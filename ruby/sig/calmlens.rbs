@@ -124,8 +124,8 @@ module CalmLens
   end
 
   class Assets < Resource
-    # Moderation statuses that carry a decision.
-    DECIDED_MODERATION_STATUSES: Array[String]
+    # The moderation status before a decision.
+    PENDING_MODERATION_STATUS: String
     # Processing statuses after which no decision arrives without a retry.
     FINISHED_PROCESSING_STATUSES: Array[String]
 
@@ -215,7 +215,7 @@ module CalmLens
 
   # require 'calmlens/testing'
   module Testing
-    # The mock's in-memory records. Change them to arrange a test, such as setting an asset's `classification.moderation.decision`.
+    # The mock's in-memory records. Change them to arrange a test, such as setting an asset's `classification.moderation.status`.
     class State < Struct[untyped]
       attr_accessor assets: Hash[String, asset]
       attr_accessor folders: Hash[String, folder]
@@ -246,9 +246,10 @@ module CalmLens
       def call: () -> String
     end
 
-    # Where a mock upload ends up: `pending` (still processing), `approved` or `rejected`
-    # (processing done with that decision), or `failed` (processing failed, retryable).
-    type outcome = "pending" | "approved" | "rejected" | "failed"
+    # Where a mock upload ends up: `pending` (still processing), `allowed`, `age-restricted`, `blocked`
+    # or `purged` (processing done with that moderation status; `purged` also removes the content),
+    # or `failed` (processing failed, retryable).
+    type outcome = "pending" | asset_moderation_decision | "failed"
 
     # An outcome, fields to deep-merge into the asset, or a callable that receives a copy of the
     # asset and returns either.

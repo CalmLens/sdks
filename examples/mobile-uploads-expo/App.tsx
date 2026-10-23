@@ -164,12 +164,30 @@ function Result({
         />
       );
     case "done":
-      if (state.asset.status === "approved")
-        return <Status tone="good" title="Approved" detail="This photo can be shown." />;
-      if (state.asset.status === "rejected")
-        return (
-          <Status tone="bad" title="Rejected" detail="This photo breaks the project's policy." />
-        );
+      switch (state.asset.status) {
+        case "allowed":
+          return <Status tone="good" title="Allowed" detail="This photo can be shown." />;
+        case "age-restricted":
+          return (
+            <Status
+              tone="bad"
+              title="Age restricted"
+              detail="This photo can only be shown behind an age check, which this app doesn't have."
+            />
+          );
+        case "blocked":
+          return (
+            <Status tone="bad" title="Blocked" detail="This photo breaks the project's policy." />
+          );
+        case "purged":
+          return (
+            <Status
+              tone="bad"
+              title="Removed"
+              detail="This photo breaks the project's policy and CalmLens deleted it."
+            />
+          );
+      }
       return (
         <Status
           tone="neutral"

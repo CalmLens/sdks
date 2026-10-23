@@ -98,17 +98,24 @@ export interface MockCalmLensServerClientOptions extends CalmLensServerClientOpt
     now?: () => number;
     /** Outcome of `assets.create` (and queued multipart uploads). Defaults to `pending`. */
     queuedOutcome?: MockAssetOutcome;
-    /** Outcome of `assets.classify` and `text.classify`. Defaults to `approved`. */
+    /** Outcome of `assets.classify` and `text.classify`. Defaults to `allowed`. */
     analyzedOutcome?: MockAssetOutcome;
     signedUrlBaseUrl?: string;
   };
 }
 
 /**
- * Where a mock upload ends up: `pending` (still processing), `approved` or `rejected` (processing
- * done with that decision), or `failed` (processing failed, retryable).
+ * Where a mock upload ends up: `pending` (still processing), `allowed`, `age-restricted`, `blocked`
+ * or `purged` (processing done with that moderation status; `purged` also removes the content),
+ * or `failed` (processing failed, retryable).
  */
-export type MockAssetOutcome = "pending" | "approved" | "rejected" | "failed";
+export type MockAssetOutcome =
+  | "pending"
+  | "allowed"
+  | "age-restricted"
+  | "blocked"
+  | "purged"
+  | "failed";
 
 /** The options each `MockCalmLensServerClient` method was given, by operation name. */
 export interface MockCalmLensOperationOptions {
@@ -220,7 +227,7 @@ export class MockCalmLensServerClient {
     this.createId = options.mockOptions?.createId ?? crypto.randomUUID.bind(crypto);
     this.now = options.mockOptions?.now ?? Date.now;
     this.queuedOutcome = options.mockOptions?.queuedOutcome ?? "pending";
-    this.analyzedOutcome = options.mockOptions?.analyzedOutcome ?? "approved";
+    this.analyzedOutcome = options.mockOptions?.analyzedOutcome ?? "allowed";
     this.apiKeyGrants = getMockApiKeyGrants(options.apiKey);
     this.signedUrlBaseUrl = options.mockOptions?.signedUrlBaseUrl ?? "mock://calmlens";
     this.cdnBaseUrl = (options.cdnBaseUrl ?? "mock://calmlens/v1").replace(/\/+$/, "");
@@ -359,8 +366,11 @@ export class MockCalmLensServerClient {
           this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
         if (!asset) return notFound();
 
+        const isPrivate =
+          asset.visibility !== "public" ||
+          (asset.classification.moderation.status === "age-restricted" && !options.ageRestricted);
         if (
-          asset.visibility !== "public" &&
+          isPrivate &&
           !permits(
             this.apiKeyGrants,
             "assets:download",
@@ -398,8 +408,7 @@ export class MockCalmLensServerClient {
           headers: {
             "Content-Type": storedContent.type ?? "application/octet-stream",
             "Content-Length": String(byteLength),
-            "Cache-Control":
-              asset.visibility === "public" ? "public, max-age=31536000" : "private, no-store",
+            "Cache-Control": isPrivate ? "private, no-store" : "public, max-age=31536000",
             ETag: `"${asset.id}-${asset.updatedAt}"`,
             "X-Request-Id": requestId,
             "X-Mock-CalmLens-CDN-URL": url,
@@ -1027,8 +1036,7 @@ export class MockCalmLensServerClient {
         updatedAt: now,
         completedAt: null,
         moderation: {
-          decision: "pending",
-          action: null,
+          status: "pending",
           manualReviews: [],
         },
       },
@@ -1051,19 +1059,21 @@ export class MockCalmLensServerClient {
   }
 
   /**
-   * Moves an asset to `outcome` like the pipeline would: a decision finishes processing, and
-   * finished processing removes content kept only temporarily (`keepContentAfterProcessing` off).
+   * Moves an asset to `outcome` like the pipeline would: a decision finishes processing, `purged`
+   * deletes the content, and finished processing removes content kept only temporarily
+   * (`keepContentAfterProcessing` off).
    */
   private async applyOutcome(asset: Asset, outcome: MockAssetOutcome): Promise<Asset> {
     const now = this.now();
-    const decided = outcome === "approved" || outcome === "rejected";
+    const decided = outcome !== "pending" && outcome !== "failed";
     const classificationStatus = decided
       ? "completed"
       : outcome === "failed"
         ? "failed"
         : "processing";
+    const purge = outcome === "purged" && asset.content.status !== "removed";
     const removeContent =
-      classificationStatus === "completed" && asset.content.status === "temporary";
+      purge || (classificationStatus === "completed" && asset.content.status === "temporary");
     if (removeContent) await this.imageStorage.deleteContent(asset.id);
     return {
       ...asset,
@@ -1072,7 +1082,7 @@ export class MockCalmLensServerClient {
         ? {
             ...asset.content,
             status: "removed",
-            removalReason: "retention",
+            removalReason: purge ? "policy" : "retention",
             updatedAt: now,
             extractedText: null,
           }
@@ -1083,7 +1093,7 @@ export class MockCalmLensServerClient {
         status: classificationStatus,
         updatedAt: now,
         completedAt: decided ? now : null,
-        moderation: { ...asset.classification.moderation, decision: decided ? outcome : "pending" },
+        moderation: { ...asset.classification.moderation, status: decided ? outcome : "pending" },
       },
     };
   }

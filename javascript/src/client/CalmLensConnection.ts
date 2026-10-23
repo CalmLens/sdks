@@ -167,7 +167,7 @@ const isAsset = (data: unknown): data is Asset =>
   !!(data as { id: string }).id &&
   hasStringStatus((data as { classification?: unknown }).classification) &&
   hasStringStatus((data as { upload?: unknown }).upload) &&
-  typeof (data as Partial<Asset>).classification?.moderation?.decision === "string";
+  typeof (data as Partial<Asset>).classification?.moderation?.status === "string";
 
 const isUploadedAsset = (data: unknown): data is UploadedAsset =>
   !!data &&

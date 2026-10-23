@@ -122,11 +122,11 @@ async fn upload_preset_id_is_sent_as_a_query_parameter_and_in_url_bodies() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue(
         200,
-        json!({"id": "a", "classification": {"moderation": {"decision": "pending"}}}),
+        json!({"id": "a", "classification": {"moderation": {"status": "pending"}}}),
     );
     mock.enqueue(
         200,
-        json!({"id": "b", "classification": {"moderation": {"decision": "pending"}}}),
+        json!({"id": "b", "classification": {"moderation": {"status": "pending"}}}),
     );
     mock.assets()
         .create(SubmitAsset {

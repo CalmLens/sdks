@@ -49,7 +49,7 @@ import javax.crypto.spec.SecretKeySpec;
  * <pre>{@code
  * try (var client = CalmLensServerClient.builder(apiKey, projectId).build()) {
  *   Asset asset = client.text.classify("Hello world");
- *   if (asset.classification().moderation().decision() == AssetModerationStatus.APPROVED) publish();
+ *   if (asset.classification().moderation().status() == AssetModerationStatus.ALLOWED) publish();
  * }
  * }</pre>
  *
@@ -634,7 +634,7 @@ public final class CalmLensServerClient implements AutoCloseable {
           ? null : Json.GSON.fromJson(value, type);
       if (result == null) throw new JsonParseException("Expected a JSON " + (type.isArray() ? "array" : "object"));
       if (result instanceof Models.Asset asset && (asset.id() == null || asset.id().isEmpty()
-          || asset.upload() == null || asset.upload().status() == null || asset.classification() == null || asset.classification().status() == null || asset.classification().moderation() == null || asset.classification().moderation().decision() == null))
+          || asset.upload() == null || asset.upload().status() == null || asset.classification() == null || asset.classification().status() == null || asset.classification().moderation() == null || asset.classification().moderation().status() == null))
         throw new JsonParseException("Expected an asset with an id, a classification status and a moderation status");
       return result;
     } catch (JsonParseException | IllegalStateException | IllegalArgumentException | NullPointerException cause) {
@@ -842,8 +842,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Retrieves the asset until its {@code classification.moderation.decision} is {@code approved} or {@code
-     * rejected}, or its {@code classification.status} is {@code failed}, and returns it. It waits 0.5 seconds before the second check and 1.5 times
+     * Retrieves the asset until its {@code classification.moderation.status} is no longer {@code
+     * pending} ({@code allowed}, {@code age-restricted}, {@code blocked} or {@code purged}), or its
+     * {@code classification.status} is {@code failed}, and returns it. It waits 0.5 seconds before the second check and 1.5 times
      * longer each time after that, up to 5 seconds, never past the timeout (60 seconds by default).
      * Webhooks report decisions without polling.
      *
@@ -870,7 +871,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (isDecided(asset)) return asset;
         long remaining = limitNanos - (nanoTime.getAsLong() - started);
         if (remaining <= 0) {
-          String processing = asset.classification().status().value(), moderation = asset.classification().moderation().decision().value();
+          String processing = asset.classification().status().value(), moderation = asset.classification().moderation().status().value();
           Map<String, Object> details = new LinkedHashMap<>();
           details.put("assetId", asset.id());
           details.put("classificationStatus", processing);
@@ -889,8 +890,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     private static boolean isDecided(Models.Asset asset) {
-      Models.AssetModerationStatus moderation = asset.classification().moderation().decision();
-      return moderation == Models.AssetModerationStatus.APPROVED || moderation == Models.AssetModerationStatus.REJECTED
+      return !Models.AssetModerationStatus.PENDING.equals(asset.classification().moderation().status())
           || asset.classification().status() == Models.AssetClassificationStatus.FAILED;
     }
 
@@ -1146,7 +1146,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Cdn() {}
 
     /**
-     * Builds the CDN URL of an asset's content or preview, optionally through a lens or transform.
+     * Builds the CDN URL of an asset's content or preview, optionally through a lens or transform,
+     * with {@code ?ageRestricted=true} when {@link Models.CdnRequest#ageRestricted(Boolean)} is true.
      *
      * @param options the asset and selector
      * @return the URL
@@ -1162,6 +1163,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (transform instanceof String text) { if (!text.isEmpty()) url += separator + transformPath(text); }
       // A serialized selector is already path-safe: unreserved characters, escapes, brackets, "=" and ",".
       else if (transform != null) url += separator + serializeTransform(transform);
+      if (o.has("ageRestricted") && !o.get("ageRestricted").isJsonNull() && o.get("ageRestricted").getAsBoolean()) url += "?ageRestricted=true";
       return url;
     }
 

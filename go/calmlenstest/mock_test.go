@@ -43,7 +43,7 @@ func TestMockLifecycle(t *testing.T) {
 	}
 	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
-	if err != nil || a.Classification.Status != calmlens.ClassificationStatusCompleted || a.Classification.Moderation.Decision != calmlens.ModerationStatusApproved || *a.Classification.CompletedAt != 123 ||
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusCompleted || a.Classification.Moderation.Status != calmlens.ModerationStatusAllowed || *a.Classification.CompletedAt != 123 ||
 		a.Content.Status != calmlens.ContentStatusStored || *a.Content.Format != "text/plain" || *a.Content.SizeInBytes != 5 || a.CreatedAt != 123 {
 		t.Fatal(a, err)
 	}
@@ -53,7 +53,7 @@ func TestMockLifecycle(t *testing.T) {
 	}
 	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["status"] = calmlens.ClassificationStatusFailed
 	a, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
-	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Decision != calmlens.ModerationStatusPending || a.Classification.CompletedAt != nil {
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Status != calmlens.ModerationStatusPending || a.Classification.CompletedAt != nil {
 		t.Fatal(a, err)
 	}
 	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotRetryable {
@@ -111,7 +111,7 @@ func TestMockLensAndMultipart(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, err = c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: a.ID, Part: calmlens.Content{Bytes: make([]byte, size), PartNumber: 2, IsFinal: true}})
-	if err != nil || a.Classification.Moderation.Decision != calmlens.ModerationStatusApproved || *a.Content.SizeInBytes != int64(2*size) || *a.Upload.PartsReceived != 2 {
+	if err != nil || a.Classification.Moderation.Status != calmlens.ModerationStatusAllowed || *a.Content.SizeInBytes != int64(2*size) || *a.Upload.PartsReceived != 2 {
 		t.Fatal(a, err)
 	}
 }
@@ -143,7 +143,7 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "note", FolderID: &folder.ID, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
-	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Decision != calmlens.ModerationStatusPending || a.Content.Status != calmlens.ContentStatusTemporary {
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Status != calmlens.ModerationStatusPending || a.Content.Status != calmlens.ContentStatusTemporary {
 		t.Fatal(a, err)
 	}
 	if _, err = c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); err != nil {
@@ -226,7 +226,7 @@ func TestMockDeleteContentKeepsRecordThenDeleteRemovesIt(t *testing.T) {
 	}
 	now = 900
 	removed, err := c.Assets.DeleteContent(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
-	if err != nil || removed.ID != a.ID || removed.Classification.Moderation.Decision != calmlens.ModerationStatusApproved || removed.Content.Status != calmlens.ContentStatusRemoved ||
+	if err != nil || removed.ID != a.ID || removed.Classification.Moderation.Status != calmlens.ModerationStatusAllowed || removed.Content.Status != calmlens.ContentStatusRemoved ||
 		*removed.Content.RemovalReason != calmlens.ContentRemovalReasonRequested || *removed.Content.UpdatedAt != 900 {
 		t.Fatal(removed, err)
 	}
@@ -303,9 +303,9 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 		return a.ID
 	}
 	create("b", nil)
-	rejected := create("a", &folder.ID)
+	blocked := create("a", &folder.ID)
 	create("c", &folder.ID)
-	c.DatabaseStorage.Assets[rejected]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = calmlens.ModerationStatusRejected
+	c.DatabaseStorage.Assets[blocked]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusBlocked
 	names := func(options calmlens.ListAssetsOptions) string {
 		page, err := c.Assets.List(ctx, options)
 		if err != nil {
@@ -321,10 +321,10 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 	if got := names(calmlens.ListAssetsOptions{Ordering: desc}); got != "[c a b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.decision==pending"), Ordering: desc}); got != "[c b]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==pending"), Ordering: desc}); got != "[c b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.decision==rejected,name=in=(b,x)"), Ordering: desc}); got != "[a b]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==blocked,name=in=(b,x)"), Ordering: desc}); got != "[a b]" {
 		t.Fatal(got)
 	}
 	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.status==processing;content.format==text/plain"), Ordering: []calmlens.Order{{Field: "createdAt", Direction: "ASC"}}}); got != "[b a c]" {
@@ -349,13 +349,13 @@ func TestMockEventsAreEnqueuedAndPaged(t *testing.T) {
 	if err != nil || len(start.Events) != 0 {
 		t.Fatal(start, err)
 	}
-	c.EnqueueEvent(calmlens.Event{Type: "asset.approved", AssetID: calmlens.Ptr("a1")}, calmlens.Event{Type: "asset.failed"}, calmlens.Event{Type: "asset.rejected"})
+	c.EnqueueEvent(calmlens.Event{Type: calmlens.EventAssetAllowed, AssetID: calmlens.Ptr("a1")}, calmlens.Event{Type: calmlens.EventAssetFailed}, calmlens.Event{Type: calmlens.EventAssetBlocked})
 	it := c.Events.ListAll(calmlens.ListEventsOptions{After: start.Cursor, Limit: 2})
 	types := []string{}
 	for it.Next(ctx) {
 		types = append(types, it.Event().Type)
 	}
-	if it.Err() != nil || fmt.Sprint(types) != "[asset.approved asset.failed asset.rejected]" {
+	if it.Err() != nil || fmt.Sprint(types) != "[asset.allowed asset.failed asset.blocked]" {
 		t.Fatal(types, it.Err())
 	}
 	again, err := c.Events.List(ctx, calmlens.ListEventsOptions{After: it.Cursor()})
@@ -386,7 +386,7 @@ func TestMockMultipartUsesSavedQueueModeAndChecksParts(t *testing.T) {
 		t.Fatal(err)
 	}
 	final, err := c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: id, Part: calmlens.Content{Bytes: []byte("x"), PartNumber: 2, IsFinal: true}})
-	if err != nil || final.Classification.Status != calmlens.ClassificationStatusProcessing || final.Classification.Moderation.Decision != calmlens.ModerationStatusPending {
+	if err != nil || final.Classification.Status != calmlens.ClassificationStatusProcessing || final.Classification.Moderation.Status != calmlens.ModerationStatusPending {
 		t.Fatal("saved queue mode not applied", final, err)
 	}
 	if requests := c.Requests(); requests[len(requests)-1].Query.Has("queue") {
@@ -397,7 +397,7 @@ func TestMockMultipartUsesSavedQueueModeAndChecksParts(t *testing.T) {
 	}
 	id = start()
 	final, err = c.Assets.UploadPart(ctx, calmlens.UploadAssetPartOptions{AssetID: id, Queue: calmlens.Ptr(false), Part: calmlens.Content{Bytes: []byte("x"), PartNumber: 2, IsFinal: true}})
-	if err != nil || final.Classification.Moderation.Decision != calmlens.ModerationStatusApproved {
+	if err != nil || final.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
 		t.Fatal("queue override ignored", final, err)
 	}
 }
@@ -474,7 +474,7 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 	}
 	ctx := context.Background()
 	queued, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "note", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
-	if err != nil || queued.Classification.Moderation.Decision != calmlens.ModerationStatusPending {
+	if err != nil || queued.Classification.Moderation.Status != calmlens.ModerationStatusPending {
 		t.Fatal(queued, err)
 	}
 	c.ClearRequests()
@@ -492,10 +492,10 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
-		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = calmlens.ModerationStatusRejected
+		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusBlocked
 	})
 	got := <-done
-	if got.err != nil || got.asset.ID != queued.ID || got.asset.Classification.Moderation.Decision != calmlens.ModerationStatusRejected {
+	if got.err != nil || got.asset.ID != queued.ID || got.asset.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
 		t.Fatal(got.asset, got.err)
 	}
 	requests := c.Requests()
@@ -509,18 +509,18 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 
 func TestMockOutcomesFinishProcessingAndRemoveTemporaryContent(t *testing.T) {
 	now := int64(10)
-	c, err := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}}), Now: func() int64 { return now }, QueuedOutcome: OutcomeFailed, AnalyzedOutcome: OutcomeRejected})
+	c, err := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}}), Now: func() int64 { return now }, QueuedOutcome: OutcomeFailed, AnalyzedOutcome: OutcomeBlocked})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
 	text := &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}
-	rejected, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "rejected", Content: text})
-	if err != nil || rejected.Classification.Status != calmlens.ClassificationStatusCompleted || rejected.Classification.Moderation.Decision != calmlens.ModerationStatusRejected ||
-		rejected.Content.Status != calmlens.ContentStatusRemoved || *rejected.Content.RemovalReason != calmlens.ContentRemovalReasonRetention || c.ImageStorage.Content[rejected.ID] != nil {
-		t.Fatal(rejected, err)
+	blocked, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "blocked", Content: text})
+	if err != nil || blocked.Classification.Status != calmlens.ClassificationStatusCompleted || blocked.Classification.Moderation.Status != calmlens.ModerationStatusBlocked ||
+		blocked.Content.Status != calmlens.ContentStatusRemoved || *blocked.Content.RemovalReason != calmlens.ContentRemovalReasonRetention || c.ImageStorage.Content[blocked.ID] != nil {
+		t.Fatal(blocked, err)
 	}
-	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: rejected.ID}})
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: blocked.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +529,7 @@ func TestMockOutcomesFinishProcessingAndRemoveTemporaryContent(t *testing.T) {
 		t.Fatal("removed content served", res.StatusCode)
 	}
 	failed, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "failed", Content: text})
-	if err != nil || failed.Classification.Status != calmlens.ClassificationStatusFailed || failed.Classification.Moderation.Decision != calmlens.ModerationStatusPending || failed.Content.Status != calmlens.ContentStatusTemporary {
+	if err != nil || failed.Classification.Status != calmlens.ClassificationStatusFailed || failed.Classification.Moderation.Status != calmlens.ModerationStatusPending || failed.Content.Status != calmlens.ContentStatusTemporary {
 		t.Fatal(failed, err)
 	}
 	now = 20
@@ -537,8 +537,8 @@ func TestMockOutcomesFinishProcessingAndRemoveTemporaryContent(t *testing.T) {
 	if err != nil || retried.Classification.Status != calmlens.ClassificationStatusProcessing || *retried.Classification.UpdatedAt != 20 || c.ImageStorage.Content[failed.ID] == nil {
 		t.Fatal(retried, err)
 	}
-	c.DatabaseStorage.Assets[rejected.ID]["classification"].(calmlens.JSON)["status"] = calmlens.ClassificationStatusFailed
-	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: rejected.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetContentUnavailable {
+	c.DatabaseStorage.Assets[blocked.ID]["classification"].(calmlens.JSON)["status"] = calmlens.ClassificationStatusFailed
+	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: blocked.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetContentUnavailable {
 		t.Fatal("retried an asset without content", err)
 	}
 	if _, err = NewServerClient(Options{AnalyzedOutcome: "error"}); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
@@ -546,10 +546,79 @@ func TestMockOutcomesFinishProcessingAndRemoveTemporaryContent(t *testing.T) {
 	}
 }
 
+func TestMockPurgedOutcomeRemovesKeptContentForPolicy(t *testing.T) {
+	c, err := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}}), AnalyzedOutcome: OutcomePurged})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "purged", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusCompleted || a.Classification.Moderation.Status != calmlens.ModerationStatusPurged ||
+		a.Content.Status != calmlens.ContentStatusRemoved || *a.Content.RemovalReason != calmlens.ContentRemovalReasonPolicy || c.ImageStorage.Content[a.ID] != nil {
+		t.Fatal(a, err)
+	}
+}
+
+func TestMockCDNServesAgeRestrictedAssetsOnlyWithDownloadPermission(t *testing.T) {
+	storage := &InMemoryDatabaseStorage{}
+	images := &InMemoryImageStorage{}
+	options := Options{DatabaseStorage: storage, ImageStorage: images, AnalyzedOutcome: OutcomeAgeRestricted}
+	c, err := NewServerClient(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "public", Visibility: calmlens.VisibilityPublic, ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
+	if err != nil || a.Classification.Moderation.Status != calmlens.ModerationStatusAgeRestricted || *a.Visibility != calmlens.VisibilityPublic {
+		t.Fatal(a, err)
+	}
+	serveURL := func(client *MockServerClient, optIn bool) int {
+		res, err := client.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, AgeRestricted: optIn}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	serve := func(client *MockServerClient) int { return serveURL(client, false) }
+	if status := serve(c); status != http.StatusForbidden {
+		t.Fatal("age-restricted asset served without download permission", status)
+	}
+	if status := serveURL(c, true); status != http.StatusOK {
+		t.Fatal("public age-restricted asset not served with the ageRestricted opt-in", status)
+	}
+	private, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "private", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: private.ID, AgeRestricted: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatal("private age-restricted asset served through the opt-in", res.StatusCode)
+	}
+	options.APIKey = CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}})
+	downloader, err := NewServerClient(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := serve(downloader); status != http.StatusOK {
+		t.Fatal("age-restricted asset not served with download permission", status)
+	}
+	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusAllowed
+	if status := serve(c); status != http.StatusOK {
+		t.Fatal("allowed public asset not served", status)
+	}
+}
+
 func TestMockOpenMultipartUploadIsUploading(t *testing.T) {
 	c, _ := NewServerClient(Options{})
 	a, err := c.Assets.Create(context.Background(), calmlens.SubmitAssetOptions{Name: "x.png", Part: &calmlens.Content{Type: "image/png", Bytes: make([]byte, 5*1024*1024)}})
-	if err != nil || a.Classification.Status != calmlens.ClassificationStatusPending || *a.Upload.PartsReceived != 1 || a.Classification.Moderation.Decision != calmlens.ModerationStatusPending || a.Classification.CompletedAt != nil {
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusPending || *a.Upload.PartsReceived != 1 || a.Classification.Moderation.Status != calmlens.ModerationStatusPending || a.Classification.CompletedAt != nil {
 		t.Fatal(a, err)
 	}
 }

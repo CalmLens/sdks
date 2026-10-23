@@ -18,7 +18,7 @@ module CalmLens
   # event's `severity`, `title`, `description`, `assetId`, `asset` and `facts`.
   #
   # @!attribute id [String] the event ID.
-  # @!attribute type [String] such as `asset.approved`. New types may appear: ignore unknown ones.
+  # @!attribute type [String] such as `asset.allowed`. New types may appear: ignore unknown ones.
   # @!attribute created_at [Integer] milliseconds since the epoch.
   # @!attribute project_id [String]
   # @!attribute data [Hash{String => Object}] the event fields, with the API's camelCase keys.

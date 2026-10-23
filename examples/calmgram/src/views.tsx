@@ -4,7 +4,7 @@ import { CalmLensIcon } from "./CalmLensIcons";
 import type { Comment, Flash, ModerationFields, Post } from "./data";
 import { examplePostArtworkUrl } from "./example-artwork";
 import { EXAMPLE_POSTS_BY_ID } from "./examples";
-import { CATEGORY_LABELS, describeFindings } from "./moderation/types";
+import { CATEGORY_LABELS, describeFindings, type ModerationStatus } from "./moderation/types";
 
 // Server-rendered HTML. Every action is a plain form post that redirects back, so the only
 // JavaScript is a confirmation dialog before deletes (browser/confirm.ts), an image preview, and
@@ -29,31 +29,6 @@ export const buttonClass = (variant: keyof typeof BUTTON_VARIANTS = "primary", s
 
 export const iconButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg p-1 hover:bg-subtle hover:no-underline";
-
-const BADGE_VARIANTS = {
-  neutral: "bg-subtle text-muted",
-  success: "bg-success-soft text-success",
-  warn: "bg-warn-soft text-warn",
-  danger: "bg-danger-soft text-danger",
-};
-
-const Badge = (props: {
-  variant?: keyof typeof BADGE_VARIANTS;
-  class?: string;
-  title?: string;
-  children: Child;
-}) => (
-  <span
-    class={cx(
-      "inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold",
-      BADGE_VARIANTS[props.variant ?? "neutral"],
-      props.class,
-    )}
-    title={props.title}
-  >
-    {props.children}
-  </span>
-);
 
 /** Panels that span the full width on phones lose their rounded corners and side borders. */
 export const panelClass =
@@ -244,20 +219,69 @@ const pendingPoller = (postId: string) =>
   }
 })();</script>`);
 
+/** Where the "Show sensitive media" setting lives, for a signed-in viewer. */
+export const sensitiveMediaSettingHref = (username: string) => `/u/${username}#sensitive-media`;
+
+/**
+ * An age-restricted photo for a viewer who hasn't turned on "Show sensitive media": its blurred
+ * placeholder with a notice. Signed-out viewers get no link, since they have no settings.
+ */
+const SensitivePlaceholder = (props: {
+  post: Post;
+  variant: "feed" | "thumb";
+  placeholderUrl: string;
+  settingsHref: string | null;
+}) => (
+  <figure
+    class="relative m-0 aspect-square w-full overflow-hidden bg-subtle"
+    aria-label="Sensitive content"
+  >
+    <img
+      src={props.placeholderUrl}
+      alt=""
+      class="absolute inset-0 size-full scale-110 object-cover blur-md"
+    />
+    <figcaption
+      class={cx(
+        "absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/55 text-center text-white",
+        props.variant === "thumb" ? "p-2 text-xs" : "p-6",
+      )}
+    >
+      <strong>Sensitive content</strong>
+      {props.variant === "feed" && (
+        <>
+          <span>This photo may contain {describeFindings(props.post.findings)}.</span>
+          {props.settingsHref && (
+            <a href={props.settingsHref} class="font-semibold text-white underline">
+              Show sensitive media
+            </a>
+          )}
+        </>
+      )}
+    </figcaption>
+  </figure>
+);
+
 export const PostImage = ({
   post,
   variant,
   url,
+  placeholderUrl = null,
+  settingsHref = null,
 }: {
   post: Post;
   variant: "feed" | "thumb";
   url: string | null;
+  /** Set for an age-restricted photo this viewer may not see. */
+  placeholderUrl?: string | null;
+  /** The viewer's "Show sensitive media" setting, or null when signed out. */
+  settingsHref?: string | null;
 }) => {
   if (post.exampleId) {
     const example = EXAMPLE_POSTS_BY_ID.get(post.exampleId);
-    const hidden = post.status !== "approved";
-    if (variant === "feed" && !example?.media && !hidden) return null;
-    if (!hidden && example?.media)
+    const blocked = post.status !== "allowed";
+    if (variant === "feed" && !example?.media && !blocked) return null;
+    if (!blocked && example?.media)
       return (
         <img
           src={examplePostArtworkUrl(example.media)}
@@ -278,11 +302,21 @@ export const PostImage = ({
         )}
       >
         <span aria-hidden="true" class="text-4xl">
-          {hidden ? "◌" : "≡"}
+          {blocked ? "◌" : "≡"}
         </span>
-        <span>{hidden ? "Content hidden" : example?.label}</span>
+        <span>{blocked ? "Content blocked" : example?.label}</span>
         <small>Illustrative example</small>
       </div>
+    );
+  }
+  if (placeholderUrl) {
+    return (
+      <SensitivePlaceholder
+        post={post}
+        variant={variant}
+        placeholderUrl={placeholderUrl}
+        settingsHref={settingsHref}
+      />
     );
   }
   if (url) {
@@ -306,7 +340,7 @@ export const PostImage = ({
         {variant === "feed" && (
           <>
             <strong>Checking your photo…</strong>
-            <span>Only you can see this post until CalmLens approves it.</span>
+            <span>Only you can see this post until CalmLens allows it.</span>
           </>
         )}
         {!post.exampleId && pendingPoller(post.id)}
@@ -337,15 +371,26 @@ export const PostImage = ({
 export const PostCard = (props: {
   post: Post;
   imageUrl: string | null;
+  /** Set for an age-restricted photo this viewer may not see. */
+  placeholderUrl?: string | null;
   comments: Comment[];
   likes: string[];
   viewer: string | null;
   linkToPost?: boolean;
 }) => {
   const { post, comments, likes, viewer, linkToPost = true } = props;
-  const visibleComments = comments.filter((c) => c.status === "approved");
+  const visibleComments = comments.filter((c) => c.status === "allowed");
   const liked = !!viewer && likes.includes(viewer);
-  const image = <PostImage post={post} variant="feed" url={props.imageUrl} />;
+  const published = post.status === "allowed" || post.status === "age-restricted";
+  const image = (
+    <PostImage
+      post={post}
+      variant="feed"
+      url={props.imageUrl}
+      placeholderUrl={props.placeholderUrl}
+      settingsHref={viewer ? sensitiveMediaSettingHref(viewer) : null}
+    />
+  );
   return (
     <article class={cx(panelClass, "overflow-hidden")}>
       <header class="flex items-center gap-2 px-3 py-2.5">
@@ -355,15 +400,11 @@ export const PostCard = (props: {
         </a>
         <span class="text-muted">· {timeAgo(post.createdAt)}</span>
         {post.exampleId && <span class="text-xs text-muted">Example</span>}
-        {post.author === viewer && post.status === "approved" && post.flagged && (
-          <Badge class="ml-auto" title="CalmLens flagged this for review but it is still visible">
-            Under review
-          </Badge>
-        )}
       </header>
 
       {linkToPost &&
-      post.status === "approved" &&
+      published &&
+      !props.placeholderUrl &&
       (!post.exampleId || EXAMPLE_POSTS_BY_ID.get(post.exampleId)?.media) ? (
         <a href={`/p/${post.id}`} class="block bg-subtle">
           {image}
@@ -372,8 +413,14 @@ export const PostCard = (props: {
         <div class="block bg-subtle">{image}</div>
       )}
 
-      {post.status === "approved" && (
+      {published && (
         <div class="px-3 pt-1.5 pb-3">
+          {post.status === "age-restricted" && post.author === viewer && !post.exampleId && (
+            <p class="text-warn" role="status">
+              Age-restricted: shown only to people who turned on sensitive media. Everyone else sees
+              a blurred placeholder.
+            </p>
+          )}
           <div class="-ml-1 flex items-center gap-1">
             <div class="flex items-center gap-1">
               <PostButton
@@ -476,13 +523,14 @@ export const QueueTypeIcon = ({ kind }: { kind: "post" | "comment" }) => (
 );
 
 export const Decision = ({ item }: { item: ModerationFields }) => {
-  const status = item.status === "approved" && item.flagged ? "flagged" : item.status;
-  const labels = {
-    approved: "Approved",
-    rejected: "Rejected",
+  const status = item.status;
+  const labels: Record<ModerationStatus, string> = {
+    allowed: "Allowed",
+    "age-restricted": "Age-restricted",
+    blocked: "Blocked",
+    purged: "Purged",
     pending: "Pending",
     error: "Failed",
-    flagged: "Flagged",
   };
   return (
     <span class={`queue-status queue-status-${status}`}>

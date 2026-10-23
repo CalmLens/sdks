@@ -9,14 +9,14 @@ import { exampleFeedFor } from "../src/examples";
 import { PostImage } from "../src/views";
 
 const posts = exampleFeedFor(100_000);
-test("curated images use shared artwork while rejected examples stay concealed", () => {
+test("curated images use shared artwork while blocked examples stay concealed", () => {
   const garden = posts.find((post) => post.exampleId === "garden")!;
   expect((<PostImage post={garden} variant="feed" url={null} />).toString()).toContain(
     "/post-examples/garden.webp",
   );
-  const rejected = posts.find((post) => post.exampleId === "graphic-clip")!;
-  expect(rejected.status).toBe("rejected");
-  expect((<PostImage post={rejected} variant="feed" url={null} />).toString()).not.toContain(
+  const blocked = posts.find((post) => post.exampleId === "graphic-clip")!;
+  expect(blocked.status).toBe("blocked");
+  expect((<PostImage post={blocked} variant="feed" url={null} />).toString()).not.toContain(
     "/post-examples/",
   );
 });

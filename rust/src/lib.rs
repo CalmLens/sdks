@@ -6,7 +6,7 @@
 //!
 //! let client = ServerClient::new("your-api-key", "your-project-id")?;
 //! let asset = client.assets().classify(SubmitAsset::text("Hello world")).await?;
-//! if asset.classification.moderation.decision == AssetModerationStatus::Approved {
+//! if asset.classification.moderation.status == AssetModerationStatus::Allowed {
 //!     println!("{}", asset.id);
 //! }
 //! # Ok(()) }

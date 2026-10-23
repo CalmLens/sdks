@@ -3,7 +3,7 @@ import data from "../src/example-data.json";
 
 const MODERATION_EXAMPLE_POSTS = data.posts;
 
-import { imageUrlFor, loadFeed } from "../src/content";
+import { loadFeed, postMediaFor } from "../src/content";
 import type { Env } from "../src/data";
 import { exampleFeedFor } from "../src/examples";
 import app from "../src/index";
@@ -18,10 +18,10 @@ test("loads the shared examples without provisioning assets or storing a seed fe
   );
   expect(new Set(feed.posts.map((post) => post.id)).size).toBe(MODERATION_EXAMPLE_POSTS.length);
   const examples = exampleFeedFor(100_000);
-  expect(examples.find((post) => post.exampleId === "obituary")?.status).toBe("approved");
-  expect(examples.find((post) => post.exampleId === "hate-exclusion")?.status).toBe("rejected");
-  expect(examples.find((post) => post.exampleId === "adult-ad")?.status).toBe("rejected");
-  expect(imageUrlFor(env, examples[0], "feed")).toBeNull();
+  expect(examples.find((post) => post.exampleId === "obituary")?.status).toBe("allowed");
+  expect(examples.find((post) => post.exampleId === "hate-exclusion")?.status).toBe("blocked");
+  expect(examples.find((post) => post.exampleId === "adult-ad")?.status).toBe("blocked");
+  expect(postMediaFor(env, examples[0], "feed", null)).toEqual({ url: null, placeholderUrl: null });
 });
 
 test("the first page already contains example queue entries without KV or API access", async () => {

@@ -15,14 +15,15 @@ const asset = await client.assets.classify({
   content: { data: file, type: file.type },
 });
 
-if (asset.status === "rejected") {
+if (asset.status === "blocked" || asset.status === "purged") {
   // "This image can't be posted."
 }
 ```
 
-`assets.classify` waits for the decision. Errors with an `upload-preset/*` code, such as
-`upload-preset/daily-limit-reached` and `upload-preset/content-type-not-allowed`, are turned into
-friendly messages.
+`assets.classify` waits for the decision. `blocked` and `purged` screenshots break your policy;
+an `age-restricted` one is still accepted, because feedback screenshots are only seen by your
+team. Errors with an `upload-preset/*` code, such as `upload-preset/daily-limit-reached` and
+`upload-preset/content-type-not-allowed`, are turned into friendly messages.
 
 ## 1. Create the upload preset
 
@@ -35,7 +36,7 @@ In the CalmLens portal, open [Upload presets](https://calmlens.com/portal/upload
 | Allowed sites | `http://localhost:6406` |
 | File types | `image/*` |
 | Maximum file size (MB) | For example `10`. |
-| Show the decision to the uploader | On, so the page can say when a screenshot is rejected. |
+| Show the decision to the uploader | On, so the page can say when a screenshot breaks your policy. |
 | Folder and visibility | Where uploads go. Leave visibility private unless you want to show uploads publicly. |
 
 Copy the preset ID and paste it into `UPLOAD_PRESET_ID` in [`app.js`](app.js).

@@ -15,6 +15,7 @@ module CalmLens
   # the API's codes, HTTP statuses and body shape. It does not classify content: assets moderated
   # synchronously get `analyzed_outcome` and queued ones `queued_outcome`. Content is kept only with
   # `keepContentAfterProcessing: true`; otherwise it is removed once classification is `completed`, as in the API.
+  # A `purged` outcome removes the content with reason `policy`, and the CDN does not serve `blocked` assets.
   #
   # To script exact responses, enqueue them: queued responses and errors are used first, in order,
   # before the stand-in answers.
@@ -22,7 +23,7 @@ module CalmLens
   # @example
   #   mock = CalmLens::MockServerClient.new
   #   asset = mock.assets.classify(name: 'note', content: {plain_text: 'hi', type: 'text/plain'})
-  #   mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'decision') # => "approved"
+  #   mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'status') # => "allowed"
   #   mock.enqueue(status: 503, body: {code: 'server/unavailable', message: 'Try again'})
   class MockServerClient < ServerClient
     # A request the mock received.
@@ -42,17 +43,18 @@ module CalmLens
     # @param now [#call] returns the current time in epoch milliseconds.
     # @param create_id [#call] returns a new ID.
     # @param queued_outcome [String] the outcome of assets created with {Assets#create}: `pending`
-    #   (processing, moderation pending), `approved` or `rejected` (processing done with that
-    #   decision) or `failed` (processing failed, retryable).
+    #   (processing, moderation pending), `allowed`, `age-restricted`, `blocked` or `purged` (processing
+    #   done with that moderation status; `purged` also removes the content) or `failed` (processing
+    #   failed, retryable).
     # @param analyzed_outcome [String, Hash, #call] the result of {Assets#classify}: an outcome, fields
-    #   to deep-merge into the asset (`{'moderation' => {'status' => 'rejected', 'action' => 'hide'}}`;
-    #   the outcome follows `classification.moderation.decision`, or is `failed` when `classification.status` is `failed`,
-    #   and is `approved` otherwise), or a callable that receives a copy of the asset and returns either.
+    #   to deep-merge into the asset (`{'classification' => {'moderation' => {'status' => 'blocked'}}}`;
+    #   the outcome follows `classification.moderation.status`, or is `failed` when `classification.status` is `failed`,
+    #   and is `allowed` otherwise), or a callable that receives a copy of the asset and returns either.
     # @param options [Hash] other {ServerClient#initialize} settings, except `api_key` and `transport`.
     #   Retries wait no time unless a queued response sets `Retry-After`.
     def initialize(project_id: 'project-1', base_url: 'https://api.calmlens.invalid/v1',
                    cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: -> { (Time.now.to_f * 1000).to_i },
-                   create_id: -> { SecureRandom.uuid }, queued_outcome: 'pending', analyzed_outcome: 'approved',
+                   create_id: -> { SecureRandom.uuid }, queued_outcome: 'pending', analyzed_outcome: 'allowed',
                    **options)
       @mock_lock = Mutex.new
       @queue = []

@@ -21,12 +21,12 @@ DEMO_DELAY_SECONDS = 2.0
 def demo_report(result: str) -> dict:
     """Synthetic reports for the demo. Nothing is classified."""
     now = int(time.time() * 1000)
-    if result == "approved":
+    if result == "allowed":
         return {"processedAt": now, "score": 0.03, "categories": {
             "criminal-activity": {"status": "evaluated", "score": 0.03, "likelihood": "very-unlikely"},
             "hate": {"status": "evaluated", "score": 0.01, "likelihood": "very-unlikely"},
         }}
-    score = 0.92 if result == "rejected" else 0.64
+    score = 0.64 if result == "age-restricted" else 0.92
     return {"processedAt": now, "score": score, "categories": {
         "criminal-activity": {"status": "evaluated", "score": score, "likelihood": "likely"},
         "hate": {"status": "evaluated", "score": 0.02, "likelihood": "very-unlikely"},
@@ -35,13 +35,14 @@ def demo_report(result: str) -> dict:
 
 
 def decide(asset: dict, result: str):
-    """Finishes processing with a demo outcome: a flagged page is approved with the policy action
-    ``flag``, a rejected one is hidden, a clean one matched nothing."""
+    """Finishes processing with a demo moderation status; ``purged`` also removes the content."""
+    now = int(time.time() * 1000)
     asset["classification"]["status"] = "completed"
-    asset["classification"]["moderation"].update(decision="approved" if result == "flagged" else result,
-                               action={"flagged": "flag", "rejected": "hide"}.get(result),
+    asset["classification"]["moderation"].update(status=result,
                                **{k: v for k, v in demo_report(result).items() if k != "processedAt"})
-    asset["classification"]["completedAt"] = int(time.time() * 1000)
+    asset["classification"]["completedAt"] = now
+    if result == "purged":
+        asset["content"].update(status="removed", removalReason="policy", updatedAt=now)
 
 
 class DemoModerator(Moderator):
@@ -56,9 +57,9 @@ class DemoModerator(Moderator):
 
     def check_note(self, link_id: str, note: str, demo_result: str) -> Asset:
         asset = super().check_note(link_id, note, demo_result)
-        if demo_result == "note-rejected":
+        if demo_result == "note-blocked":
             for stored in (self.mock.database_storage.assets[asset["id"]], asset):
-                stored["classification"]["moderation"].update(decision="rejected", action="hide")
+                stored["classification"]["moderation"].update(status="blocked")
         return asset
 
     def submit_link(self, link_id: str, url: str, demo_result: str) -> Asset:
@@ -80,7 +81,7 @@ class DemoModerator(Moderator):
             asset["classification"]["status"] = "failed"
             return
         decide(asset, result)
-        for name, kind, child_result in (("Page text", "plaintext-document", result), ("Header image", "image", "approved")):
+        for name, kind, child_result in (("Page text", "plaintext-document", result), ("Header image", "image", "allowed")):
             child_id = str(uuid.uuid4())
             assets[child_id] = {"id": child_id, "projectId": asset["projectId"], "parentId": asset_id, "name": name,
                                 "type": kind, "createdAt": asset["createdAt"],

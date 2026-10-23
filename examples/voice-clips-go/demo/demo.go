@@ -19,9 +19,10 @@ var Categories = []string{"sexual", "violence", "self-harm", "harassment", "hate
 // findings lists the simulated category score for each selected outcome, by segment.
 // Segments mirror native analysis: 30-second chunks with a one-second overlap.
 var findings = map[string][]map[string]float64{
-	"approved": {{}, {}},
-	"flagged":  {{}, {"harassment": 0.64}},
-	"rejected": {{"violence": 0.91}, {"violence": 0.47}},
+	calmlens.ModerationStatusAllowed:       {{}, {}},
+	calmlens.ModerationStatusAgeRestricted: {{}, {"sexual": 0.72}},
+	calmlens.ModerationStatusBlocked:       {{"violence": 0.91}, {"violence": 0.47}},
+	calmlens.ModerationStatusPurged:        {{"criminal-activity": 0.94}, {}},
 }
 
 // Backend is the in-memory CalmLens used in demo mode.
@@ -43,11 +44,17 @@ func New() (*Backend, error) {
 func (b *Backend) ServerClient() *calmlens.ServerClient { return b.Mock.ServerClient }
 
 // Settle writes the selected outcome into a pending demo asset, in the same shape as a real
-// audio/video report.
+// audio/video report. A purged clip also loses its stored content, as in CalmLens.
 func (b *Backend) Settle(assetID, choice string, video bool) {
-	b.Mock.WithStorage(func(db *calmlenstest.InMemoryDatabaseStorage, _ *calmlenstest.InMemoryImageStorage) {
+	b.Mock.WithStorage(func(db *calmlenstest.InMemoryDatabaseStorage, images *calmlenstest.InMemoryImageStorage) {
 		if stored := db.Assets[assetID]; stored != nil && Section(stored, "classification")["status"] == calmlens.ClassificationStatusProcessing {
 			apply(stored, choice, video)
+			if choice == calmlens.ModerationStatusPurged {
+				delete(images.Content, assetID)
+				content := Section(stored, "content")
+				content["status"], content["removalReason"], content["extractedText"] = calmlens.ContentStatusRemoved, calmlens.ContentRemovalReasonPolicy, nil
+				content["updatedAt"] = time.Now().UnixMilli()
+			}
 		}
 	})
 }
@@ -97,15 +104,9 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 		media["frameIntervalSeconds"] = 0.5
 		media["sampledFrames"] = 98
 	}
-	// The policy's action: none for a clean clip, flag to publish a flagged one, hide to reject.
+	// The selected outcome is the moderation status the policy decided.
 	processing["status"] = calmlens.ClassificationStatusCompleted
-	moderation["decision"], moderation["action"] = calmlens.ModerationStatusApproved, nil
-	switch choice {
-	case "flagged":
-		moderation["action"] = calmlens.ModerationActionFlag
-	case "rejected":
-		moderation["decision"], moderation["action"] = calmlens.ModerationStatusRejected, calmlens.ModerationActionHide
-	}
+	moderation["status"] = choice
 	processing["completedAt"] = time.Now().UnixMilli()
 	moderation["score"] = top
 	moderation["categories"] = categories

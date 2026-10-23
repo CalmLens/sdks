@@ -48,7 +48,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
   "processingOptions": {
     "keepContentAfterProcessing": true,
     "flaggedContentPolicy": {
-      "action": "hide"
+      "action": "block"
     },
     "features": {
       "ocr": {
@@ -69,9 +69,8 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
     "status": "completed",
     "updatedAt": 1760000000500,
     "moderation": {
-      "action": "purge",
-      "manualReviews": [{"id": "review-1", "decision": "approved", "action": "approve", "note": "Fine", "reviewerUserId": "user-1", "reviewedAt": 1760000000700, "appliedToAsset": true}],
-      "decision": "approved",
+      "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "Fine", "reviewerUserId": "user-1", "reviewedAt": 1760000000700, "appliedToAsset": true}],
+      "status": "age-restricted",
       "categories": {
         "sexual": {
           "status": "evaluated",
@@ -120,7 +119,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if p := a.Classification; p.Status != ClassificationStatusCompleted || *p.UpdatedAt != 1760000000500 || *a.Upload.PartsReceived != 3 {
 		t.Fatalf("processing: %+v", p)
 	}
-	if m := a.Classification.Moderation; m.Decision != ModerationStatusApproved || *m.Action != ModerationActionPurge || m.ManualReviews[0].Decision != ReviewerActionApproved || m.ManualReviews[0].Action != "approve" ||
+	if m := a.Classification.Moderation; m.Status != ModerationStatusAgeRestricted || m.ManualReviews[0].Decision != ModerationDecisionAgeRestricted ||
 		*m.ManualReviews[0].Note != "Fine" || *m.ManualReviews[0].ReviewerUserID != "user-1" || m.ManualReviews[0].ReviewedAt != 1760000000700 || *a.Classification.CompletedAt != 1760000000700 {
 		t.Fatalf("moderation: %+v", m)
 	}
@@ -145,7 +144,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 		t.Fatalf("extracted text: %+v", x)
 	}
 	o := a.ProcessingOptions
-	if !*o.KeepContentAfterProcessing || o.FlaggedContentPolicy.Action != ModerationActionHide || !o.Features.OCR.Enabled || o.Features.PersonDetection != nil ||
+	if !*o.KeepContentAfterProcessing || o.FlaggedContentPolicy.Action != ModerationActionBlock || !o.Features.OCR.Enabled || o.Features.PersonDetection != nil ||
 		!o.Features.FaceDetection.Enabled || *o.Features.FaceDetection.AgeEstimation {
 		t.Fatalf("processing options: %+v", o)
 	}
@@ -312,7 +311,7 @@ func TestEventFactsDecode(t *testing.T) {
   "events": [
     {
       "id": "e",
-      "type": "asset.flagged",
+      "type": "asset.classified",
       "severity": "high",
       "asset": {
         "id": "a",
@@ -325,8 +324,7 @@ func TestEventFactsDecode(t *testing.T) {
         "classification": {
           "status": "completed",
           "moderation": {
-            "action": "hide",
-            "decision": "rejected"
+            "status": "blocked"
           }
         }
       },
@@ -344,8 +342,8 @@ func TestEventFactsDecode(t *testing.T) {
           ]
         },
         {
-          "key": "moderation-action",
-          "value": null
+          "key": "moderation-status",
+          "value": "blocked"
         }
       ]
     },
@@ -376,11 +374,11 @@ func TestEventFactsDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 	flagged := page.Events[0]
-	var facts AssetFlaggedFacts
+	var facts AssetClassifiedFacts
 	if err = flagged.Facts.Decode(&facts); err != nil {
 		t.Fatal(err)
 	}
-	if *facts.AssetName != "cat.jpg" || !reflect.DeepEqual(facts.FlaggedCategories, []string{CategorySexual, CategoryHate}) || facts.ModerationAction != nil || facts.AssetType != nil {
+	if *facts.AssetName != "cat.jpg" || !reflect.DeepEqual(facts.FlaggedCategories, []string{CategorySexual, CategoryHate}) || facts.ModerationStatus != ModerationStatusBlocked || facts.AssetType != nil {
 		t.Fatalf("%+v", facts)
 	}
 	name, ok := flagged.Facts.Get(FactAssetName)
@@ -391,15 +389,15 @@ func TestEventFactsDecode(t *testing.T) {
 	if list, ok := categories.Strings(); !ok || !reflect.DeepEqual(list, []string{"sexual", "hate"}) {
 		t.Fatalf("%+v", categories)
 	}
-	if asset := flagged.Asset; asset.ID != "a" || asset.Classification.Status != ClassificationStatusCompleted || asset.Classification.Moderation.Decision != ModerationStatusRejected ||
-		*asset.Classification.Moderation.Action != ModerationActionHide || asset.Content.Status != ContentStatusStored || flagged.Facts.IsTest() {
+	if asset := flagged.Asset; asset.ID != "a" || asset.Classification.Status != ClassificationStatusCompleted || asset.Classification.Moderation.Status != ModerationStatusBlocked ||
+		asset.Content.Status != ContentStatusStored || flagged.Facts.IsTest() {
 		t.Fatalf("%+v", flagged)
 	}
 	var usage UsageLimitReachedFacts
 	if err = page.Events[1].Facts.Decode(&usage); err != nil || usage.Limit != 9007199254740993 || usage.Used != 10 || usage.OwnerUserID != "user-1" {
 		t.Fatalf("%+v %v", usage, err)
 	}
-	if err = page.Events[1].Facts.Decode(&AssetFlaggedFacts{}); ErrorCode(err) != "" {
+	if err = page.Events[1].Facts.Decode(&AssetClassifiedFacts{}); ErrorCode(err) != "" {
 		t.Fatalf("unrelated keys are ignored, got %v", err)
 	}
 	if err = (EventFacts{{Key: FactLimit, Value: "many"}}).Decode(&UsageLimitReachedFacts{}); ErrorCode(err) != CodeSDKInvalidResponse {
@@ -440,18 +438,18 @@ func TestEventFactsDecodeTeamAndAPIKeyEvents(t *testing.T) {
 func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 	var page EventsPage
 	err := json.Unmarshal([]byte(`{"events":[
-		{"id":"a","type":"asset.rejected","severity":"high","facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"decided-by","value":"automated"},{"key":"moderation-action","value":"hide"}]},
-		{"id":"r","type":"asset.approved","severity":"low","facts":[{"key":"decided-by","value":"reviewer"},{"key":"moderation-action","value":null},{"key":"reviewer-user-id","value":"user-1"},{"key":"note","value":"Fine"}]}],
+		{"id":"a","type":"asset.blocked","severity":"high","facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"decided-by","value":"automated"},{"key":"flagged-categories","value":["violence"]}]},
+		{"id":"r","type":"asset.allowed","severity":"low","facts":[{"key":"decided-by","value":"reviewer"},{"key":"reviewer-user-id","value":"user-1"},{"key":"note","value":"Fine"}]}],
 		"cursor":"c","hasMore":false}`), &page)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var automated AssetDecisionFacts
-	if err = page.Events[0].Facts.Decode(&automated); err != nil || automated.DecidedBy != DecidedByAutomated || *automated.ModerationAction != ModerationActionHide || automated.ReviewerUserID != nil || automated.Note != nil {
+	if err = page.Events[0].Facts.Decode(&automated); err != nil || automated.DecidedBy != DecidedByAutomated || !reflect.DeepEqual(automated.FlaggedCategories, []string{CategoryViolence}) || automated.ReviewerUserID != nil || automated.Note != nil {
 		t.Fatalf("automated %+v %v", automated, err)
 	}
 	var reviewed AssetDecisionFacts
-	if err = page.Events[1].Facts.Decode(&reviewed); err != nil || reviewed.DecidedBy != DecidedByReviewer || reviewed.ModerationAction != nil || *reviewed.ReviewerUserID != "user-1" || *reviewed.Note != "Fine" {
+	if err = page.Events[1].Facts.Decode(&reviewed); err != nil || reviewed.DecidedBy != DecidedByReviewer || reviewed.FlaggedCategories != nil || *reviewed.ReviewerUserID != "user-1" || *reviewed.Note != "Fine" {
 		t.Fatalf("reviewed %+v %v", reviewed, err)
 	}
 	if fact, ok := page.Events[1].Facts.Get(FactDecidedBy); !ok || fact.Value != DecidedByReviewer {
@@ -461,7 +459,7 @@ func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 
 func TestReportPolicySnapshotDecode(t *testing.T) {
 	var policy ReportPolicy
-	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
+	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
 		t.Fatal(err)
 	}
 	category := policy.Categories["violence"]

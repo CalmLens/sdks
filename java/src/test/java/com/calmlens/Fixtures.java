@@ -108,7 +108,7 @@ final class Fixtures {
     Map<String, Object> asset = new LinkedHashMap<>();
     asset.put("id", id);
     asset.put("upload", Map.of("status", "completed"));
-    asset.put("classification", Map.of("status", processing, "moderation", Map.of("decision", moderation)));
+    asset.put("classification", Map.of("status", processing, "moderation", Map.of("status", moderation)));
     asset.put("content", Map.of("status", "stored"));
     return asset;
   }

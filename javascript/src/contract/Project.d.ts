@@ -1,11 +1,12 @@
-import { c as FlaggedContentAction } from "./Classification-DavSTp-_.js";
+import "./AssetModerationDecision-eSI6kK4O.js";
+import { c as FlaggedContentAction } from "./Classification-4E-RsVKO.js";
 import * as zod from "zod";
 //#region packages/shared/src/Project.d.ts
 declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{
   action: zod.ZodEnum<{
+    "age-restrict": "age-restrict";
     allow: "allow";
-    flag: "flag";
-    hide: "hide";
+    block: "block";
     purge: "purge";
   }>;
 }, zod.core.$strip>;

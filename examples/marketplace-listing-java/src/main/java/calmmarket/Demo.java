@@ -32,23 +32,23 @@ final class Demo implements Calmmarket.Backend {
   @Override public CalmLensServerClient textModeration(String choice) {
     MockCalmLensServerClient mock = mock();
     if (choice.equals("unavailable")) return mock.enqueueFailure(new ConnectException("Connection refused")).client;
-    boolean rejected = choice.equals("description-rejected");
-    return mock.enqueue(200, asset("demo-" + UUID.randomUUID(), "approved", null, null, null))
-        .enqueue(200, asset("demo-" + UUID.randomUUID(), rejected ? "rejected" : "approved", null, rejected ? "hide" : null, null)).client;
+    boolean blocked = choice.equals("description-blocked");
+    return mock.enqueue(200, asset("demo-" + UUID.randomUUID(), "allowed", null, null))
+        .enqueue(200, asset("demo-" + UUID.randomUUID(), blocked ? "blocked" : "allowed", null, null)).client;
   }
 
   @Override public CalmLensServerClient photoUploads(int photos) {
     MockCalmLensServerClient mock = mock();
-    for (int i = 0; i < photos; i++) mock.enqueue(200, asset("demo-" + UUID.randomUUID(), "pending", null, null, null));
+    for (int i = 0; i < photos; i++) mock.enqueue(200, asset("demo-" + UUID.randomUUID(), "pending", null, null));
     return mock.client;
   }
 
   @Override public CalmLensServerClient photo(Calmmarket.Photo photo) {
     MockCalmLensServerClient mock = mock();
     if (Duration.between(photo.submittedAt, Instant.now()).compareTo(REVIEW_DELAY) < 0)
-      return mock.enqueue(200, asset(photo.assetId, "pending", photo.externalId, null, null)).client;
-    // Rejected demo photos are hidden by the simulated policy; clean ones matched nothing.
-    String decision = "approved", action = null;
+      return mock.enqueue(200, asset(photo.assetId, "pending", photo.externalId, null)).client;
+    // The simulated policy blocks photos it acts on; clean ones matched nothing.
+    String status = "allowed";
     Map<String, Object> report = null;
     String extractedText = null;
     switch (photo.demoResult) {
@@ -56,41 +56,39 @@ final class Demo implements Calmmarket.Backend {
         report = report(Map.of());
         extractedText = "Hand-made oak · 25.00 · collection only";
       }
-      case "text-rejected" -> {
-        decision = "rejected";
-        action = "hide";
+      case "text-blocked" -> {
+        status = "blocked";
         report = report(Map.of("criminal-activity", evaluated(0.88)));
         extractedText = "Message me for prescription pills, no questions asked";
       }
-      case "visual-rejected" -> {
-        decision = "rejected";
-        action = "hide";
+      case "visual-blocked" -> {
+        status = "blocked";
         report = report(Map.of("violence", evaluated(0.91)));
         extractedText = "Collector's edition · 25.00";
       }
-      case "error" -> decision = "error";
+      case "error" -> status = "error";
       default -> report = report(Map.of());
     }
-    Map<String, Object> asset = asset(photo.assetId, decision, photo.externalId, action, report);
+    Map<String, Object> asset = asset(photo.assetId, status, photo.externalId, report);
     asset.put("type", "image");
     if (extractedText != null) asset.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", extractedText)));
-    if (photo.demoReviewerRejected) {
-      // A reviewer's decision replaces the automated one; the policy action stays as it was.
+    if (photo.demoReviewerBlocked) {
+      // A reviewer's decision replaces the automated one.
       Map<String, Object> moderation = moderation(asset);
-      moderation.put("decision", "rejected");
-      moderation.put("manualReviews", java.util.List.of(Map.of("id", java.util.UUID.randomUUID().toString(), "decision", "rejected", "action", "hide", "note", "Simulated portal decision", "reviewerUserId", "demo-reviewer", "reviewedAt", System.currentTimeMillis(), "appliedToAsset", true)));
+      moderation.put("status", "blocked");
+      moderation.put("manualReviews", java.util.List.of(Map.of("id", java.util.UUID.randomUUID().toString(), "decision", "blocked", "note", "Simulated portal decision", "reviewerUserId", "demo-reviewer", "reviewedAt", System.currentTimeMillis(), "appliedToAsset", true)));
     }
     mock.enqueue(200, asset);
 
     return mock.client;
   }
 
-  @Override public CalmLensServerClient textAsset(String assetId, String externalId, boolean flagged) {
-    return mock().enqueue(200, asset(assetId, "approved", externalId, flagged ? "flag" : null, null)).client;
+  @Override public CalmLensServerClient textAsset(String assetId, String externalId) {
+    return mock().enqueue(200, asset(assetId, "allowed", externalId, null)).client;
   }
 
   @Override public CalmLensServerClient contentRemoval(String assetId) {
-    Map<String, Object> removed = asset(assetId, "approved", null, null, null);
+    Map<String, Object> removed = asset(assetId, "allowed", null, null);
     removed.put("content", Map.of("status", "removed", "removalReason", "requested", "updatedAt", System.currentTimeMillis()));
     return mock().enqueue(200, removed).client;
   }
@@ -103,20 +101,20 @@ final class Demo implements Calmmarket.Backend {
 
   @Override public CalmLensServerClient events() { return null; }
 
-  /** One synthetic {@code asset.rejected} event, with the facts a portal decision carries. */
+  /** One synthetic {@code asset.blocked} event, with the facts a portal decision carries. */
   @Override public CalmLensServerClient simulatedReview(Calmmarket.Photo photo) {
     String id = UUID.randomUUID().toString();
     Map<String, Object> event = new LinkedHashMap<>();
     event.put("id", id);
-    event.put("type", "asset.rejected");
+    event.put("type", "asset.blocked");
     event.put("projectId", "demo-project");
     event.put("createdAt", System.currentTimeMillis());
     event.put("severity", "high");
-    event.put("title", "Asset rejected");
+    event.put("title", "Asset blocked");
     event.put("assetId", photo.assetId);
     event.put("asset", Map.of("id", photo.assetId, "externalId", photo.externalId,
         "upload", Map.of("status", "completed"),
-        "classification", Map.of("status", "completed", "moderation", moderationSnapshot("rejected", photo.moderationAction)),
+        "classification", Map.of("status", "completed", "moderation", Map.of("status", "blocked")),
         "content", Map.of("status", "stored")));
     event.put("facts", List.of(
         Map.of("key", "asset-name", "value", photo.name),
@@ -131,15 +129,15 @@ final class Demo implements Calmmarket.Backend {
   // ---------------------------------------------------------------- Synthetic responses
 
   /**
-   * A synthetic asset with its content stored. {@code decision} is {@code pending} (still
-   * processing), {@code approved}, {@code rejected} or {@code error} (processing failed);
-   * {@code action} is the policy's action, or null when it matched nothing.
+   * A synthetic asset with its content stored. {@code status} is {@code pending} (still
+   * processing), a moderation status such as {@code allowed} or {@code blocked}, or {@code error}
+   * (processing failed).
    */
-  private static Map<String, Object> asset(String id, String decision, String externalId, String action, Map<String, Object> report) {
+  private static Map<String, Object> asset(String id, String status, String externalId, Map<String, Object> report) {
     Map<String, Object> asset = new LinkedHashMap<>();
     asset.put("id", Objects.requireNonNull(id));
     if (externalId != null) asset.put("externalId", externalId);
-    String processing = switch (decision) {
+    String processing = switch (status) {
       case "pending" -> "processing";
       case "error" -> "failed";
       default -> "completed";
@@ -149,8 +147,7 @@ final class Demo implements Calmmarket.Backend {
     asset.put("upload", Map.of("status", "completed"));
     asset.put("classification", classification);
     Map<String, Object> moderation = new LinkedHashMap<>();
-    moderation.put("decision", decision.equals("approved") || decision.equals("rejected") ? decision : "pending");
-    moderation.put("action", action);
+    moderation.put("status", status.equals("error") ? "pending" : status);
     moderation.put("manualReviews", java.util.List.of());
     if (report != null) { moderation.putAll(report); moderation.remove("processedAt"); }
     classification.put("moderation", moderation);
@@ -161,12 +158,6 @@ final class Demo implements Calmmarket.Backend {
   @SuppressWarnings("unchecked")
   private static Map<String, Object> moderation(Map<String, Object> asset) { return (Map<String, Object>) ((Map<String, Object>) asset.get("classification")).get("moderation"); }
 
-  private static Map<String, Object> moderationSnapshot(String status, String action) {
-    Map<String, Object> moderation = new LinkedHashMap<>();
-    moderation.put("decision", status);
-    moderation.put("action", action);
-    return moderation;
-  }
 
 
 

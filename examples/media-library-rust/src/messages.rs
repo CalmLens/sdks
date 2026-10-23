@@ -77,7 +77,7 @@ impl Notice {
             Notice::FolderMoved => "Folder moved.",
             Notice::FolderDeleted => "Folder deleted.",
             Notice::Uploaded => {
-                "Uploaded privately. A thumbnail appears once the image is approved."
+                "Uploaded privately. A thumbnail appears once the image is allowed."
             }
             Notice::DetailsSaved => "Details saved.",
             Notice::AssetMoved => "Asset moved.",
@@ -86,7 +86,7 @@ impl Notice {
             }
             Notice::AssetDeleted => "Asset deleted.",
             Notice::ReviewSimulated => {
-                "A simulated reviewer rejected the image. It is no longer delivered."
+                "A simulated reviewer blocked the image. It is no longer delivered."
             }
         }
     }

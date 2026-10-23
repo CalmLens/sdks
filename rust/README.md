@@ -9,7 +9,7 @@ use calmlens::{models::*, ServerClient};
 async fn main() -> calmlens::Result<()> {
     let client = ServerClient::new("your-api-key", "your-project-id")?;
     let asset = client.assets().classify(SubmitAsset::text("Hello world")).await?;
-    if asset.classification.moderation.decision == AssetModerationStatus::Approved {
+    if asset.classification.moderation.status == AssetModerationStatus::Allowed {
         println!("{}", asset.id);
     }
     let queued = client
@@ -66,7 +66,7 @@ let client = calmlens::ServerClient::builder(api_key, project_id)
 
 ## Waiting for a decision
 
-`assets().wait_for_decision(WaitForDecision::new(asset_id))` retrieves a queued asset until it is decided (moderation status `approved` or `rejected`, or classification status `failed`) and returns it. It checks again after 0.5 s, waiting 1.5 times longer each time up to 5 s, and fails with `sdk/timeout` if there's no decision within the timeout (60 s by default, or `.timeout(duration)`). The error's `details()` carry `assetId` and the last `classificationStatus` and `moderationStatus`. Drop the future to stop waiting; the blocking client's method blocks until the decision or the timeout. `Asset::is_decided` tells you whether an asset's outcome is final. Webhooks report decisions without polling.
+`assets().wait_for_decision(WaitForDecision::new(asset_id))` retrieves a queued asset until it is decided (moderation status no longer `pending`, or classification status `failed`) and returns it. It checks again after 0.5 s, waiting 1.5 times longer each time up to 5 s, and fails with `sdk/timeout` if there's no decision within the timeout (60 s by default, or `.timeout(duration)`). The error's `details()` carry `assetId` and the last `classificationStatus` and `moderationStatus`. Drop the future to stop waiting; the blocking client's method blocks until the decision or the timeout. `Asset::is_decided` tells you whether an asset's outcome is final. Webhooks report decisions without polling.
 
 ```rust
 let queued = client.assets().create(SubmitAsset::text("Hello world")).await?;
@@ -74,8 +74,8 @@ let decided = client
     .assets()
     .wait_for_decision(WaitForDecision::new(queued.id).timeout(Duration::from_secs(30)))
     .await?;
-if decided.classification.moderation.decision == AssetModerationStatus::Rejected {
-    hide(&decided.id);
+if decided.classification.moderation.status != AssetModerationStatus::Allowed {
+    block(&decided.id);
 }
 ```
 
@@ -139,6 +139,8 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
 `cdn().get_asset_url(&CdnRequest)` builds an asset's CDN URL. `cdn().serve(CdnRequest)` fetches it with your API key and returns a streaming `CdnResponse` whatever its status, with `status()` and `headers()`. Read it with `chunk().await`, `into_stream()` or `bytes().await`; drop an unfinished response to close it. `HttpOptions` sets the method and headers, for `HEAD` or a `Range` request; the SDK always sends its own API key.
 
 Set `lens` to deliver through a named lens, or `transform` to a `CdnTransform`: a selector string, one `Transform` step or a `Vec<Transform>` of steps. Structured steps become a selector with sorted, percent-encoded options, so equal transforms share a URL. `assets().create_signed_url` takes the same `transform`. Set both `lens` and `transform` to apply the lens first, then the extra transforms.
+
+A public asset whose moderation status is `age-restricted` is served from its public URL only with `age_restricted: Some(true)`, which appends `?ageRestricted=true`; otherwise it needs a signed URL or an API key. Set it only where your app has already decided the viewer may see age-restricted content.
 
 ```rust
 let url = client.cdn().get_asset_url(&CdnRequest {
@@ -204,15 +206,24 @@ Rust fields are snake_case; the wire JSON is camelCase. Response models are `#[n
 `assets().classify(SubmitAsset)` and `text().classify(ClassifyText)` return an `Asset`. Its state is in three parts:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `decision` (`pending`, `approved` or `rejected`), `action`, category scores, policy assessment, an optional `timeline` and reviewer details. A reviewer decision does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and reviewer decisions (`manual_reviews`, each with a `decision` of `allowed`, `age-restricted`, `blocked` or `purged`). A reviewer decision does not change `completedAt`.
 - `content`: `status` (`temporary` until processing finishes, `stored` or `removed`), `removal_reason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updated_at`, `safety_hold`, `format` (the MIME type), `extension`, `size_in_bytes`, `checksums`, `image`, `preview_image` and `extracted_text`.
 
-Treat an unknown moderation status as not approved:
+The moderation status also decides delivery:
+
+- `pending`: not decided yet; don't show the content.
+- `allowed`: show it.
+- `age-restricted`: the CDN serves it only through signed URLs or with an API key, like a private asset. Show it only behind your own age check.
+- `blocked`: not delivered; the content is kept.
+- `purged`: not delivered, and the stored content is deleted.
+
+Treat an unknown moderation status as not allowed:
 
 ```rust
 let asset = client.text().classify(ClassifyText::new("Hello world")).await?;
-let publishable = asset.classification.moderation.decision == AssetModerationStatus::Approved;
-let flagged = asset.classification.moderation.action.is_some();
+let publishable = asset.classification.moderation.status == AssetModerationStatus::Allowed;
+let needs_age_check =
+    asset.classification.moderation.status == AssetModerationStatus::AgeRestricted;
 ```
 
 `ensure_lens` and `ensure_lenses` create or update named lenses and return them in request order; definitions the client has already ensured are answered from its cache.
@@ -233,7 +244,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
     match calmlens::construct_webhook_event(&body, &headers, &secret) {
         Ok(event) => {
             if let Some(asset) = &event.data.asset {
-                println!("{} {} {}", event.event_type, asset.id, asset.classification.moderation.decision);
+                println!("{} {} {}", event.event_type, asset.id, asset.classification.moderation.status);
             }
             StatusCode::NO_CONTENT
         }
@@ -243,7 +254,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
 }
 ```
 
-actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.data.asset` is an `EventAsset`, a snapshot of the asset when the event was created: `id`, `external_id`, `classification.status`, `classification.moderation.decision`, `classification.moderation.action` and `content.status`.
+actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.data.asset` is an `EventAsset`, a snapshot of the asset when the event was created: `id`, `external_id`, `classification.status`, `classification.moderation.status` and `content.status`.
 
 ## Offline testing
 
@@ -258,7 +269,7 @@ calmlens = { version = "0.1", features = ["testing"] }
 use calmlens::{models::*, testing::MockServerClient};
 
 let mock = MockServerClient::new()?;
-mock.enqueue(200, Asset::new("asset-1", AssetClassificationStatus::Completed, AssetModerationStatus::Approved));
+mock.enqueue(200, Asset::new("asset-1", AssetClassificationStatus::Completed, AssetModerationStatus::Allowed));
 let asset = mock.assets().classify(SubmitAsset::text("hello")).await?;
 assert_eq!(mock.last_request().unwrap().body, b"hello");
 ```

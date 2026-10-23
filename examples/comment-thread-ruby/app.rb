@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Calmthread: a pre-moderated discussion thread demonstrating the CalmLens Ruby SDK.
-# Clean replies publish at once. Anything the project policy flags is held, with its
+# Clean replies publish at once. Anything the project policy does not allow is held, with its
 # content retained, until a person reviews it in the CalmLens portal.
 require 'calmlens'
 require 'erb'
@@ -24,15 +24,16 @@ module Calmthread
   DEFAULT_HOST = '127.0.0.1'
   DEFAULT_PORT = 6403
 
-  # Sent with every field of every reply. `hide` overrides the project's action for a flagged
-  # field: the asset is rejected and CDN delivery is blocked. Content is kept after processing so
-  # a reviewer can read a held reply; the app deletes it once the reply is rejected.
-  PROCESSING_OPTIONS = { keep_content_after_processing: true, flagged_content_policy: { action: 'hide' } }.freeze
+  # Sent with every field of every reply. `block` overrides the project's action for a flagged
+  # field: the asset becomes `blocked`, so it is not delivered but its content is kept. Content is
+  # kept after processing so a reviewer can read a held reply; the app deletes it once a reviewer
+  # decides the reply stays out of the thread.
+  PROCESSING_OPTIONS = { keep_content_after_processing: true, flagged_content_policy: { action: 'block' } }.freeze
 
   DEMO_RESULTS = {
     'clean' => 'Clean: publish immediately',
-    'held' => 'Flagged: hold the reply for review',
-    'name-held' => 'Flagged display name: hold for review',
+    'held' => 'Blocked reply: hold it for review',
+    'name-held' => 'Blocked display name: hold for review',
     'error' => 'Processing error',
     'unavailable' => 'CalmLens unavailable'
   }.freeze
@@ -49,13 +50,18 @@ module Calmthread
     'reviewer-name' => 'Reviewer',
     'note' => 'Note'
   }.freeze
-  # Only reviewer decisions change a reply: `asset.approved` and `asset.rejected` events whose
-  # `decided-by` fact is `reviewer`. Automated outcomes (`decided-by` `automated`) and other
-  # asset events are skipped, since the app already acted on the automated report at upload.
+  # Only reviewer decisions change a reply: moderation status events whose `decided-by` fact is
+  # `reviewer`. Automated outcomes (`decided-by` `automated`) and other asset events are skipped,
+  # since the app already acted on the automated result at upload.
   EVENT_LABELS = {
-    'asset.approved' => 'Approved by a reviewer',
-    'asset.rejected' => 'Rejected by a reviewer'
+    'asset.allowed' => 'Allowed by a reviewer',
+    'asset.age-restricted' => 'Age-restricted by a reviewer',
+    'asset.blocked' => 'Blocked by a reviewer',
+    'asset.purged' => 'Purged by a reviewer'
   }.freeze
+  # Statuses that keep a field out of the thread. The thread has no age check, so an
+  # `age-restricted` field is held like a `blocked` or `purged` one.
+  HELD_STATUSES = %w[age-restricted blocked purged].freeze
 
   # A form value the app refuses. Its message is written by this app, never taken from input
   # or from a library error, so it is safe to show.
@@ -104,22 +110,19 @@ module Calmthread
   # The asset's `moderation` or `processing` object, or {} when the response has none.
   def self.section(asset, key) = asset.is_a?(Hash) && asset[key].is_a?(Hash) ? asset[key] : {}
 
-  def self.status(asset) = section(section(asset, 'classification'), 'moderation')['decision']
+  def self.status(asset) = section(section(asset, 'classification'), 'moderation')['status']
   def self.processing_failed?(asset) = section(asset, 'classification')['status'] == 'failed'
-  # Flagged means the policy took an action (flag, hide or purge) on the field.
-  def self.flagged?(asset) = !section(section(asset, 'classification'), 'moderation')['action'].nil?
 
   # :clean publishes, :held waits for a reviewer, :failed never publishes.
-  # An approved but flagged field is held too: only an unflagged approval is clean.
+  # Only an `allowed` field is clean; any other decided status holds the reply.
   def self.decision(asset)
     return :failed unless asset.is_a?(Hash) && asset['id'].is_a?(String) && !asset['id'].empty?
     return :failed if processing_failed?(asset)
 
-    case status(asset)
-    when 'approved' then flagged?(asset) ? :held : :clean
-    when 'rejected' then :held
-    else :failed
-    end
+    status = status(asset)
+    return :clean if status == 'allowed'
+
+    HELD_STATUSES.include?(status) ? :held : :failed
   end
 
   # The current status of a retrieved asset, or nil when the response is not that asset of
@@ -177,7 +180,7 @@ module Calmthread
       end
       # Held replies are logged without their name or text.
       if state == :held
-        record(:held, "A reply was held for review: its #{held.map { |item| FIELD_LABELS[item] }.join(' and ')} was flagged.")
+        record(:held, "A reply was held for review: its #{held.map { |item| FIELD_LABELS[item] }.join(' and ')} was not allowed.")
       else
         record(:published, "#{name} replied.")
       end
@@ -203,7 +206,7 @@ module Calmthread
       end
     end
 
-    # Forgets the reply, including its text, so a rejected reply can never be published.
+    # Forgets the reply, including its text, so a removed reply can never be published.
     def remove(reply_id)
       @lock.synchronize { !@replies.reject! { |reply| reply[:id] == reply_id }.nil? }
     end
@@ -221,7 +224,7 @@ module Calmthread
     OUTCOME_TEXT = {
       released: 'a held reply is now published.',
       removed: 'the reply is out of the thread for good, and its stored text was deleted from CalmLens.',
-      unchanged: 'no change. A reply publishes only once every field is approved.'
+      unchanged: 'no change. A reply publishes only once every field is allowed.'
     }.freeze
 
     def initialize(discussion, cursor: nil)
@@ -296,9 +299,9 @@ module Calmthread
 
       # Act on the asset's current status, never on the event's snapshot.
       status = Calmthread.current_status(client.assets.retrieve(asset_id: asset_id), asset_id, reply)
-      outcome = if status == 'rejected' && event['type'] == 'asset.rejected'
+      outcome = if HELD_STATUSES.include?(status) && event['type'] != 'asset.allowed'
                   remove(reply, client)
-                elsif status == 'approved' && reply[:state] == :held && approved_elsewhere?(reply, asset_id, client)
+                elsif status == 'allowed' && reply[:state] == :held && allowed_elsewhere?(reply, asset_id, client)
                   @discussion.publish(reply[:id]) ? :released : :unchanged
                 else
                   :unchanged
@@ -309,10 +312,10 @@ module Calmthread
       outcome
     end
 
-    # Every other field of the reply must also be approved right now.
-    def approved_elsewhere?(reply, asset_id, client)
+    # Every other field of the reply must also be allowed right now.
+    def allowed_elsewhere?(reply, asset_id, client)
       reply[:asset_ids].values.reject { |id| id == asset_id }.all? do |id|
-        Calmthread.current_status(client.assets.retrieve(asset_id: id), id, reply) == 'approved'
+        Calmthread.current_status(client.assets.retrieve(asset_id: id), id, reply) == 'allowed'
       end
     end
 
@@ -447,8 +450,8 @@ module Calmthread
       'no-decisions' => 'No new review decisions changed the thread.',
       'applied' => 'Applied %<count>d review decision(s).',
       'busy' => 'A check for review decisions is already running. Try again in a moment.',
-      'demo-approved' => 'A simulated reviewer approved the reply. It is now published.',
-      'demo-rejected' => 'A simulated reviewer rejected the reply. It stays out of the thread and its stored text was deleted.'
+      'demo-allowed' => 'A simulated reviewer allowed the reply. It is now published.',
+      'demo-blocked' => 'A simulated reviewer blocked the reply. It stays out of the thread and its stored text was deleted.'
     }.freeze
     CSRF_COOKIE = 'calmthread_csrf'
     TOKEN = /\A[A-Za-z0-9_-]{43}\z/

@@ -21,7 +21,7 @@ test("rejects redirects before credentials reach another origin on every transpo
       return Response.json({
         id: "a",
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { decision: "approved" } },
+        classification: { status: "completed", moderation: { status: "allowed" } },
       });
     },
   });

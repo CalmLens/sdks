@@ -1,23 +1,29 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-CeNXd586.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-7aW4vaO5.js";
 import "./SharedConstants-CdFPZV7z.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
 import * as zod from "zod";
-//#region packages/shared/src/AssetReviewAction.ts
-const ASSET_REVIEW_ACTION_SCHEMA = zod.enum([
-	"approve",
-	"hide",
-	"purge"
+//#region packages/shared/src/AssetModerationDecision.ts
+/**
+* What moderation decided for an asset, which also decides how it is delivered: served to anyone
+* with access (`allowed`), only through signed URLs or server keys (`age-restricted`), not served
+* (`blocked`), or not served with its stored content deleted (`purged`).
+*/
+const ASSET_MODERATION_DECISION_SCHEMA = zod.enum([
+	"allowed",
+	"age-restricted",
+	"blocked",
+	"purged"
 ]);
 //#endregion
 //#region packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
 const HUMAN_REVIEW_SETTINGS_SCHEMA = zod.object({
-	approvedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
-	rejectedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0)
+	allowedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
+	restrictedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0)
 }).strict();
 /** Automated outcomes that can be sampled, and the decisions a reviewer can make. */
-const HUMAN_REVIEW_OUTCOME_SCHEMA = zod.enum(["approved", "rejected"]);
+const HUMAN_REVIEW_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
 const HUMAN_REVIEW_STATUS_SCHEMA = zod.enum(["pending", "completed"]);
 zod.object({
 	id: primaryUuidField(),
@@ -26,7 +32,6 @@ zod.object({
 	automatedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA,
 	status: HUMAN_REVIEW_STATUS_SCHEMA,
 	decision: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
-	action: ASSET_REVIEW_ACTION_SCHEMA.nullish(),
 	note: zod.string().max(1e3).nullish(),
 	reviewerUserId: zod.string().nullish(),
 	/** Whether the decision changed the asset's status (only when it overturned the outcome). */
@@ -35,11 +40,11 @@ zod.object({
 	reviewedAt: zod.number().int().nullish()
 });
 zod.object({
-	action: ASSET_REVIEW_ACTION_SCHEMA,
+	decision: HUMAN_REVIEW_OUTCOME_SCHEMA,
 	confirmPurge: zod.boolean().optional(),
 	note: zod.string().trim().max(1e3).nullish()
 }).strict().superRefine((body, ctx) => {
-	if (body.action === "purge" && body.confirmPurge !== true) ctx.addIssue({
+	if (body.decision === "purged" && body.confirmPurge !== true) ctx.addIssue({
 		code: "custom",
 		path: ["confirmPurge"],
 		message: "Confirm permanent deletion"
@@ -68,8 +73,8 @@ const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTIO
 /** Ranks actions by strength: allowances must be softer than the category action, restrictions not. */
 const FLAGGED_CONTENT_ACTION_RANK = {
 	allow: 0,
-	flag: 1,
-	hide: 2,
+	"age-restrict": 1,
+	block: 2,
 	purge: 3
 };
 /** Why a rule can't be used with its category's action, or undefined when it can. */
@@ -85,9 +90,9 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	threshold: zod.number().min(0).max(1).transform((threshold) => Math.max(threshold, MINIMUM_MODERATION_THRESHOLD)).meta({ description: "The policy score at which the category's action applies. The policy score is the category score, lowered by allowances that cover the content and raised to a restriction's presence score." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
-	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, flag it while continuing delivery, hide while retaining content, or permanently purge content." })
+	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `ageRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
-	const categoryAction = value.flaggedContentPolicy?.action ?? "hide";
+	const categoryAction = value.flaggedContentPolicy?.action ?? "block";
 	for (const kind of ["allowance", "restriction"]) {
 		const key = kind === "allowance" ? "allowances" : "restrictions";
 		for (const [index, rule] of (value[key] ?? []).entries()) {
@@ -190,24 +195,14 @@ const ASSET_CLASSIFICATION_STATUS_SCHEMA = zod.enum([
 	"completed",
 	"failed"
 ]);
-/** The moderation outcome in force: a reviewer's decision when there is one, else the automated one. */
-const ASSET_MODERATION_STATUS_SCHEMA = zod.enum([
-	"pending",
-	"approved",
-	"rejected"
-]);
-/** What the policy did with flagged content. `null` when the policy matched nothing. */
-const ASSET_MODERATION_ACTION_SCHEMA = zod.enum([
-	"flag",
-	"hide",
-	"purge"
-]);
-/** A reviewer's decision on an asset. */
-const ASSET_REVIEWER_ACTION_SCHEMA = zod.enum(["approved", "rejected"]);
+/**
+* The moderation decision in force, which also decides delivery: `pending` until classification
+* decides, then a reviewer's decision when there is one, else the policy's.
+*/
+const ASSET_MODERATION_STATUS_SCHEMA = zod.enum(["pending", ...ASSET_MODERATION_DECISION_SCHEMA.options]);
 const ASSET_REVIEW_SCHEMA = zod.object({
 	id: zod.string().uuid(),
-	decision: ASSET_REVIEWER_ACTION_SCHEMA,
-	action: ASSET_REVIEW_ACTION_SCHEMA,
+	decision: ASSET_MODERATION_DECISION_SCHEMA,
 	note: zod.string().nullable(),
 	reviewerUserId: zod.string().nullable(),
 	reviewerName: zod.string().nullish(),
@@ -295,7 +290,7 @@ const PROCESSING_OPTIONS_SCHEMA = zod.object({
 		defaultValue: false
 	})])),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta(metaStore([docPropertyInfo({
-		description: "Override the project moderation action for this asset. Allow takes no action, flag keeps delivery enabled and flags the asset, hide blocks delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
+		description: "Override the project moderation action for this asset. Allow takes no action, age-restrict delivers the asset only through signed URLs or API keys, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
 		defaultValue: void 0
 	})])),
 	features: PROCESSING_FEATURES_SCHEMA.nullish()
@@ -352,7 +347,6 @@ const STORED_ASSET_SCHEMA = zod.object({
 	classificationStatus: ASSET_CLASSIFICATION_STATUS_SCHEMA,
 	classificationUpdatedAt: zod.number().nullish(),
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
-	moderationAction: ASSET_MODERATION_ACTION_SCHEMA.nullish(),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
 	reviewRevision: zod.number().int().default(0).meta(metaStore([backfill({ value: 0 })])),
 	completedAt: zod.number().nullish(),
@@ -384,8 +378,7 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 })]));
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
-	decision: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force: pending, approved or rejected. A reviewer's decision takes precedence."),
-	action: ASSET_MODERATION_ACTION_SCHEMA.nullable(),
+	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `age-restricted` (delivered only through signed URLs or API keys), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
 	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),
@@ -466,8 +459,7 @@ STORED_ASSET_SCHEMA.pick({
 			updatedAt: 1767225601e3,
 			completedAt: 1767225601e3,
 			moderation: {
-				decision: "approved",
-				action: null,
+				status: "allowed",
 				manualReviews: []
 			}
 		},
@@ -492,7 +484,7 @@ STORED_ASSET_SCHEMA.pick({
 */
 const CHILD_PROCESSING_SCHEMA = zod.enum(["extracting", "ready"]);
 /** A reviewer's decision on a composite asset, which its children's statuses don't override. */
-const MANUAL_DECISION_SCHEMA = zod.enum(["approved", "rejected"]);
+const MANUAL_DECISION_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
 zod.object({
 	assetId: zod.string().uuid(),
 	projectId: zod.string().uuid(),
@@ -611,53 +603,15 @@ const ASSET_UPLOADED = defineEventType({
 		fileFormat: "jpg"
 	}
 });
-const ASSET_FLAGGED = defineEventType({
-	id: "asset.flagged",
-	name: "Asset flagged",
-	description: "Automated moderation flagged the asset for a policy violation.",
-	category: "moderation",
-	severity: "high",
-	notify: true,
-	permission: "assets:read",
-	fields: {
-		assetName: assetNameField,
-		assetType: assetTypeField,
-		flaggedCategories: field(zod.array(zod.string()), {
-			label: "Categories",
-			description: "The matched parent policy categories. Inspect the asset's classification results for qualifier detail.",
-			display: "list"
-		}),
-		moderationAction: field(ASSET_MODERATION_ACTION_SCHEMA.nullish(), {
-			label: "Moderation action",
-			description: "The action applied to the flagged content (`flag`, `hide` or `purge`).",
-			display: "enum"
-		})
-	},
-	example: {
-		assetName: "beach.jpg",
-		assetType: "image",
-		flaggedCategories: ["violence", "sexual"],
-		moderationAction: "hide"
-	}
-});
-const decidedByField = field(zod.enum(["automated", "reviewer"]), {
-	label: "Decided by",
-	description: "Who made the decision: `automated` moderation or a `reviewer` in the portal or through the API.",
-	display: "enum",
-	valueLabels: {
-		automated: "Automated moderation",
-		reviewer: "Reviewer"
-	}
-});
-const decisionModerationActionField = field(ASSET_MODERATION_ACTION_SCHEMA.nullish(), {
-	label: "Moderation action",
-	description: "What the policy did with flagged content (`flag`, `hide` or `purge`), or `null` when nothing was flagged. A reviewer's decision keeps it.",
-	display: "enum"
-});
-const ASSET_APPROVED = defineEventType({
-	id: "asset.approved",
-	name: "Asset approved",
-	description: "The asset was approved, by automated moderation or by a reviewer.",
+const FLAGGED_CATEGORIES_INFO = {
+	label: "Categories",
+	description: "The parent policy categories whose findings decided the status, or none when nothing was acted on. Inspect the asset's classification results for qualifier detail.",
+	display: "list"
+};
+const ASSET_CLASSIFIED = defineEventType({
+	id: "asset.classified",
+	name: "Asset classified",
+	description: "Classification finished for the asset, including the moderation decision it produced.",
 	category: "moderation",
 	severity: "low",
 	notify: false,
@@ -665,22 +619,39 @@ const ASSET_APPROVED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		flaggedCategories: field(zod.array(zod.string()), FLAGGED_CATEGORIES_INFO),
+		moderationStatus: field(ASSET_MODERATION_STATUS_SCHEMA, {
+			label: "Moderation status",
+			description: "The status the policy decided: `allowed`, `age-restricted`, `blocked` or `purged`. A reviewer's earlier decision on the asset keeps precedence.",
+			display: "enum"
+		})
+	},
+	example: {
+		assetName: "beach.jpg",
+		assetType: "image",
+		flaggedCategories: ["sexual"],
+		moderationStatus: "age-restricted"
+	}
+});
+const decidedByField = field(zod.enum(["automated", "reviewer"]), {
+	label: "Decided by",
+	description: "Who made the decision: `automated` moderation or a `reviewer` in the portal, through the API or by resolving an appeal.",
+	display: "enum",
+	valueLabels: {
+		automated: "Automated moderation",
+		reviewer: "Reviewer"
+	}
+});
+/** One event per moderation status, emitted whenever automated moderation or a reviewer sets it. */
+const defineModerationOutcome = (outcome) => defineEventType({
+	...outcome,
+	category: "moderation",
+	permission: "assets:read",
+	fields: {
+		assetName: assetNameField,
+		assetType: assetTypeField,
 		decidedBy: decidedByField,
-		moderationAction: decisionModerationActionField,
-		reviewAction: field(zod.enum([
-			"approve",
-			"hide",
-			"purge"
-		]).optional(), {
-			label: "Reviewer action",
-			description: "The action chosen by a reviewer.",
-			display: "enum",
-			valueLabels: {
-				approve: "Approve",
-				hide: "Hide",
-				purge: "Purge"
-			}
-		}),
+		flaggedCategories: field(zod.array(zod.string()).optional(), FLAGGED_CATEGORIES_INFO),
 		reviewerUserId: reviewerUserIdField,
 		reviewerName: reviewerNameField,
 		note: field(zod.string().nullish(), {
@@ -693,52 +664,36 @@ const ASSET_APPROVED = defineEventType({
 		assetName: "beach.jpg",
 		assetType: "image",
 		decidedBy: "automated",
-		moderationAction: null
+		flaggedCategories: outcome.id === "asset.allowed" ? [] : ["sexual"]
 	}
 });
-const ASSET_REJECTED = defineEventType({
-	id: "asset.rejected",
-	name: "Asset rejected",
-	description: "The asset was rejected, by automated moderation or by a reviewer.",
-	category: "moderation",
+const ASSET_ALLOWED = defineModerationOutcome({
+	id: "asset.allowed",
+	name: "Asset allowed",
+	description: "The asset was allowed and is delivered normally.",
+	severity: "low",
+	notify: false
+});
+const ASSET_AGE_RESTRICTED = defineModerationOutcome({
+	id: "asset.age-restricted",
+	name: "Asset age-restricted",
+	description: "The asset was age-restricted: it is not served from its plain URL, only through signed URLs, API keys or an explicit `ageRestricted=true` opt-in, so your app decides who sees it.",
 	severity: "high",
-	notify: false,
-	permission: "assets:read",
-	fields: {
-		assetName: assetNameField,
-		assetType: assetTypeField,
-		decidedBy: decidedByField,
-		moderationAction: decisionModerationActionField,
-		reviewAction: field(zod.enum([
-			"approve",
-			"hide",
-			"purge"
-		]).optional(), {
-			label: "Reviewer action",
-			description: "The action chosen by a reviewer.",
-			display: "enum",
-			valueLabels: {
-				approve: "Approve",
-				hide: "Hide",
-				purge: "Purge"
-			}
-		}),
-		reviewerUserId: reviewerUserIdField,
-		reviewerName: reviewerNameField,
-		note: field(zod.string().nullish(), {
-			label: "Note",
-			description: "The reviewer's reason for rejecting the asset, or `null`.",
-			display: "text"
-		})
-	},
-	example: {
-		assetName: "beach.jpg",
-		assetType: "image",
-		decidedBy: "reviewer",
-		reviewerUserId: "user-123",
-		reviewerName: "Sam Reviewer",
-		note: "No usage rights for this photo"
-	}
+	notify: true
+});
+const ASSET_BLOCKED = defineModerationOutcome({
+	id: "asset.blocked",
+	name: "Asset blocked",
+	description: "The asset was blocked and is no longer delivered. Its content is kept.",
+	severity: "high",
+	notify: true
+});
+const ASSET_PURGED = defineModerationOutcome({
+	id: "asset.purged",
+	name: "Asset purged",
+	description: "The asset was purged: it is no longer delivered and its stored content was deleted.",
+	severity: "high",
+	notify: true
 });
 const ASSET_FAILED = defineEventType({
 	id: "asset.failed",
@@ -967,14 +922,14 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 		assetType: assetTypeField,
 		automatedOutcome: field(ASSET_MODERATION_STATUS_SCHEMA, {
 			label: "Automated outcome",
-			description: "The asset's status from automated moderation: `approved` or `rejected`.",
+			description: "The asset's status from automated moderation: `allowed`, `age-restricted`, `blocked` or `purged`.",
 			display: "enum"
 		})
 	},
 	example: {
 		assetName: "beach.jpg",
 		assetType: "image",
-		automatedOutcome: "approved"
+		automatedOutcome: "allowed"
 	}
 });
 const USAGE_SPEND_LIMIT_REACHED = defineEventType({
@@ -1226,9 +1181,11 @@ const appealFields = {
 /** Every event type, in the order the portal and docs list them. */
 const EVENT_TYPE_INFO = {
 	"asset.uploaded": ASSET_UPLOADED,
-	"asset.flagged": ASSET_FLAGGED,
-	"asset.approved": ASSET_APPROVED,
-	"asset.rejected": ASSET_REJECTED,
+	"asset.classified": ASSET_CLASSIFIED,
+	"asset.allowed": ASSET_ALLOWED,
+	"asset.age-restricted": ASSET_AGE_RESTRICTED,
+	"asset.blocked": ASSET_BLOCKED,
+	"asset.purged": ASSET_PURGED,
 	"asset.failed": ASSET_FAILED,
 	"asset.deleted": ASSET_DELETED,
 	"asset.content-removed": ASSET_CONTENT_REMOVED,
@@ -1290,7 +1247,7 @@ const EVENT_TYPE_INFO = {
 			subjectType: "post",
 			subjectId: "post-1",
 			decision: "overturned",
-			action: "approved",
+			action: "allowed",
 			appliedToAsset: true
 		}
 	})
@@ -1330,10 +1287,7 @@ const EVENT_ASSET_SCHEMA = zod.object({
 	upload: zod.object({ status: zod.enum(["uploading", "completed"]) }),
 	classification: zod.object({
 		status: ASSET_CLASSIFICATION_STATUS_SCHEMA,
-		moderation: zod.object({
-			decision: ASSET_MODERATION_STATUS_SCHEMA,
-			action: ASSET_MODERATION_ACTION_SCHEMA.nullable()
-		})
+		moderation: zod.object({ status: ASSET_MODERATION_STATUS_SCHEMA })
 	}),
 	content: zod.object({ status: ASSET_CONTENT_STATUS_SCHEMA }).describe("Whether CalmLens held the asset's content when the event was created")
 });

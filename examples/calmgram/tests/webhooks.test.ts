@@ -17,7 +17,7 @@ const deliveryBody = (type: string, facts: { key: string; value: unknown }[] = [
         externalId: null,
         content: { status: "stored" },
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { decision: "approved", action: null } },
+        classification: { status: "completed", moderation: { status: "allowed" } },
       },
       facts,
       createdAt: 1760000000000,
@@ -26,7 +26,13 @@ const deliveryBody = (type: string, facts: { key: string; value: unknown }[] = [
   );
 
 test("syncs the asset named in the delivery's data for decision events", () => {
-  for (const type of ["asset.flagged", "asset.failed", "asset.approved", "asset.rejected"]) {
+  for (const type of [
+    "asset.failed",
+    "asset.allowed",
+    "asset.age-restricted",
+    "asset.blocked",
+    "asset.purged",
+  ]) {
     expect(readWebhookDelivery(deliveryBody(type))).toEqual({
       eventId: `event-${type}`,
       syncAssetId: "asset-1",
@@ -36,11 +42,12 @@ test("syncs the asset named in the delivery's data for decision events", () => {
 
 test("ignores other events and test sends", () => {
   expect(readWebhookDelivery(deliveryBody("asset.uploaded")).syncAssetId).toBeNull();
+  expect(readWebhookDelivery(deliveryBody("asset.classified")).syncAssetId).toBeNull();
   expect(
-    readWebhookDelivery(deliveryBody("asset.approved", [{ key: "test", value: true }])).syncAssetId,
+    readWebhookDelivery(deliveryBody("asset.allowed", [{ key: "test", value: true }])).syncAssetId,
   ).toBeNull();
 });
 
 test("rejects a body that is not a delivery", () => {
-  expect(() => readWebhookDelivery(JSON.stringify({ type: "asset.approved" }))).toThrow(Error);
+  expect(() => readWebhookDelivery(JSON.stringify({ type: "asset.allowed" }))).toThrow(Error);
 });

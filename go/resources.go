@@ -73,8 +73,8 @@ const (
 	decisionPollMaxDelay   = 5 * time.Second
 )
 
-// WaitForDecision retrieves an asset until it has a moderation decision (Moderation.Status
-// ModerationStatusApproved or ModerationStatusRejected) or its processing failed
+// WaitForDecision retrieves an asset until it has a moderation decision (Moderation.Status is no
+// longer ModerationStatusPending) or its processing failed
 // (Processing.Status ClassificationStatusFailed), and returns that asset. It waits 0.5s before the
 // second check and 1.5 times longer each time after that, up to 5s. When Timeout
 // (default DefaultDecisionTimeout) passes without a decision it returns a *Error with code
@@ -100,15 +100,15 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 			return nil, err
 		}
 		switch {
-		case asset.Classification.Moderation.Decision == ModerationStatusApproved, asset.Classification.Moderation.Decision == ModerationStatusRejected, asset.Classification.Status == ClassificationStatusFailed:
+		case asset.Classification.Moderation.Status != ModerationStatusPending, asset.Classification.Status == ClassificationStatusFailed:
 			return asset, nil
 		}
 		remaining := deadline.Sub(s.c.now())
 		if remaining <= 0 {
 			return nil, &Error{
 				Code:    CodeSDKTimeout,
-				Message: "Asset " + asset.ID + " had no moderation decision after " + timeout.String() + " (processing " + asset.Classification.Status + ", moderation " + asset.Classification.Moderation.Decision + ")",
-				Details: JSON{"assetId": asset.ID, "classificationStatus": asset.Classification.Status, "moderationStatus": asset.Classification.Moderation.Decision},
+				Message: "Asset " + asset.ID + " had no moderation decision after " + timeout.String() + " (processing " + asset.Classification.Status + ", moderation " + asset.Classification.Moderation.Status + ")",
+				Details: JSON{"assetId": asset.ID, "classificationStatus": asset.Classification.Status, "moderationStatus": asset.Classification.Moderation.Status},
 			}
 		}
 		if err = s.c.sleep(ctx, min(delay, remaining)); err != nil {
@@ -305,6 +305,9 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 			return "", err
 		}
 		endpoint += separator + path
+	}
+	if options.AgeRestricted {
+		endpoint += "?ageRestricted=true"
 	}
 	return endpoint, nil
 }

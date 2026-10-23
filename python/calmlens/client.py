@@ -898,9 +898,6 @@ class UploadTokens:
         return {"token": f"clut_{body}.{signature}", "expiresAt": expires_at}
 
 
-#: :meth:`Assets.wait_for_decision` stops at these ``classification.moderation.decision`` values, or when
-#: ``classification.status`` is ``failed``.
-_DECIDED_MODERATION_STATUSES = ("approved", "rejected")
 _DECISION_POLL_FIRST_DELAY = 0.5
 _DECISION_POLL_MAX_DELAY = 5.0
 _DEFAULT_DECISION_TIMEOUT = 60.0
@@ -927,7 +924,7 @@ class Assets:
              page_size: int = _UNSET, ordering: List[Ordering] = _UNSET, filter: str = _UNSET,
              folder_id: str = _UNSET) -> AssetPage:
         """One page of the project's assets (``cursor`` resumes a previous page; ``filter`` is RSQL,
-        e.g. ``classification.moderation.decision==approved``). Use :meth:`iter` to walk every page."""
+        e.g. ``classification.moderation.status==allowed``). Use :meth:`iter` to walk every page."""
         merged = _merge(options, cursor=cursor, page_size=page_size, ordering=ordering, filter=filter,
                         folder_id=folder_id)
         return cast(AssetPage, self._c._request("GET", self._c._project("assets/page"), query=merged))
@@ -957,8 +954,9 @@ class Assets:
 
     def wait_for_decision(self, options: WaitForDecisionOptions | None = None, /, *, asset_id: str = _UNSET,
                           timeout: float = _UNSET) -> Asset:
-        """Retrieve an asset until ``classification.moderation.decision`` is ``approved`` or ``rejected``, or
-        ``classification.status`` is ``failed``, and return that asset.
+        """Retrieve an asset until ``classification.moderation.status`` is no longer ``pending``
+        (``allowed``, ``age-restricted``, ``blocked`` or ``purged``), or ``classification.status`` is
+        ``failed``, and return that asset.
 
         Checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5
         seconds between checks. Raises :class:`CalmLensError` with ``sdk/timeout`` and
@@ -977,8 +975,8 @@ class Assets:
         while True:
             asset = self.retrieve(wanted)
             classification_status = asset["classification"]["status"]
-            moderation_status = asset["classification"]["moderation"]["decision"]
-            if moderation_status in _DECIDED_MODERATION_STATUSES or classification_status == "failed":
+            moderation_status = asset["classification"]["moderation"]["status"]
+            if moderation_status != "pending" or classification_status == "failed":
                 return asset
             remaining = deadline - self._c._clock()
             if remaining <= 0:
@@ -1250,10 +1248,19 @@ class CDN:
         self._c = client
 
     def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, asset_identifier: str = _UNSET,
-                      resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET) -> str:
+                      resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
+                      age_restricted: bool = _UNSET) -> str:
         """The CDN URL of an asset's ``content`` or ``preview``, optionally through a named
-        ``lens``, a ``transform``, or both (the lens runs first). Private assets need an API key or a signed URL."""
-        merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform)
+        ``lens``, a ``transform``, or both (the lens runs first). Private assets need an API key or a signed URL.
+
+        ``age_restricted=True`` appends ``?ageRestricted=true``, which lets the public URL serve a
+        public asset whose moderation status is ``age-restricted``. Set it only where your app has
+        already decided the viewer may see age-restricted content."""
+        merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
+                        age_restricted=age_restricted)
+        age = merged.get("ageRestricted", False)
+        if not isinstance(age, bool):
+            raise _invalid("ageRestricted must be a boolean")
         selected = merged.get("resource", "content")
         if selected not in ("content", "preview"):
             raise _invalid("Resource must be content or preview")
@@ -1263,11 +1270,11 @@ class CDN:
             url += "/@" + _id(merged["lens"], "lens")
         if _has_transform(merged.get("transform")):
             url += ("," if merged.get("lens") else "/") + _transform_path(merged["transform"])
-        return url
+        return url + "?ageRestricted=true" if age else url
 
     def serve(self, options: ServeOptions | None = None, /, *, asset_identifier: str = _UNSET,
               resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
-              init: ServeInit = _UNSET) -> CDNResponse:
+              age_restricted: bool = _UNSET, init: ServeInit = _UNSET) -> CDNResponse:
         """Request an asset from the CDN with the client's API key.
 
         Returns a streaming :class:`CDNResponse`, including for non-2xx responses (check
@@ -1275,7 +1282,7 @@ class CDN:
         an inactivity limit, so large downloads are not cut off.
         """
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens,
-                        transform=transform, init=init)
+                        transform=transform, age_restricted=age_restricted, init=init)
         settings = merged.get("init") or {}
         method = settings.get("method", "GET")
         if method not in ("GET", "HEAD"):

@@ -32,7 +32,7 @@ type Grant struct {
 }
 
 // CreateMockAPIKey returns a mock API key carrying grants, such as
-// {Actions: []string{"assets:download"}} for private CDN access.
+// {Actions: []string{"assets:download"}} for CDN access to private and age-restricted assets.
 func CreateMockAPIKey(grants []Grant) string {
 	if grants == nil {
 		grants = []Grant{}
@@ -49,7 +49,8 @@ type StoredContent struct {
 
 // InMemoryDatabaseStorage holds assets and folders as API-shaped JSON maps. An asset's
 // processing, moderation and content objects are nested calmlens.JSON maps, so a test can change
-// them in place, such as db.Assets[id]["moderation"].(calmlens.JSON)["status"] = "rejected".
+// them in place, such as
+// db.Assets[id]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = "blocked".
 type InMemoryDatabaseStorage struct {
 	Assets  map[string]calmlens.JSON
 	Folders map[string]calmlens.JSON
@@ -62,10 +63,16 @@ type InMemoryImageStorage struct{ Content map[string]*StoredContent }
 const (
 	// OutcomePending leaves the asset processing with moderation pending.
 	OutcomePending = "pending"
-	// OutcomeApproved finishes processing with moderation approved.
-	OutcomeApproved = "approved"
-	// OutcomeRejected finishes processing with moderation rejected.
-	OutcomeRejected = "rejected"
+	// OutcomeAllowed finishes processing with moderation allowed.
+	OutcomeAllowed = "allowed"
+	// OutcomeAgeRestricted finishes processing with moderation age-restricted; the mock CDN then
+	// serves the asset only to keys allowed to download it, like a private asset.
+	OutcomeAgeRestricted = "age-restricted"
+	// OutcomeBlocked finishes processing with moderation blocked.
+	OutcomeBlocked = "blocked"
+	// OutcomePurged finishes processing with moderation purged and removes the content with
+	// removal reason policy.
+	OutcomePurged = "purged"
 	// OutcomeFailed fails processing (retryable) with moderation pending.
 	OutcomeFailed = "failed"
 )
@@ -91,7 +98,7 @@ type Options struct {
 	// multipart uploads; default OutcomePending).
 	QueuedOutcome string
 	// AnalyzedOutcome is the Outcome constant of moderated uploads (Assets.Classify and
-	// Text.Classify; default OutcomeApproved). Finished processing removes content unless the
+	// Text.Classify; default OutcomeAllowed). Finished processing removes content unless the
 	// upload set ProcessingOptions.KeepContentAfterProcessing.
 	AnalyzedOutcome  string
 	CDNBaseURL       string
@@ -226,11 +233,11 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 		options.QueuedOutcome = OutcomePending
 	}
 	if options.AnalyzedOutcome == "" {
-		options.AnalyzedOutcome = OutcomeApproved
+		options.AnalyzedOutcome = OutcomeAllowed
 	}
 	for _, outcome := range []string{options.QueuedOutcome, options.AnalyzedOutcome} {
 		switch outcome {
-		case OutcomePending, OutcomeApproved, OutcomeRejected, OutcomeFailed:
+		case OutcomePending, OutcomeAllowed, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged, OutcomeFailed:
 		default:
 			return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Unknown mock outcome " + strconv.Quote(outcome)}
 		}
@@ -746,8 +753,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	a["upload"] = uploadState
 	a["classification"] = processing
 	processing["moderation"] = calmlens.JSON{
-		"decision": calmlens.ModerationStatusPending, "action": nil,
-		"manualReviews": []any{},
+		"status": calmlens.ModerationStatusPending, "manualReviews": []any{},
 	}
 	a["content"] = content
 	if options["url"] != nil {
@@ -806,20 +812,21 @@ func section(a calmlens.JSON, name string) calmlens.JSON {
 	return object
 }
 
-// applyOutcome moves an asset to outcome like the pipeline: a decision finishes processing, and
-// finished processing removes content kept only temporarily (keepContentAfterProcessing off).
+// applyOutcome moves an asset to outcome like the pipeline: a decision finishes processing,
+// OutcomePurged deletes the content, and finished processing removes content kept only
+// temporarily (keepContentAfterProcessing off).
 func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome string, now int64) {
-	decided := outcome == OutcomeApproved || outcome == OutcomeRejected
+	decided := outcome != OutcomePending && outcome != OutcomeFailed
 	processing, moderation, content := section(a, "classification"), section(section(a, "classification"), "moderation"), section(a, "content")
 	processing["updatedAt"] = now
 	section(a, "upload")["status"] = "completed"
 	section(a, "upload")["updatedAt"] = now
-	moderation["decision"] = calmlens.ModerationStatusPending
+	moderation["status"] = calmlens.ModerationStatusPending
 	processing["completedAt"] = nil
 	switch {
 	case decided:
 		processing["status"] = calmlens.ClassificationStatusCompleted
-		moderation["decision"] = outcome
+		moderation["status"] = outcome
 		processing["completedAt"] = now
 	case outcome == OutcomeFailed:
 		processing["status"] = calmlens.ClassificationStatusFailed
@@ -827,7 +834,10 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome string, now int
 		processing["status"] = calmlens.ClassificationStatusProcessing
 	}
 	a["updatedAt"] = now
-	if decided && content["status"] == calmlens.ContentStatusTemporary {
+	switch {
+	case outcome == OutcomePurged:
+		m.removeContent(a, calmlens.ContentRemovalReasonPolicy, now)
+	case decided && content["status"] == calmlens.ContentStatusTemporary:
 		m.removeContent(a, calmlens.ContentRemovalReasonRetention, now)
 	}
 }
@@ -1205,7 +1215,11 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	if asset == nil {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound)
 	}
-	if asset["visibility"] != calmlens.VisibilityPublic && !m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) {
+	// A public age-restricted asset is served from its public URL only with the
+	// ageRestricted=true opt-in; otherwise it needs the download permission, like a private one.
+	ageRestricted := section(section(asset, "classification"), "moderation")["status"] == calmlens.ModerationStatusAgeRestricted
+	restricted := asset["visibility"] != calmlens.VisibilityPublic || ageRestricted && req.URL.Query().Get("ageRestricted") != "true"
+	if restricted && !m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission")
 	}
 	stored := m.ImageStorage.Content[text(asset["id"])]

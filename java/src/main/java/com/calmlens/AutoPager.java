@@ -14,7 +14,7 @@ import java.util.stream.StreamSupport;
  * {@link CalmLensException}s from {@link Iterator#hasNext()}.
  *
  * <pre>{@code
- * for (Asset asset : client.assets.iterate(new ListAssets().filter("status==rejected"))) { ... }
+ * for (Asset asset : client.assets.iterate(new ListAssets().filter("classification.moderation.status==blocked"))) { ... }
  * }</pre>
  *
  * @param <T> the item type

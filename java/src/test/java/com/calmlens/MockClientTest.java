@@ -55,7 +55,7 @@ class MockClientTest {
     Models.Asset asset = decided.client.assets.waitForDecision(new Models.WaitForDecision("asset-1"));
     assertEquals("asset-1", asset.id());
     assertSame(Models.AssetClassificationStatus.FAILED, asset.classification().status());
-    assertSame(Models.AssetModerationStatus.PENDING, asset.classification().moderation().decision());
+    assertSame(Models.AssetModerationStatus.PENDING, asset.classification().moderation().status());
     assertEquals(2, decided.requests().size());
     assertEquals(0, decided.remainingResponses());
 
@@ -74,7 +74,7 @@ class MockClientTest {
 
   @Test void mocksRetryLikeTheRealClientWithoutWaiting() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueueError(ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS)
-        .enqueue(200, Fixtures.asset("asset-1", "completed", "approved"));
+        .enqueue(200, Fixtures.asset("asset-1", "completed", "allowed"));
     long started = System.nanoTime();
     assertEquals("asset-1", mock.client.text.classify("hello").id());
     assertTrue(Duration.ofNanos(System.nanoTime() - started).compareTo(Duration.ofMillis(900)) < 0);
@@ -98,13 +98,13 @@ class MockClientTest {
   }
 
   @Test void eventsAndCdnResponsesLookReal() {
-    Map<String, Object> event = Map.of("id", "event-1", "type", "asset.rejected", "assetId", "asset-1",
+    Map<String, Object> event = Map.of("id", "event-1", "type", "asset.blocked", "assetId", "asset-1",
         "facts", List.of(Map.of("key", "reviewer-name", "value", "Ada")));
     MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueueEvents("cursor-2", false, event)
         .enqueueCdn(200, "image/webp", new byte[] {1, 2, 3});
     Models.EventsPage page = mock.client.events.list(new Models.ListEvents().after("cursor-1"));
     assertEquals("cursor-2", page.cursor());
-    assertEquals("asset.rejected", page.events().get(0).type());
+    assertEquals("asset.blocked", page.events().get(0).type());
     assertEquals("Ada", page.events().get(0).facts().get(0).value());
     try (CdnResponse response = mock.client.cdn.serve(new Models.CdnRequest("asset-1").lens("card"))) {
       assertEquals(200, response.status());
@@ -121,8 +121,8 @@ class MockClientTest {
         "personDetection", Map.of("status", "evaluated", "stage", "beta", "people", List.of(Map.of("box", box, "confidence", 0.9))),
         "faceDetection", Map.of("status", "not-evaluated", "stage", "beta", "reason", "unavailable")));
     MockCalmLensServerClient mock = new MockCalmLensServerClient()
-        .enqueue(200, withReport(Fixtures.asset("asset-1", "completed", "approved"), report))
-        .enqueue(200, withReport(Fixtures.asset("asset-2", "completed", "approved"), Map.of("features", Map.of(
+        .enqueue(200, withReport(Fixtures.asset("asset-1", "completed", "allowed"), report))
+        .enqueue(200, withReport(Fixtures.asset("asset-2", "completed", "allowed"), Map.of("features", Map.of(
             "faceDetection", Map.of("status", "evaluated", "stage", "beta", "faces",
                 List.of(Map.of("box", box, "confidence", 0.99, "ageRange", Map.of("low", 21, "high", 30))))))));
     Models.ProcessingOptions options = new Models.ProcessingOptions().keepContentAfterProcessing(false)
@@ -155,7 +155,7 @@ class MockClientTest {
 
   @Test void deleteContentThenDeleteAsset() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient()
-        .enqueue(200, removedContent(Fixtures.asset("asset 1", "completed", "approved")))
+        .enqueue(200, removedContent(Fixtures.asset("asset 1", "completed", "allowed")))
         .enqueue(200, Map.of());
     Models.Asset removed = mock.client.assets.deleteContent(new Models.AssetId("asset 1"));
     assertSame(Models.AssetContentStatus.REMOVED, removed.content().status());
@@ -203,7 +203,7 @@ class MockClientTest {
 
   private static Map<String, Object> withReport(Map<String, Object> asset, Map<String, Object> report) {
     Map<String, Object> classification = new java.util.LinkedHashMap<>((Map<String, Object>) asset.get("classification"));
-    classification.put("moderation", Map.of("decision", "approved"));
+    classification.put("moderation", Map.of("status", "allowed"));
     if (report.containsKey("features")) classification.putAll((Map<String, Object>) report.get("features"));
     asset.put("classification", classification);
     return asset;

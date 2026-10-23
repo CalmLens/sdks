@@ -112,7 +112,7 @@ class CalmmarketTest {
 
   static String event(String id, String type, String assetId, String facts) {
     return "{\"id\":\"" + id + "\",\"type\":\"" + type + "\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"t\","
-        + "\"description\":null,\"assetId\":\"" + assetId + "\",\"asset\":{\"id\":\"" + assetId + "\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"approved\",\"action\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":" + facts + "}}";
+        + "\"description\":null,\"assetId\":\"" + assetId + "\",\"asset\":{\"id\":\"" + assetId + "\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":" + facts + "}}";
   }
 
   static String html(Calmmarket.Response response) { return new String(response.body(), StandardCharsets.UTF_8); }
@@ -127,25 +127,21 @@ class CalmmarketTest {
 
   static Map<String, Object> notEvaluated(String reason) { return Map.of("status", "not-evaluated", "reason", reason); }
 
-  /** A test report. {@code flagged} is not part of the report: {@link #asset} turns it into the policy's action. */
-  static Map<String, Object> report(boolean flagged, Map<String, Map<String, Object>> categories) {
-    return Map.of(FLAGGED, flagged, "categories", categories);
+  static Map<String, Object> report(Map<String, Map<String, Object>> categories) {
+    return Map.of("categories", categories);
   }
 
-  private static final String FLAGGED = "test-flagged";
-
   /**
-   * An asset as the API returns it, with its content stored. {@code decision} is {@code pending}
+   * An asset as the API returns it, with its content stored. {@code status} is {@code pending}
    * (still processing), {@code error} (processing failed), or the moderation status after
-   * processing: {@code approved}, {@code rejected} or a value this app does not know. A flagged
-   * report sets the policy action: {@code hide} on a rejection, {@code flag} otherwise.
+   * processing, such as {@code allowed}, {@code blocked} or a value this app does not know.
    */
-  static Map<String, Object> asset(String id, String decision, String externalId, Map<String, Object> report) {
+  static Map<String, Object> asset(String id, String status, String externalId, Map<String, Object> report) {
     Map<String, Object> asset = new LinkedHashMap<>();
     asset.put("id", id);
     if (externalId != null) asset.put("externalId", externalId);
     Map<String, Object> classification = new LinkedHashMap<>();
-    classification.put("status", switch (decision) {
+    classification.put("status", switch (status) {
       case "pending" -> "processing";
       case "error" -> "failed";
       default -> "completed";
@@ -153,15 +149,9 @@ class CalmmarketTest {
     asset.put("upload", Map.of("status", "completed"));
     asset.put("classification", classification);
     Map<String, Object> moderation = new LinkedHashMap<>();
-    moderation.put("decision", decision.equals("pending") || decision.equals("error") ? "pending" : decision);
-    boolean flagged = report != null && Boolean.TRUE.equals(report.get(FLAGGED));
-    moderation.put("action", flagged ? (decision.equals("rejected") ? "hide" : "flag") : null);
+    moderation.put("status", status.equals("pending") || status.equals("error") ? "pending" : status);
     moderation.put("manualReviews", java.util.List.of());
-    if (report != null) {
-      Map<String, Object> body = new LinkedHashMap<>(report);
-      body.remove(FLAGGED);
-      moderation.putAll(body);
-    }
+    if (report != null) moderation.putAll(report);
     classification.put("moderation", moderation);
     asset.put("content", Map.of("status", "stored"));
     return asset;
@@ -172,10 +162,10 @@ class CalmmarketTest {
     return asset("photo-" + number, status, listing.id + ":photo-" + number, report);
   }
 
-  static Map<String, Object> text(String id, String status, boolean flagged) { return asset(id, status, null, report(flagged, Map.of())); }
+  static Map<String, Object> text(String id, String status) { return asset(id, status, null, report(Map.of())); }
 
   static Map<String, Object> removed(String id) {
-    Map<String, Object> asset = asset(id, "approved", null, null);
+    Map<String, Object> asset = asset(id, "allowed", null, null);
     asset.put("content", Map.of("status", "removed", "removalReason", "requested"));
     return asset;
   }
@@ -186,13 +176,13 @@ class CalmmarketTest {
     return gson.fromJson(gson.toJsonTree(json), type);
   }
 
-  static final Map<String, Object> CLEAN = report(false, Map.of("violence", evaluated(0.02), "criminal-activity", evaluated(0.03)));
+  static final Map<String, Object> CLEAN = report(Map.of("violence", evaluated(0.02), "criminal-activity", evaluated(0.03)));
 
-  /** A mock the app treats as the live API: text approved, every photo queued as pending. */
+  /** A mock the app treats as the live API: text allowed, every photo queued as pending. */
   static MockCalmLensServerClient liveSubmission(int photos) {
     MockCalmLensServerClient mock = mock()
-        .enqueue(200, text("title-1", "approved", false))
-        .enqueue(200, text("description-1", "approved", false));
+        .enqueue(200, text("title-1", "allowed"))
+        .enqueue(200, text("description-1", "allowed"));
     for (int i = 1; i <= photos; i++) mock.enqueue(200, asset("photo-" + i, "pending", null, null));
     return mock;
   }
@@ -210,7 +200,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     // A submitted demo override must never affect live moderation.
     Calmmarket.Response response = submit(app, app.csrf, "Oak reading lamp", "Warm light.", "25", List.of(PNG, GIF, PNG),
-        "description-rejected", List.of("text-rejected", "error", "visual-rejected"));
+        "description-blocked", List.of("text-blocked", "error", "visual-blocked"));
     assertEquals(303, response.status());
     assertEquals("/?notice=submitted", response.headers().get("location"));
     Calmmarket.Listing listing = app.listings().get(0);
@@ -244,7 +234,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    Map<String, Object> image = photo(listing, 1, "rejected", report(true, Map.of("criminal-activity", evaluated(0.88))));
+    Map<String, Object> image = photo(listing, 1, "blocked", report(Map.of("criminal-activity", evaluated(0.88))));
     image.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", "Call 555-0100 <now>")));
     mock.enqueue(200, image);
     get(app, "/");
@@ -260,7 +250,7 @@ class CalmmarketTest {
 
   @Test
   void combinedCategoriesPreserveUnavailableResults() {
-    AssetModeration report = model(report(true, Map.of("violence", evaluated(0.91),
+    AssetModeration report = model(report(Map.of("violence", evaluated(0.91),
         "hate", partial(0.4), "self-harm", notEvaluated("not-supported"))), AssetModeration.class);
     Map<String, Calmmarket.CategoryRow> rows = new LinkedHashMap<>();
     for (Calmmarket.CategoryRow row : Calmmarket.explain(report)) rows.put(row.key(), row);
@@ -275,35 +265,38 @@ class CalmmarketTest {
   // ------------------------------------------------------------ listing decision
 
   @Test
-  void aListingWithAnyPhotoNotApprovedStaysHeld() {
+  void aListingWithAnyPhotoNotAllowedStaysHeld() {
     MockCalmLensServerClient mock = liveSubmission(2);
     Calmmarket app = live(mock, "");
     live(app, 2);
     Calmmarket.Listing listing = app.listings().get(0);
     String photoLink = "/listings/" + listing.id + "/photos/1";
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
+    mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, photo(listing, 2, "pending", null));
     assertFalse(html(get(app, "/")).contains("<article class=\"card\">"));
     assertEquals(Calmmarket.State.IN_REVIEW, listing.state());
-    // A status this app does not know is never treated as approval.
+    // A status this app does not know is a decision, but never treated as allowed.
     mock.enqueue(200, photo(listing, 2, "quarantined", null));
     get(app, "/");
     assertEquals("quarantined", listing.photos.get(1).moderation.value());
     assertFalse(listing.photos.get(1).moderation.isKnown());
-    assertFalse(listing.visible());
-    mock.enqueue(200, photo(listing, 2, "error", null));
-    get(app, "/");
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertFalse(html(get(app, "/")).contains("<article class=\"card\">"));
-    // An errored photo is not polled again; a later decision arrives by event. Approve it:
-    listing.photos.get(1).processing = AssetClassificationStatus.COMPLETED;
-    listing.photos.get(1).moderation = AssetModerationStatus.APPROVED;
-    assertTrue(listing.visible());
-    listing.photos.get(1).moderation = AssetModerationStatus.REJECTED;
+    // Failed processing holds the listing too.
+    listing.photos.get(1).processing = AssetClassificationStatus.FAILED;
+    listing.photos.get(1).moderation = AssetModerationStatus.PENDING;
     assertEquals(Calmmarket.State.HELD, listing.state());
-    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-2",
-        "GET /v1/assets/photo-2", "GET /v1/assets/photo-2"), paths(mock, 4));
-    assertTrue(html(get(app, "/")).contains(photoLink + "\""), "the approved photo itself can still be previewed by the seller");
+    // Decided and failed photos are not polled again; a later decision arrives by event. Allow it:
+    listing.photos.get(1).processing = AssetClassificationStatus.COMPLETED;
+    listing.photos.get(1).moderation = AssetModerationStatus.ALLOWED;
+    assertTrue(listing.visible());
+    // This marketplace has no age gate, so every other decided status holds the listing.
+    for (AssetModerationStatus status : List.of(AssetModerationStatus.AGE_RESTRICTED, AssetModerationStatus.BLOCKED, AssetModerationStatus.PURGED)) {
+      listing.photos.get(1).moderation = status;
+      assertEquals(Calmmarket.State.HELD, listing.state(), status.value());
+    }
+    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-2", "GET /v1/assets/photo-2"), paths(mock, 4));
+    assertTrue(html(get(app, "/")).contains(photoLink + "\""), "the allowed photo itself can still be previewed by the seller");
   }
 
   // ------------------------------------------------------------ withdrawing
@@ -314,9 +307,9 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     live(app, 2);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
+    mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
 
-        .enqueue(200, photo(listing, 2, "approved", CLEAN));
+        .enqueue(200, photo(listing, 2, "allowed", CLEAN));
     get(app, "/");
     assertTrue(listing.visible());
     int before = mock.requests().size();
@@ -341,7 +334,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     live(app, 3);
     Calmmarket.Listing listing = app.listings().get(0);
-    for (int i = 1; i <= 3; i++) mock.enqueue(200, photo(listing, i, "approved", CLEAN));
+    for (int i = 1; i <= 3; i++) mock.enqueue(200, photo(listing, i, "allowed", CLEAN));
     get(app, "/");
     int before = mock.requests().size();
     mock.enqueue(200, removed("photo-1")).enqueueTimeout().enqueueError(ErrorCodes.ASSET_SAFETY_HELD);
@@ -360,7 +353,7 @@ class CalmmarketTest {
     MockCalmLensServerClient unconfirmed = liveSubmission(1);
     Calmmarket other = live(unconfirmed, "");
     live(other, 1);
-    unconfirmed.enqueue(200, asset("photo-1", "approved", null, null));
+    unconfirmed.enqueue(200, asset("photo-1", "allowed", null, null));
     post(other, "/listings/" + other.listings().get(0).id + "/withdraw", "csrf=" + other.csrf);
     assertTrue(other.listings().get(0).removalPending());
     assertEquals(List.of("DELETE /v1/assets/photo-1/content"), paths(unconfirmed, 3));
@@ -369,7 +362,7 @@ class CalmmarketTest {
   @Test
   void demoWithdrawalStopsServingThePhoto() {
     Calmmarket app = demoApp("");
-    demo(app, "approved", "clean-text");
+    demo(app, "allowed", "clean-text");
     Calmmarket.Listing listing = app.listings().get(0);
     expire(listing);
     Calmmarket.Response served = get(app, "/listings/" + listing.id + "/photos/1");
@@ -386,14 +379,14 @@ class CalmmarketTest {
 
   @ParameterizedTest
   @CsvSource({
-      "no-text,approved,NO_TEXT,NONE,LIVE",
-      "clean-text,approved,FOUND,NONE,LIVE",
-      "text-rejected,rejected,FOUND,AUTOMATED,HELD",
-      "visual-rejected,rejected,FOUND,AUTOMATED,HELD",
+      "no-text,allowed,NO_TEXT,NONE,LIVE",
+      "clean-text,allowed,FOUND,NONE,LIVE",
+      "text-blocked,blocked,FOUND,AUTOMATED,HELD",
+      "visual-blocked,blocked,FOUND,AUTOMATED,HELD",
       "error,failed,NOT_CHECKED,NONE,HELD"})
   void demoOutcomesAreExplained(String choice, String status, Calmmarket.Ocr ocr, Calmmarket.Driver driver, Calmmarket.State state) {
     Calmmarket app = demoApp("");
-    Calmmarket.Response response = demo(app, "approved", choice);
+    Calmmarket.Response response = demo(app, "allowed", choice);
     assertEquals(303, response.status());
     Calmmarket.Listing listing = app.listings().get(0);
     assertEquals(Calmmarket.State.IN_REVIEW, listing.state());
@@ -408,27 +401,27 @@ class CalmmarketTest {
     assertEquals(driver, photo.driver());
     assertEquals(state, listing.state());
     Calmmarket.Response preview = get(app, "/listings/" + listing.id + "/photos/1");
-    assertEquals(status.equals("approved") ? 200 : 403, preview.status());
+    assertEquals(status.equals("allowed") ? 200 : 403, preview.status());
     if (ocr == Calmmarket.Ocr.FOUND) assertEquals("string", photo.extractedText.type());
   }
 
   @Test
-  void demoListingWithOneRejectedPhotoStaysOffTheMarket() {
+  void demoListingWithOneBlockedPhotoStaysOffTheMarket() {
     Calmmarket app = demoApp("");
-    demo(app, "approved", "no-text", "text-rejected", "clean-text");
+    demo(app, "allowed", "no-text", "text-blocked", "clean-text");
     Calmmarket.Listing listing = app.listings().get(0);
     expire(listing);
     String page = html(get(app, "/"));
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertFalse(page.contains("<article class=\"card\">"));
-    assertEquals(List.of(AssetModerationStatus.APPROVED, AssetModerationStatus.REJECTED, AssetModerationStatus.APPROVED), listing.photos.stream().map(photo -> photo.moderation).toList());
+    assertEquals(List.of(AssetModerationStatus.ALLOWED, AssetModerationStatus.BLOCKED, AssetModerationStatus.ALLOWED), listing.photos.stream().map(photo -> photo.moderation).toList());
   }
 
   @Test
-  void rejectedDescriptionUploadsNoPhoto() {
+  void blockedDescriptionUploadsNoPhoto() {
     Calmmarket app = demoApp("");
-    Calmmarket.Response response = demo(app, "description-rejected", "no-text");
-    assertEquals("/?notice=description-rejected", response.headers().get("location"));
+    Calmmarket.Response response = demo(app, "description-blocked", "no-text");
+    assertEquals("/?notice=description-not-allowed", response.headers().get("location"));
     assertTrue(app.listings().isEmpty());
     assertEquals("held", app.activity().get(0).kind());
   }
@@ -441,16 +434,16 @@ class CalmmarketTest {
   }
 
   @Test
-  void simulatedReviewerRejectionHoldsTheListing() {
+  void simulatedReviewerDecisionHoldsTheListing() {
     Calmmarket app = demoApp("");
-    demo(app, "approved", "no-text");
+    demo(app, "allowed", "no-text");
     Calmmarket.Listing listing = app.listings().get(0);
     expire(listing);
     get(app, "/");
     assertTrue(listing.visible());
     assertEquals(303, post(app, "/demo/review", "csrf=" + app.csrf + "&listing=" + listing.id).status());
     Calmmarket.Photo photo = listing.photos.get(0);
-    assertEquals(AssetModerationStatus.REJECTED, photo.moderation);
+    assertEquals(AssetModerationStatus.BLOCKED, photo.moderation);
     assertEquals(Calmmarket.Driver.REVIEWER, photo.driver());
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertEquals(403, get(app, "/listings/" + listing.id + "/photos/1").status());
@@ -515,7 +508,7 @@ class CalmmarketTest {
     assertEquals(1, app.listings().size());
     assertEquals(before, mock.requests().size());
     Calmmarket demoApp = demoApp("");
-    demo(demoApp, "approved", "no-text");
+    demo(demoApp, "allowed", "no-text");
     Calmmarket.Listing demoListing = demoApp.listings().get(0);
     expire(demoListing);
     get(demoApp, "/");
@@ -548,8 +541,8 @@ class CalmmarketTest {
   // ------------------------------------------------------------ fail closed (a mock stands in for the API)
 
   @ParameterizedTest
-  @ValueSource(strings = {"rejected", "pending", "error", "quarantined"})
-  void titleThatIsNotApprovedStopsTheSubmission(String status) {
+  @ValueSource(strings = {"age-restricted", "blocked", "purged", "pending", "error", "quarantined"})
+  void titleThatIsNotAllowedStopsTheSubmission(String status) {
     MockCalmLensServerClient mock = mock().enqueue(200, asset("title-1", status, null, null));
     Calmmarket app = live(mock, "");
     assertEquals(303, live(app, 2).status());
@@ -569,8 +562,8 @@ class CalmmarketTest {
   @Test
   void aFailedPhotoUploadDeletesThePhotosAlreadyUploaded() {
     MockCalmLensServerClient mock = mock()
-        .enqueue(200, text("title-1", "approved", false))
-        .enqueue(200, text("description-1", "approved", false))
+        .enqueue(200, text("title-1", "allowed"))
+        .enqueue(200, text("description-1", "allowed"))
         .enqueue(200, asset("photo-1", "pending", null, null))
         .enqueueFailure(new java.net.ConnectException("refused"))
         .enqueue(200, Map.of());
@@ -586,7 +579,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
+    mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, Map.of("lenses", List.of(Map.of(
             "identifier", Calmmarket.CARD_LENS, "name", "Calmmarket listing card", "type", "image", "active", true, "version", 1))))
         .enqueue(200, Map.of("url", "https://cdn.calmlens.com/signed/photo-1", "expiresAt", 1760000060000L));
@@ -606,19 +599,19 @@ class CalmmarketTest {
     assertEquals("content", body.get("resource").getAsString());
 
     // The lens is ensured once; an unsafe signed URL is refused.
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN))
+    mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, Map.of("url", "http://cdn.example.com/photo-1", "expiresAt", 1760000060000L));
     assertEquals(502, get(app, "/listings/" + listing.id + "/photos/1").status());
     assertEquals(List.of("GET /v1/assets/photo-1", "POST /v1/assets/photo-1/signed-url"), paths(mock, 6));
   }
 
   @Test
-  void failedRefreshBlocksAPreviouslyApprovedPhoto() {
+  void failedRefreshBlocksAPreviouslyAllowedPhoto() {
     MockCalmLensServerClient mock = liveSubmission(1);
     Calmmarket app = live(mock, "");
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN));
+    mock.enqueue(200, photo(listing, 1, "allowed", CLEAN));
     get(app, "/");
     assertTrue(listing.visible());
     mock.enqueueTimeout();
@@ -640,7 +633,7 @@ class CalmmarketTest {
     CalmLensServerClient slow = CalmLensServerClient.builder("key", "project-1").maxRetries(0).transport(request -> {
       entered.countDown();
       if (!release.await(10, TimeUnit.SECONDS)) throw new java.io.IOException("not released");
-      return new Transport.Response(200, Map.of(), new Gson().toJson(photo(created[0], 1, "approved", CLEAN)).getBytes(StandardCharsets.UTF_8));
+      return new Transport.Response(200, Map.of(), new Gson().toJson(photo(created[0], 1, "allowed", CLEAN)).getBytes(StandardCharsets.UTF_8));
     }).build();
     Calmmarket.Backend delegate = Calmmarket.live(mock.client);
     Calmmarket app = new Calmmarket(new Calmmarket.Backend() {
@@ -648,7 +641,7 @@ class CalmmarketTest {
       public CalmLensServerClient textModeration(String choice) { return delegate.textModeration(choice); }
       public CalmLensServerClient photoUploads(int photos) { return delegate.photoUploads(photos); }
       public CalmLensServerClient photo(Calmmarket.Photo photo) { return slow; }
-      public CalmLensServerClient textAsset(String assetId, String externalId, boolean flagged) { return delegate.textAsset(assetId, externalId, flagged); }
+      public CalmLensServerClient textAsset(String assetId, String externalId) { return delegate.textAsset(assetId, externalId); }
       public CalmLensServerClient contentRemoval(String assetId) { return delegate.contentRemoval(assetId); }
       public CalmLensServerClient preview(Calmmarket.Photo photo) { return delegate.preview(photo); }
       public CalmLensServerClient events() { return delegate.events(); }
@@ -685,18 +678,18 @@ class CalmmarketTest {
     assertEquals("/?notice=watching", post(app, "/reviews/sync", "csrf=" + app.csrf).headers().get("location"));
     assertNull(mock.requests().get(3).query().get("after"));
 
-    Map<String, Object> rejection = Map.of("id", "event-1", "type", "asset.rejected", "assetId", "description-1",
+    Map<String, Object> blocking = Map.of("id", "event-1", "type", "asset.blocked", "assetId", "description-1",
         "facts", List.of(Map.of("key", "reviewer-user-id", "value", "user-9"), Map.of("key", "reviewer-name", "value", "Sam"),
             Map.of("key", "note", "value", "Counterfeit", "url", "javascript:alert(1)")));
-    Map<String, Object> other = Map.of("id", "event-0", "type", "asset.rejected", "assetId", "someone-else", "facts", List.of());
+    Map<String, Object> other = Map.of("id", "event-0", "type", "asset.blocked", "assetId", "someone-else", "facts", List.of());
     // First attempt: retrieval fails, so the cursor must not advance.
-    mock.enqueueEvents("cursor-1", false, other, rejection).enqueueTimeout();
+    mock.enqueueEvents("cursor-1", false, other, blocking).enqueueTimeout();
     assertEquals(502, post(app, "/reviews/sync", "csrf=" + app.csrf).status());
     assertFalse(listing.removed);
     // Retry: the same page is requested again from the old cursor and applied.
-    mock.enqueueEvents("cursor-1", true, other, rejection)
-        .enqueue(200, asset("description-1", "rejected", listing.id + ":description", report(true, Map.of())))
-        .enqueueEvents("cursor-2", false, rejection);
+    mock.enqueueEvents("cursor-1", true, other, blocking)
+        .enqueue(200, asset("description-1", "blocked", listing.id + ":description", report(Map.of())))
+        .enqueueEvents("cursor-2", false, blocking);
     assertEquals("/?notice=decisions-applied", post(app, "/reviews/sync", "csrf=" + app.csrf).headers().get("location"));
     List<MockCalmLensServerClient.Request> sent = mock.requests();
     assertEquals("cursor-0", sent.get(4).query().get("after"));
@@ -716,8 +709,8 @@ class CalmmarketTest {
     Calmmarket app = live(mock, SECRET);
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, asset("description-1", "rejected", "someone-else:description", report(true, Map.of())));
-    assertEquals(204, signedWebhook(app, event("event-1", "asset.rejected", "description-1", "[]")).status());
+    mock.enqueue(200, asset("description-1", "blocked", "someone-else:description", report(Map.of())));
+    assertEquals(204, signedWebhook(app, event("event-1", "asset.blocked", "description-1", "[]")).status());
     assertFalse(listing.removed);
     assertEquals(Calmmarket.State.IN_REVIEW, listing.state());
   }
@@ -728,13 +721,13 @@ class CalmmarketTest {
     Calmmarket app = live(mock, SECRET);
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    mock.enqueue(200, photo(listing, 1, "approved", CLEAN));
+    mock.enqueue(200, photo(listing, 1, "allowed", CLEAN));
     get(app, "/");
     assertTrue(listing.visible());
     // A new image decision includes the extra text moderation pass.
-    Map<String, Object> merged = report(true, Map.of("criminal-activity", evaluated(0.7)));
-    mock.enqueue(200, photo(listing, 1, "rejected", merged));
-    assertEquals(204, signedWebhook(app, event("event-1", "asset.rejected", "photo-1", "[]")).status());
+    Map<String, Object> merged = report(Map.of("criminal-activity", evaluated(0.7)));
+    mock.enqueue(200, photo(listing, 1, "blocked", merged));
+    assertEquals(204, signedWebhook(app, event("event-1", "asset.blocked", "photo-1", "[]")).status());
     assertEquals(List.of("GET /v1/assets/photo-1"), paths(mock, 4));
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertEquals(Calmmarket.Driver.AUTOMATED, listing.photos.get(0).driver());
@@ -743,7 +736,7 @@ class CalmmarketTest {
   @Test
   void webhooksNeedASecret() {
     Calmmarket app = demoApp("");
-    assertEquals(503, signedWebhook(app, event("event-1", "asset.rejected", "photo-1", "[]")).status());
+    assertEquals(503, signedWebhook(app, event("event-1", "asset.blocked", "photo-1", "[]")).status());
   }
 
   @Test
@@ -752,7 +745,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, SECRET);
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    byte[] body = event("event-1", "asset.rejected", "photo-1", "[]").getBytes(StandardCharsets.UTF_8);
+    byte[] body = event("event-1", "asset.blocked", "photo-1", "[]").getBytes(StandardCharsets.UTF_8);
     String now = Long.toString(System.currentTimeMillis() / 1000);
     String signature = CalmLensServerClient.createWebhookSignatureHeader(SECRET, now, body);
     assertEquals(401, webhook(app, body, null, now).status());
@@ -774,17 +767,17 @@ class CalmmarketTest {
     Calmmarket app = live(mock, SECRET);
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
-    // The event snapshot says approved, but the API says rejected: the API wins.
-    String body = event("event-1", "asset.rejected", "photo-1", "[{\"key\":\"decided-by\",\"value\":\"automated\"}]");
+    // The event snapshot says allowed, but the API says blocked: the API wins.
+    String body = event("event-1", "asset.blocked", "photo-1", "[{\"key\":\"decided-by\",\"value\":\"automated\"}]");
     mock.enqueueTimeout();
     assertEquals(502, signedWebhook(app, body).status(), "a failed refresh asks CalmLens to retry");
-    mock.enqueue(200, photo(listing, 1, "rejected", report(true, Map.of("violence", evaluated(0.9)))));
+    mock.enqueue(200, photo(listing, 1, "blocked", report(Map.of("violence", evaluated(0.9)))));
     assertEquals(204, signedWebhook(app, body).status());
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertEquals(204, signedWebhook(app, body).status());
     assertEquals(5, mock.requests().size(), "a replayed event is not applied again");
-    assertEquals(204, signedWebhook(app, event("event-2", "asset.approved", "unknown-asset", "[]")).status());
-    assertEquals(204, signedWebhook(app, event("event-3", "asset.approved", "photo-1", "[{\"key\":\"test\",\"value\":true}]")).status());
+    assertEquals(204, signedWebhook(app, event("event-2", "asset.allowed", "unknown-asset", "[]")).status());
+    assertEquals(204, signedWebhook(app, event("event-3", "asset.allowed", "photo-1", "[{\"key\":\"test\",\"value\":true}]")).status());
     assertEquals(5, mock.requests().size());
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertEquals("test", app.activity().get(0).kind());
@@ -793,10 +786,10 @@ class CalmmarketTest {
   @Test
   void demoWebhookAppliesThePhotoDecision() {
     Calmmarket app = demoApp(SECRET);
-    demo(app, "approved", "visual-rejected");
+    demo(app, "allowed", "visual-blocked");
     Calmmarket.Listing listing = app.listings().get(0);
     expire(listing);
-    assertEquals(204, signedWebhook(app, event("event-1", "asset.rejected", listing.photos.get(0).assetId, "[{\"key\":\"decided-by\",\"value\":\"automated\"}]")).status());
+    assertEquals(204, signedWebhook(app, event("event-1", "asset.blocked", listing.photos.get(0).assetId, "[{\"key\":\"decided-by\",\"value\":\"automated\"}]")).status());
     assertEquals(Calmmarket.Driver.AUTOMATED, listing.photos.get(0).driver());
   }
 

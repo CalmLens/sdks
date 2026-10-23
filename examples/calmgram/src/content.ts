@@ -14,7 +14,7 @@ import { describeFindings, type ModerationOutcome } from "./moderation/types";
 import { rememberAsset, sandboxForAsset, saveSandbox } from "./sandbox";
 
 // All of Calmgram's moderation logic lives here. The pattern:
-//   text (captions, comments, bios) → classify synchronously, refuse to save if rejected
+//   text (captions, comments, bios) → classify synchronously, refuse to save unless allowed
 //   images                         → upload, mark pending, resolve via webhook or polling
 // With an upload preset, the browser uploads the photo straight to CalmLens with a token this
 // server signed, then submits the asset ID. Without JavaScript (or a preset), it posts the photo
@@ -78,7 +78,7 @@ export const loadFeed = async (env: Env, sandbox: Sandbox | null) => {
   return { posts, comments, likesFor, bioFor };
 };
 
-/** Checks a caption before anything is saved; throws `ModerationRejection` if it's rejected. */
+/** Checks a caption before anything is saved; throws `ModerationRejection` unless it's allowed. */
 const checkCaption = async (env: Env, sandbox: Sandbox, postId: string, caption: string) => {
   if (!caption.trim()) return;
   const outcome = await getModeration(env).moderateText({
@@ -87,12 +87,12 @@ const checkCaption = async (env: Env, sandbox: Sandbox, postId: string, caption:
     externalId: `caption-${postId}`,
     username: sandbox.username,
   });
-  if (outcome.status !== "approved") {
+  if (outcome.status !== "allowed") {
     throw new ModerationRejection("post", describeFindings(outcome.findings));
   }
 };
 
-/** Saves a post whose photo CalmLens is checking. It stays visible only to its author until approved. */
+/** Saves a post whose photo CalmLens is checking. It stays visible only to its author until allowed. */
 const savePost = async (
   env: Env,
   sandbox: Sandbox,
@@ -107,7 +107,6 @@ const savePost = async (
     createdAt: Date.now(),
     assetId: image.assetId,
     status: image.status,
-    flagged: image.flagged,
     findings: image.findings,
     checkedAt: Date.now(),
   };
@@ -126,7 +125,7 @@ export const createPost = async (
   await spend(env, input.caption.trim() ? 2 : 1);
   // 1. Check the caption first — it's fast, and if it fails we skip the image upload.
   await checkCaption(env, sandbox, id, input.caption);
-  // 2. Queue the image. It stays "pending" (visible only to its author) until approved.
+  // 2. Queue the image. It stays "pending" (visible only to its author) until allowed.
   const image = await getModeration(env).submitImage({
     file: input.image,
     externalId: `post-${id}`,
@@ -177,7 +176,7 @@ export const isUploadFor = (
 /**
  * Step 2 of a browser upload: the browser sends the asset ID with the caption. Its word is only
  * a pointer: the asset is fetched from CalmLens and must match the token we signed, and the post
- * is published only when CalmLens approves it (webhook or polling), like any other.
+ * is published only when CalmLens allows it (webhook or polling), like any other.
  */
 export const attachUpload = async (
   env: Env,
@@ -232,8 +231,8 @@ export const refreshPending = async (env: Env, sandbox: Sandbox | null, posts: P
 };
 
 /**
- * Called from the webhook handler with an asset ID from a decision event such as `asset.approved`
- * or `asset.rejected`, and with the `outcome` once a waiting browser's post is decided.
+ * Called from the webhook handler with an asset ID from a decision event such as `asset.allowed`
+ * or `asset.blocked`, and with the `outcome` once a waiting browser's post is decided.
  */
 export const syncAsset = async (env: Env, assetId: string, outcome?: ModerationOutcome) => {
   const sandbox = await sandboxForAsset(env, assetId);
@@ -268,14 +267,13 @@ export const addComment = async (
     createdAt: Date.now(),
     assetId: outcome.assetId,
     status: outcome.status,
-    flagged: outcome.flagged,
     findings: outcome.findings,
     checkedAt: Date.now(),
   };
-  // Rejected comments are stored too (but never shown) so moderators can see them.
+  // Comments that aren't allowed are stored too (but never shown) so moderators can see them.
   sandbox.comments.push(comment);
   await saveSandbox(env, sandbox);
-  if (outcome.status !== "approved") {
+  if (outcome.status !== "allowed") {
     throw new ModerationRejection("comment", describeFindings(outcome.findings));
   }
   return comment;
@@ -290,7 +288,7 @@ export const updateBio = async (env: Env, sandbox: Sandbox, bio: string) => {
       externalId: `bio-${sandbox.id}-${Date.now()}`,
       username: sandbox.username,
     });
-    if (outcome.status !== "approved") {
+    if (outcome.status !== "allowed") {
       throw new ModerationRejection("bio", describeFindings(outcome.findings), "saved");
     }
   }
@@ -323,12 +321,55 @@ export const toggleLike = async (env: Env, sandbox: Sandbox, postId: string) => 
   await saveSandbox(env, sandbox);
 };
 
-/** Approved posts for everyone; the viewer also sees their own pending/rejected posts. */
-export const isVisibleTo = (post: Post, viewer: string | null) =>
-  post.status === "approved" || post.author === viewer;
+/** Who is looking at a page, or null when signed out (no sandbox, such as a crawler). */
+export interface Viewer {
+  username: string;
+  /** The "Show sensitive media" setting: the app's stand-in for a real age check. */
+  showSensitiveMedia: boolean;
+}
 
-export const imageUrlFor = (env: Env, post: Post, variant: "feed" | "thumb") =>
-  // Never build a CDN URL for anything that isn't approved.
-  post.status === "approved" && !post.exampleId
-    ? getModeration(env).imageUrl(post.assetId, variant)
-    : null;
+export const viewerOf = (sandbox: Sandbox | null): Viewer | null =>
+  sandbox ? { username: sandbox.username, showSensitiveMedia: !!sandbox.showSensitiveMedia } : null;
+
+/** Published posts: shown to everyone, age-restricted ones behind a placeholder. */
+export const isPublished = (post: Post) =>
+  post.status === "allowed" || post.status === "age-restricted";
+
+/** Published posts for everyone; the viewer also sees their own posts that aren't published. */
+export const isVisibleTo = (post: Post, viewer: string | null) =>
+  isPublished(post) || post.author === viewer;
+
+/** What a post's photo slot shows: the photo, or a blurred placeholder in its place. */
+export interface PostMedia {
+  /** The photo's URL, or null when it isn't shown to this viewer. */
+  url: string | null;
+  /** For age-restricted photos this viewer may not see: the blurred placeholder's URL. */
+  placeholderUrl: string | null;
+}
+
+/**
+ * Never builds a content URL for anything that isn't published. Age-restricted photos get the
+ * `ageRestricted=true` opt-in only for viewers who turned on "Show sensitive media" (authors
+ * included); signed-out viewers and everyone else get the placeholder.
+ */
+export const postMediaFor = (
+  env: Env,
+  post: Post,
+  variant: "feed" | "thumb",
+  viewer: Viewer | null,
+): PostMedia => {
+  if (post.exampleId) return { url: null, placeholderUrl: null };
+  const moderation = getModeration(env);
+  if (post.status === "allowed") {
+    return { url: moderation.imageUrl(post.assetId, variant), placeholderUrl: null };
+  }
+  if (post.status === "age-restricted") {
+    return viewer?.showSensitiveMedia
+      ? {
+          url: moderation.imageUrl(post.assetId, variant, { ageRestricted: true }),
+          placeholderUrl: null,
+        }
+      : { url: null, placeholderUrl: moderation.placeholderUrl(post.assetId) };
+  }
+  return { url: null, placeholderUrl: null };
+};

@@ -19,8 +19,8 @@ from calmlens import CalmLensServerClient
 client = CalmLensServerClient()
 
 asset = client.text.classify(text="Great photo!", external_id="comment-42")
-if asset["classification"]["moderation"]["decision"] == "approved":
-    print("Approved; policy action:", asset["classification"]["moderation"]["action"])
+if asset["classification"]["moderation"]["status"] == "allowed":
+    print("Allowed: safe to show")
 
 with open("photo.jpg", "rb") as file:  # streamed, not read into memory
     queued = client.assets.create(name="photo.jpg", content={"data": file, "type": "image/jpeg"})
@@ -30,8 +30,8 @@ Every method takes snake_case keyword arguments, or one options dict with the AP
 keys (`client.assets.retrieve({"assetId": "..."})`); nested dicts accept either spelling.
 Responses are plain dicts with the API's camelCase field names, typed as `TypedDict`s in
 `calmlens.types`. Unknown fields from newer API versions stay in the dict, and enum-like
-values (`classification.moderation.decision`, `classification.status`, `type`, `visibility`, ...) are plain strings, so
-values this SDK version doesn't list never fail: treat an unknown status as "not approved".
+values (`classification.moderation.status`, `classification.status`, `type`, `visibility`, ...) are plain strings, so
+values this SDK version doesn't list never fail: treat an unknown status as "not allowed".
 
 ## Configuration
 
@@ -146,15 +146,15 @@ rewound for a retry when it is seekable; uploads from non-seekable streams are n
 
 ```python
 page = client.assets.list(page_size=20, ordering=[{"field": "createdAt", "direction": "DESC"}])
-for asset in client.assets.iter(filter="classification.moderation.decision==approved"):  # requests pages lazily
+for asset in client.assets.iter(filter="classification.moderation.status==allowed"):  # requests pages lazily
     print(asset["id"])
 children = client.assets.list_children(asset_id=queued["id"])
 client.assets.update(asset_id=queued["id"], description=None, tags=["reviewed"])
 folder = client.folders.create(name="Photos")
 client.assets.move(asset_id=queued["id"], folder_id=folder["id"])
 client.assets.move(asset_id=queued["id"], folder_id=None)  # project root
-# Retrieve the asset until it is approved or rejected, or processing failed (sdk/timeout after 60
-# seconds by default):
+# Retrieve the asset until its moderation status is no longer pending, or processing failed
+# (sdk/timeout after 60 seconds by default):
 decided = client.assets.wait_for_decision(asset_id=queued["id"], timeout=30)
 # For an asset whose processing failed and whose content is still held:
 # client.assets.retry(asset_id=failed_asset_id)
@@ -185,17 +185,18 @@ decisions without polling.
 
 `assets.classify`, `text.classify`, `assets.create` and the other asset methods return
 the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
-**camelCase** keys, e.g. `asset["externalId"]`, `asset["classification"]["moderation"]["decision"]`. `id`,
+**camelCase** keys, e.g. `asset["externalId"]`, `asset["classification"]["moderation"]["status"]`. `id`,
 `projectId`, `name`, `type`, `createdAt` and three nested objects are always present:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-  `failed`), `updatedAt` and `uploadPartsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `decision` (`pending`, `approved` or `rejected`), `action`, category scores, policy assessment, an optional `timeline` and reviewer details. A reviewer decision does not change `completedAt`.
-  precedence over the automated one), `action` (what your policy did with flagged content:
-  `flag`, `hide` or `purge`, or `None` when nothing was flagged), `note` (why automated
-  moderation rejected the asset), `manualReviews`, `completedAt` and `report`. `report` (the classification: `score`,
-  `categories`, `processedAt`, ...) is `None` until classification finishes. Inside it,
-  `categories` maps category names to `{status, score, likelihood, reason}`; a
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and `manualReviews` (each with a reviewer's `decision`: `allowed`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
+  `status` is `pending` until moderation decides, then:
+  - `allowed`: show the content.
+  - `age-restricted`: delivered only through signed URLs or API keys; show it only behind your own age gate.
+  - `blocked`: not delivered, content kept; don't show it.
+  - `purged`: not delivered and stored content deleted; don't show it.
+
+  `categories` maps category names to `{status, score, likelihood, ...}`; a
   `not-evaluated` category has no score.
 - `content`: `status` (`temporary` while CalmLens holds the content only until processing
   finishes, `stored` when `keepContentAfterProcessing` is on, or `removed`), `removalReason`
@@ -286,6 +287,14 @@ Structured options are sorted and percent-encoded, so both calls return the same
 `content_type`, `request_id`, `read()`, `iter_bytes()`, `close()`) even for non-2xx responses;
 check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
 
+A public asset whose moderation status is `age-restricted` is served from its public URL only
+with `age_restricted=True` (`?ageRestricted=true`); otherwise it needs a signed URL or an API
+key. Set it only where your app has already decided the viewer may see age-restricted content:
+
+```python
+client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", age_restricted=True)
+```
+
 ## Webhooks
 
 Verify the **exact raw request body** before parsing it. Parsed JSON can't be verified: a
@@ -363,20 +372,21 @@ secret)` or `create_webhook_headers(payload, delivery_id, secret, *, timestamp=N
 
 ```python
 from calmlens import create_webhook_headers, verify_webhook_signature
-body = b'{"id":"evt_1","type":"asset.approved"}'
+body = b'{"id":"evt_1","type":"asset.allowed"}'
 headers = create_webhook_headers(body, "delivery-1", webhook_secret)
 assert verify_webhook_signature(body, headers=headers, secret=webhook_secret)
 ```
 
-For moderation decisions, check `asset.classification.moderation.decision` and `asset.classification.moderation.action` (set when
-content was flagged); a `not-evaluated`
-category has no safe zero score and must not be treated as approved coverage.
+Moderation decisions arrive as `asset.allowed`, `asset.age-restricted`, `asset.blocked` and
+`asset.purged` events (`asset.classified` reports each finished classification); the event's
+`asset.classification.moderation.status` holds the status. A `not-evaluated` category has no
+safe zero score and must not be treated as allowed coverage.
 
 ## Events feed
 
 `events.list` polls the project's event feed, the same events webhooks deliver. It
 returns an `EventsPage` dict: `{"events": [...], "cursor": str, "hasMore": bool}`. Each
-event has `id`, `type` (e.g. `asset.approved`), `createdAt`, `severity`, `title`,
+event has `id`, `type` (e.g. `asset.allowed`), `createdAt`, `severity`, `title`,
 `description`, `assetId`, `asset` and `facts` (a list of `{key, value, url?}`).
 
 - Calling it **without `after`** returns **no events** and a cursor for *now*. Save that
@@ -416,7 +426,7 @@ client = MockCalmLensServerClient(
     api_key=create_mock_api_key(), project_id="project", timeout=5,
     mock_options={"now": lambda: 123, "create_id": lambda: "asset-1"},
 )
-assert client.text.classify(text="Hello", external_id="c-1")["classification"]["moderation"]["decision"] == "approved"
+assert client.text.classify(text="Hello", external_id="c-1")["classification"]["moderation"]["status"] == "allowed"
 assert client.database_storage.assets["asset-1"]["createdAt"] == 123
 
 request = client.requests[-1]            # MockRequest(method, url, path, query, body, headers)
@@ -435,7 +445,7 @@ try:
 except CalmLensAPIError as error:
     assert (error.status, error.retry_after) == (429, 5.0) and error.request_id
 
-client.enqueue_event("asset.approved", asset_id="asset-1",
+client.enqueue_event("asset.allowed", asset_id="asset-1",
                      facts=[{"key": "decided-by", "value": "automated"}])
 ```
 
@@ -448,9 +458,12 @@ the same way; `max_retries` defaults to 0 so enqueued failures surface), plus `m
 and `signed_url_base_url`. Unknown mock options raise.
 
 - `queued_outcome` (default `pending`) applies to `assets.create` and queued multipart uploads;
-  `analyzed_outcome` (default `approved`) to `assets.classify` and `text.classify`. An outcome
-  is `pending` (processing `processing`, moderation `pending`), `approved` or `rejected`
-  (processing `completed` with that decision) or `failed` (processing `failed`, retryable).
+  `analyzed_outcome` (default `allowed`) to `assets.classify` and `text.classify`. An outcome
+  is `pending` (processing `processing`, moderation `pending`), `allowed`, `age-restricted`,
+  `blocked` or `purged` (processing `completed` with that moderation status; `purged` also
+  removes the content with `removalReason` `policy`) or `failed` (processing `failed`, retryable).
+  `cdn.serve` treats an `age-restricted` asset like a private one: it needs the
+  `assets:download` permission, unless a public one is requested with `age_restricted=True`.
 - Like the API, content is `stored` when `processingOptions.keepContentAfterProcessing` is
   `True`; otherwise it is `temporary` and is removed (`removalReason` `retention`) once
   classification is `completed`, after which `cdn.serve` answers 404. Pass
@@ -472,14 +485,14 @@ and `signed_url_base_url`. Unknown mock options raise.
 - `assets.wait_for_decision` reads the mock's `database_storage` and takes no real time: it
   returns an asset that is already decided (or whose processing failed) and raises
   `sdk/timeout` at once for one whose moderation stays `pending`. Set the stored asset's
-  `classification.moderation.decision` or `classification.status` to simulate a decision or failure.
+  `classification.moderation.status` or `classification.status` to simulate a decision or failure.
 - Idempotency keys are honoured: a repeated key replays the saved response, and a key reused
   for a different request raises `idempotency/key-reused`.
 
 The mock supports the same resource methods, folder constraints, lens version checks,
 multipart uploads (saved queue mode, declared sizes, part order), stored content, content
 and asset deletion, retries of failed assets, keyword search, list filters on top-level and nested
-fields such as `classification.moderation.decision`, `classification.status` and `content.format` (a subset of RSQL: `==` with `*`, `!=`,
+fields such as `classification.moderation.status`, `classification.status` and `content.format` (a subset of RSQL: `==` with `*`, `!=`,
 `=in=`, `=out=`, `=gt=`/`=ge=`/`=lt=`/`=le=`, `;` and `,`; other syntax raises
 `NotImplementedError`) and ordering (newest first by default), and CDN download grants with
 realistic response headers. It does not classify content, transform media or fetch external

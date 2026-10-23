@@ -54,9 +54,8 @@ fn asset_nested_fields_decode_into_typed_models() {
         "status": "completed",
         "updatedAt": 5,
         "moderation": {
-          "action": "hide",
-          "manualReviews": [{"id": "review-1", "decision": "rejected", "action": "hide", "note": "confirmed", "reviewerUserId": "user-9", "reviewedAt": 7, "appliedToAsset": true}],
-          "decision": "rejected",
+          "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "confirmed", "reviewerUserId": "user-9", "reviewedAt": 7, "appliedToAsset": true}],
+          "status": "age-restricted",
           "categories": {
             "sexual": {
               "status": "evaluated",
@@ -122,11 +121,9 @@ fn asset_nested_fields_decode_into_typed_models() {
         (&AssetClassificationStatus::Completed, Some(5), Some(3))
     );
     let moderation = &asset.classification.moderation;
-    assert_eq!(moderation.manual_reviews[0].action, "hide");
     assert_eq!(
         (
-            &moderation.decision,
-            &moderation.action,
+            &moderation.status,
             &moderation.manual_reviews[0].decision,
             moderation.manual_reviews[0].note.as_deref(),
             moderation.manual_reviews[0].reviewer_user_id.as_deref(),
@@ -134,9 +131,8 @@ fn asset_nested_fields_decode_into_typed_models() {
             asset.classification.completed_at
         ),
         (
-            &AssetModerationStatus::Rejected,
-            &Some(AssetModerationAction::Hide),
-            &AssetReviewerAction::Rejected,
+            &AssetModerationStatus::AgeRestricted,
+            &AssetModerationDecision::AgeRestricted,
             Some("confirmed"),
             Some("user-9"),
             Some(7),
@@ -249,9 +245,8 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
       "classification": {
         "status": "paused",
         "moderation": {
-          "action": "quarantine",
-          "manualReviews": [{"id": "review-1", "decision": "deferred", "action": "hide", "note": null, "reviewerUserId": null, "reviewedAt": 7, "appliedToAsset": true}],
-          "decision": "escalated",
+          "manualReviews": [{"id": "review-1", "decision": "deferred", "note": null, "reviewerUserId": null, "reviewedAt": 7, "appliedToAsset": true}],
+          "status": "escalated",
           "categories": {
             "spam": {
               "status": "skipped",
@@ -281,8 +276,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     assert_eq!(
         (
             &asset.classification.status,
-            &asset.classification.moderation.decision,
-            &asset.classification.moderation.action,
+            &asset.classification.moderation.status,
             &asset.classification.moderation.manual_reviews[0].decision,
             &asset.content.status,
             &asset.content.removal_reason
@@ -290,13 +284,13 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         (
             &AssetClassificationStatus::Unknown("paused".into()),
             &AssetModerationStatus::Unknown("escalated".into()),
-            &Some(AssetModerationAction::Unknown("quarantine".into())),
-            &AssetReviewerAction::Unknown("deferred".into()),
+            &AssetModerationDecision::Unknown("deferred".into()),
             &AssetContentStatus::Unknown("archived".into()),
             &Some(AssetContentRemovalReason::Unknown("expired".into()))
         )
     );
-    assert!(!asset.is_decided());
+    // Any status other than `pending` is a decision, even one this SDK version does not know.
+    assert!(asset.is_decided());
     let spam = &&asset.classification.moderation.categories
         [&ClassificationCategory::Unknown("spam".into())];
     assert_eq!(
@@ -311,8 +305,8 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     let reencoded = serde_json::to_value(&asset).unwrap();
     assert_eq!(reencoded["type"], "hologram");
     assert_eq!(
-        reencoded["classification"]["moderation"]["action"],
-        "quarantine"
+        reencoded["classification"]["moderation"]["status"],
+        "escalated"
     );
     assert_eq!(reencoded["content"]["removalReason"], "expired");
     assert_eq!(
@@ -324,12 +318,12 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
 #[test]
 fn flagged_content_policy_encodes_as_an_object() {
     let options = ProcessingOptions {
-        flagged_content_policy: Some(FlaggedContentPolicy::new(FlaggedContentAction::Flag)),
+        flagged_content_policy: Some(FlaggedContentPolicy::new(FlaggedContentAction::AgeRestrict)),
         ..Default::default()
     };
     assert_eq!(
         serde_json::to_value(options).unwrap(),
-        json!({ "flaggedContentPolicy": { "action": "flag" } })
+        json!({ "flaggedContentPolicy": { "action": "age-restrict" } })
     );
 }
 
@@ -339,7 +333,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
       "events": [
         {
           "id": "e1",
-          "type": "asset.flagged",
+          "type": "asset.blocked",
           "severity": "high",
           "title": "t",
           "asset": {
@@ -354,8 +348,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
             "classification": {
               "status": "completed",
               "moderation": {
-                "action": "hide",
-                "decision": "rejected"
+                "status": "blocked"
               }
             }
           },
@@ -380,25 +373,23 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
       "hasMore": false
     }))
     .unwrap();
-    let flagged = &page.events[0];
-    assert_eq!(flagged.event_type, Some(EventType::AssetFlagged));
-    assert_eq!(flagged.severity, Some(EventSeverity::High));
-    let asset = flagged.asset.as_ref().unwrap();
+    let blocked = &page.events[0];
+    assert_eq!(blocked.event_type, Some(EventType::AssetBlocked));
+    assert_eq!(blocked.severity, Some(EventSeverity::High));
+    let asset = blocked.asset.as_ref().unwrap();
     assert_eq!(
         (
             asset.id.as_str(),
             asset.external_id.as_deref(),
             &asset.classification.status,
-            &asset.classification.moderation.decision,
-            &asset.classification.moderation.action,
+            &asset.classification.moderation.status,
             &asset.content.status
         ),
         (
             "a1",
             Some("x1"),
             &AssetClassificationStatus::Completed,
-            &AssetModerationStatus::Rejected,
-            &Some(AssetModerationAction::Hide),
+            &AssetModerationStatus::Blocked,
             &AssetContentStatus::Removed
         )
     );
@@ -412,8 +403,8 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
         Some(EventSeverity::Unknown("critical".into()))
     );
 
-    let payload = WebhookEventPayload::from_event(flagged);
-    assert_eq!(payload.event_type, EventType::AssetFlagged);
+    let payload = WebhookEventPayload::from_event(blocked);
+    assert_eq!(payload.event_type, EventType::AssetBlocked);
     assert_eq!(payload.data.asset.as_ref(), Some(asset));
 }
 
@@ -577,7 +568,7 @@ fn newer_event_types_decode_to_their_own_variants() {
 
 #[test]
 fn report_policy_snapshot_decodes_into_typed_models() {
-    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
+    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
     let category = &policy.categories[&ClassificationCategory::Violence];
     let settings = category.settings.as_ref().unwrap();
     assert_eq!(settings.threshold, 0.6);

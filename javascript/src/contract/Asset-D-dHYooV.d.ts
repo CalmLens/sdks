@@ -1,3 +1,4 @@
+import "./AssetModerationDecision-eSI6kK4O.js";
 import * as zod from "zod";
 //#region packages/shared/src/Asset.d.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
@@ -8,26 +9,18 @@ declare const ASSET_CLASSIFICATION_STATUS_SCHEMA: zod.ZodEnum<{
   processing: "processing";
 }>;
 type AssetClassificationStatus = zod.infer<typeof ASSET_CLASSIFICATION_STATUS_SCHEMA>;
-/** The moderation outcome in force: a reviewer's decision when there is one, else the automated one. */
+/**
+ * The moderation decision in force, which also decides delivery: `pending` until classification
+ * decides, then a reviewer's decision when there is one, else the policy's.
+ */
 declare const ASSET_MODERATION_STATUS_SCHEMA: zod.ZodEnum<{
-  approved: "approved";
+  "age-restricted": "age-restricted";
+  allowed: "allowed";
+  blocked: "blocked";
   pending: "pending";
-  rejected: "rejected";
+  purged: "purged";
 }>;
 type AssetModerationStatus = zod.infer<typeof ASSET_MODERATION_STATUS_SCHEMA>;
-/** What the policy did with flagged content. `null` when the policy matched nothing. */
-declare const ASSET_MODERATION_ACTION_SCHEMA: zod.ZodEnum<{
-  flag: "flag";
-  hide: "hide";
-  purge: "purge";
-}>;
-type AssetModerationAction = zod.infer<typeof ASSET_MODERATION_ACTION_SCHEMA>;
-/** A reviewer's decision on an asset. */
-declare const ASSET_REVIEWER_ACTION_SCHEMA: zod.ZodEnum<{
-  approved: "approved";
-  rejected: "rejected";
-}>;
-type AssetReviewerAction = zod.infer<typeof ASSET_REVIEWER_ACTION_SCHEMA>;
 /**
  * Whether CalmLens holds the asset's content (source, preview and extracted text): kept only until
  * processing finishes (`temporary`), retained (`stored`) or deleted (`removed`).
@@ -106,9 +99,9 @@ declare const PROCESSING_OPTIONS_SCHEMA: zod.ZodOptional<zod.ZodNullable<zod.Zod
   keepContentAfterProcessing: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
   flaggedContentPolicy: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     action: zod.ZodEnum<{
+      "age-restrict": "age-restrict";
       allow: "allow";
-      flag: "flag";
-      hide: "hide";
+      block: "block";
       purge: "purge";
     }>;
   }, zod.core.$strip>>>;
@@ -137,26 +130,20 @@ declare const ASSET_UPLOAD_SCHEMA: zod.ZodObject<{
 type AssetUpload = zod.infer<typeof ASSET_UPLOAD_SCHEMA>;
 /** Findings and the policy/reviewer decision for the moderation capability. */
 declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
-  decision: zod.ZodEnum<{
-    approved: "approved";
+  status: zod.ZodEnum<{
+    "age-restricted": "age-restricted";
+    allowed: "allowed";
+    blocked: "blocked";
     pending: "pending";
-    rejected: "rejected";
+    purged: "purged";
   }>;
-  action: zod.ZodNullable<zod.ZodEnum<{
-    flag: "flag";
-    hide: "hide";
-    purge: "purge";
-  }>>;
   manualReviews: zod.ZodArray<zod.ZodObject<{
     id: zod.ZodString;
     decision: zod.ZodEnum<{
-      approved: "approved";
-      rejected: "rejected";
-    }>;
-    action: zod.ZodEnum<{
-      approve: "approve";
-      hide: "hide";
-      purge: "purge";
+      "age-restricted": "age-restricted";
+      allowed: "allowed";
+      blocked: "blocked";
+      purged: "purged";
     }>;
     note: zod.ZodNullable<zod.ZodString>;
     reviewerUserId: zod.ZodNullable<zod.ZodString>;
@@ -262,6 +249,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -271,6 +259,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -406,6 +395,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -415,6 +405,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -546,6 +537,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -555,6 +547,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -691,6 +684,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -700,6 +694,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -835,6 +830,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -844,6 +840,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -975,6 +972,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -984,6 +982,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -1120,6 +1119,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1129,6 +1129,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -1264,6 +1265,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1273,6 +1275,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -1404,6 +1407,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1413,6 +1417,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -1549,6 +1554,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1558,6 +1564,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -1693,6 +1700,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1702,6 +1710,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -1833,6 +1842,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1842,6 +1852,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -1978,6 +1989,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1987,6 +1999,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -2122,6 +2135,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2131,6 +2145,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -2262,6 +2277,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2271,6 +2287,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -2407,6 +2424,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2416,6 +2434,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -2551,6 +2570,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2560,6 +2580,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -2691,6 +2712,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2700,6 +2722,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -2836,6 +2859,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2845,6 +2869,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -2980,6 +3005,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2989,6 +3015,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -3120,6 +3147,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3129,6 +3157,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -3265,6 +3294,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3274,6 +3304,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -3409,6 +3440,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3418,6 +3450,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -3549,6 +3582,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-explicit-language": "sexual-explicit-language";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3558,6 +3592,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "violence-documentary": "violence-documentary";
         "violence-educational": "violence-educational";
         "violence-encouragement": "violence-encouragement";
+        "violence-fantasy": "violence-fantasy";
         "violence-fictional": "violence-fictional";
         "violence-graphic": "violence-graphic";
         "violence-historical": "violence-historical";
@@ -3711,6 +3746,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -3720,6 +3756,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -3855,6 +3892,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -3864,6 +3902,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -3995,6 +4034,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4004,6 +4044,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -4140,6 +4181,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4149,6 +4191,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -4284,6 +4327,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4293,6 +4337,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -4424,6 +4469,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4433,6 +4479,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -4569,6 +4616,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4578,6 +4626,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -4713,6 +4762,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4722,6 +4772,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -4853,6 +4904,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4862,6 +4914,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -4998,6 +5051,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5007,6 +5061,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -5142,6 +5197,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5151,6 +5207,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -5282,6 +5339,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5291,6 +5349,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -5427,6 +5486,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5436,6 +5496,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -5571,6 +5632,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5580,6 +5642,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -5711,6 +5774,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5720,6 +5784,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -5856,6 +5921,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5865,6 +5931,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6000,6 +6067,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6009,6 +6077,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6140,6 +6209,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6149,6 +6219,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6285,6 +6356,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6294,6 +6366,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6429,6 +6502,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6438,6 +6512,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6569,6 +6644,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6578,6 +6654,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6714,6 +6791,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6723,6 +6801,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6858,6 +6937,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6867,6 +6947,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -6998,6 +7079,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7007,6 +7089,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -7064,9 +7147,9 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
     }> & zod.core.$partial, zod.ZodObject<{
       score: zod.ZodNumber;
       action: zod.ZodEnum<{
+        "age-restrict": "age-restrict";
         allow: "allow";
-        flag: "flag";
-        hide: "hide";
+        block: "block";
         purge: "purge";
       }>;
       source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -7088,9 +7171,9 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         enabled: zod.ZodOptional<zod.ZodBoolean>;
         threshold: zod.ZodNumber;
         categoryAction: zod.ZodEnum<{
+          "age-restrict": "age-restrict";
           allow: "allow";
-          flag: "flag";
-          hide: "hide";
+          block: "block";
           purge: "purge";
         }>;
         allowances: zod.ZodArray<zod.ZodObject<{
@@ -7181,6 +7264,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7190,6 +7274,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -7289,6 +7374,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7298,6 +7384,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -7311,9 +7398,9 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-weapon": "violence-weapon";
           }>>>;
           action: zod.ZodEnum<{
+            "age-restrict": "age-restrict";
             allow: "allow";
-            flag: "flag";
-            hide: "hide";
+            block: "block";
             purge: "purge";
           }>;
         }, zod.core.$strict>>;
@@ -7405,6 +7492,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7414,6 +7502,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -7513,6 +7602,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7522,6 +7612,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -7535,9 +7626,9 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "violence-weapon": "violence-weapon";
           }>>>;
           action: zod.ZodEnum<{
+            "age-restrict": "age-restrict";
             allow: "allow";
-            flag: "flag";
-            hide: "hide";
+            block: "block";
             purge: "purge";
           }>;
         }, zod.core.$strict>>;
@@ -7550,8 +7641,8 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         policy: "policy";
       }>;
       action: zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
+        "age-restrict": "age-restrict";
+        block: "block";
         purge: "purge";
       }>>;
       flaggedCategories: zod.ZodArray<zod.ZodEnum<{
@@ -7578,26 +7669,20 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   updatedAt: zod.ZodNullable<zod.ZodNumber>;
   completedAt: zod.ZodNullable<zod.ZodNumber>;
   moderation: zod.ZodObject<{
-    decision: zod.ZodEnum<{
-      approved: "approved";
+    status: zod.ZodEnum<{
+      "age-restricted": "age-restricted";
+      allowed: "allowed";
+      blocked: "blocked";
       pending: "pending";
-      rejected: "rejected";
+      purged: "purged";
     }>;
-    action: zod.ZodNullable<zod.ZodEnum<{
-      flag: "flag";
-      hide: "hide";
-      purge: "purge";
-    }>>;
     manualReviews: zod.ZodArray<zod.ZodObject<{
       id: zod.ZodString;
       decision: zod.ZodEnum<{
-        approved: "approved";
-        rejected: "rejected";
-      }>;
-      action: zod.ZodEnum<{
-        approve: "approve";
-        hide: "hide";
-        purge: "purge";
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
+        purged: "purged";
       }>;
       note: zod.ZodNullable<zod.ZodString>;
       reviewerUserId: zod.ZodNullable<zod.ZodString>;
@@ -7703,6 +7788,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -7712,6 +7798,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -7847,6 +7934,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -7856,6 +7944,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -7987,6 +8076,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -7996,6 +8086,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -8132,6 +8223,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -8141,6 +8233,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -8276,6 +8369,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -8285,6 +8379,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -8416,6 +8511,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -8425,6 +8521,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -8561,6 +8658,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -8570,6 +8668,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -8705,6 +8804,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -8714,6 +8814,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -8845,6 +8946,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -8854,6 +8956,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -8990,6 +9093,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -8999,6 +9103,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -9134,6 +9239,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9143,6 +9249,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -9274,6 +9381,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9283,6 +9391,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -9419,6 +9528,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9428,6 +9538,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -9563,6 +9674,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9572,6 +9684,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -9703,6 +9816,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9712,6 +9826,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -9848,6 +9963,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9857,6 +9973,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -9992,6 +10109,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10001,6 +10119,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -10132,6 +10251,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10141,6 +10261,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -10277,6 +10398,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10286,6 +10408,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -10421,6 +10544,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10430,6 +10554,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -10561,6 +10686,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10570,6 +10696,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -10706,6 +10833,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10715,6 +10843,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -10850,6 +10979,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10859,6 +10989,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -10990,6 +11121,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-explicit-language": "sexual-explicit-language";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10999,6 +11131,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "violence-documentary": "violence-documentary";
           "violence-educational": "violence-educational";
           "violence-encouragement": "violence-encouragement";
+          "violence-fantasy": "violence-fantasy";
           "violence-fictional": "violence-fictional";
           "violence-graphic": "violence-graphic";
           "violence-historical": "violence-historical";
@@ -11152,6 +11285,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -11161,6 +11295,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -11296,6 +11431,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -11305,6 +11441,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -11436,6 +11573,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -11445,6 +11583,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -11581,6 +11720,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -11590,6 +11730,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -11725,6 +11866,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -11734,6 +11876,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -11865,6 +12008,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -11874,6 +12018,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -12010,6 +12155,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -12019,6 +12165,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -12154,6 +12301,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -12163,6 +12311,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -12294,6 +12443,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -12303,6 +12453,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -12439,6 +12590,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -12448,6 +12600,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -12583,6 +12736,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -12592,6 +12746,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -12723,6 +12878,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -12732,6 +12888,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -12868,6 +13025,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -12877,6 +13035,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -13012,6 +13171,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13021,6 +13181,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -13152,6 +13313,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13161,6 +13323,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -13297,6 +13460,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13306,6 +13470,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -13441,6 +13606,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13450,6 +13616,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -13581,6 +13748,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13590,6 +13758,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -13726,6 +13895,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13735,6 +13905,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -13870,6 +14041,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13879,6 +14051,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14010,6 +14183,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14019,6 +14193,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14155,6 +14330,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14164,6 +14340,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14299,6 +14476,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14308,6 +14486,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14439,6 +14618,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14448,6 +14628,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14505,9 +14686,9 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
       }> & zod.core.$partial, zod.ZodObject<{
         score: zod.ZodNumber;
         action: zod.ZodEnum<{
+          "age-restrict": "age-restrict";
           allow: "allow";
-          flag: "flag";
-          hide: "hide";
+          block: "block";
           purge: "purge";
         }>;
         source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -14529,9 +14710,9 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           enabled: zod.ZodOptional<zod.ZodBoolean>;
           threshold: zod.ZodNumber;
           categoryAction: zod.ZodEnum<{
+            "age-restrict": "age-restrict";
             allow: "allow";
-            flag: "flag";
-            hide: "hide";
+            block: "block";
             purge: "purge";
           }>;
           allowances: zod.ZodArray<zod.ZodObject<{
@@ -14622,6 +14803,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14631,6 +14813,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14730,6 +14913,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14739,6 +14923,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14752,9 +14937,9 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-weapon": "violence-weapon";
             }>>>;
             action: zod.ZodEnum<{
+              "age-restrict": "age-restrict";
               allow: "allow";
-              flag: "flag";
-              hide: "hide";
+              block: "block";
               purge: "purge";
             }>;
           }, zod.core.$strict>>;
@@ -14846,6 +15031,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14855,6 +15041,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14954,6 +15141,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14963,6 +15151,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-documentary": "violence-documentary";
               "violence-educational": "violence-educational";
               "violence-encouragement": "violence-encouragement";
+              "violence-fantasy": "violence-fantasy";
               "violence-fictional": "violence-fictional";
               "violence-graphic": "violence-graphic";
               "violence-historical": "violence-historical";
@@ -14976,9 +15165,9 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "violence-weapon": "violence-weapon";
             }>>>;
             action: zod.ZodEnum<{
+              "age-restrict": "age-restrict";
               allow: "allow";
-              flag: "flag";
-              hide: "hide";
+              block: "block";
               purge: "purge";
             }>;
           }, zod.core.$strict>>;
@@ -14991,8 +15180,8 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           policy: "policy";
         }>;
         action: zod.ZodNullable<zod.ZodEnum<{
-          flag: "flag";
-          hide: "hide";
+          "age-restrict": "age-restrict";
+          block: "block";
           purge: "purge";
         }>>;
         flaggedCategories: zod.ZodArray<zod.ZodEnum<{
@@ -15162,9 +15351,9 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     keepContentAfterProcessing: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
     flaggedContentPolicy: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       action: zod.ZodEnum<{
+        "age-restrict": "age-restrict";
         allow: "allow";
-        flag: "flag";
-        hide: "hide";
+        block: "block";
         purge: "purge";
       }>;
     }, zod.core.$strip>>>;
@@ -15203,26 +15392,20 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     updatedAt: zod.ZodNullable<zod.ZodNumber>;
     completedAt: zod.ZodNullable<zod.ZodNumber>;
     moderation: zod.ZodObject<{
-      decision: zod.ZodEnum<{
-        approved: "approved";
+      status: zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
         pending: "pending";
-        rejected: "rejected";
+        purged: "purged";
       }>;
-      action: zod.ZodNullable<zod.ZodEnum<{
-        flag: "flag";
-        hide: "hide";
-        purge: "purge";
-      }>>;
       manualReviews: zod.ZodArray<zod.ZodObject<{
         id: zod.ZodString;
         decision: zod.ZodEnum<{
-          approved: "approved";
-          rejected: "rejected";
-        }>;
-        action: zod.ZodEnum<{
-          approve: "approve";
-          hide: "hide";
-          purge: "purge";
+          "age-restricted": "age-restricted";
+          allowed: "allowed";
+          blocked: "blocked";
+          purged: "purged";
         }>;
         note: zod.ZodNullable<zod.ZodString>;
         reviewerUserId: zod.ZodNullable<zod.ZodString>;
@@ -15328,6 +15511,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -15337,6 +15521,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -15472,6 +15657,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -15481,6 +15667,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -15612,6 +15799,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -15621,6 +15809,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -15757,6 +15946,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -15766,6 +15956,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -15901,6 +16092,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -15910,6 +16102,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -16041,6 +16234,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -16050,6 +16244,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -16186,6 +16381,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -16195,6 +16391,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -16330,6 +16527,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -16339,6 +16537,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -16470,6 +16669,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -16479,6 +16679,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -16615,6 +16816,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -16624,6 +16826,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -16759,6 +16962,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -16768,6 +16972,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -16899,6 +17104,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -16908,6 +17114,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -17044,6 +17251,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -17053,6 +17261,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -17188,6 +17397,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -17197,6 +17407,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -17328,6 +17539,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -17337,6 +17549,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -17473,6 +17686,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -17482,6 +17696,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -17617,6 +17832,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -17626,6 +17842,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -17757,6 +17974,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -17766,6 +17984,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -17902,6 +18121,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -17911,6 +18131,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -18046,6 +18267,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -18055,6 +18277,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -18186,6 +18409,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -18195,6 +18419,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -18331,6 +18556,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -18340,6 +18566,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -18475,6 +18702,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -18484,6 +18712,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -18615,6 +18844,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-explicit-language": "sexual-explicit-language";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -18624,6 +18854,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "violence-documentary": "violence-documentary";
             "violence-educational": "violence-educational";
             "violence-encouragement": "violence-encouragement";
+            "violence-fantasy": "violence-fantasy";
             "violence-fictional": "violence-fictional";
             "violence-graphic": "violence-graphic";
             "violence-historical": "violence-historical";
@@ -18777,6 +19008,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -18786,6 +19018,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -18921,6 +19154,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -18930,6 +19164,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -19061,6 +19296,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -19070,6 +19306,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -19206,6 +19443,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -19215,6 +19453,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -19350,6 +19589,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -19359,6 +19599,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -19490,6 +19731,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -19499,6 +19741,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -19635,6 +19878,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -19644,6 +19888,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -19779,6 +20024,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -19788,6 +20034,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -19919,6 +20166,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -19928,6 +20176,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -20064,6 +20313,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -20073,6 +20323,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -20208,6 +20459,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -20217,6 +20469,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -20348,6 +20601,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -20357,6 +20611,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -20493,6 +20748,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -20502,6 +20758,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -20637,6 +20894,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -20646,6 +20904,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -20777,6 +21036,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -20786,6 +21046,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -20922,6 +21183,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -20931,6 +21193,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -21066,6 +21329,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -21075,6 +21339,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -21206,6 +21471,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -21215,6 +21481,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -21351,6 +21618,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -21360,6 +21628,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -21495,6 +21764,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -21504,6 +21774,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -21635,6 +21906,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -21644,6 +21916,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -21780,6 +22053,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -21789,6 +22063,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -21924,6 +22199,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -21933,6 +22209,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -22064,6 +22341,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -22073,6 +22351,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -22130,9 +22409,9 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         }> & zod.core.$partial, zod.ZodObject<{
           score: zod.ZodNumber;
           action: zod.ZodEnum<{
+            "age-restrict": "age-restrict";
             allow: "allow";
-            flag: "flag";
-            hide: "hide";
+            block: "block";
             purge: "purge";
           }>;
           source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -22154,9 +22433,9 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             enabled: zod.ZodOptional<zod.ZodBoolean>;
             threshold: zod.ZodNumber;
             categoryAction: zod.ZodEnum<{
+              "age-restrict": "age-restrict";
               allow: "allow";
-              flag: "flag";
-              hide: "hide";
+              block: "block";
               purge: "purge";
             }>;
             allowances: zod.ZodArray<zod.ZodObject<{
@@ -22247,6 +22526,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -22256,6 +22536,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -22355,6 +22636,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -22364,6 +22646,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -22377,9 +22660,9 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-weapon": "violence-weapon";
               }>>>;
               action: zod.ZodEnum<{
+                "age-restrict": "age-restrict";
                 allow: "allow";
-                flag: "flag";
-                hide: "hide";
+                block: "block";
                 purge: "purge";
               }>;
             }, zod.core.$strict>>;
@@ -22471,6 +22754,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -22480,6 +22764,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -22579,6 +22864,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-explicit-language": "sexual-explicit-language";
                 "sexual-fictional": "sexual-fictional";
                 "sexual-historical": "sexual-historical";
+                "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -22588,6 +22874,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-documentary": "violence-documentary";
                 "violence-educational": "violence-educational";
                 "violence-encouragement": "violence-encouragement";
+                "violence-fantasy": "violence-fantasy";
                 "violence-fictional": "violence-fictional";
                 "violence-graphic": "violence-graphic";
                 "violence-historical": "violence-historical";
@@ -22601,9 +22888,9 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "violence-weapon": "violence-weapon";
               }>>>;
               action: zod.ZodEnum<{
+                "age-restrict": "age-restrict";
                 allow: "allow";
-                flag: "flag";
-                hide: "hide";
+                block: "block";
                 purge: "purge";
               }>;
             }, zod.core.$strict>>;
@@ -22616,8 +22903,8 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             policy: "policy";
           }>;
           action: zod.ZodNullable<zod.ZodEnum<{
-            flag: "flag";
-            hide: "hide";
+            "age-restrict": "age-restrict";
+            block: "block";
             purge: "purge";
           }>>;
           flaggedCategories: zod.ZodArray<zod.ZodEnum<{
@@ -22757,4 +23044,4 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
 }, zod.core.$strip>;
 type Asset = zod.infer<typeof ASSET_SCHEMA>;
 //#endregion
-export { ImageData as _, AssetContentRemovalReason as a, ProcessingOptions as b, AssetModerationAction as c, AssetSafetyHold as d, AssetSafetyHoldReason as f, ExtractedText as g, AssetVisibility as h, AssetContent as i, AssetModerationStatus as l, AssetUpload as m, AssetClassification as n, AssetContentStatus as o, AssetType as p, AssetClassificationStatus as r, AssetModeration as s, Asset as t, AssetReviewerAction as u, MetadataItem as v, PreviewImage as y };
+export { PreviewImage as _, AssetContentRemovalReason as a, AssetModerationStatus as c, AssetType as d, AssetUpload as f, MetadataItem as g, ImageData as h, AssetContent as i, AssetSafetyHold as l, ExtractedText as m, AssetClassification as n, AssetContentStatus as o, AssetVisibility as p, AssetClassificationStatus as r, AssetModeration as s, Asset as t, AssetSafetyHoldReason as u, ProcessingOptions as v };

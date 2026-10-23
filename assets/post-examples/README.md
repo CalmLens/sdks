@@ -10,5 +10,5 @@ backgrounds. Use a complementary editorial palette, separate from the interface 
 for gardens, warm wheat for baking, dusty blue landscapes, clay, cream and muted teal.
 Do not reuse CalmLens’s exact primary purple or UI theme tokens. Avoid dotted backgrounds, product
 cards, dashboard frames, gradients, screenshots and generic SaaS diagrams. Keep harmful content
-censored and let the consumer hide rejected examples. These are static image assets, not inline
+censored and let the consumer hide examples that are not allowed. These are static image assets, not inline
 SVG markup in each repeated post.

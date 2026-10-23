@@ -39,11 +39,12 @@ from the uploaded file with `io.NewSectionReader`). The page needs no JavaScript
 demo, and setting `CALMLENS_UPLOAD_PRESET_ID` together with `CALMLENS_DEMO=1` stops
 startup. All demo code
 lives in the separate [`demo`](demo/demo.go) package; live mode never calls it. The demo
-selector lets you choose the outcome explicitly: approve, approve and flag, reject, or a
+selector lets you choose the outcome explicitly: allow, age-restrict, block, purge, or a
 processing error. The clip stays pending for two seconds, then the selected outcome is
 written with a **simulated** report: a fixed 48-second duration and two overlapping
 `clip` segments with synthetic category scores. Nothing is decoded and no moderation
-model runs. Approved demo clips play through the mock CDN.
+model runs. Allowed demo clips play through the mock CDN, and a purged demo clip loses its
+stored content.
 
 ## Live mode
 
@@ -57,7 +58,7 @@ In the portal, open **Developer → Upload presets** and create a preset:
 | File types | `audio/*, video/*` (or the exact types listed above) |
 | Maximum file size (MB) | `50` |
 | Visibility | **Private** |
-| Keep content after moderation | **On**: approved clips are played from CalmLens, and without it the content is deleted after moderation |
+| Keep content after moderation | **On**: allowed clips are played from CalmLens, and without it the content is deleted after moderation |
 | Show the decision to the uploader | Off is fine: the page never reads the browser's view of the upload |
 | Allowed sites | `http://127.0.0.1:6402` (the origin you open the app on) |
 
@@ -109,23 +110,25 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   browser can't claim another clip's asset. Every later refresh checks the `externalId`
   again before applying a decision. The browser's view of the upload is never used.
 - **Decisions.** Audio and video always return with moderation status `pending` and are
-  processed in the background. A clip is decided once `Moderation.Status` is `approved` or
-  `rejected`, or `Processing.Status` is `failed`; it is flagged for review when
-  `Moderation.Action` is set (the policy chose `flag`). While a clip is pending, the page reloads every three seconds (never during
+  processed in the background. A clip is decided once `Classification.Moderation.Status` is
+  no longer `pending` (`allowed`, `age-restricted`, `blocked` or `purged`), or
+  `Classification.Status` is `failed`. While a clip is pending, the page reloads every three seconds (never during
   an upload) and the server calls `Assets.Retrieve`; verified webhooks update a clip
   sooner.
 - **Timeline.** `classification.moderation.timeline` provides `durationSeconds` and `segments`. Native analysis
   uses overlapping 30-second chunks (`source: "clip"`). Each segment lists the categories
   that were evaluated (or partially evaluated) with a score of at least 0.4 ("possible").
   A `not-evaluated` category is never shown as a zero score. Ranges are approximate.
-- **Playback.** Only an explicit `approved` decision plays. The `/media` route retrieves
+- **Playback.** Only an explicit `allowed` status plays. CalmLens delivers an
+  `age-restricted` asset only through signed URLs or API keys so your backend can put it
+  behind an age check; this app has no age check, so it doesn't play those either. `blocked`
+  and `purged` clips are never shown (a purged clip's content is deleted). The `/media` route retrieves
   the asset again, then calls `Assets.CreateSignedURL` with a **300-second expiry**
   (long enough to play and seek a two-minute clip) and redirects the `<audio>` or
-  `<video>` element to it. A failed retrieve, a pending, rejected or failed clip, or a
+  `<video>` element to it. A failed retrieve, a clip that is pending, failed or not allowed, or a
   non-HTTPS URL never gets one. The signed URL is reused while at least 150 seconds of it
   remain, so seeking and replays don't call CalmLens again; a refresh or webhook that
-  reports a different decision drops it. An approved, flagged clip plays with a review
-  badge. In the demo, `/media` streams the mock CDN response and passes `Range` through.
+  reports a different decision drops it. In the demo, `/media` streams the mock CDN response and passes `Range` through.
 - **Retry.** A clip whose processing `failed` offers **Retry processing**, which calls
   `Assets.Retry` and returns it to processing.
 - **Delete.** **Delete clip** calls `Assets.Delete`, which removes the asset record and
@@ -157,9 +160,9 @@ export CALMLENS_WEBHOOK_SECRET='a-local-development-secret'
 calmlens listen --forward-to http://127.0.0.1:6402/webhooks/calmlens
 ```
 
-The handler verifies the **exact raw body** before parsing JSON. For `asset.approved` and
-`asset.rejected` (sent for automated moderation outcomes and reviewer decisions alike) and
-`asset.failed`, it retrieves the clip's current state instead of trusting the event snapshot. If that
+The handler verifies the **exact raw body** before parsing JSON. For `asset.allowed`,
+`asset.age-restricted`, `asset.blocked` and `asset.purged` (sent for automated moderation
+outcomes and reviewer decisions alike) and `asset.failed`, it retrieves the clip's current state instead of trusting the event snapshot. If that
 retrieval fails it returns 502, so delivery is retried. A delivery that was already
 applied has no further effect, and a test send (fact `{ key: "test", value: true }`) is
 logged in the activity panel and changes nothing.
@@ -173,7 +176,7 @@ logged in the activity panel and changes nothing.
   multipart, with per-part progress.
 - `upload` and `send`: the demo's simulated server upload.
 - `refresh` and `timeline`: SDK retrieval and turning `classification.moderation.timeline` into segment rows.
-- `media`: fresh approval check, the signed URL cache, live short-lived signed playback
+- `media`: fresh status check, the signed URL cache, live short-lived signed playback
   and streamed demo playback.
 - `retry`, `remove`: `Assets.Retry` and `Assets.Delete`.
 - `webhook`: `VerifyWebhookRequest`, test sends, replays and state refresh.

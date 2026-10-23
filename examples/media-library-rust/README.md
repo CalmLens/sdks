@@ -17,25 +17,28 @@ moderation:
   it between folders with `assets().move_asset`.
 - **Listing.** Each folder lists 12 images a page with `assets().list`, using `cursor`,
   `folder_id` and a `filter` built only from fixed values: `parentId==null`, optionally with
-  one status: `classification.moderation.decision==approved` or `classification.moderation.decision==rejected`,
-  `classification.moderation.decision==pending;classification.status!=failed` for images in review, or
-  `classification.status==failed`. See
+  one status: `classification.moderation.status==allowed`, `==age-restricted`, `==blocked` or
+  `==purged`, `classification.moderation.status==pending;classification.status!=failed` for
+  images in review, or `classification.status==failed`. See
   [Pagination and filtering](https://calmlens.com/docs/guides/pagination-and-filtering).
 - **Search.** Describe an image in natural language with `assets().search` in `hybrid`,
   `keyword` or `semantic` mode. Results show `semanticStatus` and each item's `matchedFields`.
-  Search never returns rejected, safety-held or removed content.
-- **Delivery.** Only an image whose `classification.moderation.decision` is `approved` and whose
+  Search never returns blocked, purged, safety-held or removed content.
+- **Delivery.** Only an image whose `classification.moderation.status` is `allowed` and whose
   `content.status` is `stored` gets a thumbnail or a download. Each request retrieves the asset's current state, calls `ensure_lens` for a 320px
   square thumbnail lens (`calmlibrary-thumb`) or a 1600px web lens (`calmlibrary-web`), and
-  redirects to a 60-second signed URL from `assets().create_signed_url`. Pending, rejected and
-  failed images never get either.
+  redirects to a 60-second signed URL from `assets().create_signed_url`. Pending, blocked,
+  purged and failed images never get either. CalmLens delivers `age-restricted` images only
+  through signed URLs or API keys so an app can show them behind its own age check; this team
+  library has no age check, so it doesn't deliver them either.
 - **Lifecycle.** **Remove file** calls `assets().delete_content`: the record, its metadata and
   classification results stay, `content.status` becomes `removed`, and the CDN stops serving the
   content. **Delete** calls
   `assets().delete` and removes the asset.
-- **Moderation decisions.** Verified webhooks for `asset.approved` and `asset.rejected` (sent for
-  automated and reviewer decisions alike, with a `decided-by` fact saying which) and the other
-  asset events refresh the asset from the API and log the decision.
+- **Moderation decisions.** Verified webhooks for `asset.classified`, `asset.allowed`,
+  `asset.age-restricted`, `asset.blocked`, `asset.purged` (sent for automated and reviewer
+  decisions alike, with a `decided-by` fact saying which) and `asset.failed` refresh the asset
+  from the API and log its status.
 
 ## Run locally
 
@@ -63,16 +66,17 @@ the app restarts. It holds up to 40 assets and 30 folders. Folder rules (empty d
 cycles, unique sibling names) and duplicate catalogue IDs return the same error codes as the
 API. Demo mode does not use the SDK's test mock.
 
-Each upload takes the moderation outcome you select: **Approve**, **Reject** or **Processing
-error**. Nothing is classified. A demo upload stays in review for two seconds, then takes the
-selected outcome when the page refreshes. Approved demo images are served from the bytes the
-app kept. An approved image offers **Simulate a reviewer rejecting it**, which applies a
-synthetic `asset.rejected` event through the same code as a webhook.
+Each upload takes the moderation outcome you select: **Allow**, **Age-restrict**, **Block**,
+**Purge** or **Processing error**. Nothing is classified. A demo upload stays in review for two
+seconds, then takes the selected outcome when the page refreshes; **Purge** also deletes the
+kept file, with removal reason `policy`. Allowed demo images are served from the bytes the app
+kept. An allowed image offers **Simulate a reviewer blocking it**, which applies a synthetic
+`asset.blocked` event through the same code as a webhook.
 
 Demo search results are **simulated** and labelled as such: local keyword matching over names,
 descriptions, tags and metadata, with `semanticStatus: "disabled"`. There is no semantic
 matching offline, so `semantic` mode finds nothing in demo mode. Like CalmLens, simulated
-search skips rejected, unfinished and removed images.
+search skips blocked and purged images and removed files; it also skips unfinished uploads.
 
 ## Use live CalmLens
 
@@ -88,7 +92,7 @@ Restarting the app clears only its activity log; folders and assets live in Calm
 
 To filter or group by the metadata items in the CalmLens portal, define fields with the IDs
 `photographer`, `licence` and `campaign` under **Configuration → Metadata**. Semantic search
-covers retained, approved images automatically; results may be incomplete while indexing runs
+covers retained images that are not blocked or purged automatically; results may be incomplete while indexing runs
 (`semanticStatus: "indexing"`).
 
 Startup stops with a clear message when only one credential is set, or when demo mode is
@@ -158,7 +162,7 @@ assets when the secret is set.
 - [src/page.rs](src/page.rs): server-rendered HTML with no JavaScript or external assets. Every
   dynamic value is escaped.
 - [src/tests.rs](src/tests.rs): startup checks, folder operations and error codes, the upload,
-  list, search, edit, move and delete requests the SDK sends, delivery only for approved
+  list, search, edit, move and delete requests the SDK sends, delivery only for allowed
   images, file removal, webhook verification, replays and unknown assets, notices and error
   text, form tokens, body limits, timeouts, security headers and escaping. Tests send requests
   to the router with `tower::ServiceExt::oneshot`; live-mode tests use a client from the SDK's

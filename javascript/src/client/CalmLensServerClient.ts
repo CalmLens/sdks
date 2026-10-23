@@ -197,7 +197,8 @@ export default class CalmLensServerClient {
     return {
       /**
        * Builds a CDN URL for asset content or a preview, without a request. Private assets
-       * need a signed URL (`assets.createSignedUrl`) or an authenticated request.
+       * need a signed URL (`assets.createSignedUrl`) or an authenticated request; public
+       * age-restricted assets need one too unless `ageRestricted` adds `ageRestricted=true`.
        */
       getAssetUrl: ({ assetIdentifier, ...options }: CdnAssetUrlOptions): string => {
         const resource = options.resource ?? "content";
@@ -382,8 +383,8 @@ export default class CalmLensServerClient {
         this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/retry`),
 
       /**
-       * Waits until an asset's `classification.moderation.decision` is `approved` or `rejected`, or its
-       * `classification.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
+       * Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
+       * `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
        * decision within `timeoutMs` (default 60000). Webhooks report decisions without polling.
        */
       waitForDecision: async ({

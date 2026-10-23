@@ -55,9 +55,8 @@ class ModelsTest {
     "status": "completed",
     "updatedAt": 1700000000100,
     "moderation": {
-      "action": "hide",
-      "manualReviews": [{"id": "review-1", "decision": "approved", "action": "approve", "note": "fine", "reviewerUserId": "user-2", "reviewedAt": 1700000000200, "appliedToAsset": true}],
-      "decision": "approved",
+      "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "fine", "reviewerUserId": "user-2", "reviewedAt": 1700000000200, "appliedToAsset": true}],
+      "status": "age-restricted",
       "categories": {
         "harassment": {
           "status": "evaluated",
@@ -75,10 +74,8 @@ class ModelsTest {
     assertEquals(Instant.ofEpochMilli(1700000000100L), asset.classification().updatedAt());
     assertEquals(3, asset.upload().partsReceived());
     Models.AssetModeration moderation = asset.classification().moderation();
-    assertSame(Models.AssetModerationStatus.APPROVED, moderation.decision());
-    assertEquals("hide", moderation.action());
-    assertEquals("approved", moderation.manualReviews().get(0).decision());
-    assertEquals("approve", moderation.manualReviews().get(0).action());
+    assertSame(Models.AssetModerationStatus.AGE_RESTRICTED, moderation.status());
+    assertSame(Models.AssetModerationDecision.AGE_RESTRICTED, moderation.manualReviews().get(0).decision());
     assertEquals("fine", moderation.manualReviews().get(0).note());
     assertEquals("user-2", moderation.manualReviews().get(0).reviewerUserId());
     assertEquals(Instant.ofEpochMilli(1700000000200L), moderation.manualReviews().get(0).reviewedAt());
@@ -104,7 +101,7 @@ class ModelsTest {
     Models.Event event = Json.GSON.fromJson("""
         {
   "id": "event-1",
-  "type": "asset.rejected",
+  "type": "asset.purged",
   "asset": {
     "id": "asset-1",
     "externalId": "ext-1",
@@ -118,8 +115,7 @@ class ModelsTest {
     "classification": {
       "status": "completed",
       "moderation": {
-        "action": "purge",
-        "decision": "rejected"
+        "status": "purged"
       }
     }
   }
@@ -127,13 +123,13 @@ class ModelsTest {
         """, Models.Event.class);
     assertEquals(new Models.EventAsset("asset-1", "ext-1", "preset-1",
         new Models.EventAssetUpload("completed"),
-        new Models.EventAssetClassification(Models.AssetClassificationStatus.COMPLETED, new Models.EventAssetModeration(Models.AssetModerationStatus.REJECTED, "purge")),
+        new Models.EventAssetClassification(Models.AssetClassificationStatus.COMPLETED, new Models.EventAssetModeration(Models.AssetModerationStatus.PURGED)),
         new Models.EventAssetContent(Models.AssetContentStatus.REMOVED)), event.asset());
   }
 
   @Test void flaggedContentPolicyEncodesAsAnObject() {
-    Models.ProcessingOptions options = new Models.ProcessingOptions().flaggedContentPolicy(new Models.FlaggedContentPolicy("hide"));
-    assertEquals(JsonParser.parseString("{\"flaggedContentPolicy\":{\"action\":\"hide\"}}"), Json.GSON.toJsonTree(options));
+    Models.ProcessingOptions options = new Models.ProcessingOptions().flaggedContentPolicy(new Models.FlaggedContentPolicy("block"));
+    assertEquals(JsonParser.parseString("{\"flaggedContentPolicy\":{\"action\":\"block\"}}"), Json.GSON.toJsonTree(options));
   }
 
   @Test void lensTransformsDecodeTypedImageOptions() {
@@ -182,7 +178,7 @@ class ModelsTest {
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
     Models.ReportPolicy policy = Json.GSON.fromJson("""
-        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"hide","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"hide","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"hide"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
+        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
         """, Models.ReportPolicy.class);
     Models.CategoryPolicyScore category = policy.categories().get("violence");
     assertEquals(0.6, category.settings().threshold());

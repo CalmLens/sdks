@@ -58,7 +58,7 @@ class TransportTest < Minitest::Test
     end
   end
 
-  def with_server(respond = ->(*) { [200, {}, '{"id":"asset","status":"approved"}'] })
+  def with_server(respond = ->(*) { [200, {}, '{"id":"asset","status":"allowed"}'] })
     server = Server.new(&respond)
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', base_url: server.url, cdn_base_url: server.url,
                                         retry_base_delay: 0)

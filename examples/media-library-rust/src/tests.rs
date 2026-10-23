@@ -213,10 +213,10 @@ fn writes(mock: &MockServerClient) -> Vec<calmlens::testing::Request> {
         .collect()
 }
 
-/// An asset uploaded by this library in the mock's project, with its file stored: `approved`,
-/// `rejected` or `pending` moderation, or `failed` processing.
-fn asset(id: &str, decision: &str) -> Value {
-    let (processing, moderation) = match decision {
+/// An asset uploaded by this library in the mock's project, with its file stored and moderation
+/// status `status` (`allowed`, `age-restricted`, `blocked` or `pending`), or `failed` processing.
+fn asset(id: &str, status: &str) -> Value {
+    let (processing, moderation) = match status {
         "failed" => ("failed", "pending"),
         "pending" => ("processing", "pending"),
         decided => ("completed", decided),
@@ -224,7 +224,7 @@ fn asset(id: &str, decision: &str) -> Value {
     json!({"id": id, "name": format!("{id}.png"), "folderId": "folder-1",
            "projectId": "project-1", "externalId": format!("calmlibrary:{id}"),
            "upload": {"status": "completed"},
-           "classification": {"status": processing, "moderation": {"decision": moderation, "action": null}},
+           "classification": {"status": processing, "moderation": {"status": moderation}},
            "content": {"status": "stored"}})
 }
 
@@ -241,7 +241,7 @@ fn event(id: &str, event_type: &str, asset_id: &str, facts: Value) -> String {
         "id": id, "type": event_type, "createdAt": 1_760_000_000_000u64, "projectId": "project-1",
         "data": {"severity": "high", "title": "t", "description": null, "assetId": asset_id,
                  "asset": {"id": asset_id, "upload": {"status": "completed"},
-                           "classification": {"status": "completed", "moderation": {"decision": "approved", "action": null}},
+                           "classification": {"status": "completed", "moderation": {"status": "allowed"}},
                            "content": {"status": "stored"}},
                  "facts": facts}
     })
@@ -362,7 +362,7 @@ async fn demo_folder_errors_surface_their_codes() {
         .contains("<code>folder/duplicate-name</code>"));
 
     // A folder that holds an image is not empty either.
-    app.demo_upload(&child, "approved", "Ana").await;
+    app.demo_upload(&child, "allowed", "Ana").await;
     let with_asset = app.post(&format!("/folders/{child}/delete"), "").await;
     assert_eq!(with_asset.status, StatusCode::CONFLICT);
     assert!(with_asset.html().contains("<code>folder/not-empty</code>"));
@@ -475,7 +475,7 @@ async fn live_upload_sends_folder_metadata_catalogue_id_and_keeps_content() {
                 ("licence", "cc-by-4.0"),
                 ("campaign", "Spring launch"),
                 // Ignored in live mode.
-                ("demo_outcome", "rejected"),
+                ("demo_outcome", "blocked"),
             ],
             PNG,
         )
@@ -515,7 +515,7 @@ async fn live_upload_sends_folder_metadata_catalogue_id_and_keeps_content() {
 #[tokio::test]
 async fn duplicate_catalogue_ids_surface_their_code() {
     let app = demo();
-    let fields = [("external_id", "CAM-1"), ("demo_outcome", "approved")];
+    let fields = [("external_id", "CAM-1"), ("demo_outcome", "allowed")];
     assert_eq!(app.upload(&fields, PNG).await.status, StatusCode::SEE_OTHER);
     let duplicate = app.upload(&fields, PNG).await;
     assert_eq!(duplicate.status, StatusCode::CONFLICT);
@@ -575,11 +575,11 @@ async fn live_listing_paginates_and_filters_the_folder() {
     );
     mock.enqueue(
         200,
-        json!({"items": [asset("asset-1", "approved")], "nextCursor": "next-token",
+        json!({"items": [asset("asset-1", "allowed")], "nextCursor": "next-token",
                "pageSize": PAGE_SIZE, "hasMore": true}),
     );
     let response = app
-        .get("/?folder=folder-1&cursor=previous-token&status=approved")
+        .get("/?folder=folder-1&cursor=previous-token&status=allowed")
         .await;
     assert_eq!(response.status, StatusCode::OK);
     let list = &mock.requests()[2];
@@ -589,11 +589,11 @@ async fn live_listing_paginates_and_filters_the_folder() {
     assert_eq!(list.query_param("pageSize"), Some("12"));
     assert_eq!(
         list.query_param("filter"),
-        Some("parentId==null;classification.moderation.decision==approved")
+        Some("parentId==null;classification.moderation.status==allowed")
     );
     let page = response.html();
-    assert!(page.contains(r#"href="/?cursor=next-token&amp;folder=folder-1&amp;status=approved""#));
-    assert!(page.contains(r#"href="/?folder=folder-1&amp;status=approved""#));
+    assert!(page.contains(r#"href="/?cursor=next-token&amp;folder=folder-1&amp;status=allowed""#));
+    assert!(page.contains(r#"href="/?folder=folder-1&amp;status=allowed""#));
     assert!(page.contains(r#"src="/assets/asset-1/thumb""#));
 }
 
@@ -607,7 +607,7 @@ async fn listing_filters_only_accept_known_statuses() {
     );
     assert_eq!(
         list_filter("pending"),
-        "parentId==null;classification.moderation.decision==pending;classification.status!=failed"
+        "parentId==null;classification.moderation.status==pending;classification.status!=failed"
     );
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
@@ -616,7 +616,7 @@ async fn listing_filters_only_accept_known_statuses() {
         json!({"folders": [], "ancestors": [], "hasMore": false}),
     );
     mock.enqueue(200, json!({"items": [], "total": 0}));
-    app.get("/?status=approved,status==rejected").await;
+    app.get("/?status=allowed,status==blocked").await;
     assert_eq!(
         mock.requests()[1].query_param("filter"),
         Some("parentId==null")
@@ -634,7 +634,7 @@ async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_statu
     mock.enqueue(
         200,
         json!({"query": "cyclists at sunrise", "semanticStatus": "indexing", "items": [
-            {"asset": asset("asset-7", "approved"), "score": 0.82, "matchedFields": ["visual"]}
+            {"asset": asset("asset-7", "allowed"), "score": 0.82, "matchedFields": ["visual"]}
         ]}),
     );
     let page = app
@@ -664,32 +664,34 @@ async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_statu
 }
 
 #[tokio::test]
-async fn demo_search_matches_only_approved_stored_images() {
+async fn demo_search_matches_only_allowed_stored_images() {
     let app = demo();
-    let approved = app.demo_upload("", "approved", "Ana Ruiz").await;
-    let rejected = app.demo_upload("", "rejected", "Ana Ruiz").await;
-    let removed = app.demo_upload("", "approved", "Ana Ruiz").await;
+    let allowed = app.demo_upload("", "allowed", "Ana Ruiz").await;
+    let blocked = app.demo_upload("", "blocked", "Ana Ruiz").await;
+    let purged = app.demo_upload("", "purged", "Ana Ruiz").await;
+    let removed = app.demo_upload("", "allowed", "Ana Ruiz").await;
     app.state.library.expire_demo_reviews();
     app.post(&format!("/assets/{removed}/remove-file"), "confirm=yes")
         .await;
 
     let page = app.get("/?q=ruiz&mode=hybrid").await.html();
     assert!(page.contains(r#"data-semantic-status="disabled""#));
-    assert!(page.contains(&format!("asset={approved}")));
+    assert!(page.contains(&format!("asset={allowed}")));
     assert!(page.contains(r#"data-matched-fields="metadata""#));
-    assert!(!page.contains(&format!("asset={rejected}")));
+    assert!(!page.contains(&format!("asset={blocked}")));
+    assert!(!page.contains(&format!("asset={purged}")));
     assert!(!page.contains(&format!("asset={removed}")));
 
     // There is no semantic matching offline.
     let semantic = app.get("/?q=ruiz&mode=semantic").await.html();
-    assert!(!semantic.contains(&format!("asset={approved}")));
+    assert!(!semantic.contains(&format!("asset={allowed}")));
 }
 
 // ------------------------------------------------------------ delivery
 
 #[tokio::test]
-async fn demo_thumbnails_appear_only_for_approved_images() {
-    for outcome in ["approved", "rejected", "failed"] {
+async fn demo_thumbnails_appear_only_for_allowed_images() {
+    for outcome in ["allowed", "age-restricted", "blocked", "purged", "failed"] {
         let app = demo();
         let id = app.demo_upload("", outcome, "Ana").await;
         let pending = app.get("/").await;
@@ -704,7 +706,7 @@ async fn demo_thumbnails_appear_only_for_approved_images() {
         let page = app.get("/").await.html();
         let thumb = app.get(&format!("/assets/{id}/thumb")).await;
         let download = app.get(&format!("/assets/{id}/download")).await;
-        if outcome == "approved" {
+        if outcome == "allowed" {
             assert!(page.contains(&format!("/assets/{id}/thumb")));
             assert_eq!(thumb.status, StatusCode::OK);
             assert_eq!(thumb.body, PNG);
@@ -724,7 +726,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     let app = live(&mock, "");
     let lens_reply =
         |identifier: &str| json!({"lenses": [{"identifier": identifier, "version": 1}]});
-    mock.enqueue(200, asset("asset-1", "approved"));
+    mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, lens_reply(THUMB_LENS));
     mock.enqueue(200, json!({"url": "https://cdn.example.com/signed-thumb"}));
     let thumb = app.get("/assets/asset-1/thumb").await;
@@ -749,7 +751,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     assert_eq!(body["resource"], "content");
 
     // Downloads use the 1600px web lens.
-    mock.enqueue(200, asset("asset-1", "approved"));
+    mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, lens_reply(WEB_LENS));
     mock.enqueue(200, json!({"url": "https://cdn.example.com/signed-web"}));
     let download = app.get("/assets/asset-1/download").await;
@@ -762,7 +764,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     assert_eq!(requests[5].json().unwrap()["lens"], WEB_LENS);
 
     // The shared client caches ensured lenses, so a second thumbnail only signs.
-    mock.enqueue(200, asset("asset-1", "approved"));
+    mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(
         200,
         json!({"url": "https://cdn.example.com/signed-thumb-2"}),
@@ -775,8 +777,35 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
 }
 
 #[tokio::test]
-async fn unapproved_or_unsafe_delivery_never_signs() {
-    for status in ["pending", "rejected", "failed"] {
+async fn demo_purge_deletes_the_file_and_keeps_the_record() {
+    let app = demo();
+    let purged = app.demo_upload("", "purged", "Ana").await;
+    let blocked = app.demo_upload("", "blocked", "Ana").await;
+    app.state.library.expire_demo_reviews();
+    let record = app.state.library.retrieve(&purged).await.unwrap();
+    assert_eq!(
+        (
+            &record.classification.moderation.status,
+            &record.content.status,
+            &record.content.removal_reason
+        ),
+        (
+            &calmlens::models::AssetModerationStatus::Purged,
+            &calmlens::models::AssetContentStatus::Removed,
+            &Some(calmlens::models::AssetContentRemovalReason::Policy)
+        )
+    );
+    // A blocked image keeps its file; it is only not delivered.
+    let kept = app.state.library.retrieve(&blocked).await.unwrap();
+    assert_eq!(
+        kept.content.status,
+        calmlens::models::AssetContentStatus::Stored
+    );
+}
+
+#[tokio::test]
+async fn undelivered_statuses_or_unsafe_delivery_never_sign() {
+    for status in ["pending", "age-restricted", "blocked", "failed"] {
         let mock = MockServerClient::new().unwrap();
         let app = live(&mock, "");
         mock.enqueue(200, asset("asset-1", status));
@@ -795,7 +824,7 @@ async fn unapproved_or_unsafe_delivery_never_signs() {
     );
     assert_eq!(mock.requests().len(), 1);
 
-    mock.enqueue(200, asset("asset-1", "approved"));
+    mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, json!({"lenses": [{"identifier": THUMB_LENS}]}));
     mock.enqueue(200, json!({"url": "javascript:alert(1)"}));
     let unsafe_url = app.get("/assets/asset-1/thumb").await;
@@ -809,7 +838,7 @@ async fn unapproved_or_unsafe_delivery_never_signs() {
 async fn live_edit_and_move_send_the_asset_changes() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    mock.enqueue(200, asset("asset-1", "approved"));
+    mock.enqueue(200, asset("asset-1", "allowed"));
     let response = app
         .post(
             "/assets/asset-1/edit",
@@ -831,14 +860,14 @@ async fn live_edit_and_move_send_the_asset_changes() {
         }))
     );
 
-    mock.enqueue(200, asset("asset-1", "approved"));
+    mock.enqueue(200, asset("asset-1", "allowed"));
     let moved = app.post("/assets/asset-1/move", "folder=folder-2").await;
     assert_eq!(moved.param("folder").as_deref(), Some("folder-2"));
     let request = mock.last_request().unwrap();
     assert_eq!(request.path, "/v1/assets/asset-1/move");
     assert_eq!(request.json(), Some(json!({"folderId": "folder-2"})));
 
-    mock.enqueue(200, asset("asset-1", "approved"));
+    mock.enqueue(200, asset("asset-1", "allowed"));
     app.post("/assets/asset-1/move", "folder=").await;
     assert_eq!(
         mock.last_request().unwrap().json(),
@@ -851,7 +880,7 @@ async fn demo_moves_change_which_folder_lists_the_image() {
     let app = demo();
     let first = app.create_folder("First", "").await;
     let second = app.create_folder("Second", "").await;
-    let id = app.demo_upload(&first, "approved", "Ana").await;
+    let id = app.demo_upload(&first, "allowed", "Ana").await;
     let listed = |page: String| page.contains(&format!("asset={id}"));
     assert!(listed(app.get(&format!("/?folder={first}")).await.html()));
     app.post(&format!("/assets/{id}/move"), &format!("folder={second}"))
@@ -865,7 +894,7 @@ async fn demo_moves_change_which_folder_lists_the_image() {
 #[tokio::test]
 async fn removing_the_file_stops_thumbnails_and_keeps_the_record() {
     let app = demo();
-    let id = app.demo_upload("", "approved", "Ana Ruiz").await;
+    let id = app.demo_upload("", "allowed", "Ana Ruiz").await;
     app.state.library.expire_demo_reviews();
     let thumb = format!("/assets/{id}/thumb");
     assert_eq!(app.get(&thumb).await.status, StatusCode::OK);
@@ -889,8 +918,8 @@ async fn removing_the_file_stops_thumbnails_and_keeps_the_record() {
         calmlens::models::AssetContentStatus::Removed
     );
     assert_eq!(
-        record.classification.moderation.decision,
-        calmlens::models::AssetModerationStatus::Approved
+        record.classification.moderation.status,
+        calmlens::models::AssetModerationStatus::Allowed
     );
     assert_eq!(
         crate::app::metadata_value(&record, "photographer"),
@@ -905,7 +934,7 @@ async fn removing_the_file_stops_thumbnails_and_keeps_the_record() {
 async fn live_remove_file_calls_delete_content() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    let mut removed = asset("asset-1", "approved");
+    let mut removed = asset("asset-1", "allowed");
     removed["content"] = json!({"status": "removed", "removalReason": "requested"});
     mock.enqueue(200, removed.clone());
     assert_eq!(
@@ -932,7 +961,7 @@ async fn live_remove_file_calls_delete_content() {
 async fn deleting_removes_the_asset() {
     let app = demo();
     let folder = app.create_folder("Archive", "").await;
-    let id = app.demo_upload(&folder, "approved", "Ana").await;
+    let id = app.demo_upload(&folder, "allowed", "Ana").await;
     assert_eq!(
         app.post(&format!("/assets/{id}/delete"), "").await.status,
         StatusCode::BAD_REQUEST
@@ -981,9 +1010,9 @@ async fn deleting_removes_the_asset() {
 // ------------------------------------------------------------ review decisions
 
 #[tokio::test]
-async fn simulated_reviewer_rejection_stops_delivery() {
+async fn simulated_reviewer_blocking_stops_delivery() {
     let app = demo();
-    let id = app.demo_upload("", "approved", "Ana").await;
+    let id = app.demo_upload("", "allowed", "Ana").await;
     app.state.library.expire_demo_reviews();
     let thumb = format!("/assets/{id}/thumb");
     assert_eq!(app.get(&thumb).await.status, StatusCode::OK);
@@ -1016,7 +1045,7 @@ async fn simulated_review_is_not_available_live() {
 #[tokio::test]
 async fn webhooks_need_a_secret() {
     let app = demo();
-    let body = event("event-1", "asset.rejected", "asset-1", json!([]));
+    let body = event("event-1", "asset.blocked", "asset-1", json!([]));
     assert_eq!(
         app.webhook(body.as_bytes(), &[]).await.status,
         StatusCode::SERVICE_UNAVAILABLE
@@ -1027,7 +1056,7 @@ async fn webhooks_need_a_secret() {
 async fn webhook_rejects_forged_tampered_and_stale_deliveries() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, SECRET);
-    let body = event("event-1", "asset.rejected", "asset-1", json!([]));
+    let body = event("event-1", "asset.blocked", "asset-1", json!([]));
     let timestamp = now();
     let signature = calmlens::create_webhook_signature_header(&body, &timestamp, SECRET);
     let ts = calmlens::WEBHOOK_TIMESTAMP_HEADER;
@@ -1045,7 +1074,7 @@ async fn webhook_rejects_forged_tampered_and_stale_deliveries() {
             .status,
         StatusCode::UNAUTHORIZED
     );
-    let tampered = body.replace("asset.rejected", "asset.approved");
+    let tampered = body.replace("asset.blocked", "asset.allowed");
     assert_eq!(
         app.webhook(tampered.as_bytes(), &[(ts, &timestamp), (sig, &signature)])
             .await
@@ -1079,7 +1108,7 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
     let app = live(&mock, SECRET);
     let body = event(
         "event-1",
-        "asset.rejected",
+        "asset.blocked",
         "asset-1",
         json!([
             {"key": "reviewer-user-id", "value": "user-9"},
@@ -1096,7 +1125,7 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
     assert!(app.state.activity().is_empty());
 
     // The retry is applied.
-    mock.enqueue(200, asset("asset-1", "rejected"));
+    mock.enqueue(200, asset("asset-1", "blocked"));
     assert_eq!(
         app.signed_webhook(&body, Some("delivery-1")).await.status,
         StatusCode::NO_CONTENT
@@ -1113,7 +1142,7 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
         app.signed_webhook(&body, None).await.status,
         StatusCode::NO_CONTENT
     );
-    let same_delivery = event("event-9", "asset.approved", "asset-1", json!([]));
+    let same_delivery = event("event-9", "asset.allowed", "asset-1", json!([]));
     assert_eq!(
         app.signed_webhook(&same_delivery, Some("delivery-1"))
             .await
@@ -1125,7 +1154,7 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
 
     let test_send = event(
         "event-2",
-        "asset.rejected",
+        "asset.blocked",
         "asset-1",
         json!([{"key": "test", "value": true}]),
     );
@@ -1154,13 +1183,12 @@ async fn webhooks_for_assets_the_library_did_not_upload_are_ignored() {
           "classification": {
             "status": "completed",
             "moderation": {
-              "action": "hide",
-              "decision": "rejected"
+              "status": "blocked"
             }
           }
         }),
     );
-    let body = event("event-1", "asset.rejected", "asset-2", json!([]));
+    let body = event("event-1", "asset.blocked", "asset-2", json!([]));
     assert_eq!(
         app.signed_webhook(&body, None).await.status,
         StatusCode::NO_CONTENT
@@ -1168,7 +1196,7 @@ async fn webhooks_for_assets_the_library_did_not_upload_are_ignored() {
     assert_eq!(mock.requests()[0].path, "/v1/assets/asset-2");
 
     // An event from another project is ignored without a request.
-    let other = event("event-2", "asset.rejected", "asset-1", json!([])).replace(
+    let other = event("event-2", "asset.blocked", "asset-1", json!([])).replace(
         r#""projectId":"project-1""#,
         r#""projectId":"project-other""#,
     );
@@ -1183,11 +1211,11 @@ async fn webhooks_for_assets_the_library_did_not_upload_are_ignored() {
 #[tokio::test]
 async fn demo_webhook_refreshes_from_the_demo_library() {
     let app = app(Library::demo(), SECRET);
-    let id = app.demo_upload("", "approved", "Ana").await;
+    let id = app.demo_upload("", "allowed", "Ana").await;
     app.state.library.expire_demo_reviews();
     let body = event(
         "event-1",
-        "asset.approved",
+        "asset.allowed",
         &id,
         json!([{"key": "decided-by", "value": "automated"}]),
     )
@@ -1343,7 +1371,7 @@ async fn escapes_library_text() {
             &[
                 ("name", "<script>alert(1)</script>"),
                 ("photographer", "\"><img src=x>"),
-                ("demo_outcome", "approved"),
+                ("demo_outcome", "allowed"),
             ],
             PNG,
         )

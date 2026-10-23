@@ -4,7 +4,7 @@ Responses are plain dicts, so fields added by newer API versions stay readable w
 ``.get()``. Enum-like response values (``status``, ``type``, ``visibility``, ...) are typed
 as the known literals *or* ``str``: values this SDK version doesn't list never fail decoding
 or type checking. Compare them against the literals below, and treat unknown values as "not
-approved". Request options use the closed literal sets the API accepts.
+allowed". Request options use the closed literal sets the API accepts.
 """
 from collections.abc import Mapping
 from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Union
@@ -14,8 +14,8 @@ from .qualifiers import ModerationQualifier
 __all__ = [
     "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "CategoryPolicyScore", "ReportPolicy",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "AssetReview", "AssetModeration", "AssetModerationAction", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
-    "AssetClassificationStatus", "AssetReviewerAction", "AssetSearchMatch", "AssetSearchMatchField",
+    "AssetReview", "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
+    "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
     "ClassificationCategory", "ClassificationLabel", "Content", "CreateFolderOptions",
@@ -44,13 +44,13 @@ __all__ = [
 
 #: Where an asset is in the pipeline (``classification.status``). New statuses may be added.
 AssetClassificationStatus = Union[Literal["pending", "processing", "completed", "failed"], str]
-#: The moderation decision in force (``classification.moderation.decision``). New statuses may be added; never
-#: treat an unknown one as approved.
-AssetModerationStatus = Union[Literal["pending", "approved", "rejected"], str]
-#: What the policy did with flagged content (``classification.moderation.action``). New actions may be added.
-AssetModerationAction = Union[Literal["flag", "hide", "purge"], str]
+#: The moderation decision in force, which also decides delivery (``classification.moderation.status``):
+#: ``pending``, then ``allowed``, ``age-restricted`` (delivered only through signed URLs or API keys),
+#: ``blocked`` (not delivered, content kept) or ``purged`` (not delivered, content deleted). New
+#: statuses may be added; never treat an unknown one as allowed.
+AssetModerationStatus = Union[Literal["pending", "allowed", "age-restricted", "blocked", "purged"], str]
 #: A reviewer's decision (``classification.moderation.manualReviews[].decision``). New values may be added.
-AssetReviewerAction = Union[Literal["approved", "rejected"], str]
+AssetModerationDecision = Union[Literal["allowed", "age-restricted", "blocked", "purged"], str]
 #: Whether CalmLens holds the content (``content.status``). New statuses may be added.
 AssetContentStatus = Union[Literal["temporary", "stored", "removed"], str]
 #: Why the content was removed (``content.removalReason``). New reasons may be added.
@@ -62,7 +62,7 @@ AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "mult
 Visibility = Literal["public", "private"]
 #: What happens to content that crosses a policy threshold (request values for
 #: ``processingOptions.flaggedContentPolicy``).
-ModerationAction = Literal["allow", "flag", "hide", "purge"]
+ModerationAction = Literal["allow", "age-restrict", "block", "purge"]
 #: Why an asset is under a safety hold. New reasons may be added.
 SafetyHoldReason = Union[Literal["suspected-illegal-content"], str]
 #: Moderation categories in ``report.categories``. New categories may be added.
@@ -85,12 +85,12 @@ CdnResource = Literal["content", "preview"]
 SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
 AssetSearchMatchField = Union[Literal["name", "id", "externalId", "description", "tags", "type", "content.format",
-                                      "content.extension", "classification.moderation.decision", "visual", "transcript"], str]
+                                      "content.extension", "classification.moderation.status", "visual", "transcript"], str]
 #: State of the project's semantic search index. New values may be added.
 SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], str]
 #: Event types. New types may be added; ignore ones you don't handle.
-EventType = Union[Literal["asset.uploaded", "asset.flagged", "asset.approved", "asset.rejected",
-                          "asset.failed", "asset.deleted", "asset.content-removed",
+EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.allowed", "asset.age-restricted",
+                          "asset.blocked", "asset.purged", "asset.failed", "asset.deleted", "asset.content-removed",
                           "asset.retried", "usage.limit-reached", "usage.spend-limit-reached",
                           "upload-preset.daily-limit-reached", "project.member-joined",
                           "project.member-removed", "project.member-role-changed",
@@ -102,7 +102,7 @@ EventSeverity = Union[Literal["low", "high"], str]
 #: Slack and email deliveries and the public events feed leave out facts that hold personal or
 #: account data (names, email addresses, the project owner's ID).
 EventFactKey = Union[Literal[
-    "asset-name", "asset-type", "file-format", "decided-by", "moderation-action", "flagged-categories",
+    "asset-name", "asset-type", "file-format", "decided-by", "moderation-status", "flagged-categories",
     "reviewer-user-id", "reviewer-name", "note", "previous-status", "limit", "used", "owner-user-id",
     "member-user-id", "member-name", "role", "invited-by-user-id", "connector-id", "connector-name",
     "connector-type", "consecutive-failures", "last-error", "resumes-on", "preset-id", "preset-name",
@@ -158,8 +158,8 @@ class MetadataItem(TypedDict):
 
 class FlaggedContentPolicy(TypedDict):
     """Overrides the project moderation action for one asset: ``allow`` takes no action,
-    ``flag`` keeps delivery enabled, ``hide`` blocks delivery while retaining content and
-    ``purge`` deletes content."""
+    ``age-restrict`` delivers only through signed URLs or API keys, ``block`` stops delivery
+    while retaining content and ``purge`` deletes content."""
     action: ModerationAction
 
 
@@ -470,20 +470,23 @@ class AssetUpload(TypedDict):
     partsReceived: Optional[int]
 
 
-class AssetReview(TypedDict):
-    action: Union[Literal["approve", "hide", "purge"], str]
+class _AssetReviewRequired(TypedDict):
     id: str
-    decision: AssetReviewerAction
+    decision: AssetModerationDecision
     note: Optional[str]
     reviewerUserId: Optional[str]
     reviewedAt: int
     appliedToAsset: bool
 
 
+class AssetReview(_AssetReviewRequired, total=False):
+    reviewerName: Optional[str]
+    reviewerEmail: Optional[str]
+
+
 class _AssetModerationRequired(TypedDict):
     manualReviews: List[AssetReview]
-    decision: AssetModerationStatus
-    action: Optional[AssetModerationAction]
+    status: AssetModerationStatus
 
 class AssetModeration(_AssetModerationRequired, total=False):
     categories: ClassificationCategories
@@ -705,8 +708,7 @@ class EventAssetUpload(TypedDict):
 
 
 class EventAssetModeration(TypedDict):
-    decision: AssetModerationStatus
-    action: Optional[AssetModerationAction]
+    status: AssetModerationStatus
 
 
 class EventAssetClassification(TypedDict):
@@ -941,6 +943,10 @@ class AssetUrlOptions(_AssetUrlRequired, total=False):
     resource: CdnResource
     lens: str
     transform: CdnTransform
+    #: Appends ``?ageRestricted=true`` so the public URL serves a public asset whose moderation
+    #: status is ``age-restricted``. Set it only where your app has already decided the viewer may
+    #: see age-restricted content.
+    ageRestricted: bool
 
 
 class ServeInit(TypedDict, total=False):

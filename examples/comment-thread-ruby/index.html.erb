@@ -61,20 +61,20 @@ footer{color:#665f7d;font-size:12px;margin-top:32px}@media(max-width:760px){.lay
 </select>
 <%- end -%>
 <button type="submit">Check &amp; post</button>
-<p class="hint">Both fields are checked. If either is flagged, the whole reply waits for a moderator and nobody sees its text until it is approved.</p></form>
+<p class="hint">Both fields are checked. If either is not allowed, the whole reply waits for a moderator and nobody sees its text until it is allowed.</p></form>
 <div class="panel" aria-label="Held for review"><h2>Held for review</h2>
 <%- if @held.empty? -%>
 <p class="hint">Nothing is waiting for a moderator.</p>
 <%- else -%>
-<p class="hint"><%= @demo ? 'Simulate the portal decision. It runs through the same events-feed code as live mode.' : 'Approve or reject these assets in the CalmLens portal, then check for review decisions.' %></p>
+<p class="hint"><%= @demo ? 'Simulate the portal decision. It runs through the same events-feed code as live mode.' : 'Allow or block these assets in the CalmLens portal, then check for review decisions.' %></p>
 <ol>
 <%- @held.each do |reply| -%>
-<li><time><%= h reply[:created_at].strftime('%H:%M:%S') %></time>Flagged <%= h held_labels(reply) %>
+<li><time><%= h reply[:created_at].strftime('%H:%M:%S') %></time>Held <%= h held_labels(reply) %>
 <dl><%- reply[:asset_ids].each do |field, id| -%><dt><%= h Calmthread::FIELD_LABELS[field].capitalize %> asset</dt><dd><%= h id %></dd><%- end -%></dl>
 <%- if @demo -%>
 <div class="actions">
-<form action="/demo/review" method="post"><input type="hidden" name="csrf" value="<%= h @csrf %>"><input type="hidden" name="reply" value="<%= h reply[:id] %>"><input type="hidden" name="decision" value="approve"><button type="submit">Simulate a reviewer approving it</button></form>
-<form action="/demo/review" method="post"><input type="hidden" name="csrf" value="<%= h @csrf %>"><input type="hidden" name="reply" value="<%= h reply[:id] %>"><input type="hidden" name="decision" value="reject"><button type="submit">Simulate a reviewer rejecting it</button></form>
+<form action="/demo/review" method="post"><input type="hidden" name="csrf" value="<%= h @csrf %>"><input type="hidden" name="reply" value="<%= h reply[:id] %>"><input type="hidden" name="decision" value="allow"><button type="submit">Simulate a reviewer allowing it</button></form>
+<form action="/demo/review" method="post"><input type="hidden" name="csrf" value="<%= h @csrf %>"><input type="hidden" name="reply" value="<%= h reply[:id] %>"><input type="hidden" name="decision" value="block"><button type="submit">Simulate a reviewer blocking it</button></form>
 </div>
 <%- end -%>
 </li>

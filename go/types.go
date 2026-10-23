@@ -28,18 +28,28 @@ const (
 )
 
 // Moderation status values of AssetModeration.Status and EventAssetModeration.Status: the
-// decision in force. Status is a plain string so values added later still decode; handle
-// unknown values as "not yet approved".
+// decision in force, which also decides delivery. Status is a plain string so values added later
+// still decode; handle unknown values as "not allowed".
 const (
-	ModerationStatusPending  = "pending"
-	ModerationStatusApproved = "approved"
-	ModerationStatusRejected = "rejected"
+	ModerationStatusPending = "pending"
+	// ModerationStatusAllowed assets are delivered normally.
+	ModerationStatusAllowed = "allowed"
+	// ModerationStatusAgeRestricted assets are delivered only through signed URLs or API keys,
+	// like private assets, so your backend decides who sees them.
+	ModerationStatusAgeRestricted = "age-restricted"
+	// ModerationStatusBlocked assets are not delivered; their content is kept.
+	ModerationStatusBlocked = "blocked"
+	// ModerationStatusPurged assets are not delivered and their stored content was deleted.
+	ModerationStatusPurged = "purged"
 )
 
-// Reviewer action values of AssetModeration.ReviewerAction.
+// Reviewer decision values of AssetReview.Decision. Decision is a plain string so values added
+// later still decode.
 const (
-	ReviewerActionApproved = "approved"
-	ReviewerActionRejected = "rejected"
+	ModerationDecisionAllowed       = "allowed"
+	ModerationDecisionAgeRestricted = "age-restricted"
+	ModerationDecisionBlocked       = "blocked"
+	ModerationDecisionPurged        = "purged"
 )
 
 // Content status values of AssetContent.Status and EventAssetContent.Status: whether CalmLens
@@ -83,14 +93,14 @@ const (
 	AssetTypeFile               = "file"
 )
 
-// Moderation action values. FlaggedContentPolicy.Action takes any of them; AssetModeration.Action,
-// EventAssetModeration.Action and the moderation-action fact are ModerationActionFlag,
-// ModerationActionHide or ModerationActionPurge (an allowed match leaves them nil).
+// Policy action values of FlaggedContentPolicy.Action, CategoryPolicyScore.Action and policy
+// rules. ReportPolicyDecision.Action is ModerationActionAgeRestrict, ModerationActionBlock or
+// ModerationActionPurge, or nil when nothing was acted on.
 const (
-	ModerationActionAllow = "allow"
-	ModerationActionFlag  = "flag"
-	ModerationActionHide  = "hide"
-	ModerationActionPurge = "purge"
+	ModerationActionAllow       = "allow"
+	ModerationActionAgeRestrict = "age-restrict"
+	ModerationActionBlock       = "block"
+	ModerationActionPurge       = "purge"
 )
 
 // Asset is a moderated asset. Optional fields are nil when absent.
@@ -145,8 +155,8 @@ type AssetClassification struct {
 
 // AssetReview records one reviewer decision without erasing earlier reviews.
 type AssetReview struct {
-	Action         string  `json:"action"`
-	ID             string  `json:"id"`
+	ID string `json:"id"`
+	// Decision is one of the ModerationDecision constants.
 	Decision       string  `json:"decision"`
 	Note           *string `json:"note"`
 	ReviewerUserID *string `json:"reviewerUserId"`
@@ -156,14 +166,14 @@ type AssetReview struct {
 
 // AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	ManualReviews []AssetReview              `json:"manualReviews"`
-	Decision      string                     `json:"decision"`
-	Action        *string                    `json:"action"`
-	Categories    map[string]CategoryResult  `json:"categories,omitempty"`
-	Score         *float64                   `json:"score,omitempty"`
-	Timeline      *MediaClassificationReport `json:"timeline,omitempty"`
-	Policy        *ReportPolicy              `json:"policy,omitempty"`
-	Raw           JSON                       `json:"-"`
+	ManualReviews []AssetReview `json:"manualReviews"`
+	// Status is one of the ModerationStatus constants.
+	Status     string                     `json:"status"`
+	Categories map[string]CategoryResult  `json:"categories,omitempty"`
+	Score      *float64                   `json:"score,omitempty"`
+	Timeline   *MediaClassificationReport `json:"timeline,omitempty"`
+	Policy     *ReportPolicy              `json:"policy,omitempty"`
+	Raw        JSON                       `json:"-"`
 }
 
 // AssetContent describes an asset's content: its format and properties, and whether CalmLens
@@ -260,8 +270,8 @@ type ProcessingOptions struct {
 }
 
 // FlaggedContentPolicy is what happens when the asset is flagged. Action is one of the
-// ModerationAction constants: allow takes no action, flag keeps delivery enabled and flags the
-// asset, hide blocks delivery while retaining content and purge deletes content.
+// ModerationAction constants: allow takes no action, age-restrict delivers the asset only through
+// signed URLs or API keys, block stops delivery while retaining content and purge deletes content.
 type FlaggedContentPolicy struct {
 	Action string `json:"action"`
 }
@@ -310,7 +320,7 @@ type ReportPolicy struct {
 }
 
 // CategoryPolicyScore is how strongly a category meets the policy, from 0 to 1, and the action
-// the policy takes: allow, flag, hide or purge.
+// the policy takes: allow, age-restrict, block or purge.
 type CategoryPolicyScore struct {
 	Score    float64                         `json:"score"`
 	Action   string                          `json:"action"`
@@ -543,7 +553,7 @@ type Order struct {
 }
 
 // ListAssetsOptions selects a page of assets. Filter is an RSQL expression over the asset's
-// fields, with nested fields by path, such as "classification.moderation.decision==approved;content.format==image/png".
+// fields, with nested fields by path, such as "classification.moderation.status==allowed;content.format==image/png".
 type ListAssetsOptions struct {
 	Cursor   string  `json:"cursor,omitempty"`
 	PageSize int     `json:"pageSize,omitempty"`
@@ -809,6 +819,11 @@ type CDNAssetURLOptions struct {
 	Lens            string
 	Transform       string
 	TransformSteps  []LensTransform
+	// AgeRestricted appends ?ageRestricted=true, which the CDN requires before it serves a public
+	// asset whose moderation status is age-restricted from its public URL (without it, such an
+	// asset needs a signed URL or an API key). Set it only where your app has already decided the
+	// viewer may see age-restricted content.
+	AgeRestricted bool
 }
 
 // CDNServeOptions fetches CDN content with an optional method and extra headers (such as
@@ -862,7 +877,7 @@ const (
 	MatchedFieldType             = "type"
 	MatchedFieldContentFormat    = "content.format"
 	MatchedFieldContentExtension = "content.extension"
-	MatchedFieldModerationStatus = "classification.moderation.decision"
+	MatchedFieldModerationStatus = "classification.moderation.status"
 	MatchedFieldVisual           = "visual"
 	MatchedFieldTranscript       = "transcript"
 )

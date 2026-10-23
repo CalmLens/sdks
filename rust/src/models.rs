@@ -117,37 +117,33 @@ string_enum! {
 }
 
 string_enum! {
-    /// The moderation decision in force: a reviewer's decision when there is one, else the
-    /// automated one.
+    /// The moderation decision in force, which also decides delivery: `pending` until
+    /// classification decides, then a reviewer's decision when there is one, else the policy's.
     AssetModerationStatus {
-        /// Waiting for classification or review.
+        /// Waiting for classification or review; not delivered.
         Pending = "pending",
-        /// Approved for delivery.
-        Approved = "approved",
-        /// Rejected by moderation.
-        Rejected = "rejected",
-    }
-}
-
-string_enum! {
-    /// What the moderation policy did with an asset's flagged content.
-    AssetModerationAction {
-        /// Kept delivery enabled and flagged it.
-        Flag = "flag",
-        /// Blocked delivery while keeping the content.
-        Hide = "hide",
-        /// Deleted the content.
-        Purge = "purge",
+        /// Delivered according to the asset's visibility.
+        Allowed = "allowed",
+        /// Delivered only through signed URLs or with an API key, like a private asset.
+        AgeRestricted = "age-restricted",
+        /// Not delivered; the content is kept.
+        Blocked = "blocked",
+        /// Not delivered, and the stored content is deleted.
+        Purged = "purged",
     }
 }
 
 string_enum! {
     /// A reviewer's decision on an asset.
-    AssetReviewerAction {
-        /// The reviewer approved the asset.
-        Approved = "approved",
-        /// The reviewer rejected the asset.
-        Rejected = "rejected",
+    AssetModerationDecision {
+        /// Deliver the asset according to its visibility.
+        Allowed = "allowed",
+        /// Deliver the asset only through signed URLs or with an API key.
+        AgeRestricted = "age-restricted",
+        /// Stop delivering the asset and keep its content.
+        Blocked = "blocked",
+        /// Stop delivering the asset and delete its stored content.
+        Purged = "purged",
     }
 }
 
@@ -182,7 +178,7 @@ string_enum! {
 string_enum! {
     /// Whether the CDN serves an asset without a signed URL.
     Visibility {
-        /// Served to anyone with the URL once approved.
+        /// Served to anyone with the URL once its moderation status is `allowed`.
         Public = "public",
         /// Served only through signed URLs or with an API key.
         Private = "private",
@@ -214,10 +210,11 @@ string_enum! {
     FlaggedContentAction {
         /// Take no action.
         Allow = "allow",
-        /// Keep delivery enabled and flag it.
-        Flag = "flag",
+        /// Deliver only through signed URLs or with an API key, so your backend can limit it to
+        /// adults.
+        AgeRestrict = "age-restrict",
         /// Block delivery while keeping the content.
-        Hide = "hide",
+        Block = "block",
         /// Delete the content.
         Purge = "purge",
     }
@@ -323,12 +320,16 @@ string_enum! {
     EventType {
         /// `asset.uploaded`.
         AssetUploaded = "asset.uploaded",
-        /// `asset.flagged`.
-        AssetFlagged = "asset.flagged",
-        /// `asset.approved`.
-        AssetApproved = "asset.approved",
-        /// `asset.rejected`.
-        AssetRejected = "asset.rejected",
+        /// `asset.classified`.
+        AssetClassified = "asset.classified",
+        /// `asset.allowed`.
+        AssetAllowed = "asset.allowed",
+        /// `asset.age-restricted`.
+        AssetAgeRestricted = "asset.age-restricted",
+        /// `asset.blocked`.
+        AssetBlocked = "asset.blocked",
+        /// `asset.purged`.
+        AssetPurged = "asset.purged",
         /// `asset.failed`.
         AssetFailed = "asset.failed",
         /// `asset.deleted`.
@@ -438,7 +439,7 @@ string_enum! {
         /// The content's file extension.
         ContentExtension = "content.extension",
         /// The moderation status.
-        ModerationStatus = "classification.moderation.decision",
+        ModerationStatus = "classification.moderation.status",
         /// The visual content.
         Visual = "visual",
         /// The audio transcript.
@@ -925,7 +926,7 @@ pub struct ListAssets {
     /// Items per page, 1 to 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// A filter such as `classification.moderation.decision==approved`.
+    /// A filter such as `classification.moderation.status==allowed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
     /// Sort orders.
@@ -948,7 +949,7 @@ pub struct ListChildren {
     /// Items per page, 1 to 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// A filter such as `classification.moderation.decision==approved`.
+    /// A filter such as `classification.moderation.status==allowed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
     /// Sort orders.
@@ -1132,6 +1133,12 @@ pub struct CdnRequest {
     /// A transform: a selector such as `imageTransform[width=320]` or structured steps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
+    /// `Some(true)` appends `?ageRestricted=true`, so the CDN serves a public asset whose
+    /// moderation status is `age-restricted` from its public URL. Without it, such an asset needs
+    /// a signed URL or an API key. Set it only where your app has already decided the viewer may
+    /// see age-restricted content. `None` and `Some(false)` add nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age_restricted: Option<bool>,
     /// The HTTP method and headers, e.g. `HEAD` or a `Range` header.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub init: Option<HttpOptions>,
@@ -1207,7 +1214,7 @@ pub struct Asset {
     /// Where the asset is in the pipeline.
     #[serde(default)]
     pub upload: AssetUpload,
-    /// The moderation decision, policy action and report.
+    /// Classification progress, the moderation status and report.
     #[serde(default)]
     pub classification: AssetClassification,
     /// Whether CalmLens holds the content, and its details.
@@ -1234,7 +1241,7 @@ impl Asset {
             classification: AssetClassification {
                 status: processing,
                 moderation: AssetModeration {
-                    decision: moderation,
+                    status: moderation,
                     ..AssetModeration::default()
                 },
                 ..AssetClassification::default()
@@ -1242,13 +1249,11 @@ impl Asset {
             ..Self::default()
         }
     }
-    /// Whether moderation has finished: the moderation status is `approved` or `rejected`, or
+    /// Whether moderation has finished: the moderation status is no longer `pending`, or
     /// processing failed.
     pub fn is_decided(&self) -> bool {
-        matches!(
-            self.classification.moderation.decision,
-            AssetModerationStatus::Approved | AssetModerationStatus::Rejected
-        ) || self.classification.status == AssetClassificationStatus::Failed
+        self.classification.moderation.status != AssetModerationStatus::Pending
+            || self.classification.status == AssetClassificationStatus::Failed
     }
 }
 
@@ -1307,19 +1312,17 @@ pub struct AssetClassification {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetReview {
-    /// The chosen action: approve, hide, or purge.
-    pub action: String,
     /// Unique identifier for this review.
     pub id: String,
     /// The reviewer’s decision.
-    pub decision: AssetReviewerAction,
+    pub decision: AssetModerationDecision,
     /// The reviewer’s explanation; required for an override.
     pub note: Option<String>,
     /// The reviewing user, or none for an API key.
     pub reviewer_user_id: Option<String>,
     /// Review time in milliseconds since the Unix epoch.
     pub reviewed_at: u64,
-    /// Whether this review changed the asset decision.
+    /// Whether this review changed the asset's moderation status.
     pub applied_to_asset: bool,
 }
 
@@ -1331,12 +1334,10 @@ pub struct AssetModeration {
     /// Reviews in chronological order.
     #[serde(default)]
     pub manual_reviews: Vec<AssetReview>,
-    /// The moderation decision in force, with reviewer decisions taking precedence.
+    /// The moderation decision in force, which also decides delivery, with reviewer decisions
+    /// taking precedence.
     #[serde(default)]
-    pub decision: AssetModerationStatus,
-    /// The policy action, or none when no content was flagged.
-    #[serde(default)]
-    pub action: Option<AssetModerationAction>,
+    pub status: AssetModerationStatus,
     /// Content-safety category scores and qualifiers.
     #[serde(default)]
     pub categories: HashMap<ClassificationCategory, CategoryResult>,
@@ -1421,7 +1422,7 @@ pub struct CategoryPolicyScore {
     /// The policy score.
     #[serde(default)]
     pub score: f64,
-    /// `allow`, `flag`, `hide` or `purge`.
+    /// `allow`, `age-restrict`, `block` or `purge`.
     #[serde(default)]
     pub action: String,
     /// The rule or threshold that decided the category.
@@ -2018,7 +2019,7 @@ pub struct EventAsset {
     /// The classification status when the event was created.
     #[serde(default)]
     pub upload: EventAssetUpload,
-    /// The moderation decision and policy action when the event was created.
+    /// The classification and moderation status when the event was created.
     #[serde(default)]
     pub classification: EventAssetClassification,
     /// Whether CalmLens held the content when the event was created.
@@ -2046,7 +2047,7 @@ impl EventAsset {
             classification: EventAssetClassification {
                 status: processing,
                 moderation: EventAssetModeration {
-                    decision: moderation,
+                    status: moderation,
                     ..EventAssetModeration::default()
                 },
                 ..EventAssetClassification::default()
@@ -2066,7 +2067,7 @@ impl EventAsset {
 #[non_exhaustive]
 pub struct EventAssetClassification {
     #[serde(default)]
-    /// The moderation decision and policy action.
+    /// The moderation status.
     pub moderation: EventAssetModeration,
     /// The classification status.
     #[serde(default)]
@@ -2076,17 +2077,14 @@ pub struct EventAssetClassification {
     pub extra: HashMap<String, Value>,
 }
 
-/// An asset's moderation decision and policy action in an [`EventAsset`].
+/// An asset's moderation status in an [`EventAsset`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct EventAssetModeration {
-    /// The moderation decision.
+    /// The moderation status, which also decides delivery.
     #[serde(default)]
-    pub decision: AssetModerationStatus,
-    /// What the policy did with flagged content, or `None` when nothing was flagged.
-    #[serde(default)]
-    pub action: Option<AssetModerationAction>,
+    pub status: AssetModerationStatus,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
