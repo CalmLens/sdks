@@ -257,7 +257,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "upload-preset/daily-limit-reached": {
     status: 429,
-    message: "This upload preset has reached its daily upload limit. Try again after midnight UTC, or raise the limit in the portal.",
+    message: "You have reached this upload preset's daily upload limit. Try again after midnight UTC.",
   },
   "upload-preset/origin-not-allowed": {
     status: 403,

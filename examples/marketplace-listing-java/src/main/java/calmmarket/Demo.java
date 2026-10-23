@@ -151,6 +151,7 @@ final class Demo implements Calmmarket.Backend {
     Map<String, Object> moderation = new LinkedHashMap<>();
     moderation.put("decision", decision.equals("approved") || decision.equals("rejected") ? decision : "pending");
     moderation.put("action", action);
+    moderation.put("manualReviews", java.util.List.of());
     if (report != null) { moderation.putAll(report); moderation.remove("processedAt"); }
     classification.put("moderation", moderation);
     asset.put("content", Map.of("status", "stored"));

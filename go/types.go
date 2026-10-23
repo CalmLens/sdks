@@ -89,8 +89,8 @@ const (
 const (
 	ModerationActionAllow = "allow"
 	ModerationActionFlag  = "flag"
-	ModerationActionHide   = "hide"
-	ModerationActionPurge  = "purge"
+	ModerationActionHide  = "hide"
+	ModerationActionPurge = "purge"
 )
 
 // Asset is a moderated asset. Optional fields are nil when absent.
