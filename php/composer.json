@@ -1,0 +1,38 @@
+{
+  "name": "calmlens/sdk",
+  "description": "CalmLens PHP SDK for moderation, storage, events and CDN delivery",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": "^8.2",
+    "guzzlehttp/guzzle": "^7.9",
+    "guzzlehttp/psr7": "^2.7",
+    "psr/http-message": "^2.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "CalmLens\\": "src/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "check": "@php scripts-check.php"
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "archive": {
+    "exclude": [
+      "/tests",
+      "/scripts-check.php",
+      "/phpunit.xml",
+      "/package.json",
+      "/.phpunit.cache",
+      "/vendor",
+      "/composer.lock"
+    ]
+  }
+}

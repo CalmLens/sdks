@@ -3,9 +3,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const languages = ["javascript", "python", "ruby", "rust", "java", "go"];
+export const languages = ["javascript", "python", "ruby", "rust", "java", "go", "php"];
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const manifests = {
+  php: ["php/src/Version.php", /^(\s*public const VERSION = ')[^']+(';)/m],
   python: ["python/pyproject.toml", /^(version\s*=\s*")[^"]+("\s*)$/m],
   ruby: ["ruby/lib/calmlens/version.rb", /^(\s*VERSION\s*=\s*['"])[^'"]+(['"])/m],
   rust: ["rust/Cargo.toml", /^(version\s*=\s*")[^"]+("\s*)$/m],
