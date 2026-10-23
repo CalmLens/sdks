@@ -28,9 +28,8 @@ $client = new CalmLens\ServerClient(
     projectId: getenv('CALMLENS_PROJECT_ID'),
 );
 $asset = $client->text->classify(['text' => 'Hello world']);
-$moderation = $asset['classification']['moderation'];
-// Only publish known approved decisions; an action such as alert may need review.
-if ($moderation['decision'] === 'approved' && ($moderation['action'] ?? null) === null) {
+// pending, then allowed, age-restricted, blocked or purged. Treat any other value as not ready.
+if ($asset['classification']['moderation']['status'] === 'allowed') {
     // Publish the comment.
 }
 ```
@@ -62,8 +61,11 @@ Use `['folderId' => null]` or `['parentId' => null]` to move to the root.
 `create` queues processing; `classify` requests a synchronous decision where supported.
 Audio and video still process asynchronously. Watch webhooks or call
 `$client->assets->waitForDecision(['assetId' => $asset['id'], 'timeout' => 60])`.
-It returns approved/rejected decisions or failed classification, and otherwise throws
-`sdk/timeout`. A classification failure is not approval.
+It returns once `classification.moderation.status` is no longer `pending` (`allowed`,
+`age-restricted`, `blocked` or `purged`) or classification has failed, and otherwise throws
+`sdk/timeout`. A classification failure is not a decision to allow. Manual reviews in
+`classification.moderation.manualReviews` record their `decision` as one of those four
+statuses. Filter lists with `classification.moderation.status==allowed`.
 
 Supply a `name` and exactly one of `content`, `part` or `url`. Content accepts one of
 `plainText`, `base64`, or `data`/`bytes` (binary string, PHP stream resource or PSR-7
@@ -137,7 +139,14 @@ $response = $client->cdn->serve(['assetIdentifier' => $asset['id']]);
 CDN `serve` returns a streaming PSR-7 response, including HTTP error responses. Its
 `init` option accepts `method` (`GET` or `HEAD`) and `headers` (e.g. `Range`). Signed
 URLs let browsers access private content without your API key. URL builders accept
-`resource` (`content` or `preview`), `lens` and a string or structured `transform`.
+`resource` (`content` or `preview`), `lens`, a string or structured `transform` and
+`ageRestricted`.
+
+The CDN treats an `age-restricted` asset like a private one: its plain public URL is
+refused. Pass `'ageRestricted' => true` to append `ageRestricted=true`, so a public
+age-restricted asset is served from its public URL. Do that only where your app has
+already decided the viewer may see age-restricted content; otherwise use a signed URL.
+`blocked` assets are not served, and `purged` assets have no content.
 
 `ensureLens` takes one definition (`identifier`, `name`, `type`, `version`,
 `transforms`, etc.); `ensureLenses` takes `['lenses' => [...]]`, sends batches of at
@@ -155,6 +164,11 @@ $event = CalmLens\Webhooks::parseEvent(
 // Deduplicate using $event['id']; resource facts are in $event['data']['facts'].
 ```
 
+Moderation sends `asset.classified` when classification finishes and one event per
+status: `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purged`,
+for automated and reviewer decisions alike. `asset.failed` reports failed processing.
+Event asset snapshots carry `classification.moderation.status`.
+
 Verification uses the exact raw bytes, constant-time HMAC comparison and a default
 300-second timestamp tolerance. Future event types, extra fields and structured
 fact values are preserved. Test deliveries use the registered `test: true` fact;
@@ -166,6 +180,30 @@ TTL is 600 seconds, configurable with `expiresInSeconds` from 1 to 3600. Issue a
 fresh token per upload after authenticating and authorizing the browser user.
 
 ### Offline tests
+
+`CalmLens\Testing\MockServerClient` is an in-memory CalmLens behind the real client:
+uploads create assets you can retrieve, list (with `field==value` filters), update, move
+and delete, events can be added to the feed, and the CDN serves stored bytes.
+
+```php
+$mock = new CalmLens\Testing\MockServerClient(queuedOutcome: 'age-restricted');
+$client = $mock->client();
+$asset = $client->assets->create(['name' => 'photo.png', 'visibility' => 'public',
+    'content' => ['data' => $bytes, 'type' => 'image/png']]);
+$mock->decide($asset['id'], 'blocked'); // as a reviewer would; adds asset.blocked
+```
+
+It does not classify content. `create` gives assets `queuedOutcome` (default `pending`)
+and `classify` gives them `analyzedOutcome` (default `allowed`): `pending`, `allowed`,
+`age-restricted`, `blocked`, `purged` (which also removes the content) or `failed`.
+`analyzedOutcome` may also be fields to merge into the asset or a callable that receives
+the asset and returns either. Content is kept only with `keepContentAfterProcessing`.
+Like the CDN, the mock refuses `blocked` assets and, with `downloadPermission: false`
+(a browser without your key), private assets and public age-restricted ones requested
+without `ageRestricted`. Responses enqueued with `enqueueJson` or `enqueue` are used first;
+folders, search and multipart uploads need enqueued responses.
+
+For exact responses only, `MockTransport` replays a FIFO queue:
 
 ```php
 $mock = new CalmLens\Testing\MockTransport();

@@ -185,13 +185,14 @@ final class Assets extends Resource
             $request['maxRetries'] = 0;
             $asset = $this->retrieve(array_replace($options, ['requestOptions' => $request]));
             $classification = $asset['classification'] ?? [];
-            $decision = $classification['moderation']['decision'] ?? null;
-            if (in_array($decision, ['approved', 'rejected'], true) || ($classification['status'] ?? null) === 'failed') {
+            // Any status but pending is a decision: allowed, age-restricted, blocked or purged.
+            $status = $classification['moderation']['status'] ?? null;
+            if (($status !== null && $status !== 'pending') || ($classification['status'] ?? null) === 'failed') {
                 return $asset;
             }
             $remaining = $deadline - hrtime(true) / 1e9;
             if ($remaining <= 0) {
-                throw new CalmLensException('sdk/timeout', details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $decision]);
+                throw new CalmLensException('sdk/timeout', details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
             }
             usleep((int) (min($delay, $remaining) * 1e6));
             $delay = min($delay * 1.5, 5);

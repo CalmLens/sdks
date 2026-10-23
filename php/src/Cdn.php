@@ -24,7 +24,13 @@ final class Cdn extends Resource
         if (isset($options['transform']) && $options['transform'] !== '') {
             $url .= (isset($options['lens']) ? ',' : '/') . Transforms::path($options['transform']);
         }
-        return $url;
+        // Opts a public age-restricted asset in to its public URL; only for viewers your app has
+        // already decided may see age-restricted content. Without it, use a signed URL or the API key.
+        $ageRestricted = $options['ageRestricted'] ?? false;
+        if (!is_bool($ageRestricted)) {
+            Values::invalid('ageRestricted must be true or false');
+        }
+        return $ageRestricted ? $url . '?ageRestricted=true' : $url;
     }
 
     /** Returns a PSR-7 response with a streaming body; HTTP errors are returned, not thrown. */

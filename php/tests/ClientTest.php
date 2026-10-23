@@ -54,15 +54,18 @@ final class ClientTest extends TestCase
     public function testTextShortcutAndDecisionStates(): void
     {
         $mock = new MockTransport();
-        $asset = ['id' => 'text', 'classification' => ['status' => 'completed', 'moderation' => ['decision' => 'approved', 'action' => null]]];
+        $asset = ['id' => 'text', 'classification' => ['status' => 'completed', 'moderation' => ['status' => 'allowed']]];
         $mock->enqueueJson($asset);
         $client = $mock->client();
         self::assertSame($asset, $client->text->classify(['text' => 'Hello ✓']));
         self::assertSame('Hello ✓', (string) $mock->requests()[0]->getBody());
         self::assertStringContainsString('queue=false', $mock->requests()[0]->getUri()->getQuery());
-        $mock->enqueueJson($asset);
-        self::assertSame($asset, $client->assets->waitForDecision(['assetId' => 'text']));
-        $pending = ['id' => 'text', 'classification' => ['status' => 'processing', 'moderation' => ['decision' => 'pending']]];
+        foreach (['allowed', 'age-restricted', 'blocked', 'purged'] as $status) {
+            $decided = ['id' => 'text', 'classification' => ['status' => 'completed', 'moderation' => ['status' => $status]]];
+            $mock->enqueueJson($decided);
+            self::assertSame($decided, $client->assets->waitForDecision(['assetId' => 'text']));
+        }
+        $pending = ['id' => 'text', 'classification' => ['status' => 'processing', 'moderation' => ['status' => 'pending']]];
         $mock->enqueueJson($pending);
         $error = $this->error('sdk/timeout', fn () => $client->assets->waitForDecision(['assetId' => 'text', 'timeout' => 0]));
         self::assertSame(['assetId' => 'text', 'classificationStatus' => 'processing', 'moderationStatus' => 'pending'], $error->details);

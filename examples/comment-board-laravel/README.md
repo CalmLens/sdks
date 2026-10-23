@@ -1,9 +1,9 @@
 # Laravel comment board
 
 A runnable Laravel 12 / PHP 8.2+ example using the local CalmLens PHP SDK. Comments
-are moderated on the server and stored in the visitor's session only after an
-approved decision with no moderation action. Rejected, pending, unknown or failed
-results never publish. The board keeps the most recent 50 comments; no database is
+are moderated on the server and stored in the visitor's session only when their
+moderation status is `allowed`. Pending, age-restricted, blocked, purged, unknown or
+failed results never publish. The board keeps the most recent 50 comments; no database is
 required. Blade escapes displayed input and Laravel protects the form with CSRF.
 
 ## Run

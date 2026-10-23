@@ -17,8 +17,8 @@ final class CommentController
             // Never display an unmoderated comment when the API is unavailable.
             return back()->withInput()->withErrors(['comment' => 'Moderation is unavailable. Please try again.']);
         }
-        $moderation = $asset['classification']['moderation'] ?? [];
-        if (($moderation['decision'] ?? null) !== 'approved' || ($moderation['action'] ?? null) !== null) {
+        // Only allowed comments publish; pending, age-restricted, blocked, purged and unknown statuses do not.
+        if (($asset['classification']['moderation']['status'] ?? null) !== 'allowed') {
             return back()->withInput()->withErrors(['comment' => 'This comment cannot be published yet.']);
         }
         // Session storage keeps this demo database-free and private to the visitor.

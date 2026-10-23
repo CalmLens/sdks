@@ -4,7 +4,7 @@
 <body>
 <main>
     <h1>Comment board</h1>
-    <p>Comments appear after CalmLens approves them. This example keeps your board in your session.</p>
+    <p>Comments appear after CalmLens allows them. This example keeps your board in your session.</p>
     <form method="post" action="/comments">
         @csrf
         <label for="comment">Your comment</label>
