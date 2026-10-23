@@ -142,7 +142,7 @@ public final class Calmmarket {
     AssetClassificationStatus processing;
     /** The decision in force, a reviewer's when there is one. */
     AssetModerationStatus moderation;
-    /** What the policy did with flagged content ({@code alert}, {@code hide} or {@code purge}); null when it matched nothing. */
+    /** What the policy did with flagged content ({@code flag}, {@code hide} or {@code purge}); null when it matched nothing. */
     String moderationAction;
     AssetModeration report;
     /** The reviewer's note, or else automated moderation's reason for a rejection. */
@@ -575,7 +575,7 @@ public final class Calmmarket {
     return name.isEmpty() || name.length() > 100 ? "listing-photo-" + number : name;
   }
 
-  /** Flagged means the policy took an action (alert, hide or purge) on the asset. */
+  /** Flagged means the policy took an action (flag, hide or purge) on the asset. */
   static boolean flagged(Asset asset) { return asset.classification().moderation() != null && asset.classification().moderation().action() != null; }
 
   static AssetModerationStatus moderationStatus(Asset asset) { return asset.classification().moderation() == null ? null : asset.classification().moderation().decision(); }

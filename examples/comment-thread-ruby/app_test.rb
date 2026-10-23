@@ -32,7 +32,7 @@ module TestHelpers
 
   # An asset with content stored. `status` is `pending` or `uploading` (still processing), `error`
   # (processing failed) or the moderation status once processing is done. A flagged field is one
-  # the policy acted on: `hide` when rejected, `alert` otherwise.
+  # the policy acted on: `hide` when rejected, `flag` otherwise.
   def asset(id, status, flagged: false)
     classification = { 'pending' => 'processing', 'uploading' => 'pending', 'error' => 'failed' }.fetch(status, 'completed')
     moderation = classification == 'completed' ? status : 'pending'

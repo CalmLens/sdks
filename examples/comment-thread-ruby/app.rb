@@ -106,7 +106,7 @@ module Calmthread
 
   def self.status(asset) = section(section(asset, 'classification'), 'moderation')['decision']
   def self.processing_failed?(asset) = section(asset, 'classification')['status'] == 'failed'
-  # Flagged means the policy took an action (alert, hide or purge) on the field.
+  # Flagged means the policy took an action (flag, hide or purge) on the field.
   def self.flagged?(asset) = !section(section(asset, 'classification'), 'moderation')['action'].nil?
 
   # :clean publishes, :held waits for a reviewer, :failed never publishes.

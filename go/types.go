@@ -260,8 +260,8 @@ type ProcessingOptions struct {
 }
 
 // FlaggedContentPolicy is what happens when the asset is flagged. Action is one of the
-// ModerationAction constants: ignore takes no action, alert keeps delivery enabled, hide
-// blocks delivery while retaining content and purge deletes content.
+// ModerationAction constants: allow takes no action, flag keeps delivery enabled and flags the
+// asset, hide blocks delivery while retaining content and purge deletes content.
 type FlaggedContentPolicy struct {
 	Action string `json:"action"`
 }
@@ -310,7 +310,7 @@ type ReportPolicy struct {
 }
 
 // CategoryPolicyScore is how strongly a category meets the policy, from 0 to 1, and the action
-// the policy takes: ignore, alert, hide or purge.
+// the policy takes: allow, flag, hide or purge.
 type CategoryPolicyScore struct {
 	Score    float64                         `json:"score"`
 	Action   string                          `json:"action"`

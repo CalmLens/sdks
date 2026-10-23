@@ -56,7 +56,7 @@ console.log(image.classification.status, image.classification.moderation.decisio
 | `classification.status` | `classification.moderation.decision` | `classification.moderation.action` | Meaning |
 | --- | --- | --- | --- |
 | `completed` | `approved` | `null` | Safe to show. |
-| `completed` | `approved` | `alert` | Show it, but your policy asked to be alerted. |
+| `completed` | `approved` | `flag` | Show it, but your policy flagged it for review. |
 | `completed` | `rejected` | `hide` or `purge` | Your policy hid or purged it. Don't show it. |
 | `pending` or `processing` | `pending` | `null` | Still being received or classified; `upload.status` is `uploading` while parts are arriving. |
 | `failed` | `pending` | `null` | Processing failed; see `assets.retry`. |
@@ -539,7 +539,7 @@ Upload, classification and content each have a status; moderation has its own de
 
 - `upload.status`: `uploading` while source content is arriving, then `completed`
 - `classification.status`: `pending`, `processing`, `completed` or `failed`
-- `classification.moderation.decision`: `pending` until moderation finishes, then `approved` or `rejected`. The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated one. `classification.moderation.action` is what your policy did with flagged content (`alert`, `hide` or `purge`), or `null` when nothing was flagged; an `alert` leaves the asset `approved`.
+- `classification.moderation.decision`: `pending` until moderation finishes, then `approved` or `rejected`. The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated one. `classification.moderation.action` is what your policy did with flagged content (`flag`, `hide` or `purge`), or `null` when nothing was flagged; `flag` leaves the asset `approved`.
 - `content.status`: `temporary` (kept only until processing finishes), `stored` or `removed`, with `content.removalReason` `policy` (purged), `retention` (`keepContentAfterProcessing` off), `requested`, `parent-removed` or `disposed`
 
 ## Moderation Reports

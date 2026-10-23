@@ -42,7 +42,7 @@ import type {
 export type AssetClassificationStatus = KnownAssetClassificationStatus | (string & {});
 /** The moderation decision in force: `pending`, then `approved` or `rejected`. */
 export type AssetModerationStatus = KnownAssetModerationStatus | (string & {});
-/** What the policy did with flagged content: `alert`, `hide` or `purge`. */
+/** What the policy did with flagged content: `flag`, `hide` or `purge`. */
 export type AssetModerationAction = KnownAssetModerationAction | (string & {});
 /** A reviewer's decision: `approved` or `rejected`. */
 export type AssetReviewerAction = KnownAssetReviewerAction | (string & {});

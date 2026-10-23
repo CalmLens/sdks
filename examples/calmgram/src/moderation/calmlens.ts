@@ -63,7 +63,7 @@ export const toOutcome = (asset: Asset): ModerationOutcome => {
     externalId: asset.externalId ?? null,
     uploadPresetId: asset.uploadPresetId ?? null,
     status: toStatus(asset),
-    // The policy took an action (alert, hide or purge) when the content matched it.
+    // The policy took an action (flag, hide or purge) when the content matched it.
     flagged: asset.classification.moderation.action != null,
     findings,
   };

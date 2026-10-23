@@ -482,7 +482,7 @@ export const Decision = ({ item }: { item: ModerationFields }) => {
     rejected: "Rejected",
     pending: "Pending",
     error: "Failed",
-    flagged: "Alerted",
+    flagged: "Flagged",
   };
   return (
     <span class={`queue-status queue-status-${status}`}>

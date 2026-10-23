@@ -97,7 +97,7 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 		media["frameIntervalSeconds"] = 0.5
 		media["sampledFrames"] = 98
 	}
-	// The policy's action: none for a clean clip, alert to publish a flagged one, hide to reject.
+	// The policy's action: none for a clean clip, flag to publish a flagged one, hide to reject.
 	processing["status"] = calmlens.ClassificationStatusCompleted
 	moderation["decision"], moderation["action"] = calmlens.ModerationStatusApproved, nil
 	switch choice {

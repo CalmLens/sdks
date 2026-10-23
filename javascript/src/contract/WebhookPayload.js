@@ -1,7 +1,7 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-CNzrwkvC.js";
-import "./SharedConstants-CdFPZV7z.js";
+import { C as metaStore, D as getModerationQualifiers, E as POLICY_RESTRICTION_SCHEMA, S as docPropertyInfo, T as POLICY_ALLOWANCE_SCHEMA, _ as saneStringField, b as backfill, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as FLAGGED_CONTENT_ACTION_SCHEMA, x as PROCESSING_FEATURES_SCHEMA, y as uuidField } from "./TestTriggers-C9iIhCVG.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
+import "./SharedConstants-CdFPZV7z.js";
 import * as zod from "zod";
 //#region packages/shared/src/AssetReviewAction.ts
 const ASSET_REVIEW_ACTION_SCHEMA = zod.enum([
@@ -85,7 +85,7 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	threshold: zod.number().min(0).max(1).transform((threshold) => Math.max(threshold, MINIMUM_MODERATION_THRESHOLD)).meta({ description: "The policy score at which the category's action applies. The policy score is the category score, lowered by allowances that cover the content and raised to a restriction's presence score." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
-	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: ignore it, alert while continuing delivery, hide while retaining content, or permanently purge content." })
+	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, flag it while continuing delivery, hide while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
 	const categoryAction = value.flaggedContentPolicy?.action ?? "hide";
 	for (const kind of ["allowance", "restriction"]) {
@@ -295,7 +295,7 @@ const PROCESSING_OPTIONS_SCHEMA = zod.object({
 		defaultValue: false
 	})])),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta(metaStore([docPropertyInfo({
-		description: "Override the project moderation action for this asset. Ignore takes no action, alert keeps delivery enabled, hide blocks delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
+		description: "Override the project moderation action for this asset. Allow takes no action, flag keeps delivery enabled and flags the asset, hide blocks delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
 		defaultValue: void 0
 	})])),
 	features: PROCESSING_FEATURES_SCHEMA.nullish()

@@ -138,7 +138,7 @@ only needs a few fields:
 | `classification.moderation.decision` | `classification.moderation.action` | Calmgram does |
 | --- | --- | --- |
 | `approved` | `null` | Publish |
-| `approved` | `alert` | Publish and add to the moderation queue |
+| `approved` | `flag` | Publish and add to the moderation queue |
 | `rejected` | `hide` or `purge` | Don't publish; tell the author which category matched (from `classification.moderation`) |
 | `pending` | — | Show only to the author with a "Checking…" placeholder |
 

@@ -111,7 +111,7 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
 - **Decisions.** Audio and video always return with moderation status `pending` and are
   processed in the background. A clip is decided once `Moderation.Status` is `approved` or
   `rejected`, or `Processing.Status` is `failed`; it is flagged for review when
-  `Moderation.Action` is set (the policy chose `alert`). While a clip is pending, the page reloads every three seconds (never during
+  `Moderation.Action` is set (the policy chose `flag`). While a clip is pending, the page reloads every three seconds (never during
   an upload) and the server calls `Assets.Retrieve`; verified webhooks update a clip
   sooner.
 - **Timeline.** `classification.moderation.timeline` provides `durationSeconds` and `segments`. Native analysis

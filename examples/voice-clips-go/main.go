@@ -290,7 +290,7 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 		return err
 	}
 	item.Status = clipStatus(asset)
-	// The policy took an action (alert, hide or purge) when the content matched it.
+	// The policy took an action (flag, hide or purge) when the content matched it.
 	item.Flagged = asset.Classification.Moderation.Action != nil
 	item.Duration, item.Segments = 0, nil
 	if report := asset.Classification.Moderation; report.Timeline != nil {

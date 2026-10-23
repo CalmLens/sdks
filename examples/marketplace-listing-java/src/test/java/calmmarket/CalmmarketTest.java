@@ -138,7 +138,7 @@ class CalmmarketTest {
    * An asset as the API returns it, with its content stored. {@code decision} is {@code pending}
    * (still processing), {@code error} (processing failed), or the moderation status after
    * processing: {@code approved}, {@code rejected} or a value this app does not know. A flagged
-   * report sets the policy action: {@code hide} on a rejection, {@code alert} otherwise.
+   * report sets the policy action: {@code hide} on a rejection, {@code flag} otherwise.
    */
   static Map<String, Object> asset(String id, String decision, String externalId, Map<String, Object> report) {
     Map<String, Object> asset = new LinkedHashMap<>();

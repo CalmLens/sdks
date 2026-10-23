@@ -36,7 +36,7 @@ def demo_report(result: str) -> dict:
 
 def decide(asset: dict, result: str):
     """Finishes processing with a demo outcome: a flagged page is approved with the policy action
-    ``alert``, a rejected one is hidden, a clean one matched nothing."""
+    ``flag``, a rejected one is hidden, a clean one matched nothing."""
     asset["classification"]["status"] = "completed"
     asset["classification"]["moderation"].update(decision="approved" if result == "flagged" else result,
                                action={"flagged": "flag", "rejected": "hide"}.get(result),

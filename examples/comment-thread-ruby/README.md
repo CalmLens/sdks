@@ -89,13 +89,13 @@ processing unless the upload keeps it, so every field is sent with
 `keep_content_after_processing: true`: a reviewer can read a held reply in the portal, and the
 app deletes the stored text once a reply is rejected. Setting the override on each asset makes
 this thread hold flagged replies
-regardless of the project-wide action, which may be `alert` (publish and notify) or `purge`
+regardless of the project-wide action, which may be `flag` (publish and flag for review) or `purge`
 (delete the content, leaving nothing to review) for the project's other uploads.
 
 The override changes only what happens to a flagged asset. Your project's moderation policy
 still decides what counts as flagged: category thresholds and rules work as usual. With the
 override, a category above its threshold is held even if the project sets that category's
-action to `ignore`. See the moderation policies guide in the CalmLens docs.
+action to `allow`. See the moderation policies guide in the CalmLens docs.
 
 ## Review decisions
 

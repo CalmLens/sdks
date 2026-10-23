@@ -207,7 +207,7 @@ class Board:
                 continue
             moderation = asset["classification"]["moderation"]
             report = moderation
-            # Flagged means the policy took an action (alert, hide or purge) on the page.
+            # Flagged means the policy took an action (flag, hide or purge) on the page.
             update = {"status": link_status(asset), "flagged": moderation["action"] is not None}
             if update["status"] in ("approved", "rejected") and (update["flagged"] or update["status"] == "rejected"):
                 update["explanation"] = explain(report)
