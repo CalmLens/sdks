@@ -8335,7 +8335,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "harassment",
 		displayName: "Threats or intimidation",
 		description: "A direct, conditional or clearly implied personal threat, or serious abusive or coercive intimidation, against an identifiable person or group; broad intergroup violent rhetoric alone belongs under Hate or Violence.",
-		exclusions: "Figurative speech; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation. A concrete threat quoted or described in a report still has this form; its framing is separate."
+		exclusions: "Figurative speech; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation. A concrete threat quoted or described in a report still has this form; whether that report covers it is decided by the framing criteria."
 	},
 	"harassment-sexual": {
 		category: "harassment",
