@@ -134,6 +134,8 @@ string_enum! {
         HarassmentAbuse = "harassment-abuse",
         /// Harassment: Mild mockery or teasing.
         HarassmentMild = "harassment-mild",
+        /// Harassment: Bullying or abuse.
+        HarassmentBullying = "harassment-bullying",
         /// Harassment: Aimed at a public figure or group.
         HarassmentPublicTarget = "harassment-public-target",
         /// Harassment: Threats or intimidation.

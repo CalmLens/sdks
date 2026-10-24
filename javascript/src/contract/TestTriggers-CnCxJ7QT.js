@@ -8164,7 +8164,7 @@ const MODERATION_QUALIFIER_INFO = {
 	"violence-attack": {
 		category: "violence",
 		displayName: "Physical attack",
-		description: "A depicted or described physical attack against another person or animal.",
+		description: "A depicted or described physical attack against another person or animal, including a general or statistical statement that people were attacked or assaulted.",
 		exclusions: "An injury or death without evidence of an attack; a threat, plan or encouragement alone; solely intentional self-injury."
 	},
 	"violence-threat": {
@@ -8257,7 +8257,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		displayName: "Fantasy or cartoon violence",
 		description: "Unrealistic or stylised violence, such as cartoon, fantasy or game combat, slapstick, or defeating creatures, monsters or characters, with no realistic injury or blood.",
-		exclusions: "Realistic violence against people, realistic blood or injury, killing presented realistically, torture or sexual violence, and any depiction or recreation of a real-world attack, war crime, genocide, terrorist attack or mass shooting, even when animated or in a game."
+		exclusions: "Realistic violence against people, including shootings or killings in a story whose plot or characters are clichéd, exaggerated or caricatured, since only the violence itself being unrealistic makes it fantasy; realistic blood or injury, killing presented realistically, torture or sexual violence, and any depiction or recreation of a real-world attack, war crime, genocide, terrorist attack or mass shooting, even when animated or in a game."
 	},
 	"violence-support-prevention": {
 		category: "violence",
@@ -8336,6 +8336,12 @@ const MODERATION_QUALIFIER_INFO = {
 		displayName: "Mild mockery or teasing",
 		description: "Light ridicule, teasing, sarcasm or a mocking nickname aimed at an identifiable person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), that stops short of contempt or degradation, without threats or intimidation. Mild name-calling such as fool, dummy or silly, without degradation, exclusion or repeated targeting, is this form. It counts so that a policy can allow or restrict it. Actual quoted, reported or fictional instances also count.",
 		exclusions: "Contemptuous name-calling such as idiot, moron, loser or pathetic, insults that degrade or humiliate a person or group, attacks on a person's worth, slurs, threats, intimidation, sexual remarks, bullying campaigns or victim mockery: assess those as Insults or humiliation or the matching form. Name-calling of a protected identity group belongs under Hate. Criticism of an argument, decision, policy or conduct without mocking the people, self-deprecation and untargeted jokes. Affectionate or playful teasing between people on good terms, signalled by warmth such as \"love you\", laughter or a laughing emoji, a fond tone or a fondly described friend or family member, even with a mild word such as goofball, silly or dork. Telling someone not to call another person a name."
+	},
+	"harassment-bullying": {
+		category: "harassment",
+		displayName: "Bullying or abuse",
+		description: "Repeated or sustained targeting of a person, ganging up on them, excluding or shutting them out, or abuse or coercive control by a partner, family member or someone else in an ongoing relationship.",
+		exclusions: "A single insult or remark without repeated targeting, exclusion or an ongoing abusive relationship, which is Insults or humiliation; a one-off fight or assault by someone with no ongoing relationship to the victim."
 	},
 	"harassment-public-target": {
 		category: "harassment",

@@ -135,6 +135,14 @@ const FIRST_PARTY_COOKIES = {
 		type: "functional",
 		providerName: "CalmLens"
 	},
+	DOCS_UI_LIBRARY: {
+		name: "CL_docsUiLibrary",
+		description: "Remembers the UI library you selected for documentation examples",
+		expirationDescription: "1 year",
+		expirationMs: YEAR_MS,
+		type: "functional",
+		providerName: "CalmLens"
+	},
 	DOCS_LANGUAGE: {
 		name: "CL_docsLanguage",
 		description: "Remembers the programming language you selected for documentation examples",

@@ -71,6 +71,7 @@ const (
 	QualifierSelfHarmSupportPrevention            = "self-harm-support-prevention"
 	QualifierHarassmentAbuse                      = "harassment-abuse"
 	QualifierHarassmentMild                       = "harassment-mild"
+	QualifierHarassmentBullying                   = "harassment-bullying"
 	QualifierHarassmentPublicTarget               = "harassment-public-target"
 	QualifierHarassmentThreat                     = "harassment-threat"
 	QualifierHarassmentSexual                     = "harassment-sexual"

@@ -70,6 +70,7 @@ ModerationQualifier = Union[Literal[
     "self-harm-support-prevention",
     "harassment-abuse",
     "harassment-mild",
+    "harassment-bullying",
     "harassment-public-target",
     "harassment-threat",
     "harassment-sexual",

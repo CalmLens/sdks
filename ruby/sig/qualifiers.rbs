@@ -68,6 +68,7 @@ module CalmLens
     ?"self-harm-support-prevention" => qualifier_result,
     ?"harassment-abuse" => qualifier_result,
     ?"harassment-mild" => qualifier_result,
+    ?"harassment-bullying" => qualifier_result,
     ?"harassment-public-target" => qualifier_result,
     ?"harassment-threat" => qualifier_result,
     ?"harassment-sexual" => qualifier_result,
