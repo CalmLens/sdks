@@ -431,14 +431,14 @@ describe("MockCalmLensServerClient", () => {
 
     const response = await client.cdn.serve({
       assetIdentifier: "asset-id",
-      resource: "content",
+      resource: "original",
       init: { headers: { Accept: "image/png" } },
     });
 
     expect(await response.text()).toBe("asset-bytes");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/rendered`);
+    expect(url).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/original`);
     expect(new Headers(init.headers).get("accept")).toBe("image/png");
     expect(new Headers(init.headers).get("x-api-key")).toBe(apiKey);
     expect(init.redirect).toBe("manual");
