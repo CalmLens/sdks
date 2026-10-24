@@ -12,6 +12,14 @@ final class Assets extends Resource
 {
     /** The longest signed URL lifetime the API accepts: 24 hours. */
     public const MAX_SIGNED_URL_SECONDS = 86400;
+    /** `createSignedUrl`'s lifetime when none is given, sent explicitly. */
+    public const DEFAULT_SIGNED_URL_SECONDS = 900;
+    /** Seconds `waitForDecision` polls before `sdk/timeout`; 0 checks once. */
+    public const DEFAULT_DECISION_TIMEOUT = 60;
+    /** Seconds before `waitForDecision`'s second check; each later wait is 1.5 times longer, at most 5 seconds. */
+    public const DECISION_FIRST_INTERVAL = 0.5;
+    public const DECISION_INTERVAL_FACTOR = 1.5;
+    public const DECISION_MAX_INTERVAL = 5;
 
     public function search(array $options): array
     {
@@ -114,14 +122,14 @@ final class Assets extends Resource
         if ($resource === 'original' && (isset($api['lens']) || isset($api['transform']))) {
             Values::invalid('Lenses and transforms apply only to the rendered resource');
         }
-        $expires = $api['expiresInSeconds'] ?? 900;
+        $expires = $api['expiresInSeconds'] ?? self::DEFAULT_SIGNED_URL_SECONDS;
         if (!is_int($expires) || $expires < 1 || $expires > self::MAX_SIGNED_URL_SECONDS) {
             Values::invalid('expiresInSeconds must be a whole number from 1 to 86400');
         }
         if (isset($api['transform'])) {
             $api['transform'] = Transforms::selector($api['transform']);
         }
-        return $this->session->request('POST', $path . '/signed-url', body: $api + ['expiresInSeconds' => 900], options: $request);
+        return $this->session->request('POST', $path . '/signed-url', body: $api + ['expiresInSeconds' => self::DEFAULT_SIGNED_URL_SECONDS], options: $request);
     }
 
     public function create(array $options): array { return $this->submit($options, true); }
@@ -141,7 +149,7 @@ final class Assets extends Resource
             Values::invalid('Supply a name and exactly one of content, part or url', 'upload/invalid-payload');
         }
         if (array_key_exists('url', $api)) {
-            return $this->session->request('POST', $this->session->project('assets'), query: ['queue' => $queue], body: $api, idempotent: true, options: $request);
+            return self::asset($this->session->request('POST', $this->session->project('assets'), query: ['queue' => $queue], body: $api, idempotent: true, options: $request));
         }
         $multipart = array_key_exists('part', $api);
         $content = $api[$multipart ? 'part' : 'content'];
@@ -156,15 +164,16 @@ final class Assets extends Resource
         if ($multipart && ($content['partNumber'] ?? 1) !== 1) {
             Values::invalid('Use uploadPart for subsequent parts', 'upload/use-upload-part');
         }
-        $body = UploadBody::from($content, $multipart);
+        $body = UploadBody::from($content, $multipart, !$this->session->deferUploadChecks);
         $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
         $query += ['queue' => $queue, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
         if ($multipart) {
             $total = $api['totalSizeInBytes'] ?? null;
-            if ($total !== null && (!is_int($total) || $total <= 0 || $total < $body->getSize())) {
+            if ($total !== null && (!is_int($total) || $total <= 0
+                || (!$this->session->deferUploadChecks && $total < $body->getSize()))) {
                 Values::invalid('Invalid totalSizeInBytes', 'upload/invalid-payload');
             }
-            if (str_starts_with($baseMime, 'image/')) {
+            if (str_starts_with($baseMime, 'image/') && !$this->session->deferUploadChecks) {
                 $size = $total ?? $body->getSize();
                 if ($size > 20 * 1024 * 1024) {
                     Values::invalid('Multipart image exceeds 20MiB', 'upload/multipart-image-too-large');
@@ -175,8 +184,9 @@ final class Assets extends Resource
             }
             $query += ['partNumber' => 1, 'isFinal' => $content['isFinal'] ?? false, 'totalSizeInBytes' => $total];
         }
-        return $this->session->request('POST', $this->session->project('assets'), query: $query, raw: $body,
-            headers: ['Content-Type' => $mime, 'X-CalmLens-Upload' => $multipart ? 'part' : 'content'], idempotent: true, options: $request);
+        return self::asset($this->session->request('POST', $this->session->project('assets'), query: $query, raw: $body,
+            headers: ['Content-Type' => $mime, 'X-CalmLens-Upload' => $multipart ? 'part' : 'content'], idempotent: true, options: $request,
+            upload: !array_key_exists('plainText', $content)));
     }
 
     public function uploadPart(array $options): array
@@ -187,7 +197,7 @@ final class Assets extends Resource
         if (!is_array($part) || !is_int($part['partNumber'] ?? null) || $part['partNumber'] < 1) {
             Values::invalid('partNumber must be positive', 'upload/invalid-part-number');
         }
-        $body = UploadBody::from($part, true);
+        $body = UploadBody::from($part, true, !$this->session->deferUploadChecks);
         $query = ['partNumber' => $part['partNumber'], 'isFinal' => $part['isFinal'] ?? false, 'sizeInBytes' => $body->getSize()];
         if (array_key_exists('queue', $api)) {
             if (!is_bool($api['queue'])) {
@@ -195,37 +205,53 @@ final class Assets extends Resource
             }
             $query['queue'] = $api['queue'];
         }
-        return $this->session->request('POST', $path . '/part', query: $query, raw: $body,
-            headers: ['Content-Type' => 'application/octet-stream', 'X-CalmLens-Upload' => 'part'], idempotent: true, options: $request);
+        return self::asset($this->session->request('POST', $path . '/part', query: $query, raw: $body,
+            headers: ['X-CalmLens-Upload' => 'part'], idempotent: true, options: $request, upload: true));
     }
 
+    /**
+     * Retrieves an asset until `classification.moderation.status` is no longer `pending`, or its
+     * `classification.status` is `failed`, and returns it. Waits 0.5 seconds before the second
+     * check and 1.5 times longer each time, at most 5 seconds. Throws `TimeoutException`
+     * (`sdk/timeout`, with the asset's statuses in `details`) once `timeout` seconds (default 60)
+     * pass without a decision; 0 checks once.
+     */
     public function waitForDecision(array $options): array
     {
-        $timeout = $options['timeout'] ?? 60;
+        $timeout = $options['timeout'] ?? self::DEFAULT_DECISION_TIMEOUT;
         if ((!is_int($timeout) && !is_float($timeout)) || !is_finite((float) $timeout) || $timeout < 0) {
             Values::invalid('timeout must be a non-negative number');
         }
         unset($options['timeout']);
+        Values::segment($options['assetId'] ?? null);
         $deadline = ($this->session->clock)() + $timeout;
-        $delay = 0.5;
+        $delay = self::DECISION_FIRST_INTERVAL;
         do {
-            $remaining = max(0.001, $deadline - ($this->session->clock)());
-            $request = $options['requestOptions'] ?? [];
-            $request['timeout'] = min($request['timeout'] ?? 120, $remaining);
-            $request['maxRetries'] = 0;
-            $asset = $this->retrieve(array_replace($options, ['requestOptions' => $request]));
+            $asset = $this->retrieve($options);
             $classification = $asset['classification'] ?? [];
-            // Any status but pending is a decision: allowed, age-restricted, blocked or purged.
+            // Any status but pending is a decision: allowed, limited, age-restricted, blocked or purged.
             $status = $classification['moderation']['status'] ?? null;
             if (($status !== null && $status !== 'pending') || ($classification['status'] ?? null) === 'failed') {
                 return $asset;
             }
             $remaining = $deadline - ($this->session->clock)();
             if ($remaining <= 0) {
-                throw CalmLensException::create('sdk/timeout', details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
+                throw CalmLensException::create('sdk/timeout', "Asset {$options['assetId']} had no moderation decision after {$timeout}s",
+                    details: ['assetId' => $asset['id'] ?? $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
             }
             ($this->session->sleep)(min($delay, $remaining));
-            $delay = min($delay * 1.5, 5);
+            $delay = min($delay * self::DECISION_INTERVAL_FACTOR, self::DECISION_MAX_INTERVAL);
         } while (true);
+    }
+
+    /** An upload's response must be an asset with its statuses. */
+    private static function asset(mixed $data): array
+    {
+        if (!is_array($data) || !is_string($data['id'] ?? null) || $data['id'] === ''
+            || !is_string($data['upload']['status'] ?? null) || !is_string($data['classification']['status'] ?? null)
+            || !is_string($data['classification']['moderation']['status'] ?? null)) {
+            throw CalmLensException::create('sdk/invalid-response', 'Expected an asset response', 200);
+        }
+        return $data;
     }
 }

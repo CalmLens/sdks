@@ -7,7 +7,7 @@ namespace CalmLens\Internal;
 use GuzzleHttp\Psr7\StreamDecoratorTrait;
 use Psr\Http\Message\StreamInterface;
 
-/** A bounded view from the caller's current stream offset. @internal */
+/** A bounded view from the caller's current stream offset; unbounded when the size is unknown. @internal */
 final class UploadStream implements StreamInterface
 {
     use StreamDecoratorTrait;
@@ -15,7 +15,7 @@ final class UploadStream implements StreamInterface
     private int $position = 0;
     private int $start;
 
-    public function __construct(private StreamInterface $stream, private int $size)
+    public function __construct(private StreamInterface $stream, private ?int $size)
     {
         $this->start = $stream->isSeekable() ? $stream->tell() : 0;
         if ($size === 0 && $stream->read(1) !== '') {
@@ -23,15 +23,18 @@ final class UploadStream implements StreamInterface
         }
     }
 
-    public function getSize(): int { return $this->size; }
+    public function getSize(): ?int { return $this->size; }
     public function tell(): int { return $this->position; }
-    public function eof(): bool { return $this->position === $this->size; }
+    public function eof(): bool { return $this->size === null ? $this->stream->eof() : $this->position === $this->size; }
     public function isWritable(): bool { return false; }
     public function write(string $string): int { throw new \RuntimeException('Upload stream is read-only'); }
     public function rewind(): void { $this->seek(0); }
 
     public function seek(int $offset, int $whence = SEEK_SET): void
     {
+        if ($this->size === null) {
+            throw new \RuntimeException('An unsized upload stream cannot seek');
+        }
         $target = match ($whence) {
             SEEK_SET => $offset,
             SEEK_CUR => $this->position + $offset,
@@ -52,6 +55,11 @@ final class UploadStream implements StreamInterface
         }
         if ($length === 0 || $this->eof()) {
             return '';
+        }
+        if ($this->size === null) {
+            $chunk = $this->stream->read($length);
+            $this->position += strlen($chunk);
+            return $chunk;
         }
         $chunk = $this->stream->read(min($length, $this->size - $this->position));
         if ($chunk === '') {

@@ -91,16 +91,50 @@ final class Webhooks
         }
         try {
             $object = json_decode($payload, false, 512, JSON_THROW_ON_ERROR);
-            if (!$object instanceof \stdClass || !is_string($object->id ?? null) || !is_string($object->type ?? null)
-                || !is_int($object->createdAt ?? null) || !is_string($object->projectId ?? null) || !($object->data ?? null) instanceof \stdClass) {
-                throw new \JsonException('Not an event');
-            }
-            return json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $error) {
-            throw CalmLensException::create('sdk/invalid-webhook-payload', 'Webhook body is not an event', previous: $error);
+            throw CalmLensException::create('sdk/invalid-webhook-payload', 'Webhook body is not JSON', previous: $error);
         }
+        if (!self::isEvent($object)) {
+            throw CalmLensException::create('sdk/invalid-webhook-payload', 'Webhook body is not an event');
+        }
+        // Unknown event types and fields are kept.
+        return json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
     }
 
+    /** The API's payload shape: required envelope fields and, when present, the types of known data fields. */
+    private static function isEvent(mixed $object): bool
+    {
+        if (!$object instanceof \stdClass || !is_string($object->id ?? null) || !is_string($object->type ?? null)
+            || !is_string($object->projectId ?? null) || !(is_int($object->createdAt ?? null) || is_float($object->createdAt ?? null))
+            || !($object->data ?? null) instanceof \stdClass) {
+            return false;
+        }
+        $data = get_object_vars($object->data);
+        $nullableString = fn (string $key) => !array_key_exists($key, $data) || $data[$key] === null || is_string($data[$key]);
+        if ((array_key_exists('severity', $data) && !is_string($data['severity']))
+            || (array_key_exists('title', $data) && !is_string($data['title']))
+            || !$nullableString('description') || !$nullableString('assetId')) {
+            return false;
+        }
+        if (array_key_exists('asset', $data) && $data['asset'] !== null
+            && (!$data['asset'] instanceof \stdClass || !is_string($data['asset']->id ?? null))) {
+            return false;
+        }
+        if (array_key_exists('facts', $data)) {
+            if (!is_array($data['facts'])) {
+                return false;
+            }
+            foreach ($data['facts'] as $fact) {
+                if (!$fact instanceof \stdClass || !is_string($fact->key ?? null) || !property_exists($fact, 'value')
+                    || (property_exists($fact, 'url') && !is_string($fact->url))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** True for a test delivery: `data.facts` holds the fact `test` with the boolean value true. */
     public static function isTest(array $event): bool
     {
         foreach ($event['data']['facts'] ?? [] as $fact) {
@@ -113,14 +147,16 @@ final class Webhooks
 
     private static function header(array $headers, string $name): ?string
     {
+        $found = [];
         foreach ($headers as $key => $value) {
             // Also accepts `$_SERVER` keys such as HTTP_X_CALMLENS_SIGNATURE.
             $key = strtolower((string) $key);
             if ($key === $name || str_replace('_', '-', preg_replace('/^http_/', '', $key)) === $name) {
-                $value = is_array($value) ? ($value[0] ?? null) : $value;
-                return is_scalar($value) ? (string) $value : null;
+                $found = array_merge($found, is_array($value) ? $value : [$value]);
             }
         }
-        return null;
+        // Repeated headers join with `,`: a signature list may be split across them.
+        $found = array_filter($found, 'is_scalar');
+        return $found === [] ? null : implode(',', array_map('strval', $found));
     }
 }

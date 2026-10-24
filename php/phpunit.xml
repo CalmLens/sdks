@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache" failOnWarning="true" failOnRisky="true">
+<phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache" failOnWarning="true" failOnRisky="true" displayDetailsOnSkippedTests="true">
   <testsuites><testsuite name="PHP SDK"><directory>tests</directory></testsuite></testsuites>
 </phpunit>

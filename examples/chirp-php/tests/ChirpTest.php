@@ -36,6 +36,7 @@ final class ChirpTest extends TestCase
             return match (true) {
                 str_contains($text, 'rude') => self::scored('blocked', 'harassment'),
                 str_contains($text, 'spicy') => self::scored('age-restricted', 'sexual'),
+                str_contains($text, 'meh') => self::scored('limited', null),
                 str_contains($text, 'later') => 'pending',
                 default => self::scored('allowed', null),
             };
@@ -147,12 +148,19 @@ final class ChirpTest extends TestCase
         return $this->onlyPost();
     }
 
-    public function testAllowedTextPostIsSavedAndShownToEveryone(): void
+    public static function shownText(): iterable
+    {
+        yield 'allowed' => ['Hello, Chirp'];
+        yield 'limited' => ['Hello, meh Chirp'];
+    }
+
+    #[DataProvider('shownText')]
+    public function testAllowedOrLimitedTextPostIsSavedAndShownToEveryone(string $text): void
     {
         $this->signIn('alice');
-        self::assertSame(303, $this->request('POST', '/posts', ['text' => 'Hello, Chirp'])->status);
+        self::assertSame(303, $this->request('POST', '/posts', ['text' => $text])->status);
         $post = $this->onlyPost();
-        self::assertSame('Hello, Chirp', $this->mock->requests()[array_key_last($this->mock->requests())]->getBody()->__toString());
+        self::assertSame($text, $this->mock->requests()[array_key_last($this->mock->requests())]->getBody()->__toString());
         $this->cookies = [];
         self::assertSame([$post['id']], self::shown($this->request('GET', '/')));
         self::assertSame(200, $this->request('GET', '/post/' . $post['id'])->status);
@@ -228,10 +236,17 @@ final class ChirpTest extends TestCase
         self::assertSame(404, $this->request('GET', '/post/' . $post['id'])->status);
     }
 
-    public function testAllowedImageIsShownFromTheCdn(): void
+    public static function shownImages(): iterable
     {
-        $post = $this->postDecidedImage('allowed');
-        self::assertSame('allowed', $post['image']['status']);
+        yield ['allowed'];
+        yield ['limited'];
+    }
+
+    #[DataProvider('shownImages')]
+    public function testAllowedOrLimitedImageIsShownFromTheCdn(string $outcome): void
+    {
+        $post = $this->postDecidedImage($outcome);
+        self::assertSame($outcome, $post['image']['status']);
         $this->signIn('bob');
         $page = $this->request('GET', '/');
         self::assertSame([$post['id']], self::shown($page));

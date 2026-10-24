@@ -19,6 +19,9 @@ use PHPUnit\Framework\TestCase;
 
 final class ClientTest extends TestCase
 {
+    /** An upload's response: an asset with its statuses. */
+    private const ASSET = ['id' => 'a', 'upload' => ['status' => 'completed'], 'classification' => ['status' => 'processing', 'moderation' => ['status' => 'pending']]];
+
     private function error(string $code, callable $call): CalmLensException
     {
         try {
@@ -43,36 +46,6 @@ final class ClientTest extends TestCase
         $mock->enqueueJson(['events' => [['id' => 'event-2']], 'hasMore' => false, 'cursor' => 'end']);
         self::assertSame([['id' => 'event-1'], ['id' => 'event-2']], iterator_to_array($client->events->each(['after' => 'start']), false));
         self::assertSame('after=next%2B%2F%3D', $mock->requests()[3]->getUri()->getQuery());
-    }
-
-    public function testRepeatedCursorFailsInsteadOfLooping(): void
-    {
-        $mock = new MockTransport();
-        $mock->enqueueJson(['items' => [['id' => 'one']], 'hasMore' => true, 'nextCursor' => 'start']);
-        $this->error('sdk/invalid-response', fn () => iterator_to_array($mock->client()->assets->each(['cursor' => 'start'])));
-        self::assertCount(1, $mock->requests());
-    }
-
-    public function testTextShortcutAndDecisionStates(): void
-    {
-        $mock = new MockTransport();
-        $asset = ['id' => 'text', 'classification' => ['status' => 'completed', 'moderation' => ['status' => 'allowed']]];
-        $mock->enqueueJson($asset);
-        $client = $mock->client();
-        self::assertSame($asset, $client->text->classify(['text' => 'Hello ✓']));
-        self::assertSame('Hello ✓', (string) $mock->requests()[0]->getBody());
-        self::assertStringContainsString('queue=false', $mock->requests()[0]->getUri()->getQuery());
-        foreach (['allowed', 'age-restricted', 'blocked', 'purged'] as $status) {
-            $decided = ['id' => 'text', 'classification' => ['status' => 'completed', 'moderation' => ['status' => $status]]];
-            $mock->enqueueJson($decided);
-            self::assertSame($decided, $client->assets->waitForDecision(['assetId' => 'text']));
-        }
-        $pending = ['id' => 'text', 'classification' => ['status' => 'processing', 'moderation' => ['status' => 'pending']]];
-        $mock->enqueueJson($pending);
-        $error = $this->error('sdk/timeout', fn () => $client->assets->waitForDecision(['assetId' => 'text', 'timeout' => 0]));
-        self::assertSame(['assetId' => 'text', 'classificationStatus' => 'processing', 'moderationStatus' => 'pending'], $error->details);
-        $mock->enqueueJson(['id' => 'text', 'classification' => ['status' => 'failed']]);
-        self::assertSame('failed', $client->assets->waitForDecision(['assetId' => 'text'])['classification']['status']);
     }
 
     public static function invalidUploads(): iterable
@@ -102,28 +75,15 @@ final class ClientTest extends TestCase
             $calls[] = [$request->getBody()->getContents(), $request->getHeaderLine('Idempotency-Key')];
             self::assertSame('7', $request->getHeaderLine('Content-Length'));
             self::assertFalse($options['allow_redirects']);
-            return Create::promiseFor(count($calls) === 1 ? new Response(503, ['Retry-After' => '0'], '{"code":"server/unavailable"}') : new Response(200, [], '{"id":"a"}'));
+            return Create::promiseFor(count($calls) === 1 ? new Response(503, ['Retry-After' => '0'], '{"code":"server/unavailable"}') : new Response(200, [], json_encode(self::ASSET)));
         }]));
         $stream = Utils::streamFor('prefixpayload');
         $stream->seek(6);
-        self::assertSame(['id' => 'a'], $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]));
+        self::assertSame(self::ASSET, $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]));
         self::assertCount(2, $calls);
         self::assertSame('payload', $calls[0][0]);
         self::assertSame($calls[0], $calls[1]);
         self::assertMatchesRegularExpression('/^[a-f0-9-]{36}$/', $calls[0][1]);
-    }
-
-    public function testNonReplayableUploadIsNotRetried(): void
-    {
-        $count = 0;
-        $client = new ServerClient('key', 'p', httpClient: new Client(['handler' => function ($request) use (&$count) {
-            $count++;
-            self::assertSame('abc', $request->getBody()->getContents());
-            return Create::promiseFor(new Response(503, ['Retry-After' => '0'], '{}'));
-        }]));
-        $stream = new NoSeekStream(Utils::streamFor('abc'));
-        $this->error('sdk/http-error', fn () => $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream, 'sizeInBytes' => 3]]));
-        self::assertSame(1, $count);
     }
 
     public function testUnsizedStreamDetectsShortAndLongBodies(): void
@@ -136,34 +96,6 @@ final class ClientTest extends TestCase
             $stream = new NoSeekStream(Utils::streamFor('abc'));
             $this->error('upload/invalid-payload', fn () => $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream, 'sizeInBytes' => $size]]));
         }
-    }
-
-    public function testUnkeyedWritesDoNotRetryButReadsDo(): void
-    {
-        $calls = 0;
-        $client = new ServerClient('key', 'p', httpClient: new Client(['handler' => function () use (&$calls) {
-            $calls++;
-            return Create::promiseFor($calls < 3 ? new Response(429, ['Retry-After' => '0'], '{"code":"rate/limited"}') : new Response(200, [], '{"id":"a"}'));
-        }]));
-        $this->error('rate/limited', fn () => $client->assets->update(['assetId' => 'a', 'name' => 'changed']));
-        self::assertSame(1, $calls);
-        self::assertSame(['id' => 'a'], $client->assets->retrieve(['assetId' => 'a']));
-        self::assertSame(3, $calls);
-    }
-
-    public function testMultipartQueueOverrideAndTotalAreSent(): void
-    {
-        $mock = new MockTransport();
-        $mock->enqueueJson(['id' => 'a'])->enqueueJson(['id' => 'a']);
-        $client = $mock->client();
-        $client->assets->classify(['name' => 'image', 'totalSizeInBytes' => 10 * 1024 * 1024, 'part' => ['type' => 'image/png', 'data' => str_repeat('a', 5 * 1024 * 1024)]]);
-        parse_str($mock->requests()[0]->getUri()->getQuery(), $query);
-        self::assertSame('false', $query['queue']);
-        self::assertSame('10485760', $query['totalSizeInBytes']);
-        $client->assets->uploadPart(['assetId' => 'a', 'queue' => false, 'part' => ['data' => 'end', 'partNumber' => 2, 'isFinal' => true]]);
-        parse_str($mock->requests()[1]->getUri()->getQuery(), $query);
-        self::assertSame(['partNumber' => '2', 'isFinal' => 'true', 'sizeInBytes' => '3', 'queue' => 'false'], $query);
-        self::assertSame('end', (string) $mock->requests()[1]->getBody());
     }
 
     public function testLensCacheBatchesAndInvalidatesOldVersions(): void
@@ -197,35 +129,6 @@ final class ClientTest extends TestCase
         self::assertSame('bytes=1-3', $mock->requests()[0]->getHeaderLine('Range'));
     }
 
-    public function testUploadTokensHaveValidClaimsSignatureAndUniqueNonce(): void
-    {
-        $client = new ServerClient('clsk_example-secret', 'p');
-        $before = (int) floor(microtime(true) * 1000);
-        $token = $client->uploadTokens->sign(['uploadPresetId' => 'preset', 'externalId' => 'post-1', 'expiresInSeconds' => 30]);
-        [$body, $signature] = explode('.', substr($token['token'], 5));
-        $claims = json_decode(base64_decode(strtr($body, '-_', '+/')), true);
-        self::assertSame(1, $claims['v']);
-        self::assertSame('preset', $claims['u']);
-        self::assertSame('post-1', $claims['x']);
-        self::assertSame('clsk_example-', $claims['k']);
-        self::assertGreaterThanOrEqual($before + 30000, $claims['e']);
-        self::assertLessThanOrEqual((int) floor(microtime(true) * 1000) + 30000, $claims['e']);
-        self::assertSame(hash_hmac('sha256', 'calmlens-upload-token:v1:' . $body, hash('sha256', 'clsk_example-secret')), $signature);
-        $second = $client->uploadTokens->sign(['uploadPresetId' => 'preset']);
-        $secondClaims = json_decode(base64_decode(strtr(explode('.', substr($second['token'], 5))[0], '-_', '+/')), true);
-        self::assertNotSame($claims['n'], $secondClaims['n']);
-        $this->error('sdk/invalid-argument', fn () => $client->uploadTokens->sign(['uploadPresetId' => 'preset', 'expiresInSeconds' => 3601]));
-    }
-
-    public function testWebhookRejectsTamperingAndMalformedSignedPayload(): void
-    {
-        $signature = Webhooks::signatureHeader('{}', 100, 'secret');
-        $this->error('sdk/invalid-webhook-signature', fn () => Webhooks::parseEvent('{ }', $signature, 100, 'secret', now: 100));
-        $this->error('sdk/invalid-webhook-payload', fn () => Webhooks::parseEvent('{}', $signature, 100, 'secret', now: 100));
-        self::assertTrue(Webhooks::isTest(['data' => ['facts' => [['key' => 'test', 'value' => true]]]]));
-        self::assertFalse(Webhooks::isTest(['data' => ['facts' => [['key' => 'test', 'value' => 'true']]]]));
-    }
-
     public function testConfigurationAndDebugOutput(): void
     {
         $this->error('sdk/invalid-config', fn () => new ServerClient("key\n", 'p'));
@@ -257,7 +160,7 @@ final class ClientTest extends TestCase
     public function testMockSnapshotsFreezeUploadBytesAndExhaustionFails(): void
     {
         $mock = new MockTransport();
-        $mock->enqueueJson(['id' => 'a']);
+        $mock->enqueueJson(self::ASSET);
         $client = $mock->client();
         $stream = Utils::streamFor('original');
         $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]);

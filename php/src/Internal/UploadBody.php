@@ -10,7 +10,8 @@ use Psr\Http\Message\StreamInterface;
 /** @internal */
 final class UploadBody
 {
-    public static function from(mixed $content, bool $multipart): StreamInterface
+    /** `$checkPartSize` refuses non-final multipart parts under 5 MiB before sending, as the API would. */
+    public static function from(mixed $content, bool $multipart, bool $checkPartSize = true): StreamInterface
     {
         if (!is_array($content)) {
             Values::invalid('Content must be an array', 'upload/invalid-payload');
@@ -47,13 +48,14 @@ final class UploadBody
             $known = null;
         }
         $size = $content['sizeInBytes'] ?? $known;
-        if (!is_int($size) || $size < 0 || ($known !== null && $size !== $known)) {
-            Values::invalid('sizeInBytes must match the remaining bytes; required for unsized streams', 'upload/invalid-payload');
+        // A file stream may leave its size out; multipart parts need exact byte counts.
+        if (($size !== null || $multipart) && (!is_int($size) || $size < 0 || ($known !== null && $size !== $known))) {
+            Values::invalid('sizeInBytes must match the remaining bytes; required for unsized multipart streams', 'upload/invalid-payload');
         }
         if (isset($content['isFinal']) && !is_bool($content['isFinal'])) {
             Values::invalid('isFinal must be a boolean', 'upload/invalid-payload');
         }
-        if ($multipart && !($content['isFinal'] ?? false) && $size < 5 * 1024 * 1024) {
+        if ($checkPartSize && $multipart && !($content['isFinal'] ?? false) && $size < 5 * 1024 * 1024) {
             Values::invalid('Non-final parts must be at least 5MiB', 'upload/invalid-payload');
         }
         return new UploadStream($stream, $size);

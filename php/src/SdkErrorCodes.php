@@ -17,7 +17,7 @@ final class SdkErrorCodes
     public const TIMEOUT = 'sdk/timeout';
     /** A successful response could not be read. */
     public const INVALID_RESPONSE = 'sdk/invalid-response';
-    /** A response body was larger than the SDK reads (32 MiB for API responses). */
+    /** A response body (or its declared Content-Length) was larger than `maxResponseBytes` (32 MiB by default). */
     public const RESPONSE_TOO_LARGE = 'sdk/response-too-large';
     /** An error response did not carry a CalmLens error code. */
     public const HTTP_ERROR = 'sdk/http-error';

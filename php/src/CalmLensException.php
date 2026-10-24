@@ -16,7 +16,7 @@ class CalmLensException extends \RuntimeException
     public readonly ?string $requestId;
 
     /**
-     * @param array $details extra API details; API errors include `network => true` and, when present, `traceId`.
+     * @param array $details extra API details, with the `traceId` when the API sent one; empty for transport errors.
      * @param array<string, list<string>|string> $headers response headers (empty without a response).
      */
     public function __construct(
@@ -72,18 +72,14 @@ class CalmLensException extends \RuntimeException
         return null;
     }
 
-    /** Seconds to wait before retrying, from the `Retry-After` header (seconds or an HTTP date), or null. */
+    /**
+     * Seconds to wait before retrying, from the `Retry-After` header (whole seconds or an HTTP
+     * date, rounded up), or null.
+     */
     public function retryAfter(): ?float
     {
-        $value = trim((string) $this->header('retry-after'));
-        if ($value === '') {
-            return null;
-        }
-        if (preg_match('/^\d+(\.\d+)?$/D', $value)) {
-            return (float) $value;
-        }
-        $time = strtotime($value);
-        return $time === false ? null : (float) max(0, $time - time());
+        $seconds = Internal\Session::retryAfter($this->header('retry-after'));
+        return $seconds === null ? null : (float) $seconds;
     }
 
     /** True when the resource does not exist. */

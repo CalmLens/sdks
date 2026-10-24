@@ -5,12 +5,14 @@ optional images, replies, a home timeline and profiles with bios. Everyone's wor
 are moderated before anyone else sees them.
 
 - **Posts, replies and bios** are classified synchronously with `text->classify`. Text whose
-  `classification.moderation.status` isn't `allowed` is refused and never saved; the author sees
+  `classification.moderation.status` isn't `allowed` or `limited` is refused and never saved; the author sees
   why ("may contain harassment"). Text has no sensitive view, so `age-restricted` text is
   refused too. If CalmLens can't be reached, nothing is saved.
 - **Images** are uploaded with `assets->create` and stay `pending` until CalmLens decides. A
   pending post is visible only to its author.
   - `allowed`: shown to everyone from the CDN.
+  - `limited`: shown like `allowed`. CalmLens delivers it normally and only marks it so an app
+    can reduce its reach; Chirp's timeline is chronological, with nothing to keep it out of.
   - `age-restricted`: shown as the CDN's blurred `/placeholder` image behind a **Sensitive
     content** warning, unless the viewer turned on **Show sensitive media** on their profile
     (after confirming they are 18 or older). Then the image is the CDN URL with
@@ -18,7 +20,7 @@ are moderated before anyone else sees them.
   - `blocked` or `purged`: the post leaves the timeline and profiles. Its author still sees it,
     with the reason.
   - Failed processing (`asset.failed`): only the author sees the post, with a note to try again.
-- Decisions arrive by **webhook** (`asset.classified`, `asset.allowed`, `asset.age-restricted`,
+- Decisions arrive by **webhook** (`asset.classified`, `asset.allowed`, `asset.limited`, `asset.age-restricted`,
   `asset.blocked`, `asset.purged` and `asset.failed`), with polling as a fallback.
 
 Chirp mirrors [Calmgram](../calmgram)'s behaviour; `Content::mediaFor` is its `postMediaFor`.
@@ -110,7 +112,7 @@ Without webhooks, a page showing your own pending image re-checks it at most eve
   CSRF tokens, upload checks (the file's bytes decide its type) and server-rendered HTML with no
   JavaScript. Every dynamic value is escaped.
 - [tests/ChirpTest.php](tests/ChirpTest.php): text refusals, the outage path, pending, allowed,
-  age-restricted (placeholder and opt-in), blocked, purged and failed images, polling, webhook
+  limited, age-restricted (placeholder and opt-in), blocked, purged and failed images, polling, webhook
   tampering, test sends, replays, foreign assets, retries, deletion, CSRF and demo mode.
 
 ```sh

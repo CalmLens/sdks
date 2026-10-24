@@ -19,7 +19,7 @@ final class Demo
 {
     public const PROJECT_ID = 'chirp-demo';
     public const WEBHOOK_SECRET = 'chirp-demo-webhook-secret';
-    public const IMAGE_OUTCOMES = ['allowed', 'age-restricted', 'blocked', 'purged', 'failed'];
+    public const IMAGE_OUTCOMES = ['allowed', 'limited', 'age-restricted', 'blocked', 'purged', 'failed'];
     private const DECISION_DELAY_MS = 2000;
 
     // [pattern, category, score]. Scores of 0.8 or more stand in for a policy match: sexual

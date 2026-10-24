@@ -64,7 +64,10 @@ final class Content
         $this->store->update(function (array &$data) use ($username, $bio) { $data['users'][$username]['bio'] = $bio; });
     }
 
-    /** Text has no sensitive view: anything that isn't `allowed` is refused and never saved. */
+    /**
+     * Text has no sensitive view: anything that isn't `allowed` or `limited` is refused and never
+     * saved. Limited text is shown like allowed text; Chirp's feed has no recommendations to keep it out of.
+     */
     private function checkText(string $text, string $what, string $externalId, string $username): void
     {
         try {
@@ -74,7 +77,7 @@ final class Content
             error_log('[chirp] text moderation failed: ' . $error->errorCode);
             throw new Refused($what, [], unavailable: true);
         }
-        if ($outcome['status'] !== 'allowed') {
+        if (!in_array($outcome['status'], ['allowed', 'limited'], true)) {
             throw new Refused($what, Moderation::flaggedCategories($outcome['findings']));
         }
     }
@@ -150,10 +153,13 @@ final class Content
         return null;
     }
 
-    /** Published posts are shown to everyone; age-restricted images go behind a placeholder. */
+    /**
+     * Published posts are shown to everyone; limited images are shown like allowed ones, and
+     * age-restricted images go behind a placeholder.
+     */
     public static function isPublished(array $post): bool
     {
-        return $post['image'] === null || in_array($post['image']['status'], ['allowed', 'age-restricted'], true);
+        return $post['image'] === null || in_array($post['image']['status'], ['allowed', 'limited', 'age-restricted'], true);
     }
 
     /** Everyone sees published posts; authors also see their own pending, blocked or failed ones. */
@@ -173,7 +179,7 @@ final class Content
     {
         $image = $post['image'];
         return match ($image['status'] ?? null) {
-            'allowed' => ['url' => $this->moderation->imageUrl($image['assetId']), 'placeholderUrl' => null],
+            'allowed', 'limited' => ['url' => $this->moderation->imageUrl($image['assetId']), 'placeholderUrl' => null],
             'age-restricted' => ($viewer['showSensitiveMedia'] ?? false)
                 ? ['url' => $this->moderation->imageUrl($image['assetId'], allowAgeRestricted: true), 'placeholderUrl' => null]
                 : ['url' => null, 'placeholderUrl' => $this->moderation->placeholderUrl($image['assetId'])],

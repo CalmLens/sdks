@@ -5,7 +5,11 @@ if (str_ends_with(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/redirect')
     exit;
 }
 header('Content-Type: application/json');
+// An asset, as uploads return one, carrying what the request sent.
 echo json_encode([
+    'id' => 'asset-1',
+    'upload' => ['status' => 'completed'],
+    'classification' => ['status' => 'processing', 'moderation' => ['status' => 'pending']],
     'method' => $_SERVER['REQUEST_METHOD'],
     'path' => parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH),
     'query' => $_GET,

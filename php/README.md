@@ -31,16 +31,20 @@ $client = new CalmLens\ServerClient(
     projectId: getenv('CALMLENS_PROJECT_ID'),
 );
 $asset = $client->text->classify(['text' => 'Hello world']);
-// pending, then allowed, age-restricted, blocked or purged. Treat any other value as not ready.
-if ($asset['classification']['moderation']['status'] === 'allowed') {
+// pending, then allowed, limited, age-restricted, blocked or purged. Treat any other value as not ready.
+if (in_array($asset['classification']['moderation']['status'], ['allowed', 'limited'], true)) {
     // Publish the comment.
 }
 ```
 
 Keep API keys on the server. Reuse a client within a request or worker; each client
 caches its named lens definitions. Configure `baseUrl`, `cdnBaseUrl`, `timeout`
-(default 120 seconds), `connectTimeout` (10), `maxRetries` (2) or inject a Guzzle
-`httpClient` for your application's transport configuration.
+(seconds per API request attempt, response included; default 120), `uploadTimeout`
+(seconds per binary upload attempt; none by default, since files may be large; text uses
+`timeout`), `connectTimeout` (10), `maxRetries` (2), `maxResponseBytes` (the largest API
+response read, 32 MiB) or inject a Guzzle `httpClient` for your application's transport
+configuration. The defaults are constants on `ServerClient`. Requests send a
+`calmlens-php/<version> (php/<version>)` User-Agent.
 
 ## API coverage
 
@@ -65,15 +69,16 @@ Use `['folderId' => null]` or `['parentId' => null]` to move to the root.
 Audio and video still process asynchronously. Watch webhooks or call
 `$client->assets->waitForDecision(['assetId' => $asset['id'], 'timeout' => 60])`.
 It returns once `classification.moderation.status` is no longer `pending` (`allowed`,
-`age-restricted`, `blocked` or `purged`) or classification has failed, and otherwise throws
+`limited`, `age-restricted`, `blocked` or `purged`) or classification has failed, and otherwise throws
 `sdk/timeout`. A classification failure is not a decision to allow. Manual reviews in
-`classification.moderation.manualReviews` record their `decision` as one of those four
+`classification.moderation.manualReviews` record their `decision` as one of those five
 statuses. Filter lists with `classification.moderation.status==allowed`.
 
 Supply a `name` and exactly one of `content`, `part` or `url`. Content accepts one of
 `plainText`, `base64`, or `data`/`bytes` (binary string, PHP stream resource or PSR-7
-stream), with a concrete MIME `type`. Sized streams send from their current position;
-unsized streams need `sizeInBytes`. Streams are not loaded into memory by the SDK.
+stream), with a concrete MIME `type`. Sized streams send from their current position. A
+non-seekable file stream may leave out `sizeInBytes` and is sent without a declared size;
+multipart parts need exact byte counts. Streams are not loaded into memory by the SDK.
 The caller owns and closes input streams.
 
 ```php
@@ -112,6 +117,10 @@ foreach ($client->events->eachPage(['after' => $savedCursor]) as $page) {
 Asset lists use `cursor`, `pageSize`, `ordering` and `filter`. Child lists work the
 same way. Folder lists retain `pageIndex`. An event list without `after` starts at
 the current feed position; save the returned cursor to consume subsequent events.
+`assets->each` and `eachChild` stop at a page without a next cursor, with `hasMore` false or
+with no items, and `events->eachPage` when `hasMore` is false. Rather than loop, they throw
+`sdk/invalid-response` (with the repeated cursor in `details['cursor']`) when a page with more
+to follow returns a cursor they already sent, without yielding that page.
 
 Every error the SDK throws is a `CalmLens\CalmLensException` with `errorCode`, `status`
 (null without a response), `details`, `headers`, `requestId` (the `X-Request-Id` header;
@@ -126,18 +135,24 @@ message. Catch a subclass from `CalmLens\Exception` to handle one kind of failur
 | --- | --- |
 | `ApiException` and its subclasses `BadRequestException` (400), `AuthenticationException` (401), `PermissionDeniedException` (403), `NotFoundException` (404), `ConflictException` (409), `RateLimitException` (429), `ServerException` (5xx) | The API answered with an error status. |
 | `ConnectionException` (`sdk/transport-error`) and its subclass `TimeoutException` (`sdk/timeout`) | No complete response arrived, or `waitForDecision` had no decision in time. |
-| `InvalidResponseException` (`sdk/invalid-response`, `sdk/response-too-large`) | A successful response could not be read, or was larger than 32 MiB. |
+| `InvalidResponseException` (`sdk/invalid-response`, `sdk/response-too-large`) | A successful response could not be read, or its body or declared `Content-Length` was larger than `maxResponseBytes`. |
 | `InvalidArgumentException` (`sdk/invalid-argument`, or an `upload/*` code for payload checks the API also makes) | An argument was rejected before sending. |
 | `ConfigurationException` (`sdk/invalid-config`), a subclass of `InvalidArgumentException` | `ServerClient` received an invalid setting. |
 | `WebhookVerificationException` (`sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload`) | A webhook delivery failed verification; respond with 400. |
 
-GET requests and uploads with idempotency keys retry transient connection failures,
+GET requests and uploads with idempotency keys retry connection failures, timeouts,
 429/502/503/504 and `idempotency/request-in-progress`. Upload keys are generated once
-and retained on retries. Other writes are not retried unless you explicitly supply
-a key. Non-seekable streams are never replayed. Retry-After is respected up to 60
-seconds; larger delays return the error. Redirects are disabled to protect credentials.
-`requestOptions` supports `timeout`, `connectTimeout`, `maxRetries`, and
-`idempotencyKey` on each operation. Timeouts bound each request, not the whole retry loop.
+and reused on every retry. Other writes are not retried unless you explicitly supply
+a key. Non-seekable streams are never replayed. Retry `n` (from 0) waits half of
+`min(8, 0.5 × 2ⁿ)` seconds plus a random part of the other half; a `Retry-After` header (whole
+seconds or an HTTP date; `0` retries at once) replaces that wait, and one over 60 seconds
+returns the error. `cdn->serve` retries the same way and returns the last response.
+Redirects are never followed, to protect credentials: a 3xx fails with `sdk/http-error`, its
+status and request ID, and is not retried (`cdn->serve` too). Transport errors carry no
+`details`. `requestOptions` supports `timeout`, `uploadTimeout`, `connectTimeout`,
+`maxRetries`, `maxResponseBytes` and `idempotencyKey` on each operation; the API checks the
+key (1 to 255 printable characters, no space at either end). Timeouts bound each attempt,
+not the whole retry loop.
 Calls are synchronous: `waitForDecision`'s `timeout` bounds the whole wait, and there is no
 separate cancellation handle.
 
@@ -171,7 +186,9 @@ The CDN treats an `age-restricted` asset like a private one: its plain public UR
 refused. Pass `'allowAgeRestricted' => true` to append `allowAgeRestricted=true`, so a public
 age-restricted asset is served from its public URL. Do that only where your app has
 already decided the viewer may see age-restricted content; otherwise use a signed URL.
-`blocked` assets are not served, and `purged` assets have no content.
+A `limited` asset is delivered exactly like an `allowed` one; it is marked so your app can
+reduce its reach, such as keeping it out of recommendations, trending and notifications,
+ranking it lower or collapsing it. `blocked` assets are not served, and `purged` assets have no content.
 
 `ensureLens` takes one definition (`identifier`, `name`, `type`, `version`,
 `transforms`, etc.); `ensureLenses` takes `['lenses' => [...]]`, sends batches of at
@@ -190,14 +207,19 @@ $event = CalmLens\Webhooks::parseEvent(
 ```
 
 Moderation sends `asset.classified` when classification finishes and one event per
-status: `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purged`,
+status: `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked` and `asset.purged`,
 for automated and reviewer decisions alike. `asset.failed` reports failed processing.
 Event asset snapshots carry `classification.moderation.status`.
 
 Pass `null` for the signature and timestamp and `headers: getallheaders()` (or `$_SERVER`,
-or a PSR-7 request's `getHeaders()`) to read them from the request headers. Verification uses
-the exact raw bytes, constant-time HMAC comparison and a default timestamp tolerance of
-`Webhooks::SIGNATURE_TOLERANCE_SECONDS` (300). Retries of one delivery repeat its
+or a PSR-7 request's `getHeaders()`) to read them from the request headers. Header names
+match in any case, and repeated headers are joined with `,`, so a signature list split across
+headers verifies and a repeated timestamp does not. Verification uses the exact raw bytes,
+constant-time HMAC comparison and a default timestamp tolerance of
+`Webhooks::SIGNATURE_TOLERANCE_SECONDS` (300); a tolerance of 0 accepts only the current
+second. `parseEvent` throws `sdk/invalid-webhook-payload` unless the body is an object with
+string `id`, `type` and `projectId`, a numeric `createdAt` and a `data` object whose known
+fields have the API's types. Retries of one delivery repeat its
 `x-calmlens-delivery` ID (`Webhooks::DELIVERY_HEADER`), so use it to skip duplicates. Future event types, extra fields and structured
 fact values are preserved. Test deliveries use the registered `test: true` fact;
 `Webhooks::isTest($event)` recognizes it.
@@ -217,9 +239,12 @@ fresh token per upload after authenticating and authorizing the browser user.
 runs its usual validation, encoding, retries and error handling: uploads (including multipart
 uploads with `uploadPart`) create assets you can retrieve, list, search, update, move and
 delete; folders, lenses, idempotency keys and the events feed behave like the API's; errors
-carry the API's codes, statuses, `X-Request-Id` and body shape; and the CDN serves stored
-bytes. Arrange or inspect state through the public `assets`, `content`, `folders`, `events`
-and `lenses` arrays.
+carry the API's codes, statuses, `X-Request-Id` and body shape (schema errors are
+`validation/<issue>` with the field in `details['path']`); and the CDN serves stored bytes and
+placeholders. Unset asset fields are `null`, as in the API. Like the API, deleting an asset,
+removing its content and retrying it add `asset.deleted`, `asset.content-removed` and
+`asset.retried` events; processing adds none. Arrange or inspect state through the public
+`assets`, `content`, `folders`, `events` and `lenses` arrays.
 
 ```php
 $mock = new CalmLens\Testing\MockServerClient(queuedOutcome: 'age-restricted');
@@ -231,7 +256,9 @@ $mock->decide($asset['id'], 'blocked'); // as a reviewer would; adds asset.block
 
 It does not classify content. `create` gives assets `queuedOutcome` (default `pending`)
 and `classify` gives them `analyzedOutcome` (default `allowed`): `pending`, `allowed`,
-`age-restricted`, `blocked`, `purged` (which also removes the content) or `failed`.
+`limited`, `age-restricted`, `blocked`, `purged` (which also removes the content, with reason
+`policy`) or `failed`. A classified image gets a ThumbHash, which the `placeholder` resource
+serves as a PNG, and which goes with the content when it is removed.
 `analyzedOutcome` may also be fields to merge into the asset or a callable that receives
 the asset and returns either. Content is kept only with `keepContentAfterProcessing`.
 Like the CDN, the mock refuses blocked, purged and failed assets, and assets whose content
@@ -240,12 +267,16 @@ grants, like a real key without `assets:download`, so it also refuses private as
 public age-restricted ones requested without `allowAgeRestricted` (`403`
 `asset/api-key-missing-permission`). Pass `apiKey: MockServerClient::createApiKey([['actions' =>
 ['assets:download'], 'folderId' => null, 'includeSubfolders' => true]])` to read them; a
-`folderId` limits the grant to that folder. Served content carries its stored
-`Content-Type` and `Cache-Control` as the CDN sets it: `public` only when anyone may see
-the asset, otherwise `private`, with `max-age=31536000, immutable` for images and
-`max-age=3600` for other content. `decide` records the review in `manualReviews` and adds
-an `asset.<outcome>` event with the event catalog's severity: `low` for `allowed`, `high`
-otherwise.
+`folderId` limits the grant to that folder, and `setApiKeyGrants($grants)` replaces the
+grants of the same key later. Served content carries its stored `Content-Type` and
+`Cache-Control` as the CDN sets it: `public` only when anyone may see the asset, otherwise
+`private`, with `max-age=31536000, immutable` for images and `max-age=3600` for other
+content; plus `Cache-Tag`, `X-Content-Type-Options: nosniff`, a sandboxing
+`Content-Security-Policy` and, for images, an `ETag` and `Expires`. `decide` records the review
+in `manualReviews` and adds an `asset.<outcome>` event with the event catalog's severity
+(`low` for `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact; a
+reviewer's `purged` removes the content with reason `requested` and first adds
+`asset.content-removed`. `decide` on an unknown asset throws `asset/not-found`.
 
 List filters support `==` (with `*` wildcards), `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`
 and `=le=` joined by `;` (and), which binds tighter than `,` (or), and grouped with `( … )`, on
@@ -260,12 +291,16 @@ millisecond per reading, so assets created in a row have increasing `createdAt`.
 ```php
 $mock->failNextRequest();          // the next call throws ConnectionException (sdk/transport-error)
 $mock->failNextRequest('timeout'); // ... TimeoutException (sdk/timeout)
+$mock->failNextRequest('upload/limit-exceeded', 'assets.create'); // the next upload fails with that API error
 $mock->failNextRequest(new CalmLens\CalmLensException('upload/limit-exceeded', 'Busy', 429, headers: ['Retry-After' => '5']));
 $request = $mock->requests()[0];   // every request received, as PSR-7 snapshots
 ```
 
-Responses enqueued with `enqueueJson` or `enqueue` and `failNextRequest` failures are used
-first, in order, and leave the stored state unchanged. Retries are off unless you pass
+`failNextRequest` failures are used first (each once, for any request or the next to the
+named client method), then responses enqueued with `enqueueJson` or `enqueue`, in order; both
+leave the stored state unchanged. `MockServerClient::signUploadToken($apiKey, $options, $now,
+$nonce)` signs an upload token at a fixed clock (epoch milliseconds) and nonce, for exact
+tokens in tests. Retries are off unless you pass
 `maxRetries`. Waits take no real time: retry backoff and `waitForDecision` advance a virtual
 clock, so an asset whose decision never comes times out at once.
 
@@ -281,14 +316,16 @@ $request = $mock->requests()[0]; // PSR-7 request snapshot
 
 Responses are FIFO, and an exhausted queue fails. `enqueue` also accepts PSR-7
 responses or exceptions; `pending()` reports unused responses. This exercises the
-real SDK serialization and validation. It does not simulate moderation or a storage
-backend. For custom retry tests, inject Guzzle's MockHandler through `httpClient`.
+real SDK serialization and validation. Uploads must be answered with an asset (an `id`,
+`upload.status`, `classification.status` and `classification.moderation.status`), or they fail
+with `sdk/invalid-response`. It does not simulate moderation or a storage backend. For custom retry tests, inject Guzzle's MockHandler through `httpClient`.
 
 ## Development
 
 From `php/`, run `composer install`, `composer check`, and `composer test`.
-Tests read the existing generated `../ruby/testdata/{requests,paths,errors,webhooks,transform-options}.json`
-files directly, and check `src/ErrorCodes.php` against `errors.json`. The application repo's `bun packages/sdk-contract/generate.ts`
+Tests replay every generated fixture in `../ruby/testdata` directly (requests, paths, errors,
+client cases, webhooks, upload tokens, transform options, mock scenarios, surface and
+rejections), and check `src/ErrorCodes.php` against `errors.json`. The application repo's `bun packages/sdk-contract/generate.ts`
 refreshes that shared source; PHP needs no independently maintained fixture copy.
 The HTTP tests also start a real loopback PHP server to verify streaming and redirects.
 CI runs PHP 8.2 and 8.5 and builds a Composer archive.

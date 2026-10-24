@@ -16,7 +16,7 @@ use CalmLens\ServerClient;
 final class Moderation
 {
     /** Statuses that are decisions. Anything else CalmLens may add later is treated as pending. */
-    public const DECIDED = ['allowed', 'age-restricted', 'blocked', 'purged'];
+    public const DECIDED = ['allowed', 'limited', 'age-restricted', 'blocked', 'purged'];
 
     // Lenses are named, versioned CDN transformations. Bump `version` when you change one.
     private const FEED_LENS = [

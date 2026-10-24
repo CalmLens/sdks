@@ -24,30 +24,39 @@ use Psr\Http\Message\ResponseInterface;
  *
  * The stand-in is stateful: uploads (including multipart uploads) create assets you can
  * retrieve, list, search, update, move and delete; folders, lenses, idempotency keys and the
- * events feed behave like the API's; the CDN serves stored bytes; and errors use the API's
- * codes, statuses, `X-Request-Id` header and body shape. It does not classify content: assets
+ * events feed behave like the API's; the CDN serves stored bytes and placeholders; and errors use
+ * the API's codes, statuses, `X-Request-Id` header and body shape (schema errors are
+ * `validation/<issue>` with the field in `details.path`). It does not classify content: assets
  * submitted with `classify` get `analyzedOutcome` and those submitted with `create` get
  * `queuedOutcome`. Content is kept only with `keepContentAfterProcessing: true`; otherwise it is
  * removed once classification completes, as in the API. A `purged` outcome removes the content
- * with reason `policy`.
+ * with reason `policy`; a reviewer's purge (`decide`) with reason `requested`. A classified image
+ * gets a ThumbHash for its placeholder, which goes with its content. Like the API, deleting an
+ * asset, removing its content and retrying it add `asset.deleted`, `asset.content-removed` and
+ * `asset.retried` events; processing adds none.
  *
  * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
  * Then access: a private asset, or a public age-restricted one requested without the
  * `allowAgeRestricted` URL option, needs an `assets:download` grant for its folder. The default
  * key has no grants, like a real key without `assets:download`; pass an `apiKey` from
- * `createApiKey()` to grant downloads.
+ * `createApiKey()`, or call `setApiKeyGrants()`, to grant downloads.
  *
  * Waits (retry backoff and `assets->waitForDecision`) take no real time: they advance a virtual
  * clock, so a decision that never comes times out at once.
  *
- * Enqueued responses, exceptions and `failNextRequest` failures are used first, in order,
- * before the stand-in answers.
+ * `failNextRequest` failures come first (for any request, or the next to one operation), then
+ * enqueued responses and exceptions in order, before the stand-in answers.
  */
 final class MockServerClient
 {
-    public const OUTCOMES = ['pending', 'allowed', 'age-restricted', 'blocked', 'purged', 'failed'];
+    public const OUTCOMES = ['pending', 'allowed', 'limited', 'age-restricted', 'blocked', 'purged', 'failed'];
+    /** What `decide` accepts: a reviewer's decision, or `pending` and `failed` to arrange a test. */
+    public const DECISIONS = ['allowed', 'limited', 'age-restricted', 'blocked', 'purged'];
+    /** The ThumbHash the mock gives every classified image, standing in for one computed from its pixels. */
+    public const THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI';
     private const MIB = 1024 * 1024;
+    private const ACTIVE_CONTENT_TYPES = ['image/svg+xml', 'application/xhtml+xml', 'text/html', 'application/xml', 'text/xml'];
 
     /** @var array<string, array> Assets by ID, with the API's field names. Change them to arrange a test. */
     public array $assets = [];
@@ -62,13 +71,16 @@ final class MockServerClient
 
     private ServerClient $client;
     private array $queue = [];
+    /** @var list<array{failure: string|\Throwable, operation: ?string}> */
+    private array $failures = [];
     private array $history = [];
     /** @var array<string, array{0: string, 1: int, 2: string}> Saved responses by idempotency key. */
     private array $idempotent = [];
-    /** @var array<string, array{queue: bool, total: ?int, image: bool, parts: int}> Open multipart uploads. */
+    /** @var array<string, array{queue: bool, total: ?int}> Open multipart uploads, as they started. */
     private array $uploads = [];
     private array $grants;
     private float $elapsed = 0.0;
+    private int $requestCount = 0;
     private \Closure $now;
     private \Closure $createId;
     private mixed $analyzedOutcome;
@@ -77,7 +89,7 @@ final class MockServerClient
 
     /**
      * @param string $queuedOutcome outcome of `assets.create` (and queued multipart uploads):
-     *   `pending` (still processing), `allowed`, `age-restricted`, `blocked` or `purged`, or
+     *   `pending` (still processing), `allowed`, `limited`, `age-restricted`, `blocked` or `purged`, or
      *   `failed` (processing failed, retryable).
      * @param string|array|callable $analyzedOutcome outcome of `assets.classify` and `text.classify`:
      *   an outcome, fields to deep-merge into the asset (the outcome then follows their
@@ -116,6 +128,8 @@ final class MockServerClient
         $session = (fn (): Session => $this->session)->call($this->client);
         $session->sleep = function (float $seconds): void { $this->elapsed += $seconds; };
         $session->clock = fn (): float => $this->elapsed;
+        // The stand-in answers multipart size checks in the API's order.
+        $session->deferUploadChecks = true;
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->cdnBaseUrl = rtrim($cdnBaseUrl, '/');
     }
@@ -134,6 +148,28 @@ final class MockServerClient
         return 'sk_test_' . rtrim(strtr(base64_encode(Values::json($grants)), '+/', '-_'), '=');
     }
 
+    /**
+     * Replaces the mock API key's grants (the `createApiKey()` shape), as editing the key in the
+     * portal would: later requests, such as `cdn->serve`, use them. The key itself stays the same,
+     * so idempotency keys it used still replay.
+     */
+    public function setApiKeyGrants(array $grants): self
+    {
+        $this->grants = self::grantsOf(self::createApiKey($grants));
+        return $this;
+    }
+
+    /**
+     * Signs an upload token like `uploadTokens->sign`, with the same validation, at a fixed clock
+     * (`now`, epoch milliseconds) and nonce, so tests can compare exact tokens.
+     *
+     * @return array{token: string, expiresAt: int}
+     */
+    public static function signUploadToken(#[\SensitiveParameter] string $apiKey, array $options, int $now, string $nonce): array
+    {
+        return \CalmLens\UploadTokens::signAt($apiKey, $options, $now, $nonce);
+    }
+
     public function enqueueJson(mixed $body, int $status = 200, array $headers = []): self
     {
         return $this->enqueue(new Response($status, $headers + ['Content-Type' => 'application/json'], json_encode($body, JSON_THROW_ON_ERROR)));
@@ -146,33 +182,36 @@ final class MockServerClient
     }
 
     /**
-     * Fails the next request instead of answering it, leaving the stored state unchanged.
-     * `transport-error` and `timeout` fail the connection, so the client throws
-     * `ConnectionException` (`sdk/transport-error`) or `TimeoutException` (`sdk/timeout`). A
-     * `CalmLensException` is answered as the API's error response: its status (or the API's
-     * status for its code), a JSON `{code, message, details}` body and its headers (such as
-     * `Retry-After`). Any other exception is thrown by the transport as given.
+     * Fails the next request (or, with `operation`, the next one that client method sends, named
+     * like `assets.create` or `cdn.serve`) instead of answering it, leaving the stored state
+     * unchanged. Each queued failure is used once. `transport-error` and `timeout` fail the
+     * connection, so the client throws `ConnectionException` (`sdk/transport-error`) or
+     * `TimeoutException` (`sdk/timeout`). An API error code, such as `upload/limit-exceeded`, is
+     * answered as the API answers it: its HTTP status, message and request ID. A
+     * `CalmLensException` is answered with its status (or the API's status for its code), a JSON
+     * `{code, message, details}` body and its headers (such as `Retry-After`). Any other exception
+     * is thrown by the transport as given.
      */
-    public function failNextRequest(string|\Throwable $failure = 'transport-error'): self
+    public function failNextRequest(string|\Throwable $failure = 'transport-error', ?string $operation = null): self
     {
-        if (is_string($failure) && !in_array($failure, ['transport-error', 'timeout'], true)) {
-            throw new \InvalidArgumentException("Mock failures are transport-error, timeout or an exception (got $failure)");
+        if (is_string($failure) && !in_array($failure, ['transport-error', 'timeout'], true) && !isset(ErrorCodes::STATUSES[$failure])) {
+            throw new \InvalidArgumentException("Mock failures are transport-error, timeout, an API error code or an exception (got $failure)");
         }
-        $this->queue[] = ['failure' => $failure];
+        $this->failures[] = ['failure' => $failure, 'operation' => $operation];
         return $this;
     }
 
     /** Queued responses and failures not used yet. */
-    public function pending(): int { return count($this->queue); }
+    public function pending(): int { return count($this->queue) + count($this->failures); }
 
     /** @return list<RequestInterface> every request received, oldest first, with readable bodies. */
     public function requests(): array { return $this->history; }
 
     /**
-     * Adds an event to the feed returned by `events.list`. Omitted `id`, `projectId`, `createdAt`
-     * and `facts` are filled in; when `assetId` names a stored asset, the event carries a snapshot
-     * of its status, as the API's events do. Pass the result to `Webhooks::toPayload` to build a
-     * matching webhook body.
+     * Adds an event to the feed returned by `events.list`. Omitted `id`, `projectId`, `severity`,
+     * `title`, `createdAt`, `updatedAt` and `facts` are filled in; when `assetId` names a stored
+     * asset, the event carries a snapshot of its status, as the API's events do. Pass the result to
+     * `Webhooks::toPayload` to build a matching webhook body.
      */
     public function enqueueEvent(array $event): array
     {
@@ -187,35 +226,54 @@ final class MockServerClient
     }
 
     /**
-     * Gives an asset a new outcome, as a reviewer would, and adds the matching `asset.<status>`
-     * (or `asset.failed`) event with the asset's snapshot, the event catalog's severity (`low` for
-     * `allowed`, `high` otherwise) and a `decided-by: reviewer` fact. A review decision (`allowed`,
-     * `age-restricted`, `blocked` or `purged`) also joins the asset's `manualReviews`.
+     * Applies a reviewer's decision (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`) to a
+     * stored asset, as the portal would: the moderation status changes (`purged` also removes the
+     * content with reason `requested` and first adds an `asset.content-removed` event), the review
+     * joins `manualReviews`, and an `asset.<decision>` event with the catalog's severity (`low` for
+     * `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact joins the feed.
+     * `pending` and `failed` only change the statuses, to arrange a test. Throws `NotFoundException`
+     * (`asset/not-found`) for an unknown asset.
      */
     public function decide(string $assetId, string $outcome): array
     {
         self::checkOutcome($outcome);
         if (!isset($this->assets[$assetId])) {
-            throw new \InvalidArgumentException("No mock asset $assetId");
+            throw CalmLensException::create(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', 404);
         }
-        $asset = $this->applyOutcome($this->assets[$assetId], $outcome);
-        if (!in_array($outcome, ['pending', 'failed'], true)) {
-            $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)(), 'decision' => $outcome,
-                'note' => null, 'reviewerUserId' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
-            $this->assets[$assetId] = $asset;
+        $asset = $this->applyOutcome($this->assets[$assetId], $outcome, 'requested');
+        if (!in_array($outcome, self::DECISIONS, true)) {
+            return $asset;
         }
-        if ($outcome !== 'pending') {
-            $this->enqueueEvent(['type' => 'asset.' . $outcome, 'assetId' => $assetId, 'severity' => $outcome === 'allowed' ? 'low' : 'high',
-                'facts' => [['key' => 'decided-by', 'value' => 'reviewer']]]);
+        $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)(), 'decision' => $outcome,
+            'note' => null, 'reviewerUserId' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
+        $this->assets[$assetId] = $asset;
+        if ($outcome === 'purged') {
+            $this->lifecycleEvent('asset.content-removed', $asset);
         }
+        $this->enqueueEvent(['type' => 'asset.' . $outcome, 'severity' => in_array($outcome, ['allowed', 'limited'], true) ? 'low' : 'high',
+            'title' => 'asset.' . $outcome, 'assetId' => $assetId, 'asset' => $this->snapshot($asset),
+            'facts' => [['key' => 'decided-by', 'value' => 'reviewer'], ['key' => 'asset-type', 'value' => $asset['type']],
+                ['key' => 'asset-name', 'value' => $asset['name'], 'url' => '/portal/assets/' . $assetId], ['key' => 'note', 'value' => null]]]);
         return $asset;
+    }
+
+    /** Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API. */
+    private function lifecycleEvent(string $type, array $asset): void
+    {
+        $name = ['key' => 'asset-name', 'value' => $asset['name']];
+        // A deleted asset has no portal page to link to.
+        if ($type !== 'asset.deleted') {
+            $name['url'] = '/portal/assets/' . $asset['id'];
+        }
+        $this->enqueueEvent(['type' => $type, 'severity' => 'low', 'assetId' => $asset['id'], 'asset' => $this->snapshot($asset),
+            'facts' => [$name, ['key' => 'asset-type', 'value' => $asset['type']]]]);
     }
 
     private function snapshot(array $asset): array
     {
         return ['id' => $asset['id'], 'externalId' => $asset['externalId'] ?? null, 'uploadPresetId' => $asset['uploadPresetId'] ?? null,
-            'upload' => ['status' => $asset['upload']['status']], 'content' => ['status' => $asset['content']['status']],
-            'classification' => ['status' => $asset['classification']['status'], 'moderation' => ['status' => $asset['classification']['moderation']['status']]]];
+            'upload' => ['status' => $asset['upload']['status']], 'classification' => ['status' => $asset['classification']['status'],
+                'moderation' => ['status' => $asset['classification']['moderation']['status']]], 'content' => ['status' => $asset['content']['status']]];
     }
 
     private static function checkOutcome(string $outcome): void
@@ -234,75 +292,136 @@ final class MockServerClient
         return is_array($grants) && array_is_list($grants) ? $grants : [];
     }
 
+    /** The client methods that send a request like this one, named like `assets.create`. */
+    private function operations(RequestInterface $request, bool $cdn, array $parts, array $query): array
+    {
+        if ($cdn) {
+            return ['cdn.serve'];
+        }
+        $method = $request->getMethod();
+        if (($parts[0] ?? null) === 'projects') {
+            $route = $method . ' ' . implode('/', array_slice($parts, 2));
+            return match ($route) {
+                'GET events' => ['events.list'],
+                'PUT lenses' => ['ensureLenses', 'ensureLens'],
+                'GET folders' => ['folders.list'],
+                'POST folders' => ['folders.create'],
+                'GET assets/page' => ['assets.list'],
+                'GET assets/search' => ['assets.search'],
+                'POST assets' => self::flag($query['queue'] ?? null) ? ['assets.create'] : ['assets.classify', 'text.classify'],
+                default => [],
+            };
+        }
+        $suffix = $parts[2] ?? '';
+        $resource = $parts[0] ?? '';
+        $names = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST move' => 'move',
+            'GET children' => 'listChildren', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
+            'POST explain' => 'explain', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
+        $name = $names[$method . ' ' . $suffix] ?? null;
+        if ($name === null || !in_array($resource, ['assets', 'folders'], true)) {
+            return [];
+        }
+        return $name === 'retrieve' && $resource === 'assets' ? ['assets.retrieve', 'assets.waitForDecision'] : ["$resource.$name"];
+    }
+
     private function handle(RequestInterface $request): PromiseInterface
     {
         $body = (string) $request->getBody();
         $request = $request->withBody(\GuzzleHttp\Psr7\Utils::streamFor($body));
         $this->history[] = $request;
-        $queued = array_shift($this->queue);
-        if (is_array($queued)) {
-            $failure = $queued['failure'];
-            if ($failure instanceof CalmLensException) {
-                $status = $failure->status ?? ErrorCodes::STATUSES[$failure->errorCode] ?? 400;
-                return Create::promiseFor(self::json($status, ['code' => $failure->errorCode, 'message' => $failure->getMessage()]
-                    + ($failure->details === [] ? [] : ['details' => $failure->details]), $failure->headers));
+        $url = (string) $request->getUri()->withQuery('');
+        parse_str($request->getUri()->getQuery(), $query);
+        $cdn = str_starts_with($url, $this->cdnBaseUrl . '/');
+        $path = substr($url, strlen($cdn ? $this->cdnBaseUrl : $this->baseUrl));
+        $parts = array_map('rawurldecode', array_values(array_filter(explode('/', $path), fn ($part) => $part !== '')));
+        $operations = $this->operations($request, $cdn, $parts, $query);
+        foreach ($this->failures as $index => ['failure' => $failure, 'operation' => $operation]) {
+            if ($operation === null || in_array($operation, $operations, true)) {
+                array_splice($this->failures, $index, 1);
+                return $this->failure($failure, $request);
             }
-            $queued = is_string($failure)
-                ? new ConnectException($failure === 'timeout' ? 'Simulated timeout' : 'Simulated network failure', $request, null,
-                    $failure === 'timeout' ? ['errno' => 28] : [])
-                : $failure;
         }
+        $queued = array_shift($this->queue);
         if ($queued instanceof \Throwable) {
             return Create::rejectionFor($queued);
         }
         if ($queued !== null) {
             return Create::promiseFor($queued);
         }
-        $url = (string) $request->getUri()->withQuery('');
-        parse_str($request->getUri()->getQuery(), $query);
-        if (str_starts_with($url, $this->cdnBaseUrl . '/')) {
-            return Create::promiseFor($this->serve($request->getMethod(), substr($url, strlen($this->cdnBaseUrl)), $query));
+        if ($cdn) {
+            return Create::promiseFor($this->serve($request->getMethod(), $parts, $query));
         }
-        $path = substr($url, strlen($this->baseUrl));
-        $key = $request->getHeaderLine('Idempotency-Key');
-        $fingerprint = hash('sha256', Values::json([$request->getMethod(), $path, $request->getUri()->getQuery(), base64_encode($body)]));
-        if ($key !== '' && isset($this->idempotent[$key])) {
+        // The HTTP library trims header values, as every HTTP stack does before the API sees them.
+        $key = $request->hasHeader('Idempotency-Key') ? $request->getHeaderLine('Idempotency-Key') : null;
+        if ($key !== null && (strlen($key) > 255 || !preg_match('/^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/D', $key))) {
+            return Create::promiseFor($this->error(ErrorCodes::INVALID_IDEMPOTENCY_KEY, 'Invalid idempotency key'));
+        }
+        $fingerprint = hash('sha256', Values::json([$request->getMethod(), $path, $request->getUri()->getQuery(), hash('sha256', $body)]));
+        if ($key !== null && isset($this->idempotent[$key])) {
             [$saved, $status, $bytes] = $this->idempotent[$key];
             return Create::promiseFor($saved !== $fingerprint
-                ? self::json(ErrorCodes::STATUSES[ErrorCodes::IDEMPOTENCY_KEY_REUSED], ['code' => ErrorCodes::IDEMPOTENCY_KEY_REUSED, 'message' => 'Idempotency key reused with a different request'])
-                : new Response($status, ['Content-Type' => 'application/json', 'Idempotent-Replayed' => 'true', 'X-Request-Id' => self::requestId()], $bytes));
+                ? $this->error(ErrorCodes::IDEMPOTENCY_KEY_REUSED, 'Idempotency key reused with a different request')
+                : new Response($status, ['Content-Type' => 'application/json', 'Idempotent-Replayed' => 'true', 'X-Request-Id' => $this->requestId()], $bytes));
         }
         try {
             $json = $request->getHeaderLine('Content-Type') === 'application/json' ? json_decode($body, true) : [];
-            $data = $this->api($request, $path, $query, is_array($json) ? $json : [], $body);
-            $response = $data === null ? new Response(204, ['X-Request-Id' => self::requestId()]) : self::json(200, $data);
+            $data = $this->api($request, $parts, $query, is_array($json) ? $json : [], $body);
+            $response = $data === null ? new Response(204, ['X-Request-Id' => $this->requestId()]) : $this->json(200, $data);
         } catch (CalmLensException $failure) {
             // Raised by fail(): answer like the API does, and leave the key unsaved.
-            return Create::promiseFor(self::json($failure->status, ['code' => $failure->errorCode, 'message' => $failure->getMessage()]));
+            return Create::promiseFor($this->error($failure->errorCode, $failure->getMessage(), $failure->status, $failure->details));
         }
-        if ($key !== '') {
+        if ($key !== null) {
             $this->idempotent[$key] = [$fingerprint, $response->getStatusCode(), (string) $response->getBody()];
             $response->getBody()->rewind();
         }
         return Create::promiseFor($response);
     }
 
-    private static function fail(string $code, ?int $status = null, string $message = ''): never
+    private function failure(string|\Throwable $failure, RequestInterface $request): PromiseInterface
     {
-        throw new CalmLensException($code, $message, $status ?? ErrorCodes::STATUSES[$code] ?? 400);
+        if ($failure instanceof CalmLensException) {
+            $status = $failure->status ?? ErrorCodes::STATUSES[$failure->errorCode] ?? 400;
+            return Create::promiseFor($this->json($status, ['code' => $failure->errorCode, 'message' => $failure->getMessage()]
+                + ($failure->details === [] ? [] : ['details' => $failure->details]), $failure->headers));
+        }
+        if ($failure instanceof \Throwable) {
+            return Create::rejectionFor($failure);
+        }
+        if (isset(ErrorCodes::STATUSES[$failure])) {
+            return Create::promiseFor($this->error($failure, "Simulated $failure"));
+        }
+        return Create::rejectionFor(new ConnectException($failure === 'timeout' ? 'Simulated timeout' : 'Simulated network failure',
+            $request, null, $failure === 'timeout' ? ['errno' => 28] : []));
     }
 
-    private static function requestId(): string { return 'mock-' . bin2hex(random_bytes(4)); }
-
-    private static function json(int $status, mixed $data, array $headers = []): Response
+    /** Fails the request being answered with an API error; the status defaults to the code's. */
+    private static function fail(string $code, ?int $status = null, string $message = '', array $details = []): never
     {
-        return new Response($status, ['Content-Type' => 'application/json', 'X-Request-Id' => self::requestId()] + $headers,
-            json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        throw new CalmLensException($code, $message ?: $code, $status ?? ErrorCodes::STATUSES[$code] ?? 400, $details);
     }
 
-    private function api(RequestInterface $request, string $path, array $query, array $json, string $body): ?array
+    /** A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field in `details.path`. */
+    private static function invalid(string $code, string $path): never
     {
-        $parts = array_map('rawurldecode', array_values(array_filter(explode('/', $path), fn ($part) => $part !== '')));
+        self::fail($code, 400, "Invalid $path", ['path' => $path]);
+    }
+
+    private function requestId(): string { return 'mock-request-' . ++$this->requestCount; }
+
+    private function json(int $status, mixed $data, array $headers = []): Response
+    {
+        return new Response($status, ['Content-Type' => 'application/json', 'X-Request-Id' => $this->requestId()] + $headers,
+            json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+
+    private function error(string $code, string $message, ?int $status = null, array $details = []): Response
+    {
+        return $this->json($status ?? ErrorCodes::STATUSES[$code] ?? 400, ['code' => $code, 'message' => $message] + ($details === [] ? [] : ['details' => $details]));
+    }
+
+    private function api(RequestInterface $request, array $parts, array $query, array $json, string $body): ?array
+    {
         $method = $request->getMethod();
         $upload = $request->getHeaderLine('X-CalmLens-Upload');
         if (($parts[0] ?? null) === 'projects') {
@@ -315,8 +434,7 @@ final class MockServerClient
                 $route === 'PUT lenses' => $this->saveLenses($json['lenses'] ?? []),
                 $route === 'GET folders' => $this->listFolders($query),
                 $route === 'POST folders' => $this->createFolder($json),
-                $route === 'GET assets/page' => $this->page(array_filter($this->assets, fn ($asset) => $asset['parentId'] === null
-                    && (!isset($query['folderId']) || $asset['folderId'] === $this->folder($query['folderId'])['id'])), $query),
+                $route === 'GET assets/page' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
                 $route === 'POST assets' && $upload === '' => $this->createAsset($json, self::flag($query['queue'] ?? null), null, false),
                 $route === 'POST assets' && in_array($upload, ['content', 'part'], true) => $this->createAsset($query, self::flag($query['queue'] ?? null), $body, $upload === 'part'),
@@ -327,7 +445,7 @@ final class MockServerClient
             return $this->folderRoute($method, $parts[1], $parts[2] ?? '', $json);
         }
         if (($parts[0] ?? null) !== 'assets' || !isset($parts[1])) {
-            throw new \LogicException("MockServerClient does not emulate $method $path; enqueue a response for it");
+            throw new \LogicException("MockServerClient does not emulate $method /" . implode('/', $parts) . '; enqueue a response for it');
         }
         $id = $parts[1];
         $asset = $this->assets[$id] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
@@ -336,35 +454,55 @@ final class MockServerClient
             case 'GET ':
                 return $asset;
             case 'GET children':
-                return $this->page(array_filter($this->assets, fn ($child) => $child['parentId'] === $id), $query);
+                return $this->page(array_filter($this->assets, fn ($child) => $child['parentId'] === $id), $query, $id);
             case 'PATCH ':
                 $fields = array_diff_key($json, array_flip(['id', 'projectId', 'upload', 'classification', 'content']));
-                return $this->assets[$id] = $this->touch($fields + $asset);
+                // Like the API: an externalId stays unique in the project; null clears a field.
+                if (is_string($fields['externalId'] ?? null) && $fields['externalId'] !== '') {
+                    foreach ($this->assets as $other) {
+                        if ($other['id'] !== $id && ($other['externalId'] ?? null) === $fields['externalId']) {
+                            self::fail(ErrorCodes::DUPLICATE_EXTERNAL_ID);
+                        }
+                    }
+                }
+                return $this->assets[$id] = $this->touch(array_replace($asset, $fields));
             case 'DELETE ':
                 unset($this->assets[$id], $this->content[$id], $this->uploads[$id]);
+                $this->lifecycleEvent('asset.deleted', $asset);
                 return null;
             case 'DELETE content':
+                // Like the API: the record and report stay; stored content, extracted text and the
+                // placeholder go. Content already removed keeps its reason.
+                unset($this->content[$id]);
                 if ($asset['content']['status'] !== 'removed') {
-                    $asset = $this->removeContent($asset, 'requested');
+                    $asset = $this->touch($this->removeContent($asset, 'requested'));
+                } elseif (isset($asset['content']['image']['thumbhash'])) {
+                    $asset['content']['image'] = self::withoutPlaceholder($asset['content']['image']);
                 }
-                return $this->assets[$id] = $this->touch($asset);
+                $this->assets[$id] = $asset;
+                $this->lifecycleEvent('asset.content-removed', $asset);
+                return $asset;
             case 'POST retry':
-                if ($asset['classification']['status'] !== 'failed') {
+                if ($asset['classification']['status'] !== 'failed' || $asset['classification']['moderation']['status'] !== 'pending') {
                     self::fail(ErrorCodes::ASSET_NOT_RETRYABLE);
                 }
                 if ($asset['content']['status'] === 'removed') {
                     self::fail(ErrorCodes::ASSET_CONTENT_UNAVAILABLE);
                 }
-                return $this->applyOutcome($asset, 'pending');
+                // Like the API: back to processing, to be moderated again, with an `asset.retried` event.
+                $asset = $this->applyOutcome($asset, 'pending');
+                $this->lifecycleEvent('asset.retried', $asset);
+                return $asset;
             case 'POST explain':
                 if ($asset['classification']['status'] !== 'completed') {
                     self::fail(ErrorCodes::ASSET_NOT_DECIDED);
                 }
                 if (empty($json['rerun'])) {
                     // Like the API: the evidence is completed and every action stays as decided.
-                    if (($asset['classification']['moderation']['policy']['evidence'] ?? null) === 'decision') {
-                        $asset['classification']['moderation']['policy']['evidence'] = 'full';
+                    if (($asset['classification']['moderation']['policy']['evidence'] ?? null) !== 'decision') {
+                        return $asset;
                     }
+                    $asset['classification']['moderation']['policy']['evidence'] = 'full';
                     return $this->assets[$id] = $this->touch($asset);
                 }
                 if (($asset['classification']['moderation']['manualReviews'] ?? []) !== []) {
@@ -394,54 +532,89 @@ final class MockServerClient
 
     private static function flag(mixed $value): bool { return $value === 'true' || $value === true; }
 
+    private static function withoutPlaceholder(?array $image): ?array
+    {
+        return $image === null ? null : ['thumbhash' => null, 'averageColor' => null] + $image;
+    }
+
+    /** Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB. */
+    private static function imageSizeError(string $type, int $size, bool $final): ?string
+    {
+        return match (true) {
+            $type !== 'image' => null,
+            $size > 20 * self::MIB => ErrorCodes::MULTIPART_IMAGE_TOO_LARGE,
+            $final && $size < 10 * self::MIB => ErrorCodes::MULTIPART_IMAGE_TOO_SMALL,
+            default => null,
+        };
+    }
+
+    /** Like the API: the parts may not overshoot a declared total, and must reach it at the end. */
+    private static function totalSizeError(?int $total, int $received, bool $final): ?string
+    {
+        return $total !== null && ($received > $total || ($final && $received !== $total)) ? ErrorCodes::UPLOAD_SIZE_MISMATCH : null;
+    }
+
+    private static function failIf(?string $code): void
+    {
+        if ($code !== null) {
+            self::fail($code);
+        }
+    }
+
     private function createAsset(array $options, bool $queue, ?string $bytes, bool $multipart): array
     {
-        if (isset($options['externalId'])) {
+        $mime = (string) ($options['contentType'] ?? '');
+        $url = $bytes === null ? ($options['url'] ?? null) : null;
+        $type = self::kind($mime, $url);
+        $size = $bytes === null ? null : strlen($bytes);
+        $final = !$multipart || self::flag($options['isFinal'] ?? null);
+        $total = isset($options['totalSizeInBytes']) ? (int) $options['totalSizeInBytes'] : null;
+        if ($multipart) {
+            // Like the API, a declared total is checked before anything is stored, then a single
+            // final part as the whole upload, then the part itself.
+            self::failIf(($total === null ? null : self::imageSizeError($type, $total, true))
+                ?? ($final ? self::totalSizeError($total, $size, true) ?? self::imageSizeError($type, $size, true) : null));
+            if (!$final && $size < 5 * self::MIB) {
+                self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Parts before the last must be at least 5 MiB');
+            }
+            self::failIf($final ? null : self::totalSizeError($total, $size, false));
+        }
+        if (isset($options['folderId'])) {
+            $this->folder($options['folderId']);
+        }
+        if (isset($options['externalId']) && $options['externalId'] !== '') {
             foreach ($this->assets as $existing) {
                 if (($existing['externalId'] ?? null) === $options['externalId']) {
                     self::fail(ErrorCodes::DUPLICATE_EXTERNAL_ID);
                 }
             }
         }
-        if (isset($options['folderId'])) {
-            $this->folder($options['folderId']);
-        }
         $now = ($this->now)();
-        $mime = (string) ($options['contentType'] ?? '');
-        $processing = is_string($options['processingOptions'] ?? null) ? json_decode($options['processingOptions'], true) : ($options['processingOptions'] ?? null);
-        $metadata = is_string($options['metadata'] ?? null) ? json_decode($options['metadata'], true) : ($options['metadata'] ?? null);
+        $decode = fn (string $key) => is_string($options[$key] ?? null) && $bytes !== null ? json_decode($options[$key], true) : ($options[$key] ?? null);
+        $processing = $decode('processingOptions') ?? ['keepContentAfterProcessing' => false];
         $keep = is_array($processing) && ($processing['keepContentAfterProcessing'] ?? false) === true;
-        $url = $bytes === null ? ($options['url'] ?? null) : null;
-        $kind = self::kind($mime, $url);
-        $total = isset($options['totalSizeInBytes']) ? (int) $options['totalSizeInBytes'] : null;
-        if ($multipart && $kind === 'image' && $total !== null) {
-            if ($total > 20 * self::MIB) {
-                self::fail(ErrorCodes::MULTIPART_IMAGE_TOO_LARGE);
-            }
-            if ($total < 10 * self::MIB) {
-                self::fail(ErrorCodes::MULTIPART_IMAGE_TOO_SMALL);
-            }
-        }
-        $final = !$multipart || self::flag($options['isFinal'] ?? null);
+        // Fields the API returns as null when they are not set.
         $asset = [
-            'id' => ($this->createId)(), 'projectId' => $this->projectId, 'folderId' => $options['folderId'] ?? null,
-            'parentId' => null, 'name' => $options['name'] ?? null, 'description' => $options['description'] ?? null,
-            'externalId' => $options['externalId'] ?? null, 'externalUrl' => $url ?? ($options['externalUrl'] ?? null),
-            'uploadPresetId' => $options['uploadPresetId'] ?? null, 'metadata' => $metadata, 'processingOptions' => $processing,
-            'type' => $kind, 'visibility' => $options['visibility'] ?? 'private',
-            'createdAt' => $now, 'updatedAt' => $now,
-            'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $multipart ? 1 : null],
+            'id' => ($this->createId)(), 'projectId' => $this->projectId, 'userId' => null, 'parentId' => null,
+            'folderId' => $options['folderId'] ?? null, 'uploadPresetId' => $options['uploadPresetId'] ?? null,
+            'createdAt' => $now, 'updatedAt' => $now, 'name' => $options['name'] ?? null,
+            'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,
+            'externalUrl' => $url ?? ($multipart ? null : ($options['externalUrl'] ?? null)),
+            'type' => $type, 'metadata' => $decode('metadata'), 'tags' => null, 'processingOptions' => $processing,
+            'visibility' => $options['visibility'] ?? 'private',
+            'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
+                'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,
+                'checksums' => null, 'image' => null, 'extractedText' => null],
+            'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
             'classification' => ['status' => $final ? 'processing' : 'pending', 'updatedAt' => $now, 'completedAt' => null,
                 'moderation' => ['status' => 'pending', 'manualReviews' => []]],
-            'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
-                'format' => $mime === '' ? null : $mime, 'sizeInBytes' => $bytes === null ? null : strlen($bytes), 'extractedText' => null],
         ];
         $this->assets[$asset['id']] = $asset;
         if ($bytes !== null) {
             $this->content[$asset['id']] = ['type' => $mime, 'bytes' => $bytes];
         }
         if (!$final) {
-            $this->uploads[$asset['id']] = ['queue' => $queue, 'total' => $total, 'image' => $kind === 'image', 'parts' => 1];
+            $this->uploads[$asset['id']] = ['queue' => $queue, 'total' => $total];
             return $asset;
         }
         return $this->finish($asset, $queue);
@@ -463,34 +636,32 @@ final class MockServerClient
         return $this->assets[$asset['id']] = array_replace_recursive($this->applyOutcome($asset, $status), $outcome);
     }
 
+    /** Continues a multipart upload, in the API's order of checks. */
     private function uploadPart(array $asset, array $query, string $bytes): array
     {
         $id = $asset['id'];
-        $upload = $this->uploads[$id] ?? null;
-        if ($upload === null || $asset['upload']['status'] !== 'uploading') {
+        if ($asset['upload']['status'] !== 'uploading') {
             self::fail(ErrorCodes::UPLOAD_NOT_OPEN);
         }
+        $expected = ($asset['upload']['partsReceived'] ?? 0) + 1;
         $number = (int) ($query['partNumber'] ?? 0);
-        if ($number !== $upload['parts'] + 1) {
-            self::fail(ErrorCodes::INVALID_UPLOAD_PART_NUMBER);
+        if ($number !== $expected) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_PART_NUMBER, null, "Expected part $expected", ['expectedPartNumber' => $expected, 'receivedPartNumber' => $number]);
         }
-        $size = strlen($this->content[$id]['bytes'] ?? '') + strlen($bytes);
         $final = self::flag($query['isFinal'] ?? null);
-        if ($upload['image'] && $size > 20 * self::MIB) {
-            self::fail(ErrorCodes::MULTIPART_IMAGE_TOO_LARGE);
-        }
-        if ($upload['image'] && $final && $size < 10 * self::MIB) {
-            self::fail(ErrorCodes::MULTIPART_IMAGE_TOO_SMALL);
-        }
-        if ($upload['total'] !== null && ($size > $upload['total'] || ($final && $size !== $upload['total']))) {
-            self::fail(ErrorCodes::UPLOAD_SIZE_MISMATCH);
+        $received = ($asset['content']['sizeInBytes'] ?? 0) + strlen($bytes);
+        $upload = $this->uploads[$id] ?? ['queue' => false, 'total' => null];
+        self::failIf(self::imageSizeError($asset['type'], $received, $final) ?? self::totalSizeError($upload['total'], $received, $final));
+        if (!$final && strlen($bytes) < 5 * self::MIB) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Parts before the last must be at least 5 MiB');
         }
         $this->content[$id] = ['type' => $this->content[$id]['type'] ?? (string) $asset['content']['format'], 'bytes' => ($this->content[$id]['bytes'] ?? '') . $bytes];
-        $this->uploads[$id]['parts'] = $number;
         $now = ($this->now)();
-        $asset['content']['sizeInBytes'] = $size;
-        $asset['upload'] = ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $number] + $asset['upload'];
-        $asset = $this->assets[$id] = $this->touch($asset);
+        $asset['content']['sizeInBytes'] = $received;
+        // Like the API, a completed upload no longer counts parts.
+        $asset['upload'] = ['updatedAt' => $now, 'partsReceived' => $final ? null : $number] + $asset['upload'];
+        $asset['updatedAt'] = $now;
+        $this->assets[$id] = $asset;
         if (!$final) {
             return $asset;
         }
@@ -500,19 +671,33 @@ final class MockServerClient
         return $this->finish($asset, $queue);
     }
 
-    /** Moves an asset to an outcome like the pipeline would, and stores it. */
-    private function applyOutcome(array $asset, string $outcome): array
+    /**
+     * Moves an asset to an outcome like the pipeline would, and stores it: a decision finishes
+     * processing, `purged` removes the content (with `$purgeReason`), finished processing removes
+     * content kept only temporarily, and a classified image gets a ThumbHash for its placeholder,
+     * which goes with its content.
+     */
+    private function applyOutcome(array $asset, string $outcome, string $purgeReason = 'policy'): array
     {
         $now = ($this->now)();
         $decided = !in_array($outcome, ['pending', 'failed'], true);
-        $asset['classification'] = ['status' => $decided ? 'completed' : ($outcome === 'failed' ? 'failed' : 'processing'),
-            'updatedAt' => $now, 'completedAt' => $decided ? $now : null] + $asset['classification'];
-        $asset['classification']['moderation']['status'] = $decided ? $outcome : 'pending';
-        if ($outcome === 'purged' && $asset['content']['status'] !== 'removed') {
-            $asset = $this->removeContent($asset, 'policy');
-        } elseif ($decided && $asset['content']['status'] === 'temporary') {
-            $asset = $this->removeContent($asset, 'retention');
+        $status = $decided ? 'completed' : ($outcome === 'failed' ? 'failed' : 'processing');
+        $purge = $outcome === 'purged' && $asset['content']['status'] !== 'removed';
+        $remove = $purge || ($status === 'completed' && $asset['content']['status'] === 'temporary');
+        $image = $asset['content']['image'] ?? null;
+        if ($decided && $asset['type'] === 'image' && $asset['content']['status'] !== 'removed' && !$purge) {
+            $image = ['thumbhash' => self::THUMBHASH, 'averageColor' => $image['averageColor'] ?? '#7f7f7f']
+                + ($image ?? []) + ['width' => null, 'height' => null, 'perceptualHash' => null];
+        } elseif ($outcome === 'purged') {
+            $image = self::withoutPlaceholder($image);
         }
+        $asset['content']['image'] = $image;
+        if ($remove) {
+            $asset = $this->removeContent($asset, $purge ? $purgeReason : 'retention');
+        }
+        $asset['upload'] = ['status' => 'completed', 'updatedAt' => $now] + $asset['upload'];
+        $asset['classification'] = ['status' => $status, 'updatedAt' => $now, 'completedAt' => $decided ? $now : null] + $asset['classification'];
+        $asset['classification']['moderation']['status'] = $decided ? $outcome : 'pending';
         $asset['updatedAt'] = $now;
         return $this->assets[$asset['id']] = $asset;
     }
@@ -520,7 +705,8 @@ final class MockServerClient
     private function removeContent(array $asset, string $reason): array
     {
         unset($this->content[$asset['id']]);
-        $asset['content'] = ['status' => 'removed', 'removalReason' => $reason, 'updatedAt' => ($this->now)(), 'extractedText' => null] + $asset['content'];
+        $asset['content'] = ['status' => 'removed', 'removalReason' => $reason, 'updatedAt' => ($this->now)(), 'extractedText' => null,
+            'image' => self::withoutPlaceholder($asset['content']['image'] ?? null)] + $asset['content'];
         return $asset;
     }
 
@@ -534,28 +720,55 @@ final class MockServerClient
     {
         return match (true) {
             $url !== null => 'website',
-            (bool) preg_match('#^(image|video|audio)/#', $mime) => explode('/', $mime)[0],
+            str_starts_with($mime, 'image/') => 'image',
+            str_starts_with($mime, 'video/') => 'video',
+            str_starts_with($mime, 'audio/') => 'audio',
             str_starts_with($mime, 'text/') => 'plaintext-document',
             str_contains($mime, 'pdf') || str_contains($mime, 'document') => 'multimedia-document',
             default => 'file',
         };
     }
 
-    /**
-     * Filters with a subset of RSQL (`;` and, `,` or, `==` with `*` wildcards, `!=`, `=in=`,
-     * `=out=`, `=gt=`, `=ge=`, `=lt=`, `=le=`, `( … )` groups), orders by `createdAt` and `id`
-     * with an `id` tie-breaker, and pages with keyset cursors like the API: a cursor resumes
-     * after the last returned item, so assets created or deleted between pages are neither
-     * repeated nor skipped.
-     */
-    private function page(array $items, array $query): array
+    private function listAssets(array $query): array
     {
+        $folderId = $query['folderId'] ?? null;
+        $items = array_filter($this->assets, fn ($asset) => $asset['parentId'] === null && ($folderId === null || $asset['folderId'] === $folderId));
+        return $this->page($items, $query, Values::json([$this->projectId, $query['filter'] ?? null, $folderId]));
+    }
+
+    /** A page size from the query, refused like the API's schema outside 1 to `$max`. */
+    private static function size(array $query, string $key, int $default, int $max): int
+    {
+        if (!array_key_exists($key, $query)) {
+            return $default;
+        }
+        $value = $query[$key];
+        if (!is_string($value) || !is_numeric($value) || (float) $value < 1) {
+            self::invalid('validation/too-small', $key);
+        }
+        if ((float) $value > $max) {
+            self::invalid('validation/too-big', $key);
+        }
+        if (!preg_match('/^\d+$/D', $value)) {
+            self::invalid('validation/invalid-type', $key);
+        }
+        return (int) $value;
+    }
+
+    /**
+     * One keyset page like the API's: filtered with a subset of RSQL (`;` and, `,` or, `==` with
+     * `*` wildcards, `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`, `=le=`, `( … )` groups),
+     * ordered by `createdAt` and `id` with an `id` tie-breaker, resuming after the cursor's
+     * values. A cursor only continues the query (`$scope` and ordering) it came from.
+     */
+    private function page(array $items, array $query, string $scope): array
+    {
+        $size = self::size($query, 'pageSize', 10, 100);
         $items = array_values($items);
         if (($query['filter'] ?? '') !== '') {
-            $matches = self::filter((string) $query['filter']);
-            $items = array_values(array_filter($items, $matches));
+            $items = array_values(array_filter($items, self::filter((string) $query['filter'])));
         }
-        $ordering = is_array($query['ordering'] ?? null) ? array_values($query['ordering']) : [['field' => 'createdAt', 'direction' => 'DESC']];
+        $ordering = is_array($query['ordering'] ?? null) && $query['ordering'] !== [] ? array_values($query['ordering']) : [['field' => 'createdAt', 'direction' => 'DESC']];
         foreach ($ordering as $order) {
             if (!in_array($order['field'] ?? null, ['createdAt', 'id'], true)) {
                 self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Invalid ordering');
@@ -564,29 +777,28 @@ final class MockServerClient
         if (!in_array('id', array_column($ordering, 'field'), true)) {
             $ordering[] = ['field' => 'id', 'direction' => $ordering[0]['direction'] ?? 'ASC'];
         }
-        usort($items, function (array $a, array $b) use ($ordering): int {
+        $compare = fn ($a, $b): int => is_string($a) || is_string($b) ? strcmp((string) $a, (string) $b) : $a <=> $b;
+        usort($items, function (array $a, array $b) use ($ordering, $compare): int {
             foreach ($ordering as $order) {
-                $result = ($a[$order['field']] ?? null) <=> ($b[$order['field']] ?? null);
+                $result = $compare($a[$order['field']] ?? null, $b[$order['field']] ?? null);
                 if ($result !== 0) {
                     return strtoupper($order['direction'] ?? 'ASC') === 'DESC' ? -$result : $result;
                 }
             }
             return 0;
         });
-        $size = (int) ($query['pageSize'] ?? 10);
-        if ($size < 1 || $size > 100) {
-            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'pageSize must be from 1 to 100');
-        }
+        $signature = Values::json([$scope, $ordering]);
         if (isset($query['cursor'])) {
             $decoded = base64_decode((string) $query['cursor'], true);
-            $after = $decoded === false ? null : json_decode($decoded, true);
-            if (!is_array($after) || !array_is_list($after) || count($after) !== count($ordering)) {
-                self::fail(ErrorCodes::INVALID_CURSOR, 400, 'Invalid cursor');
+            $cursor = $decoded === false ? null : json_decode($decoded, true);
+            $after = $cursor['values'] ?? null;
+            if (!is_array($cursor) || ($cursor['scope'] ?? null) !== $signature || !is_array($after) || !array_is_list($after) || count($after) !== count($ordering)) {
+                self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
             }
             // Keyset: resume strictly after the last returned item's values.
-            $items = array_values(array_filter($items, function (array $item) use ($ordering, $after): bool {
+            $items = array_values(array_filter($items, function (array $item) use ($ordering, $after, $compare): bool {
                 foreach ($ordering as $i => $order) {
-                    $result = ($item[$order['field']] ?? null) <=> $after[$i];
+                    $result = $compare($item[$order['field']] ?? null, $after[$i]);
                     if ($result !== 0) {
                         return (strtoupper($order['direction'] ?? 'ASC') === 'DESC' ? -$result : $result) > 0;
                     }
@@ -598,8 +810,8 @@ final class MockServerClient
         $taken = array_slice($items, 0, $size);
         $last = $taken === [] ? null : $taken[array_key_last($taken)];
         $cursor = $more && $last !== null
-            ? base64_encode(Values::json(array_map(fn (array $order) => $last[$order['field']] ?? null, $ordering))) : null;
-        return ['items' => $taken, 'nextCursor' => $cursor, 'pageSize' => $size, 'ordering' => $ordering, 'hasMore' => $more];
+            ? base64_encode(Values::json(['scope' => $signature, 'values' => array_map(fn (array $order) => $last[$order['field']] ?? null, $ordering)])) : null;
+        return ['items' => $taken, 'pageSize' => $size, 'hasMore' => $more, 'ordering' => $ordering, 'nextCursor' => $cursor];
     }
 
     private static function filter(string $expression): \Closure
@@ -736,10 +948,15 @@ final class MockServerClient
      */
     private function search(array $query): array
     {
+        // Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
         $text = trim((string) ($query['query'] ?? ''));
         if ($text === '') {
-            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'query is required');
+            self::invalid('validation/too-small', 'query');
         }
+        if (mb_strlen($text) > 200) {
+            self::invalid('validation/too-big', 'query');
+        }
+        $limit = self::size($query, 'limit', 10, 20);
         $normalized = strtolower($text);
         $tokens = array_slice(array_values(array_unique(preg_split('/\s+/', $normalized))), 0, 8);
         $items = [];
@@ -762,7 +979,6 @@ final class MockServerClient
                 'matchedFields' => array_keys(array_filter($values, $contains))];
         }
         usort($items, fn ($a, $b) => [$b['score'], $b['asset']['createdAt']] <=> [$a['score'], $a['asset']['createdAt']]);
-        $limit = min(20, max(1, (int) ($query['limit'] ?? 10)));
         return ['query' => $text, 'items' => array_slice($items, 0, $limit), 'semanticStatus' => 'disabled'];
     }
 
@@ -793,7 +1009,7 @@ final class MockServerClient
     {
         foreach ($this->folders as $folder) {
             if ($folder['id'] !== $except && $folder['name'] === $name && $folder['parentId'] === $parentId) {
-                self::fail(ErrorCodes::DUPLICATE_FOLDER_NAME);
+                self::fail(ErrorCodes::DUPLICATE_FOLDER_NAME, null, "A folder named \"$name\" already exists in this location.");
             }
         }
     }
@@ -801,7 +1017,7 @@ final class MockServerClient
     private function createFolder(array $json): array
     {
         if (!is_string($json['name'] ?? null) || $json['name'] === '') {
-            self::fail('validation/invalid-body', 400, 'name is required');
+            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Folder name is required');
         }
         $parentId = $json['parentId'] ?? null;
         if ($parentId !== null) {
@@ -809,27 +1025,29 @@ final class MockServerClient
         }
         $this->uniqueFolderName($json['name'], $parentId);
         $now = ($this->now)();
-        $folder = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'parentId' => $parentId, 'createdAt' => $now, 'updatedAt' => $now] + $json;
+        $folder = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'parentId' => $parentId, 'name' => $json['name'],
+            'createdAt' => $now, 'updatedAt' => $now];
         return $this->folders[$folder['id']] = $folder;
     }
 
     /** One level of a folder tree with its visible ancestors, like the API's folder page. */
     private function listFolders(array $query): array
     {
+        $size = self::size($query, 'pageSize', 100, 100);
         $search = strtolower((string) ($query['search'] ?? ''));
         $parentId = $query['parentId'] ?? null;
         $resolveOnly = self::flag($query['resolveOnly'] ?? null);
         $found = array_values(array_filter($this->folders, fn ($folder) => (($search !== '' && self::flag($query['searchAll'] ?? null)) || $folder['parentId'] === $parentId)
             && ($search === '' || str_contains(strtolower($folder['name']), $search))));
         $byDate = ($query['sort'] ?? null) === 'createdAt';
-        usort($found, fn ($a, $b) => [$byDate ? $a['createdAt'] : $a['name'], $a['id']] <=> [$byDate ? $b['createdAt'] : $b['name'], $b['id']]);
+        // Like the database: names compare by code point, so case matters.
+        usort($found, fn ($a, $b) => ($byDate ? $a['createdAt'] <=> $b['createdAt'] : strcmp($a['name'], $b['name'])) ?: strcmp($a['id'], $b['id']));
         if (strtoupper((string) ($query['direction'] ?? 'ASC')) === 'DESC') {
             $found = array_reverse($found);
         }
-        $size = (int) ($query['pageSize'] ?? 100);
         $start = (int) ($query['pageIndex'] ?? 0) * $size;
         $page = $resolveOnly ? [] : array_slice($found, $start, $size);
-        $ids = array_fill_keys(array_merge(array_values((array) ($query['ids'] ?? [])), array_column($page, 'id'), $parentId === null ? [] : [$parentId]), true);
+        $ids = array_fill_keys(array_merge(array_values((array) ($query['ids'] ?? [])), $parentId === null ? [] : [$parentId], array_column($page, 'id')), true);
         $queue = array_keys($ids);
         while ($queue !== []) {
             $parent = $this->folders[array_pop($queue)]['parentId'] ?? null;
@@ -850,66 +1068,84 @@ final class MockServerClient
             case 'GET ':
                 return $folder;
             case 'PATCH ':
-                if (isset($json['name'])) {
+                if (isset($json['name']) && $json['name'] !== $folder['name']) {
                     $this->uniqueFolderName($json['name'], $folder['parentId'], $id);
                 }
-                $fields = array_diff_key($json, array_flip(['id', 'projectId', 'parentId', 'createdAt']));
-                return $this->folders[$id] = $this->touch($fields + $folder);
+                if (isset($json['name'])) {
+                    $folder['name'] = $json['name'];
+                }
+                return $this->folders[$id] = $this->touch($folder);
             case 'DELETE ':
-                if (array_filter($this->assets, fn ($asset) => $asset['folderId'] === $id) !== []
-                    || array_filter($this->folders, fn ($child) => $child['parentId'] === $id) !== []) {
-                    self::fail(ErrorCodes::FOLDER_NOT_EMPTY);
+                $hasAssets = array_filter($this->assets, fn ($asset) => $asset['folderId'] === $id) !== [];
+                $hasChildren = array_filter($this->folders, fn ($child) => $child['parentId'] === $id) !== [];
+                if ($hasAssets || $hasChildren) {
+                    self::fail(ErrorCodes::FOLDER_NOT_EMPTY, null, 'The folder is not empty', ['hasAssets' => $hasAssets, 'hasChildren' => $hasChildren]);
                 }
                 unset($this->folders[$id]);
                 return null;
             case 'POST move':
                 $parentId = $json['parentId'] ?? null;
-                for ($current = $parentId, $seen = [$id => true]; $current !== null; $current = $this->folder($current)['parentId']) {
-                    if (isset($seen[$current])) {
+                for ($current = $parentId, $seen = []; $current !== null; $current = $this->folder($current)['parentId']) {
+                    if ($current === $id || isset($seen[$current])) {
                         self::fail(ErrorCodes::FOLDER_PARENT_CYCLE);
                     }
                     $seen[$current] = true;
                 }
-                $this->uniqueFolderName($folder['name'], $parentId, $id);
+                if ($parentId !== $folder['parentId']) {
+                    $this->uniqueFolderName($folder['name'], $parentId, $id);
+                }
                 return $this->folders[$id] = $this->touch(['parentId' => $parentId] + $folder);
         }
         throw new \LogicException("MockServerClient does not emulate $method $suffix for a folder; enqueue a response for it");
     }
 
-    /** Without `after` the feed starts from now, like the API. */
+    /** Without `after` the feed starts from now, like the API; `limit` is 1 to 100, 50 by default. */
     private function listEvents(array $query): array
     {
-        if (!isset($query['after'])) {
+        $limit = self::size($query, 'limit', 50, 100);
+        if (!isset($query['after']) || $query['after'] === '') {
             return ['events' => [], 'cursor' => 'mock_' . count($this->events), 'hasMore' => false];
         }
-        if (!preg_match('/^mock_(\d+)$/D', (string) $query['after'], $match)) {
-            self::fail(ErrorCodes::INVALID_EVENT_CURSOR);
-        }
-        $limit = (int) ($query['limit'] ?? 50);
-        if ($limit < 1 || $limit > 100) {
-            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'limit must be from 1 to 100');
+        if (!preg_match('/^mock_(\d+)$/D', (string) $query['after'], $match) || (int) $match[1] > count($this->events)) {
+            self::fail(ErrorCodes::INVALID_EVENT_CURSOR, null, 'Invalid event cursor', ['after' => $query['after']]);
         }
         $taken = array_slice($this->events, (int) $match[1], $limit);
         $next = (int) $match[1] + count($taken);
         return ['events' => $taken, 'cursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events)];
     }
 
-    /** An unchanged definition is returned as saved; a changed one needs a higher version. */
+    /**
+     * Saves each definition in order, like the API: an unchanged one returns the stored lens, a
+     * changed one needs a greater version (`lens/version-conflict` otherwise, after the earlier
+     * definitions are saved).
+     */
     private function saveLenses(array $definitions): array
     {
-        $now = ($this->now)();
-        $pending = $this->lenses;
         $saved = [];
         foreach ($definitions as $definition) {
-            $old = $pending[$definition['identifier']] ?? null;
-            $same = $old !== null && array_intersect_key($old, $definition) == $definition;
-            if ($old !== null && !$same && ($definition['version'] ?? 0) <= ($old['version'] ?? 0)) {
-                self::fail(ErrorCodes::LENS_VERSION_CONFLICT);
+            $old = $this->lenses[$definition['identifier']] ?? null;
+            $now = ($this->now)();
+            if ($old === null) {
+                $saved[] = $this->lenses[$definition['identifier']] = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'userId' => null]
+                    + $definition + ['createdAt' => $now, 'updatedAt' => $now];
+                continue;
             }
-            $saved[] = $pending[$definition['identifier']] = $same ? $old : $definition + ['id' => $old['id'] ?? ($this->createId)(),
-                'projectId' => $this->projectId, 'createdAt' => $old['createdAt'] ?? $now, 'updatedAt' => $now];
+            $same = ($old['name'] ?? null) === ($definition['name'] ?? null)
+                && ($old['description'] ?? null) === ($definition['description'] ?? null)
+                && ($old['type'] ?? null) === ($definition['type'] ?? null)
+                && ($old['active'] ?? null) === ($definition['active'] ?? null)
+                && Values::json(Values::canonical($old['transforms'] ?? null)) === Values::json(Values::canonical($definition['transforms'] ?? null));
+            if ($same && ($old['version'] ?? null) === ($definition['version'] ?? null)) {
+                $saved[] = $old;
+                continue;
+            }
+            if (($definition['version'] ?? 0) > ($old['version'] ?? 0)) {
+                $saved[] = $this->lenses[$definition['identifier']] = array_replace($old, $definition, ['updatedAt' => $now]);
+                continue;
+            }
+            self::fail(ErrorCodes::LENS_VERSION_CONFLICT, null, 'A changed lens needs a greater version',
+                ['currentVersion' => $old['version'], 'minimumVersion' => $old['version'] + 1, 'requestedVersion' => $definition['version'] ?? null]);
         }
-        $this->lenses = $pending;
         return ['lenses' => $saved];
     }
 
@@ -935,9 +1171,9 @@ final class MockServerClient
         return false;
     }
 
-    private function serve(string $method, string $path, array $query): Response
+    /** Serves stored content and placeholders like the CDN, with its headers. */
+    private function serve(string $method, array $segments, array $query): Response
     {
-        $segments = array_map('rawurldecode', array_values(array_filter(explode('/', $path), fn ($part) => $part !== '')));
         [, $project, $identifier, $resource] = $segments + [null, null, null, null];
         $asset = null;
         foreach ($this->assets as $candidate) {
@@ -945,29 +1181,53 @@ final class MockServerClient
                 $asset = $candidate;
             }
         }
-        if ($project !== $this->projectId || $asset === null || !in_array($resource, ['original', 'rendered'], true)) {
-            return self::json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
+        if ($project !== $this->projectId || $asset === null || !in_array($resource, ['original', 'rendered', 'placeholder'], true)) {
+            return $this->json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
+        }
+        $notAvailable = fn () => $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
+        $status = $asset['classification']['moderation']['status'];
+        if ($resource === 'placeholder') {
+            // Like the CDN: an image's ThumbHash, public for public assets whatever their moderation
+            // status; refused for purged assets, assets without one and, for private assets, keys
+            // without `assets:download`.
+            $thumbhash = $asset['content']['image']['thumbhash'] ?? null;
+            $public = $asset['visibility'] === 'public';
+            if ($thumbhash === null || $status === 'purged' || (!$public && !$this->canDownload($asset['folderId'] ?? null))) {
+                return $notAvailable();
+            }
+            return $this->cdnResponse($method, Placeholder::png($thumbhash), ['Content-Type' => 'image/png',
+                'Cache-Control' => ($public ? 'public' : 'private') . ', max-age=3600', 'Cache-Tag' => 'asset-' . $asset['id'],
+                'ETag' => '"' . $thumbhash . '"']);
         }
         // Delivery checks come first and refuse everyone, like the CDN.
-        $status = $asset['classification']['moderation']['status'];
         $stored = $this->content[$asset['id']] ?? null;
-        if ($stored === null || $asset['upload']['status'] !== 'completed' || in_array($status, ['blocked', 'purged'], true)
+        if ($stored === null || $asset['upload']['status'] === 'uploading' || in_array($status, ['blocked', 'purged'], true)
             || $asset['classification']['status'] === 'failed' || $asset['content']['status'] === 'removed') {
-            return self::json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
+            return $notAvailable();
         }
         // Age-restricted assets are delivered like private ones, unless a public one is requested
         // with `allowAgeRestricted=true`.
-        $ageRestricted = $status === 'age-restricted';
-        $private = $asset['visibility'] !== 'public' || ($ageRestricted && ($query['allowAgeRestricted'] ?? null) !== 'true');
+        $private = $asset['visibility'] !== 'public' || ($status === 'age-restricted' && ($query['allowAgeRestricted'] ?? null) !== 'true');
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
-            return self::json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'The API key cannot download this asset']);
+            return $this->json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'This API key needs assets:download permission for this asset’s folder.']);
         }
+        $type = $stored['type'] === '' ? 'application/octet-stream' : $stored['type'];
+        $image = $asset['type'] === 'image';
+        $base = strtolower(trim(explode(';', $type)[0]));
         // Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
         // by shared caches only when delivery is public.
-        $lifetime = $asset['type'] === 'image' ? 'max-age=31536000, immutable' : 'max-age=3600';
-        return new Response(200, ['Content-Type' => $stored['type'], 'Content-Length' => (string) strlen($stored['bytes']),
-            'Cache-Control' => ($private ? 'private' : 'public') . ', ' . $lifetime,
-            'ETag' => '"' . substr(hash('sha256', $stored['bytes']), 0, 32) . '"', 'X-Request-Id' => self::requestId()],
-            $method === 'HEAD' ? '' : $stored['bytes']);
+        return $this->cdnResponse($method, $stored['bytes'], ['Content-Type' => $type,
+            'Cache-Control' => ($private ? 'private' : 'public') . ', ' . ($image ? 'max-age=31536000, immutable' : 'max-age=3600'),
+            'Cache-Tag' => 'asset-' . $asset['id']]
+            + ($image ? ['ETag' => '"' . $asset['id'] . '"', 'Expires' => gmdate('D, d M Y H:i:s', intdiv(($this->now)(), 1000) + 31536000) . ' GMT'] : [])
+            + ['X-Content-Type-Options' => 'nosniff', 'Content-Security-Policy' => "sandbox; default-src 'none'"]
+            // Content a browser could run as a document is served as a download.
+            + (in_array($base, self::ACTIVE_CONTENT_TYPES, true) || str_ends_with($base, '+xml') ? ['Content-Disposition' => 'attachment'] : []));
+    }
+
+    private function cdnResponse(string $method, string $bytes, array $headers): Response
+    {
+        return new Response(200, $headers + ['Content-Length' => (string) strlen($bytes), 'X-Request-Id' => $this->requestId()],
+            $method === 'HEAD' ? '' : $bytes);
     }
 }

@@ -23,10 +23,17 @@ final class CommentTest extends TestCase
             'calmlens.project_id' => 'project-1', 'calmlens.webhook_secret' => 'test-secret']);
     }
 
-    public function testAllowedCommentIsStoredAndSentToModeration(): void
+    public static function published(): iterable
+    {
+        yield ['allowed'];
+        yield ['limited'];
+    }
+
+    #[DataProvider('published')]
+    public function testAllowedOrLimitedCommentIsStoredAndSentToModeration(string $status): void
     {
         $mock = new MockTransport();
-        $mock->enqueueJson(['id' => 'asset-1', 'classification' => ['moderation' => ['status' => 'allowed']]]);
+        $mock->enqueueJson(['id' => 'asset-1', 'classification' => ['moderation' => compact('status')]]);
         $this->app->instance(ServerClient::class, $mock->client());
         $this->post('/comments', ['comment' => 'Hello'])->assertRedirect('/')->assertSessionHas('comments', [['text' => 'Hello', 'assetId' => 'asset-1']]);
         self::assertSame('Hello', (string) $mock->requests()[0]->getBody());

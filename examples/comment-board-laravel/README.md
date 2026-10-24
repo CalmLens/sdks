@@ -2,7 +2,8 @@
 
 A runnable Laravel 12 / PHP 8.2+ example using the local CalmLens PHP SDK. Comments
 are moderated on the server and stored in the visitor's session only when their
-moderation status is `allowed`. Pending, age-restricted, blocked, purged, unknown or
+moderation status is `allowed` or `limited` (a limited comment is shown like an allowed
+one; the board has no recommendations or notifications to keep it out of). Pending, age-restricted, blocked, purged, unknown or
 failed results never publish. The board keeps the most recent 50 comments; no database is
 required. Blade escapes displayed input and Laravel protects the form with CSRF.
 

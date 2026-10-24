@@ -17,7 +17,7 @@ final class Webhooks
      * Events that can change an image's moderation status: classification finishing, one event
      * per status (sent for automated and reviewer decisions alike) and failed processing.
      */
-    public const SYNC_EVENTS = ['asset.classified', 'asset.allowed', 'asset.age-restricted', 'asset.blocked', 'asset.purged', 'asset.failed'];
+    public const SYNC_EVENTS = ['asset.classified', 'asset.allowed', 'asset.limited', 'asset.age-restricted', 'asset.blocked', 'asset.purged', 'asset.failed'];
     private const REMEMBERED_DELIVERIES = 500;
 
     public function __construct(private Store $store, private Content $content, private string $projectId, private string $secret) {}

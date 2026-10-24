@@ -10,6 +10,18 @@ use GuzzleHttp\ClientInterface;
 
 final class ServerClient
 {
+    public const DEFAULT_BASE_URL = 'https://api.calmlens.com/v1';
+    public const DEFAULT_CDN_BASE_URL = 'https://cdn.calmlens.com/v1';
+    /** Seconds each API request attempt may take, reading the response included. */
+    public const DEFAULT_TIMEOUT = 120;
+    /** Seconds each binary upload attempt may take: none unless set. */
+    public const DEFAULT_UPLOAD_TIMEOUT = null;
+    public const DEFAULT_MAX_RETRIES = 2;
+    /** The largest API response body the client reads (32 MiB). */
+    public const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+    /** ensureLenses sends new definitions in consecutive requests of at most this many. */
+    public const ENSURE_LENSES_BATCH_SIZE = 100;
+
     public readonly Assets $assets;
     public readonly Folders $folders;
     public readonly Events $events;
@@ -19,21 +31,31 @@ final class ServerClient
     private Session $session;
     private array $lenses = [];
 
+    /**
+     * @param float $timeout seconds each API request attempt may take, reading the response included.
+     * @param ?float $uploadTimeout seconds each binary upload attempt (file content and multipart
+     *   parts) may take; none by default, since files may be large. Text uploads use `timeout`.
+     * @param int $maxRetries retries after a retryable failure, for reads and for requests carrying
+     *   an Idempotency-Key, unless their body is a one-shot stream.
+     * @param int $maxResponseBytes the largest API response body the client reads.
+     */
     public function __construct(
         #[\SensitiveParameter] string $apiKey,
         public readonly string $projectId,
-        string $baseUrl = 'https://api.calmlens.com/v1',
-        string $cdnBaseUrl = 'https://cdn.calmlens.com/v1',
-        float $timeout = 120,
-        float $connectTimeout = 10,
-        int $maxRetries = 2,
+        string $baseUrl = self::DEFAULT_BASE_URL,
+        string $cdnBaseUrl = self::DEFAULT_CDN_BASE_URL,
+        int|float $timeout = self::DEFAULT_TIMEOUT,
+        int|float $connectTimeout = 10,
+        int|float $maxRetries = self::DEFAULT_MAX_RETRIES,
         ?ClientInterface $httpClient = null,
+        int|float $maxResponseBytes = self::DEFAULT_MAX_RESPONSE_BYTES,
+        int|float|null $uploadTimeout = self::DEFAULT_UPLOAD_TIMEOUT,
     ) {
         if (!preg_match('/^[\x21-\x7e]+$/D', $apiKey) || $projectId === '' || in_array($projectId, ['.', '..'], true)) {
             Values::invalid('Invalid API key or project ID', 'sdk/invalid-config');
         }
         $this->session = new Session($apiKey, $projectId, Values::url($baseUrl), Values::url($cdnBaseUrl),
-            compact('timeout', 'connectTimeout', 'maxRetries'), $httpClient);
+            compact('timeout', 'connectTimeout', 'maxRetries', 'maxResponseBytes', 'uploadTimeout'), $httpClient);
         $this->assets = new Assets($this->session);
         $this->folders = new Folders($this->session);
         $this->events = new Events($this->session);
@@ -70,11 +92,11 @@ final class ServerClient
             }
         }
         $resolved = $this->lenses;
-        foreach (array_chunk($missing, 100, true) as $chunk) {
+        foreach (array_chunk($missing, self::ENSURE_LENSES_BATCH_SIZE, true) as $chunk) {
             $sent = array_values($chunk);
             $response = $this->session->request('PUT', $this->session->project('lenses'), body: ['lenses' => $sent], options: $options['requestOptions'] ?? []);
-            $returned = $response['lenses'] ?? $response;
-            if (!is_array($returned) || count($returned) !== count($sent)) {
+            $returned = is_array($response['lenses'] ?? null) && array_is_list($response['lenses']) ? $response['lenses'] : [];
+            if (count($returned) !== count($sent)) {
                 throw CalmLensException::create('sdk/invalid-response', 'Unexpected lens response');
             }
             foreach ($sent as $index => $definition) {
