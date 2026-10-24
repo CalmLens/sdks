@@ -20,6 +20,10 @@ const input = {
   index: "src/index.ts",
   server: "src/server.ts",
   app: "src/app.ts",
+  ui: "src/ui.ts",
+  react: "src/react.tsx",
+  vue: "src/vue.ts",
+  elements: "src/elements.ts",
   testing: "src/testing.ts",
   "test-inputs": "src/test-inputs.ts",
 };

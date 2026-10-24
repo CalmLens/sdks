@@ -1,6 +1,12 @@
 export { generateMediaTestCode, MEDIA_TEST_SIGNALS } from "./contract/MediaTestTriggers.js";
 export { createMockApiKey, MOCK_API_KEY_PREFIX } from "./testing/MockApiKey";
 export type {
+  MockCalmLensAppClientOptions,
+  MockUploadPreset,
+} from "./testing/MockCalmLensAppClient";
+export { MockCalmLensAppClient } from "./testing/MockCalmLensAppClient";
+export type {
+  MockAssetOutcome,
   MockCalmLensCall,
   MockCalmLensOperation,
   MockCalmLensOperationOptions,

@@ -548,6 +548,63 @@ const { token, expiresAt } = await client.uploadTokens.sign({
 
 Server uploads can also pass `uploadPresetId` to `assets.create` or `assets.classify` to apply a preset's folder, visibility, file types and size limit. See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
 
+## Upload widget and media component
+
+Ready-made front-end components for each UI library. They share one core, so they behave the same everywhere:
+
+| Import | Components |
+| --- | --- |
+| `@calmlens/sdk/react` | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload` (also works in Preact through `preact/compat`) |
+| `@calmlens/sdk/vue` | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload` |
+| `@calmlens/sdk/svelte` | `CalmLensUploader`, `CalmLensMedia` (Svelte 5) |
+| `@calmlens/sdk/elements` | `<calmlens-uploader>`, `<calmlens-media>` for plain HTML, Angular, Solid, Lit and anything else that renders custom elements |
+| `@calmlens/sdk/ui` | The framework-free core: `createUploadController`, `getMediaState`, messages and styles |
+
+`react`, `vue` and `svelte` are optional peer dependencies: install the one you use.
+
+**The uploader** is a drop zone with a file list. It uploads each file through `CalmLensAppClient`, shows byte progress, checks the upload until it has a moderation decision (for about 15 seconds; anything still pending is your webhook's to settle), and shows the decision or a message for each error code.
+
+```tsx
+import { CalmLensUploader } from "@calmlens/sdk/react";
+
+<CalmLensUploader
+  uploadPresetId="your-upload-preset-id"
+  tokenUrl="/api/upload-token" // POSTs { name, type, size }; answer { token }
+  accept="image/*"
+  maxFileSize={10 * 1024 * 1024}
+  multiple
+  onUploaded={({ assetId, status, file }) => savePhoto(assetId)}
+/>;
+```
+
+Options: `uploadPresetId`, `token` (a string, or a function of the file returning one), `tokenUrl`, `accept`, `maxFileSize`, `multiple`, `maxFiles`, `concurrency`, `decisionTimeoutMs`, `baseUrl`, `disabled`, `capture` and `messages`. Callbacks: `onUploaded` (not called for blocked or purged files), `onRejected`, `onFailed` and `onRemoved`; Vue emits `uploaded`, `rejected`, `failed` and `removed`, and the web component dispatches `calmlens-uploaded` and friends with the same `detail`.
+
+To upload through your own API instead of a preset, pass `upload(file, { signal, onProgress })`, which returns `{ assetId, status? }`, and optionally `checkStatus(assetId)` for pending uploads. The uploader still shows progress, decisions and errors; throw a `CalmLensError` to show its code's message. `createProgressFetch(onProgress)` gives you a `fetch` that reports sent bytes, to pass as `uploadFetch` to your client.
+
+**The media component** shows an asset from the CDN. It offers AVIF before the original by default (`formats`), adds `srcset` widths when you pass `widths` and `sizes`, shows the blurred placeholder while the image loads, and fades the image in. Age-restricted assets stay behind the placeholder and a notice with a reveal button until you pass `canView`, and then use the `allowAgeRestricted` opt-in. Blocked and purged assets, and images that fail to load, show an unavailable notice.
+
+```tsx
+import { CalmLensMedia } from "@calmlens/sdk/react";
+
+<CalmLensMedia
+  projectId="your-project-id"
+  assetId={post.assetId}
+  status={post.status}
+  canView={viewer.canViewSensitiveMedia}
+  onReveal={askForAgeCheck}
+  alt={post.alt}
+  aspectRatio={post.aspectRatio}
+  widths={[400, 800]}
+  sizes="(min-width: 768px) 50vw, 100vw"
+/>;
+```
+
+It also takes `type` (`image`, `video` or `audio`), `resource`, `lens`, `transform`, `url` (a signed URL from your server), `placeholderHash` (the asset's `content.previewImage.thumbhash`, drawn in the browser so no placeholder request is needed, including for private assets), `placeholderUrl`, `averageColor`, `fit`, `position`, `lazy`, `fetchPriority` and `controls`.
+
+The components add their stylesheet to the page when they first render. Theme them with `--calmlens-accent`, `--calmlens-radius` and the other `--calmlens-*` properties, which take precedence on any element. Pass `unstyled` to style the `calmlens-*` classes yourself. When server rendering, or when your Content Security Policy refuses injected styles, include `CALMLENS_STYLES` in the page or link `@calmlens/sdk/styles.css`, and pass `unstyled`. All text can be replaced or translated with `messages`, keyed by message name or error code.
+
+The [widget playground](https://github.com/CalmLens/sdks/tree/main/examples/widget-playground) runs every component against a mock API.
+
 ## Asset Types
 
 Assets can be of the following types:
@@ -670,7 +727,7 @@ const client = new MockCalmLensServerClient({
 
 `MockCalmLensServerClient` accepts the same options as `CalmLensServerClient` (`apiKey`, `projectId`, `baseUrl`, `cdnBaseUrl`, `timeoutMs`, ...) and validates them the same way, plus `mockOptions`. `cdn.getAssetUrl` uses `cdnBaseUrl` (default `mock://calmlens/v1`).
 
-It behaves like the API where tests depend on it: errors carry the API's code, HTTP `status`, a `requestId` and `headers`; `assets.list` applies `ordering`, `folderId` and simple `filter` expressions (comparisons joined by `;` and `,`; anything else throws `sdk/invalid-argument` rather than returning wrong results); `assets.search` matches names, IDs, external IDs, descriptions and tags; multipart parts must arrive in order and the queue mode chosen at the start applies to the final part; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, `purged` removes it with reason `policy`, and `assets.deleteContent` removes it with reason `requested`; a reused `idempotencyKey` replays the first result; and `cdn.serve` returns CDN-like responses with JSON error bodies, serving private assets, and age-restricted ones requested without `allowAgeRestricted: true`, only to keys with `assets:download`. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
+It behaves like the API where tests depend on it: errors carry the API's code, HTTP `status`, a `requestId` and `headers`; `assets.list` applies `ordering`, `folderId` and simple `filter` expressions (comparisons joined by `;` and `,`; anything else throws `sdk/invalid-argument` rather than returning wrong results); `assets.search` matches names, IDs, external IDs, descriptions and tags; multipart parts must arrive in order and the queue mode chosen at the start applies to the final part; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, `purged` removes it with reason `policy`, and `assets.deleteContent` removes it with reason `requested`; a reused `idempotencyKey` replays the first result; and `cdn.serve` returns CDN-like responses with JSON error bodies, serving private assets, and age-restricted ones requested without `allowAgeRestricted: true`, only to keys with `assets:download`, refusing blocked assets with `asset/not-available`, and serving a public asset's `placeholder` whatever its status. `queuedOutcome` and `analyzedOutcome` can also be functions of the new asset, for example to decide from its name. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
 
 Every call is recorded in `client.calls` as `{ operation, options }`, where `operation` is the method path (`"text.classify"`, `"assets.retrieve"`, `"events.list"`, ...) and `options` is the object you passed. `client.callsTo(operation)` filters them. To test failure handling, `client.failNextRequest()` makes the next call throw the same `CalmLensError` the real client throws when the network fails (`sdk/transport-error`); pass `"timeout"` for `sdk/timeout`, or any `Error` to throw it as is, and `{ operation }` to fail only that method. Each queued failure is used once.
 
@@ -694,6 +751,8 @@ const body = JSON.stringify(toWebhookEventPayload(event));
 const headers = await createWebhookHeaders({ secret, body, deliveryId: "delivery-1" });
 const response = await app.request("/api/webhooks/calmlens", { method: "POST", body, headers });
 ```
+
+`MockCalmLensAppClient` is the same for `CalmLensAppClient`: it applies upload preset rules from `mockOptions.preset` (`requireToken`, `allowedContentTypes`, `maxFileSizeInBytes`, `showDecisions`, `visibility`, `keepContentAfterProcessing`) with the API's error codes, and stores uploads in a `MockCalmLensServerClient`. Pass yours as `mockOptions.server` to check uploads from the server side and serve them from its CDN, or read the one it creates from `client.server`. To run the upload widget on it, pass `createClient: (options) => new MockCalmLensAppClient({ ...options, mockOptions })`.
 
 For `mockOptions`, deterministic timestamps and IDs, storage inspection, and testing recipes, see the [JavaScript SDK Testing Guide](https://calmlens.com/docs/sdk/javascript/testing).
 

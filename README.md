@@ -21,6 +21,7 @@ The six existing SDKs are published; PHP is available from this checkout pending
 | [Calmgram: photo sharing](examples/calmgram) | JavaScript / TypeScript |
 | [Calmform: static feedback form](examples/feedback-form-static) | JavaScript |
 | [UI components](examples/ui-components) | React, Vue, Svelte, JavaScript |
+| [Widget playground](examples/widget-playground) | React, Vue, Svelte, web components |
 | [Calmsnap: mobile photo uploads](examples/mobile-uploads-expo) | TypeScript / Expo |
 | [Link board](examples/link-board-python) | Python |
 | [Comment board](examples/comment-board-laravel) | PHP / Laravel |

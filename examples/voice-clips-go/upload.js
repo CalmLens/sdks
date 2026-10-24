@@ -1,49 +1,43 @@
-// Calmclips browser upload (live mode). The clip goes straight from this page to CalmLens
-// through the upload preset, using a single-use token the Go server signed for it. The server
-// then retrieves the asset itself before it shows a decision or allows playback.
+// Calmclips browser upload (live mode), through the CalmLens upload widget. The clip goes
+// straight from this page to CalmLens through the upload preset, using a single-use token the Go
+// server signed for it. The server then retrieves the asset itself before it shows a decision or
+// allows playback.
 //
-// /sdk/app.js is the workspace build of @calmlens/sdk/app. Once a published release includes
-// CalmLensAppClient, import that instead (for example from your bundler).
-import { CalmLensAppClient } from "/sdk/app.js";
+// The widget's `upload` hook runs this page's own flow (the server handshake and multipart
+// parts) while the widget shows the file, its progress and any error.
+//
+// /sdk/ is the workspace build of @calmlens/sdk. Once a published release includes the widget,
+// import `@calmlens/sdk/app` and `@calmlens/sdk/elements` from your bundler or CDN instead.
+import { CalmLensAppClient, CalmLensError } from "/sdk/app.js";
+import { createProgressFetch } from "/sdk/elements.js";
 
 const form = document.getElementById("upload-form");
-const input = document.getElementById("clip");
-const button = form.querySelector("button[type=submit]");
-const progress = document.getElementById("upload-progress");
-const status = document.getElementById("upload-status");
-let uploading = false;
-
-const say = (message) => {
-  status.textContent = message;
+const uploader = form.querySelector("calmlens-uploader");
+uploader.setAttribute("max-file-size", String(Number(form.dataset.maxMib) * 1024 * 1024));
+uploader.messages = {
+  "clip/refused": "This clip can't be uploaded. Check its format, size and length.",
 };
+uploader.style.setProperty("--calmlens-accent", "#355bd4");
 
 // Posts a small form to this server, with the page's form token.
 const post = async (path, fields) => {
   const body = new URLSearchParams({ csrf: form.elements.csrf.value, ...fields });
   const response = await fetch(path, { method: "POST", body });
   if (!response.ok) {
-    throw new Error((await response.text()).trim() || `Request failed (${response.status})`);
+    // The server's refusal reasons are for its own log; the widget shows a fixed message.
+    throw new CalmLensError("clip/refused", { message: (await response.text()).trim() });
   }
   const json = response.headers.get("Content-Type")?.startsWith("application/json");
   return json ? response.json() : null;
 };
 
-const report = (sent, total) => {
-  progress.max = total;
-  progress.value = sent;
-  progress.hidden = false;
-  say(total === 1 ? (sent ? "Uploaded." : "Uploading…") : `Uploaded part ${sent} of ${total}.`);
-};
-
 // Small clips go in one request. Larger ones are a multipart upload: every part except the
 // last is exactly partSize (5 MiB, the minimum CalmLens accepts) and is a slice of the file,
 // so the clip is never copied into memory.
-const send = async (client, file, { type, parts, partSize }) => {
-  report(0, parts);
+// `onPart` gets the bytes sent in earlier parts, so the progress bar covers the whole clip.
+const send = async (client, file, { type, parts, partSize }, onPart) => {
   if (parts === 1) {
-    const asset = await client.assets.create({ name: file.name, content: { data: file, type } });
-    report(1, 1);
-    return asset;
+    return client.assets.create({ name: file.name, content: { data: file, type } });
   }
   const slice = (n) => file.slice((n - 1) * partSize, Math.min(n * partSize, file.size));
   let asset = await client.assets.create({
@@ -51,13 +45,12 @@ const send = async (client, file, { type, parts, partSize }) => {
     totalSizeInBytes: file.size,
     part: { data: slice(1), type, partNumber: 1, isFinal: false },
   });
-  report(1, parts);
   for (let n = 2; n <= parts; n++) {
+    onPart((n - 1) * partSize);
     asset = await client.assets.uploadPart({
       assetId: asset.id,
       part: { data: slice(n), partNumber: n, isFinal: n === parts },
     });
-    report(n, parts);
   }
   return asset;
 };
@@ -75,43 +68,39 @@ const finish = async (clip, assetId) => {
   }
 };
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const file = input.files[0];
-  if (uploading || !file) return;
-  uploading = true;
-  button.disabled = true;
-  let clip;
+uploader.upload = async (file, { signal, onProgress }) => {
+  // The server checks the format and size, and signs a token for this clip only.
+  const started = await post("/uploads/start", {
+    name: file.name,
+    type: file.type,
+    size: String(file.size),
+  });
   try {
-    say("Preparing the upload…");
-    // The server checks the format and size, and signs a token for this clip only.
-    const started = await post("/uploads/start", {
-      name: file.name,
-      type: file.type,
-      size: String(file.size),
-    });
-    clip = started.clip;
+    let sentBefore = 0;
     const client = new CalmLensAppClient({
       uploadPresetId: form.dataset.preset,
       token: started.token,
       baseUrl: form.dataset.api,
+      signal,
+      uploadFetch: createProgressFetch((sent) => onProgress(sentBefore + sent, file.size)),
     });
-    const asset = await send(client, file, started);
-    say("Uploaded. Checking it with the server…");
-    await finish(clip, asset.id);
-    window.location.reload();
+    const asset = await send(client, file, started, (bytes) => {
+      sentBefore = bytes;
+    });
+    await finish(started.clip, asset.id);
+    // The server reads the decision from CalmLens and shows it after the reload.
+    return { assetId: asset.id, status: "pending" };
   } catch (error) {
-    say(`The upload did not finish: ${error.message}`);
-    progress.hidden = true;
     // Free the clip's slot. An asset whose upload was never confirmed stays in the project.
-    if (clip) await post("/delete", { clip }).catch(() => {});
-    uploading = false;
-    button.disabled = false;
+    await post("/delete", { clip: started.clip }).catch(() => {});
+    throw error;
   }
-});
+};
+uploader.addEventListener("calmlens-uploaded", () => window.location.reload());
 
 // While a clip is being checked, reload every three seconds, but never during an upload.
 if (form.dataset.pending === "true") {
-  const reload = () => (uploading ? setTimeout(reload, 3000) : window.location.reload());
+  const reload = () =>
+    uploader.controller.getSnapshot().busy ? setTimeout(reload, 3000) : window.location.reload();
   setTimeout(reload, 3000);
 }

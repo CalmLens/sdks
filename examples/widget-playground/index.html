@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CalmLens widget playground</title>
+    <link rel="stylesheet" href="/src/playground.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <h1>Widget playground</h1>
+        <p>The CalmLens upload widget and media component in each UI library.</p>
+      </div>
+      <span id="mode" class="mode"></span>
+    </header>
+    <div class="tabs" role="tablist" aria-label="UI library">
+      <button type="button" role="tab" data-framework="react">React</button>
+      <button type="button" role="tab" data-framework="vue">Vue</button>
+      <button type="button" role="tab" data-framework="svelte">Svelte</button>
+      <button type="button" role="tab" data-framework="elements">Web components</button>
+    </div>
+    <div class="layout">
+      <main id="app" role="tabpanel"></main>
+      <aside class="panel side">
+        <h2>Settings</h2>
+        <label class="toggle"><input type="checkbox" id="multiple" /> Multiple files</label>
+        <label class="toggle"><input type="checkbox" id="can-view" /> Viewer may see sensitive media</label>
+        <button type="button" id="clear" class="secondary">Clear gallery</button>
+        <h2>Sample files</h2>
+        <p class="hint">Each drops a file on the uploader.</p>
+        <div class="samples">
+          <button type="button" class="secondary" data-sample="cat.jpg">Photo</button>
+          <button type="button" class="secondary" data-sample="large-photo.jpg">Large photo (6 MB)</button>
+          <button type="button" class="secondary" data-sample="animation.gif">GIF</button>
+          <button type="button" class="secondary" data-sample="sensitive-photo.png">Sensitive photo</button>
+          <button type="button" class="secondary" data-sample="blocked-photo.jpg">Blocked photo</button>
+        </div>
+        <p id="mock-help" class="hint" hidden>
+          The mock API decides from the file name: names containing <code>sensitive</code> are
+          age-restricted and names containing <code>blocked</code> are blocked. Everything else is
+          allowed after a short check. Files over 25 MB and other file types are refused.
+        </p>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

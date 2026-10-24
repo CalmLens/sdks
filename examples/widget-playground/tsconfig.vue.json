@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": [] },
+  "include": ["src/vue", "src/playground.ts", "src/vite-env.d.ts"]
+}

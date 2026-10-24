@@ -96,10 +96,13 @@ export interface MockCalmLensServerClientOptions extends CalmLensServerClientOpt
     imageStorage?: MockImageStorage;
     createId?: () => string;
     now?: () => number;
-    /** Outcome of `assets.create` (and queued multipart uploads). Defaults to `pending`. */
-    queuedOutcome?: MockAssetOutcome;
+    /**
+     * Outcome of `assets.create` (and queued multipart uploads). Defaults to `pending`. Pass a
+     * function to choose per upload, for example from `asset.name`.
+     */
+    queuedOutcome?: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
     /** Outcome of `assets.classify` and `text.classify`. Defaults to `allowed`. */
-    analyzedOutcome?: MockAssetOutcome;
+    analyzedOutcome?: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
     signedUrlBaseUrl?: string;
   };
 }
@@ -196,8 +199,8 @@ export class MockCalmLensServerClient {
   readonly imageStorage: MockImageStorage;
   private readonly createId: () => string;
   private readonly now: () => number;
-  private readonly queuedOutcome: MockAssetOutcome;
-  private readonly analyzedOutcome: MockAssetOutcome;
+  private readonly queuedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
+  private readonly analyzedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
   private readonly apiKeyGrants: ReturnType<typeof getMockApiKeyGrants>;
   private readonly signedUrlBaseUrl: string;
   private readonly cdnBaseUrl: string;
@@ -369,10 +372,12 @@ export class MockCalmLensServerClient {
           this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
         if (!asset) return notFound();
 
+        // A placeholder is served whatever the moderation status; everything else follows it.
+        const status = asset.classification.moderation.status;
+        const isPlaceholder = options.resource === "placeholder";
         const isPrivate =
           asset.visibility !== "public" ||
-          (asset.classification.moderation.status === "age-restricted" &&
-            !options.allowAgeRestricted);
+          (!isPlaceholder && status === "age-restricted" && !options.allowAgeRestricted);
         if (
           isPrivate &&
           !permits(
@@ -394,6 +399,13 @@ export class MockCalmLensServerClient {
 
         const storedContent = await this.imageStorage.getContent(asset.id);
         if (!storedContent) return notFound();
+        if (!isPlaceholder && status === "blocked") {
+          return this.jsonResponse(
+            403,
+            { code: "asset/not-available", message: "This asset is not available" },
+            url,
+          );
+        }
 
         const parts = [...storedContent.parts.entries()]
           .sort(([left], [right]) => left - right)
@@ -631,7 +643,7 @@ export class MockCalmLensServerClient {
           };
           return this.databaseStorage.updateAsset(
             part.isFinal
-              ? await this.applyOutcome(received, queue ? this.queuedOutcome : this.analyzedOutcome)
+              ? await this.applyOutcome(received, this.outcomeFor(received, queue))
               : received,
           );
         });
@@ -1056,10 +1068,13 @@ export class MockCalmLensServerClient {
     }
 
     return this.databaseStorage.createAsset(
-      isOpenUpload
-        ? asset
-        : await this.applyOutcome(asset, queue ? this.queuedOutcome : this.analyzedOutcome),
+      isOpenUpload ? asset : await this.applyOutcome(asset, this.outcomeFor(asset, queue)),
     );
+  }
+
+  private outcomeFor(asset: Asset, queue: boolean): MockAssetOutcome {
+    const outcome = queue ? this.queuedOutcome : this.analyzedOutcome;
+    return typeof outcome === "function" ? outcome(asset) : outcome;
   }
 
   /**

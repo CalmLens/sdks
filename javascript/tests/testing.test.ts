@@ -9,6 +9,7 @@ import {
   createMockApiKey,
   InMemoryMockDatabaseStorage,
   InMemoryMockImageStorage,
+  MockCalmLensAppClient,
   MockCalmLensServerClient,
   type MockDatabaseStorage,
   type MockImageStorage,
@@ -1097,5 +1098,82 @@ describe("MockCalmLensServerClient", () => {
     await expect(client.assets.update({ assetId: "missing", name: "x" })).rejects.toMatchObject({
       code: PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId(),
     });
+  });
+});
+
+describe("MockCalmLensAppClient", () => {
+  const PRESET = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
+  const photo = { data: new Blob([new Uint8Array([1, 2, 3])]), type: "image/png" };
+  const codeOf = async (run: () => Promise<unknown>) =>
+    run().then(
+      () => undefined,
+      (error: CalmLensError) => error.code,
+    );
+
+  it("stores uploads in its server mock, which serves them from the CDN", async () => {
+    const app = new MockCalmLensAppClient({
+      uploadPresetId: PRESET,
+      mockOptions: {
+        queuedOutcome: (asset) => (asset.name.includes("bad") ? "blocked" : "allowed"),
+      },
+    });
+    const good = await app.assets.create({ name: "good.png", content: photo });
+    const bad = await app.assets.create({ name: "bad.png", content: photo });
+
+    expect([good.status, bad.status]).toEqual(["allowed", "blocked"]);
+    expect((await app.assets.retrieve({ assetId: good.id })).status).toBe("allowed");
+    const served = await app.server.cdn.serve({ assetIdentifier: good.id });
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    expect((await app.server.cdn.serve({ assetIdentifier: bad.id })).status).toBe(403);
+    expect(
+      (await app.server.cdn.serve({ assetIdentifier: bad.id, resource: "placeholder" })).status,
+    ).toBe(200);
+  });
+
+  it("applies the preset's token, type and size rules with the API's error codes", async () => {
+    const app = new MockCalmLensAppClient({
+      uploadPresetId: PRESET,
+      mockOptions: {
+        preset: { requireToken: true, allowedContentTypes: ["image/*"], maxFileSizeInBytes: 2 },
+      },
+    });
+    expect(await codeOf(() => app.assets.create({ name: "a.png", content: photo }))).toBe(
+      "upload-preset/token-required",
+    );
+    const withToken = new MockCalmLensAppClient({
+      uploadPresetId: PRESET,
+      token: "clut_test",
+      mockOptions: {
+        server: app.server,
+        preset: { allowedContentTypes: ["image/*"], maxFileSizeInBytes: 2 },
+      },
+    });
+    expect(await codeOf(() => withToken.assets.create({ name: "a.png", content: photo }))).toBe(
+      "upload-preset/too-large",
+    );
+    expect(
+      await codeOf(() =>
+        withToken.assets.create({
+          name: "a.txt",
+          content: { plainText: "hi", type: "text/plain" },
+        }),
+      ),
+    ).toBe("upload-preset/content-type-not-allowed");
+  });
+
+  it("hides decisions when the preset doesn't show them, and checks only its own uploads", async () => {
+    const app = new MockCalmLensAppClient({
+      uploadPresetId: PRESET,
+      mockOptions: { queuedOutcome: "allowed", preset: { showDecisions: false } },
+    });
+    const upload = await app.assets.create({ name: "a.png", content: photo });
+    expect(upload.status).toBeUndefined();
+    const other = new MockCalmLensAppClient({
+      uploadPresetId: PRESET,
+      mockOptions: { server: app.server },
+    });
+    expect(await codeOf(() => other.assets.retrieve({ assetId: upload.id }))).toBe(
+      "asset/not-found",
+    );
   });
 });

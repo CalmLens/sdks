@@ -36,6 +36,7 @@ function copyDeclarationsToCjs() {
 
 const TESTING_EXPORTS = [
   "MockCalmLensServerClient",
+  "MockCalmLensAppClient",
   "createMockApiKey",
   "MOCK_API_KEY_PREFIX",
   "InMemoryMockDatabaseStorage",
@@ -45,6 +46,19 @@ const TESTING_EXPORTS = [
   "generateMediaTestCode",
   "MEDIA_TEST_SIGNALS",
 ];
+
+/**
+ * Svelte components ship as source, as Svelte libraries do, so the consumer's Svelte compiler
+ * builds them. They import the core from `../ui.js`, which sits beside them in `esm/`.
+ */
+function copySvelteComponents() {
+  const sourceDir = path.join(__dirname, "..", "src", "svelte");
+  const targetDir = path.join(__dirname, "..", "esm", "svelte");
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (const file of fs.readdirSync(sourceDir)) {
+    fs.copyFileSync(path.join(sourceDir, file), path.join(targetDir, file));
+  }
+}
 
 /** Source modules each production entry must not bundle, by the `//#region` rolldown writes. */
 const FORBIDDEN_MODULES = {
@@ -60,6 +74,9 @@ const FORBIDDEN_MODULES = {
     /CryptoUtils\.ts$/,
   ],
 };
+// The UI entries run in browsers too, so they carry no more than the app entry.
+for (const entry of ["ui", "react", "vue", "elements"])
+  FORBIDDEN_MODULES[entry] = FORBIDDEN_MODULES.app;
 
 /** The source modules bundled into an entry and every chunk it imports. */
 function bundledModules(buildDir, entryFile) {
@@ -155,8 +172,16 @@ function runMockClientSanityCheck(targetDir) {
     });
 }
 
+/** The components' stylesheet as a file, for pages whose CSP refuses injected styles. */
+function writeStylesheet() {
+  const { CALMLENS_STYLES } = require(path.join(__dirname, "..", "cjs", "ui.js"));
+  fs.writeFileSync(path.join(__dirname, "..", "esm", "styles.css"), `${CALMLENS_STYLES.trim()}\n`);
+}
+
 writeModuleTypeMarkers();
 copyDeclarationsToCjs();
+copySvelteComponents();
+writeStylesheet();
 checkProductionEntries("esm");
 checkProductionEntries("cjs");
 Promise.resolve(runMockClientSanityCheck("cjs")).catch((error) => {

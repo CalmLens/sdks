@@ -16,7 +16,10 @@
   "main": "cjs/index.js",
   "types": "cjs/index.d.ts",
   "module": "esm/index.js",
-  "sideEffects": false,
+  "sideEffects": [
+    "./esm/elements.js",
+    "./cjs/elements.js"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -52,10 +55,14 @@
     "@oxc-project/runtime": "0.148.0",
     "@types/bun": "^1.4.2",
     "@types/node": "26.6.1",
+    "@types/react": "19.2.2",
+    "react": "19.2.0",
     "rimraf": "6.1.3",
     "rolldown": "1.2.13",
     "rolldown-plugin-dts": "0.28.7",
-    "typescript": "7.0.2"
+    "svelte": "5.41.0",
+    "typescript": "7.0.2",
+    "vue": "3.5.22"
   },
   "dependencies": {
     "zod": "^4.6.5",
@@ -95,6 +102,56 @@
       },
       "default": "./esm/app.js"
     },
+    "./ui": {
+      "import": {
+        "types": "./esm/ui.d.ts",
+        "default": "./esm/ui.js"
+      },
+      "require": {
+        "types": "./cjs/ui.d.ts",
+        "default": "./cjs/ui.js"
+      },
+      "default": "./esm/ui.js"
+    },
+    "./react": {
+      "import": {
+        "types": "./esm/react.d.ts",
+        "default": "./esm/react.js"
+      },
+      "require": {
+        "types": "./cjs/react.d.ts",
+        "default": "./cjs/react.js"
+      },
+      "default": "./esm/react.js"
+    },
+    "./vue": {
+      "import": {
+        "types": "./esm/vue.d.ts",
+        "default": "./esm/vue.js"
+      },
+      "require": {
+        "types": "./cjs/vue.d.ts",
+        "default": "./cjs/vue.js"
+      },
+      "default": "./esm/vue.js"
+    },
+    "./svelte": {
+      "types": "./esm/svelte/index.d.ts",
+      "svelte": "./esm/svelte/index.js",
+      "default": "./esm/svelte/index.js"
+    },
+    "./elements": {
+      "import": {
+        "types": "./esm/elements.d.ts",
+        "default": "./esm/elements.js"
+      },
+      "require": {
+        "types": "./cjs/elements.d.ts",
+        "default": "./cjs/elements.js"
+      },
+      "default": "./esm/elements.js"
+    },
+    "./styles.css": "./esm/styles.css",
     "./testing": {
       "import": {
         "types": "./esm/testing.d.ts",
@@ -121,5 +178,21 @@
   },
   "bugs": {
     "url": "https://github.com/CalmLens/sdks/issues"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "svelte": ">=5",
+    "vue": ">=3.3"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
   }
 }

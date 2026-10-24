@@ -1,0 +1,33 @@
+{
+  "name": "calmlens-widget-playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Try the CalmLens upload widget and media component in React, Vue, Svelte and web components, against a mock API or your own project.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "tsc --noEmit && vue-tsc --noEmit -p tsconfig.vue.json && svelte-check --tsconfig tsconfig.svelte.json --fail-on-warnings && biome check ."
+  },
+  "dependencies": {
+    "@calmlens/sdk": "file:../../javascript",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "svelte": "5.41.0",
+    "vue": "3.5.22"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@sveltejs/vite-plugin-svelte": "6.2.1",
+    "@types/node": "26.6.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.1.0",
+    "@vitejs/plugin-vue": "6.0.1",
+    "svelte-check": "4.3.3",
+    "typescript": "5.9.3",
+    "vite": "7.1.12",
+    "vue-tsc": "3.1.1"
+  }
+}
