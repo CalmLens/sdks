@@ -68,10 +68,15 @@ func payload(content Content, multipart bool) (io.Reader, *int64, error) {
 	if multipart && size == nil {
 		return nil, nil, invalid(CodeInvalidUploadPayload, "Multipart streams require sizeInBytes")
 	}
-	if multipart && !content.IsFinal && *size < 5*1024*1024 {
-		return nil, nil, invalid(CodeInvalidUploadPayload, "Multipart upload parts must be at least 5MiB except the final part.")
-	}
 	return reader, size, nil
+}
+
+// partSize refuses a non-final multipart part under 5 MiB.
+func partSize(content Content, size *int64) error {
+	if !content.IsFinal && *size < 5*1024*1024 {
+		return invalid(CodeInvalidUploadPayload, "Multipart upload parts must be at least 5MiB except the final part.")
+	}
+	return nil
 }
 
 // imageSize checks a multipart image total; final also enforces the minimum.
@@ -126,11 +131,11 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	key := idempotencyKey(options.IdempotencyKey)
 	var result Asset
 	if options.URL != "" {
-		err := s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: url.Values{"queue": {strconv.FormatBool(queue)}}, body: options, idempotencyKey: key, transfer: true}, &result)
+		err := s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: url.Values{"queue": {strconv.FormatBool(queue)}}, body: options, idempotencyKey: key}, &result)
 		if err != nil {
 			return nil, err
 		}
-		return &result, nil
+		return uploaded(&result)
 	}
 	multipart := options.Part != nil
 	content := options.Content
@@ -147,16 +152,25 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	if multipart && content.PartNumber < 0 {
 		return nil, invalid(CodeInvalidUploadPartNumber, "Part number must be positive")
 	}
+	image := multipart && strings.HasPrefix(mime, "image/") && !s.c.deferUploadChecks
+	// Like the API: a declared image total is checked first, then a single final part as the
+	// whole image, then the part's own size.
+	if image && options.TotalSizeInBytes != nil {
+		if err := imageSize(options.TotalSizeInBytes, true); err != nil {
+			return nil, err
+		}
+	}
 	raw, size, err := payload(*content, multipart)
 	if err != nil {
 		return nil, err
 	}
-	if multipart && strings.HasPrefix(mime, "image/") {
-		total := size
-		if options.TotalSizeInBytes != nil {
-			total = options.TotalSizeInBytes
+	if image && options.TotalSizeInBytes == nil {
+		if err = imageSize(size, content.IsFinal); err != nil {
+			return nil, err
 		}
-		if err = imageSize(total, content.IsFinal || options.TotalSizeInBytes != nil); err != nil {
+	}
+	if multipart && !s.c.deferUploadChecks {
+		if err = partSize(*content, size); err != nil {
 			return nil, err
 		}
 	}
@@ -177,17 +191,23 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 		params.Set("partNumber", "1")
 		params.Set("isFinal", strconv.FormatBool(content.IsFinal))
 	}
-	err = s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: params, raw: raw, size: length, headers: headers, idempotencyKey: key, transfer: true}, &result)
+	// Text is small: it keeps the API timeout. Binary content uses UploadTimeout.
+	binary := content.PlainText == nil
+	err = s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: params, raw: raw, size: length, headers: headers, idempotencyKey: key, binary: binary}, &result)
 	if err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return uploaded(&result)
 }
 
 // UploadPart sends part 2 or later of a multipart upload. Send parts sequentially. The queue
 // mode chosen when the upload started is saved by CalmLens and applies to the final part
 // unless Queue overrides it.
 func (s *AssetsService) UploadPart(ctx context.Context, options UploadAssetPartOptions) (*Asset, error) {
+	return s.uploadPart(ctx, options)
+}
+
+func (s *AssetsService) uploadPart(ctx context.Context, options UploadAssetPartOptions) (*Asset, error) {
 	path, err := resourcePath("assets", options.AssetID, "/part")
 	if err != nil {
 		return nil, err
@@ -200,14 +220,27 @@ func (s *AssetsService) UploadPart(ctx context.Context, options UploadAssetPartO
 	if err != nil {
 		return nil, err
 	}
+	if !s.c.deferUploadChecks {
+		if err = partSize(part, size); err != nil {
+			return nil, err
+		}
+	}
 	params := url.Values{"partNumber": {strconv.Itoa(part.PartNumber)}, "isFinal": {strconv.FormatBool(part.IsFinal)}, "sizeInBytes": {strconv.FormatInt(*size, 10)}}
 	if options.Queue != nil {
 		params.Set("queue", strconv.FormatBool(*options.Queue))
 	}
 	var result Asset
-	err = s.c.send(ctx, call{method: "POST", path: path, params: params, raw: raw, size: *size, headers: http.Header{"X-Calmlens-Upload": {"part"}}, idempotencyKey: idempotencyKey(options.IdempotencyKey), transfer: true}, &result)
+	err = s.c.send(ctx, call{method: "POST", path: path, params: params, raw: raw, size: *size, headers: http.Header{"X-Calmlens-Upload": {"part"}}, idempotencyKey: idempotencyKey(options.IdempotencyKey), binary: true}, &result)
 	if err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return uploaded(&result)
+}
+
+// uploaded checks that an upload was answered with an asset.
+func uploaded(asset *Asset) (*Asset, error) {
+	if asset.ID == "" {
+		return nil, &Error{Code: CodeSDKInvalidResponse, Message: "Expected an uploaded asset response", Status: http.StatusOK}
+	}
+	return asset, nil
 }

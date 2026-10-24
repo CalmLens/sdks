@@ -28,9 +28,9 @@ import { randomUuid, stringifyQuery } from "./CalmLensUtils";
 // Requests, uploads and response checks that `CalmLensServerClient` and `CalmLensAppClient`
 // share. Each client keeps one `CalmLensConnection` privately, so credentials stay hidden.
 
-const DEFAULT_TIMEOUT_MS = 120_000;
-const DEFAULT_MAX_RETRIES = 2;
-const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+export const DEFAULT_TIMEOUT_MS = 120_000;
+export const DEFAULT_MAX_RETRIES = 2;
+export const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 
 /**
  * Bytes as a fetch body. They're sent as they are rather than in a Blob: React Native can't

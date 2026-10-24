@@ -61,13 +61,39 @@ export const inferAssetType = (options: SubmitAssetOptions): AssetType => {
 
 type Ordering = NonNullable<Page<unknown>["ordering"]>;
 
+const toBase64Utf8 = (value: string) =>
+  btoa(Array.from(new TextEncoder().encode(value), (byte) => String.fromCharCode(byte)).join(""));
+const fromBase64Utf8 = (value: string) =>
+  new TextDecoder("utf-8", { fatal: true }).decode(
+    Uint8Array.from(atob(value), (char) => char.charCodeAt(0)),
+  );
+
+/**
+ * Why a page request is refused, like the API: `validation/too-small` or `validation/too-big` for
+ * a page size outside 1 to 100 (with the query field as `path`), and `validation/invalid-cursor`
+ * for a cursor that does not decode or came from another query.
+ */
+export type PageRequestFailure = (
+  code: "validation/too-small" | "validation/too-big" | "validation/invalid-cursor",
+  path?: string,
+) => Error;
+
+/**
+ * One keyset page like the API's (packages/shared-backend/src/CursorPagination.ts): ordered by
+ * `createdAt` and `id` (an `id` tie-breaker is added), starting after the cursor's values. The
+ * cursor is tied to `scope` (the filter, folder or parent) and the ordering, so it only
+ * continues the query it came from.
+ */
 export const createPage = <T extends { id: string; createdAt: number }>(
   items: T[],
   query: CursorPageQuery,
+  { scope, fail }: { scope: string; fail: PageRequestFailure },
 ): CursorPage<T> => {
   const pageSize = query.pageSize ?? 10;
-  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)
-    throw invalidArgument("Invalid page size");
+  if (typeof pageSize !== "number" || !Number.isFinite(pageSize) || pageSize < 1)
+    throw fail("validation/too-small", "pageSize");
+  if (pageSize > 100) throw fail("validation/too-big", "pageSize");
+  if (!Number.isInteger(pageSize)) throw invalidArgument("Invalid page size");
   const ordering: NonNullable<CursorPageQuery["ordering"]> = query.ordering?.length
     ? [...query.ordering]
     : [{ field: "createdAt", direction: "DESC" } as const];
@@ -75,12 +101,15 @@ export const createPage = <T extends { id: string; createdAt: number }>(
     throw invalidArgument("Invalid ordering");
   if (!ordering.some(({ field }) => field === "id"))
     ordering.push({ field: "id", direction: ordering[0]!.direction });
+  const signature = JSON.stringify([scope, ordering]);
   let remaining = orderItems(items, ordering);
   if (query.cursor) {
     let values: unknown[];
     try {
-      values = JSON.parse(atob(query.cursor));
+      const parsed = JSON.parse(fromBase64Utf8(query.cursor));
+      values = parsed?.values;
       if (
+        parsed?.scope !== signature ||
         !Array.isArray(values) ||
         values.length !== ordering.length ||
         values.some((value, i) =>
@@ -91,7 +120,7 @@ export const createPage = <T extends { id: string; createdAt: number }>(
       )
         throw new Error();
     } catch {
-      throw invalidArgument("Invalid cursor");
+      throw fail("validation/invalid-cursor");
     }
     remaining = remaining.filter((item) => {
       for (const [i, rule] of ordering.entries()) {
@@ -111,7 +140,12 @@ export const createPage = <T extends { id: string; createdAt: number }>(
     ordering,
     nextCursor:
       hasMore && last
-        ? btoa(JSON.stringify(ordering.map(({ field }) => last[field as keyof T])))
+        ? toBase64Utf8(
+            JSON.stringify({
+              scope: signature,
+              values: ordering.map(({ field }) => last[field as keyof T]),
+            }),
+          )
         : null,
   };
 };

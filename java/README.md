@@ -72,11 +72,11 @@ Responses read from newer API versions keep working: unknown fields are ignored,
 
 ## Uploads
 
-`Content.text(text)`, `Content.bytes(bytes, mime)`, `Content.file(path, mime)` and `Content.stream(inputStream, sizeInBytes, mime)` create upload content. Files and streams are sent as they are read, with a `Content-Length`, so large uploads are never held in memory; bytes are sent without copying or base64 encoding.
+`Content.text(text)`, `Content.bytes(bytes, mime)`, `Content.file(path, mime)` and `Content.stream(inputStream, sizeInBytes, mime)` create upload content. Files and streams are sent as they are read, with a `Content-Length`, so large uploads are never held in memory; bytes are sent without copying or base64 encoding. `Content.stream(inputStream, mime)` sends a stream whose size you don't know, chunked and without `sizeInBytes`.
 
-Multipart uploads: send the first part with `assets.create(new SubmitAsset().name(...).part(content.partNumber(1).isFinal(false)))` (optionally `.totalSizeInBytes(size)` so CalmLens checks the total up front), then each later part with `assets.uploadPart(new UploadPart(assetId, content.partNumber(n).isFinal(last)))`. Non-final parts must be at least 5 MiB. CalmLens saves the queue choice when the upload starts, so parts can be sent from any client or process; `UploadPart.queue(Boolean)` overrides it for the final part.
+Multipart uploads: send the first part with `assets.create(new SubmitAsset().name(...).part(content.partNumber(1).isFinal(false)))` (optionally `.totalSizeInBytes(size)` so CalmLens checks the total up front), then each later part with `assets.uploadPart(new UploadPart(assetId, content.partNumber(n).isFinal(last)))`. Non-final parts must be at least 5 MiB, and image uploads in parts must total 10 to 20 MiB. The client refuses a part it can measure before sending it: a non-final part under 5 MiB with `upload/invalid-payload`, and a first image part over 20 MiB, or a final one under 10 MiB, with `upload/multipart-image-too-large` or `upload/multipart-image-too-small`. CalmLens checks the totals across parts and answers with the same codes, or `upload/size-mismatch`. CalmLens saves the queue choice when the upload starts, so parts can be sent from any client or process; `UploadPart.queue(Boolean)` overrides it for the final part.
 
-Every upload carries an `Idempotency-Key`. The client generates one per call and reuses it for that call's retries, so a retried upload never creates a second asset. Pass your own key to retry safely across processes:
+Every upload carries an `Idempotency-Key`. The client generates one per call and reuses it for that call's retries, so a retried upload never creates a second asset. Pass your own key (1 to 255 printable ASCII characters, without a space at either end; CalmLens refuses others with `idempotency/invalid-key`) to retry safely across processes:
 
 ```java
 client.assets.create(options, new RequestOptions().idempotencyKey(listing.id() + ":photo-1"));
@@ -160,16 +160,17 @@ protected void doPost(HttpServletRequest request, HttpServletResponse response) 
 }
 ```
 
-The payload has `id()`, `type()`, `createdAt()`, `projectId()` and `data()` (`severity`, `title`, `description`, `assetId`, the `asset` snapshot and `facts`). `verifyWebhookSignature(body, signature, timestamp, secret)` returns a boolean if you prefer, and an overload takes `nowSeconds` and `toleranceSeconds`. `createWebhookSignatureHeader(secret, timestamp, body)` signs test deliveries. The headers are exported as `WEBHOOK_SIGNATURE_HEADER`, `WEBHOOK_TIMESTAMP_HEADER` and `WEBHOOK_DELIVERY_HEADER`.
+With the request's headers at hand, `parseWebhookRequest(headers, body, secret)` and `verifyWebhookRequest(headers, body, secret)` read the signature and timestamp themselves: header names match in any case, and a header repeated in the request (a list value, as in `HttpHeaders.map()`) is joined with commas.
+
+A delivery must be a JSON object with string `id`, `type` and `projectId`, a numeric `createdAt` and an object `data` whose known fields have the API's types. The payload has `id()`, `type()`, `createdAt()`, `projectId()` and `data()` (`severity`, `title`, `description`, `assetId`, the `asset` snapshot and `facts`), and `json()` holds the whole body as received, including fields this SDK version doesn't model. `isTestWebhookEvent(event)` is true for test sends from the portal or API, which carry the `{ key: "test", value: true }` fact. `verifyWebhookSignature(body, signature, timestamp, secret)` returns a boolean if you prefer, and overloads take `nowSeconds` and `toleranceSeconds`. `createWebhookSignatureHeader(secret, timestamp, body)` and `createWebhookHeaders(secret, body, deliveryId, timestampSeconds)` sign test deliveries, and `toWebhookEventPayload(event)` turns an event from `events.list` into its delivery body. The headers are exported as `WEBHOOK_SIGNATURE_HEADER`, `WEBHOOK_TIMESTAMP_HEADER` and `WEBHOOK_DELIVERY_HEADER`.
 
 ## CDN
 
-`cdn.getAssetUrl(new CdnRequest(id).lens("thumb"))` builds a CDN URL. `CdnRequest.resource` is `rendered` (the default), `original` or `placeholder`; only `rendered` takes a lens or transform. `cdn.serve` streams content with the API key and returns a `CdnResponse` for any status; close it when done:
+`cdn.getAssetUrl(new CdnRequest(id).lens("thumb"))` builds a CDN URL. `CdnRequest.resource` is `rendered` (the default), `original` or `placeholder`; only `rendered` takes a lens or transform. `cdn.serve` streams content with the API key and returns a `CdnResponse` for any status but a redirect, which fails with `sdk/http-error` and is never followed; close the response when done. Transport failures and HTTP 429, 502, 503 and 504 are retried like API reads, and once retries run out the last response is returned:
 
 ```java
-try (CdnResponse response = client.cdn.serve(new CdnRequest(asset.id())
-    .init(new HttpOptions().headers(Map.of("Range", "bytes=0-1023"))))) {
-  if (response.status() == 206) response.transferTo(outputStream);
+try (CdnResponse response = client.cdn.serve(new CdnRequest(asset.id()))) {
+  if (response.status() == 200) response.transferTo(outputStream);
 }
 ```
 
@@ -189,7 +190,7 @@ client.cdn.getAssetUrl(new CdnRequest(id).transform(List.of(
 
 A selector has one path segment per step, such as `fit=cover,width=640/format=webp`: options are sorted `key=value` pairs, nested options are dotted (`border.color=fff`) and hex colours drop the `#`. A lens runs before any additional transforms, and the two are joined with `/` (`/rendered/@thumbnail/width=320`). `quality` takes `Quality.of(80)` or `Quality.level("high")`.
 
-`readAllBytes(maxBytes)` buffers a body up to a limit. A stream read that receives nothing for the client's `timeout` fails with `HttpTimeoutException`; pass `new RequestOptions().timeout(...)` to change it per call. Use `assets.createSignedUrl` for private content in browsers.
+`readAllBytes(maxBytes)` buffers a body up to a limit. The client's `timeout` bounds the wait for the response headers, and a stream read that then receives nothing for that long fails with `HttpTimeoutException`; pass `new RequestOptions().timeout(...)` to `cdn.serve` to change it per call. Use `assets.createSignedUrl` for private content in browsers.
 
 ## Errors
 
@@ -206,23 +207,25 @@ Every failure is an unchecked `CalmLensException` with a stable `getCode()`; com
 
 ## Retries and timeouts
 
-Reads (`GET`, `HEAD`) and uploads (which carry an `Idempotency-Key`) are retried up to `maxRetries` times (2 by default; `0` disables retries) after network failures, HTTP 429, 502, 503 and 504, and `idempotency/request-in-progress`. The client waits with jittered exponential backoff, or for the `Retry-After` delay when the API sends one (up to 60 seconds; longer delays are returned as the error). Other writes are never retried automatically. Uploads from `Content.stream` can be read once, so they are not retried either.
+Reads (`GET`, `HEAD`) and uploads (which carry an `Idempotency-Key`, and reuse it on every retry) are retried up to `maxRetries` times (2 by default; `0` disables retries) after network failures, timeouts, HTTP 429, 502, 503 and 504, and `idempotency/request-in-progress`. Before retry `n` (from 0) the client waits `d/2` plus a random part of `d/2`, where `d` is 500 ms doubled `n` times, at most 8 seconds; a `Retry-After` in seconds or as an HTTP date replaces that wait (`0` retries at once), and one over 60 seconds is returned as the error instead. Other writes are never retried automatically. Uploads from `Content.stream` can be read once, so they are not retried either. Redirects are never followed: a 3xx fails with `sdk/http-error` and its status.
 
 ```java
 CalmLensServerClient.builder(apiKey, projectId)
-    .connectTimeout(Duration.ofSeconds(10))  // opening a connection
-    .timeout(Duration.ofSeconds(60))         // API responses, response bodies and idle CDN streams
-    .uploadTimeout(Duration.ofMinutes(15))   // uploads, which may take long for large files; null for none
+    .connectTimeout(Duration.ofSeconds(10))   // opening a connection
+    .timeout(Duration.ofSeconds(120))         // each API request attempt, response body included; text uploads too
+    .uploadTimeout(Duration.ofMinutes(30))    // each binary upload attempt; none by default
     .maxRetries(2)
-    .maxResponseBytes(32L * 1024 * 1024)
+    .maxResponseBytes(32L * 1024 * 1024)      // larger API responses fail with sdk/response-too-large
     .build();
 ```
 
-Override the upload timeout for one call with `new RequestOptions().timeout(...)`. Pass `httpClient(...)` to use your own `java.net.http.HttpClient` (proxy, TLS, executor), or `transport(...)` to send requests through another HTTP stack.
+Override these for one call with `RequestOptions` (`timeout`, `uploadTimeout`, `maxRetries`), or for every call of a derived client that shares this one's connection and lens cache with `client.withRequestOptions(new RequestOptions().timeout(Duration.ofMinutes(5)))`. Pass `httpClient(...)` to use your own `java.net.http.HttpClient` (proxy, TLS, executor), or `transport(...)` to send requests through another HTTP stack.
+
+`ensureLenses` sends only definitions this client hasn't ensured yet, in requests of at most 100, and concurrent calls for the same new definitions share one request.
 
 ## Identification and lifecycle
 
-Requests send `User-Agent: calmlens-java/<version> (Java <runtime version>)`; `CalmLensServerClient.VERSION` is read from the Maven manifest. `close()` makes later calls fail with `sdk/client-closed` and, on Java 21 and later, closes the built-in `HttpClient` (on Java 17 it is released by garbage collection). An `httpClient` you pass is never closed by the SDK.
+Requests send `User-Agent: calmlens-java/<version> (java/<runtime version>)` and, for API requests, `Accept: application/json`; `CalmLensServerClient.VERSION` is read from the Maven manifest. `close()` makes later calls fail with `sdk/client-closed` and, on Java 21 and later, closes the built-in `HttpClient` (on Java 17 it is released by garbage collection). An `httpClient` you pass is never closed by the SDK.
 
 ## Naming compared with the JavaScript SDK
 
@@ -232,7 +235,7 @@ The Java SDK follows the JavaScript SDK's names (`assets.classify`, `cdn.serve`,
 - `cdn.serve` returns a closeable `CdnResponse` with a streamed body instead of a fetch `Response`.
 - Request options are builders: `Content.mimeType(...)` and `LensDefinition.lensType(...)` set the API's `type` field, because `type` would be ambiguous among the other setters.
 - `assets.iterate`, `assets.iterateChildren` and `events.pages` return `Iterable` pagers instead of async generators.
-- Per-call idempotency keys and timeouts are passed as `RequestOptions`.
+- Per-call idempotency keys, deadlines and retries are passed as `RequestOptions`, and `withRequestOptions` takes the same class. Cancel a call by interrupting its thread: it fails with `sdk/cancelled` and is not retried.
 
 ## Testing
 
@@ -256,7 +259,8 @@ The mock is the real client in front of an in-memory API: validation, encoding, 
 - **Failures and grants**: `failNextRequest("transport-error")`, `failNextRequest("timeout")` or `failNextRequest(apiErrorCode)` fails the next request without running it; `failNextRequest(failure, "assets.create")` waits for that operation. `setApiKeyGrants(grants...)` replaces the key's grants for later requests, keeping the key itself.
 - **Outcomes per upload**: `queuedOutcome` and `analyzedOutcome` also take a function of the uploaded `Asset`, for example to block assets by name.
 - **Waiting for decisions** with `assets.waitForDecision` checks storage; its waits are skipped but count towards its timeout, so a pending asset times out at once. Use `mock.withStorage(storage -> ...)` to read or change stored records.
-- **CDN responses** from `cdn.serve` carry the stored bytes, content type and length, and `Cache-Control` as the CDN sets it (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable` for images and `max-age=3600` for other content). Like the CDN, blocked, purged and failed assets, and assets whose content was removed or is still uploading, are refused first with `403` `asset/not-available` whatever the key. Then private and age-restricted assets need a key with the download grant (the default key has none): build the mock from `CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(MockCalmLensServerClient.Grant.download()), "project-1")`. A public age-restricted asset is also served with `allowAgeRestricted(true)`.
+- **CDN responses** from `cdn.serve` carry the stored bytes, content type and length, `Cache-Tag`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy` and, for images, `ETag` and `Expires`, and `Cache-Control` as the CDN sets it (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable` for images and `max-age=3600` for other content). Like the CDN, blocked, purged and failed assets, and assets whose content was removed or is still uploading, are refused first with `403` `asset/not-available` whatever the key. Then private and age-restricted assets need a key with the download grant (the default key has none): build the mock from `CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(MockCalmLensServerClient.Grant.download()), "project-1")`. A public age-restricted asset is also served with `allowAgeRestricted(true)`. A classified image's `placeholder` is a small PNG rendered from its ThumbHash, served for public assets whatever their moderation and refused once the asset is purged or its content removed.
+- **Upload tokens**: `MockCalmLensServerClient.signUploadToken(apiKey, options, now, nonce)` signs like `uploadTokens.sign` at a fixed time and nonce, for exact tokens in tests.
 - **Options** `createId` and `now` make IDs and timestamps deterministic (the default clock moves on by at least a millisecond per reading, so assets created in a row have increasing `createdAt`); `signedUrlBaseUrl` sets the base of signed URLs, which are not production URLs.
 
 Queued responses take precedence, in order: `enqueue(status, body)`, `enqueueError(code)`, `enqueueRateLimited`, `enqueueEvents`, `enqueueCdn`, `enqueueFailure(exception)` and `enqueueTimeout()` answer the next request instead of the in-memory API. `enqueue(method, path, status, body)` binds a response to one route and waits for a request to it. Queue one response per retry attempt, or build the mock with `maxRetries(0)`.

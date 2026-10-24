@@ -983,6 +983,20 @@ public final class Models {
       return content;
     }
 
+    /**
+     * Content read from a stream whose size is not known. It is sent chunked, without {@code
+     * sizeInBytes}; the stream is read once and not closed, and the request is not retried.
+     *
+     * @param stream the source
+     * @param mimeType the file's MIME type
+     * @return streamed content
+     */
+    public static Content stream(InputStream stream, String mimeType) {
+      Content content = new Content().mimeType(mimeType);
+      content.stream = Objects.requireNonNull(stream, "stream");
+      return content;
+    }
+
     public Content mimeType(String value) { mimeType = value; return this; }
     public Content plainText(String value) { plainText = value; return this; }
     public Content base64(String value) { base64 = value; return this; }
@@ -1932,15 +1946,44 @@ public final class Models {
    * @param facts registered facts (never null)
    * @param notifies whether the event triggers portal notifications ({@code notify} in the API)
    * @param readAt when it was marked as read in the portal
+   * @param json the event's JSON object as the API sent it, fields this SDK version does not model
+   *     included; null for an event built in code
    */
   public record Event(String id, String type,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String projectId, String userId, String severity, String title, String description,
       String assetId, EventAsset asset, List<EventFact> facts, @SerializedName("notify") Boolean notifies,
-      @JsonAdapter(Json.EpochMillis.class) Instant readAt) {
+      @JsonAdapter(Json.EpochMillis.class) Instant readAt, Map<String, Object> json) {
     /** Copies facts; missing facts become an empty list. */
-    public Event { facts = listOrEmpty(facts); }
+    public Event { facts = listOrEmpty(facts); json = json == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(json)); }
+
+    /**
+     * An event built in code, without received JSON.
+     *
+     * @param id event ID
+     * @param type event type
+     * @param createdAt creation time
+     * @param updatedAt last update time
+     * @param projectId owning project
+     * @param userId user who caused the event
+     * @param severity severity
+     * @param title short summary
+     * @param description longer explanation
+     * @param assetId asset the event is about
+     * @param asset snapshot of the asset
+     * @param facts registered facts
+     * @param notifies whether the event triggers portal notifications
+     * @param readAt when it was marked as read
+     */
+    public Event(String id, String type, Instant createdAt, Instant updatedAt, String projectId, String userId, String severity,
+        String title, String description, String assetId, EventAsset asset, List<EventFact> facts, Boolean notifies, Instant readAt) {
+      this(id, type, createdAt, updatedAt, projectId, userId, severity, title, description, assetId, asset, facts, notifies, readAt, null);
+    }
+
+    Event withJson(Map<String, Object> value) {
+      return new Event(id, type, createdAt, updatedAt, projectId, userId, severity, title, description, assetId, asset, facts, notifies, readAt, value);
+    }
   }
 
   /**
@@ -1972,15 +2015,37 @@ public final class Models {
 
   /**
    * The JSON body of a webhook delivery. Get it from {@code CalmLensServerClient.parseWebhookEvent}.
+   * Serialized with Gson it is written as {@link #json()} when it has one, so fields this SDK
+   * version does not model survive.
    *
    * @param id event ID; the same on every retry, so use it to skip duplicates
    * @param type event type, such as {@code asset.blocked}
    * @param createdAt event creation time
    * @param projectId owning project
    * @param data event fields
+   * @param json the whole body as received (or as {@code toWebhookEventPayload} builds it), fields
+   *     this SDK version does not model included; null for a payload built in code
    */
   public record WebhookEventPayload(String id, String type,
-      @JsonAdapter(Json.EpochMillis.class) Instant createdAt, String projectId, WebhookEventData data) {}
+      @JsonAdapter(Json.EpochMillis.class) Instant createdAt, String projectId, WebhookEventData data, Map<String, Object> json) {
+    /** Copies the JSON object. */
+    public WebhookEventPayload { json = json == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(json)); }
+
+    /**
+     * A payload built in code, without received JSON.
+     *
+     * @param id event ID
+     * @param type event type
+     * @param createdAt event creation time
+     * @param projectId owning project
+     * @param data event fields
+     */
+    public WebhookEventPayload(String id, String type, Instant createdAt, String projectId, WebhookEventData data) {
+      this(id, type, createdAt, projectId, data, null);
+    }
+
+    WebhookEventPayload withJson(Map<String, Object> value) { return new WebhookEventPayload(id, type, createdAt, projectId, data, value); }
+  }
 
   /**
    * A lens.

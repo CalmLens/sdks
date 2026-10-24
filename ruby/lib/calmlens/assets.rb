@@ -20,8 +20,12 @@ module CalmLens
     # Processing statuses after which no decision will arrive without a retry.
     FINISHED_PROCESSING_STATUSES = %w[failed].freeze
     DECISION_POLL_FIRST_DELAY = 0.5
+    # Each wait between decision checks is this many times the one before, up to DECISION_POLL_MAX_DELAY.
+    DECISION_POLL_FACTOR = 1.5
     DECISION_POLL_MAX_DELAY = 5.0
     DEFAULT_DECISION_TIMEOUT = 60
+    # The lifetime of a signed URL when none is given: 15 minutes.
+    DEFAULT_SIGNED_URL_SECONDS = 15 * 60
     # The longest signed URL lifetime the API accepts: 24 hours.
     MAX_SIGNED_URL_SECONDS = 24 * 60 * 60
 
@@ -189,7 +193,7 @@ module CalmLens
     def create_signed_url(options)
       call(options) do |api, request|
         path = "/assets/#{Internal.segment(api['assetId'])}/signed-url"
-        body = { 'expiresInSeconds' => 900 }.merge(without(api, 'assetId'))
+        body = { 'expiresInSeconds' => DEFAULT_SIGNED_URL_SECONDS }.merge(without(api, 'assetId'))
         check_signed_url(body)
         body['transform'] = Transforms.selector(body['transform']) if body.key?('transform')
         request('POST', path,
@@ -253,11 +257,11 @@ module CalmLens
                                  ErrorCodes::INVALID_UPLOAD_PART_NUMBER)
         end
 
-        body = UploadBody.from(part, multipart: true)
+        body = UploadBody.from(part, multipart: true, part_size: !@session.defer_upload_checks)
         query = { 'partNumber' => number, 'isFinal' => part.fetch('isFinal', false), 'sizeInBytes' => body.size }
         query['queue'] = api['queue'] if api.key?('queue')
-        request('POST', path, query: query, raw: body, idempotent: true, request_options: request,
-                              headers: { 'Content-Type' => 'application/octet-stream', 'X-CalmLens-Upload' => 'part' })
+        expect_asset(request('POST', path, query: query, raw: body, idempotent: true, request_options: request, upload: true,
+                                           headers: { 'Content-Type' => 'application/octet-stream', 'X-CalmLens-Upload' => 'part' }))
       end
     end
 
@@ -285,7 +289,7 @@ module CalmLens
         end
 
         sleep([delay, remaining].min)
-        delay = [delay * 1.5, DECISION_POLL_MAX_DELAY].min
+        delay = [delay * DECISION_POLL_FACTOR, DECISION_POLL_MAX_DELAY].min
       end
     end
 
@@ -296,8 +300,8 @@ module CalmLens
                                ErrorCodes::INVALID_UPLOAD_PAYLOAD)
       end
       if options.key?('url')
-        return request('POST', project('assets'), query: { 'queue' => queue }, body: options, idempotent: true,
-                                                  request_options: request_options)
+        return expect_asset(request('POST', project('assets'), query: { 'queue' => queue }, body: options,
+                                                               idempotent: true, request_options: request_options))
       end
 
       multipart = options.key?('part')
@@ -309,21 +313,38 @@ module CalmLens
         raise Internal.invalid('Use uploadPart for multipart upload parts after the first part', ErrorCodes::USE_UPLOAD_PART)
       end
 
-      body = UploadBody.from(content, multipart: multipart)
+      body = UploadBody.from(content, multipart: multipart, part_size: !@session.defer_upload_checks)
       query = options.slice(*SUBMIT_QUERY_KEYS).merge('queue' => queue, 'contentType' => content['type'],
                                                       'sizeInBytes' => body.size)
-      if multipart
-        total = options['totalSizeInBytes']
-        unless total.nil? || (total.is_a?(Integer) && total.positive?)
-          raise Internal.invalid('totalSizeInBytes must be a positive Integer', ErrorCodes::INVALID_UPLOAD_PAYLOAD)
-        end
+      query.merge!(first_part_query(options, content, mime, body)) if multipart
+      expect_asset(request('POST', project('assets'),
+                           query: query, raw: body, idempotent: true, request_options: request_options,
+                           upload: !content.key?('plainText'),
+                           headers: { 'Content-Type' => content['type'], 'X-CalmLens-Upload' => multipart ? 'part' : 'content' }))
+    end
 
-        check_image_size(total || body.size, total || content.fetch('isFinal', false)) if mime.start_with?('image/')
-        query.merge!('partNumber' => 1, 'isFinal' => content.fetch('isFinal', false), 'totalSizeInBytes' => total)
+    # The query of a first multipart part: its number, whether it is the last and the declared total.
+    def first_part_query(options, content, mime, body)
+      total = options['totalSizeInBytes']
+      unless total.nil? || (total.is_a?(Integer) && total.positive?)
+        raise Internal.invalid('totalSizeInBytes must be a positive Integer', ErrorCodes::INVALID_UPLOAD_PAYLOAD)
       end
-      request('POST', project('assets'),
-              query: query, raw: body, idempotent: true, request_options: request_options,
-              headers: { 'Content-Type' => content['type'], 'X-CalmLens-Upload' => multipart ? 'part' : 'content' })
+
+      final = content.fetch('isFinal', false)
+      check_image_size(total || body.size, total || final) if mime.start_with?('image/') && !@session.defer_upload_checks
+      { 'partNumber' => 1, 'isFinal' => final, 'totalSizeInBytes' => total }
+    end
+
+    # Like the API's asset responses: an ID and string statuses for the upload, classification and moderation.
+    def expect_asset(data)
+      valid = data.is_a?(Hash) && data['id'].is_a?(String) && !data['id'].empty? &&
+              data['upload'].is_a?(Hash) && data['upload']['status'].is_a?(String) &&
+              data['classification'].is_a?(Hash) && data['classification']['status'].is_a?(String) &&
+              data.dig('classification', 'moderation').is_a?(Hash) &&
+              data.dig('classification', 'moderation', 'status').is_a?(String)
+      return data if valid
+
+      raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Expected an asset response', status: 200)
     end
 
     def check_signed_url(body)

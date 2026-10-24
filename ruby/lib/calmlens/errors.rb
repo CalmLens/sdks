@@ -13,11 +13,12 @@ module CalmLens
     TRANSPORT_ERROR = 'sdk/transport-error'
     # Connecting, sending or receiving took longer than the configured timeout.
     TIMEOUT = 'sdk/timeout'
-    # A successful response could not be read (malformed JSON or too large).
+    # A successful response could not be read: malformed JSON, or not what the API returns.
     INVALID_RESPONSE = 'sdk/invalid-response'
-    # A response body was larger than the SDK reads (32 MiB for API responses).
+    # A response body was larger than the client's `max_response_bytes` (32 MiB by default).
     RESPONSE_TOO_LARGE = 'sdk/response-too-large'
-    # An error response did not carry a CalmLens error code.
+    # An error response did not carry a CalmLens error code, or the API answered with a redirect,
+    # which the SDK never follows.
     HTTP_ERROR = 'sdk/http-error'
     # A webhook signature or timestamp did not verify.
     INVALID_WEBHOOK_SIGNATURE = 'sdk/invalid-webhook-signature'
@@ -31,8 +32,8 @@ module CalmLens
   #   @return [String] a stable identifier such as `asset/not-found` or `sdk/timeout`.
   #     Compare it with {ErrorCodes} or {SdkErrorCodes}, never with the message.
   # @!attribute [r] details
-  #   @return [Hash{String => Object}] extra API details; API errors include `"network" => true`
-  #     and, when present, `"traceId"`.
+  #   @return [Hash{String => Object}, nil] the API's details, with its `"traceId"` when there is one;
+  #     nil when the error has none.
   # @!attribute [r] status
   #   @return [Integer, nil] the HTTP status, or nil when no response was received.
   # @!attribute [r] request_id
@@ -44,7 +45,7 @@ module CalmLens
 
     # @param code [String]
     # @param message [String, nil] defaults to the code.
-    def initialize(code, message = nil, details: {}, status: nil, headers: {}, request_id: nil)
+    def initialize(code, message = nil, details: nil, status: nil, headers: {}, request_id: nil)
       super("[calmlens] #{message || code}")
       @code = code
       @details = details
@@ -53,7 +54,8 @@ module CalmLens
       @request_id = request_id || headers['x-request-id']
     end
 
-    # @return [Float, nil] seconds to wait before retrying, from the `Retry-After` header.
+    # @return [Integer, nil] whole seconds to wait before retrying, from the `Retry-After` header
+    #   (seconds, or an HTTP date counted from now).
     def retry_after
       Error.parse_retry_after(headers['retry-after'])
     end
@@ -96,9 +98,9 @@ module CalmLens
       return nil if value.nil? || value.to_s.strip.empty?
 
       text = value.to_s.strip
-      return [Float(text), 0.0].max if text.match?(/\A\d+(\.\d+)?\z/)
+      return Integer(text, 10) if text.match?(/\A\d+\z/)
 
-      [Time.httpdate(text) - Time.now, 0.0].max
+      [(Time.httpdate(text) - Time.now).ceil, 0].max
     rescue ArgumentError
       nil
     end

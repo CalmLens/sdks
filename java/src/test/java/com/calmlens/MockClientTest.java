@@ -27,7 +27,7 @@ class MockClientTest {
       ApiException error = assertThrows(ApiException.class, () -> mock.client.assets.retrieve(new Models.AssetId("a")));
       assertEquals(code, error.getCode());
       assertEquals(ErrorCodes.httpStatus(code).orElseThrow(), error.getStatus());
-      assertEquals(true, error.getDetails().get("network"));
+      assertEquals(Map.of("traceId", "trace_mock"), error.getDetails());
       assertEquals("trace_mock", error.getTraceId());
       assertTrue(error.getRequestId().startsWith("req_mock_"), error.getRequestId());
     }

@@ -3,7 +3,10 @@ import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { PUBLIC_ERROR_CODES } from "../src/contract/PublicErrorCodes.js";
-import { MIN_MULTIPART_UPLOAD_PART_BYTES } from "../src/contract/SharedConstants.js";
+import {
+  MIN_MULTIPART_IMAGE_UPLOAD_BYTES,
+  MIN_MULTIPART_UPLOAD_PART_BYTES,
+} from "../src/contract/SharedConstants.js";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
 import {
   createMockApiKey,
@@ -63,9 +66,16 @@ const expectServedBytesToEqual = async (
   expect(new Uint8Array(await response.arrayBuffer())).toEqual(expectedBytes);
 };
 
-const splitForMockMultipart = (bytes: Uint8Array) => {
-  expect(bytes.byteLength).toBeGreaterThan(MIN_MULTIPART_UPLOAD_PART_BYTES);
+/**
+ * The fixture's bytes, repeated until they reach the 10 MiB the API requires of a multipart
+ * image, split into a 5 MiB first part and the rest.
+ */
+const splitForMockMultipart = (fixture: Uint8Array) => {
+  const copies = Math.ceil(MIN_MULTIPART_IMAGE_UPLOAD_BYTES / fixture.byteLength);
+  const bytes = new Uint8Array(fixture.byteLength * copies);
+  for (let copy = 0; copy < copies; copy++) bytes.set(fixture, copy * fixture.byteLength);
   return {
+    bytes,
     firstPart: bytes.subarray(0, MIN_MULTIPART_UPLOAD_PART_BYTES),
     finalPart: bytes.subarray(MIN_MULTIPART_UPLOAD_PART_BYTES),
   };
@@ -165,8 +175,9 @@ describe("MockCalmLensServerClient", () => {
 
   it("serves fixture images uploaded through multipart base64 without byte corruption", async () => {
     for (const fixture of multipartImageFixtures) {
-      const bytes = await readFixtureBytes(fixture.fileName);
-      const { firstPart, finalPart } = splitForMockMultipart(bytes);
+      const { bytes, firstPart, finalPart } = splitForMockMultipart(
+        await readFixtureBytes(fixture.fileName),
+      );
       const client = createClient({
         createId: () =>
           `multipart-base64-${basename(fixture.fileName).replaceAll(/[^a-zA-Z0-9]/g, "-")}`,
@@ -195,8 +206,9 @@ describe("MockCalmLensServerClient", () => {
 
   it("serves fixture images uploaded through multipart uint8Array without byte corruption", async () => {
     for (const fixture of multipartImageFixtures) {
-      const bytes = await readFixtureBytes(fixture.fileName);
-      const { firstPart, finalPart } = splitForMockMultipart(bytes);
+      const { bytes, firstPart, finalPart } = splitForMockMultipart(
+        await readFixtureBytes(fixture.fileName),
+      );
       const client = createClient({
         createId: () =>
           `multipart-uint8-${basename(fixture.fileName).replaceAll(/[^a-zA-Z0-9]/g, "-")}`,
@@ -259,7 +271,8 @@ describe("MockCalmLensServerClient", () => {
       },
     });
 
-    expect(updated.upload).toMatchObject({ status: "completed", partsReceived: 2 });
+    // Like the API, a completed upload no longer counts its parts.
+    expect(updated.upload).toMatchObject({ status: "completed", partsReceived: null });
     expect(updated.classification.status).toBe("processing");
     const stored = await imageStorage.getContent(uploading.id);
     expect(stored?.parts.size).toBe(2);

@@ -22,17 +22,18 @@ module CalmLens
 
   class Error < StandardError
     attr_reader code: String
-    # Extra details from the API error body (any JSON), plus `"network" => true` for API errors.
-    attr_reader details: Hash[String, json_value]
+    # The API error's details (any JSON) with its `"traceId"`, or nil when it has none.
+    attr_reader details: Hash[String, json_value]?
     attr_reader status: Integer?
     attr_reader request_id: String?
     attr_reader headers: Hash[String, String]
-    def initialize: (String code, ?String? message, ?details: Hash[String, json_value], ?status: Integer?,
+    def initialize: (String code, ?String? message, ?details: Hash[String, json_value]?, ?status: Integer?,
                      ?headers: Hash[String, String], ?request_id: String?) -> void
-    def retry_after: () -> Float?
+    # Whole seconds from the `Retry-After` header.
+    def retry_after: () -> Integer?
     def not_found?: () -> bool
     def retryable?: () -> bool
-    def self.build: (String code, ?String? message, ?status: Integer?, ?details: Hash[String, json_value],
+    def self.build: (String code, ?String? message, ?status: Integer?, ?details: Hash[String, json_value]?,
                      ?headers: Hash[String, String], ?request_id: String?) -> Error
   end
   class APIError < Error end
@@ -101,6 +102,14 @@ module CalmLens
   class ServerClient
     DEFAULT_BASE_URL: String
     DEFAULT_CDN_BASE_URL: String
+    DEFAULT_TIMEOUT: Integer
+    DEFAULT_OPEN_TIMEOUT: Integer
+    DEFAULT_MAX_RETRIES: Integer
+    DEFAULT_RETRY_BASE_DELAY: Float
+    RETRY_MAX_DELAY: Integer
+    RETRY_AFTER_MAX: Integer
+    DEFAULT_MAX_RESPONSE_BYTES: Integer
+    ENSURE_LENSES_MAX_PER_REQUEST: Integer
     attr_reader assets: Assets
     attr_reader folders: Folders
     attr_reader text: Text
@@ -111,8 +120,8 @@ module CalmLens
     attr_reader base_url: String
     attr_reader cdn_base_url: String
     def initialize: (api_key: String, project_id: String, ?base_url: String, ?cdn_base_url: String, ?timeout: number,
-                     ?open_timeout: number, ?max_retries: Integer, ?retry_base_delay: number,
-                     ?transport: Transport::_Transport?) -> void
+                     ?open_timeout: number, ?upload_timeout: number?, ?max_retries: Integer, ?retry_base_delay: number,
+                     ?max_response_bytes: Integer, ?transport: Transport::_Transport?) -> void
     def close: () -> nil
     def ensure_lenses: (ensure_lenses_options options) -> Array[lens]
     def ensure_lens: (ensure_lens_options options) -> lens
@@ -128,6 +137,12 @@ module CalmLens
     PENDING_MODERATION_STATUS: String
     # Processing statuses after which no decision arrives without a retry.
     FINISHED_PROCESSING_STATUSES: Array[String]
+    DECISION_POLL_FIRST_DELAY: Float
+    DECISION_POLL_FACTOR: Float
+    DECISION_POLL_MAX_DELAY: Float
+    DEFAULT_DECISION_TIMEOUT: Integer
+    DEFAULT_SIGNED_URL_SECONDS: Integer
+    MAX_SIGNED_URL_SECONDS: Integer
 
     def search: (asset_search_options options) -> asset_search_response
     def list: (?list_assets_options options) -> asset_page
@@ -194,29 +209,48 @@ module CalmLens
     attr_accessor created_at: Integer
     attr_accessor project_id: String
     attr_accessor data: webhook_event_data
-    def initialize: (id: String, type: event_type, created_at: Integer, project_id: String, data: webhook_event_data) -> void
+    # Other top-level fields of the delivery body, as received.
+    attr_accessor fields: Hash[String, json_value]
+    def initialize: (id: String, type: event_type, created_at: Integer, project_id: String, data: webhook_event_data,
+                     ?fields: Hash[String, json_value]) -> void
     def asset_id: () -> String?
     def facts: () -> Array[event_fact]
     def test?: () -> bool
+    # The delivery body as received, with every field.
+    def to_payload: () -> Hash[String, json_value]
+  end
+
+  # Request headers to read webhook headers from: names in any case, repeated values as an Array
+  # (`Net::HTTPHeader#to_hash`), or a Rack env.
+  type webhook_headers = Hash[String | Symbol, String | Array[String]] | _ToHash
+
+  interface _ToHash
+    def to_hash: () -> Hash[String, String | Array[String]]
   end
 
   module Webhooks
     def self.signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
     def self.headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
     def self.to_payload: (event event) -> Hash[String, untyped]
-    def self.verify: (payload: String, signature: String?, timestamp: String?, secret: String, ?tolerance_seconds: Integer,
-                      ?now: number) -> bool
-    def self.parse_event: (payload: String, signature: String?, timestamp: String?, secret: String,
+    def self.verify: (payload: String, secret: String, ?signature: String?, ?timestamp: String?, ?headers: webhook_headers?,
+                      ?tolerance_seconds: Integer, ?now: number) -> bool
+    def self.verify_request: (payload: String, headers: webhook_headers, secret: String, ?tolerance_seconds: Integer,
+                              ?now: number) -> bool
+    def self.parse_event: (payload: String, secret: String, ?signature: String?, ?timestamp: String?, ?headers: webhook_headers?,
                            ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
+    def self.test_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
   end
 
   def self.create_webhook_signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
   def self.create_webhook_headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
   def self.to_webhook_event_payload: (event event) -> Hash[String, untyped]
-  def self.verify_webhook_signature: (payload: String, signature: String?, timestamp: String?, secret: String,
-                                      ?tolerance_seconds: Integer, ?now: number) -> bool
-  def self.parse_webhook_event: (payload: String, signature: String?, timestamp: String?, secret: String,
-                                 ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
+  def self.verify_webhook_signature: (payload: String, secret: String, ?signature: String?, ?timestamp: String?,
+                                      ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> bool
+  def self.verify_webhook_request: (payload: String, headers: webhook_headers, secret: String, ?tolerance_seconds: Integer,
+                                    ?now: number) -> bool
+  def self.parse_webhook_event: (payload: String, secret: String, ?signature: String?, ?timestamp: String?,
+                                 ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
+  def self.test_webhook_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
 
   # require 'calmlens/testing'
   module Testing
@@ -268,10 +302,20 @@ module CalmLens
 
     # A mock API key carrying permission grants, such as `assets:download` for CDN reads.
     def self.create_api_key: (?Array[Hash[Symbol | String, untyped]] grants) -> String
+    # Signs an upload token like UploadTokens#sign at `now` (epoch milliseconds) with `nonce`.
+    def self.sign_upload_token: (String api_key, sign_upload_token_options options, now: Integer, nonce: String) -> signed_upload_token
+
+    REQUEST_FAILURES: Array[String]
 
     def initialize: (?project_id: String, ?api_key: String, ?base_url: String, ?cdn_base_url: String, ?now: _Clock, ?create_id: _IdFactory,
                      ?queued_outcome: outcome, ?analyzed_outcome: analyzed_outcome, ?timeout: number,
-                     ?open_timeout: number, ?max_retries: Integer, ?retry_base_delay: number) -> void
+                     ?open_timeout: number, ?upload_timeout: number?, ?max_retries: Integer, ?retry_base_delay: number,
+                     ?max_response_bytes: Integer) -> void
+    # Replaces the mock API key's grants for later requests; the key stays the same.
+    def api_key_grants=: (Array[Hash[Symbol | String, untyped]] grants) -> Array[Hash[Symbol | String, untyped]]
+    # Fails the next call (or the next call to `operation`) with `transport-error`, `timeout`, an API
+    # error code or an exception.
+    def fail_next_request: (?(String | Exception) failure, ?operation: String?) -> self
     def state: () -> Testing::State
     # `body` is any JSON value, encoded as the response body.
     def enqueue: (body: json_input, ?status: Integer, ?headers: Hash[String, String]) -> self

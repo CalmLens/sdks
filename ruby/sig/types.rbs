@@ -20,7 +20,9 @@ module CalmLens
     ?idempotency_key: String,
     ?timeout: number,
     ?open_timeout: number,
-    ?max_retries: Integer
+    ?upload_timeout: number,
+    ?max_retries: Integer,
+    ?max_response_bytes: Integer
   }
 
   # ---- Assets (Asset.ts) ----------------------------------------------------------------------
@@ -41,7 +43,7 @@ module CalmLens
   type asset_type = "image" | "video" | "audio" | "plaintext-document" | "multimedia-document" | "website" | "file"
   type asset_visibility = "public" | "private"
   # FLAGGED_CONTENT_ACTION_SCHEMA in PolicyRule.ts.
-  type flagged_content_action = "allow" | "age-restrict" | "block" | "purge"
+  type flagged_content_action = "allow" | "limit" | "age-restrict" | "block" | "purge"
 
   # A custom metadata item. `value` is any JSON value you chose.
   type metadata_item = { "id" => String, "value" => json_value }

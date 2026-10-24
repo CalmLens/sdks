@@ -514,6 +514,48 @@
       }
     },
     {
+      "id": "webhooks.verifyHeaders",
+      "kind": "function",
+      "description": "Verifies a delivery from its request headers: names in any case, repeated values joined.",
+      "names": {
+        "javascript": "verifyWebhookSignature",
+        "python": "verify_webhook_signature",
+        "go": "VerifyWebhookRequest",
+        "rust": "construct_webhook_event",
+        "java": "CalmLensServerClient.verifyWebhookRequest",
+        "ruby": "CalmLens.verify_webhook_request",
+        "php": "Webhooks::verify"
+      }
+    },
+    {
+      "id": "webhooks.isTest",
+      "kind": "function",
+      "description": "Whether an event is a test send: it has the { key: \"test\", value: true } fact.",
+      "names": {
+        "javascript": "isTestWebhookEvent",
+        "python": "is_test_webhook_event",
+        "go": "EventFacts.IsTest",
+        "rust": "models::WebhookEventPayload::is_test",
+        "java": "CalmLensServerClient.isTestWebhookEvent",
+        "ruby": "CalmLens.test_webhook_event?",
+        "php": "Webhooks::isTest"
+      }
+    },
+    {
+      "id": "uploadTokens.signAt",
+      "kind": "mock-function",
+      "description": "Signs an upload token with a fixed clock and nonce, for exact test tokens.",
+      "names": {
+        "javascript": "testing.signUploadToken",
+        "python": "testing.sign_upload_token",
+        "go": "calmlenstest.SignUploadToken",
+        "rust": "testing::sign_upload_token",
+        "java": "MockCalmLensServerClient.signUploadToken",
+        "ruby": "CalmLens::MockServerClient.sign_upload_token",
+        "php": "Testing\\MockServerClient::signUploadToken"
+      }
+    },
+    {
       "id": "webhooks.deliveryHeaderName",
       "kind": "constant",
       "description": "The x-calmlens-delivery header name.",
@@ -785,6 +827,185 @@
         "java": "MockCalmLensServerClient.createMockApiKey",
         "ruby": "CalmLens::MockServerClient.create_api_key",
         "php": "Testing\\MockServerClient::createApiKey"
+      }
+    },
+    {
+      "id": "errors.sdkCode.transport-error",
+      "kind": "constant",
+      "description": "The sdk/transport-error error code.",
+      "value": "sdk/transport-error",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.TRANSPORT_ERROR",
+        "python": "error_codes.SDK_TRANSPORT_ERROR",
+        "go": "CodeSDKTransportError",
+        "rust": "ErrorCode::TransportError",
+        "java": "ErrorCodes.SDK_TRANSPORT_ERROR",
+        "ruby": "CalmLens::SdkErrorCodes::TRANSPORT_ERROR",
+        "php": "SdkErrorCodes::TRANSPORT_ERROR"
+      }
+    },
+    {
+      "id": "errors.sdkCode.timeout",
+      "kind": "constant",
+      "description": "The sdk/timeout error code.",
+      "value": "sdk/timeout",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.TIMEOUT",
+        "python": "error_codes.SDK_TIMEOUT",
+        "go": "CodeSDKTimeout",
+        "rust": "ErrorCode::Timeout",
+        "java": "ErrorCodes.SDK_TIMEOUT",
+        "ruby": "CalmLens::SdkErrorCodes::TIMEOUT",
+        "php": "SdkErrorCodes::TIMEOUT"
+      }
+    },
+    {
+      "id": "errors.sdkCode.cancelled",
+      "kind": "constant",
+      "description": "The sdk/cancelled error code.",
+      "value": "sdk/cancelled",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.CANCELLED",
+        "python": "error_codes.SDK_CANCELLED",
+        "go": "CodeSDKCancelled",
+        "rust": "ErrorCode::Cancelled",
+        "java": "ErrorCodes.SDK_CANCELLED",
+        "ruby": "CalmLens::SdkErrorCodes::CANCELLED",
+        "php": "SdkErrorCodes::CANCELLED"
+      },
+      "notApplicable": {
+        "python": "The client is synchronous and has no way to cancel a call while it runs.",
+        "ruby": "The client is synchronous and has no way to cancel a call while it runs.",
+        "php": "The client is synchronous and has no way to cancel a call while it runs.",
+        "rust": "A call is cancelled by dropping its future, which leaves no error to report."
+      }
+    },
+    {
+      "id": "errors.sdkCode.invalid-response",
+      "kind": "constant",
+      "description": "The sdk/invalid-response error code.",
+      "value": "sdk/invalid-response",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.INVALID_RESPONSE",
+        "python": "error_codes.SDK_INVALID_RESPONSE",
+        "go": "CodeSDKInvalidResponse",
+        "rust": "ErrorCode::InvalidResponse",
+        "java": "ErrorCodes.SDK_INVALID_RESPONSE",
+        "ruby": "CalmLens::SdkErrorCodes::INVALID_RESPONSE",
+        "php": "SdkErrorCodes::INVALID_RESPONSE"
+      }
+    },
+    {
+      "id": "errors.sdkCode.http-error",
+      "kind": "constant",
+      "description": "The sdk/http-error error code.",
+      "value": "sdk/http-error",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.HTTP_ERROR",
+        "python": "error_codes.SDK_HTTP_ERROR",
+        "go": "CodeSDKHTTPError",
+        "rust": "ErrorCode::HttpError",
+        "java": "ErrorCodes.SDK_HTTP_ERROR",
+        "ruby": "CalmLens::SdkErrorCodes::HTTP_ERROR",
+        "php": "SdkErrorCodes::HTTP_ERROR"
+      }
+    },
+    {
+      "id": "errors.sdkCode.response-too-large",
+      "kind": "constant",
+      "description": "The sdk/response-too-large error code.",
+      "value": "sdk/response-too-large",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.RESPONSE_TOO_LARGE",
+        "python": "error_codes.SDK_RESPONSE_TOO_LARGE",
+        "go": "CodeSDKResponseTooLarge",
+        "rust": "ErrorCode::ResponseTooLarge",
+        "java": "ErrorCodes.SDK_RESPONSE_TOO_LARGE",
+        "ruby": "CalmLens::SdkErrorCodes::RESPONSE_TOO_LARGE",
+        "php": "SdkErrorCodes::RESPONSE_TOO_LARGE"
+      }
+    },
+    {
+      "id": "errors.sdkCode.invalid-argument",
+      "kind": "constant",
+      "description": "The sdk/invalid-argument error code.",
+      "value": "sdk/invalid-argument",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.INVALID_ARGUMENT",
+        "python": "error_codes.SDK_INVALID_ARGUMENT",
+        "go": "CodeSDKInvalidArgument",
+        "rust": "ErrorCode::InvalidArgument",
+        "java": "ErrorCodes.SDK_INVALID_ARGUMENT",
+        "ruby": "CalmLens::SdkErrorCodes::INVALID_ARGUMENT",
+        "php": "SdkErrorCodes::INVALID_ARGUMENT"
+      }
+    },
+    {
+      "id": "errors.sdkCode.invalid-config",
+      "kind": "constant",
+      "description": "The sdk/invalid-config error code.",
+      "value": "sdk/invalid-config",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.INVALID_CONFIG",
+        "python": "error_codes.SDK_INVALID_CONFIG",
+        "go": "CodeSDKInvalidConfig",
+        "rust": "ErrorCode::InvalidConfig",
+        "java": "ErrorCodes.SDK_INVALID_CONFIG",
+        "ruby": "CalmLens::SdkErrorCodes::INVALID_CONFIG",
+        "php": "SdkErrorCodes::INVALID_CONFIG"
+      }
+    },
+    {
+      "id": "errors.sdkCode.no-fetch",
+      "kind": "constant",
+      "description": "The sdk/no-fetch error code.",
+      "value": "sdk/no-fetch",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.NO_FETCH",
+        "python": "error_codes.SDK_NO_FETCH",
+        "go": "CodeSDKNoFetch",
+        "rust": "ErrorCode::NoFetch",
+        "java": "ErrorCodes.SDK_NO_FETCH",
+        "ruby": "CalmLens::SdkErrorCodes::NO_FETCH",
+        "php": "SdkErrorCodes::NO_FETCH"
+      },
+      "notApplicable": {
+        "python": "Only JavaScript looks up a fetch implementation at run time; this SDK always has its HTTP client.",
+        "go": "Only JavaScript looks up a fetch implementation at run time; this SDK always has its HTTP client.",
+        "rust": "Only JavaScript looks up a fetch implementation at run time; this SDK always has its HTTP client.",
+        "java": "Only JavaScript looks up a fetch implementation at run time; this SDK always has its HTTP client.",
+        "ruby": "Only JavaScript looks up a fetch implementation at run time; this SDK always has its HTTP client.",
+        "php": "Only JavaScript looks up a fetch implementation at run time; this SDK always has its HTTP client."
+      }
+    },
+    {
+      "id": "errors.sdkCode.invalid-webhook-signature",
+      "kind": "constant",
+      "description": "The sdk/invalid-webhook-signature error code.",
+      "value": "sdk/invalid-webhook-signature",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.INVALID_WEBHOOK_SIGNATURE",
+        "python": "error_codes.SDK_INVALID_WEBHOOK_SIGNATURE",
+        "go": "CodeSDKInvalidWebhookSignature",
+        "rust": "ErrorCode::InvalidWebhookSignature",
+        "java": "ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE",
+        "ruby": "CalmLens::SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE",
+        "php": "SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE"
+      }
+    },
+    {
+      "id": "errors.sdkCode.invalid-webhook-payload",
+      "kind": "constant",
+      "description": "The sdk/invalid-webhook-payload error code.",
+      "value": "sdk/invalid-webhook-payload",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.INVALID_WEBHOOK_PAYLOAD",
+        "python": "error_codes.SDK_INVALID_WEBHOOK_PAYLOAD",
+        "go": "CodeSDKInvalidWebhookPayload",
+        "rust": "ErrorCode::InvalidWebhookPayload",
+        "java": "ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD",
+        "ruby": "CalmLens::SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD",
+        "php": "SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD"
       }
     }
   ],
@@ -1225,6 +1446,133 @@
       "code": "appeal/content-unavailable",
       "status": 409,
       "retryable": false
+    }
+  ],
+  "defaults": [
+    {
+      "id": "baseUrl",
+      "value": "https://api.calmlens.com/v1",
+      "description": "The API base URL. Trailing slashes are dropped; it must be absolute http(s).",
+      "observedBy": [
+        "API requests send the API key, user agent and JSON accept header to the default base URL"
+      ]
+    },
+    {
+      "id": "cdnBaseUrl",
+      "value": "https://cdn.calmlens.com/v1",
+      "description": "The CDN base URL for getAssetUrl and cdn.serve, with the same rules.",
+      "observedBy": [
+        "cdn.serve fetches the rendered resource with the API key and returns the response"
+      ]
+    },
+    {
+      "id": "timeoutMs",
+      "value": 120000,
+      "unit": "milliseconds",
+      "description": "Deadline of each API request attempt, including reading the response body. cdn.serve's ends when the response headers arrive. Text uploads use it too.",
+      "observedBy": []
+    },
+    {
+      "id": "uploadTimeoutMs",
+      "value": null,
+      "unit": "milliseconds",
+      "description": "Deadline of each binary upload attempt (file content and multipart parts): none unless set.",
+      "observedBy": []
+    },
+    {
+      "id": "maxRetries",
+      "value": 2,
+      "description": "Retries after a retryable failure (surface.json retryable), for GET and HEAD requests and requests that carry an Idempotency-Key, unless their body is a one-shot stream. Each retry reuses the Idempotency-Key.",
+      "observedBy": [
+        "the client retries twice by default, then raises the last error"
+      ]
+    },
+    {
+      "id": "retryBaseDelayMs",
+      "value": 500,
+      "unit": "milliseconds",
+      "description": "Backoff before retry n (0-based): d = min(retryMaxDelayMs, retryBaseDelayMs * 2^n); the client waits d/2 + random * d/2, rounded. A Retry-After header (seconds or an HTTP date; 0 retries at once) replaces the backoff.",
+      "observedBy": [
+        "502 and 504 are retried with exponential backoff and jitter"
+      ]
+    },
+    {
+      "id": "retryMaxDelayMs",
+      "value": 8000,
+      "unit": "milliseconds",
+      "description": "The longest backoff before a retry.",
+      "observedBy": []
+    },
+    {
+      "id": "retryAfterMaxMs",
+      "value": 60000,
+      "unit": "milliseconds",
+      "description": "A Retry-After longer than this is not waited out: the error (or, for cdn.serve, the response) goes back to the caller.",
+      "observedBy": [
+        "a Retry-After over 60 seconds is returned to the caller without retrying"
+      ]
+    },
+    {
+      "id": "maxResponseBytes",
+      "value": 33554432,
+      "unit": "bytes",
+      "description": "The largest API response body the client reads; a larger declared Content-Length or body fails with sdk/response-too-large. cdn.serve bodies are not limited.",
+      "observedBy": []
+    },
+    {
+      "id": "signedUrlExpiresInSeconds",
+      "value": 900,
+      "unit": "seconds",
+      "description": "assets.createSignedUrl's expiresInSeconds when omitted (sent explicitly).",
+      "observedBy": [
+        "assets.createSignedUrl sends the default lifetime"
+      ]
+    },
+    {
+      "id": "uploadTokenExpiresInSeconds",
+      "value": 600,
+      "unit": "seconds",
+      "description": "uploadTokens.sign's expiresInSeconds when omitted.",
+      "observedBy": []
+    },
+    {
+      "id": "waitForDecisionTimeoutMs",
+      "value": 60000,
+      "unit": "milliseconds",
+      "description": "How long waitForDecision polls before sdk/timeout. 0 checks once; a negative value is sdk/invalid-argument.",
+      "observedBy": []
+    },
+    {
+      "id": "waitForDecisionFirstIntervalMs",
+      "value": 500,
+      "unit": "milliseconds",
+      "description": "The wait before waitForDecision's second check. Each later wait is 1.5 times longer, at most waitForDecisionMaxIntervalMs, and never past the deadline.",
+      "observedBy": [
+        "waitForDecision polls at growing intervals until a decision"
+      ]
+    },
+    {
+      "id": "waitForDecisionIntervalFactor",
+      "value": 1.5,
+      "description": "How much longer each waitForDecision wait is than the one before.",
+      "observedBy": [
+        "waitForDecision polls at growing intervals until a decision"
+      ]
+    },
+    {
+      "id": "waitForDecisionMaxIntervalMs",
+      "value": 5000,
+      "unit": "milliseconds",
+      "description": "The longest wait between waitForDecision checks.",
+      "observedBy": []
+    },
+    {
+      "id": "ensureLensesBatchSize",
+      "value": 100,
+      "description": "ensureLenses sends new definitions in consecutive requests of at most this many, in order.",
+      "observedBy": [
+        "ensureLenses sends 101 definitions as batches of 100 and 1"
+      ]
     }
   ]
 }

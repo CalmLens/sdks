@@ -8,8 +8,10 @@ module CalmLens
   # @api private
   module Internal
     # Per-call settings accepted under the `request_options:` option of any method.
-    REQUEST_OPTIONS = %i[idempotency_key timeout open_timeout max_retries].freeze
-    IDEMPOTENCY_KEY = /\A[\x21-\x7e]{1,255}\z/
+    REQUEST_OPTIONS = %i[idempotency_key timeout open_timeout upload_timeout max_retries max_response_bytes].freeze
+    # A key the API can receive as a header value; the API checks the rest (1 to 255 printable
+    # ASCII characters without a space at either end) and answers `idempotency/invalid-key`.
+    IDEMPOTENCY_KEY = /\A[^\r\n\0]+\z/
     HEADER_VALUE = /\A[^\r\n\0]*\z/
 
     module_function
@@ -58,16 +60,19 @@ module CalmLens
     def check_request_options(request)
       key = request[:idempotency_key]
       if !key.nil? && !(key.is_a?(String) && key.match?(IDEMPOTENCY_KEY))
-        raise invalid('idempotency_key must be 1 to 255 printable ASCII characters')
+        raise invalid('idempotency_key must be a non-empty String without line breaks')
       end
 
-      %i[timeout open_timeout].each do |name|
+      %i[timeout open_timeout upload_timeout].each do |name|
         next if request[name].nil? || positive?(request[name])
 
         raise invalid("#{name} must be a positive number of seconds")
       end
       retries = request[:max_retries]
       raise invalid('max_retries must be a non-negative Integer') unless retries.nil? || (retries.is_a?(Integer) && retries >= 0)
+
+      limit = request[:max_response_bytes]
+      raise invalid('max_response_bytes must be a positive Integer') unless limit.nil? || (limit.is_a?(Integer) && limit.positive?)
     end
 
     def positive?(value)
@@ -88,7 +93,8 @@ module CalmLens
       raise invalid('Identifier is required') if text.empty?
       raise invalid('Identifier cannot be "." or ".."') if %w[. ..].include?(text)
 
-      URI.encode_www_form_component(text).gsub('+', '%20')
+      # Like JavaScript's encodeURIComponent.
+      text.encode(Encoding::UTF_8).b.gsub(/[^A-Za-z0-9\-_.!~*'()]/n) { |byte| format('%%%02X', byte.ord) }
     end
 
     # Splits an absolute URL into its parsed origin and its raw request target. Only the origin is

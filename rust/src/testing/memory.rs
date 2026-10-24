@@ -85,6 +85,54 @@ pub fn create_mock_api_key(grants: &[MockApiKeyGrant]) -> String {
 
 type CreateId = Arc<dyn Fn() -> String + Send + Sync>;
 type Now = Arc<dyn Fn() -> u64 + Send + Sync>;
+type OutcomeFor = Arc<dyn Fn(&crate::models::Asset) -> MockOutcome + Send + Sync>;
+
+/// How [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
+/// fails a request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MockFailure {
+    /// The connection fails before a response: `sdk/transport-error`.
+    TransportError,
+    /// No response arrives in time: `sdk/timeout`.
+    Timeout,
+    /// The API answers with this error code and its HTTP status.
+    Api(ErrorCode),
+}
+
+/// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
+/// takes: the JavaScript SDK's method paths.
+pub(super) const OPERATIONS: [&str; 29] = [
+    "assets.create",
+    "assets.classify",
+    "text.classify",
+    "assets.uploadPart",
+    "assets.list",
+    "assets.iterate",
+    "assets.search",
+    "assets.retrieve",
+    "assets.waitForDecision",
+    "assets.update",
+    "assets.delete",
+    "assets.listChildren",
+    "assets.iterateChildren",
+    "assets.deleteContent",
+    "assets.createSignedUrl",
+    "assets.retry",
+    "assets.explain",
+    "assets.move",
+    "folders.list",
+    "folders.create",
+    "folders.retrieve",
+    "folders.update",
+    "folders.delete",
+    "folders.move",
+    "events.list",
+    "events.pages",
+    "ensureLens",
+    "ensureLenses",
+    "cdn.serve",
+];
 
 /// Options for [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
 ///
@@ -99,8 +147,8 @@ pub struct MockOptions {
     pub(super) max_retries: u32,
     pub(super) api_base_url: String,
     pub(super) cdn_base_url: String,
-    queued_outcome: MockOutcome,
-    analyzed_outcome: MockOutcome,
+    queued_outcome: OutcomeFor,
+    analyzed_outcome: OutcomeFor,
     create_id: CreateId,
     now: Now,
     signed_url_base_url: String,
@@ -113,8 +161,8 @@ impl Default for MockOptions {
             max_retries: 0,
             api_base_url: API_BASE_URL.into(),
             cdn_base_url: CDN_BASE_URL.into(),
-            queued_outcome: MockOutcome::Pending,
-            analyzed_outcome: MockOutcome::Allowed,
+            queued_outcome: Arc::new(|_| MockOutcome::Pending),
+            analyzed_outcome: Arc::new(|_| MockOutcome::Allowed),
             create_id: Arc::new(crate::transport::uuid),
             now: monotonic_clock(),
             signed_url_base_url: "https://mock.calmlens.invalid".into(),
@@ -141,8 +189,6 @@ impl fmt::Debug for MockOptions {
             .field("max_retries", &self.max_retries)
             .field("api_base_url", &self.api_base_url)
             .field("cdn_base_url", &self.cdn_base_url)
-            .field("queued_outcome", &self.queued_outcome)
-            .field("analyzed_outcome", &self.analyzed_outcome)
             .field("signed_url_base_url", &self.signed_url_base_url)
             .finish_non_exhaustive()
     }
@@ -179,14 +225,29 @@ impl MockOptions {
         self
     }
     /// The outcome of `assets().create` and queued multipart uploads.
-    pub fn queued_outcome(mut self, value: MockOutcome) -> Self {
-        self.queued_outcome = value;
-        self
+    pub fn queued_outcome(self, value: MockOutcome) -> Self {
+        self.queued_outcome_for(move |_| value)
     }
     /// The outcome of `assets().classify` and `text().classify`. Finished processing removes
     /// the content unless the upload set `keep_content_after_processing`.
-    pub fn analyzed_outcome(mut self, value: MockOutcome) -> Self {
-        self.analyzed_outcome = value;
+    pub fn analyzed_outcome(self, value: MockOutcome) -> Self {
+        self.analyzed_outcome_for(move |_| value)
+    }
+    /// The outcome of each queued upload, chosen from the asset as uploaded (its name,
+    /// metadata, type and so on), e.g. to block only some assets.
+    pub fn queued_outcome_for(
+        mut self,
+        outcome: impl Fn(&crate::models::Asset) -> MockOutcome + Send + Sync + 'static,
+    ) -> Self {
+        self.queued_outcome = Arc::new(outcome);
+        self
+    }
+    /// The outcome of each analyzed upload (`classify`), chosen from the asset as uploaded.
+    pub fn analyzed_outcome_for(
+        mut self,
+        outcome: impl Fn(&crate::models::Asset) -> MockOutcome + Send + Sync + 'static,
+    ) -> Self {
+        self.analyzed_outcome = Arc::new(outcome);
         self
     }
     /// Creates asset, folder, lens and event IDs.
@@ -262,6 +323,51 @@ fn custom(code: &str, status: u16, message: &str) -> Failure {
 fn invalid(message: &str) -> Failure {
     fail(ErrorCode::InvalidUploadPayload, message)
 }
+/// A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
+fn validation(issue: &str, path: &str) -> Failure {
+    let mut failure = custom(
+        &format!("validation/{issue}"),
+        400,
+        &format!("Invalid {path}"),
+    );
+    failure.details = json!({ "path": path });
+    failure
+}
+/// A whole number from `low` to `high` in query parameter `path`, or the schema's error.
+fn bounded(
+    value: Option<&String>,
+    default: usize,
+    low: usize,
+    high: usize,
+    path: &str,
+) -> Outcome<usize> {
+    let Some(value) = value else {
+        return Ok(default);
+    };
+    let number: f64 = value
+        .parse()
+        .map_err(|_| validation("invalid-type", path))?;
+    if number < low as f64 {
+        return Err(validation("too-small", path));
+    }
+    if number > high as f64 {
+        return Err(validation("too-big", path));
+    }
+    if number.fract() != 0.0 {
+        return Err(validation("invalid-type", path));
+    }
+    Ok(number as usize)
+}
+/// Like the API: 1 to 255 printable ASCII characters, without a space at either end.
+fn valid_idempotency_key(key: &str) -> bool {
+    let printable = |byte: &u8| (0x20..=0x7e).contains(byte);
+    let bytes = key.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 255
+        && bytes.iter().all(printable)
+        && bytes[0] != b' '
+        && bytes[bytes.len() - 1] != b' '
+}
 fn unknown_route() -> Failure {
     custom(
         "mock/unknown-route",
@@ -284,9 +390,70 @@ struct Upload {
     total_size: Option<u64>,
 }
 
+/// MIME types an upload cannot use: they name no concrete file type.
+const REJECTED_UPLOAD_MIME_TYPES: [&str; 7] = [
+    "application/octet-stream",
+    "multipart/form-data",
+    "multipart/mixed",
+    "multipart/alternative",
+    "multipart/related",
+    "multipart/signed",
+    "multipart/encrypted",
+];
+fn normalize_mime(mime: &str) -> String {
+    mime.split(';').next().unwrap_or("").trim().to_lowercase()
+}
+/// The asset type the API infers from a content type.
+fn asset_type(mime: &str) -> &'static str {
+    if mime.starts_with("image/") {
+        "image"
+    } else if mime.starts_with("video/") {
+        "video"
+    } else if mime.starts_with("audio/") {
+        "audio"
+    } else if mime.starts_with("text/") {
+        "plaintext-document"
+    } else if mime.contains("pdf") || mime.contains("document") {
+        "multimedia-document"
+    } else {
+        "file"
+    }
+}
+const MIB: u64 = 1024 * 1024;
+/// Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB.
+fn image_size_error(kind: &str, size: u64, is_final: bool) -> Option<ErrorCode> {
+    if kind != "image" {
+        None
+    } else if size > 20 * MIB {
+        Some(ErrorCode::MultipartImageTooLarge)
+    } else if is_final && size < 10 * MIB {
+        Some(ErrorCode::MultipartImageTooSmall)
+    } else {
+        None
+    }
+}
+/// Like the API: the parts may not overshoot a declared total, and must reach it at the end.
+fn total_size_error(total: Option<u64>, received: u64, is_final: bool) -> Option<ErrorCode> {
+    let total = total?;
+    (received > total || (is_final && received != total)).then_some(ErrorCode::UploadSizeMismatch)
+}
+/// Like the API: every part but the last is at least 5 MiB.
+fn check_part_size(size: u64, is_final: bool) -> Outcome<()> {
+    if !is_final && size < 5 * MIB {
+        return Err(invalid(
+            "Multipart upload parts must be at least 5MiB except the final part.",
+        ));
+    }
+    Ok(())
+}
+
 pub(super) struct Backend {
     pub(super) storage: MockStorage,
     options: MockOptions,
+    /// The mock API key's grants; `set_api_key_grants` replaces them.
+    grants: Vec<MockApiKeyGrant>,
+    /// Failures queued by `fail_next_request`, each for any request or one operation.
+    failures: Vec<(MockFailure, Option<String>)>,
     uploads: HashMap<String, Upload>,
     lenses: HashMap<String, Value>,
     replays: HashMap<String, (String, MockResponse)>,
@@ -349,25 +516,80 @@ fn percent_decode(segment: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// The ThumbHash the mock gives every classified image, standing in for one computed from its
+/// pixels. The `placeholder` resource serves it as a PNG, like the CDN.
+const MOCK_THUMBHASH: &str = "1QcSHQRnh493V4dIh4eXh1h4kJUI";
+
+/// `image` without its placeholder: removing content removes the ThumbHash and average colour.
+fn without_placeholder(image: &Value) -> Value {
+    match image {
+        Value::Object(image) => {
+            let mut image = image.clone();
+            image.insert("thumbhash".into(), Value::Null);
+            image.insert("averageColor".into(), Value::Null);
+            Value::Object(image)
+        }
+        other => other.clone(),
+    }
+}
+
 /// Moves `asset` to `outcome` like the pipeline: a decision completes processing, `purged`
-/// removes the content, and completed processing removes content held only temporarily.
+/// removes the content (with `purge_reason`), and completed processing removes content held
+/// only temporarily (reason `retention`). A classified image gets a ThumbHash for its
+/// placeholder, which goes with its content.
 fn apply_outcome(
     asset: &mut Value,
     content: &mut HashMap<String, StoredContent>,
     outcome: &str,
+    purge_reason: &str,
     now: u64,
 ) {
     let decided = outcome != "pending" && outcome != "failed";
-    let classification = section(asset, "classification");
-    classification.insert(
-        "status".into(),
-        match outcome {
-            "pending" => "processing",
-            "failed" => "failed",
-            _ => "completed",
+    let status = match outcome {
+        "pending" => "processing",
+        "failed" => "failed",
+        _ => "completed",
+    };
+    let removed = asset["content"]["status"] == "removed";
+    let purge = outcome == "purged" && !removed;
+    let remove = purge || (status == "completed" && asset["content"]["status"] == "temporary");
+    let classified_image = decided && asset["type"] == "image" && !removed && !purge;
+    let image = asset["content"]["image"].clone();
+    let image = if classified_image {
+        let mut fields = json!({"width": null, "height": null, "perceptualHash": null});
+        if let Value::Object(old) = &image {
+            for (key, value) in old {
+                fields[key] = value.clone();
+            }
         }
-        .into(),
-    );
+        fields["thumbhash"] = MOCK_THUMBHASH.into();
+        if fields["averageColor"].is_null() {
+            fields["averageColor"] = "#7f7f7f".into();
+        }
+        fields
+    } else if outcome == "purged" {
+        without_placeholder(&image)
+    } else {
+        image
+    };
+    let stored = section(asset, "content");
+    if remove {
+        stored.insert("status".into(), "removed".into());
+        stored.insert(
+            "removalReason".into(),
+            if purge { purge_reason } else { "retention" }.into(),
+        );
+        stored.insert("updatedAt".into(), now.into());
+        stored.insert("extractedText".into(), Value::Null);
+        stored.insert("image".into(), without_placeholder(&image));
+    } else {
+        stored.insert("image".into(), image);
+    }
+    if remove {
+        content.remove(text(&asset["id"]));
+    }
+    let classification = section(asset, "classification");
+    classification.insert("status".into(), status.into());
     classification.insert("updatedAt".into(), now.into());
     classification.insert(
         "completedAt".into(),
@@ -381,27 +603,6 @@ fn apply_outcome(
     upload.insert("status".into(), "completed".into());
     upload.insert("updatedAt".into(), now.into());
     asset["updatedAt"] = now.into();
-    if outcome == "purged" {
-        remove_content(asset, content, "policy", now);
-    } else if decided && asset["content"]["status"] == "temporary" {
-        remove_content(asset, content, "retention", now);
-    }
-}
-fn remove_content(
-    asset: &mut Value,
-    content: &mut HashMap<String, StoredContent>,
-    reason: &str,
-    now: u64,
-) {
-    content.remove(text(&asset["id"]));
-    let section = section(asset, "content");
-    if section.get("status").and_then(Value::as_str) == Some("removed") {
-        return;
-    }
-    section.insert("status".into(), "removed".into());
-    section.insert("removalReason".into(), reason.into());
-    section.insert("updatedAt".into(), now.into());
-    section.insert("extractedText".into(), Value::Null);
 }
 /// The asset snapshot events carry.
 pub(super) fn snapshot(asset: &Value) -> Value {
@@ -422,6 +623,8 @@ impl Backend {
     pub(super) fn new(options: MockOptions) -> Self {
         Self {
             storage: MockStorage::default(),
+            grants: grants_of(&options.api_key),
+            failures: Vec::new(),
             options,
             uploads: HashMap::new(),
             lenses: HashMap::new(),
@@ -438,18 +641,18 @@ impl Backend {
         &self.options.project_id
     }
 
-    /// Records a reviewer decision on a stored asset and adds the matching `asset.<status>` event.
+    /// Records a reviewer decision on a stored asset and adds the matching `asset.<status>` event
+    /// (after an `asset.content-removed` event for a purge).
     pub(super) fn decide(&mut self, asset_id: &str, decision: &str) -> Option<Value> {
         let now = self.now();
         let review_id = self.create_id();
-        let event_id = self.create_id();
         let project_id = self.options.project_id.clone();
         let storage = &mut self.storage;
         let asset = storage
             .assets
             .get_mut(asset_id)
             .filter(|asset| asset["projectId"] == project_id.as_str())?;
-        apply_outcome(asset, &mut storage.content, decision, now);
+        apply_outcome(asset, &mut storage.content, decision, "requested", now);
         let moderation = &mut asset["classification"]["moderation"];
         if !moderation["manualReviews"].is_array() {
             moderation["manualReviews"] = json!([]);
@@ -462,6 +665,9 @@ impl Backend {
                 "reviewedAt": now, "appliedToAsset": true,
             }));
         let asset = asset.clone();
+        if decision == "purged" {
+            self.record_lifecycle_event("asset.content-removed", &asset);
+        }
         let event_type = format!("asset.{decision}");
         // Like the event catalog: only allowing and limiting are low severity.
         let severity = if matches!(decision, "allowed" | "limited") {
@@ -469,13 +675,36 @@ impl Backend {
         } else {
             "high"
         };
-        storage.events.push(json!({
-            "id": event_id, "projectId": project_id, "userId": null, "type": event_type,
-            "severity": severity, "title": event_type, "description": null, "assetId": asset_id,
-            "asset": snapshot(&asset), "facts": [{"key": "decided-by", "value": "reviewer"}],
-            "notify": false, "createdAt": now, "updatedAt": now, "readAt": null,
-        }));
+        let facts = json!([
+            {"key": "decided-by", "value": "reviewer"},
+            {"key": "asset-type", "value": asset["type"]},
+            {"key": "asset-name", "value": asset["name"], "url": format!("/portal/assets/{asset_id}")},
+            {"key": "note", "value": null},
+        ]);
+        self.push_event(&event_type, severity, &asset, facts);
         Some(asset)
+    }
+
+    /// Adds an event to the feed, as the API records it.
+    fn push_event(&mut self, event_type: &str, severity: &str, asset: &Value, facts: Value) {
+        let now = self.now();
+        let event = json!({
+            "id": self.create_id(), "projectId": self.options.project_id, "type": event_type,
+            "severity": severity, "title": event_type, "assetId": asset["id"],
+            "asset": snapshot(asset), "facts": facts, "createdAt": now, "updatedAt": now,
+        });
+        self.storage.events.push(event);
+    }
+
+    /// Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API.
+    fn record_lifecycle_event(&mut self, event_type: &str, asset: &Value) {
+        let mut name = json!({"key": "asset-name", "value": asset["name"]});
+        // A deleted asset has no portal page to link to.
+        if event_type != "asset.deleted" {
+            name["url"] = format!("/portal/assets/{}", text(&asset["id"])).into();
+        }
+        let facts = json!([name, {"key": "asset-type", "value": asset["type"]}]);
+        self.push_event(event_type, "low", asset, facts);
     }
 
     pub(super) fn handle(
@@ -511,7 +740,15 @@ impl Backend {
         }
         let content_type = header(headers, "content-type");
         let is_json = content_type == "application/json";
-        let key = header(headers, "idempotency-key");
+        let raw_key = headers.get("idempotency-key");
+        // A key that is not ASCII text reads as invalid, not as missing. HTTP stacks trim header
+        // values, so the API sees the key without surrounding whitespace.
+        let key = raw_key.map_or("", |value| {
+            value
+                .to_str()
+                .unwrap_or("\u{0}")
+                .trim_matches([' ', '\t', '\r', '\n'])
+        });
         // Like the API, raw uploads are compared by query, content type and length, not bytes.
         let fingerprint = format!(
             "{method}\n{}\n{}\n{content_type}\n{}\n{}",
@@ -524,8 +761,8 @@ impl Backend {
                 "".into()
             }
         );
-        if !key.is_empty() {
-            if key.len() > 255 || !key.bytes().all(|byte| (0x20..=0x7e).contains(&byte)) {
+        if raw_key.is_some() {
+            if !valid_idempotency_key(key) {
                 return fail(ErrorCode::InvalidIdempotencyKey, "Invalid Idempotency-Key")
                     .response();
             }
@@ -583,11 +820,13 @@ impl Backend {
                 match (method, route.join("/").as_str()) {
                     ("GET", "events") => self.list_events(q),
                     ("PUT", "lenses") => self.ensure_lenses(body, now),
-                    ("GET", "folders") => Ok(self.list_folders(q)),
+                    ("GET", "folders") => self.list_folders(q),
                     ("POST", "folders") => self.create_folder(body, now),
                     ("GET", "assets/page") => {
                         let folder = q.get("folderId").cloned();
-                        self.page(q, |asset| {
+                        let scope =
+                            json!([self.options.project_id, q.get("filter"), folder]).to_string();
+                        self.page(q, &scope, |asset| {
                             folder
                                 .as_deref()
                                 .is_none_or(|folder| asset["folderId"] == folder)
@@ -633,24 +872,20 @@ impl Backend {
         }
         Ok(())
     }
-    fn outcome(&self, queue: bool) -> &'static str {
+    /// The outcome the options choose for `asset`.
+    fn outcome(&self, queue: bool, asset: &Value) -> MockOutcome {
+        let typed: crate::models::Asset = serde_json::from_value(asset.clone()).unwrap_or_default();
         if queue {
-            self.options.queued_outcome.as_str()
+            (self.options.queued_outcome)(&typed)
         } else {
-            self.options.analyzed_outcome.as_str()
+            (self.options.analyzed_outcome)(&typed)
         }
     }
 
     fn list_events(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let events = &self.storage.events;
-        let limit = match q.get("limit") {
-            None => 100,
-            Some(value) => value
-                .parse::<usize>()
-                .ok()
-                .filter(|limit| (1..=100).contains(limit))
-                .ok_or_else(|| invalid("limit must be from 1 to 100"))?,
-        };
+        // Like the API's query schema: an integer from 1 to 100, 50 by default.
+        let limit = bounded(q.get("limit"), 50, 1, 100, "limit")?;
         // Cursors are `<n>_mock`: the number of events already delivered. Without one, the
         // page is empty and its cursor marks now.
         let start = match q.get("after") {
@@ -659,7 +894,11 @@ impl Backend {
                 .strip_suffix("_mock")
                 .and_then(|n| n.parse::<usize>().ok())
                 .filter(|n| *n <= events.len())
-                .ok_or_else(|| fail(ErrorCode::InvalidEventCursor, "Invalid events cursor"))?,
+                .ok_or_else(|| {
+                    let mut failure = fail(ErrorCode::InvalidEventCursor, "Invalid events cursor");
+                    failure.details = json!({ "after": after });
+                    failure
+                })?,
         };
         let end = (start + limit).min(events.len());
         Ok(json!({
@@ -668,8 +907,9 @@ impl Backend {
         }))
     }
 
+    /// Saves each definition in turn, like the API: a lens saved before a later one fails
+    /// stays saved.
     fn ensure_lenses(&mut self, body: Map<String, Value>, now: u64) -> Outcome<Value> {
-        let mut pending = self.lenses.clone();
         let mut result = Vec::new();
         for mut definition in body
             .get("lenses")
@@ -678,7 +918,7 @@ impl Backend {
             .unwrap_or_default()
         {
             let identifier = text(&definition["identifier"]).to_owned();
-            let old = pending.get(&identifier);
+            let old = self.lenses.get(&identifier);
             let same = old.is_some_and(|old| {
                 [
                     "name",
@@ -694,10 +934,16 @@ impl Backend {
             let lens = match old {
                 Some(old) if same => old.clone(),
                 Some(old) if definition["version"].as_u64() <= old["version"].as_u64() => {
-                    return Err(fail(
+                    let current = old["version"].as_u64().unwrap_or(0);
+                    let mut failure = fail(
                         ErrorCode::LensVersionConflict,
                         "Lens updates require a greater version",
-                    ))
+                    );
+                    failure.details = json!({
+                        "currentVersion": current, "minimumVersion": current + 1,
+                        "requestedVersion": definition["version"],
+                    });
+                    return Err(failure);
                 }
                 _ => {
                     definition["id"] =
@@ -710,14 +956,13 @@ impl Backend {
                     definition
                 }
             };
-            pending.insert(identifier, lens.clone());
+            self.lenses.insert(identifier, lens.clone());
             result.push(lens);
         }
-        self.lenses = pending;
         Ok(json!({ "lenses": result }))
     }
 
-    fn list_folders(&self, q: &HashMap<String, String>) -> Value {
+    fn list_folders(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let get = |key: &str| q.get(key).map_or("", String::as_str);
         let search = get("search").to_lowercase();
         let search_all = get("searchAll") == "true" && !search.is_empty();
@@ -742,7 +987,7 @@ impl Backend {
                 order
             }
         });
-        let size = get("pageSize").parse().unwrap_or(100usize).max(1);
+        let size = bounded(q.get("pageSize"), 100, 1, 100, "pageSize")?;
         let index = get("pageIndex").parse().unwrap_or(0usize);
         let resolve_only = get("resolveOnly") == "true";
         let page: Vec<&Value> = if resolve_only {
@@ -778,13 +1023,16 @@ impl Backend {
                 }
             }
         }
-        json!({
+        Ok(json!({
             "folders": page, "ancestors": ancestors,
             "hasMore": !resolve_only && folders.len() > (index + 1) * size,
-        })
+        }))
     }
 
     fn create_folder(&mut self, mut body: Map<String, Value>, now: u64) -> Outcome<Value> {
+        if body.get("name").map_or("", text).is_empty() {
+            return Err(invalid("Folder name is required"));
+        }
         let parent = body.get("parentId").cloned().unwrap_or(Value::Null);
         if let Some(parent) = parent.as_str() {
             self.folder(parent)?;
@@ -817,10 +1065,12 @@ impl Backend {
         match (method, suffix) {
             ("GET", "") => return Ok(folder),
             ("DELETE", "") => {
-                let used = self.storage.assets.values().any(|a| a["folderId"] == id)
-                    || self.storage.folders.values().any(|f| f["parentId"] == id);
-                if used {
-                    return Err(fail(ErrorCode::FolderNotEmpty, "Folder is not empty"));
+                let has_assets = self.storage.assets.values().any(|a| a["folderId"] == id);
+                let has_children = self.storage.folders.values().any(|f| f["parentId"] == id);
+                if has_assets || has_children {
+                    let mut failure = fail(ErrorCode::FolderNotEmpty, "Folder is not empty");
+                    failure.details = json!({"hasAssets": has_assets, "hasChildren": has_children});
+                    return Err(failure);
                 }
                 self.storage.folders.remove(id);
                 return Ok(json!({}));
@@ -886,56 +1136,92 @@ impl Backend {
         if options.get("name").map_or("", text).is_empty() {
             return Err(invalid("Asset name is required"));
         }
+        let website = options.contains_key("url");
+        let mime = q.get("contentType").map_or("", String::as_str);
+        if !website && REJECTED_UPLOAD_MIME_TYPES.contains(&normalize_mime(mime).as_str()) {
+            let mut failure = fail(
+                ErrorCode::InvalidUploadMimeType,
+                "Upload file type is not supported",
+            );
+            failure.details = json!({ "mimeType": mime });
+            return Err(failure);
+        }
+        let kind = if website { "website" } else { asset_type(mime) };
+        let is_final = q.get("isFinal").is_some_and(|value| value == "true");
+        let total = match q.get("totalSizeInBytes") {
+            None => None,
+            Some(total) => Some(
+                total
+                    .parse::<u64>()
+                    .map_err(|_| validation("invalid-type", "totalSizeInBytes"))?,
+            ),
+        };
+        if multipart {
+            // Like the API: a declared total is checked before anything is stored, then a
+            // single final part as the whole upload, then the part itself.
+            let size = raw.len() as u64;
+            let error = total
+                .and_then(|total| image_size_error(kind, total, true))
+                .or_else(|| {
+                    is_final
+                        .then(|| {
+                            total_size_error(total, size, true)
+                                .or_else(|| image_size_error(kind, size, true))
+                        })
+                        .flatten()
+                });
+            if let Some(code) = error {
+                return Err(fail(code, "The upload's size is not accepted"));
+            }
+            check_part_size(size, is_final)?;
+            if !is_final {
+                if let Some(code) = total_size_error(total, size, false) {
+                    return Err(fail(code, "The parts exceed totalSizeInBytes"));
+                }
+            }
+        }
+        if let Some(folder) = options.get("folderId").and_then(Value::as_str) {
+            self.folder(folder)?;
+        }
         if let Some(external) = options.get("externalId").and_then(Value::as_str) {
-            if self.storage.assets.values().any(|other| {
-                other["projectId"] == self.options.project_id.as_str()
-                    && other["externalId"] == external
-            }) {
+            if self.external_id_taken(external, None) {
                 return Err(fail(
                     ErrorCode::DuplicateExternalId,
                     "An asset with this externalId already exists",
                 ));
             }
         }
-        if let Some(folder) = options.get("folderId").and_then(Value::as_str) {
-            self.folder(folder)?;
-        }
-        let mime = q.get("contentType").map_or("", String::as_str);
-        let website = options.contains_key("url");
-        let kind = if website {
-            "website"
-        } else if mime.contains("pdf") || mime.contains("document") {
-            "multimedia-document"
-        } else if mime.starts_with("text/") {
-            "plaintext-document"
-        } else {
-            ["image", "video", "audio"]
-                .into_iter()
-                .find(|prefix| mime.starts_with(&format!("{prefix}/")))
-                .unwrap_or("file")
-        };
         let queue = q.get("queue").is_some_and(|value| value == "true");
-        let open = multipart && q.get("isFinal").is_none_or(|value| value != "true");
-        let keep = options
+        let open = multipart && !is_final;
+        let processing = options
             .get("processingOptions")
-            .is_some_and(|processing| processing["keepContentAfterProcessing"] == true);
+            .cloned()
+            .unwrap_or_else(|| json!({"keepContentAfterProcessing": false}));
+        let keep = processing["keepContentAfterProcessing"] == true;
+        let part_number: u64 = q
+            .get("partNumber")
+            .and_then(|number| number.parse().ok())
+            .unwrap_or(1);
         let id = self.create_id();
+        // Fields the API returns as `null` when they are not set.
         let mut asset = json!({
             "id": id, "projectId": self.options.project_id, "userId": null, "parentId": null,
-            "folderId": null, "uploadPresetId": null, "type": kind, "createdAt": now,
-            "updatedAt": now, "tags": [], "visibility": "private", "externalId": null,
-            "upload": {
-                "status": if open { "uploading" } else { "completed" }, "updatedAt": now,
-                "partsReceived": if multipart { json!(1) } else { Value::Null },
-            },
-            "classification": {
-                "status": if open { "pending" } else { "processing" }, "updatedAt": now,
-                "completedAt": null, "moderation": {"status": "pending", "manualReviews": []},
-            },
+            "folderId": null, "uploadPresetId": null, "createdAt": now, "updatedAt": now,
+            "name": null, "description": null, "externalId": null, "externalUrl": null,
+            "type": kind, "metadata": null, "tags": null, "processingOptions": processing,
+            "visibility": "private",
             "content": {
                 "status": if keep { "stored" } else { "temporary" }, "removalReason": null,
                 "updatedAt": now, "safetyHold": null, "format": null, "extension": null,
                 "sizeInBytes": null, "checksums": null, "image": null, "extractedText": null,
+            },
+            "upload": {
+                "status": if open { "uploading" } else { "completed" }, "updatedAt": now,
+                "partsReceived": if open { json!(part_number) } else { Value::Null },
+            },
+            "classification": {
+                "status": if open { "pending" } else { "processing" }, "updatedAt": now,
+                "completedAt": null, "moderation": {"status": "pending", "manualReviews": []},
             },
         });
         for key in [
@@ -944,7 +1230,6 @@ impl Backend {
             "metadata",
             "externalId",
             "externalUrl",
-            "processingOptions",
             "folderId",
             "visibility",
             "uploadPresetId",
@@ -968,31 +1253,34 @@ impl Backend {
                 },
             );
         }
-        if multipart && open {
-            let total_size = match q.get("totalSizeInBytes") {
-                None => None,
-                Some(total) => Some(
-                    total
-                        .parse::<u64>()
-                        .ok()
-                        .filter(|total| *total >= raw.len() as u64)
-                        .ok_or_else(|| {
-                            fail(
-                                ErrorCode::UploadSizeMismatch,
-                                "totalSizeInBytes is too small",
-                            )
-                        })?,
-                ),
-            };
-            self.uploads
-                .insert(id.clone(), Upload { queue, total_size });
-        }
-        if !open {
-            let outcome = self.outcome(queue);
-            apply_outcome(&mut asset, &mut self.storage.content, outcome, now);
+        if open {
+            self.uploads.insert(
+                id.clone(),
+                Upload {
+                    queue,
+                    total_size: total,
+                },
+            );
+        } else {
+            let outcome = self.outcome(queue, &asset);
+            apply_outcome(
+                &mut asset,
+                &mut self.storage.content,
+                outcome.as_str(),
+                "policy",
+                now,
+            );
         }
         self.storage.assets.insert(id, asset.clone());
         Ok(asset)
+    }
+
+    fn external_id_taken(&self, external_id: &str, except: Option<&str>) -> bool {
+        self.storage.assets.values().any(|other| {
+            other["projectId"] == self.options.project_id.as_str()
+                && other["externalId"] == external_id
+                && except.is_none_or(|id| other["id"] != id)
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1006,20 +1294,22 @@ impl Backend {
         raw: &[u8],
         now: u64,
     ) -> Outcome<Value> {
-        let asset = self
+        let mut asset = self
             .owned(&self.storage.assets, id)
             .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?
             .clone();
+        let storage = &mut self.storage;
         match (method, suffix) {
             ("GET", "") => return Ok(asset),
             ("DELETE", "") => {
-                self.storage.assets.remove(id);
-                self.storage.content.remove(id);
+                storage.assets.remove(id);
+                storage.content.remove(id);
                 self.uploads.remove(id);
+                self.record_lifecycle_event("asset.deleted", &asset);
                 return Ok(json!({}));
             }
             ("GET", "children") => {
-                return self.page(q, |child| child["parentId"] == id);
+                return self.page(q, id, |child| child["parentId"] == id);
             }
             ("POST", "signed-url") => {
                 let expires = body
@@ -1042,7 +1332,9 @@ impl Backend {
                 return Ok(json!({"url": url.as_str(), "expiresAt": now + expires * 1000}));
             }
             ("POST", "retry") => {
-                if asset["classification"]["status"] != "failed" {
+                if asset["classification"]["status"] != "failed"
+                    || asset["classification"]["moderation"]["status"] != "pending"
+                {
                     return Err(fail(
                         ErrorCode::AssetNotRetryable,
                         "Only failed assets can be retried",
@@ -1054,6 +1346,11 @@ impl Backend {
                         "The content is no longer stored",
                     ));
                 }
+                // Back to processing, to be moderated again, with an `asset.retried` event.
+                apply_outcome(&mut asset, &mut storage.content, "pending", "policy", now);
+                storage.assets.insert(id.to_owned(), asset.clone());
+                self.record_lifecycle_event("asset.retried", &asset);
+                return Ok(asset);
             }
             ("POST", "explain") => {
                 if asset["classification"]["status"] != "completed" {
@@ -1062,7 +1359,15 @@ impl Backend {
                         "The asset has no moderation decision yet",
                     ));
                 }
-                if body.get("rerun") == Some(&Value::Bool(true)) {
+                if body.get("rerun") != Some(&Value::Bool(true)) {
+                    // The evidence is completed and every action stays as decided.
+                    let evidence = "/classification/moderation/policy/evidence";
+                    if asset.pointer(evidence) != Some(&json!("decision")) {
+                        return Ok(asset);
+                    }
+                    *asset.pointer_mut(evidence).expect("evidence") = "full".into();
+                    asset["updatedAt"] = now.into();
+                } else {
                     let reviews = &asset["classification"]["moderation"]["manualReviews"];
                     if reviews
                         .as_array()
@@ -1079,75 +1384,95 @@ impl Backend {
                             "The content is no longer stored",
                         ));
                     }
+                    // Back to processing under the current policy.
+                    apply_outcome(&mut asset, &mut storage.content, "pending", "policy", now);
                 }
             }
             ("POST", "move") => {
-                if let Some(folder) = body.get("folderId").and_then(Value::as_str) {
+                let folder = body.get("folderId").cloned().unwrap_or(Value::Null);
+                if let Some(folder) = folder.as_str() {
                     self.folder(folder)?;
                 }
+                asset["folderId"] = folder;
+                asset["updatedAt"] = now.into();
             }
-            ("POST", "part") => self.check_part(&asset, q, raw)?,
-            ("PATCH", "") | ("DELETE", "content") => {}
+            ("PATCH", "") => {
+                // An externalId stays unique in the project; `null` clears a field.
+                if let Some(external) = body.get("externalId").and_then(Value::as_str) {
+                    if self.external_id_taken(external, Some(id)) {
+                        return Err(fail(
+                            ErrorCode::DuplicateExternalId,
+                            "An asset with this externalId already exists",
+                        ));
+                    }
+                }
+                for (key, value) in body {
+                    asset[key] = value;
+                }
+                asset["updatedAt"] = now.into();
+            }
+            ("DELETE", "content") => {
+                // The record and report stay; stored content, extracted text and the
+                // placeholder go. Content already removed keeps its reason, and an
+                // `asset.content-removed` event is recorded either way.
+                storage.content.remove(id);
+                let image = without_placeholder(&asset["content"]["image"]);
+                if asset["content"]["status"] != "removed" {
+                    let content = section(&mut asset, "content");
+                    content.insert("status".into(), "removed".into());
+                    content.insert("removalReason".into(), "requested".into());
+                    content.insert("updatedAt".into(), now.into());
+                    content.insert("extractedText".into(), Value::Null);
+                    asset["updatedAt"] = now.into();
+                }
+                asset["content"]["image"] = image;
+                storage.assets.insert(id.to_owned(), asset.clone());
+                self.record_lifecycle_event("asset.content-removed", &asset);
+                return Ok(asset);
+            }
+            ("POST", "part") => {
+                let (received, is_final) = self.check_part(&asset, q, raw)?;
+                let part: u64 = q["partNumber"].parse().unwrap_or(0);
+                let upload = self.uploads.get(id).expect("open upload");
+                let queue = q.get("queue").map_or(upload.queue, |value| value == "true");
+                let storage = &mut self.storage;
+                let parts = &mut storage.content.get_mut(id).expect("content").parts;
+                parts.insert(part as u32, raw.to_vec());
+                asset["updatedAt"] = now.into();
+                asset["content"]["sizeInBytes"] = received.into();
+                asset["upload"]["updatedAt"] = now.into();
+                // Like the API, a completed upload no longer counts parts.
+                asset["upload"]["partsReceived"] = if is_final { Value::Null } else { part.into() };
+                if is_final {
+                    self.uploads.remove(id);
+                    let outcome = self.outcome(queue, &asset);
+                    apply_outcome(
+                        &mut asset,
+                        &mut self.storage.content,
+                        outcome.as_str(),
+                        "policy",
+                        now,
+                    );
+                }
+            }
             _ => return Err(unknown_route()),
         }
-        let storage = &mut self.storage;
-        let stored = storage.assets.get_mut(id).expect("asset");
-        match (method, suffix) {
-            ("PATCH", _) => {
-                for (key, value) in body {
-                    stored[key] = value;
-                }
-            }
-            // Like the API: the record and report stay; stored content and extracted text go.
-            ("DELETE", _) => remove_content(stored, &mut storage.content, "requested", now),
-            // Back to processing, to be moderated again.
-            (_, "retry") => apply_outcome(stored, &mut storage.content, "pending", now),
-            // Back to processing under the current policy, or the evidence completed with every
-            // action as decided.
-            (_, "explain") if body.get("rerun") == Some(&Value::Bool(true)) => {
-                apply_outcome(stored, &mut storage.content, "pending", now)
-            }
-            (_, "explain") => {
-                if let Some(evidence) = stored
-                    .pointer_mut("/classification/moderation/policy/evidence")
-                    .filter(|evidence| *evidence == "decision")
-                {
-                    *evidence = "full".into();
-                }
-            }
-            (_, "move") => {
-                stored["folderId"] = body.get("folderId").cloned().unwrap_or(Value::Null)
-            }
-            _ => {
-                let part: u32 = q["partNumber"].parse().unwrap_or(0);
-                let parts = &mut storage.content.get_mut(id).expect("content").parts;
-                parts.insert(part, raw.to_vec());
-                let size: usize = parts.values().map(Vec::len).sum();
-                stored["content"]["sizeInBytes"] = size.into();
-                stored["upload"]["partsReceived"] = part.into();
-                if q.get("isFinal").is_some_and(|value| value == "true") {
-                    let upload = self.uploads.remove(id).expect("open upload");
-                    let queue = q.get("queue").map_or(upload.queue, |value| value == "true");
-                    let outcome = if queue {
-                        self.options.queued_outcome
-                    } else {
-                        self.options.analyzed_outcome
-                    };
-                    apply_outcome(stored, &mut storage.content, outcome.as_str(), now);
-                }
-            }
-        }
-        stored["updatedAt"] = now.into();
-        Ok(stored.clone())
+        self.storage.assets.insert(id.to_owned(), asset.clone());
+        Ok(asset)
     }
 
-    fn check_part(&self, asset: &Value, q: &HashMap<String, String>, raw: &[u8]) -> Outcome<()> {
+    /// Checks a later part in the API's order: the upload must be open, parts arrive in order,
+    /// image totals and the declared total hold, then the part itself (5 MiB unless it is the
+    /// last). Returns the size received with it and whether it is the last.
+    fn check_part(
+        &self,
+        asset: &Value,
+        q: &HashMap<String, String>,
+        raw: &[u8],
+    ) -> Outcome<(u64, bool)> {
         let id = text(&asset["id"]);
-        let (Some(upload), Some(stored)) = (self.uploads.get(id), self.storage.content.get(id))
-        else {
-            return Err(fail(ErrorCode::UploadNotOpen, "The upload is not open"));
-        };
-        if asset["upload"]["status"] != "uploading" {
+        let upload = self.uploads.get(id);
+        if upload.is_none() || asset["upload"]["status"] != "uploading" {
             return Err(fail(ErrorCode::UploadNotOpen, "The upload is not open"));
         }
         if q.get("sizeInBytes")
@@ -1156,31 +1481,39 @@ impl Backend {
             return Err(invalid("sizeInBytes does not match the body"));
         }
         let expected = asset["upload"]["partsReceived"].as_u64().unwrap_or(0) + 1;
-        if q.get("partNumber").and_then(|n| n.parse::<u64>().ok()) != Some(expected) {
-            let mut failure = fail(ErrorCode::InvalidUploadPartNumber, "Unexpected part number");
-            failure.details = json!({ "expectedPartNumber": expected });
+        let received_number = q.get("partNumber").and_then(|n| n.parse::<u64>().ok());
+        if received_number != Some(expected) {
+            let mut failure = fail(
+                ErrorCode::InvalidUploadPartNumber,
+                &format!("Expected part {expected}"),
+            );
+            failure.details = json!({
+                "expectedPartNumber": expected, "receivedPartNumber": received_number,
+            });
             return Err(failure);
         }
-        let size = stored.parts.values().map(Vec::len).sum::<usize>() as u64 + raw.len() as u64;
         let is_final = q.get("isFinal").is_some_and(|value| value == "true");
-        if upload
-            .total_size
-            .is_some_and(|total| size > total || (is_final && size != total))
-        {
-            return Err(fail(
-                ErrorCode::UploadSizeMismatch,
-                "The parts do not add up to totalSizeInBytes",
-            ));
+        let received = asset["content"]["sizeInBytes"].as_u64().unwrap_or(0) + raw.len() as u64;
+        let total = upload.and_then(|upload| upload.total_size);
+        let error = image_size_error(text(&asset["type"]), received, is_final)
+            .or_else(|| total_size_error(total, received, is_final));
+        if let Some(code) = error {
+            return Err(fail(code, "The parts' size is not accepted"));
         }
-        Ok(())
+        check_part_size(raw.len() as u64, is_final)?;
+        Ok((received, is_final))
     }
 
-    /// Project assets accepted by `include`, filtered, ordered and paged like the API.
+    /// Project assets accepted by `include`, filtered, ordered and paged like the API. A cursor
+    /// is tied to `scope` (the filter, folder or parent) and the ordering, so it only continues
+    /// the query it came from.
     fn page(
         &self,
         q: &HashMap<String, String>,
+        scope: &str,
         include: impl Fn(&Value) -> bool,
     ) -> Outcome<Value> {
+        let size = bounded(q.get("pageSize"), 10, 1, 100, "pageSize")?;
         let filter = q
             .get("filter")
             .map(|expression| parse_filter(expression))
@@ -1226,43 +1559,54 @@ impl Backend {
             .filter(|asset| filter.as_ref().is_none_or(|filter| filter.matches(asset)))
             .collect();
         items.sort_by(|a, b| order(a, b));
-        if let Some(cursor) = q.get("cursor") {
-            let boundary: Value = base64::engine::general_purpose::STANDARD
-                .decode(cursor)
-                .ok()
-                .and_then(|raw| serde_json::from_slice(&raw).ok())
-                .filter(|boundary: &Value| {
-                    ordering.iter().all(|(field, _)| !boundary[field].is_null())
-                })
-                .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?;
-            items.retain(|item| order(item, &boundary).is_gt());
-        }
-        let size = match q.get("pageSize").map(|size| size.parse::<usize>()) {
-            None => 10,
-            Some(Ok(size)) if (1..=100).contains(&size) => size,
-            Some(_) => return Err(invalid("pageSize must be from 1 to 100")),
-        };
-        let has_more = items.len() > size;
-        items.truncate(size);
-        let next_cursor = match items.last() {
-            Some(last) if has_more => {
-                let boundary: Map<String, Value> = ordering
-                    .iter()
-                    .map(|(field, _)| (field.clone(), last[field].clone()))
-                    .collect();
-                Value::from(
-                    base64::engine::general_purpose::STANDARD
-                        .encode(serde_json::to_vec(&boundary).expect("json")),
-                )
-            }
-            _ => Value::Null,
-        };
-        let ordering: Vec<Value> = ordering
+        let ordering_json: Vec<Value> = ordering
             .iter()
             .map(|(field, ascending)| {
                 json!({"field": field, "direction": if *ascending { "ASC" } else { "DESC" }})
             })
             .collect();
+        let signature = json!([scope, ordering_json]).to_string();
+        let engine = base64::engine::general_purpose::STANDARD;
+        if let Some(cursor) = q.get("cursor") {
+            let values: Vec<Value> = engine
+                .decode(cursor)
+                .ok()
+                .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
+                .filter(|parsed| parsed["scope"] == signature.as_str())
+                .and_then(|parsed| parsed["values"].as_array().cloned())
+                .filter(|values| {
+                    values.len() == ordering.len()
+                        && values.iter().zip(&ordering).all(|(value, (field, _))| {
+                            if field == "id" {
+                                value.is_string()
+                            } else {
+                                value.is_number()
+                            }
+                        })
+                })
+                .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?;
+            let boundary: Map<String, Value> = ordering
+                .iter()
+                .map(|(field, _)| field.clone())
+                .zip(values)
+                .collect();
+            let boundary = Value::Object(boundary);
+            items.retain(|item| order(item, &boundary).is_gt());
+        }
+        let has_more = items.len() > size;
+        items.truncate(size);
+        let next_cursor = match items.last() {
+            Some(last) if has_more => {
+                let values: Vec<Value> = ordering
+                    .iter()
+                    .map(|(field, _)| last[field].clone())
+                    .collect();
+                let cursor = json!({"scope": signature, "values": values});
+                Value::from(engine.encode(cursor.to_string()))
+            }
+            _ => Value::Null,
+        };
+        let ordering = ordering_json;
         Ok(json!({
             "items": items, "nextCursor": next_cursor, "pageSize": size, "ordering": ordering,
             "hasMore": has_more,
@@ -1273,15 +1617,15 @@ impl Backend {
     /// most 8 distinct) must appear in some searchable field. Results rank by the API's keyword
     /// score, then newest first. Semantic search is not simulated.
     fn search(&self, q: &HashMap<String, String>) -> Outcome<Value> {
+        // Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
         let query = q.get("query").map_or("", |query| query.trim());
-        if query.is_empty() || query.len() > 200 {
-            return Err(invalid("query must be 1 to 200 characters"));
+        if query.is_empty() {
+            return Err(validation("too-small", "query"));
         }
-        let limit = match q.get("limit").map(|limit| limit.parse::<usize>()) {
-            None => 10,
-            Some(Ok(limit)) if (1..=20).contains(&limit) => limit,
-            Some(_) => return Err(invalid("limit must be from 1 to 20")),
-        };
+        if query.chars().count() > 200 {
+            return Err(validation("too-big", "query"));
+        }
+        let limit = bounded(q.get("limit"), 10, 1, 20, "limit")?;
         let normalized = query.to_lowercase();
         let mut tokens: Vec<&str> = Vec::new();
         for token in normalized.split_whitespace() {
@@ -1348,9 +1692,11 @@ impl Backend {
         Ok(json!({"query": query, "items": items, "semanticStatus": "disabled"}))
     }
 
-    /// A CDN request: stored bytes with their content type. Like the CDN, delivery checks come
-    /// first and refuse everyone (content uploading or removed, blocked, purged or failed
-    /// assets); then private or age-restricted assets need the download permission.
+    /// A CDN request, served like the CDN: stored bytes with `Content-Type`, `Content-Length`,
+    /// `Cache-Control`, `Cache-Tag`, the protection headers and, for images, `ETag` and
+    /// `Expires`; or a JSON error. Delivery checks come first and refuse everyone (content
+    /// uploading or removed, blocked, purged or failed assets); then private and age-restricted
+    /// assets need the download permission. A `placeholder` is the image's ThumbHash as a PNG.
     fn serve(
         &self,
         parts: &[String],
@@ -1359,7 +1705,9 @@ impl Backend {
     ) -> MockResponse {
         let not_found =
             || custom(ErrorCode::AssetNotFound.as_str(), 404, "Asset not found").response();
-        let [scope, project, identifier, _resource, ..] = parts else {
+        let not_available =
+            || custom("asset/not-available", 403, "Asset is not available").response();
+        let [scope, project, identifier, resource, ..] = parts else {
             return not_found();
         };
         if scope != "assets" || *project != self.options.project_id {
@@ -1372,86 +1720,90 @@ impl Backend {
         }) else {
             return not_found();
         };
+        let id = text(&asset["id"]);
         let status = text(&asset["classification"]["moderation"]["status"]);
-        let stored = self
-            .storage
-            .content
-            .get(text(&asset["id"]))
-            .filter(|_| asset["upload"]["status"] != "uploading");
+        let public = asset["visibility"] == "public";
+        let can_download =
+            || self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"));
+        if resource == "placeholder" {
+            // Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
+            // whatever their moderation; refused for purged assets, assets without one (not yet
+            // classified, or content removed) and, for private assets, keys without
+            // `assets:download`.
+            let thumbhash = text(&asset["content"]["image"]["thumbhash"]);
+            if thumbhash.is_empty() || status == "purged" || (!public && !can_download()) {
+                return not_available();
+            }
+            let Some(png) = super::placeholder::placeholder_png(thumbhash) else {
+                return not_available();
+            };
+            let access = if public { "public" } else { "private" };
+            return cdn_response(
+                png,
+                &[
+                    ("content-type", "image/png".into()),
+                    ("cache-control", format!("{access}, max-age=3600")),
+                    ("cache-tag", format!("asset-{id}")),
+                    ("etag", format!("\"{thumbhash}\"")),
+                ],
+            );
+        }
+        let stored = self.storage.content.get(id);
         let Some(stored) = stored.filter(|_| {
-            status != "blocked"
+            asset["upload"]["status"] != "uploading"
+                && status != "blocked"
                 && status != "purged"
                 && asset["classification"]["status"] != "failed"
                 && asset["content"]["status"] != "removed"
         }) else {
-            return custom("asset/not-available", 403, "Asset is not available").response();
+            return not_available();
         };
-        let age_restricted = status == "age-restricted";
-        let public = asset["visibility"] == "public";
-        let restricted =
-            !public || (age_restricted && q.get("allowAgeRestricted").is_none_or(|v| v != "true"));
-        if restricted && !self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"))
-        {
+        let restricted = !public
+            || (status == "age-restricted"
+                && q.get("allowAgeRestricted").is_none_or(|v| v != "true"));
+        if restricted && !can_download() {
             return custom(
                 "asset/api-key-missing-permission",
                 403,
-                "The API key cannot download this asset",
+                "This API key needs assets:download permission for this asset's folder.",
             )
             .response();
         }
-        let data = stored.bytes();
         // Like the CDN: an image's bytes are immutable for a year, other content is kept for an
         // hour, by shared caches only when delivery is public.
+        let image = asset["type"] == "image";
         let access = if restricted { "private" } else { "public" };
-        let lifetime = if asset["type"] == "image" {
+        let lifetime = if image {
             "max-age=31536000, immutable"
         } else {
             "max-age=3600"
         };
-        let cache = format!("{access}, {lifetime}");
-        let response = MockResponse::new(200)
-            .header("content-type", &stored.content_type)
-            .header("accept-ranges", "bytes")
-            .header("cache-control", &cache);
-        let range = header(headers, "range").strip_prefix("bytes=");
-        let Some(spec) = range.filter(|spec| !spec.contains(',')) else {
-            return response.body(data);
-        };
-        let (start, end) = spec.split_once('-').unwrap_or((spec, ""));
-        let last = data.len().saturating_sub(1);
-        let start = start.parse::<usize>().ok();
-        let end = if end.is_empty() {
-            Some(last)
-        } else {
-            end.parse::<usize>().ok()
-        };
-        match (start, end) {
-            (Some(start), Some(end)) if start <= end && start < data.len() => {
-                let end = end.min(last);
-                MockResponse {
-                    status: 206,
-                    ..response
-                }
-                .header(
-                    "content-range",
-                    &format!("bytes {start}-{end}/{}", data.len()),
-                )
-                .body(data[start..=end].to_vec())
-            }
-            _ => custom("cdn/invalid-range", 416, "Range Not Satisfiable").response(),
+        let mut response_headers = vec![
+            ("content-type", stored.content_type.clone()),
+            ("cache-control", format!("{access}, {lifetime}")),
+            ("cache-tag", format!("asset-{id}")),
+        ];
+        if image {
+            response_headers.push(("etag", format!("\"{id}\"")));
+            response_headers.push(("expires", http_date(self.now() / 1000 + 31_536_000)));
         }
+        response_headers.push(("x-content-type-options", "nosniff".into()));
+        response_headers.push((
+            "content-security-policy",
+            "sandbox; default-src 'none'".into(),
+        ));
+        if is_active_content_type(&stored.content_type) {
+            response_headers.push(("content-disposition", "attachment".into()));
+        }
+        cdn_response(stored.bytes(), &response_headers)
     }
 
     fn can_download(&self, folder: &str, api_key: &str) -> bool {
-        let grants: Vec<MockApiKeyGrant> = api_key
-            .strip_prefix("sk_test_")
-            .and_then(|raw| {
-                base64::engine::general_purpose::URL_SAFE_NO_PAD
-                    .decode(raw)
-                    .ok()
-            })
-            .and_then(|raw| serde_json::from_slice(&raw).ok())
-            .unwrap_or_default();
+        let grants = if api_key == self.options.api_key {
+            self.grants.clone()
+        } else {
+            grants_of(api_key)
+        };
         grants
             .iter()
             .filter(|grant| {
@@ -1480,6 +1832,159 @@ impl Backend {
                 false
             })
     }
+}
+
+impl Backend {
+    /// Replaces the mock API key's grants; the key itself stays the same.
+    pub(super) fn set_grants(&mut self, grants: &[MockApiKeyGrant]) {
+        self.grants = grants.to_vec();
+    }
+    pub(super) fn queue_failure(&mut self, failure: MockFailure, operation: Option<&str>) {
+        self.failures.push((failure, operation.map(str::to_owned)));
+    }
+    /// The first queued failure for this request, removed from the queue.
+    pub(super) fn take_failure(
+        &mut self,
+        method: &Method,
+        url: &reqwest::Url,
+        headers: &HeaderMap,
+    ) -> Option<MockFailure> {
+        let operation = self.operation(method, url, headers);
+        let index = self.failures.iter().position(|(_, target)| {
+            target
+                .as_deref()
+                .is_none_or(|target| operation.is_some_and(|op| covers(target, op)))
+        })?;
+        Some(self.failures.remove(index).0)
+    }
+    /// The operation a request belongs to, by its route: an operation name in [`OPERATIONS`].
+    fn operation(
+        &self,
+        method: &Method,
+        url: &reqwest::Url,
+        headers: &HeaderMap,
+    ) -> Option<&'static str> {
+        if under(url, &self.options.cdn_base_url).is_some() {
+            return Some("cdn.serve");
+        }
+        let rest = under(url, &self.options.api_base_url)?;
+        let parts: Vec<&str> = rest.split('/').filter(|part| !part.is_empty()).collect();
+        let queue = url
+            .query_pairs()
+            .any(|(key, value)| key == "queue" && value == "true");
+        let _ = headers;
+        Some(match (method.as_str(), parts.as_slice()) {
+            ("GET", ["projects", _, "events"]) => "events.list",
+            ("PUT", ["projects", _, "lenses"]) => "ensureLenses",
+            ("GET", ["projects", _, "folders"]) => "folders.list",
+            ("POST", ["projects", _, "folders"]) => "folders.create",
+            ("GET", ["projects", _, "assets", "page"]) => "assets.list",
+            ("GET", ["projects", _, "assets", "search"]) => "assets.search",
+            ("POST", ["projects", _, "assets"]) if queue => "assets.create",
+            ("POST", ["projects", _, "assets"]) => "assets.classify",
+            ("GET", ["assets", _]) => "assets.retrieve",
+            ("PATCH", ["assets", _]) => "assets.update",
+            ("DELETE", ["assets", _]) => "assets.delete",
+            ("GET", ["assets", _, "children"]) => "assets.listChildren",
+            ("DELETE", ["assets", _, "content"]) => "assets.deleteContent",
+            ("POST", ["assets", _, "signed-url"]) => "assets.createSignedUrl",
+            ("POST", ["assets", _, "retry"]) => "assets.retry",
+            ("POST", ["assets", _, "explain"]) => "assets.explain",
+            ("POST", ["assets", _, "move"]) => "assets.move",
+            ("POST", ["assets", _, "part"]) => "assets.uploadPart",
+            ("GET", ["folders", _]) => "folders.retrieve",
+            ("PATCH", ["folders", _]) => "folders.update",
+            ("DELETE", ["folders", _]) => "folders.delete",
+            ("POST", ["folders", _, "move"]) => "folders.move",
+            _ => return None,
+        })
+    }
+}
+
+/// Whether a failure queued for operation `target` applies to a request of `operation`:
+/// conveniences fail with the request they send.
+fn covers(target: &str, operation: &str) -> bool {
+    target == operation
+        || matches!(
+            (target, operation),
+            ("text.classify", "assets.classify")
+                | ("assets.waitForDecision", "assets.retrieve")
+                | ("assets.iterate", "assets.list")
+                | ("assets.iterateChildren", "assets.listChildren")
+                | ("events.pages", "events.list")
+                | ("ensureLens", "ensureLenses")
+        )
+}
+
+/// The grants a key made by [`create_mock_api_key`] carries; none for any other key.
+fn grants_of(api_key: &str) -> Vec<MockApiKeyGrant> {
+    api_key
+        .strip_prefix("sk_test_")
+        .and_then(|raw| {
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(raw)
+                .ok()
+        })
+        .and_then(|raw| serde_json::from_slice(&raw).ok())
+        .unwrap_or_default()
+}
+
+/// A successful CDN response with `headers` and `Content-Length`.
+fn cdn_response(body: Vec<u8>, headers: &[(&str, String)]) -> MockResponse {
+    let mut response = MockResponse::new(200);
+    for (name, value) in headers {
+        response = response.header(name, value);
+    }
+    response
+        .header("content-length", &body.len().to_string())
+        .body(body)
+}
+
+/// Like the CDN, content a browser could run as a document is served as a download.
+fn is_active_content_type(content_type: &str) -> bool {
+    let normalized = normalize_mime(content_type);
+    [
+        "image/svg+xml",
+        "application/xhtml+xml",
+        "text/html",
+        "application/xml",
+        "text/xml",
+    ]
+    .contains(&normalized.as_str())
+        || normalized.ends_with("+xml")
+}
+
+/// An HTTP date (IMF-fixdate) for `seconds` since the Unix epoch.
+fn http_date(seconds: u64) -> String {
+    const DAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let days = (seconds / 86_400) as i64;
+    let time = seconds % 86_400;
+    // The civil date from days since the epoch (Howard Hinnant's algorithm).
+    let shifted = days + 719_468;
+    let era = shifted.div_euclid(146_097);
+    let day_of_era = shifted - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!(
+        "{}, {day:02} {} {year} {:02}:{:02}:{:02} GMT",
+        DAYS[(days % 7) as usize],
+        MONTHS[(month - 1) as usize],
+        time / 3600,
+        time % 3600 / 60,
+        time % 60
+    )
 }
 
 /// Keyword search fields, in the order matches are reported.

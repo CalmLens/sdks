@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -138,7 +139,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
 
   /** Outcome, ID and clock controls for the in-memory API. */
   public static final class Options {
-    Outcome queuedOutcome = Outcome.PENDING, analyzedOutcome = Outcome.ALLOWED;
+    java.util.function.Function<Models.Asset, Outcome> queuedOutcome = asset -> Outcome.PENDING, analyzedOutcome = asset -> Outcome.ALLOWED;
     Supplier<String> createId = () -> UUID.randomUUID().toString();
     LongSupplier now = monotonicClock();
     String signedUrlBaseUrl = "https://mock.calmlens.invalid";
@@ -147,10 +148,32 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     public Options() {}
 
     /** @param value outcome of {@code assets.create} and queued multipart uploads @return these options */
-    public Options queuedOutcome(Outcome value) { queuedOutcome = Objects.requireNonNull(value, "queuedOutcome"); return this; }
+    public Options queuedOutcome(Outcome value) { Objects.requireNonNull(value, "queuedOutcome"); queuedOutcome = asset -> value; return this; }
+
+    /**
+     * Chooses each queued upload's outcome, for example from {@code asset.name()}.
+     *
+     * @param value returns the outcome of each {@code assets.create} and queued multipart upload
+     * @return these options
+     */
+    public Options queuedOutcome(java.util.function.Function<Models.Asset, Outcome> value) { queuedOutcome = Objects.requireNonNull(value, "queuedOutcome"); return this; }
 
     /** @param value outcome of {@code assets.classify} and {@code text.classify} @return these options */
-    public Options analyzedOutcome(Outcome value) { analyzedOutcome = Objects.requireNonNull(value, "analyzedOutcome"); return this; }
+    public Options analyzedOutcome(Outcome value) { Objects.requireNonNull(value, "analyzedOutcome"); analyzedOutcome = asset -> value; return this; }
+
+    /**
+     * Chooses each moderated upload's outcome, for example from {@code asset.name()}.
+     *
+     * @param value returns the outcome of each {@code assets.classify} and {@code text.classify}
+     * @return these options
+     */
+    public Options analyzedOutcome(java.util.function.Function<Models.Asset, Outcome> value) { analyzedOutcome = Objects.requireNonNull(value, "analyzedOutcome"); return this; }
+
+    /** The outcome for an upload that finished, from its stored record. */
+    Outcome outcome(JsonObject asset, boolean queue) {
+      Outcome outcome = (queue ? queuedOutcome : analyzedOutcome).apply(Json.GSON.fromJson(asset, Models.Asset.class));
+      return Objects.requireNonNull(outcome, "outcome");
+    }
 
     /** @param value returns new asset, folder, lens and event IDs @return these options */
     public Options createId(Supplier<String> value) { createId = Objects.requireNonNull(value, "createId"); return this; }
@@ -171,7 +194,10 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     }
 
     private Options copy() {
-      return new Options().queuedOutcome(queuedOutcome).analyzedOutcome(analyzedOutcome).createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
+      Options copy = new Options().createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
+      copy.queuedOutcome = queuedOutcome;
+      copy.analyzedOutcome = analyzedOutcome;
+      return copy;
     }
   }
 
@@ -232,6 +258,10 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * @return the key
    */
   public static String createMockApiKey(Grant... grants) {
+    return "sk_test_" + Base64.getUrlEncoder().withoutPadding().encodeToString(Json.write(grantsJson(List.of(grants))).getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static JsonArray grantsJson(List<Grant> grants) {
     JsonArray list = new JsonArray();
     for (Grant grant : grants) {
       JsonObject item = new JsonObject();
@@ -242,10 +272,61 @@ public final class MockCalmLensServerClient implements AutoCloseable {
       item.addProperty("includeSubfolders", grant.includeSubfolders());
       list.add(item);
     }
-    return "sk_test_" + Base64.getUrlEncoder().withoutPadding().encodeToString(Json.write(list).getBytes(StandardCharsets.UTF_8));
+    return list;
+  }
+
+  /**
+   * Signs an upload token like {@code client.uploadTokens.sign}, with the same validation, at a
+   * fixed time and nonce, so a test can compare exact tokens.
+   *
+   * @param apiKey the API key that signs it
+   * @param options the preset, optional external ID and lifetime
+   * @param now the signing time, in milliseconds since the Unix epoch
+   * @param nonce the token's nonce
+   * @return the token and when it expires
+   */
+  public static Models.SignedUploadToken signUploadToken(String apiKey, Models.SignUploadToken options, long now, String nonce) {
+    if (apiKey == null || apiKey.isEmpty()) throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "An API key is required");
+    if (nonce == null || nonce.isEmpty()) throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "A nonce is required");
+    return CalmLensServerClient.signUploadToken(apiKey, options, now, nonce);
+  }
+
+  /**
+   * Replaces the grants of the mock's API key, as editing the key in the portal would: later
+   * requests, such as {@code cdn.serve}, use them. The key itself stays the same, so the
+   * idempotency keys it used still replay.
+   *
+   * @param grants the key's new grants (none for a key without permissions)
+   */
+  public synchronized void setApiKeyGrants(Grant... grants) { api.grants = grantsJson(List.of(grants)); }
+
+  /**
+   * Makes the next request fail without running, as if it never completed: {@code
+   * "transport-error"} ({@link ErrorCodes#SDK_TRANSPORT_ERROR}), {@code "timeout"} ({@link
+   * ErrorCodes#SDK_TIMEOUT}) or a public API error code, answered with its HTTP status. Queue
+   * several to fail several requests; each is used once.
+   *
+   * @param failure {@code transport-error}, {@code timeout} or an API error code
+   */
+  public void failNextRequest(String failure) { failNextRequest(failure, null); }
+
+  /**
+   * Makes the next request for {@code operation} fail without running; other requests are
+   * answered meanwhile.
+   *
+   * @param failure {@code transport-error}, {@code timeout} or an API error code
+   * @param operation a client method path, such as {@code assets.create}, {@code cdn.serve} or
+   *     {@code assets.waitForDecision}, or null for any request
+   */
+  public synchronized void failNextRequest(String failure, String operation) {
+    Objects.requireNonNull(failure, "failure");
+    if (!failure.equals("transport-error") && !failure.equals("timeout") && ErrorCodes.httpStatus(failure).isEmpty())
+      throw new IllegalArgumentException("failure must be transport-error, timeout or an API error code: " + failure);
+    failures.add(new String[] {failure, operation});
   }
 
   private final Deque<Queued> responses = new ArrayDeque<>();
+  private final List<String[]> failures = new ArrayList<>();
   private final MockApi api;
   private final String projectId;
   private final List<Request> requests = new ArrayList<>();
@@ -280,6 +361,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    */
   public MockCalmLensServerClient(CalmLensServerClient.Builder builder, Options options) {
     client = builder.build(this::send, delay -> skippedNanos.addAndGet(delay.toNanos()), () -> System.nanoTime() + skippedNanos.get());
+    // The in-memory API answers multipart size checks in the API's order.
+    client.deferUploadChecks = true;
     projectId = client.projectId();
     api = new MockApi(projectId, client.baseUrl(), client.cdnBaseUrl(), Objects.requireNonNull(options, "options").copy());
   }
@@ -408,23 +491,32 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   public MockCalmLensServerClient enqueueTimeout() { return enqueueFailure(new HttpTimeoutException("request timed out")); }
 
   /**
-   * Gives an asset a new outcome, as a reviewer would: a decided status records a manual review,
-   * and every outcome but {@code pending} adds the matching {@code asset.<status>} (or {@code
-   * asset.failed}) event with the asset's snapshot, the event catalog's severity ({@code low} for
-   * {@code allowed} and {@code limited}, {@code high} otherwise) and a {@code decided-by: reviewer} fact.
-   * Finished processing removes temporary content, and {@code purged} removes it in any case.
+   * Gives an asset a new outcome, as a reviewer would: a decision ({@code allowed}, {@code
+   * limited}, {@code age-restricted}, {@code blocked} or {@code purged}) records a manual review and
+   * adds the matching {@code asset.<status>} event with the asset's snapshot, the event catalog's
+   * severity ({@code low} for {@code allowed} and {@code limited}, {@code high} otherwise) and a
+   * {@code decided-by: reviewer} fact. {@code purged} removes the content with reason {@code requested}, adding an {@code
+   * asset.content-removed} event first, as the API does. {@code pending} and {@code failed} only
+   * change the processing state ({@code failed} adds an {@code asset.failed} event).
    *
    * @param assetId a stored asset
    * @param outcome the new outcome
    * @return the asset
-   * @throws IllegalArgumentException when the asset is not stored
+   * @throws ApiException {@link ErrorCodes#ASSET_NOT_FOUND} when the asset is not stored
    */
   public synchronized Models.Asset decide(String assetId, Outcome outcome) {
-    JsonObject asset = api.storage.assets.get(assetId);
-    if (asset == null) throw new IllegalArgumentException("No mock asset " + assetId);
+    Objects.requireNonNull(outcome, "outcome");
+    JsonObject asset;
+    try {
+      asset = api.asset(assetId);
+    } catch (MockApi.Failure missing) {
+      Transport.Response response = MockApi.error(missing);
+      throw new ApiException(missing.code, missing.getMessage(), Map.of("traceId", "trace_mock"), missing.status, response.headers(), null);
+    }
     long now = api.now();
-    api.applyOutcome(asset, Objects.requireNonNull(outcome, "outcome"), now);
-    if (outcome != Outcome.PENDING && outcome != Outcome.FAILED) {
+    api.applyOutcome(asset, outcome, "requested", now);
+    if (outcome == Outcome.PENDING) return Json.GSON.fromJson(asset, Models.Asset.class);
+    if (outcome != Outcome.FAILED) {
       JsonObject review = new JsonObject();
       review.addProperty("id", api.createId());
       review.addProperty("decision", outcome.value());
@@ -434,11 +526,13 @@ public final class MockCalmLensServerClient implements AutoCloseable {
       review.addProperty("appliedToAsset", true);
       asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);
     }
-    if (outcome != Outcome.PENDING) {
-      enqueueEvent("asset." + outcome.value(), assetId, new Models.EventFact("decided-by", "reviewer", null));
-      // Like the event catalog: only allowing and limiting are low severity.
-      api.storage.events.get(api.storage.events.size() - 1).addProperty("severity", outcome == Outcome.ALLOWED || outcome == Outcome.LIMITED ? "low" : "high");
-    }
+    String name = MockApi.str(asset, "name"), type = MockApi.str(asset, "type");
+    if (outcome == Outcome.PURGED)
+      api.recordEvent("asset.content-removed", "low", asset, List.of(new Models.EventFact("asset-name", name, "/portal/assets/" + assetId), new Models.EventFact("asset-type", type, null)));
+    // Like the event catalog: allowing and limiting are low severity.
+    api.recordEvent("asset." + outcome.value(), outcome == Outcome.ALLOWED || outcome == Outcome.LIMITED ? "low" : "high", asset, java.util.Arrays.asList(
+        new Models.EventFact("decided-by", "reviewer", null), new Models.EventFact("asset-type", type, null),
+        new Models.EventFact("asset-name", name, "/portal/assets/" + assetId), new Models.EventFact("note", null, null)));
     return Json.GSON.fromJson(asset, Models.Asset.class);
   }
 
@@ -465,7 +559,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     event.addProperty("assetId", assetId);
     JsonObject asset = assetId == null ? null : api.storage.assets.get(assetId);
     event.add("asset", asset == null ? null : MockApi.snapshot(asset));
-    event.add("facts", Json.GSON.toJsonTree(List.of(facts)));
+    event.add("facts", MockApi.facts(java.util.Arrays.asList(facts)));
     event.addProperty("notify", false);
     event.addProperty("createdAt", now);
     event.addProperty("updatedAt", now);
@@ -495,6 +589,15 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     Queued next;
     synchronized (this) {
       requests.add(captured);
+      Set<String> operations = api.operations(captured);
+      for (int i = 0; i < failures.size(); i++) {
+        String[] pending = failures.get(i);
+        if (pending[1] != null && !operations.contains(pending[1])) continue;
+        failures.remove(i);
+        if (pending[0].equals("transport-error")) throw new java.net.ConnectException("Simulated network failure");
+        if (pending[0].equals("timeout")) throw new HttpTimeoutException("The operation timed out");
+        return MockApi.error(new MockApi.Failure(pending[0]));
+      }
       if (!responses.isEmpty() && responses.peek().matches(request.method(), captured.path())) next = responses.remove();
       else return api.answer(captured);
     }

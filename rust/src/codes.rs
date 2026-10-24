@@ -20,9 +20,9 @@ error_codes! {
     MultipartImageTooLarge = "upload/multipart-image-too-large", 400;
     /// `upload/image-exceeded-max-dimensions` (HTTP 400): Image exceeds maximum dimensions. Maximum dimensions are 12,000px.
     ImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions", 400;
-    /// `upload/limit-exceeded` (HTTP 403): Upload limit exceeded. You have used all your free uploads. Please upgrade to Plus or Pro for unlimited uploads.
+    /// `upload/limit-exceeded` (HTTP 403): Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.
     UploadLimitExceeded = "upload/limit-exceeded", 403;
-    /// `upload/spend-limit-reached` (HTTP 402): The project owner's spend limit for this billing period has been reached. Raise the limit in Billing to resume uploads.
+    /// `upload/spend-limit-reached` (HTTP 402): Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.
     SpendLimitReached = "upload/spend-limit-reached", 402;
     /// `upload/invalid-mime-type` (HTTP 400): Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.
     InvalidUploadMimeType = "upload/invalid-mime-type", 400;

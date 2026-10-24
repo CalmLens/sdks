@@ -595,9 +595,9 @@ impl FaceDetectionOptions {
 
 /// The bytes of an upload or multipart part.
 ///
-/// `Text` and `Bytes` are sent as they are and can be retried. `Reader` and `Stream` are read
-/// once while the request is sent, so the whole file never needs to be in memory; the SDK
-/// does not retry them. Both need the exact `size`.
+/// `Text` and `Bytes` are sent as they are and can be retried. `Reader`, `Stream` and
+/// `UnsizedStream` are read once while the request is sent, so the whole file never needs to be
+/// in memory; the SDK does not retry them. `Reader` and `Stream` need the exact `size`.
 #[non_exhaustive]
 pub enum Payload {
     /// UTF-8 text.
@@ -622,6 +622,10 @@ pub enum Payload {
         /// The exact total number of bytes.
         size: u64,
     },
+    /// An async byte stream whose length is not known in advance. It is sent with chunked
+    /// transfer encoding and no `sizeInBytes`, unless the content declares `size_in_bytes`.
+    #[cfg(feature = "async")]
+    UnsizedStream(crate::ByteStream),
 }
 impl Default for Payload {
     fn default() -> Self {
@@ -638,6 +642,8 @@ impl fmt::Debug for Payload {
             Self::Reader { size, .. } => f.debug_struct("Reader").field("size", size).finish(),
             #[cfg(feature = "async")]
             Self::Stream { size, .. } => f.debug_struct("Stream").field("size", size).finish(),
+            #[cfg(feature = "async")]
+            Self::UnsizedStream(_) => f.debug_struct("UnsizedStream").finish_non_exhaustive(),
         }
     }
 }
@@ -695,6 +701,20 @@ impl Content {
                 stream: Box::pin(stream.map_err(Into::into)),
                 size,
             },
+            mime_type,
+        )
+    }
+    /// Content streamed from `stream`, whose length is not known in advance, while it is
+    /// uploaded. Set [`size_in_bytes`](Self::size_in_bytes) when you know it.
+    #[cfg(feature = "async")]
+    pub fn unsized_stream<S, E>(stream: S, mime_type: impl Into<String>) -> Self
+    where
+        S: futures_util::Stream<Item = std::result::Result<Bytes, E>> + Send + 'static,
+        E: Into<Box<dyn std::error::Error + Send + Sync>> + 'static,
+    {
+        use futures_util::TryStreamExt;
+        Self::new(
+            Payload::UnsizedStream(Box::pin(stream.map_err(Into::into))),
             mime_type,
         )
     }
@@ -1461,7 +1481,7 @@ pub struct CategoryPolicyScore {
     /// The policy score.
     #[serde(default)]
     pub score: f64,
-    /// `allow`, `age-restrict`, `block` or `purge`.
+    /// `allow`, `limit`, `age-restrict`, `block` or `purge`.
     #[serde(default)]
     pub action: String,
     /// The rule or threshold that decided the category.
@@ -1939,6 +1959,9 @@ pub struct EventFact {
     /// A link for the fact.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 /// An event from the events feed.
@@ -2003,7 +2026,9 @@ impl Event {
     }
 }
 
-/// The JSON body of a webhook delivery. Read it with [`crate::construct_webhook_event`].
+/// The JSON body of a webhook delivery. Read it with [`crate::construct_webhook_event`], which
+/// checks the fields' types first; [`json`](Self::json) returns the body as received,
+/// including fields this SDK version does not model.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2014,13 +2039,14 @@ pub struct WebhookEventPayload {
     #[serde(rename = "type")]
     pub event_type: EventType,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
-    pub created_at: Option<u64>,
+    pub created_at: u64,
     /// The owning project.
-    #[serde(default)]
-    pub project_id: Option<String>,
+    pub project_id: String,
     /// The event fields.
     pub data: WebhookEventData,
+    /// The body this payload was parsed from.
+    #[serde(skip)]
+    received: Option<Value>,
 }
 impl WebhookEventPayload {
     /// The delivery body CalmLens sends for `event`, e.g. to test a webhook handler.
@@ -2028,8 +2054,8 @@ impl WebhookEventPayload {
         Self {
             id: event.id.clone(),
             event_type: event.event_type.clone().unwrap_or_default(),
-            created_at: event.created_at,
-            project_id: event.project_id.clone(),
+            created_at: event.created_at.unwrap_or_default(),
+            project_id: event.project_id.clone().unwrap_or_default(),
             data: WebhookEventData {
                 severity: event.severity.clone(),
                 title: event.title.clone(),
@@ -2038,108 +2064,105 @@ impl WebhookEventPayload {
                 asset: event.asset.clone(),
                 facts: event.facts.clone(),
             },
+            received: None,
         }
+    }
+    /// Whether this is a test send from the portal or API: its facts include `test` with the
+    /// value `true`. Handle test sends without acting on the asset they name.
+    pub fn is_test(&self) -> bool {
+        self.data
+            .facts
+            .iter()
+            .any(|fact| fact.key == "test" && fact.value == Value::Bool(true))
+    }
+    /// The delivery as JSON: the body exactly as received for a parsed delivery (unknown fields
+    /// included), otherwise this payload serialized.
+    pub fn json(&self) -> Value {
+        self.received
+            .clone()
+            .unwrap_or_else(|| serde_json::to_value(self).unwrap_or(Value::Null))
+    }
+    pub(crate) fn received(mut self, body: Value) -> Self {
+        self.received = Some(body);
+        self
     }
 }
 
-/// Snapshot of an asset's state when an event was created.
+/// Snapshot of an asset's state when an event was created, holding the fields CalmLens sent
+/// (fields this SDK version does not know included). Read them with the accessors, or
+/// [`get`](Self::get) for any other field; retrieve the asset for its current state.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct EventAsset {
-    /// The asset ID.
-    pub id: String,
-    /// Your ID for the asset, if you set one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub external_id: Option<String>,
-    /// The upload preset used to create the asset, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub upload_preset_id: Option<String>,
-    /// The classification status when the event was created.
-    #[serde(default)]
-    pub upload: EventAssetUpload,
-    /// The classification and moderation status when the event was created.
-    #[serde(default)]
-    pub classification: EventAssetClassification,
-    /// Whether CalmLens held the content when the event was created.
-    #[serde(default)]
-    pub content: EventAssetContent,
-    /// Fields this SDK version does not know.
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
+#[serde(transparent)]
+pub struct EventAsset(serde_json::Map<String, Value>);
 impl EventAsset {
     /// A snapshot of asset `id` with classification status `processing`, moderation status
-    /// `moderation` and content status `content`, e.g. for a mock event.
+    /// `moderation`, content status `content` and a completed upload, e.g. for a mock event.
     pub fn new(
         id: impl Into<String>,
         processing: AssetClassificationStatus,
         moderation: AssetModerationStatus,
         content: AssetContentStatus,
     ) -> Self {
-        Self {
-            id: id.into(),
-            upload: EventAssetUpload {
-                status: "completed".into(),
-                ..EventAssetUpload::default()
-            },
-            classification: EventAssetClassification {
-                status: processing,
-                moderation: EventAssetModeration {
-                    status: moderation,
-                    ..EventAssetModeration::default()
-                },
-                ..EventAssetClassification::default()
-            },
-            content: EventAssetContent {
-                status: content,
-                ..EventAssetContent::default()
-            },
-            ..Self::default()
+        let value = serde_json::json!({
+            "id": id.into(),
+            "upload": {"status": "completed"},
+            "classification": {"status": processing, "moderation": {"status": moderation}},
+            "content": {"status": content},
+        });
+        match value {
+            Value::Object(map) => Self(map),
+            _ => Self::default(),
         }
     }
-}
-
-/// An asset's classification status in an [`EventAsset`].
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct EventAssetClassification {
-    #[serde(default)]
-    /// The moderation status.
-    pub moderation: EventAssetModeration,
-    /// The classification status.
-    #[serde(default)]
-    pub status: AssetClassificationStatus,
-    /// Fields this SDK version does not know.
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-/// An asset's moderation status in an [`EventAsset`].
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct EventAssetModeration {
-    /// The moderation status, which also decides delivery.
-    #[serde(default)]
-    pub status: AssetModerationStatus,
-    /// Fields this SDK version does not know.
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-/// Whether CalmLens held an asset's content, in an [`EventAsset`].
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct EventAssetContent {
-    /// The content status.
-    #[serde(default)]
-    pub status: AssetContentStatus,
-    /// Fields this SDK version does not know.
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
+    /// The snapshot's fields.
+    pub fn from_json(fields: serde_json::Map<String, Value>) -> Self {
+        Self(fields)
+    }
+    /// The asset ID.
+    pub fn id(&self) -> &str {
+        self.text(&["id"]).unwrap_or_default()
+    }
+    /// Your ID for the asset, if you set one.
+    pub fn external_id(&self) -> Option<&str> {
+        self.text(&["externalId"])
+    }
+    /// The upload preset used to create the asset, if any.
+    pub fn upload_preset_id(&self) -> Option<&str> {
+        self.text(&["uploadPresetId"])
+    }
+    /// The upload status, such as `completed`.
+    pub fn upload_status(&self) -> Option<&str> {
+        self.text(&["upload", "status"])
+    }
+    /// The classification status when the event was created.
+    pub fn classification_status(&self) -> Option<AssetClassificationStatus> {
+        self.text(&["classification", "status"]).map(Into::into)
+    }
+    /// The moderation status when the event was created, which also decides delivery.
+    pub fn moderation_status(&self) -> Option<AssetModerationStatus> {
+        self.text(&["classification", "moderation", "status"])
+            .map(Into::into)
+    }
+    /// Whether CalmLens held the content when the event was created.
+    pub fn content_status(&self) -> Option<AssetContentStatus> {
+        self.text(&["content", "status"]).map(Into::into)
+    }
+    /// A top-level field of the snapshot.
+    pub fn get(&self, field: &str) -> Option<&Value> {
+        self.0.get(field)
+    }
+    /// The snapshot's fields.
+    pub fn as_json(&self) -> &serde_json::Map<String, Value> {
+        &self.0
+    }
+    fn text(&self, path: &[&str]) -> Option<&str> {
+        let (last, parents) = path.split_last()?;
+        let mut object = &self.0;
+        for parent in parents {
+            object = object.get(*parent)?.as_object()?;
+        }
+        object.get(*last)?.as_str()
+    }
 }
 
 /// The event fields of a webhook delivery; the events feed has the same fields at the top level.
@@ -3111,17 +3134,4 @@ pub struct ListFolders {
     /// ASC or DESC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direction: Option<String>,
-}
-
-/// Upload progress in an event snapshot.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct EventAssetUpload {
-    /// Classification or upload progress.
-    #[serde(default)]
-    pub status: String,
-    /// Fields this SDK version does not know.
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
 }

@@ -55,9 +55,19 @@ impl ServerClientBuilder {
     pub fn cdn_base_url(self, value: impl Into<String>) -> Self {
         Self(self.0.cdn_base_url(value))
     }
-    /// The whole-request timeout for API calls. See [`crate::ServerClientBuilder::timeout`].
+    /// The timeout of each API call attempt. See [`crate::ServerClientBuilder::timeout`].
     pub fn timeout(self, value: Duration) -> Self {
         Self(self.0.timeout(value))
+    }
+    /// The timeout of each binary upload attempt. See
+    /// [`crate::ServerClientBuilder::upload_timeout`].
+    pub fn upload_timeout(self, value: Duration) -> Self {
+        Self(self.0.upload_timeout(value))
+    }
+    /// The largest API response body the client reads. See
+    /// [`crate::ServerClientBuilder::max_response_bytes`].
+    pub fn max_response_bytes(self, value: usize) -> Self {
+        Self(self.0.max_response_bytes(value))
     }
     /// The connect timeout.
     pub fn connect_timeout(self, value: Duration) -> Self {

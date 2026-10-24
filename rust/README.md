@@ -24,7 +24,7 @@ async fn main() -> calmlens::Result<()> {
 }
 ```
 
-Install with `cargo add calmlens`. Request and response models live in `calmlens::models`. `Patch::Missing` leaves a field unchanged, `Patch::Null` clears it and `Patch::Value(value)` replaces it. Requests never follow redirects.
+Install with `cargo add calmlens`. Request and response models live in `calmlens::models`. `Patch::Missing` leaves a field unchanged, `Patch::Null` clears it and `Patch::Value(value)` replaces it. Requests never follow redirects: a `3xx` response fails with `sdk/http-error`, its status and request ID, and is not retried.
 
 ## Features
 
@@ -51,18 +51,21 @@ Create one `ServerClient` when your application starts and reuse it. Clones are 
 let client = calmlens::ServerClient::builder(api_key, project_id)
     .base_url("http://localhost:6110/v1")       // default https://api.calmlens.com/v1
     .cdn_base_url("http://localhost:6110/cdn/v1") // default https://cdn.calmlens.com/v1
-    .timeout(Duration::from_secs(60))         // whole-request limit for API calls
+    .timeout(Duration::from_secs(120))        // each API call attempt, response body included
+    .upload_timeout(Duration::from_secs(900)) // each binary upload attempt (none by default)
     .connect_timeout(Duration::from_secs(10))
-    .read_timeout(Duration::from_secs(60))    // longest wait for the next response bytes
+    .read_timeout(Duration::from_secs(120))   // longest wait for the next response bytes
     .max_retries(2)
+    .max_response_bytes(32 * 1024 * 1024)     // the largest API response body read
     .build()?;
 ```
 
-- `timeout` applies to API calls. Uploads and CDN downloads have no whole-request limit, so large transfers are not cut off; `connect_timeout` and `read_timeout` still bound stalled connections. `client.with_timeout(duration)` returns a handle whose calls, uploads included, time out after `duration`, and `client.with_max_retries(n)` one with its own retry limit. Both share the client's connections.
+- `timeout` (120 seconds by default) applies to each API call attempt, including text uploads, and to the wait for a CDN download's response headers; the CDN body then streams for as long as it takes. Binary uploads use `upload_timeout`, which is unset by default so large files are not cut off; `connect_timeout` and `read_timeout` still bound stalled connections. The defaults are exported as constants such as `DEFAULT_TIMEOUT`, `DEFAULT_MAX_RETRIES` and `DEFAULT_MAX_RESPONSE_BYTES`.
+- `max_response_bytes` (32 MiB by default) limits API response bodies: a larger body, or a larger declared `Content-Length`, fails with `sdk/response-too-large` before it is read. `client.with_timeout(duration)` returns a handle whose calls, uploads included, time out after `duration`, and `client.with_max_retries(n)` one with its own retry limit. Both share the client's connections.
 - `http_client(reqwest::Client)` sends requests through your own reqwest client (a proxy, custom root certificates, a shared pool). Its own timeouts and redirect policy apply; disable redirects on it.
 - Invalid options fail with `sdk/invalid-config`.
 - `Debug` output of the client and builder never includes the API key.
-- Every request sends `User-Agent: calmlens-rust/<version> (rustc <compiler version>)`; `calmlens::VERSION` is the crate version.
+- Every request sends `User-Agent: calmlens-rust/<version> (rustc/<compiler version>)` (`calmlens::VERSION` is the crate version) and the API key in `x-api-key`; API calls also send `Accept: application/json`.
 
 ## Waiting for a decision
 
@@ -81,7 +84,7 @@ if decided.classification.moderation.status != AssetModerationStatus::Allowed {
 
 ## Retries and idempotency
 
-GET and HEAD requests, uploads and multipart parts are retried up to `max_retries` times (2 by default) after transport failures and timeouts, `429`, `502`, `503` and `504` responses, and `idempotency/request-in-progress`. The client waits for `Retry-After` when the API sends it (and gives up when it asks for more than 60 seconds), and otherwise for a random delay of up to 0.5 s, 1 s, 2 s and so on, capped at 8 s.
+GET and HEAD requests, uploads and multipart parts are retried up to `max_retries` times (2 by default) after transport failures and timeouts, `429`, `502`, `503` and `504` responses, and `idempotency/request-in-progress`. The client waits for `Retry-After` when the API sends it, in seconds or as an HTTP date (`0` or a past date retries at once), and gives up when it asks for more than 60 seconds (`RETRY_AFTER_MAX`). Otherwise it backs off from `RETRY_BASE_DELAY` (0.5 s), doubling per retry up to `RETRY_MAX_DELAY` (8 s), and waits half that delay plus a random share of the other half. `cdn().serve` retries the same way and returns the last response when retries run out.
 
 Each upload (`assets().create`, `assets().classify`, `text().classify`) and each part (`assets().upload_part`) is sent with a new `Idempotency-Key`, reused across the client's own retries, so a retried request returns the original response instead of creating a second asset. Set `idempotency_key` on `SubmitAsset`, `UploadPart` or `ClassifyText` to reuse a key across processes. Other writes (folders, updates, deletes) are sent once. Uploads from a reader or stream are read once, so they are never retried.
 
@@ -93,6 +96,7 @@ Each upload (`assets().create`, `assets().classify`, `text().classify`) and each
 | `Content::bytes(bytes, mime_type)` | A `Vec<u8>`, `bytes::Bytes` or `&'static [u8]` without copying |
 | `Content::reader(reader, size, mime_type)` | A `std::io::Read` that yields exactly `size` bytes, read in 64 KiB chunks on Tokio's blocking pool |
 | `Content::stream(stream, size, mime_type)` | A `Stream` of `Bytes` chunks totalling `size` |
+| `Content::unsized_stream(stream, mime_type)` | A `Stream` whose length isn't known in advance, sent chunked without `sizeInBytes` |
 | `Content::file(path, mime_type)` | A file, streamed from disk |
 | `Content { payload: Payload::Base64(..), .. }` | Base64 (or a `data:` URL) |
 
@@ -100,7 +104,7 @@ Readers, streams and files are sent as they are read, so a file is never held in
 
 Set `Content.size_in_bytes` to declare a payload's byte length explicitly. A value that differs from the measured payload length or the reader/stream size fails with `upload/invalid-payload` before the request is sent.
 
-For a multipart upload, start with `SubmitAsset::multipart(name, content.part(1, is_final))` and send later parts with `assets().upload_part(UploadPart { asset_id, part: content.part(n, is_final), .. })`. Non-final parts must be at least 5 MiB. Set `total_size_in_bytes` on the first request when you know the file's size; CalmLens then refuses an upload that could never finish and parts that overshoot or fall short. CalmLens saves the `queue` choice when the upload starts, so any process or client that knows the asset ID can send the remaining parts; set `queue` on a part only to override it.
+For a multipart upload, start with `SubmitAsset::multipart(name, content.part(1, is_final))` and send later parts with `assets().upload_part(UploadPart { asset_id, part: content.part(n, is_final), .. })`. Non-final parts must be at least 5 MiB, and image uploads in parts must total 10 to 20 MiB. The client refuses a part of known size before sending it: a non-final part under 5 MiB with `upload/invalid-payload`, and a first image part over 20 MiB, or a final one under 10 MiB, with `upload/multipart-image-too-large` or `upload/multipart-image-too-small`. The API checks the totals across parts and answers with the same codes. Set `total_size_in_bytes` on the first request when you know the file's size; CalmLens then refuses an upload that could never finish and parts that overshoot or fall short. CalmLens saves the `queue` choice when the upload starts, so any process or client that knows the asset ID can send the remaining parts; set `queue` on a part only to override it.
 
 Optional analyses are off unless a request turns them on in `ProcessingOptions::features`. Person and face detection are in beta; their results are informational, never change the moderation decision, and are returned in `asset.classification.personDetection` and `asset.classification.faceDetection`:
 
@@ -131,6 +135,8 @@ let signed = client.upload_tokens().sign(SignUploadToken {
 })?;
 // signed.token, signed.expires_at (milliseconds since the Unix epoch)
 ```
+
+For tests that compare whole tokens, `calmlens::testing::sign_upload_token(api_key, options, now_ms, nonce)` signs with the same validation at a fixed time and nonce.
 
 See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
 
@@ -165,8 +171,9 @@ assert_eq!(url, same);
 
 ## Pagination and events
 
-- `assets().iterate(ListAssets)` and `assets().iterate_children(ListChildren)` return a `Stream` of assets (`Iterator` for the blocking client) that fetches pages from `cursor` on as it is read, keeping the filter and ordering. An error ends the stream.
-- `events().pages(ListEvents)` returns pages of the events feed, following each page's cursor until a page has `has_more: false`. Store the last page's `cursor` and pass it as `after` on the next poll. Without `after`, the first page is empty and its cursor marks the current time.
+- `assets().iterate(ListAssets)` and `assets().iterate_children(ListChildren)` return a `Stream` of assets (`Iterator` for the blocking client) that fetches pages from `cursor` on as it is read, keeping the filter and ordering. It ends at a page without a next cursor, with `has_more: false` or without items. An error ends the stream.
+- `events().pages(ListEvents)` returns pages of the events feed, following each page's cursor until a page has `has_more: false`.
+- A page with more to follow whose cursor the iteration already sent fails with `sdk/invalid-response` and `details.cursor`, instead of repeating pages forever; that page is not yielded. Store the last page's `cursor` and pass it as `after` on the next poll. Without `after`, the first page is empty and its cursor marks the current time.
 
 ```rust
 use futures_util::TryStreamExt;
@@ -192,12 +199,12 @@ Every call returns `calmlens::Error`. `Display` prefixes the message with `[calm
 | `status()` | The HTTP status of an API error |
 | `request_id()` | The response's `X-Request-Id`; log it and quote it to support |
 | `retry_after()` | The `Retry-After` delay of a `429` or `idempotency/request-in-progress` response |
-| `details()` | The API's `details`, plus `traceId` and `network: true` for API errors |
+| `details()` | The API's `details`, plus its `traceId`; empty for SDK errors such as transport failures |
 | `headers()` | The failed response's headers |
 | `source()` | The underlying reqwest, IO or JSON error |
 | `is_not_found()`, `is_retryable()`, `is_timeout()` | Common checks |
 
-SDK codes: `sdk/transport-error` (the request could not be sent or the response read), `sdk/timeout` (also returned by `wait_for_decision` when no decision arrives in time), `sdk/invalid-response` (a successful response that isn't the expected JSON), `sdk/http-error` (an error response without a CalmLens error body), `sdk/response-too-large` (an API response over 64 MiB), `sdk/invalid-argument` (an empty, `.` or `..` ID, an invalid transform or CDN header), `sdk/invalid-config`, `sdk/invalid-webhook-signature` and `sdk/invalid-webhook-payload`. Upload validation uses the API's codes, such as `upload/invalid-payload` and `upload/invalid-mime-type`, before anything is sent. `Error::new(code, message)` and the `with_*` methods build errors for tests.
+SDK codes: `sdk/transport-error` (the request could not be sent or the response read), `sdk/timeout` (also returned by `wait_for_decision` when no decision arrives in time), `sdk/invalid-response` (a successful response that isn't the expected JSON), `sdk/http-error` (an error response without a CalmLens error body), `sdk/response-too-large` (an API response over `max_response_bytes`), `sdk/invalid-argument` (an empty, `.` or `..` ID, an invalid transform or CDN header), `sdk/invalid-config`, `sdk/invalid-webhook-signature` and `sdk/invalid-webhook-payload`. Upload validation uses the API's codes, such as `upload/invalid-payload` and `upload/invalid-mime-type`, before anything is sent. `Error::new(code, message)` and the `with_*` methods build errors for tests.
 
 ## Models
 
@@ -237,7 +244,7 @@ let needs_age_check =
 
 CalmLens signs each delivery with `WEBHOOK_SIGNATURE_HEADER` (`x-calmlens-signature`, `v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`), `WEBHOOK_TIMESTAMP_HEADER` (`x-calmlens-timestamp`, Unix seconds) and `WEBHOOK_DELIVERY_HEADER` (`x-calmlens-delivery`, for deduplicating retries).
 
-`construct_webhook_event(raw_body, &http::HeaderMap, secret)` verifies the signature against the exact raw bytes, rejects timestamps more than `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS` (300) from now, and returns a `models::WebhookEventPayload`. It fails with `sdk/invalid-webhook-signature` (answer 401) or `sdk/invalid-webhook-payload` (answer 400). It takes raw bytes (`&[u8]`, `Bytes`, `Vec<u8>` or `&str`), never a parsed JSON value, because re-serialized JSON may not match the signed bytes.
+`construct_webhook_event(raw_body, &http::HeaderMap, secret)` verifies the signature against the exact raw bytes, rejects timestamps more than `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS` (300) from now, and returns a `models::WebhookEventPayload`. It reads the headers in any case and joins repeated ones with `,`, so a signature list split across headers verifies. It fails with `sdk/invalid-webhook-signature` (answer 401) or `sdk/invalid-webhook-payload` (answer 400): the body must be a JSON object with string `id`, `type` and `projectId`, a numeric `createdAt` and an object `data` whose fields have the API's types. `payload.json()` returns the body as received, with fields this SDK version doesn't model, and `payload.is_test()` tells a test send (a `test` fact with the value `true`) from a real event. `verify_webhook_headers(raw_body, &headers, secret, now_seconds, tolerance_seconds)` only verifies. It takes raw bytes (`&[u8]`, `Bytes`, `Vec<u8>` or `&str`), never a parsed JSON value, because re-serialized JSON may not match the signed bytes.
 
 With axum, extract the body as `axum::body::Bytes`, not `Json`:
 
@@ -249,7 +256,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
     match calmlens::construct_webhook_event(&body, &headers, &secret) {
         Ok(event) => {
             if let Some(asset) = &event.data.asset {
-                println!("{} {} {}", event.event_type, asset.id, asset.classification.moderation.status);
+                println!("{} {} {:?}", event.event_type, asset.id(), asset.moderation_status());
             }
             StatusCode::NO_CONTENT
         }
@@ -259,7 +266,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
 }
 ```
 
-actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.data.asset` is an `EventAsset`, a snapshot of the asset when the event was created: `id`, `external_id`, `classification.status`, `classification.moderation.status` and `content.status`.
+actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.data.asset` is an `EventAsset`, a snapshot of the asset when the event was created, holding the fields CalmLens sent: read them with `id()`, `external_id()`, `upload_preset_id()`, `upload_status()`, `classification_status()`, `moderation_status()` and `content_status()`, or `get(field)`.
 
 ## Offline testing
 
@@ -279,9 +286,9 @@ let asset = mock.assets().classify(SubmitAsset::text("hello")).await?;
 assert_eq!(mock.last_request().unwrap().body, b"hello");
 ```
 
-`MockServerClient` answers from a FIFO queue and uses the real client's validation, encoding, retries and error mapping; it creates no HTTP client, so it works inside any runtime. Queue responses with `enqueue(status, model)`, `enqueue_api_error(code, message)` (the API's body shape and the HTTP status the API uses for that code), `enqueue_response(MockResponse::new(206).header(..).body(..))` (CDN responses, `Retry-After`), `enqueue_raw`, `enqueue_timeout()`, `enqueue_transport_error(message)` and `enqueue_error(error)`. Responses carry an `x-request-id` unless you set one. `requests()` and `last_request()` return captured requests (`method`, `url`, `path`, `query`/`query_param`, `headers`/`header` with the API key redacted, `body` including streamed uploads, `json()`). `client()` returns a `ServerClient` and `blocking()` a `blocking::ServerClient` sharing the queue. An empty queue fails with `sdk/transport-error` and never reaches the network. `MockServerClient::new()` disables retries; build one with `MockServerClient::from_builder(ServerClient::builder(key, project).max_retries(2))` to test them.
+`MockServerClient` answers from a FIFO queue and uses the real client's validation, encoding, retries and error mapping; it creates no HTTP client, so it works inside any runtime. Queue responses with `enqueue(status, model)`, `enqueue_api_error(code, message)` (the API's body shape and the HTTP status the API uses for that code), `enqueue_response(MockResponse::new(206).header(..).body(..))` (CDN responses, `Retry-After`), `enqueue_raw`, `enqueue_timeout()`, `enqueue_hang()` (no response until the attempt's timeout passes on the virtual clock), `enqueue_transport_error(message)` and `enqueue_error(error)`. Responses carry an `x-request-id` unless you set one, and a declared `content-length` over `max_response_bytes` fails as it would over the network. `requests()` and `last_request()` return captured requests (`method`, `url`, `path`, `query`/`query_param`, `headers`/`header`, `body` including streamed uploads, `json()`), and `sleeps()` the waits between attempts and polls. `client()` returns a `ServerClient` and `blocking()` a `blocking::ServerClient` sharing the queue. An empty queue fails with `sdk/transport-error` and never reaches the network. `MockServerClient::new()` disables retries; build one with `MockServerClient::from_builder(ServerClient::builder(key, project).max_retries(2))` to test them.
 
-`MockServerClient::in_memory(MockOptions::new())` adds an in-memory API behind the queue, so tests can simulate moderation outcomes. Queued replies are still used first. Uploads create stored assets: `assets().create` (and queued multipart uploads) get `queued_outcome` (default `MockOutcome::Pending`), and `assets().classify` and `text().classify` get `analyzed_outcome` (default `MockOutcome::Allowed`). The outcomes are `Pending`, `Allowed`, `Limited` (served like an allowed asset), `AgeRestricted`, `Blocked`, `Purged` (removes the content with reason `policy`) and `Failed` (retryable). Finished processing removes the content unless the upload sets `keep_content_after_processing`. Retrieve, list (`field==value` RSQL filters with `;`, `,`, `( … )` groups, `!=`, `=in=`, `=out=` and comparisons, with `;` binding tighter than `,`; ordering; folder; cursors that resume after the last item returned, so assets created or deleted between pages are neither repeated nor skipped), children, update, move, delete, delete content, retry, explain, keyword search (every word of the query must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status; results carry the API's keyword scores and matched fields and rank by score, then newest first), signed URLs, folders, lenses and `wait_for_decision` read and change that storage, with the API's error codes, statuses, `x-request-id` and idempotent replays.
+`MockServerClient::in_memory(MockOptions::new())` adds an in-memory API behind the queue, so tests can simulate moderation outcomes. Queued replies are still used first. Uploads create stored assets: `assets().create` (and queued multipart uploads) get `queued_outcome` (default `MockOutcome::Pending`), and `assets().classify` and `text().classify` get `analyzed_outcome` (default `MockOutcome::Allowed`); `queued_outcome_for(|asset| ..)` and `analyzed_outcome_for(|asset| ..)` choose one per upload from the asset. The outcomes are `Pending`, `Allowed`, `Limited` (served like an allowed asset), `AgeRestricted`, `Blocked`, `Purged` (removes the content with reason `policy`) and `Failed` (retryable). Finished processing removes the content unless the upload sets `keep_content_after_processing`. Retrieve, list (`field==value` RSQL filters with `;`, `,`, `( … )` groups, `!=`, `=in=`, `=out=` and comparisons, with `;` binding tighter than `,`; ordering; folder; cursors that resume after the last item returned, so assets created or deleted between pages are neither repeated nor skipped), children, update, move, delete, delete content, retry, explain, keyword search (every word of the query must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status; results carry the API's keyword scores and matched fields and rank by score, then newest first), signed URLs, folders, lenses and `wait_for_decision` read and change that storage, with the API's error codes, statuses and details (schema errors are `validation/<issue>` with HTTP 400 and the field in `details.path`), `x-request-id` and idempotent replays. List cursors continue only the query they came from. Deletions, content removal and retries record `asset.deleted`, `asset.content-removed` and `asset.retried` events, as the API does. `set_api_key_grants(&grants)` changes the mock key's grants for later requests, and `fail_next_request(MockFailure::TransportError | Timeout | Api(code), Some("assets.create"))` fails the next request (of that operation, by its JavaScript method path) without running it.
 
 ```rust
 use calmlens::{models::*, testing::*};
@@ -293,7 +300,7 @@ mock.decide(&asset.id, AssetModerationDecision::Blocked)?; // adds an asset.bloc
 let page = mock.events().list(ListEvents { after: Some(start), ..Default::default() }).await?;
 ```
 
-`decide(asset_id, decision)` applies a reviewer decision and adds the matching `asset.<status>` event with the event catalog's severity (`low` for `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact; `enqueue_event(event)` adds any event to the feed. `cdn().serve` returns stored bytes (with single byte ranges) with their stored `content-type` and `cache-control` as the CDN sets it (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable` for images and `max-age=3600` for other content). Like the CDN, it first refuses blocked, purged and failed assets, and assets whose content was removed or is still uploading, with `403` `asset/not-available` whatever the key; then it serves private and age-restricted assets only when the API key has a download grant, such as `MockOptions::new().api_key(create_mock_api_key(&[MockApiKeyGrant::download()]))`, or a public age-restricted asset with `allow_age_restricted`. The default key has no grants. `with_storage(|storage| ..)` reads or seeds `assets`, `folders`, `content` and `events` in the API's JSON shape. `create_id`, `now` and `project_id` make results deterministic (the default clock moves on by at least a millisecond per reading, so assets created in a row get increasing `created_at`), and `api_base_url` and `cdn_base_url` set the URLs the mock client uses. Waits take no real time: retry backoff and `wait_for_decision` advance the mock's virtual clock (`mock.elapsed()`), so a pending asset fails with `sdk/timeout` at once. This applies to `MockServerClient::new()` and `from_builder` too. The mock does not classify or transform content.
+`decide(asset_id, decision)` applies a reviewer decision and adds the matching `asset.<status>` event with the event catalog's severity (`low` for `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact; a purge removes the content with reason `requested` after an `asset.content-removed` event. `enqueue_event(event)` adds any event to the feed. `cdn().serve` returns stored bytes with their stored `content-type`, `content-length`, `cache-tag`, `x-content-type-options: nosniff`, a sandboxing `content-security-policy` and `cache-control` as the CDN sets it (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable` with an `etag` and `expires` for images and `max-age=3600` for other content). A classified image gets a ThumbHash, and its `placeholder` resource is served as the PNG it renders; removing the content removes it. Like the CDN, it first refuses blocked, purged and failed assets, and assets whose content was removed or is still uploading, with `403` `asset/not-available` whatever the key; then it serves private and age-restricted assets only when the API key has a download grant, such as `MockOptions::new().api_key(create_mock_api_key(&[MockApiKeyGrant::download()]))`, or a public age-restricted asset with `allow_age_restricted`. The default key has no grants. `with_storage(|storage| ..)` reads or seeds `assets`, `folders`, `content` and `events` in the API's JSON shape. `create_id`, `now` and `project_id` make results deterministic (the default clock moves on by at least a millisecond per reading, so assets created in a row get increasing `created_at`), and `api_base_url` and `cdn_base_url` set the URLs the mock client uses. Waits take no real time: retry backoff and `wait_for_decision` advance the mock's virtual clock (`mock.elapsed()`), so a pending asset fails with `sdk/timeout` at once. This applies to `MockServerClient::new()` and `from_builder` too. The mock does not classify or transform content.
 
 ## Development
 

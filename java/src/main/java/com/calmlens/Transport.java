@@ -131,7 +131,7 @@ public interface Transport {
 
     /**
      * @param stream the source, read once when the request is sent
-     * @param length the exact number of bytes the stream supplies
+     * @param length the exact number of bytes the stream supplies, or -1 when unknown (sent chunked)
      * @return a body streaming {@code stream}
      */
     public static Body ofStream(InputStream stream, long length) {
@@ -139,7 +139,7 @@ public interface Transport {
       return new Body(length, null, null, () -> stream);
     }
 
-    /** @return the exact body length in bytes */
+    /** @return the exact body length in bytes, or -1 for a stream of unknown length */
     public long length() { return length; }
 
     /** @return whether {@link #open()} can be called more than once */

@@ -8,16 +8,36 @@ use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use serde_json::{Map, Value};
 use std::time::Duration;
 
-/// API JSON responses larger than this fail with `sdk/response-too-large`.
-pub const MAX_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
-/// The longest `Retry-After` delay the SDK waits for before giving up and returning the error.
-pub(crate) const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
+/// The default size limit for API responses: larger ones fail with `sdk/response-too-large`.
+/// Change it with [`ServerClientBuilder::max_response_bytes`](crate::ServerClientBuilder::max_response_bytes).
+pub const DEFAULT_MAX_RESPONSE_BYTES: usize = 32 * 1024 * 1024;
+/// The longest `Retry-After` delay the SDK waits for; a longer one returns the error (or, for
+/// `cdn().serve`, the response) to the caller instead.
+pub const RETRY_AFTER_MAX: Duration = Duration::from_secs(60);
+/// The backoff before retry `n` (from 0) is `min(RETRY_MAX_DELAY, RETRY_BASE_DELAY * 2^n)`, of
+/// which the client waits half plus a random share of the other half.
+pub const RETRY_BASE_DELAY: Duration = Duration::from_millis(500);
+/// The longest backoff between attempts.
+pub const RETRY_MAX_DELAY: Duration = Duration::from_secs(8);
 
 pub(crate) enum RequestBody {
     Empty,
     Bytes(Bytes),
-    /// Read once; requests with a stream body are never retried.
-    Stream(Option<crate::ByteStream>, u64),
+    /// Read once; requests with a stream body are never retried. The size is sent as
+    /// `Content-Length` when known.
+    Stream(Option<crate::ByteStream>, Option<u64>),
+}
+
+/// Which deadline a request has.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Deadline {
+    /// API calls: the client timeout covers the whole exchange, body included.
+    Api,
+    /// Binary uploads: the upload timeout (none by default) covers the whole exchange.
+    Upload,
+    /// CDN downloads: the client timeout ends when the response headers arrive, so the body
+    /// can stream for as long as it takes.
+    Headers,
 }
 
 pub(crate) struct Prepared {
@@ -25,8 +45,7 @@ pub(crate) struct Prepared {
     pub url: reqwest::Url,
     pub headers: HeaderMap,
     pub body: RequestBody,
-    /// Uploads and CDN downloads have no default whole-request timeout.
-    pub transfer: bool,
+    pub deadline: Deadline,
 }
 
 impl Prepared {
@@ -36,7 +55,7 @@ impl Prepared {
             url,
             headers: HeaderMap::new(),
             body: RequestBody::Empty,
-            transfer: false,
+            deadline: Deadline::Api,
         }
     }
     pub fn header(mut self, name: &'static str, value: &str) -> Result<Self> {
@@ -88,7 +107,7 @@ pub(crate) struct Attempt {
 pub(crate) enum AttemptBody {
     Empty,
     Bytes(Bytes),
-    Stream(crate::ByteStream, u64),
+    Stream(crate::ByteStream, Option<u64>),
 }
 
 pub(crate) enum ResponseBody {
@@ -102,21 +121,29 @@ pub(crate) struct Exchange {
     pub body: ResponseBody,
 }
 impl Exchange {
-    pub async fn read(self) -> Result<Bytes> {
+    /// Reads the whole body, failing with `sdk/response-too-large` as soon as it (or the
+    /// declared `Content-Length`) exceeds `limit` bytes.
+    pub async fn read(self, limit: usize) -> Result<Bytes> {
+        let declared = self
+            .headers
+            .get(http::header::CONTENT_LENGTH)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse::<u64>().ok());
+        if declared.is_some_and(|length| length > limit as u64) {
+            return Err(too_large(limit, self.status, &self.headers));
+        }
         match self.body {
+            #[cfg(feature = "testing")]
+            ResponseBody::Mock(bytes) if bytes.len() > limit => {
+                Err(too_large(limit, self.status, &self.headers))
+            }
             #[cfg(feature = "testing")]
             ResponseBody::Mock(bytes) => Ok(bytes),
             ResponseBody::Http(mut response) => {
-                if response
-                    .content_length()
-                    .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
-                {
-                    return Err(too_large(self.status, &self.headers));
-                }
                 let mut body = Vec::new();
                 while let Some(chunk) = response.chunk().await.map_err(transport_error)? {
-                    if body.len() + chunk.len() > MAX_RESPONSE_BYTES {
-                        return Err(too_large(self.status, &self.headers));
+                    if body.len() + chunk.len() > limit {
+                        return Err(too_large(limit, self.status, &self.headers));
                     }
                     body.extend_from_slice(&chunk);
                 }
@@ -139,11 +166,11 @@ impl Exchange {
         }
     }
 }
-fn too_large(status: u16, headers: &HeaderMap) -> Error {
+fn too_large(limit: usize, status: u16, headers: &HeaderMap) -> Error {
     with_response(
         Error::new(
             ErrorCode::ResponseTooLarge,
-            format!("Response exceeds {MAX_RESPONSE_BYTES} bytes"),
+            format!("Response body exceeds {limit} bytes"),
         ),
         status,
         headers,
@@ -157,6 +184,15 @@ pub(crate) enum Transport {
 }
 
 impl Transport {
+    /// Whether the client leaves multipart size checks to the API: only the in-memory mock's
+    /// does, so its API answers them in the API's order.
+    pub(crate) fn defers_upload_checks(&self) -> bool {
+        match self {
+            #[cfg(feature = "testing")]
+            Transport::Mock(mock) => mock.defers_upload_checks(),
+            Transport::Http(_) => false,
+        }
+    }
     /// The clock waits are measured with: the mock's virtual clock, or Tokio's.
     pub(crate) fn now(&self) -> tokio::time::Instant {
         match self {
@@ -173,10 +209,15 @@ impl Transport {
             Transport::Http(_) => tokio::time::sleep(duration).await,
         }
     }
-    async fn exchange(&self, attempt: Attempt, timeout: Option<Duration>) -> Result<Exchange> {
+    async fn exchange(
+        &self,
+        attempt: Attempt,
+        timeout: Option<Duration>,
+        deadline: Deadline,
+    ) -> Result<Exchange> {
         match self {
             #[cfg(feature = "testing")]
-            Transport::Mock(mock) => mock.exchange(attempt).await,
+            Transport::Mock(mock) => mock.exchange(attempt, timeout).await,
             Transport::Http(client) => {
                 let mut request = client
                     .request(attempt.method, attempt.url)
@@ -184,14 +225,28 @@ impl Transport {
                 request = match attempt.body {
                     AttemptBody::Empty => request,
                     AttemptBody::Bytes(bytes) => request.body(bytes),
-                    AttemptBody::Stream(stream, size) => request
+                    AttemptBody::Stream(stream, Some(size)) => request
                         .header(http::header::CONTENT_LENGTH, size)
                         .body(reqwest::Body::wrap_stream(stream)),
+                    AttemptBody::Stream(stream, None) => {
+                        request.body(reqwest::Body::wrap_stream(stream))
+                    }
                 };
-                if let Some(timeout) = timeout {
-                    request = request.timeout(timeout);
+                let response = match (timeout, deadline) {
+                    (Some(timeout), Deadline::Headers) => {
+                        tokio::time::timeout(timeout, request.send())
+                            .await
+                            .map_err(|_| {
+                                Error::new(
+                                    ErrorCode::Timeout,
+                                    format!("No response headers within {timeout:?}"),
+                                )
+                            })?
+                    }
+                    (Some(timeout), _) => request.timeout(timeout).send().await,
+                    (None, _) => request.send().await,
                 }
-                let response = request.send().await.map_err(transport_error)?;
+                .map_err(transport_error)?;
                 Ok(Exchange {
                     status: response.status().as_u16(),
                     headers: response.headers().clone(),
@@ -202,18 +257,23 @@ impl Transport {
     }
 }
 
-/// Retry and timeout settings for one call.
+/// Retry, timeout and size settings for one call.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CallOptions {
     pub timeout: Duration,
+    pub upload_timeout: Option<Duration>,
     pub timeout_override: Option<Duration>,
     pub max_retries: u32,
+    pub max_response_bytes: usize,
 }
 
-/// Sends `request`, retrying transport failures, `429`, `502`, `503`, `504` and
-/// `idempotency/request-in-progress` with jittered backoff when the request is repeatable.
-/// With `api_errors`, an unsuccessful status is returned as an [`Error`]; without it (CDN
-/// requests) the final response is returned whatever its status.
+const RETRYABLE_STATUSES: [u16; 4] = [429, 502, 503, 504];
+
+/// Sends `request`, retrying transport failures, timeouts, `429`, `502`, `503`, `504` and
+/// `idempotency/request-in-progress` with jittered backoff (or the `Retry-After` the server
+/// sent) when the request is repeatable. A redirect is never followed: it fails with
+/// `sdk/http-error`. With `api_errors`, an unsuccessful status is returned as an [`Error`];
+/// without it (CDN requests) the final response is returned whatever its status.
 pub(crate) async fn execute(
     transport: &Transport,
     mut request: Prepared,
@@ -225,43 +285,66 @@ pub(crate) async fn execute(
     } else {
         0
     };
-    let timeout = options
-        .timeout_override
-        .or((!request.transfer).then_some(options.timeout));
+    let timeout = options.timeout_override.or(match request.deadline {
+        Deadline::Api | Deadline::Headers => Some(options.timeout),
+        Deadline::Upload => options.upload_timeout,
+    });
     let mut retry = 0;
     loop {
-        let result = transport.exchange(request.attempt(), timeout).await;
+        let can_retry = retry < max_retries;
+        let result = transport
+            .exchange(request.attempt(), timeout, request.deadline)
+            .await;
         let failure = match result {
+            Err(error) => error,
+            Ok(exchange) if (300..400).contains(&exchange.status) => with_response(
+                Error::new(
+                    ErrorCode::HttpError,
+                    format!("Unexpected redirect (HTTP {})", exchange.status),
+                ),
+                exchange.status,
+                &exchange.headers,
+            ),
             Ok(exchange) if (200..300).contains(&exchange.status) => return Ok(exchange),
-            Ok(exchange) if !api_errors && !matches!(exchange.status, 429 | 502 | 503 | 504) => {
-                return Ok(exchange)
+            Ok(exchange) if !api_errors => {
+                let delay = retry_after(&exchange.headers).unwrap_or_else(|| backoff(retry));
+                if !can_retry
+                    || !RETRYABLE_STATUSES.contains(&exchange.status)
+                    || delay > RETRY_AFTER_MAX
+                {
+                    return Ok(exchange);
+                }
+                transport.sleep(delay).await;
+                retry += 1;
+                continue;
             }
-            Ok(exchange) if !api_errors && retry >= max_retries => return Ok(exchange),
             Ok(exchange) => {
                 let status = exchange.status;
                 let headers = exchange.headers.clone();
-                let body = exchange.read().await?;
-                api_error(status, &headers, &body)
+                match exchange.read(options.max_response_bytes).await {
+                    Ok(body) => api_error(status, &headers, &body),
+                    Err(error) => error,
+                }
             }
-            Err(error) => error,
         };
-        if retry >= max_retries || !failure.is_retryable() {
+        let delay = failure.retry_after().unwrap_or_else(|| backoff(retry));
+        if !can_retry || delay > RETRY_AFTER_MAX || !failure.is_retryable() {
             return Err(failure);
         }
-        let delay = match failure.retry_after() {
-            Some(delay) if delay > MAX_RETRY_AFTER => return Err(failure),
-            Some(delay) => delay,
-            None => backoff(retry),
-        };
         transport.sleep(delay).await;
         retry += 1;
     }
 }
 
-/// Full jitter: a random delay up to 0.5s, 1s, 2s, ... capped at 8s.
+/// Exponential backoff with jitter: 0.5s, 1s, 2s, ... capped at 8s, of which half is fixed and
+/// half random.
 fn backoff(retry: u32) -> Duration {
-    let ceiling = 500u64.saturating_mul(1 << retry.min(4));
-    Duration::from_millis(random_u64() % (ceiling + 1))
+    let delay = RETRY_BASE_DELAY
+        .saturating_mul(1 << retry.min(16))
+        .min(RETRY_MAX_DELAY)
+        .as_millis() as u64;
+    let half = delay / 2;
+    Duration::from_millis(half + random_u64() % (delay - half + 1))
 }
 
 pub(crate) fn random_u64() -> u64 {
@@ -290,42 +373,101 @@ pub(crate) fn uuid() -> String {
     )
 }
 
+/// The `Retry-After` delay: whole seconds, or an HTTP date (rounded up to whole seconds from
+/// now, and zero once it has passed).
+fn retry_after(headers: &HeaderMap) -> Option<Duration> {
+    let value = headers
+        .get(http::header::RETRY_AFTER)?
+        .to_str()
+        .ok()?
+        .trim();
+    if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Some(Duration::from_secs(value.parse().unwrap_or(u64::MAX)));
+    }
+    let date = parse_http_date(value)?;
+    let now = std::time::SystemTime::now();
+    Some(match date.duration_since(now) {
+        Ok(ahead) => Duration::from_secs(ahead.as_secs() + u64::from(ahead.subsec_nanos() > 0)),
+        Err(_) => Duration::ZERO,
+    })
+}
+
+/// Parses an IMF-fixdate such as `Wed, 21 Oct 2015 07:28:00 GMT`, the HTTP date format.
+fn parse_http_date(value: &str) -> Option<std::time::SystemTime> {
+    let (_, rest) = value.split_once(", ")?;
+    let parts: Vec<&str> = rest.split(' ').collect();
+    let [day, month, year, time, "GMT"] = parts.as_slice() else {
+        return None;
+    };
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let month = MONTHS.iter().position(|name| name == month)? as i64 + 1;
+    let day: i64 = day.parse().ok()?;
+    let year: i64 = year.parse().ok()?;
+    let clock: Vec<i64> = time
+        .split(':')
+        .map(|part| part.parse().ok())
+        .collect::<Option<_>>()?;
+    let [hours, minutes, seconds] = clock.as_slice() else {
+        return None;
+    };
+    if !(1..=31).contains(&day) || *hours > 23 || *minutes > 59 || *seconds > 60 {
+        return None;
+    }
+    // Days from the civil date (Howard Hinnant's algorithm).
+    let (y, m) = if month <= 2 {
+        (year - 1, month + 9)
+    } else {
+        (year, month - 3)
+    };
+    let era = y.div_euclid(400);
+    let year_of_era = y - era * 400;
+    let day_of_year = (153 * m + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+    let seconds = days * 86_400 + hours * 3600 + minutes * 60 + seconds;
+    let seconds = u64::try_from(seconds).ok()?;
+    std::time::UNIX_EPOCH.checked_add(Duration::from_secs(seconds))
+}
+
 /// Adds the response's status, request ID, `Retry-After` and headers to `error`.
 pub(crate) fn with_response(mut error: Error, status: u16, headers: &HeaderMap) -> Error {
     error = error.with_status(status).with_headers(headers.clone());
     if let Some(id) = headers.get("x-request-id").and_then(|v| v.to_str().ok()) {
         error = error.with_request_id(id);
     }
-    if let Some(seconds) = headers
-        .get(http::header::RETRY_AFTER)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().parse::<u64>().ok())
-    {
-        error = error.with_retry_after(Duration::from_secs(seconds));
+    if let Some(delay) = retry_after(headers) {
+        error = error.with_retry_after(delay);
     }
     error
 }
 
-/// The [`Error`] for an unsuccessful API response.
+/// The [`Error`] for an unsuccessful API response: its `code`, `message` and `details` (with
+/// the `traceId`), or `sdk/http-error` when the body is not a CalmLens error.
 pub(crate) fn api_error(status: u16, headers: &HeaderMap, body: &[u8]) -> Error {
     let parsed = serde_json::from_slice::<Value>(body);
-    let error = match &parsed {
-        Ok(Value::Object(object)) => {
-            let text = |key: &str| object.get(key).and_then(Value::as_str);
+    let api_code = match &parsed {
+        Ok(Value::Object(object)) => object.get("code").and_then(Value::as_str),
+        _ => None,
+    };
+    let error = match (api_code, &parsed) {
+        (Some(code), Ok(Value::Object(object))) => {
             let mut details: Map<String, Value> = object
                 .get("details")
                 .and_then(Value::as_object)
                 .cloned()
                 .unwrap_or_default();
-            details.insert("network".into(), Value::Bool(true));
-            if let Some(trace) = object.get("traceId") {
+            if let Some(trace) = object.get("traceId").filter(|trace| !trace.is_null()) {
                 details.insert("traceId".into(), trace.clone());
             }
             Error::new(
-                text("code").unwrap_or("sdk/http-error"),
-                text("message")
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| format!("HTTP {status}")),
+                code,
+                object
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or(code)
+                    .to_owned(),
             )
             .with_details(details)
         }
@@ -346,7 +488,6 @@ pub(crate) fn decode<T: serde::de::DeserializeOwned>(
     headers: &HeaderMap,
     body: &[u8],
 ) -> Result<T> {
-    let body: &[u8] = if body.is_empty() { b"null" } else { body };
     serde_json::from_slice(body).map_err(|cause| {
         with_response(
             Error::new(
@@ -407,12 +548,12 @@ pub(crate) fn stream_error(error: Box<dyn std::error::Error + Send + Sync>) -> E
     }
 }
 
-/// The request body for an upload payload, and its size.
+/// The request body for an upload payload, and its size when it is known before sending.
 pub(crate) fn upload_body(
     payload: Payload,
     multipart: bool,
     declared_size: Option<u64>,
-) -> Result<(RequestBody, u64)> {
+) -> Result<(RequestBody, Option<u64>)> {
     use base64::{engine::general_purpose::STANDARD, Engine};
     let (body, size) = match payload {
         Payload::Text(text) => {
@@ -443,17 +584,24 @@ pub(crate) fn upload_body(
             let size = bytes.len() as u64;
             (RequestBody::Bytes(bytes.into()), size)
         }
-        Payload::Reader { reader, size } => {
-            (RequestBody::Stream(Some(reader_stream(reader)), size), size)
+        Payload::Reader { reader, size } => (
+            RequestBody::Stream(Some(reader_stream(reader)), Some(size)),
+            size,
+        ),
+        Payload::Stream { stream, size } => (RequestBody::Stream(Some(stream), Some(size)), size),
+        Payload::UnsizedStream(stream) => {
+            return Ok((
+                RequestBody::Stream(Some(stream), declared_size),
+                declared_size,
+            ))
         }
-        Payload::Stream { stream, size } => (RequestBody::Stream(Some(stream), size), size),
     };
     if declared_size.is_some_and(|declared| declared != size) {
         return Err(crate::error::invalid_payload(
             "sizeInBytes must match the payload byte length",
         ));
     }
-    Ok((body, size))
+    Ok((body, Some(size)))
 }
 
 /// Reads a blocking reader in 64 KiB chunks on Tokio's blocking thread pool.

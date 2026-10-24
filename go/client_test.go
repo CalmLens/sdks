@@ -118,23 +118,6 @@ func TestTextAndRawUploads(t *testing.T) {
 		t.Fatal("JSON metadata must remain an array")
 	}
 }
-func TestPathEscapingAndOrderingQuery(t *testing.T) {
-	c, h := setup(t)
-	ctx := context.Background()
-	if _, err := c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a/b"}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasSuffix(h.last().URL.EscapedPath(), "/v1/assets/a%2Fb") {
-		t.Fatal(h.last().URL)
-	}
-	if _, err := c.Assets.List(ctx, ListAssetsOptions{PageSize: 20, Ordering: []Order{{Field: "createdAt", Direction: "ASC"}}}); err != nil {
-		t.Fatal(err)
-	}
-	query := h.last().URL.Query()
-	if query.Get("ordering[0][field]") != "createdAt" || query.Get("ordering[0][direction]") != "ASC" {
-		t.Fatal(h.last().URL)
-	}
-}
 func TestMultipartLeavesQueueModeToTheServer(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
@@ -169,6 +152,21 @@ func TestMultipartLeavesQueueModeToTheServer(t *testing.T) {
 	if ErrorCode(err) != CodeMultipartImageTooSmall || len(h.calls) != 1 {
 		t.Fatal(err)
 	}
+	// A refusal raised before sending has no HTTP status.
+	var refused *Error
+	if !errors.As(err, &refused) || refused.Status != 0 {
+		t.Fatal("local refusal status", err)
+	}
+	// A part under 5 MiB that is not the last is refused before sending, as is a final image
+	// part that is the whole upload but under 10 MiB.
+	_, err = other.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", Part: Content{PartNumber: 2, Bytes: make([]byte, 1024)}})
+	if ErrorCode(err) != CodeInvalidUploadPayload || len(h2.calls) != 2 {
+		t.Fatal(err)
+	}
+	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", Part: &Content{Type: "image/png", IsFinal: true, Bytes: make([]byte, 1024)}})
+	if ErrorCode(err) != CodeMultipartImageTooSmall || len(h.calls) != 1 {
+		t.Fatal(err)
+	}
 }
 
 func TestIdempotencyKeysAreSentAndReusedAcrossRetries(t *testing.T) {
@@ -199,65 +197,6 @@ func TestIdempotencyKeysAreSentAndReusedAcrossRetries(t *testing.T) {
 	}
 }
 
-func TestRetriesHonourRetryAfterAndLimits(t *testing.T) {
-	c, h := setup(t)
-	ctx := context.Background()
-	busy := reply{status: 429, result: JSON{"code": "rate-limited"}, header: http.Header{"Retry-After": {"7"}}}
-	h.next = []reply{busy, {status: 409, result: JSON{"code": CodeIdempotentRequestInProgress}, header: http.Header{"Retry-After": {"2"}}}}
-	if _, err := c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); err != nil {
-		t.Fatal(err)
-	}
-	if len(h.calls) != 3 || len(h.slept) != 2 || h.slept[0] != 7*time.Second || h.slept[1] != 2*time.Second {
-		t.Fatal(len(h.calls), h.slept)
-	}
-	// Retries stop after MaxRetries and return the last error with its Retry-After.
-	h.calls, h.slept = nil, nil
-	h.next = []reply{busy, busy, busy, busy}
-	_, err := c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"})
-	var apiErr *Error
-	if !errors.As(err, &apiErr) || apiErr.Status != 429 || apiErr.RetryAfter != 7*time.Second || len(h.calls) != DefaultMaxRetries+1 {
-		t.Fatal(err, len(h.calls))
-	}
-	// A Retry-After beyond the limit is returned to the caller instead of waited for.
-	h.calls, h.next = nil, []reply{{status: 503, result: []byte("x"), header: http.Header{"Retry-After": {"3600"}}}}
-	if _, err = c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); err == nil || len(h.calls) != 1 {
-		t.Fatal("waited for a long Retry-After", len(h.calls))
-	}
-	// A PATCH without an idempotency key, and a 500, are never retried.
-	h.calls, h.next = nil, []reply{{status: 503, result: []byte("busy")}}
-	if _, err = c.Assets.Update(ctx, UpdateAssetOptions{AssetID: "a", Name: Ptr("n")}); err == nil || len(h.calls) != 1 {
-		t.Fatal("PATCH retried", len(h.calls))
-	}
-	h.calls, h.next = nil, []reply{{status: 500, result: JSON{"code": CodeAssetUpdateFailed}}}
-	if _, err = c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); ErrorCode(err) != CodeAssetUpdateFailed || len(h.calls) != 1 {
-		t.Fatal("500 retried", len(h.calls))
-	}
-	// Backoff without Retry-After grows and stays jittered within bounds.
-	h.calls, h.slept, h.next = nil, nil, []reply{{status: 502, result: []byte("x")}, {status: 504, result: []byte("x")}}
-	if _, err = c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); err != nil {
-		t.Fatal(err)
-	}
-	if h.slept[0] < 250*time.Millisecond || h.slept[0] > 500*time.Millisecond || h.slept[1] < 500*time.Millisecond || h.slept[1] > time.Second {
-		t.Fatal(h.slept)
-	}
-	disabled, h3 := setup(t)
-	disabled.maxRetries = 0
-	h3.next = []reply{{status: 503, result: []byte("x")}}
-	if _, err = disabled.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); err == nil || len(h3.calls) != 1 {
-		t.Fatal("retried with MaxRetries 0")
-	}
-}
-
-func TestStreamsThatCannotRewindAreNotRetried(t *testing.T) {
-	c, h := setup(t)
-	h.next = []reply{{status: 503, result: []byte("busy")}}
-	stream := io.MultiReader(strings.NewReader("abc"))
-	_, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "x", Content: &Content{Type: "text/plain", Data: stream, SizeInBytes: Ptr(int64(3))}})
-	if err == nil || len(h.calls) != 1 {
-		t.Fatal("non-seekable stream resent", len(h.calls))
-	}
-}
-
 func TestValidation(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
@@ -278,6 +217,8 @@ func TestValidation(t *testing.T) {
 		t.Fatal("validation sent requests")
 	}
 }
+
+// The error message and helpers; the fields each response gives are in client-cases.json.
 func TestErrors(t *testing.T) {
 	c, h := setup(t)
 	h.status = 404
@@ -285,27 +226,11 @@ func TestErrors(t *testing.T) {
 	h.result = JSON{"code": "asset/not-found", "message": "Missing", "details": JSON{"x": 1}, "traceId": "trace"}
 	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "x"})
 	var failure *Error
-	if asset != nil || !errors.As(err, &failure) || failure.Code != CodeAssetNotFound || failure.Status != 404 || failure.Details["traceId"] != "trace" || failure.Details["network"] != true || failure.RequestID != "req_1" || !IsNotFound(err) || IsRetryable(err) {
+	if asset != nil || !errors.As(err, &failure) || failure.Code != CodeAssetNotFound || failure.Status != 404 || failure.Details["traceId"] != "trace" || failure.RequestID != "req_1" || !IsNotFound(err) || IsRetryable(err) {
 		t.Fatal(asset, err)
 	}
 	if message := err.Error(); !strings.Contains(message, CodeAssetNotFound) || !strings.Contains(message, "404") || !strings.Contains(message, "req_1") {
 		t.Fatal(message)
-	}
-	h.status = 400
-	h.result = []byte("bad request")
-	_, err = c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "x"})
-	if !errors.As(err, &failure) || failure.Code != CodeSDKHTTPError || failure.Status != 400 {
-		t.Fatal(err)
-	}
-	h.status = 200
-	_, err = c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "x"})
-	if !errors.As(err, &failure) || failure.Code != CodeSDKInvalidResponse {
-		t.Fatal(err)
-	}
-	h.status = 204
-	h.result = []byte{}
-	if err = c.Folders.Delete(context.Background(), FolderIDOptions{FolderID: "f"}); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -330,7 +255,7 @@ func TestLocalFailuresAreSDKErrors(t *testing.T) {
 	}
 }
 
-func TestResponsesAreLimitedAndKeepIntegerPrecision(t *testing.T) {
+func TestResponsesKeepUnknownFieldsAndIntegerPrecision(t *testing.T) {
 	c, h := setup(t)
 	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"status": "future-status", "categories": JSON{"x": JSON{"status": "future-status"}}}}}
 	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"})
@@ -339,11 +264,6 @@ func TestResponsesAreLimitedAndKeepIntegerPrecision(t *testing.T) {
 	}
 	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Classification.Moderation.Status != "future-status" || asset.Classification.Moderation.Categories["x"].Status != "future-status" {
 		t.Fatalf("%#v", asset.Raw)
-	}
-	c.options.MaxResponseBytes = 16
-	_, err = c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"})
-	if ErrorCode(err) != CodeSDKResponseTooLarge {
-		t.Fatal(err)
 	}
 }
 
@@ -459,44 +379,6 @@ func TestLensCache(t *testing.T) {
 		t.Fatal(len(h.calls))
 	}
 }
-func TestEnsureLensesSplitsLargeBatches(t *testing.T) {
-	c, h := setup(t)
-	lenses := make([]EnsureLensOptions, EnsureLensesMaxPerRequest+1)
-	replies := []reply{{status: 200}, {status: 200}}
-	var first, second []Lens
-	for i := range lenses {
-		lenses[i] = EnsureLensOptions{Identifier: fmt.Sprintf("lens-%d", i), Name: "Lens", Type: "image", Active: true, Version: 1}
-		if i < EnsureLensesMaxPerRequest {
-			first = append(first, Lens{ID: fmt.Sprint(i), EnsureLensOptions: lenses[i]})
-		} else {
-			second = append(second, Lens{ID: fmt.Sprint(i), EnsureLensOptions: lenses[i]})
-		}
-	}
-	replies[0].result, replies[1].result = JSON{"lenses": first}, JSON{"lenses": second}
-	h.next = replies
-	result, err := c.EnsureLenses(context.Background(), EnsureLensesOptions{Lenses: lenses})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(h.calls) != 2 || len(result) != len(lenses) {
-		t.Fatal(len(h.calls), len(result))
-	}
-	for call, want := range [][]EnsureLensOptions{lenses[:EnsureLensesMaxPerRequest], lenses[EnsureLensesMaxPerRequest:]} {
-		var sent EnsureLensesOptions
-		if err := json.Unmarshal(h.bodies[call], &sent); err != nil {
-			t.Fatal(err)
-		}
-		if h.calls[call].Method != "PUT" || len(sent.Lenses) != len(want) || sent.Lenses[0].Identifier != want[0].Identifier || sent.Lenses[len(want)-1].Identifier != want[len(want)-1].Identifier {
-			t.Fatalf("request %d sent %d lenses", call, len(sent.Lenses))
-		}
-	}
-	for i, lens := range result {
-		if lens.Identifier != lenses[i].Identifier || lens.ID != fmt.Sprint(i) {
-			t.Fatalf("result %d is %s", i, lens.Identifier)
-		}
-	}
-}
-
 func TestCDNURLsAndServeHeaders(t *testing.T) {
 	c, h := setup(t)
 	endpoint, err := c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a/b?", Lens: "my lens"})
@@ -619,39 +501,11 @@ func fakeClock(c *ServerClient, h *harness) {
 	}
 }
 
-func TestWaitForDecisionChecksUntilDecided(t *testing.T) {
-	c, h := setup(t)
-	fakeClock(c, h)
-	state := func(processing, moderation string) reply {
-		return reply{status: 200, result: JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": processing, "moderation": JSON{"status": moderation}}}}
-	}
-	h.next = []reply{state(ClassificationStatusPending, ModerationStatusPending), state(ClassificationStatusProcessing, ModerationStatusPending), state(ClassificationStatusCompleted, ModerationStatusAgeRestricted)}
-	asset, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
-	if err != nil || asset.ID != "a" || asset.Classification.Moderation.Status != ModerationStatusAgeRestricted {
-		t.Fatal(asset, err)
-	}
-	if len(h.calls) != 3 || fmt.Sprint(h.slept) != "[500ms 750ms]" {
-		t.Fatal(len(h.calls), h.slept)
-	}
-	for _, call := range h.calls {
-		if call.Method != http.MethodGet || !strings.HasSuffix(call.URL.Path, "/v1/assets/a") {
-			t.Fatal(call.Method, call.URL.Path)
-		}
-	}
-	// Failed processing ends the wait with moderation still pending.
-	h.calls = nil
-	h.next = []reply{state(ClassificationStatusProcessing, ModerationStatusPending), state(ClassificationStatusFailed, ModerationStatusPending)}
-	asset, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
-	if err != nil || asset.Classification.Status != ClassificationStatusFailed || len(h.calls) != 2 {
-		t.Fatal(asset, err, len(h.calls))
-	}
-}
-
 func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	c, h := setup(t)
 	fakeClock(c, h)
 	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"status": ModerationStatusPending}}}
-	_, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: 2 * time.Second})
+	_, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: Ptr(2 * time.Second)})
 	var failure *Error
 	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || failure.Details["classificationStatus"] != ClassificationStatusProcessing || failure.Details["moderationStatus"] != ModerationStatusPending {
 		t.Fatal(err)
@@ -674,7 +528,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 		t.Fatal(h.slept, total, len(h.calls))
 	}
 	h.calls = nil
-	if _, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: -time.Second}); ErrorCode(err) != CodeSDKInvalidArgument || len(h.calls) != 0 {
+	if _, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: Ptr(-time.Second)}); ErrorCode(err) != CodeSDKInvalidArgument || len(h.calls) != 0 {
 		t.Fatal(err, len(h.calls))
 	}
 }
@@ -696,5 +550,61 @@ func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 	h.calls = nil
 	if _, err = c.Assets.WaitForDecision(ctx, WaitForDecisionOptions{AssetID: "a"}); ErrorCode(err) != CodeSDKCancelled || len(h.calls) != 0 {
 		t.Fatal("cancelled context still checked", err, len(h.calls))
+	}
+}
+
+func TestWithRequestOptionsChangesRetriesAndSharesTheLensCache(t *testing.T) {
+	c, h := setup(t)
+	ctx := context.Background()
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true, Version: 1}
+	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
+	if _, err := c.EnsureLens(ctx, lens); err != nil {
+		t.Fatal(err)
+	}
+	once, err := c.WithRequestOptions(RequestOptions{MaxRetries: Ptr(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = once.EnsureLens(ctx, lens); err != nil || len(h.calls) != 1 {
+		t.Fatal("the lens cache is not shared", err, len(h.calls))
+	}
+	h.next = []reply{{status: 503, result: []byte("busy")}, {status: 503, result: []byte("busy")}}
+	if _, err = once.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); ErrorCode(err) != CodeSDKHTTPError || len(h.calls) != 2 {
+		t.Fatal("MaxRetries 0 retried", err, len(h.calls))
+	}
+	// The original client keeps its retries.
+	h.next = []reply{{status: 503, result: []byte("busy")}}
+	if _, err = c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); err != nil || len(h.calls) != 4 {
+		t.Fatal("the original client changed", err, len(h.calls))
+	}
+	if _, err = c.WithRequestOptions(RequestOptions{Timeout: -time.Second}); ErrorCode(err) != CodeSDKInvalidConfig {
+		t.Fatal(err)
+	}
+}
+
+func TestUploadTimeoutBoundsBinaryUploadsOnly(t *testing.T) {
+	hang := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Query().Get("contentType") == "text/plain" {
+			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"id":"a"}`)), Request: r}, nil
+		}
+		<-r.Context().Done()
+		return nil, r.Context().Err()
+	})
+	c, err := NewServerClient(Options{APIKey: "key", ProjectID: "p", MaxRetries: Ptr(0), UploadTimeout: 20 * time.Millisecond, HTTPClient: &http.Client{Transport: hang}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Without the upload deadline, the cancellation ends the call with sdk/cancelled instead.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer time.AfterFunc(2*time.Second, cancel).Stop()
+	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "clip", Content: &Content{Type: "audio/mpeg", Bytes: []byte("ID3")}})
+	if ErrorCode(err) != CodeSDKTimeout {
+		t.Fatal("binary upload not bounded", err)
+	}
+	if _, err = c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "note", Content: &Content{Type: "text/plain", PlainText: Ptr("hi")}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = NewServerClient(Options{APIKey: "key", ProjectID: "p", UploadTimeout: -time.Second}); ErrorCode(err) != CodeSDKInvalidConfig {
+		t.Fatal(err)
 	}
 }

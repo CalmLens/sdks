@@ -419,7 +419,7 @@
             "result": {
               "classification.moderation.status": "purged",
               "content.status": "removed",
-              "content.removalReason": "policy"
+              "content.removalReason": "requested"
             }
           }
         },
@@ -855,6 +855,149 @@
       ]
     },
     {
+      "name": "a limited asset is served from its public URL like an allowed one",
+      "mock": {
+        "analyzedOutcome": "limited"
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "public",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "limited"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=31536000, immutable"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "classification.moderation.status==limited"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "public.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed"
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "public.id"
+            },
+            "outcome": "age-restricted"
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "public.id"
+            },
+            "outcome": "limited"
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=31536000, immutable"
+              }
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 2,
+              "events.1.type": "asset.limited",
+              "events.1.severity": "low",
+              "events.1.assetId": {
+                "$ref": "public.id"
+              },
+              "events.1.asset.classification.moderation.status": "limited",
+              "events.1.facts": {
+                "$contains": {
+                  "key": "decided-by",
+                  "value": "reviewer"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "an idempotency key replays the first result and refuses a different request",
       "mock": {},
       "steps": [
@@ -1060,7 +1203,11 @@
           "expect": {
             "error": {
               "code": "folder/not-empty",
-              "status": 409
+              "status": 409,
+              "details": {
+                "hasAssets": true,
+                "hasChildren": false
+              }
             }
           }
         },
@@ -1689,6 +1836,3776 @@
                   "key": "automated-outcome",
                   "value": "allowed"
                 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update changes only the fields it is given, null clears them, and externalId stays unique",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "externalId": "order-1",
+            "description": "first"
+          },
+          "save": "a",
+          "expect": {
+            "result": {
+              "description": "first",
+              "tags": null,
+              "metadata": null,
+              "folderId": null
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "b.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "b",
+          "expect": {
+            "result": {
+              "externalId": null,
+              "description": null
+            }
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "name": "renamed.png",
+            "tags": [
+              "beach",
+              "sunset"
+            ]
+          },
+          "expect": {
+            "result": {
+              "name": "renamed.png",
+              "description": "first",
+              "externalId": "order-1",
+              "tags": [
+                "beach",
+                "sunset"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "sunset"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "a.id"
+              },
+              "items.0.score": 500,
+              "items.0.matchedFields": [
+                "tags"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "description": null,
+            "tags": []
+          },
+          "expect": {
+            "result": {
+              "name": "renamed.png",
+              "description": null,
+              "tags": []
+            }
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "b.id"
+            },
+            "externalId": "order-1"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/duplicate-external-id",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "externalId": null
+          },
+          "expect": {
+            "result": {
+              "externalId": null
+            }
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "b.id"
+            },
+            "externalId": "order-1",
+            "visibility": "public"
+          },
+          "expect": {
+            "result": {
+              "externalId": "order-1",
+              "visibility": "public"
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "name": "renamed.png",
+              "description": null,
+              "tags": [],
+              "externalId": null
+            }
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000",
+            "name": "missing.png"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "move files an asset into a folder and back to the root, and refuses an unknown folder",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Inbox"
+          },
+          "save": "folder"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "a"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "b.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "b"
+        },
+        {
+          "operation": "assets.move",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "a.id"
+              },
+              "folderId": {
+                "$ref": "folder.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "a.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.move",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "folderId": null
+          },
+          "expect": {
+            "result": {
+              "folderId": null
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.move",
+          "args": {
+            "assetId": {
+              "$ref": "b.id"
+            },
+            "folderId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "b.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "folderId": null
+            }
+          }
+        },
+        {
+          "operation": "assets.move",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000",
+            "folderId": null
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "c.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "folderId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.createSignedUrl",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an uploaded asset has no children, and listing an unknown asset's children is not found",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "a"
+        },
+        {
+          "operation": "assets.listChildren",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 0,
+              "hasMore": false,
+              "nextCursor": null,
+              "pageSize": 10
+            }
+          }
+        },
+        {
+          "operation": "assets.iterateChildren",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.listChildren",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "retry processes a failed asset again only while it still has content",
+      "mock": {
+        "queuedOutcome": "failed"
+      },
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "failed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "failed",
+          "expect": {
+            "result": {
+              "classification.status": "failed",
+              "classification.moderation.status": "pending",
+              "content.status": "temporary"
+            }
+          }
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": {
+              "$ref": "failed.id"
+            },
+            "timeoutMs": 60000
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "failed.id"
+              },
+              "classification.status": "failed"
+            }
+          }
+        },
+        {
+          "operation": "assets.retry",
+          "args": {
+            "assetId": {
+              "$ref": "failed.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "processing",
+              "classification.completedAt": null,
+              "classification.moderation.status": "pending"
+            }
+          }
+        },
+        {
+          "operation": "assets.retry",
+          "args": {
+            "assetId": {
+              "$ref": "failed.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-retryable",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "allowed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "allowed"
+        },
+        {
+          "operation": "assets.retry",
+          "args": {
+            "assetId": {
+              "$ref": "allowed.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-retryable",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "emptied.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "emptied"
+        },
+        {
+          "operation": "assets.deleteContent",
+          "args": {
+            "assetId": {
+              "$ref": "emptied.id"
+            }
+          }
+        },
+        {
+          "operation": "assets.retry",
+          "args": {
+            "assetId": {
+              "$ref": "emptied.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/content-unavailable",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.retry",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 2,
+              "events.0.type": "asset.retried",
+              "events.0.severity": "low",
+              "events.0.assetId": {
+                "$ref": "failed.id"
+              },
+              "events.0.asset.classification.status": "processing",
+              "events.0.facts": {
+                "$contains": {
+                  "key": "asset-type",
+                  "value": "image"
+                }
+              },
+              "events.1.type": "asset.content-removed",
+              "events.1.assetId": {
+                "$ref": "emptied.id"
+              },
+              "events.1.asset.content.status": "removed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "explain needs a decision, and rerun moderates again unless reviewed or the content is gone",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "queued"
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-decided",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "rerun": true
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-decided",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "kept.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "kept"
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "expect": {
+            "sameAs": "kept"
+          }
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            },
+            "rerun": true
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "kept.id"
+              },
+              "classification.status": "processing",
+              "classification.completedAt": null,
+              "classification.moderation.status": "pending"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "reviewed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "reviewed"
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "reviewed.id"
+            },
+            "outcome": "allowed"
+          }
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "reviewed.id"
+            },
+            "rerun": true
+          },
+          "expect": {
+            "error": {
+              "code": "asset/reviewed",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "temporary.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "temporary"
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "temporary.id"
+            },
+            "rerun": true
+          },
+          "expect": {
+            "error": {
+              "code": "asset/content-unavailable",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "temporary.id"
+            }
+          },
+          "expect": {
+            "sameAs": "temporary"
+          }
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "deleting content twice keeps the first removal, and a deleted asset is gone",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed"
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "kept.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "kept"
+        },
+        {
+          "operation": "assets.deleteContent",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "save": "removed",
+          "expect": {
+            "result": {
+              "content.status": "removed",
+              "content.removalReason": "requested",
+              "classification.moderation.status": "allowed"
+            }
+          }
+        },
+        {
+          "operation": "assets.deleteContent",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "expect": {
+            "sameAs": "removed"
+          }
+        },
+        {
+          "operation": "assets.delete",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          }
+        },
+        {
+          "operation": "assets.delete",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.deleteContent",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 0
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 3,
+              "events.0.type": "asset.content-removed",
+              "events.0.facts": {
+                "$contains": {
+                  "key": "asset-name",
+                  "value": "kept.png",
+                  "url": {
+                    "$concat": [
+                      "/portal/assets/",
+                      {
+                        "$ref": "kept.id"
+                      }
+                    ]
+                  }
+                }
+              },
+              "events.1.type": "asset.content-removed",
+              "events.2.type": "asset.deleted",
+              "events.2.severity": "low",
+              "events.2.assetId": {
+                "$ref": "kept.id"
+              },
+              "events.2.asset.content.status": "removed",
+              "events.2.facts": {
+                "$contains": {
+                  "key": "asset-name",
+                  "value": "kept.png"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a reviewer's purge records content-removed before asset.purged",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "purged.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "purged"
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed"
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "purged.id"
+            },
+            "outcome": "purged"
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 2,
+              "events.0.type": "asset.content-removed",
+              "events.0.assetId": {
+                "$ref": "purged.id"
+              },
+              "events.1.type": "asset.purged",
+              "events.1.severity": "high",
+              "events.1.asset.content.status": "removed",
+              "events.1.facts": {
+                "$contains": {
+                  "key": "decided-by",
+                  "value": "reviewer"
+                }
+              }
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000",
+            "outcome": "allowed"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "events page by limit until hasMore is false, with a default limit of 50 and a maximum of 100",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "result": {
+              "events.length": 0
+            }
+          }
+        },
+        {
+          "operation": "mock.enqueueEvent",
+          "args": {
+            "type": "asset.allowed",
+            "facts": [
+              {
+                "key": "decided-by",
+                "value": "automated"
+              }
+            ]
+          },
+          "repeat": 3
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            },
+            "limit": 2
+          },
+          "save": "first",
+          "expect": {
+            "result": {
+              "events.length": 2,
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "first.cursor"
+            },
+            "limit": 2
+          },
+          "save": "second",
+          "expect": {
+            "result": {
+              "events.length": 1,
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "second.cursor"
+            },
+            "limit": 2
+          },
+          "expect": {
+            "result": {
+              "events.length": 0,
+              "hasMore": false,
+              "cursor": {
+                "$ref": "second.cursor"
+              }
+            }
+          }
+        },
+        {
+          "operation": "events.pages",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            },
+            "limit": 2
+          },
+          "expect": {
+            "result": {
+              "length": 2,
+              "0.events.length": 2,
+              "0.hasMore": true,
+              "1.events.length": 1,
+              "1.hasMore": false,
+              "1.cursor": {
+                "$ref": "second.cursor"
+              }
+            }
+          }
+        },
+        {
+          "operation": "mock.enqueueEvent",
+          "args": {
+            "type": "asset.allowed",
+            "facts": [
+              {
+                "key": "decided-by",
+                "value": "automated"
+              }
+            ]
+          },
+          "repeat": 98
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "save": "defaultPage",
+          "expect": {
+            "result": {
+              "events.length": 50,
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            },
+            "limit": 100
+          },
+          "expect": {
+            "result": {
+              "events.length": 100,
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "defaultPage.cursor"
+            },
+            "limit": 100
+          },
+          "expect": {
+            "result": {
+              "events.length": 51,
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            },
+            "limit": 101
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-big",
+              "status": 400,
+              "details": {
+                "path": "limit"
+              }
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            },
+            "limit": 0
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-small",
+              "status": 400,
+              "details": {
+                "path": "limit"
+              }
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": "not-a-cursor"
+          },
+          "expect": {
+            "error": {
+              "code": "events/invalid-cursor",
+              "status": 400,
+              "details": {
+                "after": "not-a-cursor"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "list pages default to 10 items, accept 1 to 100, and a cursor only continues its own query",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "repeat": 11
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "save": "first",
+          "expect": {
+            "result": {
+              "items.length": 10,
+              "pageSize": 10,
+              "hasMore": true,
+              "ordering": [
+                {
+                  "field": "createdAt",
+                  "direction": "DESC"
+                },
+                {
+                  "field": "id",
+                  "direction": "DESC"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "cursor": {
+              "$ref": "first.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "hasMore": false,
+              "nextCursor": null
+            }
+          }
+        },
+        {
+          "operation": "assets.iterate",
+          "args": {
+            "pageSize": 4
+          },
+          "expect": {
+            "result": {
+              "length": 11,
+              "0.id": {
+                "$ref": "first.items.0.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.iterate",
+          "args": {
+            "pageSize": 4,
+            "filter": "name==none.png"
+          },
+          "expect": {
+            "result": {
+              "length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "cursor": {
+              "$ref": "first.nextCursor"
+            },
+            "filter": "name==a.png"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-cursor",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "cursor": {
+              "$ref": "first.nextCursor"
+            },
+            "ordering": [
+              {
+                "field": "createdAt",
+                "direction": "ASC"
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-cursor",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "cursor": "not-a-cursor"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-cursor",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 100
+          },
+          "expect": {
+            "result": {
+              "items.length": 11,
+              "pageSize": 100,
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 101
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-big",
+              "status": 400,
+              "details": {
+                "path": "pageSize"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 0
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-small",
+              "status": 400,
+              "details": {
+                "path": "pageSize"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "search uses at most 8 distinct tokens, returns 10 results by default and refuses out-of-range input",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "jkqvwxyz.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "letters"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "photo.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "repeat": 11
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "j k q v w x y z nomatch"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "letters.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "nomatch j k q v w x y"
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "j j k k q q v v w w x x y y z z nomatch"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "photo"
+          },
+          "expect": {
+            "result": {
+              "items.length": 10
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "photo",
+            "limit": 20
+          },
+          "expect": {
+            "result": {
+              "items.length": 11
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "photo",
+            "limit": 21
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-big",
+              "status": 400,
+              "details": {
+                "path": "limit"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "photo",
+            "limit": 0
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-small",
+              "status": 400,
+              "details": {
+                "path": "limit"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "   "
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-small",
+              "status": 400,
+              "details": {
+                "path": "query"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-big",
+              "status": 400,
+              "details": {
+                "path": "query"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "waitForDecision reports the asset's statuses when it times out and refuses a negative timeout",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "queued"
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "timeoutMs": 0
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/timeout",
+              "status": null,
+              "details": {
+                "assetId": {
+                  "$ref": "queued.id"
+                },
+                "classificationStatus": "processing",
+                "moderationStatus": "pending"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "timeoutMs": -1
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000",
+            "timeoutMs": 0
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "multipart parts arrive in order, need 5 MiB until the last, and finish with the saved queue mode",
+      "mock": {
+        "queuedOutcome": "blocked",
+        "analyzedOutcome": "allowed"
+      },
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.txt",
+            "part": {
+              "base64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 5242880
+                }
+              },
+              "type": "text/plain",
+              "partNumber": 1,
+              "isFinal": false
+            }
+          },
+          "save": "queued",
+          "expect": {
+            "result": {
+              "upload.status": "uploading",
+              "upload.partsReceived": 1,
+              "classification.status": "pending",
+              "classification.moderation.status": "pending",
+              "content.sizeInBytes": 5242880
+            }
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 3,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/invalid-part-number",
+              "status": 409,
+              "details": {
+                "expectedPartNumber": 2,
+                "receivedPartNumber": 3
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 2,
+              "isFinal": false
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/invalid-payload",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 2,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "result": {
+              "upload.status": "completed",
+              "upload.partsReceived": null,
+              "classification.status": "completed",
+              "classification.moderation.status": "blocked",
+              "content.sizeInBytes": 5242885
+            }
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 3,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/not-open",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "analyzed.txt",
+            "part": {
+              "base64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 5242880
+                }
+              },
+              "type": "text/plain",
+              "partNumber": 1,
+              "isFinal": false
+            }
+          },
+          "save": "analyzed"
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "analyzed.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 2,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "allowed"
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "override.txt",
+            "part": {
+              "base64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 5242880
+                }
+              },
+              "type": "text/plain",
+              "partNumber": 1,
+              "isFinal": false
+            }
+          },
+          "save": "override"
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "override.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 2,
+              "isFinal": true
+            },
+            "queue": false
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "allowed"
+            }
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": "00000000-0000-4000-8000-000000000000",
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 2,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "multipart image totals must be 10 to 20 MiB, and parts must add up to a declared total",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "small.png",
+            "part": {
+              "base64": "aGVsbG8=",
+              "type": "image/png",
+              "partNumber": 1,
+              "isFinal": false
+            },
+            "totalSizeInBytes": 1048576
+          },
+          "expect": {
+            "error": {
+              "code": "upload/multipart-image-too-small",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "huge.png",
+            "part": {
+              "base64": "aGVsbG8=",
+              "type": "image/png",
+              "partNumber": 1,
+              "isFinal": false
+            },
+            "totalSizeInBytes": 26214400
+          },
+          "expect": {
+            "error": {
+              "code": "upload/multipart-image-too-large",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "single.png",
+            "part": {
+              "base64": "aGVsbG8=",
+              "type": "image/png",
+              "partNumber": 1,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/multipart-image-too-small",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "short.png",
+            "part": {
+              "base64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 5242880
+                }
+              },
+              "type": "image/png",
+              "partNumber": 1,
+              "isFinal": false
+            }
+          },
+          "save": "short",
+          "expect": {
+            "result": {
+              "type": "image",
+              "upload.status": "uploading"
+            }
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "short.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 2,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/multipart-image-too-small",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "short.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "upload.status": "uploading",
+              "upload.partsReceived": 1,
+              "content.sizeInBytes": 5242880
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "declared.txt",
+            "part": {
+              "base64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 5242880
+                }
+              },
+              "type": "text/plain",
+              "partNumber": 1,
+              "isFinal": false
+            },
+            "totalSizeInBytes": 5242881
+          },
+          "save": "declared"
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "declared.id"
+            },
+            "part": {
+              "base64": "aGVsbG8=",
+              "partNumber": 2,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/size-mismatch",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "declared.id"
+            },
+            "part": {
+              "base64": "YQ==",
+              "partNumber": 2,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "result": {
+              "upload.status": "completed",
+              "content.sizeInBytes": 5242881
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failed request frees its idempotency key, keys are 1 to 255 printable characters, and surrounding spaces are trimmed",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "retry.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "retry-1",
+            "folderId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "retry.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "retry-1"
+          },
+          "save": "first"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "retry.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "retry-1"
+          },
+          "expect": {
+            "sameAs": "first"
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "retry.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "retry-1"
+          },
+          "expect": {
+            "error": {
+              "code": "idempotency/key-reused",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "spaces.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "order 17 upload"
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "padded.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": " order-17"
+          },
+          "save": "padded"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "padded.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "order-17 "
+          },
+          "expect": {
+            "sameAs": "padded"
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "long.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "too-long.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+          },
+          "expect": {
+            "error": {
+              "code": "idempotency/invalid-key",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "accent.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "café"
+          },
+          "expect": {
+            "error": {
+              "code": "idempotency/invalid-key",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error"
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "network.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "network-1"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "network.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "network-1"
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "injected failures fail only the request they target, once each, and change nothing",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "timeout"
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "error": {
+              "code": "sdk/timeout",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "upload/limit-exceeded",
+            "operation": "assets.create"
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "limited.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/limit-exceeded",
+              "status": 403
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "accepted.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "accepted"
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error"
+          },
+          "repeat": 2
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "accepted.id"
+            }
+          },
+          "repeat": 2,
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "accepted.id"
+            }
+          },
+          "expect": {
+            "sameAs": "accepted"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "cdn.serve"
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "accepted.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "accepted.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ensureLenses saves new lenses, returns unchanged ones and needs a greater version for changes",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "ensureLenses",
+          "args": {
+            "lenses": [
+              {
+                "identifier": "thumb",
+                "name": "Thumbnail",
+                "type": "image",
+                "active": true,
+                "version": 1,
+                "description": null,
+                "transforms": null
+              },
+              {
+                "identifier": "card",
+                "name": "Card",
+                "type": "image",
+                "active": true,
+                "version": 1,
+                "description": null,
+                "transforms": null
+              }
+            ]
+          },
+          "save": "first",
+          "expect": {
+            "result": {
+              "length": 2,
+              "0.identifier": "thumb",
+              "0.version": 1,
+              "1.identifier": "card"
+            }
+          }
+        },
+        {
+          "operation": "ensureLens",
+          "args": {
+            "identifier": "thumb",
+            "name": "Thumbnail",
+            "type": "image",
+            "active": true,
+            "version": 1,
+            "description": null,
+            "transforms": null
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "first.0.id"
+              },
+              "updatedAt": {
+                "$ref": "first.0.updatedAt"
+              }
+            }
+          }
+        },
+        {
+          "operation": "ensureLens",
+          "args": {
+            "identifier": "thumb",
+            "name": "Small thumbnail",
+            "type": "image",
+            "active": true,
+            "version": 1,
+            "description": null,
+            "transforms": null
+          },
+          "expect": {
+            "error": {
+              "code": "lens/version-conflict",
+              "status": 409,
+              "details": {
+                "currentVersion": 1,
+                "requestedVersion": 1,
+                "minimumVersion": 2
+              }
+            }
+          }
+        },
+        {
+          "operation": "ensureLens",
+          "args": {
+            "identifier": "thumb",
+            "name": "Small thumbnail",
+            "type": "image",
+            "active": true,
+            "version": 2,
+            "description": null,
+            "transforms": null
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "first.0.id"
+              },
+              "name": "Small thumbnail",
+              "version": 2
+            }
+          }
+        },
+        {
+          "operation": "ensureLens",
+          "args": {
+            "identifier": "thumb",
+            "name": "Thumbnail",
+            "type": "image",
+            "active": true,
+            "version": 1,
+            "description": null,
+            "transforms": null
+          },
+          "expect": {
+            "error": {
+              "code": "lens/version-conflict",
+              "status": 409,
+              "details": {
+                "currentVersion": 2,
+                "requestedVersion": 1,
+                "minimumVersion": 3
+              }
+            }
+          }
+        },
+        {
+          "operation": "ensureLenses",
+          "args": {
+            "lenses": [
+              {
+                "identifier": "hero",
+                "name": "Hero",
+                "type": "image",
+                "active": true,
+                "version": 1,
+                "description": null,
+                "transforms": null
+              },
+              {
+                "identifier": "thumb",
+                "name": "Thumbnail",
+                "type": "image",
+                "active": true,
+                "version": 1,
+                "description": null,
+                "transforms": null
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "lens/version-conflict",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "ensureLens",
+          "args": {
+            "identifier": "hero",
+            "name": "Changed hero",
+            "type": "image",
+            "active": true,
+            "version": 1,
+            "description": null,
+            "transforms": null
+          },
+          "expect": {
+            "error": {
+              "code": "lens/version-conflict",
+              "status": 409,
+              "details": {
+                "currentVersion": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "folders are unique among siblings, list in name order with their ancestors, and search",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Photos"
+          },
+          "save": "photos"
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "photos"
+          },
+          "save": "lower",
+          "expect": {
+            "result": {
+              "name": "photos",
+              "parentId": null
+            }
+          }
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Photos"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/duplicate-name",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Trips",
+            "parentId": {
+              "$ref": "photos.id"
+            }
+          },
+          "save": "trips",
+          "expect": {
+            "result": {
+              "parentId": {
+                "$ref": "photos.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Trips"
+          },
+          "save": "rootTrips"
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "2024",
+            "parentId": {
+              "$ref": "trips.id"
+            }
+          },
+          "save": "year"
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Lost",
+            "parentId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "folders.update",
+          "args": {
+            "folderId": {
+              "$ref": "lower.id"
+            },
+            "name": "Photos"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/duplicate-name",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "folders.update",
+          "args": {
+            "folderId": {
+              "$ref": "lower.id"
+            },
+            "name": "archive"
+          },
+          "save": "archive",
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "lower.id"
+              },
+              "name": "archive",
+              "parentId": null
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "folders.length": 3,
+              "folders.0.id": {
+                "$ref": "photos.id"
+              },
+              "folders.1.id": {
+                "$ref": "rootTrips.id"
+              },
+              "folders.2.id": {
+                "$ref": "lower.id"
+              },
+              "ancestors.length": 0,
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "parentId": {
+              "$ref": "trips.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "folders.length": 1,
+              "folders.0.id": {
+                "$ref": "year.id"
+              },
+              "ancestors.length": 2,
+              "ancestors": {
+                "$contains": {
+                  "$ref": "photos"
+                }
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "ids": [
+              {
+                "$ref": "year.id"
+              }
+            ],
+            "resolveOnly": true
+          },
+          "expect": {
+            "result": {
+              "folders.length": 0,
+              "ancestors.length": 3,
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "search": "TRIP",
+            "searchAll": true
+          },
+          "expect": {
+            "result": {
+              "folders.length": 2
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "search": "trip"
+          },
+          "expect": {
+            "result": {
+              "folders.length": 1,
+              "folders.0.id": {
+                "$ref": "rootTrips.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "pageSize": 2
+          },
+          "expect": {
+            "result": {
+              "folders.length": 2,
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "pageSize": 2,
+            "pageIndex": 1
+          },
+          "expect": {
+            "result": {
+              "folders.length": 1,
+              "folders.0.id": {
+                "$ref": "lower.id"
+              },
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "sort": "createdAt",
+            "direction": "DESC"
+          },
+          "expect": {
+            "result": {
+              "folders.0.id": {
+                "$ref": "rootTrips.id"
+              },
+              "folders.2.id": {
+                "$ref": "photos.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "pageSize": 101
+          },
+          "expect": {
+            "error": {
+              "code": "validation/too-big",
+              "status": 400,
+              "details": {
+                "path": "pageSize"
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.retrieve",
+          "args": {
+            "folderId": {
+              "$ref": "archive.id"
+            }
+          },
+          "expect": {
+            "sameAs": "archive"
+          }
+        },
+        {
+          "operation": "folders.retrieve",
+          "args": {
+            "folderId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "moving folders refuses cycles and duplicate names, and a folder with subfolders is not empty",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "A"
+          },
+          "save": "a"
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "B",
+            "parentId": {
+              "$ref": "a.id"
+            }
+          },
+          "save": "b"
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "C",
+            "parentId": {
+              "$ref": "b.id"
+            }
+          },
+          "save": "c"
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "B"
+          },
+          "save": "rootB"
+        },
+        {
+          "operation": "folders.move",
+          "args": {
+            "folderId": {
+              "$ref": "a.id"
+            },
+            "parentId": {
+              "$ref": "c.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "folder/parent-cycle",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "folders.move",
+          "args": {
+            "folderId": {
+              "$ref": "a.id"
+            },
+            "parentId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "folder/parent-cycle",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "folders.move",
+          "args": {
+            "folderId": {
+              "$ref": "b.id"
+            },
+            "parentId": null
+          },
+          "expect": {
+            "error": {
+              "code": "folder/duplicate-name",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "folders.move",
+          "args": {
+            "folderId": {
+              "$ref": "c.id"
+            },
+            "parentId": null
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "c.id"
+              },
+              "parentId": null
+            }
+          }
+        },
+        {
+          "operation": "folders.move",
+          "args": {
+            "folderId": {
+              "$ref": "c.id"
+            },
+            "parentId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "parentId": {
+                "$ref": "a.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.move",
+          "args": {
+            "folderId": {
+              "$ref": "a.id"
+            },
+            "parentId": "00000000-0000-4000-8000-000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "folders.move",
+          "args": {
+            "folderId": "00000000-0000-4000-8000-000000000000",
+            "parentId": null
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "folders.delete",
+          "args": {
+            "folderId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-empty",
+              "status": 409,
+              "details": {
+                "hasAssets": false,
+                "hasChildren": true
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.delete",
+          "args": {
+            "folderId": {
+              "$ref": "c.id"
+            }
+          }
+        },
+        {
+          "operation": "folders.delete",
+          "args": {
+            "folderId": {
+              "$ref": "b.id"
+            }
+          }
+        },
+        {
+          "operation": "folders.delete",
+          "args": {
+            "folderId": {
+              "$ref": "a.id"
+            }
+          }
+        },
+        {
+          "operation": "folders.retrieve",
+          "args": {
+            "folderId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "folders.delete",
+          "args": {
+            "folderId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an assets:download grant on a folder covers its subfolders only with includeSubfolders",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Parent"
+          },
+          "save": "parent"
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Child",
+            "parentId": {
+              "$ref": "parent.id"
+            }
+          },
+          "save": "child"
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "root.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "root"
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "parent.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "folderId": {
+              "$ref": "parent.id"
+            }
+          },
+          "save": "inParent"
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "child.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "folderId": {
+              "$ref": "child.id"
+            }
+          },
+          "save": "inChild"
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:download"
+                ],
+                "folderId": {
+                  "$ref": "parent.id"
+                },
+                "includeSubfolders": false
+              }
+            ]
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "inParent.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "private, max-age=31536000, immutable"
+              }
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "inChild.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "root.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:download"
+                ],
+                "folderId": {
+                  "$ref": "parent.id"
+                },
+                "includeSubfolders": true
+              }
+            ]
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "inChild.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "private, max-age=31536000, immutable"
+              }
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "root.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:read"
+                ],
+                "folderId": {
+                  "$ref": "parent.id"
+                },
+                "includeSubfolders": true
+              }
+            ]
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "inParent.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:download"
+                ],
+                "folderId": null,
+                "includeSubfolders": true
+              }
+            ]
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "root.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "private, max-age=31536000, immutable"
+              }
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "inChild.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "private, max-age=31536000, immutable"
+              }
+            }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": []
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "inParent.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a public image's placeholder is served whatever its moderation, and refused once purged or removed",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "public"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "bodyPrefixBase64": "iVBORw0KGgo=",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=3600",
+                "Cache-Tag": {
+                  "$concat": [
+                    "asset-",
+                    {
+                      "$ref": "public.id"
+                    }
+                  ]
+                }
+              },
+              "headersPresent": [
+                "ETag"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "public.id"
+            },
+            "outcome": "blocked"
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "bodyPrefixBase64": "iVBORw0KGgo=",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=3600",
+                "Cache-Tag": {
+                  "$concat": [
+                    "asset-",
+                    {
+                      "$ref": "public.id"
+                    }
+                  ]
+                }
+              },
+              "headersPresent": [
+                "ETag"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "public.id"
+            },
+            "outcome": "age-restricted"
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "bodyPrefixBase64": "iVBORw0KGgo=",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=3600",
+                "Cache-Tag": {
+                  "$concat": [
+                    "asset-",
+                    {
+                      "$ref": "public.id"
+                    }
+                  ]
+                }
+              },
+              "headersPresent": [
+                "ETag"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "private"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:download"
+                ],
+                "folderId": null,
+                "includeSubfolders": true
+              }
+            ]
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "bodyPrefixBase64": "iVBORw0KGgo=",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "private, max-age=3600",
+                "Cache-Tag": {
+                  "$concat": [
+                    "asset-",
+                    {
+                      "$ref": "private.id"
+                    }
+                  ]
+                }
+              },
+              "headersPresent": [
+                "ETag"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "queued"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "queued.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "note"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "note.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "assets.deleteContent",
+          "args": {
+            "assetId": {
+              "$ref": "private.id"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "unkept.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "visibility": "public"
+          },
+          "save": "unkept",
+          "expect": {
+            "result": {
+              "content.status": "removed",
+              "content.removalReason": "retention",
+              "content.image.thumbhash": null,
+              "content.image.averageColor": null
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "unkept.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "purged.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "purged"
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "purged.id"
+            },
+            "outcome": "purged"
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "purged.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": "missing-asset",
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "originals carry the CDN's cache tag and protection headers, and images an ETag and Expires",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "image.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "image"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "image.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "Cache-Tag": {
+                  "$concat": [
+                    "asset-",
+                    {
+                      "$ref": "image.id"
+                    }
+                  ]
+                },
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "sandbox; default-src 'none'"
+              },
+              "headersPresent": [
+                "ETag",
+                "Expires",
+                "Content-Length"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "note"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "note.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Cache-Control": "public, max-age=3600",
+                "Cache-Tag": {
+                  "$concat": [
+                    "asset-",
+                    {
+                      "$ref": "note.id"
+                    }
+                  ]
+                },
+                "X-Content-Type-Options": "nosniff"
               }
             }
           }

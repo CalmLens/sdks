@@ -116,6 +116,37 @@ final class Fixtures {
   /** {@link #asset} as a JSON string. */
   static String assetJson(String id, String processing, String moderation) { return JSON.toJson(asset(id, processing, moderation)); }
 
+  /**
+   * The error fields every runner compares, null where there is none: {@code code}, {@code status},
+   * {@code requestId}, {@code retryAfter} (whole seconds) and {@code details}.
+   */
+  static JsonObject errorFields(CalmLensException error) {
+    JsonObject fields = new JsonObject();
+    fields.addProperty("code", error.getCode());
+    fields.add("status", error.getStatus() == 0 ? JsonNull.INSTANCE : new JsonPrimitive(error.getStatus()));
+    fields.add("requestId", error.getRequestId() == null ? JsonNull.INSTANCE : new JsonPrimitive(error.getRequestId()));
+    java.util.Optional<java.time.Duration> retryAfter = error instanceof ApiException api ? api.getRetryAfter() : java.util.Optional.empty();
+    fields.add("retryAfter", retryAfter.<JsonElement>map(delay -> new JsonPrimitive(delay.toSeconds())).orElse(JsonNull.INSTANCE));
+    fields.add("details", error.getDetails().isEmpty() ? JsonNull.INSTANCE : Json.GSON.toJsonTree(error.getDetails()));
+    return fields;
+  }
+
+  /** {@code value} without object members whose value is null, at every level. */
+  static JsonElement withoutNulls(JsonElement value) {
+    if (value == null) return JsonNull.INSTANCE;
+    if (value.isJsonObject()) {
+      JsonObject copy = new JsonObject();
+      value.getAsJsonObject().entrySet().forEach(entry -> { if (!entry.getValue().isJsonNull()) copy.add(entry.getKey(), withoutNulls(entry.getValue())); });
+      return copy;
+    }
+    if (value.isJsonArray()) {
+      com.google.gson.JsonArray copy = new com.google.gson.JsonArray();
+      value.getAsJsonArray().forEach(item -> copy.add(withoutNulls(item)));
+      return copy;
+    }
+    return value;
+  }
+
   static Transport.Response json(int status, String body) {
     return new Transport.Response(status, Map.of("content-type", List.of("application/json")), body.getBytes(StandardCharsets.UTF_8));
   }

@@ -7,10 +7,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/CalmLens/sdks/go/internal/clock"
 )
 
 const (
@@ -52,6 +53,24 @@ type uploadTokenClaims struct {
 // Sign signs a single-use token with the client's API key. A browser can use it as the
 // bearer token for an upload preset that requires one. Give each upload its own token.
 func (s *UploadTokensService) Sign(_ context.Context, options SignUploadTokenOptions) (*SignedUploadToken, error) {
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	nonce[6] = nonce[6]&0x0f | 0x40
+	nonce[8] = nonce[8]&0x3f | 0x80
+	hexNonce := hex.EncodeToString(nonce)
+	return signUploadToken(s.c.options.APIKey, options, time.Now(), hexNonce[0:8]+"-"+hexNonce[8:12]+"-"+hexNonce[12:16]+"-"+hexNonce[16:20]+"-"+hexNonce[20:])
+}
+
+func init() {
+	clock.SignUploadToken = func(apiKey string, options any, now time.Time, nonce string) (any, error) {
+		return signUploadToken(apiKey, options.(SignUploadTokenOptions), now, nonce)
+	}
+}
+
+// signUploadToken signs a token at now with nonce, after the checks Sign makes.
+func signUploadToken(apiKey string, options SignUploadTokenOptions, now time.Time, nonce string) (*SignedUploadToken, error) {
 	if options.UploadPresetID == "" {
 		return nil, invalid(CodeSDKInvalidArgument, "Upload preset ID is required")
 	}
@@ -68,14 +87,6 @@ func (s *UploadTokensService) Sign(_ context.Context, options SignUploadTokenOpt
 	if options.ExternalID != nil && *options.ExternalID == "" {
 		return nil, invalid(CodeSDKInvalidArgument, "ExternalID must be a non-empty string")
 	}
-	nonce := make([]byte, 16)
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
-	}
-	nonce[6] = nonce[6]&0x0f | 0x40
-	nonce[8] = nonce[8]&0x3f | 0x80
-	hexNonce := hex.EncodeToString(nonce)
-	apiKey := s.c.options.APIKey
 	prefixLength := 8
 	if strings.HasPrefix(apiKey, "clsk_") {
 		prefixLength = 13
@@ -83,13 +94,13 @@ func (s *UploadTokensService) Sign(_ context.Context, options SignUploadTokenOpt
 	if len(apiKey) < prefixLength {
 		prefixLength = len(apiKey)
 	}
-	expiresAt := time.Now().UnixMilli() + int64(ttl)*1000
-	claims := uploadTokenClaims{V: 1, U: options.UploadPresetID, K: apiKey[:prefixLength], E: expiresAt,
-		N: hexNonce[0:8] + "-" + hexNonce[8:12] + "-" + hexNonce[12:16] + "-" + hexNonce[16:20] + "-" + hexNonce[20:]}
+	expiresAt := now.UnixMilli() + int64(ttl)*1000
+	claims := uploadTokenClaims{V: 1, U: options.UploadPresetID, K: apiKey[:prefixLength], E: expiresAt, N: nonce}
 	if options.ExternalID != nil {
 		claims.X = *options.ExternalID
 	}
-	encoded, err := json.Marshal(claims)
+	// Encoded as JSON.stringify writes it: raw UTF-8, and no escaping of <, > or &.
+	encoded, err := encodeJSON(claims)
 	if err != nil {
 		return nil, err
 	}

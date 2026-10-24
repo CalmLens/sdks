@@ -1,19 +1,23 @@
 # frozen_string_literal: true
 
+require 'digest'
 require 'json'
 require 'securerandom'
 require 'uri'
+require_relative 'placeholder'
 
 module CalmLens
   module Testing
     # Raised inside the fake API to answer with a CalmLens error response.
     # @api private
     class Failure < StandardError
-      attr_reader :code
+      attr_reader :code, :details, :status
 
-      def initialize(code, message = nil)
+      def initialize(code, message = nil, details: nil, status: nil)
         super(message || code)
         @code = code
+        @details = details
+        @status = status
       end
     end
 
@@ -28,8 +32,9 @@ module CalmLens
     State = Struct.new(:assets, :folders, :content, :events, :lenses, :uploads, :idempotency, keyword_init: true)
 
     # A stateful stand-in for the CalmLens API and CDN. It stores assets and folders, applies
-    # filters and ordering, serves stored bytes, and answers errors with the API's codes, statuses
-    # and body shape. It does not classify content, run transforms or index for semantic search.
+    # filters and ordering, serves stored bytes, and answers errors with the API's codes, statuses,
+    # details and body shape, checking requests in the API's order. It does not classify content,
+    # run transforms or index for semantic search.
     # @api private
     class FakeAPI
       JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize pageIndex searchAll resolveOnly limit
@@ -40,14 +45,29 @@ module CalmLens
                         'content.format' => %w[content format], 'content.extension' => %w[content extension],
                         'classification.moderation.status' => %w[classification moderation status] }.freeze
       MAX_SEARCH_TOKENS = 8
+      MAX_SEARCH_LIMIT = 20
+      MAX_SEARCH_QUERY_LENGTH = 200
+      DEFAULT_EVENTS_LIMIT = 50
+      MAX_EVENTS_LIMIT = 100
+      MAX_PAGE_SIZE = 100
       REVIEW_DECISIONS = %w[allowed limited age-restricted blocked purged].freeze
       RESOURCES = %w[original rendered placeholder].freeze
+      MIN_PART = 5 * 1024 * 1024
       MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
+      # The ThumbHash the mock gives every classified image, standing in for one computed from its
+      # pixels. The `placeholder` resource serves it as a PNG, like the CDN.
+      THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI'
+      # Like the API: 1 to 255 printable ASCII characters, without a space at either end.
+      IDEMPOTENCY_KEY = /\A[\x21-\x7e](?:[\x20-\x7e]{0,253}[\x21-\x7e])?\z/
+      # Content a browser could run as a document, which the CDN serves as a download.
+      ACTIVE_TYPES = %w[image/svg+xml application/xhtml+xml text/html application/xml text/xml].freeze
 
       attr_reader :state
+      # The mock API key's `{ 'actions', 'folderId', 'includeSubfolders' }` grants.
+      attr_accessor :grants
 
-      def initialize(project_id:, base_url:, cdn_base_url:, now:, create_id:, queued_outcome:, analyzed_outcome:)
+      def initialize(project_id:, base_url:, cdn_base_url:, now:, create_id:, queued_outcome:, analyzed_outcome:, grants:)
         @project_id = project_id
         @base_url = base_url
         @cdn_base_url = cdn_base_url
@@ -55,23 +75,23 @@ module CalmLens
         @create_id = create_id
         @queued_outcome = queued_outcome
         @analyzed_outcome = analyzed_outcome
+        @grants = grants
         @state = State.new(assets: {}, folders: {}, content: {}, events: [], lenses: {}, uploads: {}, idempotency: {})
-        @event_sequence = 0
+        @request_count = 0
       end
 
       # Adds an event to the feed, filling the fields the API always sets.
       def add_event(event)
-        @event_sequence += 1
         time = @now.call
         record = { 'id' => @create_id.call, 'projectId' => @project_id, 'severity' => 'low', 'facts' => [],
                    'createdAt' => time, 'updatedAt' => time }.merge(event)
         record['title'] ||= record['type']
-        @state.events << record.merge('_sequence' => @event_sequence)
+        @state.events << record
         record
       end
 
-      # Applies a reviewer's decision, adds the matching `asset.<decision>` event and returns the
-      # asset, or nil when there is no such asset.
+      # Applies a reviewer's decision, adds the matching events and returns the asset, or nil when
+      # there is no such asset. A purge removes the content with reason `requested`.
       def decide(asset_id, decision)
         unless REVIEW_DECISIONS.include?(decision)
           raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
@@ -80,27 +100,36 @@ module CalmLens
         item = @state.assets[asset_id]
         return unless item && item['projectId'] == @project_id
 
-        apply_outcome(item, decision)
-        now = @now.call
-        (item['classification']['moderation']['manualReviews'] ||= []) <<
+        apply_outcome(item, decision, 'requested')
+        item['classification']['moderation']['manualReviews'] <<
           { 'id' => @create_id.call, 'decision' => decision, 'note' => nil, 'reviewerUserId' => nil,
-            'reviewedAt' => now, 'appliedToAsset' => true }
+            'reviewedAt' => @now.call, 'appliedToAsset' => true }
+        lifecycle_event('asset.content-removed', item) if decision == 'purged'
         # Like the event catalog: only allowing and limiting are low severity.
         add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
-                  'assetId' => asset_id, 'asset' => snapshot(item),
-                  'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }])
+                  'title' => "asset.#{decision}", 'assetId' => asset_id, 'asset' => snapshot(item),
+                  'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }, { 'key' => 'asset-type', 'value' => item['type'] },
+                              { 'key' => 'asset-name', 'value' => item['name'], 'url' => "/portal/assets/#{asset_id}" },
+                              { 'key' => 'note', 'value' => nil }])
         deep_copy(item)
       end
 
       # @return [Response]
       def handle(method, url, headers, body)
         if url.start_with?("#{@cdn_base_url}/")
-          serve(method, url.delete_prefix(@cdn_base_url), headers)
+          serve(method, url.delete_prefix(@cdn_base_url))
         else
           api(method, url.delete_prefix(@base_url), headers, body)
         end
       rescue Failure => e
-        error(e.code, e.message)
+        error(e.code, e.message, details: e.details, status: e.status)
+      end
+
+      # An API error response, as the API sends it: the code's status, message and details.
+      def error(code, message = nil, details: nil, status: nil)
+        body = { 'code' => code, 'message' => message || code }
+        body['details'] = details if details
+        respond(status || ErrorCodes::STATUSES.fetch(code, 400), body)
       end
 
       private
@@ -110,21 +139,38 @@ module CalmLens
                      headers: { 'content-type' => 'application/json', 'x-request-id' => request_id }.merge(headers))
       end
 
-      def request_id = "mock-#{SecureRandom.hex(8)}"
-
-      def error(code, message, status = ErrorCodes::STATUSES.fetch(code, 400))
-        respond(status, { 'code' => code, 'message' => message })
-      end
+      def request_id = "mock-request-#{@request_count += 1}"
 
       # The asset summary events carry.
       def snapshot(item)
         { 'id' => item['id'], 'externalId' => item['externalId'], 'uploadPresetId' => item['uploadPresetId'],
-          'upload' => { 'status' => item['upload']['status'] }, 'content' => { 'status' => item['content']['status'] },
+          'upload' => { 'status' => item['upload']['status'] },
           'classification' => { 'status' => item['classification']['status'],
-                                'moderation' => { 'status' => item['classification']['moderation']['status'] } } }
+                                'moderation' => { 'status' => item['classification']['moderation']['status'] } },
+          'content' => { 'status' => item['content']['status'] } }
       end
 
-      def fail!(code, message = nil) = raise(Failure.new(code, message))
+      # The `asset.deleted`, `asset.content-removed` and `asset.retried` events the API records.
+      def lifecycle_event(type, item)
+        name = { 'key' => 'asset-name', 'value' => item['name'] }
+        # A deleted asset has no portal page to link to.
+        name['url'] = "/portal/assets/#{item['id']}" unless type == 'asset.deleted'
+        add_event('type' => type, 'severity' => 'low', 'assetId' => item['id'], 'asset' => snapshot(item),
+                  'facts' => [name, { 'key' => 'asset-type', 'value' => item['type'] }])
+      end
+
+      def fail!(code, message = nil, details: nil) = raise(Failure.new(code, message, details: details))
+
+      # A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
+      def invalid!(code, path) = raise(Failure.new(code, "Invalid #{path}", details: { 'path' => path }, status: 400))
+
+      # Like the API's query schema: an integer from 1 to `max`.
+      def check_range(value, path, max)
+        invalid!('validation/too-small', path) if !value.is_a?(Numeric) || value < 1
+        invalid!('validation/too-big', path) if value > max
+        invalid!('validation/invalid-type', path) unless value.is_a?(Integer)
+        value
+      end
 
       def api(method, relative, headers, body)
         uri = URI.parse(relative)
@@ -132,13 +178,17 @@ module CalmLens
         query = URI.decode_www_form(uri.query.to_s).to_h.to_h { |key, value| [key, query_value(key, value)] }
         selected_ids = query.keys.grep(/\Aids\[\d+\]\z/).sort_by { |key| key[/\d+/].to_i }
         query['ids'] = selected_ids.map { |key| query.delete(key) } unless selected_ids.empty?
-        json = headers['Content-Type'] == 'application/json' && body ? JSON.parse(body) : {}
-        key = headers['Idempotency-Key']
-        upload = headers.find { |name, _| name.to_s.casecmp?('X-CalmLens-Upload') }&.last
+        content_type = header(headers, 'Content-Type')
+        json = content_type == 'application/json' && body ? JSON.parse(body) : {}
+        # HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
+        key = header(headers, 'Idempotency-Key')&.to_s&.gsub(/\A[ \t\r\n]+|[ \t\r\n]+\z/, '')
+        upload = header(headers, 'X-CalmLens-Upload')
         return dispatch(method, parts, query, json, body, upload) unless key && method == 'POST'
 
-        # Like the API: a successful response is saved and replayed for the same key and request.
-        fingerprint = [method, relative, headers['Content-Type'], body&.bytesize]
+        fail!(ErrorCodes::INVALID_IDEMPOTENCY_KEY) unless key.match?(IDEMPOTENCY_KEY)
+        # Like the API: a successful response is saved and replayed for the same key and request;
+        # a failed one frees the key.
+        fingerprint = [method, relative, content_type, Digest::SHA256.hexdigest(body.to_s)]
         saved = @state.idempotency[key]
         if saved
           fail!(ErrorCodes::IDEMPOTENCY_KEY_REUSED) unless saved[:fingerprint] == fingerprint
@@ -146,10 +196,14 @@ module CalmLens
                               headers: saved[:headers].merge('idempotent-replayed' => 'true', 'x-request-id' => request_id))
         end
         response = dispatch(method, parts, query, json, body, upload)
-        @state.idempotency[key] = { fingerprint: fingerprint, status: response.status, body: response.body,
-                                    headers: response.headers }
+        if response.success?
+          @state.idempotency[key] = { fingerprint: fingerprint, status: response.status, body: response.body,
+                                      headers: response.headers }
+        end
         response
       end
+
+      def header(headers, name) = headers.find { |key, _| key.to_s.casecmp?(name) }&.last
 
       def query_value(key, value)
         return value unless JSON_QUERY.include?(key)
@@ -180,7 +234,7 @@ module CalmLens
         in ['PUT', ['lenses'], _] then lenses(json.fetch('lenses', []))
         in ['GET', ['folders'], _] then folder_page(query)
         in ['POST', ['folders'], _] then create_folder(json)
-        in ['GET', ['assets', 'page'], _] then page(project_assets.reject { |item| item['parentId'] }, query)
+        in ['GET', ['assets', 'page'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
         in ['POST', ['assets'], nil] then create_asset(json, query['queue'] == true, url: json['url'])
         in ['POST', ['assets'], 'content'] then create_asset(query, query['queue'] == true, data: body)
@@ -191,17 +245,24 @@ module CalmLens
 
       def project_assets = @state.assets.values.select { |item| item['projectId'] == @project_id }
 
+      def list(query)
+        items = project_assets.reject { |item| item['parentId'] }
+        items = items.select { |item| item['folderId'] == query['folderId'] } if query.key?('folderId')
+        page(RSQL.filter(items, query['filter']), query, JSON.generate([@project_id, query['filter'], query['folderId']]))
+      end
+
       def folder_page(query)
+        size = check_range(query.fetch('pageSize', MAX_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         found = project_folders.select do |f|
           in_scope = (query['searchAll'] && query['search']) || f['parentId'] == query['parentId']
           in_scope && (!query['search'] || f['name'].downcase.include?(query['search'].downcase))
         end
+        # Like the database: names compare by code point, so case matters.
         found.sort_by! { |f| [query['sort'] == 'createdAt' ? f['createdAt'] : f['name'], f['id']] }
         found.reverse! if query['direction'] == 'DESC'
-        size = query.fetch('pageSize', 100)
         start = query.fetch('pageIndex', 0) * size
         page = query['resolveOnly'] ? [] : found.slice(start, size) || []
-        ids = (Array(query['ids']) + page.map { |f| f['id'] } + [query['parentId']]).compact.uniq
+        ids = (Array(query['ids']) + [query['parentId']] + page.map { |f| f['id'] }).compact.uniq
         queue = ids.dup
         until queue.empty?
           parent = @state.folders.dig(queue.pop, 'parentId')
@@ -217,48 +278,64 @@ module CalmLens
 
       def project_folders = @state.folders.values.select { |item| item['projectId'] == @project_id }
 
+      # Like the API: without a cursor, no events and a cursor for now; with one, up to `limit`
+      # events added since, oldest first.
       def events(query)
-        # Without a cursor the feed starts from now, like the API.
-        return { 'events' => [], 'cursor' => "mock_#{@event_sequence}", 'hasMore' => false } unless query.key?('after')
+        limit = check_range(query.fetch('limit', DEFAULT_EVENTS_LIMIT), 'limit', MAX_EVENTS_LIMIT)
+        feed = @state.events
+        return { 'events' => [], 'cursor' => "mock_#{feed.size}", 'hasMore' => false } unless query['after']
 
         match = query['after'].to_s.match(/\Amock_(\d+)\z/)
-        fail!(ErrorCodes::INVALID_EVENT_CURSOR) unless match
+        position = match && Integer(match[1], 10)
+        fail!(ErrorCodes::INVALID_EVENT_CURSOR, details: { 'after' => query['after'] }) unless position && position <= feed.size
 
-        sequence = Integer(match[1], 10)
-        limit = query.fetch('limit', 50)
-        later = @state.events.select { |event| event['_sequence'] > sequence }
-        taken = later.first(limit)
-        cursor = taken.empty? ? sequence : taken.last['_sequence']
-        { 'events' => taken.map { |event| event.except('_sequence') }, 'cursor' => "mock_#{cursor}",
-          'hasMore' => later.size > taken.size }
+        taken = feed[position, limit]
+        following = position + taken.size
+        { 'events' => taken, 'cursor' => "mock_#{following}", 'hasMore' => following < feed.size }
       end
 
+      # Saves lenses in order, like the API: an unchanged definition returns the stored lens, a
+      # change needs a greater version, and lenses before a conflict stay saved.
       def lenses(definitions)
-        now = @now.call
-        pending = deep_copy(@state.lenses)
-        saved = definitions.map do |definition|
-          old = pending[definition['identifier']]
-          same = old && %w[name description type active transforms version].all? { |key| old[key] == definition[key] }
-          fail!(ErrorCodes::LENS_VERSION_CONFLICT) if old && !same && definition['version'].to_i <= old['version'].to_i
+        { 'lenses' => definitions.map { |definition| save_lens(definition) } }
+      end
 
-          lens = if same
-                   old
-                 else
-                   definition.merge('id' => old ? old['id'] : @create_id.call, 'projectId' => @project_id,
-                                    'createdAt' => old ? old['createdAt'] : now, 'updatedAt' => now)
-                 end
-          pending[lens['identifier']] = lens
+      def save_lens(definition)
+        now = @now.call
+        old = @state.lenses[definition['identifier']]
+        unless old
+          return @state.lenses[definition['identifier']] =
+                   { 'id' => @create_id.call, 'projectId' => @project_id, 'userId' => nil }.merge(definition)
+                                                                                           .merge('createdAt' => now, 'updatedAt' => now)
         end
-        @state.lenses = pending
-        { 'lenses' => saved }
+
+        same = %w[name type active].all? { |key| old[key] == definition[key] } &&
+               old['description'] == definition['description'] && canonical(old['transforms']) == canonical(definition['transforms'])
+        return old if same && old['version'] == definition['version']
+        if definition['version'].to_i > old['version'].to_i
+          return @state.lenses[old['identifier']] =
+                   old.merge(definition).merge('updatedAt' => now)
+        end
+
+        fail!(ErrorCodes::LENS_VERSION_CONFLICT, details: { 'currentVersion' => old['version'], 'minimumVersion' => old['version'] + 1,
+                                                            'requestedVersion' => definition['version'] })
+      end
+
+      def canonical(value)
+        case value
+        when Hash then value.sort_by { |key, _| key }.to_h { |key, item| [key, canonical(item)] }
+        when Array then value.map { |item| canonical(item) }
+        else value
+        end
       end
 
       # Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8
       # distinct) must appear in some field. Results rank by the API's score, then newest first.
       def search(query)
         text = query['query'].to_s.strip
-        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'query is required') if text.empty?
-
+        invalid!('validation/too-small', 'query') if text.empty?
+        invalid!('validation/too-big', 'query') if text.length > MAX_SEARCH_QUERY_LENGTH
+        limit = check_range(query.fetch('limit', 10), 'limit', MAX_SEARCH_LIMIT)
         normalized = text.downcase
         tokens = normalized.split(/\s+/).uniq.first(MAX_SEARCH_TOKENS)
         items = project_assets.filter_map do |item|
@@ -270,7 +347,7 @@ module CalmLens
         end
         items = items.each_with_index.sort_by { |result, index| [-result['score'], -result['asset']['createdAt'].to_i, index] }
                      .map(&:first)
-        { 'query' => text, 'items' => items.first(query.fetch('limit', 10)), 'semanticStatus' => 'disabled' }
+        { 'query' => text, 'items' => items.first(limit), 'semanticStatus' => 'disabled' }
       end
 
       # The API's keyword score for the whole normalized query.
@@ -298,79 +375,123 @@ module CalmLens
       end
 
       def create_asset(options, queue, url: nil, data: nil, open: false)
+        check_folder(options['folderId']) if options['folderId']
         if options['externalId'] && project_assets.any? { |item| item['externalId'] == options['externalId'] }
           fail!(ErrorCodes::DUPLICATE_EXTERNAL_ID)
         end
-        check_folder(options['folderId']) if options['folderId']
         now = @now.call
         mime = options['contentType'].to_s
-        asset = options.slice('name', 'description', 'metadata', 'externalId', 'externalUrl', 'processingOptions')
-        keep = options['processingOptions'].is_a?(Hash) && options['processingOptions']['keepContentAfterProcessing'] == true
-        asset.merge!('id' => @create_id.call, 'projectId' => @project_id, 'folderId' => options['folderId'],
-                     'parentId' => nil, 'type' => kind(mime, url), 'visibility' => options.fetch('visibility', 'private'),
-                     'createdAt' => now, 'updatedAt' => now,
-                     **AssetRecord.sections(now: now, open: open, keep: keep, format: mime, size: data&.bytesize))
-        asset['externalUrl'] = url if url
+        processing = options['processingOptions'] || { 'keepContentAfterProcessing' => false }
+        keep = processing.is_a?(Hash) && processing['keepContentAfterProcessing'] == true
+        # Fields the API returns as null when they are not set.
+        asset = { 'id' => @create_id.call, 'projectId' => @project_id, 'userId' => nil, 'parentId' => nil,
+                  'folderId' => options['folderId'], 'uploadPresetId' => options['uploadPresetId'],
+                  'createdAt' => now, 'updatedAt' => now, 'name' => options['name'], 'description' => options['description'],
+                  'externalId' => options['externalId'], 'externalUrl' => url || options['externalUrl'],
+                  'type' => kind(mime, url), 'metadata' => options['metadata'], 'tags' => nil,
+                  'processingOptions' => processing, 'visibility' => options.fetch('visibility', 'private'),
+                  **sections(now: now, open: open, keep: keep, format: mime, size: data&.bytesize) }
         @state.assets[asset['id']] = asset
         @state.content[asset['id']] = { 'type' => mime, 'parts' => { 1 => data } } if data
-        open ? asset : finish(asset, queue)
+        open ? asset : apply_outcome(asset, outcome_for(asset, queue))
       end
 
-      # The queue mode and declared total are saved with the upload and apply to its final part.
+      def sections(now:, open:, keep:, format:, size:)
+        {
+          'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
+                         'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
+                         'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'extractedText' => nil },
+          # Like the API, only an open upload counts the parts received.
+          'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
+          'classification' => { 'status' => open ? 'pending' : 'processing', 'updatedAt' => now, 'completedAt' => nil,
+                                'moderation' => { 'status' => 'pending', 'manualReviews' => [] } }
+        }
+      end
+
+      # Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB.
+      def image_size_error(type, size, final)
+        return unless type == 'image'
+        return ErrorCodes::MULTIPART_IMAGE_TOO_LARGE if size > MAX_MULTIPART_IMAGE
+
+        ErrorCodes::MULTIPART_IMAGE_TOO_SMALL if final && size < MIN_MULTIPART_IMAGE
+      end
+
+      # Like the API: the parts may not overshoot a declared total, and must reach it at the end.
+      def total_size_error(total, received, final)
+        return if total.nil?
+
+        ErrorCodes::UPLOAD_SIZE_MISMATCH if received > total || (final && received != total)
+      end
+
+      def check_part_size(size, final)
+        return if final || size >= MIN_PART
+
+        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Multipart upload parts must be at least 5MiB except the final part.')
+      end
+
+      # In the API's order: a declared total, then a single final part as the whole upload, then the
+      # part itself. The queue mode and declared total are saved with an open upload.
       def start_multipart(query, data)
         total = query['totalSizeInBytes']
-        if query['contentType'].to_s.start_with?('image/') && [total, data.bytesize].compact.max > MAX_MULTIPART_IMAGE
-          fail!(ErrorCodes::MULTIPART_IMAGE_TOO_LARGE)
-        end
+        type = kind(query['contentType'].to_s, nil)
+        final = query['isFinal'] == true
+        size = data.to_s.bytesize
+        code = (total && image_size_error(type, total, true)) ||
+               (final ? total_size_error(total, size, true) || image_size_error(type, size, true) : nil)
+        fail!(code) if code
+        check_part_size(size, final)
+        fail!(total_size_error(total, size, false)) if !final && total_size_error(total, size, false)
 
-        asset = create_asset(query, query['queue'] == true, data: data, open: true)
-        upload = { 'queue' => query['queue'] == true, 'total' => total }
-        return complete(asset, upload, nil) if query['isFinal']
-
-        @state.uploads[asset['id']] = upload
+        asset = create_asset(query, query['queue'] == true, data: data, open: !final)
+        @state.uploads[asset['id']] = { 'queue' => query['queue'] == true, 'total' => total } unless final
         asset
       end
 
-      # Applies queue mode: queued assets get `queued_outcome`; others `analyzed_outcome` now.
-      def finish(asset, queue)
-        return apply_outcome(asset, @queued_outcome) if queue
-
-        outcome = @analyzed_outcome.respond_to?(:call) ? @analyzed_outcome.call(deep_copy(asset)) : @analyzed_outcome
-        return apply_outcome(asset, outcome) unless outcome.is_a?(Hash)
-
-        fields = deep_copy(outcome)
-        AssetRecord.deep_merge!(apply_outcome(asset, AssetRecord.outcome_of(fields)), fields)
+      def outcome_for(asset, queue)
+        outcome = queue ? @queued_outcome : @analyzed_outcome
+        outcome = outcome.call(deep_copy(asset)) if outcome.respond_to?(:call)
+        outcome
       end
 
       # Moves an asset to an outcome like the pipeline would: a decision finishes processing, `purged`
-      # deletes the content, and finished processing removes content kept only temporarily.
-      def apply_outcome(asset, outcome)
+      # deletes the content (with `purge_reason`, `policy` for the pipeline), and finished processing
+      # removes content kept only temporarily. A classified image gets a ThumbHash for its
+      # placeholder, which goes with its content. `outcome` may also be fields to deep-merge.
+      def apply_outcome(asset, outcome, purge_reason = 'policy')
+        fields = nil
+        if outcome.is_a?(Hash)
+          fields = deep_copy(outcome)
+          outcome = AssetRecord.outcome_of(fields)
+        end
         processing, moderation = AssetRecord.statuses(outcome)
         now = @now.call
-        asset['classification'].merge!('status' => processing, 'updatedAt' => now, 'completedAt' => processing == 'completed' ? now : nil)
-        asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
-        asset['classification']['moderation'].merge!('status' => moderation)
-        if moderation == 'purged' && asset['content']['status'] != 'removed'
-          remove_content(asset, 'policy', now)
-        elsif processing == 'completed' && asset['content']['status'] == 'temporary'
-          remove_content(asset, 'retention', now)
+        decided = processing == 'completed'
+        purge = moderation == 'purged' && asset['content']['status'] != 'removed'
+        remove = purge || (decided && asset['content']['status'] == 'temporary')
+        image = asset['content']['image']
+        if decided && asset['type'] == 'image' && asset['content']['status'] != 'removed' && !purge
+          image = { 'width' => nil, 'height' => nil, 'perceptualHash' => nil }.merge(image || {})
+                                                                              .merge('thumbhash' => THUMBHASH,
+                                                                                     'averageColor' => image&.fetch('averageColor',
+                                                                                                                    nil) || '#7f7f7f')
+        elsif moderation == 'purged'
+          image = without_placeholder(image)
         end
+        asset['content']['image'] = image
+        if remove
+          @state.content.delete(asset['id'])
+          asset['content'].merge!('status' => 'removed', 'removalReason' => purge ? purge_reason : 'retention', 'updatedAt' => now,
+                                  'extractedText' => nil, 'image' => without_placeholder(image))
+        end
+        asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
+        asset['classification'].merge!('status' => processing, 'updatedAt' => now, 'completedAt' => decided ? now : nil)
+        asset['classification']['moderation']['status'] = moderation
         asset['updatedAt'] = now
-        asset
+        fields ? AssetRecord.deep_merge!(asset, fields) : asset
       end
 
-      def remove_content(asset, reason, now)
-        @state.content.delete(asset['id'])
-        asset['content'].merge!('status' => 'removed', 'removalReason' => reason, 'updatedAt' => now,
-                                'extractedText' => nil)
-      end
-
-      def complete(asset, upload, queue_override)
-        size = asset.dig('content', 'sizeInBytes').to_i
-        fail!(ErrorCodes::UPLOAD_SIZE_MISMATCH) if upload['total'] && upload['total'] != size
-        fail!(ErrorCodes::MULTIPART_IMAGE_TOO_SMALL) if (asset['type'] == 'image') && (size < MIN_MULTIPART_IMAGE)
-        finish(asset, queue_override.nil? ? upload['queue'] : queue_override == true)
-      end
+      # Removing content removes the placeholder and average colour with it.
+      def without_placeholder(image) = image&.merge('thumbhash' => nil, 'averageColor' => nil)
 
       def asset(method, parts, query, json, body)
         id = parts[1]
@@ -378,20 +499,15 @@ module CalmLens
         fail!(ErrorCodes::ASSET_NOT_FOUND) unless item && item['projectId'] == @project_id
         case [method, parts[2]]
         in ['GET', nil] then item
-        in ['PATCH', nil] then touch(item.merge!(json.except('id', 'projectId', 'upload', 'classification', 'content')))
+        in ['PATCH', nil] then update(item, json)
         in ['DELETE', nil]
           @state.assets.delete(id)
           @state.content.delete(id)
-          {}
-        in ['DELETE', 'content']
-          remove_content(item, 'requested', @now.call) unless item['content']['status'] == 'removed'
-          touch(item)
-        in ['GET', 'children'] then page(project_assets.select { |child| child['parentId'] == id }, query)
-        in ['POST', 'retry']
-          fail!(ErrorCodes::ASSET_NOT_RETRYABLE) unless item['classification']['status'] == 'failed'
-          fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
-          # Like the API: back to processing, to be moderated again.
-          apply_outcome(item, 'pending')
+          lifecycle_event('asset.deleted', item)
+          nil
+        in ['DELETE', 'content'] then delete_content(item)
+        in ['GET', 'children'] then page(project_assets.select { |child| child['parentId'] == id }, query, id)
+        in ['POST', 'retry'] then retry_asset(item)
         in ['POST', 'explain'] then explain(item, json['rerun'])
         in ['POST', 'move']
           check_folder(json['folderId']) if json['folderId']
@@ -407,19 +523,60 @@ module CalmLens
         item
       end
 
+      # Like the API: an externalId stays unique in the project; null clears a field.
+      def update(item, json)
+        if json['externalId'] && project_assets.any? { |other| other['id'] != item['id'] && other['externalId'] == json['externalId'] }
+          fail!(ErrorCodes::DUPLICATE_EXTERNAL_ID)
+        end
+        touch(item.merge!(json.except('id', 'projectId', 'upload', 'classification', 'content')))
+      end
+
+      # Like the API: the record and report stay; stored content, extracted text and the placeholder
+      # go. Content already removed keeps its reason, and an `asset.content-removed` event is
+      # recorded either way.
+      def delete_content(item)
+        @state.content.delete(item['id'])
+        content = item['content']
+        if content['status'] == 'removed'
+          content['image'] = without_placeholder(content['image']) if content.dig('image', 'thumbhash')
+        else
+          now = @now.call
+          content.merge!('status' => 'removed', 'removalReason' => 'requested', 'updatedAt' => now, 'extractedText' => nil,
+                         'image' => without_placeholder(content['image']))
+          item['updatedAt'] = now
+        end
+        lifecycle_event('asset.content-removed', item)
+        item
+      end
+
+      # Like the API: back to processing, to be moderated again, with an `asset.retried` event.
+      def retry_asset(item)
+        unless item['classification']['status'] == 'failed' && item['classification']['moderation']['status'] == 'pending'
+          fail!(ErrorCodes::ASSET_NOT_RETRYABLE)
+        end
+        fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
+
+        apply_outcome(item, 'pending')
+        lifecycle_event('asset.retried', item)
+        item
+      end
+
       def explain(item, rerun)
         fail!(ErrorCodes::ASSET_NOT_DECIDED) unless item['classification']['status'] == 'completed'
         moderation = item['classification']['moderation']
-        if rerun
-          fail!(ErrorCodes::ASSET_REVIEWED) unless moderation.fetch('manualReviews', []).empty?
-          fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
-          # Like the API: back to processing, to be moderated again under the current policy.
-          return apply_outcome(item, 'pending')
+        unless rerun
+          # Like the API: the evidence is completed and every action stays as decided.
+          policy = moderation['policy']
+          return item unless policy.is_a?(Hash) && policy['evidence'] == 'decision'
+
+          policy['evidence'] = 'full'
+          return touch(item)
         end
-        # Like the API: the evidence is completed and every action stays as decided.
-        policy = moderation['policy']
-        policy['evidence'] = 'full' if policy && policy['evidence'] == 'decision'
-        touch(item)
+        fail!(ErrorCodes::ASSET_REVIEWED) unless moderation.fetch('manualReviews', []).empty?
+        fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
+
+        # Like the API: back to processing, to be moderated again under the current policy.
+        apply_outcome(item, 'pending')
       end
 
       def signed_url(id, json)
@@ -429,22 +586,36 @@ module CalmLens
           'expiresAt' => @now.call + (expires * 1000) }
       end
 
+      # In the API's order: the upload must be open, parts arrive in order, image totals and the
+      # declared total are checked, then the part itself (5 MiB unless it is the last).
       def part(item, query, body)
-        upload = @state.uploads[item['id']]
-        fail!(ErrorCodes::UPLOAD_NOT_OPEN) unless upload && item['upload']['status'] == 'uploading'
+        fail!(ErrorCodes::UPLOAD_NOT_OPEN) unless item['upload']['status'] == 'uploading'
         number = query['partNumber']
-        fail!(ErrorCodes::INVALID_UPLOAD_PART_NUMBER) unless number.is_a?(Integer) && number >= 2
+        expected = item['upload']['partsReceived'].to_i + 1
+        unless number == expected
+          fail!(ErrorCodes::INVALID_UPLOAD_PART_NUMBER, "Expected part #{expected}",
+                details: { 'expectedPartNumber' => expected, 'receivedPartNumber' => number })
+        end
+        final = query['isFinal'] == true
+        size = body.to_s.bytesize
+        received = item['content']['sizeInBytes'].to_i + size
+        upload = @state.uploads[item['id']] || {}
+        code = image_size_error(item['type'], received, final) || total_size_error(upload['total'], received, final)
+        fail!(code) if code
+        check_part_size(size, final)
 
-        stored = (@state.content[item['id']] ||= { 'type' => '', 'parts' => {} })
+        stored = (@state.content[item['id']] ||= { 'type' => item['content']['format'].to_s, 'parts' => {} })
         stored['parts'][number] = body.to_s
-        size = stored['parts'].values.sum(&:bytesize)
-        fail!(ErrorCodes::MULTIPART_IMAGE_TOO_LARGE) if item['type'] == 'image' && size > MAX_MULTIPART_IMAGE
-        item['content']['sizeInBytes'] = size
-        item['upload']['partsReceived'] = number
-        return touch(item) unless query['isFinal']
+        now = @now.call
+        item['content']['sizeInBytes'] = received
+        # Like the API, a completed upload no longer counts parts.
+        item['upload'].merge!('updatedAt' => now, 'partsReceived' => final ? nil : number)
+        item['updatedAt'] = now
+        return item unless final
 
         @state.uploads.delete(item['id'])
-        complete(item, upload, query['queue'])
+        queue = query.key?('queue') ? query['queue'] == true : upload.fetch('queue', false)
+        apply_outcome(item, outcome_for(item, queue))
       end
 
       def folder(method, parts, json)
@@ -453,13 +624,13 @@ module CalmLens
         case [method, parts[2]]
         in ['GET', nil] then item
         in ['PATCH', nil]
-          unique_name(json['name'], item['parentId'], id) if json.key?('name')
+          unique_name(json['name'], item['parentId'], id) if json.key?('name') && json['name'] != item['name']
           touch(item.merge!(json.slice('name')))
         in ['POST', 'move'] then move_folder(item, json['parentId'])
         in ['DELETE', nil]
-          if project_assets.any? { |asset| asset['folderId'] == id } || project_folders.any? { |other| other['parentId'] == id }
-            fail!(ErrorCodes::FOLDER_NOT_EMPTY)
-          end
+          assets = project_assets.any? { |asset| asset['folderId'] == id }
+          children = project_folders.any? { |other| other['parentId'] == id }
+          fail!(ErrorCodes::FOLDER_NOT_EMPTY, details: { 'hasAssets' => assets, 'hasChildren' => children }) if assets || children
 
           @state.folders.delete(id)
           nil
@@ -476,15 +647,16 @@ module CalmLens
       def unique_name(name, parent_id, exclude = nil)
         return unless project_folders.any? { |other| other['id'] != exclude && other['name'] == name && other['parentId'] == parent_id }
 
-        fail!(ErrorCodes::DUPLICATE_FOLDER_NAME)
+        fail!(ErrorCodes::DUPLICATE_FOLDER_NAME, "A folder named \"#{name}\" already exists in this location.")
       end
 
       def create_folder(json)
+        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Folder name is required') if json['name'].to_s.empty?
         check_folder(json['parentId']) if json['parentId']
         unique_name(json['name'], json['parentId'])
         now = @now.call
-        item = json.slice('name').merge('id' => @create_id.call, 'projectId' => @project_id,
-                                        'parentId' => json['parentId'], 'createdAt' => now, 'updatedAt' => now)
+        item = { 'id' => @create_id.call, 'projectId' => @project_id, 'parentId' => json['parentId'], 'name' => json['name'],
+                 'createdAt' => now, 'updatedAt' => now }
         @state.folders[item['id']] = item
       end
 
@@ -497,34 +669,51 @@ module CalmLens
           visited << current
           current = check_folder(current)['parentId']
         end
-        unique_name(item['name'], parent_id, item['id'])
+        unique_name(item['name'], parent_id, item['id']) unless parent_id == item['parentId']
         touch(item.merge!('parentId' => parent_id))
       end
 
-      def page(items, query)
-        size = query.fetch('pageSize', 10)
+      # One keyset page like the API's: ordered by `createdAt` and `id` (an `id` tie-breaker is
+      # added), starting after the cursor's values. The cursor is tied to `scope` (the filter, folder
+      # or parent) and the ordering, so it only continues the query it came from.
+      def page(items, query, scope)
+        size = check_range(query.fetch('pageSize', 10), 'pageSize', MAX_PAGE_SIZE)
         ordering = ordering(query)
-        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD) if ordering.any? { |o| !%w[createdAt id].include?(o['field']) }
+        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Invalid ordering') if ordering.any? { |o| !%w[createdAt id].include?(o['field']) }
         ordering << { 'field' => 'id', 'direction' => ordering.first['direction'] } unless ordering.any? { |o| o['field'] == 'id' }
-        matched = RSQL.filter(items, query['filter'])
-        sorted = matched.sort { |a, b| compare(a, b, ordering) }
+        signature = JSON.generate([scope, ordering])
+        sorted = items.sort { |a, b| compare_items(a, b, ordering) }
         if query['cursor']
-          begin
-            boundary = JSON.parse(query['cursor'].unpack1('m0'))
-            valid = boundary.is_a?(Hash) && ordering.all? do |o|
-              o['field'] == 'id' ? boundary[o['field']].is_a?(String) : boundary[o['field']].is_a?(Numeric)
-            end
-            fail!(ErrorCodes::INVALID_CURSOR) unless valid
-          rescue ArgumentError, JSON::ParserError
-            fail!(ErrorCodes::INVALID_CURSOR)
-          end
-          sorted = sorted.select { |item| compare(item, boundary, ordering).positive? }
+          values = cursor_values(query['cursor'], signature, ordering)
+          sorted = sorted.select { |item| after_cursor?(item, values, ordering) }
         end
         selected = sorted.first(size)
         more = sorted.size > size
-        cursor = more ? [JSON.generate(selected.last.slice(*ordering.map { |o| o['field'] }))].pack('m0') : nil
-        { 'items' => selected, 'nextCursor' => cursor,
-          'pageSize' => size, 'ordering' => ordering, 'hasMore' => more }
+        cursor = if more
+                   [JSON.generate({ 'scope' => signature, 'values' => ordering.map do |o|
+                     selected.last[o['field']]
+                   end })].pack('m0')
+                 end
+        { 'items' => selected, 'pageSize' => size, 'hasMore' => more, 'ordering' => ordering, 'nextCursor' => cursor }
+      end
+
+      def cursor_values(cursor, signature, ordering)
+        parsed = JSON.parse(cursor.unpack1('m0').force_encoding(Encoding::UTF_8))
+        values = parsed.is_a?(Hash) ? parsed['values'] : nil
+        valid = parsed.is_a?(Hash) && parsed['scope'] == signature && values.is_a?(Array) && values.size == ordering.size &&
+                values.zip(ordering).all? { |value, o| o['field'] == 'id' ? value.is_a?(String) : value.is_a?(Numeric) }
+        fail!(ErrorCodes::INVALID_CURSOR) unless valid
+        values
+      rescue ArgumentError, JSON::ParserError, EncodingError
+        fail!(ErrorCodes::INVALID_CURSOR)
+      end
+
+      def after_cursor?(item, values, ordering)
+        ordering.each_with_index do |rule, index|
+          result = compare_values(item[rule['field']], values[index])
+          return rule['direction'] == 'DESC' ? result.negative? : result.positive? unless result.zero?
+        end
+        false
       end
 
       def ordering(query)
@@ -536,75 +725,101 @@ module CalmLens
         end
       end
 
-      def compare(left, right, ordering)
-        ordering.each do |order|
-          a = left[order['field']]
-          b = right[order['field']]
-          # Missing values sort last in either direction.
-          result = if a.nil? || b.nil? then (a.nil? ? 1 : 0) - (b.nil? ? 1 : 0)
-                   else
-                     natural = (a <=> b) || (a.to_s <=> b.to_s)
-                     order['direction'].to_s.casecmp?('DESC') ? -natural : natural
-                   end
-          return result unless result.zero?
+      def compare_items(left, right, ordering)
+        ordering.each do |rule|
+          result = compare_values(left[rule['field']], right[rule['field']])
+          return rule['direction'] == 'DESC' ? -result : result unless result.zero?
         end
-        left['id'].to_s <=> right['id'].to_s
+        0
       end
 
-      # Answers like the CDN: delivery checks first, which refuse everyone (content still uploading,
-      # blocked or purged, failed processing, removed content, or a placeholder, since the mock
-      # makes no previews); then a private asset, or a public age-restricted one requested without
+      # Like the API: missing values first, numbers by value, everything else as text.
+      def compare_values(left, right)
+        return 0 if left == right
+        return -1 if left.nil?
+        return 1 if right.nil?
+        return left <=> right if left.is_a?(Numeric) && right.is_a?(Numeric)
+
+        left.to_s <=> right.to_s
+      end
+
+      # Answers like the CDN: a placeholder is the asset's ThumbHash as a PNG, public for public
+      # assets whatever their moderation; other resources pass delivery checks first, which refuse
+      # everyone (content still uploading, blocked or purged, failed processing, removed content),
+      # then a private asset, or a public age-restricted one requested without
       # `allowAgeRestricted=true`, needs an API key with `assets:download` for its folder.
-      def serve(method, relative, headers)
+      def serve(method, relative)
         path, query = relative.split('#', 2).first.split('?', 2)
         segments = path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
         _, project, identifier, resource = segments
         item = project == @project_id && project_assets.find { |asset| [asset['id'], asset['externalId']].include?(identifier) }
-        return error(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', 404) unless item && RESOURCES.include?(resource)
+        return error('asset/not-found', 'Asset not found', status: 404) unless item && RESOURCES.include?(resource)
+
+        return placeholder(method, item) if resource == 'placeholder'
 
         moderation = item['classification']['moderation']['status']
         stored = @state.content[item['id']]
-        if resource == 'placeholder' || stored.nil? || item['upload']['status'] == 'uploading' ||
-           %w[blocked purged].include?(moderation) || item['classification']['status'] == 'failed' ||
-           item['content']['status'] == 'removed'
-          return error('asset/not-available', 'Asset is not available', 403)
+        if stored.nil? || item['upload']['status'] == 'uploading' || %w[blocked purged].include?(moderation) ||
+           item['classification']['status'] == 'failed' || item['content']['status'] == 'removed'
+          return not_available
         end
 
         opted_in = URI.decode_www_form(query.to_s).to_h['allowAgeRestricted'] == 'true'
         restricted = item['visibility'] != 'public' || (moderation == 'age-restricted' && !opted_in)
-        if restricted && !can_download?(item['folderId'], headers)
+        if restricted && !can_download?(item['folderId'])
           return error('asset/api-key-missing-permission',
-                       'This API key needs assets:download permission for this asset’s folder.', 403)
+                       'This API key needs assets:download permission for this asset’s folder.', status: 403)
         end
 
-        bytes = stored['parts'].sort.map(&:last).join.b
-        Response.new(status: 200, body: method == 'HEAD' ? '' : bytes,
-                     headers: { 'content-type' => stored['type'], 'content-length' => bytes.bytesize.to_s,
-                                'cache-control' => cache_control(item, restricted), 'x-request-id' => request_id })
+        type = stored['type'].to_s.empty? ? 'application/octet-stream' : stored['type']
+        cdn_response(method, stored['parts'].sort.map(&:last).join.b, delivery_headers(item, type, restricted))
+      end
+
+      def not_available = error('asset/not-available', 'Asset is not available', status: 403)
+
+      # Like the CDN's placeholder handler: an image's ThumbHash, public for public assets whatever
+      # their moderation; refused for purged assets, assets without one (not yet classified, or
+      # content removed) and, for private assets, keys without `assets:download`.
+      def placeholder(method, item)
+        thumbhash = item.dig('content', 'image', 'thumbhash')
+        public = item['visibility'] == 'public'
+        if thumbhash.nil? || item['classification']['moderation']['status'] == 'purged' ||
+           (!public && !can_download?(item['folderId']))
+          return not_available
+        end
+
+        cdn_response(method, Placeholder.png(thumbhash),
+                     'content-type' => 'image/png', 'cache-control' => "#{public ? 'public' : 'private'}, max-age=3600",
+                     'cache-tag' => "asset-#{item['id']}", 'etag' => "\"#{thumbhash}\"")
       end
 
       # Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
-      # by shared caches only when delivery is public.
-      def cache_control(item, restricted)
-        lifetime = item['type'] == 'image' ? 'max-age=31536000, immutable' : 'max-age=3600'
-        "#{restricted ? 'private' : 'public'}, #{lifetime}"
+      # by shared caches only when delivery is public. Active content is served as a download.
+      def delivery_headers(item, type, restricted)
+        image = item['type'] == 'image'
+        headers = { 'content-type' => type,
+                    'cache-control' => "#{restricted ? 'private' : 'public'}, #{image ? 'max-age=31536000, immutable' : 'max-age=3600'}",
+                    'cache-tag' => "asset-#{item['id']}" }
+        headers.merge!('etag' => "\"#{item['id']}\"", 'expires' => Time.at((@now.call / 1000) + 31_536_000).utc.httpdate) if image
+        headers.merge!('x-content-type-options' => 'nosniff', 'content-security-policy' => "sandbox; default-src 'none'")
+        mime = type.downcase.split(';', 2).first.to_s.strip
+        headers['content-disposition'] = 'attachment' if ACTIVE_TYPES.include?(mime) || mime.end_with?('+xml')
+        headers
       end
 
-      # Whether the request's mock API key grants `assets:download` for `folder_id`.
-      def can_download?(folder_id, headers)
-        key = headers.find { |name, _| name.to_s.casecmp?('X-Api-Key') }&.last.to_s
-        return false unless key.start_with?(MockServerClient::API_KEY_PREFIX)
+      def cdn_response(method, bytes, headers)
+        Response.new(status: 200, body: method == 'HEAD' ? '' : bytes,
+                     headers: headers.merge('content-length' => bytes.bytesize.to_s, 'x-request-id' => request_id))
+      end
 
-        encoded = key.delete_prefix(MockServerClient::API_KEY_PREFIX).tr('-_', '+/')
-        grants = JSON.parse("#{encoded}#{'=' * (-encoded.size % 4)}".unpack1('m0'))
-        grants.any? do |grant|
+      # Whether the mock API key's grants give `assets:download` for `folder_id`.
+      def can_download?(folder_id)
+        @grants.any? do |grant|
           next false unless Array(grant['actions']).include?('assets:download')
           next true if grant['folderId'].nil?
 
           covers?(grant, folder_id)
         end
-      rescue ArgumentError, JSON::ParserError, TypeError, NoMethodError
-        false
       end
 
       def covers?(grant, folder_id)
@@ -621,7 +836,7 @@ module CalmLens
       end
     end
 
-    # The nested state of a new mock asset, and merging test fields into it.
+    # Outcomes and merging test fields into a mock asset.
     # @api private
     module AssetRecord
       module_function
@@ -642,18 +857,6 @@ module CalmLens
       # The outcome of analyzed fields: `failed` when they fail processing, else their moderation status.
       def outcome_of(fields)
         fields.dig('classification', 'status') == 'failed' ? 'failed' : fields.dig('classification', 'moderation', 'status') || 'allowed'
-      end
-
-      def sections(now:, open:, keep:, format:, size:)
-        {
-          'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
-          'classification' => { 'status' => open ? 'pending' : 'processing', 'updatedAt' => now, 'completedAt' => nil,
-                                'moderation' => { 'status' => 'pending', 'manualReviews' => [] } },
-          'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
-                         'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
-                         'sizeInBytes' => size, 'checksums' => nil, 'image' => nil,
-                         'extractedText' => nil }
-        }
       end
 
       def deep_merge!(target, fields)

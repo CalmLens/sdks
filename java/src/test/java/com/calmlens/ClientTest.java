@@ -29,25 +29,7 @@ class ClientTest {
     String[] agent = {null};
     client(request -> { agent[0] = request.headers().get("User-Agent"); return Fixtures.json(200, Fixtures.assetJson("a", "completed", "allowed")); })
         .assets.retrieve(new Models.AssetId("a"));
-    assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (Java " + Runtime.version() + ")", agent[0]);
-  }
-
-  @Test void parseWebhookEventVerifiesThenParses() throws Exception {
-    JsonObject payload = Fixtures.read("webhooks.json").getAsJsonObject().getAsJsonArray("payloads").get(0).getAsJsonObject().getAsJsonObject("payload");
-    byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
-    String now = Long.toString(System.currentTimeMillis() / 1000);
-    String header = CalmLensServerClient.createWebhookSignatureHeader("whsec", now, body);
-    Models.WebhookEventPayload event = CalmLensServerClient.parseWebhookEvent(body, header, now, "whsec");
-    assertEquals(payload.get("id").getAsString(), event.id());
-    assertEquals(payload.get("type").getAsString(), event.type());
-    assertEquals(ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE,
-        assertThrows(CalmLensException.class, () -> CalmLensServerClient.parseWebhookEvent(body, header, now, "other-secret")).getCode());
-    String stale = Long.toString(System.currentTimeMillis() / 1000 - CalmLensServerClient.WEBHOOK_SIGNATURE_TOLERANCE_SECONDS - 5);
-    assertEquals(ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE, assertThrows(CalmLensException.class,
-        () -> CalmLensServerClient.parseWebhookEvent(body, CalmLensServerClient.createWebhookSignatureHeader("whsec", stale, body), stale, "whsec")).getCode());
-    byte[] notAnEvent = "{\"hello\":1}".getBytes(StandardCharsets.UTF_8);
-    assertEquals(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, assertThrows(CalmLensException.class,
-        () -> CalmLensServerClient.parseWebhookEvent(notAnEvent, CalmLensServerClient.createWebhookSignatureHeader("whsec", now, notAnEvent), now, "whsec")).getCode());
+    assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (java/" + Runtime.version() + ")", agent[0]);
   }
 
   @Test void webhookVerificationUsesExactRawBytes() {
@@ -62,38 +44,18 @@ class ClientTest {
     assertFalse(CalmLensServerClient.verifyWebhookSignature((byte[]) null, header, "1700000000", "key", 1700000000, 300));
   }
 
-  @Test void invalidWebhookPayloads() {
-    for (String body : new String[] {"", "not json", "[]", "{\"type\":\"asset.classified\",\"data\":{}}",
-        "{\"id\":\"event-1\",\"data\":{}}", "{\"id\":\"event-1\",\"type\":\"asset.classified\"}",
-        "{\"id\":\"event-1\",\"type\":\"asset.classified\",\"data\":{}}"}) {
-      CalmLensException error = assertThrows(CalmLensException.class, () -> CalmLensServerClient.readWebhookEvent(body), body);
-      assertEquals(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, error.getCode(), body);
-    }
-    assertEquals(List.of(), CalmLensServerClient.readWebhookEvent("{\"id\":\"event-1\",\"type\":\"test.sent\",\"projectId\":\"project-1\",\"data\":{}}").data().facts());
-  }
-
-  @Test void apiErrorsCarryStatusRequestIdHeadersAndDetails() {
+  /** The fields every SDK has are checked by errors.json and client-cases.json; these accessors are Java's own. */
+  @Test void apiErrorsExposeTheirMessageHeadersAndTraceId() {
     CalmLensServerClient client = client(request -> Fixtures.json(400,
-        "{\"code\":\"test/error\",\"message\":\"bad\",\"details\":{\"field\":\"name\"},\"traceId\":\"trace\"}",
-        Map.of("X-Request-Id", List.of("req_123"), "Retry-After", List.of("7"))));
+        "{\"code\":\"test/error\",\"message\":\"bad\",\"traceId\":\"trace\"}", Map.of("X-Request-Id", List.of("req_123"))));
     ApiException error = assertThrows(ApiException.class, () -> client.assets.retrieve(new Models.AssetId("asset")));
-    assertEquals("test/error", error.getCode());
     assertEquals("[calmlens] bad", error.getMessage());
-    assertEquals(400, error.getStatus());
-    assertEquals("req_123", error.getRequestId());
     assertEquals("req_123", error.getHeaders().get("x-request-id").get(0));
-    assertEquals(Duration.ofSeconds(7), error.getRetryAfter().orElseThrow());
     assertEquals("trace", error.getTraceId());
-    assertEquals(Map.of("field", "name", "network", true, "traceId", "trace"), error.getDetails());
-    assertFalse(error.isRetryable());
     assertFalse(error.isNotFound());
     ApiException missing = assertThrows(ApiException.class,
         () -> client(request -> Fixtures.json(404, "{\"code\":\"asset/not-found\"}")).assets.retrieve(new Models.AssetId("gone")));
     assertTrue(missing.isNotFound());
-    ApiException html = assertThrows(ApiException.class,
-        () -> client(request -> Fixtures.json(500, "<html>")).assets.retrieve(new Models.AssetId("asset")));
-    assertEquals(ErrorCodes.SDK_HTTP_ERROR, html.getCode());
-    assertEquals(500, html.getStatus());
   }
 
   @Test void argumentAndConfigurationErrorsHaveTheirOwnCodes() {
@@ -118,6 +80,25 @@ class ClientTest {
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a%2Fb/rendered", client.cdn.getAssetUrl(new Models.CdnRequest("a/b")));
   }
 
+  @Test void multipartSizesAreRefusedBeforeSendingWithoutAStatus() {
+    CalmLensServerClient client = client(request -> fail("A refused part made an HTTP request"));
+    int mib = 1024 * 1024;
+    Map<String, org.junit.jupiter.api.function.Executable> refusals = new java.util.LinkedHashMap<>();
+    refusals.put(ErrorCodes.INVALID_UPLOAD_PAYLOAD + " first", () -> client.assets.create(
+        new Models.SubmitAsset().name("clip.mp4").part(Models.Content.bytes(new byte[mib], "video/mp4").partNumber(1).isFinal(false))));
+    refusals.put(ErrorCodes.INVALID_UPLOAD_PAYLOAD + " later", () -> client.assets.uploadPart(
+        new Models.UploadPart("asset-1", Models.Content.bytes(new byte[mib], "video/mp4").partNumber(2).isFinal(false))));
+    refusals.put(ErrorCodes.MULTIPART_IMAGE_TOO_SMALL, () -> client.assets.create(
+        new Models.SubmitAsset().name("small.png").part(Models.Content.bytes(new byte[mib], "image/png").partNumber(1).isFinal(true))));
+    refusals.put(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, () -> client.assets.create(
+        new Models.SubmitAsset().name("large.png").part(Models.Content.bytes(new byte[21 * mib], "image/png").partNumber(1).isFinal(false))));
+    refusals.forEach((name, call) -> {
+      CalmLensException error = assertThrows(CalmLensException.class, call, name);
+      assertEquals(name.split(" ")[0], error.getCode(), name);
+      assertEquals(0, error.getStatus(), name);
+    });
+  }
+
   @Test void typedImageTransformOptionsSerializeLikeJavaScriptNumbers() {
     CalmLensServerClient client = client(request -> fail("Building a URL made an HTTP request"));
     Models.Transform image = Models.Transform.image(new Models.ImageTransformOptions().width(640).blur(2.0).sharpen(0.25).format("webp"));
@@ -137,10 +118,7 @@ class ClientTest {
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(List.of(quality, numeric))));
   }
 
-  @Test void malformedAndOversizedResponsesAreInvalidResponses() {
-    ApiException malformed = assertThrows(ApiException.class,
-        () -> client(request -> Fixtures.json(200, "not-json")).assets.retrieve(new Models.AssetId("asset-1")));
-    assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, malformed.getCode());
+  @Test void assetsWithoutTheirStatusesAreInvalidResponses() {
     // An asset without a processing or moderation status cannot be acted on.
     for (String body : new String[] {"{\"id\":\"asset-1\"}", "{\"id\":\"asset-1\",\"processing\":{\"status\":\"done\"}}",
         "{\"id\":\"asset-1\",\"moderation\":{\"status\":\"allowed\"}}", "{\"id\":\"asset-1\",\"processing\":{},\"moderation\":{\"status\":\"allowed\"}}"}) {
@@ -148,45 +126,57 @@ class ClientTest {
           () -> client(request -> Fixtures.json(200, body)).assets.retrieve(new Models.AssetId("asset-1")), body);
       assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, noStatus.getCode(), body);
     }
-    Map<String, Object> described = Fixtures.asset("asset-1", "completed", "allowed");
-    described.put("description", "x".repeat(4096));
-    String large = Fixtures.JSON.toJson(described);
-    ApiException tooLarge = assertThrows(ApiException.class, () -> CalmLensServerClient.builder("key", "project").maxResponseBytes(1024)
-        .transport(request -> Fixtures.json(200, large)).build().assets.retrieve(new Models.AssetId("asset-1")));
-    assertEquals(ErrorCodes.SDK_RESPONSE_TOO_LARGE, tooLarge.getCode());
   }
 
-  @Test void ensureLensesSendsLargeBatchesInConsecutiveRequests() {
-    List<String> methods = new ArrayList<>();
-    List<List<String>> sent = new ArrayList<>();
+
+  private static Transport.Response lensReply(Transport.Request request) throws java.io.IOException {
+    JsonObject body = JsonParser.parseString(new String(Fixtures.body(request), StandardCharsets.UTF_8)).getAsJsonObject();
+    for (JsonElement lens : body.getAsJsonArray("lenses")) lens.getAsJsonObject().addProperty("id", "id-" + lens.getAsJsonObject().get("identifier").getAsString());
+    return Fixtures.json(200, body.toString());
+  }
+
+  @Test void concurrentEnsuresOfTheSameNewLensShareOneRequest() throws Exception {
+    java.util.concurrent.CountDownLatch inRequest = new java.util.concurrent.CountDownLatch(1), release = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.atomic.AtomicInteger sent = new java.util.concurrent.atomic.AtomicInteger();
     CalmLensServerClient client = client(request -> {
-      methods.add(request.method());
-      JsonArray lenses = JsonParser.parseString(new String(Fixtures.body(request), StandardCharsets.UTF_8))
-          .getAsJsonObject().getAsJsonArray("lenses");
-      List<String> identifiers = new ArrayList<>();
-      JsonArray returned = new JsonArray();
-      for (JsonElement lens : lenses) {
-        String identifier = lens.getAsJsonObject().get("identifier").getAsString();
-        identifiers.add(identifier);
-        JsonObject created = lens.getAsJsonObject().deepCopy();
-        created.addProperty("id", "id-" + identifier);
-        returned.add(created);
-      }
-      sent.add(identifiers);
-      JsonObject body = new JsonObject();
-      body.add("lenses", returned);
-      return Fixtures.json(200, body.toString());
+      sent.incrementAndGet();
+      inRequest.countDown();
+      if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new java.io.IOException("not released");
+      return lensReply(request);
     });
-    List<Models.LensDefinition> definitions = new ArrayList<>();
-    List<String> expected = new ArrayList<>();
-    for (int i = 0; i <= CalmLensServerClient.ENSURE_LENSES_MAX_PER_REQUEST; i++) {
-      definitions.add(new Models.LensDefinition("lens-" + i, "Lens", "image", true, 1));
-      expected.add("lens-" + i);
+    Models.EnsureLenses definition = new Models.EnsureLenses(List.of(new Models.LensDefinition("thumb", "Thumbnail", "image", true, 1)));
+    java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      var first = executor.submit(() -> client.ensureLenses(definition));
+      assertTrue(inRequest.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      Thread[] second = {null};
+      var waiting = executor.submit(() -> { second[0] = Thread.currentThread(); return client.ensureLenses(definition); });
+      // Let the second call reach the in-flight request (or, without sharing, a request of its own).
+      long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+      while ((second[0] == null || second[0].getState() != Thread.State.WAITING && second[0].getState() != Thread.State.TIMED_WAITING) && System.nanoTime() < deadline)
+        Thread.sleep(5);
+      release.countDown();
+      assertEquals(first.get(5, java.util.concurrent.TimeUnit.SECONDS), waiting.get(5, java.util.concurrent.TimeUnit.SECONDS));
+      assertEquals(1, sent.get());
+    } finally {
+      executor.shutdownNow();
     }
-    List<Models.Lens> result = client.ensureLenses(new Models.EnsureLenses(definitions));
-    assertEquals(List.of("PUT", "PUT"), methods);
-    assertEquals(List.of(expected.subList(0, 100), expected.subList(100, 101)), sent);
-    assertEquals(expected, result.stream().map(Models.Lens::identifier).toList());
-    assertEquals(expected.stream().map(identifier -> "id-" + identifier).toList(), result.stream().map(Models.Lens::id).toList());
+  }
+
+  @Test void derivedClientsUseTheirOwnRetriesAndShareTheLensCache() {
+    List<String> methods = new ArrayList<>();
+    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").transport(request -> {
+      methods.add(request.method());
+      return request.method().equals("PUT") ? lensReply(request) : Fixtures.json(503, "{}");
+    }).build(null, delay -> {});
+    CalmLensServerClient patient = client.withRequestOptions(new RequestOptions().maxRetries(0).timeout(Duration.ofSeconds(5)));
+    assertEquals(503, assertThrows(ApiException.class, () -> patient.assets.retrieve(new Models.AssetId("a"))).getStatus());
+    assertEquals(List.of("GET"), methods);
+    Models.EnsureLenses definition = new Models.EnsureLenses(List.of(new Models.LensDefinition("thumb", "Thumbnail", "image", true, 1)));
+    Models.Lens lens = client.ensureLenses(definition).get(0);
+    assertEquals(lens, patient.ensureLenses(definition).get(0));
+    assertEquals(List.of("GET", "PUT"), methods);
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
+        () -> client.withRequestOptions(new RequestOptions().idempotencyKey("one-call"))).getCode());
   }
 }

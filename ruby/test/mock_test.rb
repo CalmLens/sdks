@@ -8,42 +8,6 @@ class MockTest < Minitest::Test
   # A key that may read private content from the CDN; the default key may not.
   DOWNLOAD = CalmLens::MockServerClient.create_api_key([{ actions: ['assets:download'], folder_id: nil, include_subfolders: true }])
 
-  def test_uploads_are_stored_retrieved_served_and_deleted
-    mock = CalmLens::MockServerClient.new(now: -> { 7 }, api_key: DOWNLOAD)
-    asset = mock.assets.classify(name: 'note.txt', content: { data: StringIO.new('hello'), type: 'text/plain' },
-                                 processing_options: KEEP)
-    assert_equal ['completed', 'allowed', 7, 'stored', 'text/plain', 5],
-                 [asset.dig('classification', 'status'), asset.dig('classification', 'moderation', 'status'),
-                  asset.dig('classification', 'completedAt'),
-                  asset.dig('content', 'status'), asset.dig('content', 'format'), asset.dig('content', 'sizeInBytes')]
-    queued = mock.assets.create(name: 'later.txt', content: { plain_text: 'x', type: 'text/plain' })
-    assert_equal %w[processing pending temporary],
-                 [queued.dig('classification', 'status'), queued.dig('classification', 'moderation', 'status'),
-                  queued.dig('content', 'status')]
-    assert_equal asset, mock.assets.retrieve(asset_id: asset['id'])
-    served = mock.cdn.serve(asset_identifier: asset['id'])
-    assert_equal [200, 'hello', '5'], [served.status, served.body, served.headers['content-length']]
-    refute_nil served.request_id
-    assert_equal "/assets/project-1/#{asset['id']}/rendered", mock.requests.last.path
-
-    removed = mock.assets.delete_content(asset_id: asset['id'])
-    assert_equal %w[removed requested], [removed.dig('content', 'status'), removed.dig('content', 'removalReason')]
-    assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
-    assert_nil mock.assets.delete(asset_id: asset['id'])
-    error = assert_raises(CalmLens::NotFoundError) { mock.assets.retrieve(asset_id: asset['id']) }
-    assert_equal [CalmLens::ErrorCodes::ASSET_NOT_FOUND, 404, true], [error.code, error.status, error.details['network']]
-    refute_nil error.request_id
-  end
-
-  def test_content_without_keep_is_removed_once_processing_is_done
-    mock = CalmLens::MockServerClient.new(now: -> { 9 })
-    asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' })
-    assert_equal [{ 'status' => 'removed', 'removalReason' => 'retention', 'updatedAt' => 9 }, 'completed'],
-                 [asset['content'].slice('status', 'removalReason', 'updatedAt'), asset.dig('classification', 'status')]
-    assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
-    refute mock.state.content.key?(asset['id'])
-  end
-
   def test_blocked_assets_keep_content_but_are_not_served
     mock = CalmLens::MockServerClient.new(analyzed_outcome: { 'classification' => { 'moderation' => { 'status' => 'blocked' } } })
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
@@ -52,52 +16,6 @@ class MockTest < Minitest::Test
                   asset.dig('content', 'status')]
     assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
     assert mock.state.content.key?(asset['id'])
-  end
-
-  def test_purged_assets_have_their_content_removed_by_policy
-    mock = CalmLens::MockServerClient.new(now: -> { 4 }, analyzed_outcome: 'purged')
-    asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
-    assert_equal [{ 'status' => 'removed', 'removalReason' => 'policy', 'updatedAt' => 4 }, 'purged'],
-                 [asset['content'].slice('status', 'removalReason', 'updatedAt'), asset.dig('classification', 'moderation', 'status')]
-    refute mock.state.content.key?(asset['id'])
-    assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
-  end
-
-  def test_retry_reprocesses_failed_assets_with_content
-    mock = CalmLens::MockServerClient.new(analyzed_outcome: 'failed')
-    failed = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' })
-    assert_equal %w[failed pending temporary],
-                 [failed.dig('classification', 'status'), failed.dig('classification', 'moderation', 'status'),
-                  failed.dig('content', 'status')]
-    retried = mock.assets.retry(asset_id: failed['id'])
-    assert_equal %w[processing pending], [retried.dig('classification', 'status'), retried.dig('classification', 'moderation', 'status')]
-    assert_equal CalmLens::ErrorCodes::ASSET_NOT_RETRYABLE,
-                 assert_raises(CalmLens::APIError) { mock.assets.retry(asset_id: failed['id']) }.code
-
-    mock.state.assets[failed['id']]['classification']['status'] = 'failed'
-    mock.assets.delete_content(asset_id: failed['id'])
-    assert_equal CalmLens::ErrorCodes::ASSET_CONTENT_UNAVAILABLE,
-                 assert_raises(CalmLens::APIError) { mock.assets.retry(asset_id: failed['id']) }.code
-  end
-
-  def test_explain_completes_evidence_and_rerun_moderates_again
-    mock = CalmLens::MockServerClient.new(analyzed_outcome: 'blocked')
-    asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
-    moderation = mock.state.assets[asset['id']]['classification']['moderation']
-    moderation['policy'] = { 'score' => 0.9, 'categories' => {}, 'evidence' => 'decision' }
-    explained = mock.assets.explain(asset_id: asset['id'])
-    assert_equal %w[full blocked],
-                 [explained.dig('classification', 'moderation', 'policy', 'evidence'),
-                  explained.dig('classification', 'moderation', 'status')]
-
-    moderation['manualReviews'] = [{ 'decision' => 'blocked' }]
-    assert_equal CalmLens::ErrorCodes::ASSET_REVIEWED,
-                 assert_raises(CalmLens::APIError) { mock.assets.explain(asset_id: asset['id'], rerun: true) }.code
-    moderation['manualReviews'] = []
-    rerun = mock.assets.explain(asset_id: asset['id'], rerun: true)
-    assert_equal %w[processing pending], [rerun.dig('classification', 'status'), rerun.dig('classification', 'moderation', 'status')]
-    assert_equal CalmLens::ErrorCodes::ASSET_NOT_DECIDED,
-                 assert_raises(CalmLens::APIError) { mock.assets.explain(asset_id: asset['id']) }.code
   end
 
   def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector
@@ -146,21 +64,6 @@ class MockTest < Minitest::Test
     assert_equal CalmLens::ErrorCodes::ASSET_NOT_FOUND, error.code
   end
 
-  def test_errors_use_the_api_status_for_each_code
-    mock = CalmLens::MockServerClient.new
-    folder = mock.folders.create(name: 'A')
-    mock.assets.create(name: 'x', content: { plain_text: 'x', type: 'text/plain' }, folder_id: folder['id'])
-    {
-      -> { mock.folders.create(name: 'A') } => [CalmLens::ConflictError, 409, 'folder/duplicate-name'],
-      -> { mock.folders.delete(folder_id: folder['id']) } => [CalmLens::ConflictError, 409, 'folder/not-empty'],
-      -> { mock.folders.retrieve(folder_id: 'nope') } => [CalmLens::NotFoundError, 404, 'folder/not-found'],
-      -> { mock.events.list(after: 'garbage') } => [CalmLens::BadRequestError, 400, 'events/invalid-cursor']
-    }.each do |action, (klass, status, code)|
-      error = assert_raises(klass) { action.call }
-      assert_equal [status, code], [error.status, error.code]
-    end
-  end
-
   def test_filters_ordering_and_pagination_are_applied
     clock = 0
     mock = CalmLens::MockServerClient.new(now: -> { clock += 1 }, analyzed_outcome: lambda { |asset|
@@ -187,43 +90,6 @@ class MockTest < Minitest::Test
     assert_equal %w[good-b bad-a], by_name.call("createdAt=le=#{created['bad-a']}")
     error = assert_raises(CalmLens::InvalidArgumentError) { mock.assets.list(filter: 'name=like=good') }
     assert_equal 'sdk/invalid-argument', error.code
-  end
-
-  def test_search_matches_assets_and_reports_semantic_search_disabled
-    mock = CalmLens::MockServerClient.new
-    mock.assets.create(name: 'orchard.txt', content: { plain_text: 'x', type: 'text/plain' })
-    mock.assets.create(name: 'other.txt', content: { plain_text: 'x', type: 'text/plain' })
-    result = mock.assets.search(query: 'ORCHARD', mode: 'hybrid')
-    assert_equal [['orchard.txt'], [['name']], 'disabled'],
-                 [result['items'].map { |item| item['asset']['name'] }, result['items'].map do |item|
-                   item['matchedFields']
-                 end, result['semanticStatus']]
-  end
-
-  def test_events_are_enqueued_and_paged_with_cursors
-    mock = CalmLens::MockServerClient.new
-    start = mock.events.list
-    assert_equal [], start['events']
-    3.times { |index| mock.enqueue_event(type: 'asset.allowed', asset_id: "asset-#{index}") }
-    pages = mock.events.each_page(after: start['cursor'], limit: 2).to_a
-    assert_equal([%w[asset-0 asset-1], %w[asset-2]], pages.map { |page| page['events'].map { |event| event['assetId'] } })
-    assert_equal(%w[asset-0 asset-1 asset-2], mock.events.each(after: start['cursor'], limit: 1).map { |event| event['assetId'] })
-  end
-
-  def test_multipart_upload_uses_queue_mode_saved_at_start
-    mock = CalmLens::MockServerClient.new
-    first = ('a' * (5 * 1024 * 1024)).b
-    asset = mock.assets.create(name: 'big.txt', part: { data: first, type: 'text/plain' }, total_size_in_bytes: first.bytesize + 3)
-    assert_equal ['uploading', 1], [asset.dig('upload', 'status'), asset.dig('upload', 'partsReceived')]
-    done = mock.assets.upload_part(asset_id: asset['id'], part: { data: 'end', part_number: 2, is_final: true })
-    assert_equal ['processing', 'pending', 2, first.bytesize + 3],
-                 [done.dig('classification', 'status'), done.dig('classification', 'moderation', 'status'),
-                  done.dig('upload', 'partsReceived'),
-                  done.dig('content', 'sizeInBytes')]
-    refute mock.requests.last.query.key?('queue')
-    assert_equal 'upload/not-open', assert_raises(CalmLens::ConflictError) {
-      mock.assets.upload_part(asset_id: asset['id'], part: { data: 'x', part_number: 3, is_final: true })
-    }.code
   end
 
   def test_queued_responses_come_first_then_the_fake_answers

@@ -17,6 +17,7 @@ Every failure the SDK raises is a :class:`CalmLensError` (or a subclass), with a
 from __future__ import annotations
 
 import email.utils
+import math
 import time
 from typing import Any, Mapping
 
@@ -32,20 +33,24 @@ _RETRYABLE_CODES = frozenset({error_codes.SDK_TRANSPORT_ERROR, error_codes.SDK_T
                               error_codes.IDEMPOTENT_REQUEST_IN_PROGRESS})
 
 
-def _parse_retry_after(value: str | None) -> float | None:
-    """Seconds from a ``Retry-After`` header: delta-seconds or an HTTP date."""
+def _parse_retry_after(value: str | None) -> int | None:
+    """Whole seconds from a ``Retry-After`` header: delta-seconds, or an HTTP date (rounded up,
+    0 once it has passed)."""
     if not value:
         return None
     value = value.strip()
     if value.isascii() and value.isdigit():
-        return float(value)
+        return int(value)
     try:
         when = email.utils.parsedate_to_datetime(value)
-    except (TypeError, ValueError, IndexError):
+    except (TypeError, ValueError, IndexError, OverflowError):
         return None
     if when is None:
         return None
-    return max(0.0, when.timestamp() - time.time())
+    try:
+        return max(0, math.ceil(when.timestamp() - time.time()))
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 class CalmLensError(Exception):
@@ -113,7 +118,8 @@ class CalmLensTimeoutError(CalmLensTransportError):
 
 
 class CalmLensValidationError(CalmLensError, ValueError):
-    """The SDK rejected the arguments or configuration before sending a request."""
+    """The SDK rejected the arguments or configuration before sending a request, so the error
+    has no HTTP status."""
 
 
 class WebhookVerificationError(CalmLensError):

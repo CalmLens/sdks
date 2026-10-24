@@ -22,6 +22,9 @@ type AssetIterator struct {
 	pos   int
 	err   error
 	done  bool
+	// sent holds the cursors returned so far, so a page that repeats one fails instead of
+	// looping.
+	sent map[string]bool
 }
 
 // ListAll iterates over every asset matching options, starting at options.Cursor.
@@ -51,8 +54,7 @@ func (it *AssetIterator) Next(ctx context.Context) bool {
 			it.pos++
 			return true
 		}
-		if it.done || it.page != nil && (!it.page.HasMore || len(it.page.Items) == 0) {
-			it.done = true
+		if it.done {
 			return false
 		}
 		page, err := it.fetch(ctx, it.index)
@@ -60,12 +62,29 @@ func (it *AssetIterator) Next(ctx context.Context) bool {
 			it.err = err
 			return false
 		}
+		more := page.NextCursor != "" && page.HasMore && len(page.Items) > 0
+		if more {
+			if it.err = repeatedCursor(&it.sent, page.NextCursor); it.err != nil {
+				return false
+			}
+		}
 		it.page, it.pos = page, 0
 		it.index = page.NextCursor
-		if it.index == "" {
-			it.done = true
-		}
+		it.done = !more
 	}
+}
+
+// repeatedCursor records cursor in sent and fails with sdk/invalid-response (Details
+// {"cursor"}) when a page with more to follow hands back a cursor already returned.
+func repeatedCursor(sent *map[string]bool, cursor string) error {
+	if *sent == nil {
+		*sent = map[string]bool{}
+	}
+	if (*sent)[cursor] {
+		return &Error{Code: CodeSDKInvalidResponse, Message: "The API returned a cursor it had already returned, with more pages to follow", Details: JSON{"cursor": cursor}}
+	}
+	(*sent)[cursor] = true
+	return nil
 }
 
 // Asset returns the current asset. Call it only after Next returned true.
@@ -101,7 +120,7 @@ func (it *AssetIterator) All(ctx context.Context) func(yield func(Asset, error) 
 //	savedCursor = it.Cursor() // persist it, even after an error
 //
 // Without After the feed starts at "now", so the first page is empty and iteration stops
-// at once; save Cursor and iterate again later.
+// at once; save Cursor and iterate again later. NextPage walks the same feed a page at a time.
 type EventIterator struct {
 	s       *EventsService
 	options ListEventsOptions
@@ -109,36 +128,57 @@ type EventIterator struct {
 	pos     int
 	err     error
 	done    bool
+	sent    map[string]bool
 }
 
 // ListAll iterates over events after options.After, following the cursor across pages.
 func (s *EventsService) ListAll(options ListEventsOptions) *EventIterator {
-	return &EventIterator{s: s, options: options}
+	it := &EventIterator{s: s, options: options}
+	if options.After != "" {
+		it.sent = map[string]bool{options.After: true}
+	}
+	return it
 }
+
+// NextPage fetches the next page of events, which may be empty. It returns false when the
+// previous page said no more events follow or a request failed; check Err afterwards. A page
+// that says more follow but repeats a cursor already sent fails with sdk/invalid-response
+// (Details {"cursor"}) and is not returned. Do not mix NextPage and Next on one iterator.
+func (it *EventIterator) NextPage(ctx context.Context) bool {
+	if it.err != nil || it.done {
+		return false
+	}
+	page, err := it.s.List(ctx, it.options)
+	if err != nil {
+		it.err = err
+		return false
+	}
+	if page.HasMore {
+		if it.err = repeatedCursor(&it.sent, page.Cursor); it.err != nil {
+			return false
+		}
+	}
+	it.page, it.pos = page, 0
+	if page.Cursor != "" {
+		it.options.After = page.Cursor
+	}
+	it.done = !page.HasMore
+	return true
+}
+
+// Page returns the page NextPage (or Next) fetched last, or nil before the first fetch.
+func (it *EventIterator) Page() *EventsPage { return it.page }
 
 // Next advances to the next event. It returns false when the feed has no more events or
 // a request failed; check Err afterwards.
 func (it *EventIterator) Next(ctx context.Context) bool {
 	for {
-		if it.err != nil {
-			return false
-		}
 		if it.page != nil && it.pos < len(it.page.Events) {
 			it.pos++
 			return true
 		}
-		if it.done || it.page != nil && (!it.page.HasMore || len(it.page.Events) == 0) {
-			it.done = true
+		if !it.NextPage(ctx) {
 			return false
-		}
-		page, err := it.s.List(ctx, it.options)
-		if err != nil {
-			it.err = err
-			return false
-		}
-		it.page, it.pos = page, 0
-		if page.Cursor != "" {
-			it.options.After = page.Cursor
 		}
 	}
 }

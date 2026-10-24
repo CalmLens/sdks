@@ -6,6 +6,7 @@ package calmlenstest
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -157,11 +159,19 @@ type MockServerClient struct {
 	events          []calmlens.JSON
 	replays         map[string]replay
 	requests        []CapturedRequest
-	failures        []error
+	failures        []failure
+	grants          []Grant
 	requestCount    int
 	// waited is the time the client has spent waiting; mock waits advance it instead of sleeping.
 	waited time.Duration
 	mu     sync.Mutex
+}
+
+// failure is a queued request failure: a transport error, or an API error code with its status.
+type failure struct {
+	err       error
+	code      string
+	operation string
 }
 
 // FailNext queues transport failures. Each following request is captured and then fails
@@ -171,7 +181,48 @@ type MockServerClient struct {
 func (m *MockServerClient) FailNext(errs ...error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.failures = append(m.failures, errs...)
+	for _, err := range errs {
+		m.failures = append(m.failures, failure{err: err})
+	}
+}
+
+// Failures for FailNextRequest besides API error codes.
+const (
+	// FailureTransportError fails the request as a reset connection would (sdk/transport-error).
+	FailureTransportError = "transport-error"
+	// FailureTimeout fails the request as an expired deadline would (sdk/timeout).
+	FailureTimeout = "timeout"
+)
+
+// FailNextRequest makes the next request, or the next request of operation (a JavaScript client
+// method path such as "assets.create" or "cdn.serve"; empty for any), fail without running.
+// failure is FailureTransportError, FailureTimeout or an API error code, which the mock answers
+// with its HTTP status. Each queued failure is used once.
+func (m *MockServerClient) FailNextRequest(failure string, operation string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	queued := failureFor(failure)
+	queued.operation = operation
+	m.failures = append(m.failures, queued)
+}
+
+func failureFor(name string) failure {
+	switch name {
+	case FailureTransportError:
+		return failure{err: errors.New("mock transport error")}
+	case FailureTimeout:
+		return failure{err: context.DeadlineExceeded}
+	}
+	return failure{code: name}
+}
+
+// SetAPIKeyGrants replaces the grants of the mock's API key, as editing the key in the portal
+// would: later requests, such as CDN.Serve, use them. The key itself stays the same, so its
+// idempotency keys still replay.
+func (m *MockServerClient) SetAPIKeyGrants(grants []Grant) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.grants = append([]Grant{}, grants...)
 }
 
 // Requests returns a copy of every request sent so far, oldest first.
@@ -196,13 +247,20 @@ func (m *MockServerClient) WithStorage(fn func(db *InMemoryDatabaseStorage, imag
 	fn(m.DatabaseStorage, m.ImageStorage)
 }
 
-// EnqueueEvent appends events to the mock event feed. Missing IDs, project IDs and
-// creation times are filled in. Events.List returns them to cursors taken before they
-// were enqueued, in order.
-func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) {
+// EnqueueEvent appends events to the mock event feed and returns them as stored. Missing IDs,
+// project IDs, severities (low), titles (the type), facts and creation times are filled in.
+// Events.List returns them to cursors taken before they were enqueued, in order.
+func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Event {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	stored := []calmlens.Event{}
 	for _, event := range events {
+		if event.Severity == "" {
+			event.Severity = calmlens.SeverityLow
+		}
+		if event.Title == "" {
+			event.Title = event.Type
+		}
 		if event.ID == "" {
 			event.ID = m.options.CreateID()
 		}
@@ -212,21 +270,29 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) {
 		if event.CreatedAt == 0 {
 			event.CreatedAt = m.options.Now()
 		}
+		if event.UpdatedAt == nil {
+			event.UpdatedAt = calmlens.Ptr(event.CreatedAt)
+		}
 		if event.Facts == nil {
 			event.Facts = []calmlens.EventFact{}
 		}
 		data, _ := json.Marshal(event)
-		var stored calmlens.JSON
-		_ = json.Unmarshal(data, &stored)
-		m.events = append(m.events, stored)
+		var raw calmlens.JSON
+		_ = json.Unmarshal(data, &raw)
+		m.events = append(m.events, raw)
+		var copied calmlens.Event
+		_ = json.Unmarshal(data, &copied)
+		stored = append(stored, copied)
 	}
+	return stored
 }
 
 // Decide applies a reviewer's decision (calmlens.ModerationStatusAllowed, ...Limited,
 // ...AgeRestricted, ...Blocked or ...Purged) to a stored asset, as the portal or API would: the moderation status
-// changes (purged also removes the content), the review joins manualReviews, and an
-// "asset.<decision>" event with a decided-by: reviewer fact joins the events feed. It returns a
-// *calmlens.Error with code asset/not-found for an unknown asset.
+// changes (purged also removes the content with removal reason requested, recording an
+// asset.content-removed event first), the review joins manualReviews, and an "asset.<decision>"
+// event with a decided-by: reviewer fact joins the events feed. It returns a *calmlens.Error with
+// code asset/not-found for an unknown asset.
 func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, error) {
 	switch decision {
 	case OutcomeAllowed, OutcomeLimited, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged:
@@ -239,25 +305,27 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 	if err != nil {
 		return nil, &calmlens.Error{Code: calmlens.CodeAssetNotFound, Message: "Asset not found", Status: http.StatusNotFound}
 	}
+	m.applyOutcome(a, decision, calmlens.ContentRemovalReasonRequested)
 	now := m.options.Now()
-	m.applyOutcome(a, decision, now)
 	moderation := section(section(a, "classification"), "moderation")
 	reviews, _ := moderation["manualReviews"].([]any)
 	moderation["manualReviews"] = append(reviews, calmlens.JSON{
 		"id": m.options.CreateID(), "decision": decision, "note": nil, "reviewerUserId": nil,
 		"reviewedAt": now, "appliedToAsset": true,
 	})
-	// Like the event catalog: only allowing and limiting are low severity.
-	severity := "high"
-	if decision == OutcomeAllowed || decision == OutcomeLimited {
-		severity = "low"
+	if decision == OutcomePurged {
+		m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a)
 	}
-	m.events = append(m.events, calmlens.JSON{
-		"id": m.options.CreateID(), "projectId": m.options.ProjectID, "userId": nil,
-		"type": "asset." + decision, "severity": severity, "title": "asset." + decision,
-		"description": nil, "assetId": assetID, "asset": snapshot(a),
-		"facts":  []any{calmlens.JSON{"key": "decided-by", "value": "reviewer"}},
-		"notify": false, "createdAt": now, "updatedAt": now, "readAt": nil,
+	// Like the event catalog: only allowing and limiting are low severity.
+	severity := calmlens.SeverityHigh
+	if decision == OutcomeAllowed || decision == OutcomeLimited {
+		severity = calmlens.SeverityLow
+	}
+	m.addEvent("asset."+decision, severity, a, []any{
+		calmlens.JSON{"key": calmlens.FactDecidedBy, "value": calmlens.DecidedByReviewer},
+		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+		calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "/portal/assets/" + assetID},
+		calmlens.JSON{"key": calmlens.FactNote, "value": nil},
 	})
 	data, _ := json.Marshal(a)
 	var asset calmlens.Asset
@@ -265,6 +333,27 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 		return nil, err
 	}
 	return &asset, nil
+}
+
+// addEvent records an event about asset in the feed.
+func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON, facts []any) {
+	now := m.options.Now()
+	m.events = append(m.events, calmlens.JSON{
+		"id": m.options.CreateID(), "projectId": m.options.ProjectID, "userId": nil,
+		"type": eventType, "severity": severity, "title": eventType,
+		"description": nil, "assetId": a["id"], "asset": snapshot(a),
+		"facts": facts, "notify": false, "createdAt": now, "updatedAt": now, "readAt": nil,
+	})
+}
+
+// recordLifecycleEvent adds an asset.deleted, asset.content-removed or asset.retried event, like
+// the API. A deleted asset has no portal page to link its name to.
+func (m *MockServerClient) recordLifecycleEvent(eventType string, a calmlens.JSON) {
+	name := calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"]}
+	if eventType != calmlens.EventAssetDeleted {
+		name["url"] = "/portal/assets/" + text(a["id"])
+	}
+	m.addEvent(eventType, calmlens.SeverityLow, a, []any{name, calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]}})
 }
 
 // snapshot is the asset summary events carry.
@@ -377,8 +466,33 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 		runtime.Gosched()
 		return nil
 	})
+	clock.DeferUploadChecks(client)
+	mock.grants = keyGrants(options.APIKey)
 	mock.ServerClient = client
 	return mock, nil
+}
+
+// SignUploadToken signs an upload token with apiKey as UploadTokens.Sign does (with the same
+// checks), but at now and with nonce, so a test can compare exact tokens.
+func SignUploadToken(apiKey string, options calmlens.SignUploadTokenOptions, now time.Time, nonce string) (*calmlens.SignedUploadToken, error) {
+	signed, err := clock.SignUploadToken(apiKey, options, now, nonce)
+	if err != nil {
+		return nil, err
+	}
+	return signed.(*calmlens.SignedUploadToken), nil
+}
+
+// keyGrants decodes the grants CreateMockAPIKey put in a key; other keys have none.
+func keyGrants(apiKey string) []Grant {
+	data, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(apiKey, "sk_test_"))
+	if err != nil {
+		return nil
+	}
+	var grants []Grant
+	if json.Unmarshal(data, &grants) != nil {
+		return nil
+	}
+	return grants
 }
 
 // transport answers the embedded client's requests from memory. It is unexported so the
@@ -437,13 +551,19 @@ func (m *MockServerClient) roundTrip(req *http.Request, raw []byte) (*http.Respo
 		_ = json.Unmarshal(raw, &captured.Body)
 	}
 	m.requests = append(m.requests, captured)
-	if len(m.failures) > 0 {
-		failure := m.failures[0]
-		m.failures = m.failures[1:]
-		return nil, failure
-	}
 	m.requestCount++
 	header := http.Header{"X-Request-Id": {fmt.Sprintf("req_mock_%d", m.requestCount)}}
+	operations := operationsOf(req.Method, parts, req.URL.Query(), cdn)
+	for index, queued := range m.failures {
+		if queued.operation != "" && !contains(operations, queued.operation) {
+			continue
+		}
+		m.failures = append(m.failures[:index:index], m.failures[index+1:]...)
+		if queued.err != nil {
+			return nil, queued.err
+		}
+		return m.jsonResponse(req, header, nil, fail(queued.code)), nil
+	}
 	if cdn {
 		status, data, contentType := m.serve(req, parts, header)
 		return response(req, status, header, contentType, data), nil
@@ -451,15 +571,16 @@ func (m *MockServerClient) roundTrip(req *http.Request, raw []byte) (*http.Respo
 	if req.Header.Get("X-Api-Key") != m.options.APIKey {
 		return m.jsonResponse(req, header, nil, fail(calmlens.CodeInvalidAPIKey)), nil
 	}
-	key := req.Header.Get("Idempotency-Key")
+	// HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
+	key := strings.Trim(req.Header.Get("Idempotency-Key"), " \t\r\n")
 	// Like the API, raw uploads are compared by query, Content-Type and length, not bytes.
 	compared := ""
 	if req.Header.Get("Content-Type") == "application/json" {
 		compared = string(raw)
 	}
-	fingerprint := strings.Join([]string{req.Method, req.URL.EscapedPath(), req.URL.RawQuery, req.Header.Get("Content-Type"), strconv.Itoa(len(raw)), compared}, "\n")
-	if key != "" {
-		if len(key) > 255 || strings.IndexFunc(key, func(r rune) bool { return r < 0x20 || r > 0x7e }) >= 0 {
+	fingerprint := strings.Join([]string{req.Method, req.URL.EscapedPath(), req.URL.RawQuery, req.Header.Get("Content-Type"), req.Header.Get("X-Calmlens-Upload"), strconv.Itoa(len(raw)), compared}, "\n")
+	if len(req.Header.Values("Idempotency-Key")) > 0 {
+		if !validIdempotencyKey(key) {
 			return m.jsonResponse(req, header, nil, fail(calmlens.CodeInvalidIdempotencyKey)), nil
 		}
 		if saved, ok := m.replays[key]; ok {
@@ -472,11 +593,89 @@ func (m *MockServerClient) roundTrip(req *http.Request, raw []byte) (*http.Respo
 	}
 	result, err := m.dispatch(req.Method, parts, req.URL.Query(), raw, req.Header)
 	res := m.jsonResponse(req, header, result, err)
+	// A failed request frees its key, like the API.
 	if key != "" && err == nil {
 		data, _ := json.Marshal(result)
 		m.replays[key] = replay{fingerprint: fingerprint, status: res.StatusCode, data: data}
 	}
 	return res, nil
+}
+
+// validIdempotencyKey is the API's rule for a trimmed key: 1 to 255 printable ASCII characters,
+// without a space at either end.
+func validIdempotencyKey(key string) bool {
+	if key == "" || len(key) > 255 || key[0] == ' ' || key[len(key)-1] == ' ' {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] < 0x20 || key[i] > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+// operationsOf names the JavaScript client methods a request can come from, for
+// FailNextRequest.
+func operationsOf(method string, parts []string, q url.Values, cdn bool) []string {
+	if cdn {
+		return []string{"cdn.serve"}
+	}
+	if len(parts) >= 3 && parts[0] == "projects" {
+		switch route := strings.Join(parts[2:], "/"); {
+		case route == "events":
+			return []string{"events.list", "events.pages"}
+		case route == "lenses":
+			return []string{"ensureLenses", "ensureLens"}
+		case route == "folders" && method == "GET":
+			return []string{"folders.list"}
+		case route == "folders":
+			return []string{"folders.create"}
+		case route == "assets/page":
+			return []string{"assets.list", "assets.iterate"}
+		case route == "assets/search":
+			return []string{"assets.search"}
+		case route == "assets" && q.Get("queue") == "false":
+			return []string{"assets.classify", "text.classify"}
+		case route == "assets":
+			return []string{"assets.create"}
+		}
+		return nil
+	}
+	if len(parts) < 2 {
+		return nil
+	}
+	suffix := strings.Join(parts[2:], "/")
+	if parts[0] == "folders" {
+		switch {
+		case suffix == "move":
+			return []string{"folders.move"}
+		case method == "GET":
+			return []string{"folders.retrieve"}
+		case method == "PATCH":
+			return []string{"folders.update"}
+		case method == "DELETE":
+			return []string{"folders.delete"}
+		}
+		return nil
+	}
+	switch {
+	case suffix == "" && method == "GET":
+		return []string{"assets.retrieve", "assets.waitForDecision"}
+	case suffix == "" && method == "PATCH":
+		return []string{"assets.update"}
+	case suffix == "" && method == "DELETE":
+		return []string{"assets.delete"}
+	case suffix == "content":
+		return []string{"assets.deleteContent"}
+	case suffix == "children":
+		return []string{"assets.listChildren", "assets.iterateChildren"}
+	case suffix == "signed-url":
+		return []string{"assets.createSignedUrl"}
+	case suffix == "part":
+		return []string{"assets.uploadPart"}
+	}
+	return []string{"assets." + suffix}
 }
 
 // jsonResponse encodes result, or err as the API's error body and status.
@@ -553,6 +752,48 @@ func number(value any) float64 {
 
 var errUnknownRoute = &apiError{code: "mock/unknown-route", status: http.StatusNotFound}
 
+// validation is a request the API's schema refuses: validation/<issue> with HTTP 400 and the
+// field in details.path.
+func validation(code, path string) error {
+	return &apiError{code: code, status: http.StatusBadRequest, details: calmlens.JSON{"path": path}}
+}
+
+// intRange reads an integer query parameter that must be within [low, high], or fallback when
+// it is absent.
+func intRange(q url.Values, name string, fallback, low, high int) (int, error) {
+	value := q.Get(name)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	switch {
+	case err != nil:
+		return 0, validation("validation/invalid-type", name)
+	case parsed < low:
+		return 0, validation("validation/too-small", name)
+	case parsed > high:
+		return 0, validation("validation/too-big", name)
+	}
+	return parsed, nil
+}
+
+const (
+	defaultEventsLimit  = 50
+	maxEventsLimit      = 100
+	maxPageSize         = 100
+	maxSearchLimit      = 20
+	maxSearchQuery      = 200
+	maxFolderPageSize   = 100
+	minMultipartPart    = 5 * 1024 * 1024
+	minMultipartImage   = 10 * 1024 * 1024
+	maxMultipartImage   = 20 * 1024 * 1024
+	imageCacheLifetime  = 31536000
+	mockThumbHash       = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
+	mockAverageColor    = "#7f7f7f"
+	defaultContentType  = "application/octet-stream"
+	cdnProtectionPolicy = "sandbox; default-src 'none'"
+)
+
 func (m *MockServerClient) dispatch(method string, parts []string, q url.Values, raw []byte, headers http.Header) (any, error) {
 	body := calmlens.JSON{}
 	if headers.Get("Content-Type") == "application/json" && len(raw) > 0 {
@@ -561,7 +802,6 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		}
 	}
 	now := m.options.Now()
-	db := m.DatabaseStorage
 	if len(parts) < 2 {
 		return nil, errUnknownRoute
 	}
@@ -572,103 +812,16 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		route := strings.Join(parts[2:], "/")
 		switch {
 		case route == "events" && method == "GET":
-			return m.listEvents(q, now)
+			return m.listEvents(q)
 		case route == "lenses" && method == "PUT":
 			return m.ensureLenses(body, now)
 		case route == "folders" && method == "GET":
-			folders := []calmlens.JSON{}
-			for _, f := range db.Folders {
-				if f["projectId"] == m.options.ProjectID && ((q.Get("searchAll") == "true" && q.Get("search") != "") || text(f["parentId"]) == q.Get("parentId")) && strings.Contains(strings.ToLower(text(f["name"])), strings.ToLower(q.Get("search"))) {
-					folders = append(folders, f)
-				}
-			}
-			sort.Slice(folders, func(i, j int) bool {
-				a, b := text(folders[i]["name"]), text(folders[j]["name"])
-				if q.Get("sort") == "createdAt" {
-					a, b = fmt.Sprintf("%020v", folders[i]["createdAt"]), fmt.Sprintf("%020v", folders[j]["createdAt"])
-				}
-				if a == b {
-					a, b = text(folders[i]["id"]), text(folders[j]["id"])
-				}
-				if q.Get("direction") == "DESC" {
-					return a > b
-				}
-				return a < b
-			})
-			size, _ := strconv.Atoi(q.Get("pageSize"))
-			if size == 0 {
-				size = 100
-			}
-			index, _ := strconv.Atoi(q.Get("pageIndex"))
-			start := index * size
-			end := start + size
-			if end > len(folders) {
-				end = len(folders)
-			}
-			if start > end {
-				start = end
-			}
-			page := folders[start:end]
-			if q.Get("resolveOnly") == "true" {
-				page = []calmlens.JSON{}
-			}
-			ids := map[string]bool{}
-			var selected []string
-			for index := 0; ; index++ {
-				id := q.Get(fmt.Sprintf("ids[%d]", index))
-				if id == "" {
-					break
-				}
-				selected = append(selected, id)
-			}
-			selected = append(selected, q.Get("parentId"))
-			for _, f := range page {
-				selected = append(selected, text(f["id"]))
-			}
-			for len(selected) > 0 {
-				id := selected[len(selected)-1]
-				selected = selected[:len(selected)-1]
-				if id == "" || ids[id] {
-					continue
-				}
-				ids[id] = true
-				if f := db.Folders[id]; f != nil {
-					selected = append(selected, text(f["parentId"]))
-				}
-			}
-			ancestors := []calmlens.JSON{}
-			for id := range ids {
-				if f := db.Folders[id]; f != nil && f["projectId"] == m.options.ProjectID {
-					inPage := false
-					for _, item := range page {
-						if text(item["id"]) == id {
-							inPage = true
-							break
-						}
-					}
-					if !inPage {
-						ancestors = append(ancestors, f)
-					}
-				}
-			}
-			return calmlens.JSON{"folders": page, "ancestors": ancestors, "hasMore": q.Get("resolveOnly") != "true" && len(folders) > index*size+size}, nil
+			return m.listFolders(q)
 		case route == "folders" && method == "POST":
-			if id := text(body["parentId"]); id != "" {
-				if _, err := m.folder(id); err != nil {
-					return nil, err
-				}
-			}
-			if err := m.unique(body["name"], body["parentId"], nil); err != nil {
-				return nil, err
-			}
-			body["id"] = m.options.CreateID()
-			body["projectId"] = m.options.ProjectID
-			body["createdAt"] = now
-			body["updatedAt"] = now
-			db.Folders[text(body["id"])] = body
-			return body, nil
+			return m.createFolder(body, now)
 		case route == "assets/page" && method == "GET":
-			return m.page(func(a calmlens.JSON) bool { return q.Get("folderId") == "" || a["folderId"] == q.Get("folderId") }, q)
+			folder, hasFolder := q["folderId"]
+			return m.page(func(a calmlens.JSON) bool { return !hasFolder || a["folderId"] == folder[0] }, q, "assets:"+q.Get("filter")+":"+strings.Join(folder, ""))
 		case route == "assets/search" && method == "GET":
 			return m.search(q)
 		case route == "assets" && method == "POST":
@@ -687,14 +840,12 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 	return nil, errUnknownRoute
 }
 
-func (m *MockServerClient) listEvents(q url.Values, now int64) (any, error) {
-	limit := 100
-	if value := q.Get("limit"); value != "" {
-		parsed, err := strconv.Atoi(value)
-		if err != nil || parsed < 1 || parsed > 100 {
-			return nil, fail(calmlens.CodeInvalidUploadPayload)
-		}
-		limit = parsed
+// listEvents reads the feed like the API: without after, no events and a cursor for now; with
+// after, up to limit (default 50, at most 100) events added since, oldest first.
+func (m *MockServerClient) listEvents(q url.Values) (any, error) {
+	limit, err := intRange(q, "limit", defaultEventsLimit, 1, maxEventsLimit)
+	if err != nil {
+		return nil, err
 	}
 	// Cursors are "<sequence>_mock": the number of events already delivered.
 	position := len(m.events)
@@ -702,57 +853,67 @@ func (m *MockServerClient) listEvents(q url.Values, now int64) (any, error) {
 		sequence, ok := strings.CutSuffix(after, "_mock")
 		parsed, err := strconv.Atoi(sequence)
 		if !ok || err != nil || parsed < 0 || parsed > len(m.events) {
-			return nil, fail(calmlens.CodeInvalidEventCursor)
+			failure := fail(calmlens.CodeInvalidEventCursor).(*apiError)
+			failure.details = calmlens.JSON{"after": after}
+			return nil, failure
 		}
 		position = parsed
+	} else {
+		return calmlens.JSON{"events": []calmlens.JSON{}, "cursor": fmt.Sprintf("%d_mock", position), "hasMore": false}, nil
 	}
 	end := min(position+limit, len(m.events))
 	events := append([]calmlens.JSON{}, m.events[position:end]...)
 	return calmlens.JSON{"events": events, "cursor": fmt.Sprintf("%d_mock", end), "hasMore": end < len(m.events)}, nil
 }
 
+// ensureLenses saves each definition in order like the API: a new identifier is created, an
+// unchanged definition returns the stored lens, and a change needs a greater version. Lenses
+// before a conflict stay saved.
 func (m *MockServerClient) ensureLenses(body calmlens.JSON, now int64) (any, error) {
 	definitions, _ := body["lenses"].([]any)
 	result := []calmlens.JSON{}
-	pending := map[string]calmlens.JSON{}
-	for k, v := range m.lenses {
-		pending[k] = v
-	}
 	for _, value := range definitions {
 		definition, ok := value.(map[string]any)
 		if !ok {
 			return nil, fail(calmlens.CodeInvalidUploadPayload)
 		}
 		id := text(definition["identifier"])
-		old := pending[id]
-		same := old != nil
+		old := m.lenses[id]
+		if old == nil {
+			lens := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "userId": nil, "createdAt": now, "updatedAt": now}
+			for key, item := range definition {
+				lens[key] = item
+			}
+			m.lenses[id] = lens
+			result = append(result, lens)
+			continue
+		}
+		same := true
 		for _, key := range []string{"name", "description", "type", "active", "transforms", "version"} {
 			a, _ := json.Marshal(old[key])
 			b, _ := json.Marshal(definition[key])
-			if !bytes.Equal(a, b) {
-				same = false
-			}
+			same = same && bytes.Equal(a, b)
 		}
-		if old != nil && !same && number(definition["version"]) <= number(old["version"]) {
-			return nil, fail(calmlens.CodeLensVersionConflict)
-		}
-		lens := old
-		if !same {
-			lens = definition
-			lens["id"] = m.options.CreateID()
-			lens["createdAt"] = now
-			if old != nil {
-				lens["id"] = old["id"]
-				lens["createdAt"] = old["createdAt"]
+		switch {
+		case same:
+			result = append(result, old)
+		case number(definition["version"]) > number(old["version"]):
+			lens := calmlens.JSON{}
+			for key, item := range old {
+				lens[key] = item
 			}
-			lens["projectId"] = m.options.ProjectID
-			lens["userId"] = nil
+			for key, item := range definition {
+				lens[key] = item
+			}
 			lens["updatedAt"] = now
+			m.lenses[id] = lens
+			result = append(result, lens)
+		default:
+			failure := fail(calmlens.CodeLensVersionConflict).(*apiError)
+			failure.details = calmlens.JSON{"currentVersion": old["version"], "minimumVersion": number(old["version"]) + 1, "requestedVersion": definition["version"]}
+			return nil, failure
 		}
-		pending[id] = lens
-		result = append(result, lens)
 	}
-	m.lenses = pending
 	return calmlens.JSON{"lenses": result}, nil
 }
 
@@ -782,17 +943,10 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	if text(options["name"]) == "" {
 		return nil, fail(calmlens.CodeInvalidUploadPayload)
 	}
-	if external := text(options["externalId"]); external != "" {
-		for _, other := range m.DatabaseStorage.Assets {
-			if other["projectId"] == m.options.ProjectID && other["externalId"] == external {
-				return nil, fail(calmlens.CodeDuplicateExternalID)
-			}
-		}
-	}
 	mime := q.Get("contentType")
-	kind := "file"
+	kind := calmlens.AssetTypeFile
 	if options["url"] != nil {
-		kind = "website"
+		kind = calmlens.AssetTypeWebsite
 	} else {
 		for _, prefix := range []string{"image", "video", "audio"} {
 			if strings.HasPrefix(mime, prefix+"/") {
@@ -800,85 +954,147 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 			}
 		}
 		if strings.HasPrefix(mime, "text/") {
-			kind = "plaintext-document"
+			kind = calmlens.AssetTypePlaintextDocument
 		}
 		if strings.Contains(mime, "pdf") || strings.Contains(mime, "document") {
-			kind = "multimedia-document"
+			kind = calmlens.AssetTypeMultimediaDocument
 		}
 	}
 	queue := q.Get("queue") == "true"
 	open := multipart && q.Get("isFinal") != "true"
-	a := calmlens.JSON{}
-	for _, key := range []string{"name", "description", "metadata", "externalId", "externalUrl", "processingOptions", "folderId", "visibility"} {
-		if v, ok := options[key]; ok {
-			a[key] = v
+	var total *int64
+	if multipart {
+		if declared := q.Get("totalSizeInBytes"); declared != "" {
+			size, err := strconv.ParseInt(declared, 10, 64)
+			if err != nil {
+				return nil, fail(calmlens.CodeInvalidUploadPayload)
+			}
+			total = &size
+		}
+		// Like the API: a declared total is checked before anything is stored, then a single
+		// final part as the whole upload, then the part itself.
+		if total != nil {
+			if err := imageSizeError(kind, *total, true); err != nil {
+				return nil, err
+			}
+		}
+		if !open {
+			if err := totalSizeError(total, int64(len(raw)), true); err != nil {
+				return nil, err
+			}
+			if err := imageSizeError(kind, int64(len(raw)), true); err != nil {
+				return nil, err
+			}
+		}
+		if err := partSizeError(len(raw), !open); err != nil {
+			return nil, err
+		}
+		if err := totalSizeError(total, int64(len(raw)), !open); err != nil {
+			return nil, err
 		}
 	}
-	if folder := text(a["folderId"]); folder != "" {
+	if folder := text(options["folderId"]); folder != "" {
 		if _, err := m.folder(folder); err != nil {
 			return nil, err
 		}
 	}
-	id := m.options.CreateID()
-	a["id"] = id
-	a["projectId"] = m.options.ProjectID
-	a["type"] = kind
-	a["createdAt"] = now
-	a["updatedAt"] = now
-	a["parentId"] = nil
-	a["tags"] = []any{}
-	if a["visibility"] == nil {
-		a["visibility"] = calmlens.VisibilityPrivate
+	if external := text(options["externalId"]); external != "" {
+		for _, other := range m.DatabaseStorage.Assets {
+			if other["projectId"] == m.options.ProjectID && other["externalId"] == external {
+				return nil, fail(calmlens.CodeDuplicateExternalID)
+			}
+		}
 	}
-	processing := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "updatedAt": now, "completedAt": nil}
-	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
-	if open {
-		processing["status"] = calmlens.ClassificationStatusPending
-		uploadState["status"] = "uploading"
+	orNull := func(key string) any {
+		if value, ok := options[key]; ok {
+			return value
+		}
+		return nil
+	}
+	processingOptions := orNull("processingOptions")
+	if processingOptions == nil {
+		processingOptions = calmlens.JSON{"keepContentAfterProcessing": false}
 	}
 	contentStatus := calmlens.ContentStatusTemporary
-	if keep, _ := asJSON(options["processingOptions"])["keepContentAfterProcessing"].(bool); keep {
+	if keep, _ := asJSON(processingOptions)["keepContentAfterProcessing"].(bool); keep {
 		contentStatus = calmlens.ContentStatusStored
+	}
+	visibility := orNull("visibility")
+	if visibility == nil {
+		visibility = calmlens.VisibilityPrivate
+	}
+	externalURL := orNull("externalUrl")
+	if options["url"] != nil {
+		externalURL = options["url"]
+	}
+	id := m.options.CreateID()
+	// Fields the API returns as null when they are not set.
+	a := calmlens.JSON{
+		"id": id, "projectId": m.options.ProjectID, "userId": nil, "parentId": nil,
+		"folderId": orNull("folderId"), "uploadPresetId": orNull("uploadPresetId"),
+		"createdAt": now, "updatedAt": now, "name": options["name"],
+		"description": orNull("description"), "externalId": orNull("externalId"), "externalUrl": externalURL,
+		"type": kind, "metadata": orNull("metadata"), "tags": nil,
+		"processingOptions": processingOptions, "visibility": visibility,
 	}
 	content := calmlens.JSON{
 		"status": contentStatus, "removalReason": nil, "updatedAt": now, "safetyHold": nil,
 		"format": nil, "extension": nil, "sizeInBytes": nil, "checksums": nil, "image": nil,
 		"extractedText": nil,
 	}
-	a["upload"] = uploadState
-	a["classification"] = processing
-	processing["moderation"] = calmlens.JSON{
-		"status": calmlens.ModerationStatusPending, "manualReviews": []any{},
+	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
+	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "updatedAt": now, "completedAt": nil,
+		"moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}}}
+	if open {
+		uploadState["status"] = "uploading"
+		uploadState["partsReceived"] = 1
+		classification["status"] = calmlens.ClassificationStatusPending
 	}
-	a["content"] = content
-	if options["url"] != nil {
-		a["externalUrl"] = options["url"]
-	} else {
+	a["content"], a["upload"], a["classification"] = content, uploadState, classification
+	if options["url"] == nil {
 		if mime != "" {
 			content["format"] = mime
 		}
 		content["sizeInBytes"] = len(raw)
 		m.ImageStorage.Content[id] = &StoredContent{Type: mime, Parts: map[int][]byte{1: raw}}
 	}
-	if multipart {
-		uploadState["partsReceived"] = 1
-		state := &upload{queue: queue}
-		if total := q.Get("totalSizeInBytes"); total != "" {
-			size, err := strconv.ParseInt(total, 10, 64)
-			if err != nil || size < int64(len(raw)) {
-				return nil, fail(calmlens.CodeUploadSizeMismatch)
-			}
-			state.totalSize = &size
-		}
-		if open {
-			m.uploads[id] = state
-		}
-	}
-	if !open {
-		m.applyOutcome(a, m.outcome(queue), now)
+	if open {
+		m.uploads[id] = &upload{queue: queue, totalSize: total}
+	} else {
+		m.applyOutcome(a, m.outcome(queue), calmlens.ContentRemovalReasonPolicy)
 	}
 	m.DatabaseStorage.Assets[id] = a
 	return a, nil
+}
+
+// imageSizeError is the API's rule for image uploads in parts: at most 20 MiB, and (checked at
+// the last part) at least 10 MiB.
+func imageSizeError(kind string, size int64, final bool) error {
+	switch {
+	case kind != calmlens.AssetTypeImage:
+		return nil
+	case size > maxMultipartImage:
+		return fail(calmlens.CodeMultipartImageTooLarge)
+	case final && size < minMultipartImage:
+		return fail(calmlens.CodeMultipartImageTooSmall)
+	}
+	return nil
+}
+
+// partSizeError is the API's rule for a part: at least 5 MiB unless it is the last.
+func partSizeError(size int, final bool) error {
+	if !final && size < minMultipartPart {
+		return fail(calmlens.CodeInvalidUploadPayload)
+	}
+	return nil
+}
+
+// totalSizeError refuses parts that overshoot a declared total, or do not reach it at the end.
+func totalSizeError(total *int64, received int64, final bool) error {
+	if total != nil && (received > *total || final && received != *total) {
+		return fail(calmlens.CodeUploadSizeMismatch)
+	}
+	return nil
 }
 
 func (m *MockServerClient) outcome(queue bool) string {
@@ -907,17 +1123,59 @@ func section(a calmlens.JSON, name string) calmlens.JSON {
 	return object
 }
 
+// withoutPlaceholder drops an image's ThumbHash and average colour, which go with its content.
+func withoutPlaceholder(image any) any {
+	object, ok := image.(map[string]any)
+	if !ok {
+		return image
+	}
+	copied := calmlens.JSON{}
+	for key, value := range object {
+		copied[key] = value
+	}
+	copied["thumbhash"], copied["averageColor"] = nil, nil
+	return copied
+}
+
 // applyOutcome moves an asset to outcome like the pipeline: a decision finishes processing,
-// OutcomePurged deletes the content, and finished processing removes content kept only
-// temporarily (keepContentAfterProcessing off).
-func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome string, now int64) {
+// OutcomePurged deletes the content (with purgeReason), and finished processing removes content
+// kept only temporarily (keepContentAfterProcessing off). A classified image gets a ThumbHash
+// for its placeholder, which goes with its content.
+func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason string) {
+	now := m.options.Now()
 	decided := outcome != OutcomePending && outcome != OutcomeFailed
 	processing, moderation, content := section(a, "classification"), section(section(a, "classification"), "moderation"), section(a, "content")
-	processing["updatedAt"] = now
+	removed := content["status"] == calmlens.ContentStatusRemoved
+	purge := outcome == OutcomePurged && !removed
+	removeContent := purge || decided && content["status"] == calmlens.ContentStatusTemporary
+	image := content["image"]
+	switch {
+	case decided && a["type"] == calmlens.AssetTypeImage && !removed && !purge:
+		classified := calmlens.JSON{"width": nil, "height": nil, "perceptualHash": nil}
+		for key, value := range asJSON(image) {
+			classified[key] = value
+		}
+		classified["thumbhash"] = mockThumbHash
+		if classified["averageColor"] == nil {
+			classified["averageColor"] = mockAverageColor
+		}
+		image = classified
+	case outcome == OutcomePurged:
+		image = withoutPlaceholder(image)
+	}
+	content["image"] = image
+	if removeContent {
+		reason := calmlens.ContentRemovalReasonRetention
+		if purge {
+			reason = purgeReason
+		}
+		m.removeContent(a, reason, now)
+	}
 	section(a, "upload")["status"] = "completed"
 	section(a, "upload")["updatedAt"] = now
-	moderation["status"] = calmlens.ModerationStatusPending
+	processing["updatedAt"] = now
 	processing["completedAt"] = nil
+	moderation["status"] = calmlens.ModerationStatusPending
 	switch {
 	case decided:
 		processing["status"] = calmlens.ClassificationStatusCompleted
@@ -929,15 +1187,10 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome string, now int
 		processing["status"] = calmlens.ClassificationStatusProcessing
 	}
 	a["updatedAt"] = now
-	switch {
-	case outcome == OutcomePurged:
-		m.removeContent(a, calmlens.ContentRemovalReasonPolicy, now)
-	case decided && content["status"] == calmlens.ContentStatusTemporary:
-		m.removeContent(a, calmlens.ContentRemovalReasonRetention, now)
-	}
 }
 
-// removeContent deletes the asset's stored bytes and marks its content removed for reason.
+// removeContent deletes the asset's stored bytes and marks its content removed for reason; the
+// extracted text and the image's placeholder go with it.
 func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int64) {
 	delete(m.ImageStorage.Content, text(a["id"]))
 	content := section(a, "content")
@@ -948,6 +1201,7 @@ func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int
 	content["removalReason"] = reason
 	content["updatedAt"] = now
 	content["extractedText"] = nil
+	content["image"] = withoutPlaceholder(content["image"])
 }
 
 func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.JSON, q url.Values, raw []byte, now int64) (any, error) {
@@ -958,19 +1212,41 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 	switch {
 	case method == "GET" && suffix == "":
 	case method == "DELETE" && suffix == "":
+		m.recordLifecycleEvent(calmlens.EventAssetDeleted, a)
 		delete(m.ImageStorage.Content, id)
 		delete(m.DatabaseStorage.Assets, id)
 		delete(m.uploads, id)
 		return calmlens.JSON{}, nil
 	case method == "PATCH" && suffix == "":
+		// Like the API: an externalId stays unique in the project; null clears a field.
+		if external := text(body["externalId"]); external != "" {
+			for otherID, other := range m.DatabaseStorage.Assets {
+				if otherID != id && other["projectId"] == m.options.ProjectID && other["externalId"] == external {
+					return nil, fail(calmlens.CodeDuplicateExternalID)
+				}
+			}
+		}
 		for key, value := range body {
 			a[key] = value
 		}
+		a["updatedAt"] = now
 	case method == "DELETE" && suffix == "content":
-		// Like the API: the record and report stay; stored content and extracted text go.
-		m.removeContent(a, calmlens.ContentRemovalReasonRequested, now)
+		// Like the API: the record and report stay; stored content, extracted text and the
+		// placeholder go. Content already removed keeps its reason, and an
+		// asset.content-removed event is recorded either way.
+		content := section(a, "content")
+		if content["status"] == calmlens.ContentStatusRemoved {
+			delete(m.ImageStorage.Content, id)
+			if asJSON(content["image"])["thumbhash"] != nil {
+				content["image"] = withoutPlaceholder(content["image"])
+			}
+		} else {
+			m.removeContent(a, calmlens.ContentRemovalReasonRequested, now)
+			a["updatedAt"] = now
+		}
+		m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a)
 	case method == "GET" && suffix == "children":
-		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q)
+		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q, "children:"+id)
 	case method == "POST" && suffix == "signed-url":
 		params := url.Values{"expiresInSeconds": {fmt.Sprint(body["expiresInSeconds"])}}
 		for _, key := range []string{"lens", "transform"} {
@@ -985,14 +1261,16 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		}
 		return calmlens.JSON{"url": m.options.SignedURLBaseURL + "/assets/" + id + "/" + resource + "?" + params.Encode(), "expiresAt": now + int64(number(body["expiresInSeconds"])*1000)}, nil
 	case method == "POST" && suffix == "retry":
-		if section(a, "classification")["status"] != calmlens.ClassificationStatusFailed {
+		classification := section(a, "classification")
+		if classification["status"] != calmlens.ClassificationStatusFailed || section(classification, "moderation")["status"] != calmlens.ModerationStatusPending {
 			return nil, fail(calmlens.CodeAssetNotRetryable)
 		}
 		if section(a, "content")["status"] == calmlens.ContentStatusRemoved {
 			return nil, fail(calmlens.CodeAssetContentUnavailable)
 		}
-		// Like the API: back to processing, to be moderated again.
-		m.applyOutcome(a, OutcomePending, now)
+		// Like the API: back to processing, to be moderated again, with an asset.retried event.
+		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy)
+		m.recordLifecycleEvent(calmlens.EventAssetRetried, a)
 	case method == "POST" && suffix == "explain":
 		classification := section(a, "classification")
 		if classification["status"] != calmlens.ClassificationStatusCompleted {
@@ -1003,6 +1281,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 			// Like the API: the evidence is completed and every action stays as decided.
 			if policy, ok := moderation["policy"].(map[string]any); ok && policy["evidence"] == calmlens.PolicyEvidenceDecision {
 				policy["evidence"] = calmlens.PolicyEvidenceFull
+				a["updatedAt"] = now
 			}
 			break
 		}
@@ -1013,7 +1292,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 			return nil, fail(calmlens.CodeAssetContentUnavailable)
 		}
 		// Like the API: back to processing, to be moderated again under the current policy.
-		m.applyOutcome(a, OutcomePending, now)
+		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy)
 	case method == "POST" && suffix == "move":
 		if folder := text(body["folderId"]); folder != "" {
 			if _, err = m.folder(folder); err != nil {
@@ -1021,6 +1300,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 			}
 		}
 		a["folderId"] = body["folderId"]
+		a["updatedAt"] = now
 	case method == "POST" && suffix == "part":
 		if err := m.uploadPart(a, id, q, raw, now); err != nil {
 			return nil, err
@@ -1028,51 +1308,148 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 	default:
 		return nil, errUnknownRoute
 	}
-	if method != "GET" {
-		a["updatedAt"] = now
-	}
 	return a, nil
 }
 
+// uploadPart continues a multipart upload in the API's order: the upload must be open, parts
+// arrive in order, then image totals and the declared total are checked.
 func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, raw []byte, now int64) error {
 	state := m.uploads[id]
 	stored := m.ImageStorage.Content[id]
-	processing := section(a, "upload")
-	if state == nil || stored == nil || processing["status"] != "uploading" {
+	progress := section(a, "upload")
+	if state == nil || stored == nil || progress["status"] != "uploading" {
 		return fail(calmlens.CodeUploadNotOpen)
 	}
 	if size := q.Get("sizeInBytes"); size != "" && size != strconv.Itoa(len(raw)) {
 		return fail(calmlens.CodeInvalidUploadPayload)
 	}
 	part, _ := strconv.Atoi(q.Get("partNumber"))
-	expected := int(number(processing["partsReceived"])) + 1
+	expected := int(number(progress["partsReceived"])) + 1
 	if part != expected {
 		failure := fail(calmlens.CodeInvalidUploadPartNumber).(*apiError)
-		failure.details = calmlens.JSON{"expectedPartNumber": expected}
+		failure.details = calmlens.JSON{"expectedPartNumber": expected, "receivedPartNumber": part}
 		return failure
 	}
-	size := int64(0)
+	size := int64(len(raw))
 	for _, value := range stored.Parts {
 		size += int64(len(value))
 	}
-	size += int64(len(raw))
 	final := q.Get("isFinal") == "true"
-	if state.totalSize != nil && (size > *state.totalSize || final && size != *state.totalSize) {
-		return fail(calmlens.CodeUploadSizeMismatch)
+	if err := imageSizeError(text(a["type"]), size, final); err != nil {
+		return err
+	}
+	if err := totalSizeError(state.totalSize, size, final); err != nil {
+		return err
+	}
+	if err := partSizeError(len(raw), final); err != nil {
+		return err
 	}
 	stored.Parts[part] = raw
 	section(a, "content")["sizeInBytes"] = size
-	processing["partsReceived"] = part
+	progress["updatedAt"] = now
+	a["updatedAt"] = now
 	if !final {
+		progress["partsReceived"] = part
 		return nil
 	}
+	// Like the API, a completed upload no longer counts parts.
+	progress["partsReceived"] = nil
 	queue := state.queue
 	if override := q.Get("queue"); override != "" {
 		queue = override == "true"
 	}
 	delete(m.uploads, id)
-	m.applyOutcome(a, m.outcome(queue), now)
+	m.applyOutcome(a, m.outcome(queue), calmlens.ContentRemovalReasonPolicy)
 	return nil
+}
+
+// listFolders lists one page of child folders, or searches names, with the ancestors of the
+// listed and requested folders, like the API.
+func (m *MockServerClient) listFolders(q url.Values) (any, error) {
+	db := m.DatabaseStorage
+	size, err := intRange(q, "pageSize", maxFolderPageSize, 1, maxFolderPageSize)
+	if err != nil {
+		return nil, err
+	}
+	index, _ := strconv.Atoi(q.Get("pageIndex"))
+	search := strings.ToLower(q.Get("search"))
+	folders := []calmlens.JSON{}
+	for _, f := range db.Folders {
+		if f["projectId"] == m.options.ProjectID && ((q.Get("searchAll") == "true" && search != "") || text(f["parentId"]) == q.Get("parentId")) && strings.Contains(strings.ToLower(text(f["name"])), search) {
+			folders = append(folders, f)
+		}
+	}
+	// Like the database: names compare by code point, so case matters.
+	sort.Slice(folders, func(i, j int) bool {
+		var order int
+		if q.Get("sort") == "createdAt" {
+			order = cmp.Compare(number(folders[i]["createdAt"]), number(folders[j]["createdAt"]))
+		} else {
+			order = strings.Compare(text(folders[i]["name"]), text(folders[j]["name"]))
+		}
+		if order == 0 {
+			order = strings.Compare(text(folders[i]["id"]), text(folders[j]["id"]))
+		}
+		if q.Get("direction") == "DESC" {
+			return order > 0
+		}
+		return order < 0
+	})
+	start := min(index*size, len(folders))
+	end := min(start+size, len(folders))
+	page := folders[start:end]
+	if q.Get("resolveOnly") == "true" {
+		page = []calmlens.JSON{}
+	}
+	ids := map[string]bool{}
+	var selected []string
+	for index := 0; ; index++ {
+		id := q.Get(fmt.Sprintf("ids[%d]", index))
+		if id == "" {
+			break
+		}
+		selected = append(selected, id)
+	}
+	selected = append(selected, q.Get("parentId"))
+	for _, f := range page {
+		selected = append(selected, text(f["id"]))
+	}
+	for len(selected) > 0 {
+		id := selected[len(selected)-1]
+		selected = selected[:len(selected)-1]
+		if id == "" || ids[id] {
+			continue
+		}
+		ids[id] = true
+		if f := db.Folders[id]; f != nil {
+			selected = append(selected, text(f["parentId"]))
+		}
+	}
+	ancestors := []calmlens.JSON{}
+	for id := range ids {
+		if f := db.Folders[id]; f != nil && f["projectId"] == m.options.ProjectID && !slices.ContainsFunc(page, func(item calmlens.JSON) bool { return text(item["id"]) == id }) {
+			ancestors = append(ancestors, f)
+		}
+	}
+	sort.Slice(ancestors, func(i, j int) bool { return text(ancestors[i]["id"]) < text(ancestors[j]["id"]) })
+	return calmlens.JSON{"folders": page, "ancestors": ancestors, "hasMore": q.Get("resolveOnly") != "true" && len(folders) > index*size+size}, nil
+}
+
+func (m *MockServerClient) createFolder(body calmlens.JSON, now int64) (any, error) {
+	if text(body["name"]) == "" {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	if id := text(body["parentId"]); id != "" {
+		if _, err := m.folder(id); err != nil {
+			return nil, err
+		}
+	}
+	if err := m.unique(body["name"], body["parentId"], nil); err != nil {
+		return nil, err
+	}
+	folder := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "parentId": body["parentId"], "name": body["name"], "createdAt": now, "updatedAt": now}
+	m.DatabaseStorage.Folders[text(folder["id"])] = folder
+	return folder, nil
 }
 
 func (m *MockServerClient) folderRoute(method, id, suffix string, body calmlens.JSON, now int64) (any, error) {
@@ -1083,15 +1460,17 @@ func (m *MockServerClient) folderRoute(method, id, suffix string, body calmlens.
 	switch {
 	case method == "GET" && suffix == "":
 	case method == "DELETE" && suffix == "":
+		hasAssets, hasChildren := false, false
 		for _, a := range m.DatabaseStorage.Assets {
-			if a["folderId"] == id {
-				return nil, fail(calmlens.CodeFolderNotEmpty)
-			}
+			hasAssets = hasAssets || a["folderId"] == id
 		}
 		for _, other := range m.DatabaseStorage.Folders {
-			if other["parentId"] == id {
-				return nil, fail(calmlens.CodeFolderNotEmpty)
-			}
+			hasChildren = hasChildren || other["parentId"] == id
+		}
+		if hasAssets || hasChildren {
+			failure := fail(calmlens.CodeFolderNotEmpty).(*apiError)
+			failure.details = calmlens.JSON{"hasAssets": hasAssets, "hasChildren": hasChildren}
+			return nil, failure
 		}
 		delete(m.DatabaseStorage.Folders, id)
 		return calmlens.JSON{}, nil
@@ -1113,6 +1492,7 @@ func (m *MockServerClient) folderRoute(method, id, suffix string, body calmlens.
 			return nil, err
 		}
 		f["parentId"] = body["parentId"]
+		f["updatedAt"] = now
 	case method == "PATCH" && suffix == "":
 		if name, ok := body["name"]; ok {
 			if err = m.unique(name, f["parentId"], id); err != nil {
@@ -1120,24 +1500,33 @@ func (m *MockServerClient) folderRoute(method, id, suffix string, body calmlens.
 			}
 			f["name"] = name
 		}
+		f["updatedAt"] = now
 	default:
 		return nil, errUnknownRoute
-	}
-	if method != "GET" {
-		f["updatedAt"] = now
 	}
 	return f, nil
 }
 
+// pageCursor is the position a page ends at, for the query (scope and ordering) it belongs to.
+type pageCursor struct {
+	Scope  string `json:"scope"`
+	Values []any  `json:"values"`
+}
+
 // page lists project assets accepted by include, applying the RSQL filter, ordering and
-// pagination from the query like the API.
-func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values) (any, error) {
+// pagination from the query like the API. A cursor continues only the query (scope and
+// ordering) it came from.
+func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values, scope string) (any, error) {
 	var filter filterNode
 	if expression := q.Get("filter"); expression != "" {
 		var err error
 		if filter, err = parseFilter(expression); err != nil {
 			return nil, &apiError{code: "mock/invalid-filter", status: http.StatusBadRequest, details: calmlens.JSON{"reason": err.Error()}}
 		}
+	}
+	size, err := intRange(q, "pageSize", 10, 1, maxPageSize)
+	if err != nil {
+		return nil, err
 	}
 	ordering := []calmlens.Order{}
 	for i := 0; q.Has(fmt.Sprintf("ordering[%d][field]", i)); i++ {
@@ -1150,93 +1539,65 @@ func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values) 
 	if len(ordering) == 0 {
 		ordering = append(ordering, calmlens.Order{Field: "createdAt", Direction: "DESC"})
 	}
-	hasID := false
-	for _, order := range ordering {
-		if order.Field == "id" {
-			hasID = true
-		}
-	}
-	if !hasID {
+	if !slices.ContainsFunc(ordering, func(order calmlens.Order) bool { return order.Field == "id" }) {
 		ordering = append(ordering, calmlens.Order{Field: "id", Direction: ordering[0].Direction})
 	}
+	signature, _ := json.Marshal([]any{scope, ordering})
 	items := []calmlens.JSON{}
 	for _, a := range m.DatabaseStorage.Assets {
 		if a["projectId"] == m.options.ProjectID && include(a) && (filter == nil || filter.match(a)) {
 			items = append(items, a)
 		}
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		for _, order := range ordering {
-			left, right := lookup(items[i], order.Field), lookup(items[j], order.Field)
-			result := 0
-			switch {
-			case left == nil && right == nil:
-			case left == nil:
-				result = -1
-			case right == nil:
-				result = 1
-			default:
-				result = compareValues(left, fmt.Sprint(right))
-			}
+	compareItems := func(item calmlens.JSON, values []any) int {
+		for i, order := range ordering {
+			result := compareValues(lookup(item, order.Field), fmt.Sprint(values[i]))
 			if result != 0 {
-				return result < 0 == (order.Direction == "ASC")
+				if order.Direction == "DESC" {
+					return -result
+				}
+				return result
 			}
 		}
-		if number(items[i]["createdAt"]) == number(items[j]["createdAt"]) {
-			return text(items[i]["id"]) < text(items[j]["id"])
+		return 0
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		values := make([]any, len(ordering))
+		for k, order := range ordering {
+			values[k] = lookup(items[j], order.Field)
 		}
-		return number(items[i]["createdAt"]) < number(items[j]["createdAt"])
+		return compareItems(items[i], values) < 0
 	})
-	if cursor := q.Get("cursor"); cursor != "" {
-		raw, err := base64.StdEncoding.DecodeString(cursor)
-		var boundary calmlens.JSON
-		if err != nil || json.Unmarshal(raw, &boundary) != nil {
+	if encoded := q.Get("cursor"); encoded != "" {
+		raw, err := base64.StdEncoding.DecodeString(encoded)
+		var cursor pageCursor
+		if err != nil || json.Unmarshal(raw, &cursor) != nil || cursor.Scope != string(signature) || len(cursor.Values) != len(ordering) {
 			return nil, fail(calmlens.CodeInvalidCursor)
 		}
-		for _, order := range ordering {
-			if order.Field == "id" {
-				if _, ok := boundary[order.Field].(string); !ok {
-					return nil, fail(calmlens.CodeInvalidCursor)
-				}
-			} else {
-				if _, ok := boundary[order.Field].(float64); !ok {
-					return nil, fail(calmlens.CodeInvalidCursor)
-				}
+		for i, order := range ordering {
+			if _, isText := cursor.Values[i].(string); isText != (order.Field == "id") {
+				return nil, fail(calmlens.CodeInvalidCursor)
 			}
 		}
 		remaining := []calmlens.JSON{}
 		for _, item := range items {
-			for _, order := range ordering {
-				comparison := compareValues(lookup(item, order.Field), fmt.Sprint(boundary[order.Field]))
-				if comparison == 0 {
-					continue
-				}
-				if (comparison > 0) == (order.Direction == "ASC") {
-					remaining = append(remaining, item)
-				}
-				break
+			if compareItems(item, cursor.Values) > 0 {
+				remaining = append(remaining, item)
 			}
 		}
 		items = remaining
 	}
-	size, _ := strconv.Atoi(q.Get("pageSize"))
-	if size <= 0 {
-		size = 10
-	}
-	if size > 100 {
-		return nil, fail(calmlens.CodeInvalidUploadPayload)
-	}
 	end := min(size, len(items))
-	var cursor any
+	var next any
 	if end < len(items) {
-		boundary := calmlens.JSON{}
+		cursor := pageCursor{Scope: string(signature)}
 		for _, order := range ordering {
-			boundary[order.Field] = lookup(items[end-1], order.Field)
+			cursor.Values = append(cursor.Values, lookup(items[end-1], order.Field))
 		}
-		raw, _ := json.Marshal(boundary)
-		cursor = base64.StdEncoding.EncodeToString(raw)
+		raw, _ := json.Marshal(cursor)
+		next = base64.StdEncoding.EncodeToString(raw)
 	}
-	return calmlens.JSON{"items": items[:end], "nextCursor": cursor, "pageSize": size, "ordering": ordering, "hasMore": end < len(items)}, nil
+	return calmlens.JSON{"items": items[:end], "nextCursor": next, "pageSize": size, "ordering": ordering, "hasMore": end < len(items)}, nil
 }
 
 // maxSearchTokens is how many distinct query words the API searches for.
@@ -1251,17 +1612,17 @@ var searchFields = []string{"name", "id", "externalId", "description", "tags", "
 // external ID or name first, then prefixes, then name and tag substrings), then newest first.
 // Semantic search is not simulated, so semanticStatus is "disabled".
 func (m *MockServerClient) search(q url.Values) (any, error) {
+	// Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
 	queryText := strings.TrimSpace(q.Get("query"))
-	if queryText == "" || len(queryText) > 200 {
-		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	if queryText == "" {
+		return nil, validation("validation/too-small", "query")
 	}
-	limit := 10
-	if value := q.Get("limit"); value != "" {
-		parsed, err := strconv.Atoi(value)
-		if err != nil || parsed < 1 || parsed > 20 {
-			return nil, fail(calmlens.CodeInvalidUploadPayload)
-		}
-		limit = parsed
+	if len([]rune(queryText)) > maxSearchQuery {
+		return nil, validation("validation/too-big", "query")
+	}
+	limit, err := intRange(q, "limit", 10, 1, maxSearchLimit)
+	if err != nil {
+		return nil, err
 	}
 	normalized := strings.ToLower(queryText)
 	tokens := []string{}
@@ -1371,15 +1732,15 @@ func contains(values []string, value string) bool {
 	return false
 }
 
-// serve answers a CDN request like the CDN: JSON errors, content type and length, and
-// single byte ranges.
+// serve answers a CDN request like the CDN: a placeholder PNG, or the stored content with its
+// type, length, cache and protection headers; or a JSON error body.
 func (m *MockServerClient) serve(req *http.Request, parts []string, header http.Header) (int, []byte, string) {
-	errorBody := func(status int, code string) (int, []byte, string) {
-		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": http.StatusText(status)})
+	errorBody := func(status int, code, message string) (int, []byte, string) {
+		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})
 		return status, data, "application/json"
 	}
 	if len(parts) < 4 || parts[0] != "assets" || parts[1] != m.options.ProjectID {
-		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound)
+		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
 	id := parts[2]
 	var asset calmlens.JSON
@@ -1390,23 +1751,54 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 		}
 	}
 	if asset == nil {
-		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound)
+		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
+	}
+	notAvailable := func() (int, []byte, string) {
+		return errorBody(http.StatusForbidden, "asset/not-available", "Asset is not available")
+	}
+	canDownload := func() bool { return m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) }
+	moderation := section(section(asset, "classification"), "moderation")["status"]
+	tag := "asset-" + text(asset["id"])
+	if parts[3] == calmlens.ResourcePlaceholder {
+		// Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
+		// whatever their moderation status; refused for purged assets, assets without one (not
+		// yet classified, or content removed) and, for private assets, keys without
+		// assets:download.
+		thumbhash := text(contentImage(asset)["thumbhash"])
+		if thumbhash == "" || moderation == calmlens.ModerationStatusPurged {
+			return notAvailable()
+		}
+		public := asset["visibility"] == calmlens.VisibilityPublic
+		if !public && !canDownload() {
+			return notAvailable()
+		}
+		png, err := placeholderPNG(thumbhash)
+		if err != nil {
+			return notAvailable()
+		}
+		access := "private"
+		if public {
+			access = "public"
+		}
+		header.Set("Cache-Control", access+", max-age=3600")
+		header.Set("Cache-Tag", tag)
+		header.Set("ETag", strconv.Quote(thumbhash))
+		return http.StatusOK, png, "image/png"
 	}
 	// Like the CDN, delivery checks come first and refuse everyone: content still uploading,
 	// blocked or purged, failed processing or removed content.
-	moderation := section(section(asset, "classification"), "moderation")["status"]
 	stored := m.ImageStorage.Content[text(asset["id"])]
 	if stored == nil || section(asset, "upload")["status"] == "uploading" ||
 		moderation == calmlens.ModerationStatusBlocked || moderation == calmlens.ModerationStatusPurged ||
 		section(asset, "classification")["status"] == calmlens.ClassificationStatusFailed ||
 		section(asset, "content")["status"] == calmlens.ContentStatusRemoved {
-		return errorBody(http.StatusForbidden, "asset/not-available")
+		return notAvailable()
 	}
 	// Then access: a private asset, or a public age-restricted one requested without the
 	// allowAgeRestricted=true opt-in, needs the download permission for its folder.
 	restricted := asset["visibility"] != calmlens.VisibilityPublic || moderation == calmlens.ModerationStatusAgeRestricted && req.URL.Query().Get("allowAgeRestricted") != "true"
-	if restricted && !m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) {
-		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission")
+	if restricted && !canDownload() {
+		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission", "This API key needs assets:download permission for this asset's folder.")
 	}
 	// Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
 	// by shared caches only when delivery is public.
@@ -1414,10 +1806,23 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	if restricted {
 		access = "private"
 	}
-	if asset["type"] == "image" {
-		lifetime = "max-age=31536000, immutable"
+	image := asset["type"] == calmlens.AssetTypeImage
+	if image {
+		lifetime = fmt.Sprintf("max-age=%d, immutable", imageCacheLifetime)
+		header.Set("ETag", strconv.Quote(text(asset["id"])))
+		header.Set("Expires", time.UnixMilli(m.options.Now()).Add(imageCacheLifetime*time.Second).UTC().Format(http.TimeFormat))
 	}
 	header.Set("Cache-Control", access+", "+lifetime)
+	header.Set("Cache-Tag", tag)
+	header.Set("X-Content-Type-Options", "nosniff")
+	header.Set("Content-Security-Policy", cdnProtectionPolicy)
+	contentType := stored.Type
+	if contentType == "" {
+		contentType = defaultContentType
+	}
+	if activeContentType(contentType) {
+		header.Set("Content-Disposition", "attachment")
+	}
 	indices := []int{}
 	for index := range stored.Parts {
 		indices = append(indices, index)
@@ -1427,32 +1832,31 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	for _, index := range indices {
 		data = append(data, stored.Parts[index]...)
 	}
-	header.Set("Accept-Ranges", "bytes")
-	if spec, ok := strings.CutPrefix(req.Header.Get("Range"), "bytes="); ok && !strings.Contains(spec, ",") {
-		startText, endText, _ := strings.Cut(spec, "-")
-		start, startErr := strconv.Atoi(startText)
-		end, endErr := strconv.Atoi(endText)
-		if endText == "" {
-			end, endErr = len(data)-1, nil
-		}
-		if startErr != nil || endErr != nil || start > end || start >= len(data) {
-			return errorBody(http.StatusRequestedRangeNotSatisfiable, "cdn/invalid-range")
-		}
-		end = min(end, len(data)-1)
-		header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(data)))
-		return http.StatusPartialContent, data[start : end+1], stored.Type
-	}
-	return http.StatusOK, data, stored.Type
+	return http.StatusOK, data, contentType
 }
 
-func (m *MockServerClient) canDownload(folder, apiKey string) bool {
-	data, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(apiKey, "sk_test_"))
-	if err != nil {
-		return false
+// contentImage returns the asset's content.image object (empty when it has none).
+func contentImage(asset calmlens.JSON) calmlens.JSON {
+	return asJSON(section(asset, "content")["image"])
+}
+
+// activeContentType reports content a browser could run as a document, which the CDN serves as
+// a download.
+func activeContentType(contentType string) bool {
+	normalized := strings.TrimSpace(strings.ToLower(strings.Split(contentType, ";")[0]))
+	switch normalized {
+	case "image/svg+xml", "application/xhtml+xml", "text/html", "application/xml", "text/xml":
+		return true
 	}
-	var grants []Grant
-	if json.Unmarshal(data, &grants) != nil {
-		return false
+	return strings.HasSuffix(normalized, "+xml")
+}
+
+// canDownload reports whether the API key may download content in folder: the mock's own key
+// has the grants SetAPIKeyGrants (or CreateMockAPIKey) gave it.
+func (m *MockServerClient) canDownload(folder, apiKey string) bool {
+	grants := m.grants
+	if apiKey != m.options.APIKey {
+		grants = keyGrants(apiKey)
 	}
 	for _, grant := range grants {
 		if !contains(grant.Actions, "assets:download") {

@@ -12,7 +12,7 @@ export const SDK_ERROR_CODES = {
   CANCELLED: "sdk/cancelled",
   /** A successful response whose body is not the JSON the operation returns. */
   INVALID_RESPONSE: "sdk/invalid-response",
-  /** An HTTP failure without a CalmLens error body, for example from a proxy. */
+  /** An HTTP failure without a CalmLens error body, for example from a proxy, or a redirect. */
   HTTP_ERROR: "sdk/http-error",
   /** A response body larger than `maxResponseBytes`. */
   RESPONSE_TOO_LARGE: "sdk/response-too-large",

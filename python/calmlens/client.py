@@ -15,7 +15,6 @@ import queue
 import random
 import re
 import select
-import sys
 import threading
 import time
 import uuid
@@ -30,7 +29,7 @@ from urllib.request import Request, getproxies, proxy_bypass
 from . import error_codes
 from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
-                     CalmLensValidationError)
+                     CalmLensValidationError, _parse_retry_after)
 from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
@@ -42,7 +41,7 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetIdOptions, AssetPag
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
 __all__ = ["CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse", "DEFAULT_TIMEOUT",
-           "DEFAULT_CONNECT_TIMEOUT", "DEFAULT_MAX_RETRIES", "USER_AGENT"]
+           "DEFAULT_CONNECT_TIMEOUT", "DEFAULT_MAX_RETRIES", "DEFAULT_MAX_RESPONSE_BYTES", "USER_AGENT"]
 
 
 class TransportResponse(Protocol):
@@ -65,17 +64,20 @@ Transport = Callable[[Request, float], TransportResponse]
 
 #: Seconds a connection may stay silent (no bytes sent or received) before ``sdk/timeout``.
 #: It is not a limit on the whole transfer, so large uploads and downloads are not cut off.
-DEFAULT_TIMEOUT = 60.0
+DEFAULT_TIMEOUT = 120.0
 #: Seconds allowed to open a connection (TCP, proxy CONNECT and TLS handshake).
 DEFAULT_CONNECT_TIMEOUT = 10.0
 #: Retries after the first attempt for requests that are safe to resend.
 DEFAULT_MAX_RETRIES = 2
-#: Largest JSON response body the client reads (CDN downloads are streamed and unlimited).
-MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+#: Default largest API response body the client reads (CDN downloads are streamed and unlimited).
+DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+#: Seconds before the first retry; each later retry waits twice as long, up to ``RETRY_MAX_DELAY``.
+#: Half of each wait is fixed and half random.
+RETRY_BASE_DELAY = 0.5
+RETRY_MAX_DELAY = 8.0
 #: ``Retry-After`` values above this are not waited for; the error is raised instead.
 MAX_RETRY_AFTER_SECONDS = 60.0
-USER_AGENT = (f"calmlens-python/{__version__} "
-              f"({platform.python_implementation()} {platform.python_version()}; {sys.platform})")
+USER_AGENT = f"calmlens-python/{__version__} ({platform.python_implementation().lower()}/{platform.python_version()})"
 
 _RETRY_STATUSES = frozenset({429, 502, 503, 504})
 _ENV_API_KEY, _ENV_PROJECT_ID = "CALMLENS_API_KEY", "CALMLENS_PROJECT_ID"
@@ -258,18 +260,41 @@ def _response_headers(response: Any) -> dict[str, str]:
     return {str(k).lower(): str(v) for k, v in items}
 
 
-def _read_body(response: Any, headers: Mapping[str, str]) -> bytes | None:
-    """Read a JSON response body; None when it exceeds ``MAX_RESPONSE_BYTES`` (a body that
-    declares a larger ``Content-Length`` is not read at all)."""
+def _read_body(response: Any, headers: Mapping[str, str], limit: int) -> bytes | None:
+    """Read an API response body; None when it exceeds ``limit`` bytes (a body that declares a
+    larger ``Content-Length`` is not read at all)."""
     declared = headers.get("content-length", "")
     if declared.isascii() and declared.isdigit():
-        if int(declared) > MAX_RESPONSE_BYTES:
+        if int(declared) > limit:
             return None
         # read() without a size raises IncompleteRead when the connection ends early.
         content = cast(bytes, response.read())
     else:
-        content = cast(bytes, response.read(MAX_RESPONSE_BYTES + 1))
-    return None if len(content) > MAX_RESPONSE_BYTES else content
+        content = cast(bytes, response.read(limit + 1))
+    return None if len(content) > limit else content
+
+
+def _is_redirect(status: int, headers: Mapping[str, str]) -> bool:
+    """A redirect the SDK must not follow: it would send the API key to another origin."""
+    return 300 <= status < 400 and "location" in headers
+
+
+def _redirect_error(status: int, headers: dict[str, str]) -> CalmLensAPIError:
+    # An HTTP failure like any other non-2xx: repeating the request redirects again.
+    return CalmLensAPIError(error_codes.SDK_HTTP_ERROR, f"Unexpected redirect (HTTP {status})", status=status,
+                            headers=headers)
+
+
+def _too_large(status: int, headers: dict[str, str], limit: int) -> CalmLensError:
+    return CalmLensError(error_codes.SDK_RESPONSE_TOO_LARGE, f"Response body exceeds {limit} bytes", status=status,
+                         headers=headers)
+
+
+def _retry_delay(attempt: int) -> float:
+    """Seconds to wait before retry ``attempt`` (0-based): half of the exponential delay is fixed,
+    the other half random, rounded to milliseconds like the JavaScript SDK."""
+    delay = min(RETRY_MAX_DELAY, RETRY_BASE_DELAY * float(2 ** attempt))
+    return round((delay / 2 + random.random() * delay / 2) * 1000) / 1000
 
 
 class _PooledResponse:
@@ -463,9 +488,10 @@ class _Transport:
 
 class _LimitedReader(io.RawIOBase):
     """Streams exactly ``size`` bytes of a binary file object, so a stream that is longer
-    than declared cannot corrupt the HTTP request and a shorter one fails clearly."""
+    than declared cannot corrupt the HTTP request and a shorter one fails clearly. Without a
+    ``size`` it streams until the end (the request is then sent with chunked encoding)."""
 
-    def __init__(self, stream: BinaryIO, size: int):
+    def __init__(self, stream: BinaryIO, size: int | None):
         super().__init__()
         self._stream, self._remaining, self._size = stream, size, size
 
@@ -474,21 +500,26 @@ class _LimitedReader(io.RawIOBase):
 
     def read(self, amount: int | None = -1) -> bytes:
         if amount is None or amount < 0:
-            chunks = []
-            while self._remaining > 0:
-                chunks.append(self.read(min(self._remaining, 1024 * 1024)))
-            return b"".join(chunks)
-        if self._remaining <= 0:
+            chunks: list[bytes] = []
+            while True:
+                chunk = self.read(1024 * 1024)
+                if not chunk:
+                    return b"".join(chunks)
+                chunks.append(chunk)
+        if self._remaining is not None and self._remaining <= 0:
             return b""
-        wanted = min(amount, self._remaining)
+        wanted = amount if self._remaining is None else min(amount, self._remaining)
         data = self._stream.read(wanted)
         if not isinstance(data, (bytes, bytearray)):
             raise CalmLensValidationError(error_codes.INVALID_UPLOAD_PAYLOAD,
                                           "Upload streams must be opened in binary mode")
+        if self._remaining is None:
+            return bytes(data)
         if not data:
             raise CalmLensValidationError(
                 error_codes.INVALID_UPLOAD_PAYLOAD,
-                f"The stream ended after {self._size - self._remaining} of {self._size} bytes (sizeInBytes)")
+                f"The stream ended after {cast(int, self._size) - self._remaining} of {self._size} bytes "
+                "(sizeInBytes)")
         self._remaining -= len(data)
         return bytes(data)
 
@@ -509,7 +540,7 @@ def _stream_size(stream: Any) -> int | None:
 class _Body:
     """An upload body that can be rewound for a retry when its source allows it."""
 
-    def __init__(self, data: bytes | None = None, stream: Any = None, size: int = 0):
+    def __init__(self, data: bytes | None = None, stream: Any = None, size: int | None = 0):
         self.data, self.stream, self.size = data, stream, size
         self.start: int | None = None
         if stream is not None and _stream_size(stream) is not None:
@@ -530,7 +561,7 @@ class _Body:
 _PAYLOAD_KEYS = ("plainText", "base64", "data")
 
 
-def _payload(payload: object, multipart: bool = False) -> _Body:
+def _payload(payload: object, multipart: bool = False, part_size: bool = True) -> _Body:
     if not isinstance(payload, Mapping):
         raise _invalid("content must be a dict")
     legacy = [k for k in ("uint8Array", "buffer", "bytes") if k in payload]
@@ -563,11 +594,12 @@ def _payload(payload: object, multipart: bool = False) -> _Body:
         if isinstance(value, io.TextIOBase):
             raise _invalid("Open upload files in binary mode ('rb')", error_codes.INVALID_UPLOAD_PAYLOAD)
         available = _stream_size(value)
-        if declared is None and available is None:
-            raise _invalid("sizeInBytes is required for streams that cannot seek (pipes, sockets, generators)",
-                           error_codes.INVALID_UPLOAD_PAYLOAD)
-        size = declared if declared is not None else cast(int, available)
-        if available is not None and available < size:
+        if declared is None and available is None and multipart:
+            raise _invalid("sizeInBytes is required for multipart parts from streams that cannot seek (pipes, "
+                           "sockets, generators)", error_codes.INVALID_UPLOAD_PAYLOAD)
+        # A stream of unknown length is sent with chunked encoding and no sizeInBytes.
+        size = declared if declared is not None else available
+        if available is not None and size is not None and available < size:
             raise _invalid(f"sizeInBytes is {size} but the stream has {available} bytes left",
                            error_codes.INVALID_UPLOAD_PAYLOAD)
         body = _Body(stream=value, size=size)
@@ -578,7 +610,7 @@ def _payload(payload: object, multipart: bool = False) -> _Body:
         body.size = len(cast(bytes, body.data))
         if declared is not None and declared != body.size:
             raise _invalid("sizeInBytes must match the payload byte length", error_codes.INVALID_UPLOAD_PAYLOAD)
-    if multipart and not payload.get("isFinal", False) and body.size < 5 * 1024 * 1024:
+    if part_size and multipart and not payload.get("isFinal", False) and cast(int, body.size) < 5 * 1024 * 1024:
         raise _invalid("Multipart upload parts must be at least 5MiB except the final part.",
                        error_codes.INVALID_UPLOAD_PAYLOAD)
     return body
@@ -631,6 +663,46 @@ def _positive_number(name: str, value: object, allow_zero: bool = False) -> floa
     return float(value)
 
 
+def _max_retries(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise _invalid("max_retries must be a non-negative integer", error_codes.SDK_INVALID_CONFIG)
+    return value
+
+
+def _max_response_bytes(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise _invalid("max_response_bytes must be a positive integer", error_codes.SDK_INVALID_CONFIG)
+    return value
+
+
+def _is_asset(data: Any) -> bool:
+    """Whether a response is an asset: a non-empty ``id`` and string upload, classification and
+    moderation statuses."""
+    if not isinstance(data, dict) or not isinstance(data.get("id"), str) or not data["id"]:
+        return False
+    classification, upload = data.get("classification"), data.get("upload")
+    return (isinstance(classification, dict) and isinstance(classification.get("status"), str)
+            and isinstance(upload, dict) and isinstance(upload.get("status"), str)
+            and isinstance(classification.get("moderation"), dict)
+            and isinstance(classification["moderation"].get("status"), str))
+
+
+def _expect_asset(data: Any) -> Asset:
+    if not _is_asset(data):
+        raise CalmLensError(error_codes.SDK_INVALID_RESPONSE, "Expected an asset response", status=200)
+    return cast(Asset, data)
+
+
+def _new_cursor(sent: set[str], cursor: str) -> None:
+    """Iterators stop rather than loop: a page that says more follow must not hand back a cursor
+    the iteration has already sent, which would repeat the same pages forever."""
+    if cursor in sent:
+        raise CalmLensError(error_codes.SDK_INVALID_RESPONSE,
+                            "The API returned a cursor it had already returned, with more pages to follow",
+                            {"cursor": cursor})
+    sent.add(cursor)
+
+
 class CalmLensServerClient:
     """Synchronous CalmLens API client.
 
@@ -644,10 +716,14 @@ class CalmLensServerClient:
         cdn_base_url: CDN base URL.
         timeout: Seconds without any bytes sent or received before a request fails with
             ``sdk/timeout`` (an inactivity limit, not a limit on the whole transfer).
+        upload_timeout: The ``timeout`` of binary uploads (file content and multipart parts);
+            ``None`` (the default) uses ``timeout``.
         connect_timeout: Seconds allowed to open a connection.
         max_retries: Retries for requests that are safe to resend (``GET`` and writes sent
-            with an ``Idempotency-Key``) after network failures, 429, 502, 503, 504 and
+            with an ``Idempotency-Key``) after network failures, timeouts, 429, 502, 503, 504 and
             ``idempotency/request-in-progress``; 0 disables retries.
+        max_response_bytes: The largest API response body the client reads; a larger one fails
+            with ``sdk/response-too-large``. CDN downloads are not limited.
         transport: Optional ``transport(request, timeout)`` callable returning a
             context-managed response with ``status``, ``headers`` and ``read()``.
 
@@ -659,12 +735,15 @@ class CalmLensServerClient:
     def __init__(self, *, api_key: str | None = None, project_id: str | None = None,
                  base_url: str = "https://api.calmlens.com/v1",
                  cdn_base_url: str = "https://cdn.calmlens.com/v1",
-                 timeout: float = DEFAULT_TIMEOUT, connect_timeout: float = DEFAULT_CONNECT_TIMEOUT,
-                 max_retries: int = DEFAULT_MAX_RETRIES, transport: Transport | None = None):
+                 timeout: float = DEFAULT_TIMEOUT, upload_timeout: float | None = None,
+                 connect_timeout: float = DEFAULT_CONNECT_TIMEOUT,
+                 max_retries: int = DEFAULT_MAX_RETRIES, max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
+                 transport: Transport | None = None):
         # Validate every option before creating any state (connection pools, caches).
         api_key = os.environ.get(_ENV_API_KEY) if api_key is None else api_key
         project_id = os.environ.get(_ENV_PROJECT_ID) if project_id is None else project_id
         timeout = _positive_number("timeout", timeout)
+        upload = None if upload_timeout is None else _positive_number("upload_timeout", upload_timeout)
         connect_timeout = _positive_number("connect_timeout", connect_timeout)
         if not isinstance(api_key, str) or not api_key:
             raise _invalid(f"api_key is required (or set {_ENV_API_KEY})", error_codes.SDK_INVALID_CONFIG)
@@ -673,18 +752,21 @@ class CalmLensServerClient:
         for name, url in (("base_url", base_url), ("cdn_base_url", cdn_base_url)):
             if not isinstance(url, str) or urlsplit(url).scheme not in ("http", "https") or not urlsplit(url).netloc:
                 raise _invalid(f"{name} must be an HTTP(S) URL", error_codes.SDK_INVALID_CONFIG)
-        if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
-            raise _invalid("max_retries must be a non-negative integer", error_codes.SDK_INVALID_CONFIG)
+        max_retries = _max_retries(max_retries)
+        max_response_bytes = _max_response_bytes(max_response_bytes)
         if transport is not None and not callable(transport):
             raise _invalid("transport must be callable", error_codes.SDK_INVALID_CONFIG)
         self.api_key, self.project_id = api_key, project_id
         self.base_url, self.cdn_base_url = base_url.rstrip("/"), cdn_base_url.rstrip("/")
-        self.timeout, self.connect_timeout, self.max_retries = timeout, connect_timeout, max_retries
+        self.timeout, self.upload_timeout, self.connect_timeout = timeout, upload, connect_timeout
+        self.max_retries, self.max_response_bytes = max_retries, max_response_bytes
         self.transport: Transport = transport if transport is not None else _Transport(connect_timeout)
         self._lenses: dict[str, Lens] = {}
         self._lens_lock = threading.RLock()
         self._sleep: Callable[[float], None] = time.sleep
         self._clock: Callable[[], float] = time.monotonic
+        # Leaves multipart size checks to the API; set by the mock so it answers them in the API's order.
+        self._defer_upload_checks = False
         self._bind()
 
     def _bind(self) -> None:
@@ -696,16 +778,20 @@ class CalmLensServerClient:
         # Never include the API key.
         return f"{type(self).__name__}(project_id={self.project_id!r}, base_url={self.base_url!r})"
 
-    def with_options(self, *, timeout: float | None = None, max_retries: int | None = None) -> CalmLensServerClient:
-        """A client sharing this one's connections and caches with other per-call settings,
-        e.g. ``client.with_options(timeout=300).cdn.serve(...)`` or ``max_retries=0``."""
+    def with_options(self, *, timeout: float | None = None, upload_timeout: float | None = None,
+                     max_retries: int | None = None, max_response_bytes: int | None = None) -> CalmLensServerClient:
+        """A client sharing this one's connections and lens cache with other per-call settings,
+        e.g. ``client.with_options(timeout=300).cdn.serve(...)`` or ``max_retries=0``. Options
+        left out (``None``) keep this client's values."""
         clone = copy.copy(self)
         if timeout is not None:
             clone.timeout = _positive_number("timeout", timeout)
+        if upload_timeout is not None:
+            clone.upload_timeout = _positive_number("upload_timeout", upload_timeout)
         if max_retries is not None:
-            if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
-                raise _invalid("max_retries must be a non-negative integer", error_codes.SDK_INVALID_CONFIG)
-            clone.max_retries = max_retries
+            clone.max_retries = _max_retries(max_retries)
+        if max_response_bytes is not None:
+            clone.max_response_bytes = _max_response_bytes(max_response_bytes)
         clone._bind()
         return clone
 
@@ -737,24 +823,21 @@ class CalmLensServerClient:
                 params[f"ordering[{index}][{key}]"] = value
         return self.base_url + path + ("?" + urlencode(params) if params else "")
 
-    def _headers(self, extra: Mapping[str, str] | None = None) -> dict[str, str]:
+    def _headers(self, extra: Mapping[str, str] | None = None, *, api: bool = True) -> dict[str, str]:
         headers = {"User-Agent": USER_AGENT}
-        headers.update(extra or {})
+        if api:
+            headers["Accept"] = "application/json"
+        for name, value in (extra or {}).items():
+            # One value per header name, whatever its case.
+            for existing in [key for key in headers if key.lower() == name.lower()]:
+                del headers[existing]
+            headers[name] = value
         headers["X-Api-Key"] = _header_value("X-Api-Key", self.api_key)
         return headers
 
-    def _backoff(self, attempt: int, error: CalmLensError) -> float | None:
-        """Seconds to wait before retry ``attempt`` (1-based), or None to give up."""
-        if attempt > self.max_retries:
-            return None
-        if error.retry_after is not None:
-            return error.retry_after if error.retry_after <= MAX_RETRY_AFTER_SECONDS else None
-        # Exponential backoff with full jitter: 0-0.5s, 0-1s, 0-2s, ... capped at 8s.
-        return random.uniform(0, min(8.0, 0.5 * 2 ** (attempt - 1)))
-
     def _request(self, method: str, path: str, *, query: Mapping[str, Any] | None = None, body: Any = None,
                  raw: _Body | None = None, headers: Mapping[str, str] | None = None,
-                 idempotency_key: str | None = None) -> Any:
+                 idempotency_key: str | None = None, timeout: float | None = None) -> Any:
         request_headers = self._headers(headers)
         if idempotency_key is not None:
             request_headers["Idempotency-Key"] = _header_value("Idempotency-Key", idempotency_key)
@@ -763,37 +846,45 @@ class CalmLensServerClient:
             request_headers["Content-Type"] = "application/json"
         url = self._url(path, query)
         retryable = (method in ("GET", "HEAD") or idempotency_key is not None) and (raw is None or raw.rewindable)
+        limit = self.max_response_bytes
         attempt = 0
         while True:
-            attempt += 1
+            can_retry = retryable and attempt < self.max_retries
             request = Request(url, data=raw.open() if raw is not None else None, headers=request_headers, method=method)
+            error: CalmLensError | None = None
+            content: bytes | None = None
             try:
-                with self.transport(request, self.timeout) as response:
+                with self.transport(request, self.timeout if timeout is None else timeout) as response:
                     status, response_headers = response.status, _response_headers(response)
-                    content = _read_body(response, response_headers)
-            except _TRANSPORT_ERRORS as error:
-                failure = _transport_error(error)
-                delay = self._backoff(attempt, failure) if retryable else None
-                if delay is None:
-                    raise failure from error
-                self._sleep(delay)
+                    if _is_redirect(status, response_headers):
+                        error = _redirect_error(status, response_headers)
+                    else:
+                        content = _read_body(response, response_headers, limit)
+            except _TRANSPORT_ERRORS as cause:
+                failure = _transport_error(cause)
+                if not can_retry:
+                    raise failure from cause
+                self._sleep(_retry_delay(attempt))
+                attempt += 1
                 continue
-            if content is None and 200 <= status < 300:
-                raise CalmLensError(error_codes.SDK_RESPONSE_TOO_LARGE, "Response body is too large", status=status,
-                                    headers=response_headers)
-            if 200 <= status < 300 and content is not None:
-                try:
-                    return json.loads(content) if content else None
-                except (ValueError, UnicodeDecodeError) as error:
-                    raise CalmLensError(error_codes.SDK_INVALID_RESPONSE, f"Invalid JSON response (HTTP {status})",
-                                        status=status, headers=response_headers) from error
-            api_error = self._api_error(status, response_headers, content or b"")
-            delay = None
-            if retryable and (status in _RETRY_STATUSES or api_error.code == error_codes.IDEMPOTENT_REQUEST_IN_PROGRESS):
-                delay = self._backoff(attempt, api_error)
-            if delay is None:
-                raise api_error
+            if error is None:
+                if content is None:
+                    error = _too_large(status, response_headers, limit)
+                elif 200 <= status < 300:
+                    if not content and (status == 204 or method == "DELETE"):
+                        return None
+                    try:
+                        return json.loads(content)
+                    except (ValueError, UnicodeDecodeError) as cause:
+                        raise CalmLensError(error_codes.SDK_INVALID_RESPONSE, f"Invalid JSON response (HTTP {status})",
+                                            status=status, headers=response_headers) from cause
+                else:
+                    error = self._api_error(status, response_headers, content)
+            delay = error.retry_after if error.retry_after is not None else _retry_delay(attempt)
+            if not (can_retry and error.is_retryable and delay <= MAX_RETRY_AFTER_SECONDS):
+                raise error
             self._sleep(delay)
+            attempt += 1
 
     @staticmethod
     def _api_error(status: int, headers: dict[str, str], content: bytes) -> CalmLensAPIError:
@@ -803,7 +894,6 @@ class CalmLensServerClient:
             data = None
         if isinstance(data, dict) and isinstance(data.get("code"), str):
             details = dict(data["details"]) if isinstance(data.get("details"), dict) else {}
-            details["network"] = True  # Same as the JavaScript SDK: the error came from the API.
             if "traceId" in data:
                 details["traceId"] = data["traceId"]
             message = data.get("message") if isinstance(data.get("message"), str) else None
@@ -862,8 +952,31 @@ class CalmLensServerClient:
 ENSURE_LENSES_MAX_PER_REQUEST = 100
 
 _UPLOAD_TOKEN_CONTEXT = "calmlens-upload-token:v1:"
-_UPLOAD_TOKEN_DEFAULT_TTL_SECONDS = 600
+#: ``upload_tokens.sign``'s lifetime when ``expires_in_seconds`` is omitted.
+UPLOAD_TOKEN_DEFAULT_EXPIRES_IN_SECONDS = 600
 _UPLOAD_TOKEN_MAX_TTL_SECONDS = 3600
+
+
+def _sign_upload_token(api_key: str, options: Mapping[str, Any], now: int, nonce: str) -> SignedUploadToken:
+    """Sign an upload token at ``now`` (milliseconds since the epoch) with ``nonce``."""
+    preset_id = options.get("uploadPresetId")
+    _id(preset_id, "Upload preset ID")
+    ttl = options.get("expiresInSeconds", UPLOAD_TOKEN_DEFAULT_EXPIRES_IN_SECONDS)
+    if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= _UPLOAD_TOKEN_MAX_TTL_SECONDS:
+        raise _invalid(f"expiresInSeconds must be a whole number from 1 to {_UPLOAD_TOKEN_MAX_TTL_SECONDS}")
+    external = options.get("externalId")
+    if "externalId" in options and (not isinstance(external, str) or not external):
+        raise _invalid("externalId must be a non-empty string")
+    expires_at = now + ttl * 1000
+    claims: dict[str, Any] = {"v": 1, "u": preset_id, "k": api_key[:13 if api_key.startswith("clsk_") else 8],
+                              "e": expires_at, "n": nonce}
+    if external is not None:
+        claims["x"] = external
+    # The claims as JSON.stringify writes them: no whitespace, raw UTF-8, "/" and "<>&" unescaped.
+    body = base64.urlsafe_b64encode(_json(claims).encode("utf-8")).rstrip(b"=").decode("ascii")
+    secret = hashlib.sha256(api_key.encode("utf-8")).hexdigest().encode("ascii")
+    signature = hmac.new(secret, (_UPLOAD_TOKEN_CONTEXT + body).encode("utf-8"), hashlib.sha256).hexdigest()
+    return {"token": f"clut_{body}.{signature}", "expiresAt": expires_at}
 
 
 class UploadTokens:
@@ -882,31 +995,18 @@ class UploadTokens:
         """
         merged = _merge(options, upload_preset_id=upload_preset_id, external_id=external_id,
                         expires_in_seconds=expires_in_seconds)
-        preset_id = merged.get("uploadPresetId")
-        _id(preset_id, "Upload preset ID")
-        ttl = merged.get("expiresInSeconds", _UPLOAD_TOKEN_DEFAULT_TTL_SECONDS)
-        if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= _UPLOAD_TOKEN_MAX_TTL_SECONDS:
-            raise _invalid(f"expiresInSeconds must be a whole number from 1 to {_UPLOAD_TOKEN_MAX_TTL_SECONDS}")
-        external = merged.get("externalId")
-        if "externalId" in merged and (not isinstance(external, str) or not external):
-            raise _invalid("externalId must be a non-empty string")
-        api_key = self._c.api_key
-        expires_at = int(time.time() * 1000) + ttl * 1000
-        claims: dict[str, Any] = {"v": 1, "u": preset_id,
-                                  "k": api_key[:13 if api_key.startswith("clsk_") else 8], "e": expires_at,
-                                  "n": str(uuid.uuid4())}
-        if external is not None:
-            claims["x"] = external
-        body = base64.urlsafe_b64encode(
-            json.dumps(claims, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).rstrip(b"=").decode("ascii")
-        secret = hashlib.sha256(api_key.encode("utf-8")).hexdigest().encode("ascii")
-        signature = hmac.new(secret, (_UPLOAD_TOKEN_CONTEXT + body).encode("utf-8"), hashlib.sha256).hexdigest()
-        return {"token": f"clut_{body}.{signature}", "expiresAt": expires_at}
+        return _sign_upload_token(self._c.api_key, merged, int(time.time() * 1000), str(uuid.uuid4()))
 
 
-_DECISION_POLL_FIRST_DELAY = 0.5
-_DECISION_POLL_MAX_DELAY = 5.0
-_DEFAULT_DECISION_TIMEOUT = 60.0
+#: ``wait_for_decision`` checks again after this many seconds, then waits
+#: ``DECISION_POLL_DELAY_FACTOR`` times longer each time, up to ``DECISION_POLL_MAX_DELAY``.
+DECISION_POLL_FIRST_DELAY = 0.5
+DECISION_POLL_DELAY_FACTOR = 1.5
+DECISION_POLL_MAX_DELAY = 5.0
+#: Seconds ``wait_for_decision`` polls before ``sdk/timeout`` when ``timeout`` is omitted.
+DEFAULT_DECISION_TIMEOUT = 60.0
+#: ``assets.create_signed_url``'s lifetime when ``expires_in_seconds`` is omitted.
+DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 900
 
 _SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "externalId",
                       "externalUrl", "folderId", "uploadPresetId")
@@ -944,14 +1044,17 @@ class Assets:
 
     @staticmethod
     def _iterate(fetch: Callable[[str | None], AssetPage], index: str | None) -> Iterator[Asset]:
+        sent: set[str] = set()
         while True:
             page = fetch(index)
+            cursor = page.get("nextCursor")
+            more = bool(cursor) and bool(page.get("hasMore")) and bool(page["items"])
+            if more:
+                _new_cursor(sent, cast(str, cursor))
             yield from page["items"]
-            if not page.get("hasMore") or not page["items"]:
+            if not more:
                 return
-            index = page.get("nextCursor")
-            if not index:
-                return
+            index = cursor
 
     def retrieve(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Fetch an asset by ID."""
@@ -973,11 +1076,11 @@ class Assets:
         merged = _merge(options, asset_id=asset_id, timeout=timeout)
         _id(merged.get("assetId"), "assetId")
         wanted = cast(AssetIdOptions, {"assetId": merged["assetId"]})
-        limit = merged.get("timeout", _DEFAULT_DECISION_TIMEOUT)
+        limit = merged.get("timeout", DEFAULT_DECISION_TIMEOUT)
         if isinstance(limit, bool) or not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit < 0:
             raise _invalid("timeout must be a non-negative number of seconds")
         deadline = self._c._clock() + limit
-        delay = _DECISION_POLL_FIRST_DELAY
+        delay = DECISION_POLL_FIRST_DELAY
         while True:
             asset = self.retrieve(wanted)
             classification_status = asset["classification"]["status"]
@@ -993,7 +1096,7 @@ class Assets:
                     {"assetId": asset.get("id"), "classificationStatus": classification_status,
                      "moderationStatus": moderation_status})
             self._c._sleep(min(delay, remaining))
-            delay = min(_DECISION_POLL_MAX_DELAY, delay * 1.5)
+            delay = min(DECISION_POLL_MAX_DELAY, delay * DECISION_POLL_DELAY_FACTOR)
 
     def update(self, options: UpdateAssetOptions | None = None, /, *, asset_id: str = _UNSET, name: str = _UNSET,
                description: str | None = _UNSET, tags: List[str] | None = _UNSET,
@@ -1070,8 +1173,8 @@ class Assets:
                            error_codes.INVALID_UPLOAD_PAYLOAD)
         key = idempotency_key if idempotency_key is not None else str(uuid.uuid4())
         if "url" in options:
-            return cast(Asset, self._c._request("POST", self._c._project("assets"), query={"queue": queue},
-                                                body=options, idempotency_key=key))
+            return _expect_asset(self._c._request("POST", self._c._project("assets"), query={"queue": queue},
+                                                  body=options, idempotency_key=key))
         multipart = "part" in options
         payload = options["part" if multipart else "content"]
         if not isinstance(payload, Mapping):
@@ -1091,18 +1194,25 @@ class Assets:
         if total is not None and (not multipart or type(total) is not int or total <= 0):
             raise _invalid("total_size_in_bytes is a positive integer for multipart uploads",
                            error_codes.INVALID_UPLOAD_PAYLOAD)
-        body = _payload(payload, multipart)
-        if multipart and normalized.startswith("image/"):
+        checked = not self._c._defer_upload_checks
+        if checked and multipart and normalized.startswith("image/") and total is not None:
+            # Like the API, a declared image total is checked before the part itself.
+            _image_size(total, True)
+        body = _payload(payload, multipart, checked)
+        if checked and multipart and normalized.startswith("image/"):
             _image_size(body.size, payload.get("isFinal", False))
         query = {k: options[k] for k in _SUBMIT_QUERY_KEYS if k in options}
         query.update(queue=queue, contentType=mime, sizeInBytes=body.size)
         if multipart:
             query.update(partNumber=1, isFinal=payload.get("isFinal", False), totalSizeInBytes=total)
-        headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part" if multipart else "content",
-                   "Content-Length": str(body.size)}
-        return cast(Asset, self._c._request(
-            "POST", self._c._project("assets"),
-            query=query, raw=body, headers=headers, idempotency_key=key))
+        headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part" if multipart else "content"}
+        if body.size is not None:
+            headers["Content-Length"] = str(body.size)
+        # Text is sent with the API timeout; binary content with the upload timeout when one is set.
+        binary = "plainText" not in payload and self._c.upload_timeout is not None
+        return _expect_asset(self._c._request(
+            "POST", self._c._project("assets"), query=query, raw=body, headers=headers, idempotency_key=key,
+            timeout=self._c.upload_timeout if binary else None))
 
     def upload_part(self, options: UploadPartOptions | None = None, /, *, asset_id: str = _UNSET,
                     part: PartContent = _UNSET, queue: bool = _UNSET, idempotency_key: str | None = None) -> Asset:
@@ -1119,16 +1229,16 @@ class Assets:
             raise _invalid("part must be a dict")
         if type(payload.get("partNumber")) is not int or payload["partNumber"] < 1:
             raise CalmLensValidationError(error_codes.INVALID_UPLOAD_PART_NUMBER)
-        body = _payload(payload, True)
+        body = _payload(payload, True, not self._c._defer_upload_checks)
         query: dict[str, Any] = {"partNumber": payload["partNumber"], "isFinal": payload.get("isFinal", False),
                                  "sizeInBytes": body.size}
         if merged.get("queue") is not None:
             query["queue"] = bool(merged["queue"])
-        headers = {"X-CalmLens-Upload": "part", "Content-Type": "application/octet-stream",
-                   "Content-Length": str(body.size)}
-        return cast(Asset, self._c._request(
+        headers = {"X-CalmLens-Upload": "part", "Content-Length": str(body.size)}
+        return _expect_asset(self._c._request(
             "POST", path, raw=body, headers=headers, query=query,
-            idempotency_key=idempotency_key if idempotency_key is not None else str(uuid.uuid4())))
+            idempotency_key=idempotency_key if idempotency_key is not None else str(uuid.uuid4()),
+            timeout=self._c.upload_timeout))
 
     def create_signed_url(self, options: SignedUrlOptions | None = None, /, *, asset_id: str = _UNSET,
                           resource: Literal["original", "rendered"] = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,
@@ -1138,7 +1248,7 @@ class Assets:
         merged = _merge(options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
                         lens=lens, transform=transform)
         asset_path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/signed-url"
-        body = {"expiresInSeconds": 900,
+        body = {"expiresInSeconds": DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
                 **{k: v for k, v in merged.items() if k != "assetId"}}
         resource = body.get("resource", "rendered")
         if resource not in ("original", "rendered"):
@@ -1252,12 +1362,17 @@ class Events:
     def iter_pages(self, options: ListEventsOptions | None = None, /, *, after: str = _UNSET,
                    limit: int = _UNSET) -> Iterator[EventsPage]:
         """Yield pages from ``after`` until one reports ``hasMore=False``. Persist the last
-        page's ``cursor`` to resume later."""
+        page's ``cursor`` to resume later. Without ``after`` it yields one empty page whose cursor
+        is now. Raises ``sdk/invalid-response`` (``details.cursor``) instead of looping when a page
+        with more to follow returns a cursor already sent."""
         merged = _merge(options, after=after, limit=limit)
+        sent = {merged["after"]} if merged.get("after") is not None else set()
         while True:
             page = self.list(cast(ListEventsOptions, merged))
+            if page.get("hasMore"):
+                _new_cursor(sent, page["cursor"])
             yield page
-            if not page.get("hasMore") or not page["events"]:
+            if not page.get("hasMore"):
                 return
             merged["after"] = page["cursor"]
 
@@ -1314,8 +1429,10 @@ class CDN:
         """Request an asset from the CDN with the client's API key.
 
         Returns a streaming :class:`CDNResponse`, including for non-2xx responses (check
-        ``status``); close it, or use it as a context manager. Not retried. The timeout is
-        an inactivity limit, so large downloads are not cut off.
+        ``status``); close it, or use it as a context manager. Transport failures, timeouts, 429,
+        502, 503 and 504 are retried like API reads (``Retry-After`` replaces the backoff), and the
+        last response is returned once retries run out. A redirect is not followed: it raises
+        ``sdk/http-error``. The timeout is an inactivity limit, so large downloads are not cut off.
         """
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens,
                         transform=transform, allow_age_restricted=allow_age_restricted, init=init)
@@ -1325,11 +1442,31 @@ class CDN:
             raise _invalid("init.method must be GET or HEAD")
         extra = {k: _header_value(k, v) for k, v in (settings.get("headers") or {}).items() if k.lower() != "x-api-key"}
         url = self.get_asset_url(cast(AssetUrlOptions, {k: v for k, v in merged.items() if k != "init"}))
-        request = Request(url, headers=self._c._headers(extra), method=method)
-        try:
-            return CDNResponse(self._c.transport(request, self._c.timeout))
-        except _TRANSPORT_ERRORS as error:
-            raise _transport_error(error) from error
+        headers = self._c._headers(extra, api=False)
+        attempt = 0
+        while True:
+            can_retry = attempt < self._c.max_retries
+            try:
+                response = CDNResponse(self._c.transport(Request(url, headers=headers, method=method),
+                                                         self._c.timeout))
+            except _TRANSPORT_ERRORS as error:
+                if not can_retry:
+                    raise _transport_error(error) from error
+                self._c._sleep(_retry_delay(attempt))
+                attempt += 1
+                continue
+            if _is_redirect(response.status, response.headers):
+                response.close()
+                raise _redirect_error(response.status, response.headers)
+            if response.ok or not can_retry or response.status not in _RETRY_STATUSES:
+                return response
+            retry_after = _parse_retry_after(response.headers.get("retry-after"))
+            delay = retry_after if retry_after is not None else _retry_delay(attempt)
+            if delay > MAX_RETRY_AFTER_SECONDS:
+                return response
+            response.close()
+            self._c._sleep(delay)
+            attempt += 1
 
 
 class CDNResponse:

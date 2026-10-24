@@ -13,19 +13,22 @@ module CalmLens
     end
 
     # Iterates pages from `after` until `hasMore` is false. Persist each page's `cursor` once its
-    # events are handled, and resume from it later.
+    # events are handled, and resume from it later. Raises `sdk/invalid-response` (with
+    # `details['cursor']`) instead of looping when a page with more to follow repeats a cursor.
     # @yieldparam page [Hash]
     # @return [Enumerator, nil] an Enumerator when no block is given.
     def each_page(options = {})
       return enum_for(:each_page, options) unless block_given?
 
       api, request = call(options) { |*split| split }
+      sent = api.key?('after') ? [api['after']] : []
       loop do
         page = list(api.merge('request_options' => request))
         unless page.is_a?(Hash) && page['events'].is_a?(Array) && page['cursor'].is_a?(String)
           raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Events page has no events or cursor')
         end
 
+        new_cursor!(sent, page['cursor']) if page['hasMore'] == true
         yield page
         break unless page['hasMore'] == true
 

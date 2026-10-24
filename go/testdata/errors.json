@@ -1,0 +1,2150 @@
+[
+  {
+    "code": "validation/invalid-cursor",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-validation-invalid-cursor"
+      },
+      "body": {
+        "code": "validation/invalid-cursor",
+        "message": "The cursor is invalid or belongs to a different query.",
+        "details": {
+          "reason": "invalid_cursor"
+        },
+        "traceId": "trace-validation-invalid-cursor"
+      }
+    },
+    "expected": {
+      "code": "validation/invalid-cursor",
+      "status": 400,
+      "requestId": "req-validation-invalid-cursor",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_cursor",
+        "traceId": "trace-validation-invalid-cursor"
+      }
+    }
+  },
+  {
+    "code": "auth/missing-token",
+    "status": 401,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-auth-missing-token"
+      },
+      "body": {
+        "code": "auth/missing-token",
+        "message": "Authentication required. Send your project API key in the X-Api-Key header.",
+        "details": {
+          "reason": "missing_token"
+        },
+        "traceId": "trace-auth-missing-token"
+      }
+    },
+    "expected": {
+      "code": "auth/missing-token",
+      "status": 401,
+      "requestId": "req-auth-missing-token",
+      "retryAfter": null,
+      "details": {
+        "reason": "missing_token",
+        "traceId": "trace-auth-missing-token"
+      }
+    }
+  },
+  {
+    "code": "auth/invalid-api-key",
+    "status": 401,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-auth-invalid-api-key"
+      },
+      "body": {
+        "code": "auth/invalid-api-key",
+        "message": "The API key is invalid, revoked or expired. Create a key under Developer → API Keys.",
+        "details": {
+          "reason": "invalid_api_key"
+        },
+        "traceId": "trace-auth-invalid-api-key"
+      }
+    },
+    "expected": {
+      "code": "auth/invalid-api-key",
+      "status": 401,
+      "requestId": "req-auth-invalid-api-key",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_api_key",
+        "traceId": "trace-auth-invalid-api-key"
+      }
+    }
+  },
+  {
+    "code": "auth/project-mismatch",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-auth-project-mismatch"
+      },
+      "body": {
+        "code": "auth/project-mismatch",
+        "message": "This API key belongs to a different project. Use a key created for the project that owns this resource.",
+        "details": {
+          "reason": "api_key_project_mismatch"
+        },
+        "traceId": "trace-auth-project-mismatch"
+      }
+    },
+    "expected": {
+      "code": "auth/project-mismatch",
+      "status": 403,
+      "requestId": "req-auth-project-mismatch",
+      "retryAfter": null,
+      "details": {
+        "reason": "api_key_project_mismatch",
+        "traceId": "trace-auth-project-mismatch"
+      }
+    }
+  },
+  {
+    "code": "auth/api-key-not-accepted",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-auth-api-key-not-accepted"
+      },
+      "body": {
+        "code": "auth/api-key-not-accepted",
+        "message": "API keys are only accepted by the public API at /v1.",
+        "details": {
+          "reason": "api_key_not_accepted"
+        },
+        "traceId": "trace-auth-api-key-not-accepted"
+      }
+    },
+    "expected": {
+      "code": "auth/api-key-not-accepted",
+      "status": 403,
+      "requestId": "req-auth-api-key-not-accepted",
+      "retryAfter": null,
+      "details": {
+        "reason": "api_key_not_accepted",
+        "traceId": "trace-auth-api-key-not-accepted"
+      }
+    }
+  },
+  {
+    "code": "upload/file-too-large",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-file-too-large"
+      },
+      "body": {
+        "code": "upload/file-too-large",
+        "message": "File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.",
+        "details": {
+          "reason": "file_too_large"
+        },
+        "traceId": "trace-upload-file-too-large"
+      }
+    },
+    "expected": {
+      "code": "upload/file-too-large",
+      "status": 400,
+      "requestId": "req-upload-file-too-large",
+      "retryAfter": null,
+      "details": {
+        "reason": "file_too_large",
+        "traceId": "trace-upload-file-too-large"
+      }
+    }
+  },
+  {
+    "code": "upload/image-requires-multipart-upload",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-image-requires-multipart-upload"
+      },
+      "body": {
+        "code": "upload/image-requires-multipart-upload",
+        "message": "Images of 10MB or more must use a multipart upload.",
+        "details": {
+          "reason": "image_requires_multipart_upload"
+        },
+        "traceId": "trace-upload-image-requires-multipart-upload"
+      }
+    },
+    "expected": {
+      "code": "upload/image-requires-multipart-upload",
+      "status": 400,
+      "requestId": "req-upload-image-requires-multipart-upload",
+      "retryAfter": null,
+      "details": {
+        "reason": "image_requires_multipart_upload",
+        "traceId": "trace-upload-image-requires-multipart-upload"
+      }
+    }
+  },
+  {
+    "code": "upload/multipart-image-too-small",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-multipart-image-too-small"
+      },
+      "body": {
+        "code": "upload/multipart-image-too-small",
+        "message": "Multipart image uploads must total at least 10MB.",
+        "details": {
+          "reason": "multipart_image_too_small"
+        },
+        "traceId": "trace-upload-multipart-image-too-small"
+      }
+    },
+    "expected": {
+      "code": "upload/multipart-image-too-small",
+      "status": 400,
+      "requestId": "req-upload-multipart-image-too-small",
+      "retryAfter": null,
+      "details": {
+        "reason": "multipart_image_too_small",
+        "traceId": "trace-upload-multipart-image-too-small"
+      }
+    }
+  },
+  {
+    "code": "upload/multipart-image-too-large",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-multipart-image-too-large"
+      },
+      "body": {
+        "code": "upload/multipart-image-too-large",
+        "message": "Multipart image uploads cannot exceed 20MB.",
+        "details": {
+          "reason": "multipart_image_too_large"
+        },
+        "traceId": "trace-upload-multipart-image-too-large"
+      }
+    },
+    "expected": {
+      "code": "upload/multipart-image-too-large",
+      "status": 400,
+      "requestId": "req-upload-multipart-image-too-large",
+      "retryAfter": null,
+      "details": {
+        "reason": "multipart_image_too_large",
+        "traceId": "trace-upload-multipart-image-too-large"
+      }
+    }
+  },
+  {
+    "code": "upload/image-exceeded-max-dimensions",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-image-exceeded-max-dimensions"
+      },
+      "body": {
+        "code": "upload/image-exceeded-max-dimensions",
+        "message": "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
+        "details": {
+          "reason": "image_exceeded_max_dimensions"
+        },
+        "traceId": "trace-upload-image-exceeded-max-dimensions"
+      }
+    },
+    "expected": {
+      "code": "upload/image-exceeded-max-dimensions",
+      "status": 400,
+      "requestId": "req-upload-image-exceeded-max-dimensions",
+      "retryAfter": null,
+      "details": {
+        "reason": "image_exceeded_max_dimensions",
+        "traceId": "trace-upload-image-exceeded-max-dimensions"
+      }
+    }
+  },
+  {
+    "code": "upload/limit-exceeded",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-limit-exceeded"
+      },
+      "body": {
+        "code": "upload/limit-exceeded",
+        "message": "Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.",
+        "details": {
+          "reason": "upload_limit_exceeded"
+        },
+        "traceId": "trace-upload-limit-exceeded"
+      }
+    },
+    "expected": {
+      "code": "upload/limit-exceeded",
+      "status": 403,
+      "requestId": "req-upload-limit-exceeded",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_limit_exceeded",
+        "traceId": "trace-upload-limit-exceeded"
+      }
+    }
+  },
+  {
+    "code": "upload/spend-limit-reached",
+    "status": 402,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 402,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-spend-limit-reached"
+      },
+      "body": {
+        "code": "upload/spend-limit-reached",
+        "message": "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
+        "details": {
+          "reason": "spend_limit_reached"
+        },
+        "traceId": "trace-upload-spend-limit-reached"
+      }
+    },
+    "expected": {
+      "code": "upload/spend-limit-reached",
+      "status": 402,
+      "requestId": "req-upload-spend-limit-reached",
+      "retryAfter": null,
+      "details": {
+        "reason": "spend_limit_reached",
+        "traceId": "trace-upload-spend-limit-reached"
+      }
+    }
+  },
+  {
+    "code": "upload/invalid-mime-type",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-invalid-mime-type"
+      },
+      "body": {
+        "code": "upload/invalid-mime-type",
+        "message": "Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
+        "details": {
+          "reason": "invalid_upload_mime_type"
+        },
+        "traceId": "trace-upload-invalid-mime-type"
+      }
+    },
+    "expected": {
+      "code": "upload/invalid-mime-type",
+      "status": 400,
+      "requestId": "req-upload-invalid-mime-type",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_upload_mime_type",
+        "traceId": "trace-upload-invalid-mime-type"
+      }
+    }
+  },
+  {
+    "code": "events/invalid-cursor",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-events-invalid-cursor"
+      },
+      "body": {
+        "code": "events/invalid-cursor",
+        "message": "The events cursor is invalid. Use the cursor from a previous response, or omit it to start from now.",
+        "details": {
+          "reason": "invalid_event_cursor"
+        },
+        "traceId": "trace-events-invalid-cursor"
+      }
+    },
+    "expected": {
+      "code": "events/invalid-cursor",
+      "status": 400,
+      "requestId": "req-events-invalid-cursor",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_event_cursor",
+        "traceId": "trace-events-invalid-cursor"
+      }
+    }
+  },
+  {
+    "code": "upload/invalid-payload",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-invalid-payload"
+      },
+      "body": {
+        "code": "upload/invalid-payload",
+        "message": "Upload payload is invalid.",
+        "details": {
+          "reason": "invalid_upload_payload"
+        },
+        "traceId": "trace-upload-invalid-payload"
+      }
+    },
+    "expected": {
+      "code": "upload/invalid-payload",
+      "status": 400,
+      "requestId": "req-upload-invalid-payload",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_upload_payload",
+        "traceId": "trace-upload-invalid-payload"
+      }
+    }
+  },
+  {
+    "code": "upload/use-upload-part",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-use-upload-part"
+      },
+      "body": {
+        "code": "upload/use-upload-part",
+        "message": "Use uploadPart for multipart upload parts after the first part",
+        "details": {
+          "reason": "use_upload_part"
+        },
+        "traceId": "trace-upload-use-upload-part"
+      }
+    },
+    "expected": {
+      "code": "upload/use-upload-part",
+      "status": 409,
+      "requestId": "req-upload-use-upload-part",
+      "retryAfter": null,
+      "details": {
+        "reason": "use_upload_part",
+        "traceId": "trace-upload-use-upload-part"
+      }
+    }
+  },
+  {
+    "code": "upload/not-open",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-not-open"
+      },
+      "body": {
+        "code": "upload/not-open",
+        "message": "Asset is not accepting additional parts",
+        "details": {
+          "reason": "upload_not_open"
+        },
+        "traceId": "trace-upload-not-open"
+      }
+    },
+    "expected": {
+      "code": "upload/not-open",
+      "status": 409,
+      "requestId": "req-upload-not-open",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_not_open",
+        "traceId": "trace-upload-not-open"
+      }
+    }
+  },
+  {
+    "code": "upload/invalid-part-number",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-invalid-part-number"
+      },
+      "body": {
+        "code": "upload/invalid-part-number",
+        "message": "Multipart upload part number is invalid.",
+        "details": {
+          "reason": "invalid_upload_part_number"
+        },
+        "traceId": "trace-upload-invalid-part-number"
+      }
+    },
+    "expected": {
+      "code": "upload/invalid-part-number",
+      "status": 409,
+      "requestId": "req-upload-invalid-part-number",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_upload_part_number",
+        "traceId": "trace-upload-invalid-part-number"
+      }
+    }
+  },
+  {
+    "code": "upload/missing",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-missing"
+      },
+      "body": {
+        "code": "upload/missing",
+        "message": "Multipart upload state is missing",
+        "details": {
+          "reason": "upload_missing"
+        },
+        "traceId": "trace-upload-missing"
+      }
+    },
+    "expected": {
+      "code": "upload/missing",
+      "status": 409,
+      "requestId": "req-upload-missing",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_missing",
+        "traceId": "trace-upload-missing"
+      }
+    }
+  },
+  {
+    "code": "upload/size-mismatch",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-size-mismatch"
+      },
+      "body": {
+        "code": "upload/size-mismatch",
+        "message": "The uploaded parts do not add up to the totalSizeInBytes declared when the multipart upload started.",
+        "details": {
+          "reason": "upload_size_mismatch"
+        },
+        "traceId": "trace-upload-size-mismatch"
+      }
+    },
+    "expected": {
+      "code": "upload/size-mismatch",
+      "status": 400,
+      "requestId": "req-upload-size-mismatch",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_size_mismatch",
+        "traceId": "trace-upload-size-mismatch"
+      }
+    }
+  },
+  {
+    "code": "idempotency/invalid-key",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-idempotency-invalid-key"
+      },
+      "body": {
+        "code": "idempotency/invalid-key",
+        "message": "The Idempotency-Key header must be 1 to 255 printable ASCII characters, such as a UUID.",
+        "details": {
+          "reason": "invalid_idempotency_key"
+        },
+        "traceId": "trace-idempotency-invalid-key"
+      }
+    },
+    "expected": {
+      "code": "idempotency/invalid-key",
+      "status": 400,
+      "requestId": "req-idempotency-invalid-key",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_idempotency_key",
+        "traceId": "trace-idempotency-invalid-key"
+      }
+    }
+  },
+  {
+    "code": "idempotency/key-reused",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-idempotency-key-reused"
+      },
+      "body": {
+        "code": "idempotency/key-reused",
+        "message": "This Idempotency-Key was already used for a different request. Use a new key for each distinct request.",
+        "details": {
+          "reason": "idempotency_key_reused"
+        },
+        "traceId": "trace-idempotency-key-reused"
+      }
+    },
+    "expected": {
+      "code": "idempotency/key-reused",
+      "status": 409,
+      "requestId": "req-idempotency-key-reused",
+      "retryAfter": null,
+      "details": {
+        "reason": "idempotency_key_reused",
+        "traceId": "trace-idempotency-key-reused"
+      }
+    }
+  },
+  {
+    "code": "idempotency/request-in-progress",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-idempotency-request-in-progress",
+        "retry-after": "3"
+      },
+      "body": {
+        "code": "idempotency/request-in-progress",
+        "message": "A request with this Idempotency-Key is still being processed. Retry after the Retry-After delay to receive its result.",
+        "details": {
+          "retryAfterSeconds": 3
+        },
+        "traceId": "trace-idempotency-request-in-progress"
+      }
+    },
+    "expected": {
+      "code": "idempotency/request-in-progress",
+      "status": 409,
+      "requestId": "req-idempotency-request-in-progress",
+      "retryAfter": 3,
+      "details": {
+        "retryAfterSeconds": 3,
+        "traceId": "trace-idempotency-request-in-progress"
+      }
+    }
+  },
+  {
+    "code": "asset/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-not-found"
+      },
+      "body": {
+        "code": "asset/not-found",
+        "message": "Asset not found",
+        "details": {
+          "reason": "asset_not_found"
+        },
+        "traceId": "trace-asset-not-found"
+      }
+    },
+    "expected": {
+      "code": "asset/not-found",
+      "status": 404,
+      "requestId": "req-asset-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_not_found",
+        "traceId": "trace-asset-not-found"
+      }
+    }
+  },
+  {
+    "code": "project/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-project-not-found"
+      },
+      "body": {
+        "code": "project/not-found",
+        "message": "Project not found",
+        "details": {
+          "reason": "project_not_found"
+        },
+        "traceId": "trace-project-not-found"
+      }
+    },
+    "expected": {
+      "code": "project/not-found",
+      "status": 404,
+      "requestId": "req-project-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "project_not_found",
+        "traceId": "trace-project-not-found"
+      }
+    }
+  },
+  {
+    "code": "asset/review-changed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-review-changed"
+      },
+      "body": {
+        "code": "asset/review-changed",
+        "message": "The asset changed during review. Refresh and review the current decision.",
+        "details": {
+          "reason": "asset_review_changed"
+        },
+        "traceId": "trace-asset-review-changed"
+      }
+    },
+    "expected": {
+      "code": "asset/review-changed",
+      "status": 409,
+      "requestId": "req-asset-review-changed",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_review_changed",
+        "traceId": "trace-asset-review-changed"
+      }
+    }
+  },
+  {
+    "code": "asset/review-note-required",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-review-note-required"
+      },
+      "body": {
+        "code": "asset/review-note-required",
+        "message": "A note is required when changing the decision.",
+        "details": {
+          "reason": "asset_review_note_required"
+        },
+        "traceId": "trace-asset-review-note-required"
+      }
+    },
+    "expected": {
+      "code": "asset/review-note-required",
+      "status": 400,
+      "requestId": "req-asset-review-note-required",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_review_note_required",
+        "traceId": "trace-asset-review-note-required"
+      }
+    }
+  },
+  {
+    "code": "asset/update-failed",
+    "status": 500,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-update-failed"
+      },
+      "body": {
+        "code": "asset/update-failed",
+        "message": "Failed to update asset",
+        "details": {
+          "reason": "asset_update_failed"
+        },
+        "traceId": "trace-asset-update-failed"
+      }
+    },
+    "expected": {
+      "code": "asset/update-failed",
+      "status": 500,
+      "requestId": "req-asset-update-failed",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_update_failed",
+        "traceId": "trace-asset-update-failed"
+      }
+    }
+  },
+  {
+    "code": "asset/safety-held",
+    "status": 423,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 423,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-safety-held"
+      },
+      "body": {
+        "code": "asset/safety-held",
+        "message": "Asset access is restricted by a safety hold.",
+        "details": {
+          "reason": "asset_safety_held"
+        },
+        "traceId": "trace-asset-safety-held"
+      }
+    },
+    "expected": {
+      "code": "asset/safety-held",
+      "status": 423,
+      "requestId": "req-asset-safety-held",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_safety_held",
+        "traceId": "trace-asset-safety-held"
+      }
+    }
+  },
+  {
+    "code": "asset/not-retryable",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-not-retryable"
+      },
+      "body": {
+        "code": "asset/not-retryable",
+        "message": "Only assets that failed to process (status error) can be retried.",
+        "details": {
+          "reason": "asset_not_retryable"
+        },
+        "traceId": "trace-asset-not-retryable"
+      }
+    },
+    "expected": {
+      "code": "asset/not-retryable",
+      "status": 409,
+      "requestId": "req-asset-not-retryable",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_not_retryable",
+        "traceId": "trace-asset-not-retryable"
+      }
+    }
+  },
+  {
+    "code": "asset/content-unavailable",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-content-unavailable"
+      },
+      "body": {
+        "code": "asset/content-unavailable",
+        "message": "This asset's content is no longer stored, so it can't be processed again. Upload it again instead.",
+        "details": {
+          "reason": "asset_content_unavailable"
+        },
+        "traceId": "trace-asset-content-unavailable"
+      }
+    },
+    "expected": {
+      "code": "asset/content-unavailable",
+      "status": 409,
+      "requestId": "req-asset-content-unavailable",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_content_unavailable",
+        "traceId": "trace-asset-content-unavailable"
+      }
+    }
+  },
+  {
+    "code": "asset/not-decided",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-not-decided"
+      },
+      "body": {
+        "code": "asset/not-decided",
+        "message": "This asset has no automatic moderation decision to explain yet.",
+        "details": {
+          "reason": "asset_not_decided"
+        },
+        "traceId": "trace-asset-not-decided"
+      }
+    },
+    "expected": {
+      "code": "asset/not-decided",
+      "status": 409,
+      "requestId": "req-asset-not-decided",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_not_decided",
+        "traceId": "trace-asset-not-decided"
+      }
+    }
+  },
+  {
+    "code": "asset/policy-changed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-policy-changed"
+      },
+      "body": {
+        "code": "asset/policy-changed",
+        "message": "The project's moderation policy has changed since this decision, so it can't be explained as made. Re-run moderation with the current policy instead.",
+        "details": {
+          "reason": "asset_policy_changed"
+        },
+        "traceId": "trace-asset-policy-changed"
+      }
+    },
+    "expected": {
+      "code": "asset/policy-changed",
+      "status": 409,
+      "requestId": "req-asset-policy-changed",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_policy_changed",
+        "traceId": "trace-asset-policy-changed"
+      }
+    }
+  },
+  {
+    "code": "asset/reviewed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-reviewed"
+      },
+      "body": {
+        "code": "asset/reviewed",
+        "message": "A reviewer has decided this asset, so its moderation can't be re-run.",
+        "details": {
+          "reason": "asset_reviewed"
+        },
+        "traceId": "trace-asset-reviewed"
+      }
+    },
+    "expected": {
+      "code": "asset/reviewed",
+      "status": 409,
+      "requestId": "req-asset-reviewed",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_reviewed",
+        "traceId": "trace-asset-reviewed"
+      }
+    }
+  },
+  {
+    "code": "support/ticket-not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-support-ticket-not-found"
+      },
+      "body": {
+        "code": "support/ticket-not-found",
+        "message": "Support ticket not found.",
+        "details": {
+          "reason": "support_ticket_not_found"
+        },
+        "traceId": "trace-support-ticket-not-found"
+      }
+    },
+    "expected": {
+      "code": "support/ticket-not-found",
+      "status": 404,
+      "requestId": "req-support-ticket-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "support_ticket_not_found",
+        "traceId": "trace-support-ticket-not-found"
+      }
+    }
+  },
+  {
+    "code": "asset/duplicate-external-id",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-duplicate-external-id"
+      },
+      "body": {
+        "code": "asset/duplicate-external-id",
+        "message": "An asset with this externalId already exists in the project.",
+        "details": {
+          "reason": "duplicate_external_id"
+        },
+        "traceId": "trace-asset-duplicate-external-id"
+      }
+    },
+    "expected": {
+      "code": "asset/duplicate-external-id",
+      "status": 409,
+      "requestId": "req-asset-duplicate-external-id",
+      "retryAfter": null,
+      "details": {
+        "reason": "duplicate_external_id",
+        "traceId": "trace-asset-duplicate-external-id"
+      }
+    }
+  },
+  {
+    "code": "folder/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-folder-not-found"
+      },
+      "body": {
+        "code": "folder/not-found",
+        "message": "Folder not found",
+        "details": {
+          "reason": "folder_not_found"
+        },
+        "traceId": "trace-folder-not-found"
+      }
+    },
+    "expected": {
+      "code": "folder/not-found",
+      "status": 404,
+      "requestId": "req-folder-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "folder_not_found",
+        "traceId": "trace-folder-not-found"
+      }
+    }
+  },
+  {
+    "code": "folder/duplicate-name",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-folder-duplicate-name"
+      },
+      "body": {
+        "code": "folder/duplicate-name",
+        "message": "A folder with this name already exists in this location.",
+        "details": {
+          "reason": "duplicate_folder_name"
+        },
+        "traceId": "trace-folder-duplicate-name"
+      }
+    },
+    "expected": {
+      "code": "folder/duplicate-name",
+      "status": 409,
+      "requestId": "req-folder-duplicate-name",
+      "retryAfter": null,
+      "details": {
+        "reason": "duplicate_folder_name",
+        "traceId": "trace-folder-duplicate-name"
+      }
+    }
+  },
+  {
+    "code": "folder/not-empty",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-folder-not-empty"
+      },
+      "body": {
+        "code": "folder/not-empty",
+        "message": "Folder must be empty before it can be deleted.",
+        "details": {
+          "reason": "folder_not_empty"
+        },
+        "traceId": "trace-folder-not-empty"
+      }
+    },
+    "expected": {
+      "code": "folder/not-empty",
+      "status": 409,
+      "requestId": "req-folder-not-empty",
+      "retryAfter": null,
+      "details": {
+        "reason": "folder_not_empty",
+        "traceId": "trace-folder-not-empty"
+      }
+    }
+  },
+  {
+    "code": "folder/parent-cycle",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-folder-parent-cycle"
+      },
+      "body": {
+        "code": "folder/parent-cycle",
+        "message": "A folder cannot be moved inside itself or one of its descendants.",
+        "details": {
+          "reason": "folder_parent_cycle"
+        },
+        "traceId": "trace-folder-parent-cycle"
+      }
+    },
+    "expected": {
+      "code": "folder/parent-cycle",
+      "status": 409,
+      "requestId": "req-folder-parent-cycle",
+      "retryAfter": null,
+      "details": {
+        "reason": "folder_parent_cycle",
+        "traceId": "trace-folder-parent-cycle"
+      }
+    }
+  },
+  {
+    "code": "lens/version-conflict",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-lens-version-conflict"
+      },
+      "body": {
+        "code": "lens/version-conflict",
+        "message": "Lens updates require a version greater than the current version.",
+        "details": {
+          "reason": "lens_version_conflict"
+        },
+        "traceId": "trace-lens-version-conflict"
+      }
+    },
+    "expected": {
+      "code": "lens/version-conflict",
+      "status": 409,
+      "requestId": "req-lens-version-conflict",
+      "retryAfter": null,
+      "details": {
+        "reason": "lens_version_conflict",
+        "traceId": "trace-lens-version-conflict"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-not-found"
+      },
+      "body": {
+        "code": "upload-preset/not-found",
+        "message": "Upload preset not found. Check the preset ID in the portal.",
+        "details": {
+          "reason": "upload_preset_not_found"
+        },
+        "traceId": "trace-upload-preset-not-found"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/not-found",
+      "status": 404,
+      "requestId": "req-upload-preset-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_not_found",
+        "traceId": "trace-upload-preset-not-found"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/disabled",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-disabled"
+      },
+      "body": {
+        "code": "upload-preset/disabled",
+        "message": "This upload preset is paused. Turn it on in the portal to accept uploads.",
+        "details": {
+          "reason": "upload_preset_disabled"
+        },
+        "traceId": "trace-upload-preset-disabled"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/disabled",
+      "status": 403,
+      "requestId": "req-upload-preset-disabled",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_disabled",
+        "traceId": "trace-upload-preset-disabled"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/token-required",
+    "status": 401,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-token-required"
+      },
+      "body": {
+        "code": "upload-preset/token-required",
+        "message": "This upload preset only accepts uploads with an upload token. Sign one on your server with uploadTokens.sign and pass it to the client.",
+        "details": {
+          "reason": "upload_preset_token_required"
+        },
+        "traceId": "trace-upload-preset-token-required"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/token-required",
+      "status": 401,
+      "requestId": "req-upload-preset-token-required",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_token_required",
+        "traceId": "trace-upload-preset-token-required"
+      }
+    }
+  },
+  {
+    "code": "upload/remote-url-not-allowed",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-remote-url-not-allowed"
+      },
+      "body": {
+        "code": "upload/remote-url-not-allowed",
+        "message": "This project doesn't accept URLs from this domain. Change the allowed or blocked domains under Project settings.",
+        "details": {
+          "reason": "remote_url_not_allowed"
+        },
+        "traceId": "trace-upload-remote-url-not-allowed"
+      }
+    },
+    "expected": {
+      "code": "upload/remote-url-not-allowed",
+      "status": 403,
+      "requestId": "req-upload-remote-url-not-allowed",
+      "retryAfter": null,
+      "details": {
+        "reason": "remote_url_not_allowed",
+        "traceId": "trace-upload-remote-url-not-allowed"
+      }
+    }
+  },
+  {
+    "code": "upload/website-rate-limit-exceeded",
+    "status": 429,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 429,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-website-rate-limit-exceeded",
+        "retry-after": "60"
+      },
+      "body": {
+        "code": "upload/website-rate-limit-exceeded",
+        "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
+        "details": {
+          "reason": "website_rate_limit_exceeded"
+        },
+        "traceId": "trace-upload-website-rate-limit-exceeded"
+      }
+    },
+    "expected": {
+      "code": "upload/website-rate-limit-exceeded",
+      "status": 429,
+      "requestId": "req-upload-website-rate-limit-exceeded",
+      "retryAfter": 60,
+      "details": {
+        "reason": "website_rate_limit_exceeded",
+        "traceId": "trace-upload-website-rate-limit-exceeded"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/content-type-not-allowed",
+    "status": 415,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 415,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-content-type-not-allowed"
+      },
+      "body": {
+        "code": "upload-preset/content-type-not-allowed",
+        "message": "This upload preset doesn't accept this file type.",
+        "details": {
+          "reason": "upload_preset_content_type_not_allowed"
+        },
+        "traceId": "trace-upload-preset-content-type-not-allowed"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/content-type-not-allowed",
+      "status": 415,
+      "requestId": "req-upload-preset-content-type-not-allowed",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_content_type_not_allowed",
+        "traceId": "trace-upload-preset-content-type-not-allowed"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/too-large",
+    "status": 413,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 413,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-too-large"
+      },
+      "body": {
+        "code": "upload-preset/too-large",
+        "message": "This file is larger than the upload preset allows.",
+        "details": {
+          "reason": "upload_preset_too_large"
+        },
+        "traceId": "trace-upload-preset-too-large"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/too-large",
+      "status": 413,
+      "requestId": "req-upload-preset-too-large",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_too_large",
+        "traceId": "trace-upload-preset-too-large"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/daily-limit-reached",
+    "status": 429,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 429,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-daily-limit-reached",
+        "retry-after": "60"
+      },
+      "body": {
+        "code": "upload-preset/daily-limit-reached",
+        "message": "You have reached this upload preset's daily upload limit. Try again after midnight UTC.",
+        "details": {
+          "reason": "upload_preset_daily_limit_reached"
+        },
+        "traceId": "trace-upload-preset-daily-limit-reached"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/daily-limit-reached",
+      "status": 429,
+      "requestId": "req-upload-preset-daily-limit-reached",
+      "retryAfter": 60,
+      "details": {
+        "reason": "upload_preset_daily_limit_reached",
+        "traceId": "trace-upload-preset-daily-limit-reached"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/origin-not-allowed",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-origin-not-allowed"
+      },
+      "body": {
+        "code": "upload-preset/origin-not-allowed",
+        "message": "This site isn't allowed to upload through this upload preset.",
+        "details": {
+          "reason": "upload_preset_origin_not_allowed"
+        },
+        "traceId": "trace-upload-preset-origin-not-allowed"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/origin-not-allowed",
+      "status": 403,
+      "requestId": "req-upload-preset-origin-not-allowed",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_origin_not_allowed",
+        "traceId": "trace-upload-preset-origin-not-allowed"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/field-not-allowed",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-field-not-allowed"
+      },
+      "body": {
+        "code": "upload-preset/field-not-allowed",
+        "message": "This field is set by the upload preset or the upload token and can't be changed by the upload.",
+        "details": {
+          "reason": "upload_preset_field_not_allowed"
+        },
+        "traceId": "trace-upload-preset-field-not-allowed"
+      }
+    },
+    "expected": {
+      "code": "upload-preset/field-not-allowed",
+      "status": 400,
+      "requestId": "req-upload-preset-field-not-allowed",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_field_not_allowed",
+        "traceId": "trace-upload-preset-field-not-allowed"
+      }
+    }
+  },
+  {
+    "code": "upload-token/invalid",
+    "status": 401,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-token-invalid"
+      },
+      "body": {
+        "code": "upload-token/invalid",
+        "message": "The upload token is invalid. Sign a new one on your server with an active API key for this project.",
+        "details": {
+          "reason": "upload_token_invalid"
+        },
+        "traceId": "trace-upload-token-invalid"
+      }
+    },
+    "expected": {
+      "code": "upload-token/invalid",
+      "status": 401,
+      "requestId": "req-upload-token-invalid",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_token_invalid",
+        "traceId": "trace-upload-token-invalid"
+      }
+    }
+  },
+  {
+    "code": "upload-token/expired",
+    "status": 401,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-token-expired"
+      },
+      "body": {
+        "code": "upload-token/expired",
+        "message": "The upload token has expired. Sign a new one on your server.",
+        "details": {
+          "reason": "upload_token_expired"
+        },
+        "traceId": "trace-upload-token-expired"
+      }
+    },
+    "expected": {
+      "code": "upload-token/expired",
+      "status": 401,
+      "requestId": "req-upload-token-expired",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_token_expired",
+        "traceId": "trace-upload-token-expired"
+      }
+    }
+  },
+  {
+    "code": "upload-token/used",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-token-used"
+      },
+      "body": {
+        "code": "upload-token/used",
+        "message": "The upload token has already been used. Each token uploads one asset.",
+        "details": {
+          "reason": "upload_token_used"
+        },
+        "traceId": "trace-upload-token-used"
+      }
+    },
+    "expected": {
+      "code": "upload-token/used",
+      "status": 409,
+      "requestId": "req-upload-token-used",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_token_used",
+        "traceId": "trace-upload-token-used"
+      }
+    }
+  },
+  {
+    "code": "asset/invalid-remote-url",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-invalid-remote-url"
+      },
+      "body": {
+        "code": "asset/invalid-remote-url",
+        "message": "Remote URLs must use HTTP or HTTPS and cannot target private networks, localhost names or URL credentials.",
+        "details": {
+          "reason": "invalid_remote_url"
+        },
+        "traceId": "trace-asset-invalid-remote-url"
+      }
+    },
+    "expected": {
+      "code": "asset/invalid-remote-url",
+      "status": 400,
+      "requestId": "req-asset-invalid-remote-url",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_remote_url",
+        "traceId": "trace-asset-invalid-remote-url"
+      }
+    }
+  },
+  {
+    "code": "asset/remote-url-unavailable",
+    "status": 422,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-remote-url-unavailable"
+      },
+      "body": {
+        "code": "asset/remote-url-unavailable",
+        "message": "The URL responded with an error status. Check that it is publicly reachable.",
+        "details": {
+          "reason": "remote_url_unavailable"
+        },
+        "traceId": "trace-asset-remote-url-unavailable"
+      }
+    },
+    "expected": {
+      "code": "asset/remote-url-unavailable",
+      "status": 422,
+      "requestId": "req-asset-remote-url-unavailable",
+      "retryAfter": null,
+      "details": {
+        "reason": "remote_url_unavailable",
+        "traceId": "trace-asset-remote-url-unavailable"
+      }
+    }
+  },
+  {
+    "code": "appeal/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-not-found"
+      },
+      "body": {
+        "code": "appeal/not-found",
+        "message": "The appeal does not exist in this project.",
+        "details": {
+          "reason": "appeal_not_found"
+        },
+        "traceId": "trace-appeal-not-found"
+      }
+    },
+    "expected": {
+      "code": "appeal/not-found",
+      "status": 404,
+      "requestId": "req-appeal-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_not_found",
+        "traceId": "trace-appeal-not-found"
+      }
+    }
+  },
+  {
+    "code": "appeal/judgment-not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-judgment-not-found"
+      },
+      "body": {
+        "code": "appeal/judgment-not-found",
+        "message": "The judgment event is unavailable, belongs to another project or cannot supply an asset decision. Supply explicit context instead.",
+        "details": {
+          "reason": "appeal_judgment_not_found"
+        },
+        "traceId": "trace-appeal-judgment-not-found"
+      }
+    },
+    "expected": {
+      "code": "appeal/judgment-not-found",
+      "status": 404,
+      "requestId": "req-appeal-judgment-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_judgment_not_found",
+        "traceId": "trace-appeal-judgment-not-found"
+      }
+    }
+  },
+  {
+    "code": "appeal/asset-not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-asset-not-found"
+      },
+      "body": {
+        "code": "appeal/asset-not-found",
+        "message": "The linked asset does not exist in this project.",
+        "details": {
+          "reason": "appeal_asset_not_found"
+        },
+        "traceId": "trace-appeal-asset-not-found"
+      }
+    },
+    "expected": {
+      "code": "appeal/asset-not-found",
+      "status": 404,
+      "requestId": "req-appeal-asset-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_asset_not_found",
+        "traceId": "trace-appeal-asset-not-found"
+      }
+    }
+  },
+  {
+    "code": "appeal/permission-denied",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-permission-denied"
+      },
+      "body": {
+        "code": "appeal/permission-denied",
+        "message": "You cannot review this project's appeals.",
+        "details": {
+          "reason": "appeal_permission_denied"
+        },
+        "traceId": "trace-appeal-permission-denied"
+      }
+    },
+    "expected": {
+      "code": "appeal/permission-denied",
+      "status": 403,
+      "requestId": "req-appeal-permission-denied",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_permission_denied",
+        "traceId": "trace-appeal-permission-denied"
+      }
+    }
+  },
+  {
+    "code": "appeal/already-reviewed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-already-reviewed"
+      },
+      "body": {
+        "code": "appeal/already-reviewed",
+        "message": "A reviewer already resolved this appeal.",
+        "details": {
+          "reason": "appeal_already_reviewed"
+        },
+        "traceId": "trace-appeal-already-reviewed"
+      }
+    },
+    "expected": {
+      "code": "appeal/already-reviewed",
+      "status": 409,
+      "requestId": "req-appeal-already-reviewed",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_already_reviewed",
+        "traceId": "trace-appeal-already-reviewed"
+      }
+    }
+  },
+  {
+    "code": "appeal/decision-changed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-decision-changed"
+      },
+      "body": {
+        "code": "appeal/decision-changed",
+        "message": "The linked asset's decision changed after the appealed decision. Submit a new appeal for the current decision.",
+        "details": {
+          "reason": "appeal_decision_changed"
+        },
+        "traceId": "trace-appeal-decision-changed"
+      }
+    },
+    "expected": {
+      "code": "appeal/decision-changed",
+      "status": 409,
+      "requestId": "req-appeal-decision-changed",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_decision_changed",
+        "traceId": "trace-appeal-decision-changed"
+      }
+    }
+  },
+  {
+    "code": "appeal/invalid-action",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-invalid-action"
+      },
+      "body": {
+        "code": "appeal/invalid-action",
+        "message": "The decision's action is not valid for this appeal.",
+        "details": {
+          "reason": "appeal_invalid_action"
+        },
+        "traceId": "trace-appeal-invalid-action"
+      }
+    },
+    "expected": {
+      "code": "appeal/invalid-action",
+      "status": 400,
+      "requestId": "req-appeal-invalid-action",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_invalid_action",
+        "traceId": "trace-appeal-invalid-action"
+      }
+    }
+  },
+  {
+    "code": "appeal/safety-held",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-safety-held"
+      },
+      "body": {
+        "code": "appeal/safety-held",
+        "message": "A safety hold prevents this appeal from being submitted or applied.",
+        "details": {
+          "reason": "appeal_safety_held"
+        },
+        "traceId": "trace-appeal-safety-held"
+      }
+    },
+    "expected": {
+      "code": "appeal/safety-held",
+      "status": 409,
+      "requestId": "req-appeal-safety-held",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_safety_held",
+        "traceId": "trace-appeal-safety-held"
+      }
+    }
+  },
+  {
+    "code": "appeal/content-unavailable",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-appeal-content-unavailable"
+      },
+      "body": {
+        "code": "appeal/content-unavailable",
+        "message": "The appeal's content is unavailable, or approval would require restoring removed content.",
+        "details": {
+          "reason": "appeal_content_unavailable"
+        },
+        "traceId": "trace-appeal-content-unavailable"
+      }
+    },
+    "expected": {
+      "code": "appeal/content-unavailable",
+      "status": 409,
+      "requestId": "req-appeal-content-unavailable",
+      "retryAfter": null,
+      "details": {
+        "reason": "appeal_content_unavailable",
+        "traceId": "trace-appeal-content-unavailable"
+      }
+    }
+  }
+]

@@ -107,21 +107,59 @@ export async function parseWebhookEvent(
       cause,
     });
   }
-  const candidate = event as Partial<Record<keyof ReceivedWebhookEventPayload, unknown>> | null;
-  if (
-    !candidate ||
-    typeof candidate !== "object" ||
-    typeof candidate.id !== "string" ||
-    typeof candidate.type !== "string" ||
-    typeof candidate.projectId !== "string" ||
-    typeof candidate.createdAt !== "number" ||
-    !candidate.data ||
-    typeof candidate.data !== "object" ||
-    Array.isArray(candidate.data)
-  ) {
+  if (!isWebhookEvent(event)) {
     throw new CalmLensError(SDK_ERROR_CODES.INVALID_WEBHOOK_PAYLOAD, {
       message: "Webhook body is not a CalmLens event",
     });
   }
-  return event as ReceivedWebhookEventPayload;
+  return event;
 }
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+const isOptional = (value: unknown, type: "string" | "object", nullable: boolean) =>
+  value === undefined || (nullable && value === null) || typeof value === type;
+
+/**
+ * Whether `value` is a webhook body, by the rules of shared/WebhookPayload's
+ * RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA: the envelope fields CalmLens always sends, and the types
+ * of the known `data` fields when present. Each fact needs a string `key` and a `value` (any JSON
+ * value, `null` included). Unknown fields and fact values are accepted.
+ */
+const isWebhookEvent = (value: unknown): value is ReceivedWebhookEventPayload => {
+  if (
+    !isObject(value) ||
+    typeof value.id !== "string" ||
+    typeof value.type !== "string" ||
+    typeof value.projectId !== "string" ||
+    typeof value.createdAt !== "number" ||
+    !isObject(value.data)
+  ) {
+    return false;
+  }
+  const { severity, title, description, assetId, asset, facts } = value.data;
+  return (
+    isOptional(severity, "string", false) &&
+    isOptional(title, "string", false) &&
+    isOptional(description, "string", true) &&
+    isOptional(assetId, "string", true) &&
+    (asset === undefined || asset === null || (isObject(asset) && typeof asset.id === "string")) &&
+    (facts === undefined ||
+      (Array.isArray(facts) &&
+        facts.every(
+          (fact) =>
+            isObject(fact) &&
+            typeof fact.key === "string" &&
+            "value" in fact &&
+            isOptional(fact.url, "string", false),
+        )))
+  );
+};
+
+/**
+ * Whether a webhook event is a test send from the portal or the CLI rather than a real event: it
+ * carries the registered `{ key: "test", value: true }` fact.
+ */
+export const isTestWebhookEvent = (event: Pick<ReceivedWebhookEventPayload, "data">): boolean =>
+  Array.isArray(event?.data?.facts) &&
+  event.data.facts.some((fact) => fact?.key === "test" && fact.value === true);

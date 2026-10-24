@@ -44,7 +44,7 @@ class TransportTest < Minitest::Test
             name, value = header.split(':', 2)
             headers[name.downcase] = value.strip
           end
-          body = headers['content-length'] ? socket.read(Integer(headers['content-length'])) : nil
+          body = headers['content-length'] ? socket.read(Integer(headers['content-length'])) : read_chunked(socket, headers)
           @requests << { line: line.strip, headers: headers, body: body }
           status, response_headers, response = @respond.call(line, headers, body)
           socket.write("HTTP/1.1 #{status} X\r\nContent-Length: #{response.bytesize}\r\n" \
@@ -56,9 +56,23 @@ class TransportTest < Minitest::Test
         socket.close
       end
     end
+
+    def read_chunked(socket, headers)
+      return nil unless headers['transfer-encoding'] == 'chunked'
+
+      body = +''
+      while (size = Integer(socket.gets.strip, 16)).positive?
+        body << socket.read(size)
+        socket.gets
+      end
+      socket.gets
+      body
+    end
   end
 
-  def with_server(respond = ->(*) { [200, {}, '{"id":"asset","status":"allowed"}'] })
+  ASSET = '{"id":"asset","upload":{"status":"completed"},"classification":{"status":"completed","moderation":{"status":"allowed"}}}'
+
+  def with_server(respond = ->(*) { [200, {}, ASSET] })
     server = Server.new(&respond)
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', base_url: server.url, cdn_base_url: server.url,
                                         retry_base_delay: 0)
@@ -81,7 +95,7 @@ class TransportTest < Minitest::Test
   def test_requests_identify_the_sdk_and_runtime
     with_server do |client, server|
       client.assets.retrieve(asset_id: 'asset')
-      assert_equal "calmlens-ruby/#{CalmLens::VERSION} (ruby #{RUBY_VERSION})", server.requests.pop[:headers]['user-agent']
+      assert_equal "calmlens-ruby/#{CalmLens::VERSION} (ruby/#{RUBY_VERSION})", server.requests.pop[:headers]['user-agent']
     end
   end
 
@@ -98,6 +112,26 @@ class TransportTest < Minitest::Test
       assert_equal ['200000', 200_000], [request[:headers]['content-length'], request[:body].bytesize]
       assert reads.none?(&:nil?), "the stream was read whole: #{reads.inspect}"
       assert_operator reads.size, :>, 1
+    end
+  end
+
+  def test_a_stream_of_unknown_length_is_sent_chunked
+    reader, writer = IO.pipe
+    writer.write('piped content')
+    writer.close
+    with_server do |client, server|
+      client.assets.create(name: 'pipe.txt', content: { data: reader, type: 'text/plain' })
+      request = server.requests.pop
+      assert_equal ['chunked', nil, 'piped content'],
+                   [request[:headers]['transfer-encoding'], request[:headers]['content-length'], request[:body]]
+      refute_includes request[:line], 'sizeInBytes'
+    end
+  end
+
+  def test_redirects_are_not_followed
+    with_server(->(*) { [302, { 'Location' => 'https://elsewhere.example/steal' }, ''] }) do |client, server|
+      error = assert_raises(CalmLens::APIError) { client.assets.retrieve(asset_id: 'asset') }
+      assert_equal ['sdk/http-error', 302, 1], [error.code, error.status, server.requests.size]
     end
   end
 

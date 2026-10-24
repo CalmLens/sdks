@@ -64,7 +64,7 @@ AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "mult
 Visibility = Literal["public", "private"]
 #: What happens to content that crosses a policy threshold (request values for
 #: ``processingOptions.flaggedContentPolicy``).
-ModerationAction = Literal["allow", "age-restrict", "block", "purge"]
+ModerationAction = Literal["allow", "limit", "age-restrict", "block", "purge"]
 #: Why an asset is under a safety hold. New reasons may be added.
 SafetyHoldReason = Union[Literal["suspected-illegal-content"], str]
 #: Moderation categories in ``report.categories``. New categories may be added.
@@ -163,6 +163,7 @@ class MetadataItem(TypedDict):
 
 class FlaggedContentPolicy(TypedDict):
     """Overrides the project moderation action for one asset: ``allow`` takes no action,
+    ``limit`` delivers normally but marks the asset so your app can reduce its reach,
     ``age-restrict`` delivers only through signed URLs or API keys, ``block`` stops delivery
     while retaining content and ``purge`` deletes content."""
     action: ModerationAction

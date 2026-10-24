@@ -57,6 +57,7 @@ import type {
 import { signUploadTokenWithApiKey } from "./CalmLensUploadTokens";
 import {
   DEFAULT_CDN_BASE_URL,
+  DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
   encodePathSegment,
   getAssetUrl,
   pollForDecision,
@@ -84,6 +85,20 @@ const getEnsureLensCacheKey = (options: EnsureLensOptions): string =>
   });
 
 const requireId = (value: unknown, name: string): string => encodePathSegment(value, name);
+
+/**
+ * Iterators stop rather than loop: a page that says more follow must not hand back a cursor this
+ * iteration has already sent, which would repeat the same pages forever.
+ */
+const assertNewCursor = (sent: Set<string>, cursor: string) => {
+  if (sent.has(cursor)) {
+    throw new CalmLensError(SDK_ERROR_CODES.INVALID_RESPONSE, {
+      message: "The API returned a cursor it had already returned, with more pages to follow",
+      details: { cursor },
+    });
+  }
+  sent.add(cursor);
+};
 
 type ServerClientSettings = Omit<CalmLensServerClientOptions, "apiKey" | "baseUrl"> & {
   baseUrl: string;
@@ -362,7 +377,7 @@ export default class CalmLensServerClient {
         return this.request("POST", `/assets/${encodedAssetId}/signed-url`, {
           body: {
             resource: options.resource,
-            expiresInSeconds: options.expiresInSeconds ?? 60 * 15,
+            expiresInSeconds: options.expiresInSeconds ?? DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
             lens: options.lens,
             transform: transformSelector(options.transform),
           },
@@ -448,10 +463,12 @@ export default class CalmLensServerClient {
     options: ListEventsOptions,
   ): AsyncGenerator<GetEventsResponse, void, undefined> {
     let after = options.after;
+    const sent = new Set(after === undefined ? [] : [after]);
     for (;;) {
       const page = await this.events.list({ ...options, after });
+      if (page.hasMore) assertNewCursor(sent, page.cursor);
       yield page;
-      if (!page.hasMore || page.cursor === after) return;
+      if (!page.hasMore) return;
       after = page.cursor;
     }
   }
@@ -462,11 +479,14 @@ export default class CalmLensServerClient {
     ) => Promise<{ items: Asset[]; nextCursor: string | null; hasMore: boolean }>,
   ): AsyncGenerator<Asset, void, undefined> {
     let cursor: string | undefined;
+    const sent = new Set<string>();
     for (;;) {
       const page = await listPage(cursor);
+      const more = !!page.nextCursor && page.hasMore && page.items.length > 0;
+      if (more) assertNewCursor(sent, page.nextCursor!);
       yield* page.items;
-      if (!page.nextCursor || !page.hasMore || page.items.length === 0) return;
-      cursor = page.nextCursor;
+      if (!more) return;
+      cursor = page.nextCursor!;
     }
   }
 

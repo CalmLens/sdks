@@ -11,7 +11,9 @@ import java.util.stream.StreamSupport;
 /**
  * Iterates over every item of a paginated list, requesting the next page only when the current one
  * is used up. Each {@link #iterator()} starts again from the first page. Request failures surface as
- * {@link CalmLensException}s from {@link Iterator#hasNext()}.
+ * {@link CalmLensException}s from {@link Iterator#hasNext()}, and so does a page that says more
+ * follow but hands back a cursor the iteration already sent ({@link ErrorCodes#SDK_INVALID_RESPONSE},
+ * with the {@code cursor} in its details), so iteration never loops.
  *
  * <pre>{@code
  * for (Asset asset : client.assets.iterate(new ListAssets().filter("classification.moderation.status==blocked"))) { ... }
@@ -28,11 +30,17 @@ public final class AutoPager<T> implements Iterable<T> {
 
   private final Source<T> source;
   private final String start;
+  private final boolean startSent;
   private volatile String cursor;
 
-  AutoPager(Source<T> source, String start) {
+  /**
+   * @param startSent whether {@code start} counts as a cursor already sent (the events feed's
+   *     {@code after}), so a page handing it back with more to follow fails
+   */
+  AutoPager(Source<T> source, String start, boolean startSent) {
     this.source = source;
     this.start = start;
+    this.startSent = startSent;
     this.cursor = start;
   }
 
@@ -54,14 +62,26 @@ public final class AutoPager<T> implements Iterable<T> {
       private Iterator<T> page = List.<T>of().iterator();
       private String token = start;
       private boolean more = true;
+      private final java.util.Set<String> sent = new java.util.HashSet<>();
+
+      {
+        if (startSent && start != null) sent.add(start);
+      }
 
       @Override public boolean hasNext() {
         while (!page.hasNext() && more) {
           Chunk<T> chunk = source.fetch(token);
+          // A page without items ends iteration unless the API says more are ready (event cursors).
+          boolean next = chunk.hasMore() && chunk.next() != null;
+          // Stop rather than loop: a page with more to follow must not hand back a cursor already sent.
+          if (next && !sent.add(chunk.next())) {
+            more = false;
+            throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE,
+                "The API returned a cursor it had already returned, with more pages to follow", java.util.Map.of("cursor", chunk.next()), null);
+          }
           token = chunk.next();
           cursor = chunk.next();
-          // A page without items ends iteration unless the API says more are ready (event cursors).
-          more = chunk.hasMore() && token != null;
+          more = next;
           page = chunk.items().iterator();
         }
         return page.hasNext();

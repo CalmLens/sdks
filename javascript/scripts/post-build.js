@@ -43,6 +43,7 @@ const TESTING_EXPORTS = [
   "InMemoryMockImageStorage",
   "toWebhookEventPayload",
   "createWebhookHeaders",
+  "signUploadToken",
   "generateMediaTestCode",
   "MEDIA_TEST_SIGNALS",
 ];

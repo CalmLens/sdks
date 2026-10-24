@@ -50,6 +50,14 @@ module CalmLens
 
     # The prefix of mock API keys made by {.create_api_key}.
     API_KEY_PREFIX = 'sk_test_'
+    # Simulated failures for {#fail_next_request}, besides API error codes and exceptions.
+    REQUEST_FAILURES = %w[transport-error timeout].freeze
+    # The methods {#fail_next_request} can target, by resource. Iterators are their list calls.
+    OPERATIONS = { assets: %i[search list retrieve list_children update create classify upload_part create_signed_url move
+                              retry explain wait_for_decision delete_content delete],
+                   folders: %i[list retrieve create update delete move], text: %i[classify], events: %i[list],
+                   cdn: %i[serve] }.freeze
+    private_constant :OPERATIONS
 
     # A mock API key carrying permission grants, such as
     # `[{ actions: ['assets:download'], folderId: nil, includeSubfolders: true }]` for CDN reads of
@@ -58,6 +66,31 @@ module CalmLens
     # @return [String]
     def self.create_api_key(grants = [])
       API_KEY_PREFIX + [JSON.generate(Internal.normalize(grants))].pack('m0').tr('+/', '-_').delete('=')
+    end
+
+    # The grants a key from {.create_api_key} carries; none for any other key.
+    # @api private
+    def self.grants_of(api_key)
+      return [] unless api_key.start_with?(API_KEY_PREFIX)
+
+      encoded = api_key.delete_prefix(API_KEY_PREFIX).tr('-_', '+/')
+      grants = JSON.parse("#{encoded}#{'=' * (-encoded.size % 4)}".unpack1('m0'))
+      grants.is_a?(Array) ? grants.grep(Hash) : []
+    rescue ArgumentError, JSON::ParserError
+      []
+    end
+
+    # Signs an upload token like {UploadTokens#sign}, with the same checks, at a fixed time and with
+    # a fixed nonce, so tests can compare exact tokens.
+    # @param api_key [String]
+    # @param options [Hash] the options of {UploadTokens#sign}
+    # @param now [Integer] the signing time in milliseconds since the Unix epoch
+    # @param nonce [String]
+    # @return [Hash] `{'token', 'expiresAt'}`
+    def self.sign_upload_token(api_key, options, now:, nonce:)
+      UploadTokens.sign_at(api_key, options, now: now, nonce: nonce)
+    rescue KeyError, TypeError, ArgumentError, JSON::GeneratorError, EncodingError => e
+      raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT, e.message), cause: e
     end
 
     # A clock in epoch milliseconds that follows the system time but never repeats or goes back.
@@ -83,7 +116,7 @@ module CalmLens
     #   the outcome follows `classification.moderation.status`, or is `failed` when `classification.status` is `failed`,
     #   and is `allowed` otherwise), or a callable that receives a copy of the asset and returns either.
     # @param options [Hash] other {ServerClient#initialize} settings, except `api_key` and `transport`.
-    #   Retries wait no time unless a queued response sets `Retry-After`.
+    #   Retries and decision checks wait no real time.
     def initialize(project_id: 'project-1', api_key: MockServerClient.create_api_key, base_url: 'https://api.calmlens.invalid/v1',
                    cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: MockServerClient.monotonic_clock,
                    create_id: -> { SecureRandom.uuid }, queued_outcome: 'pending', analyzed_outcome: 'allowed',
@@ -91,13 +124,18 @@ module CalmLens
       @mock_lock = Mutex.new
       @queue = []
       @received = []
+      @failures = []
+      @call_key = :"calmlens_mock_call_#{object_id}"
       super(api_key: api_key, project_id: project_id, base_url: base_url, cdn_base_url: cdn_base_url,
-            retry_base_delay: 0, **options, transport: method(:receive))
+            **options, transport: method(:receive))
       @fake = Testing::FakeAPI.new(project_id: project_id, base_url: self.base_url, cdn_base_url: self.cdn_base_url,
                                    now: now, create_id: create_id, queued_outcome: queued_outcome,
-                                   analyzed_outcome: analyzed_outcome)
+                                   analyzed_outcome: analyzed_outcome, grants: MockServerClient.grants_of(api_key))
       @state = @fake.state
-      # Decision checks advance this clock instead of sleeping.
+      # Like the API, the stand-in checks upload sizes itself, in the API's order.
+      @session.defer_upload_checks = true
+      OPERATIONS.each { |resource, methods| track(public_send(resource), Internal.camelize(resource), methods) }
+      # Retries and decision checks advance this clock instead of sleeping.
       @waited = 0.0
       @session.use_clock(monotonic: -> { @mock_lock.synchronize { @waited } },
                          pause: ->(seconds) { @mock_lock.synchronize { @waited += seconds } })
@@ -116,6 +154,40 @@ module CalmLens
 
       raise APIError.class_for(404).new(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', status: 404)
     end
+
+    # Changes the grants of the mock's API key, as editing the key in the portal would: later
+    # requests, such as {CDN#serve}, use them. The key itself stays the same, so idempotency keys it
+    # used still replay.
+    # @param grants [Array<Hash>] like {.create_api_key}'s
+    def api_key_grants=(grants)
+      normalized = JSON.parse(JSON.generate(Internal.normalize(grants)))
+      @mock_lock.synchronize { @fake.grants = normalized }
+    end
+
+    # Makes the next call (or the next call to `operation`) fail instead of running, as if its
+    # request never completed: every request it sends, retries included, fails the same way. Queue
+    # several to fail several calls in a row; each is used once.
+    # @param failure [String, Exception] `transport-error` (`sdk/transport-error`), `timeout`
+    #   (`sdk/timeout`), an API error code such as `upload/limit-exceeded` (answered with its HTTP
+    #   status), or an exception for the transport to raise.
+    # @param operation [String, nil] a method such as `assets.create`, `assets.upload_part`,
+    #   `cdn.serve` or `ensure_lens` (JavaScript names such as `assets.uploadPart` work too).
+    # @return [self]
+    def fail_next_request(failure = 'transport-error', operation: nil)
+      unless failure.is_a?(Exception) || REQUEST_FAILURES.include?(failure) || ErrorCodes::STATUSES.key?(failure)
+        raise Internal.invalid("Unknown failure #{failure.inspect}: use #{REQUEST_FAILURES.join(', ')}, an API error code or an exception")
+      end
+
+      name = operation && operation.to_s.split('.').map { |part| Internal.camelize(part) }.join('.')
+      @mock_lock.synchronize { @failures << { failure: failure, operation: name } }
+      self
+    end
+
+    # @see ServerClient#ensure_lenses
+    def ensure_lenses(options) = operation('ensureLenses') { super }
+
+    # @see ServerClient#ensure_lens
+    def ensure_lens(options) = operation('ensureLens') { super }
 
     # Queues a JSON response for the next request.
     # @param status [Integer]
@@ -166,20 +238,68 @@ module CalmLens
 
     private
 
+    # Wraps a resource's methods so requests know which call sent them, for {#fail_next_request}.
+    def track(resource, prefix, methods)
+      mock = self
+      resource.singleton_class.prepend(Module.new do
+        methods.each do |name|
+          define_method(name) do |*args, **options, &block|
+            mock.send(:operation, "#{prefix}.#{Internal.camelize(name)}") { super(*args, **options, &block) }
+          end
+        end
+      end)
+    end
+
+    # Runs a call; calls it makes (text.classify through assets.classify) count as the outer one.
+    def operation(name)
+      return yield if Thread.current[@call_key]
+
+      begin
+        Thread.current[@call_key] = { operation: name }
+        yield
+      ensure
+        Thread.current[@call_key] = nil
+      end
+    end
+
+    # The failure for this request: the one its call already took, or the next queued for it.
+    def failure_for(call)
+      return call[:failure] if call&.key?(:failure)
+
+      index = @failures.index { |pending| pending[:operation].nil? || pending[:operation] == call&.dig(:operation) }
+      return unless index
+
+      failure = @failures.delete_at(index)[:failure]
+      call[:failure] = failure if call
+      failure
+    end
+
     # Returns the response rather than yielding it: the client accepts either from a transport.
     def receive(request, &)
       body = request.body.respond_to?(:read) ? read_stream(request.body) : request.body&.b
       path, query = Internal.split_url(request.url).last.split('?', 2)
       base = request.url.start_with?("#{cdn_base_url}/") ? URI(cdn_base_url).path : URI(base_url).path
+      call = Thread.current[@call_key]
       @mock_lock.synchronize do
         @received << Request.new(method: request.method, url: request.url, path: path.delete_prefix(base),
                                  query: URI.decode_www_form(query.to_s).to_h, headers: request.headers.dup,
                                  body: body)
+        failure = failure_for(call)
+        return fail_request(failure) if failure
+
         queued = @queue.shift
         raise queued if queued.is_a?(Exception)
 
         queued || @fake.handle(request.method, request.url, request.headers, body)
       end
+    end
+
+    def fail_request(failure)
+      raise failure if failure.is_a?(Exception)
+      raise Errno::ECONNRESET, 'Simulated network failure' if failure == 'transport-error'
+      raise Net::ReadTimeout, 'Simulated timeout' if failure == 'timeout'
+
+      @fake.error(failure)
     end
 
     def read_stream(io)

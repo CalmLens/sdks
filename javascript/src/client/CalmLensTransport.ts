@@ -2,10 +2,10 @@ import { CalmLensError, SDK_ERROR_CODES } from "./CalmLensError";
 import { getUserAgent, isBrowserRuntime } from "./CalmLensVersion";
 
 /** Retry delays grow from this base, doubling per attempt, with jitter. */
-const RETRY_BASE_DELAY_MS = 500;
-const RETRY_MAX_DELAY_MS = 8_000;
+export const RETRY_BASE_DELAY_MS = 500;
+export const RETRY_MAX_DELAY_MS = 8_000;
 /** A `Retry-After` longer than this is returned to the caller instead of waited out. */
-const RETRY_AFTER_MAX_MS = 60_000;
+export const RETRY_AFTER_MAX_MS = 60_000;
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 
 export interface TransportSettings {
@@ -286,8 +286,12 @@ export class CalmLensTransport {
         } as RequestInit);
         if (isRedirect(response)) {
           await response.body?.cancel().catch(() => {});
-          throw new CalmLensError(SDK_ERROR_CODES.TRANSPORT_ERROR, {
+          // An HTTP failure like any other non-2xx: repeating the request redirects again.
+          throw new CalmLensError(SDK_ERROR_CODES.HTTP_ERROR, {
             message: `Unexpected redirect (HTTP ${response.status})`,
+            ...responseInfo(response),
+            // Browsers hide a manual redirect's status, reporting 0.
+            status: response.status || undefined,
           });
         }
       } catch (cause) {

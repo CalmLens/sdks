@@ -200,8 +200,8 @@ impl Error {
     pub fn message(&self) -> &str {
         &self.inner.message
     }
-    /// The API's `details` object (empty for SDK errors). API errors also carry `traceId`
-    /// when the API sent one, and `network: true`.
+    /// The API's `details` object, with the response's `traceId` when the API sent one. Empty
+    /// for SDK errors such as transport failures, except where a code documents its details.
     pub fn details(&self) -> &Map<String, Value> {
         &self.inner.details
     }
@@ -213,7 +213,8 @@ impl Error {
     pub fn request_id(&self) -> Option<&str> {
         self.inner.request_id.as_deref()
     }
-    /// The `Retry-After` delay sent with a `429` or `idempotency/request-in-progress` response.
+    /// The `Retry-After` delay the response sent, in seconds or as an HTTP date (rounded up to
+    /// whole seconds from now, and zero once past).
     pub fn retry_after(&self) -> Option<Duration> {
         self.inner.retry_after
     }

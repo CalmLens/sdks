@@ -1,6 +1,9 @@
-//! Replays every shared SDK contract fixture in `testdata/` (packages/sdk-contract/README.md):
-//! requests, paths, webhooks, errors, transform options, mock behaviour scenarios, the capability
-//! surface and refused requests. Each fixture case runs on its own and a failure names the case.
+//! Replays the shared SDK contract fixtures in `testdata/` (packages/sdk-contract/README.md):
+//! requests, paths, webhooks, upload tokens, transform options, mock behaviour scenarios, the
+//! capability surface (its capabilities, errorResponse and retryable errors) and refused requests.
+//! `client_cases.rs` replays the client cases, errors and surface defaults; each fixture is replayed
+//! in one of the two, read through `common::fixture`. Each fixture case runs on its own and a
+//! failure names the case.
 mod common;
 use calmlens::models::*;
 use calmlens::testing::{self, MockOptions, MockResponse, MockServerClient};
@@ -8,7 +11,7 @@ use calmlens::{
     AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, ServerClient, TextClient,
     UploadTokensClient,
 };
-use common::{input, invoke, typed};
+use common::{compare_typed, fixture, input, invoke, typed, whole_numbers};
 use futures_util::FutureExt;
 use serde_json::{json, Map, Value};
 use std::{
@@ -20,12 +23,6 @@ use std::{
     thread,
     time::Duration,
 };
-
-/// Loads a shared fixture file from `testdata/`.
-fn fixture(name: &str) -> Value {
-    let path = format!("{}/testdata/{name}.json", env!("CARGO_MANIFEST_DIR"));
-    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
-}
 
 /// Runs every named case, so one failure doesn't hide the others, then fails naming each failed case.
 async fn each_case<'a, F, Fut>(
@@ -116,6 +113,16 @@ fn serve_once(listener: TcpListener, response: String) -> thread::JoinHandle<Val
     })
 }
 
+/// The result a request fixture's operation returns: the response, `null` for deletes and the
+/// lenses for `ensureLenses`.
+fn expected_result(fixture: &Value) -> Value {
+    match fixture["operation"].as_str().unwrap() {
+        "ensureLenses" => fixture["response"]["lenses"].clone(),
+        operation if operation.ends_with(".delete") => Value::Null,
+        _ => fixture["response"].clone(),
+    }
+}
+
 #[tokio::test]
 async fn request_contracts() {
     let fixtures = fixture("requests");
@@ -130,7 +137,7 @@ async fn request_contracts() {
                 .base_url(format!("http://127.0.0.1:{port}/v1"))
                 .build()
                 .unwrap();
-            invoke(
+            let result = invoke(
                 &client,
                 fixture["operation"].as_str().unwrap(),
                 fixture["options"].clone(),
@@ -138,6 +145,8 @@ async fn request_contracts() {
             .await
             .unwrap();
             assert_eq!(fixture["request"], server.join().unwrap());
+            compare_typed(&result, &expected_result(fixture))
+                .unwrap_or_else(|path| panic!("{}: {path}", fixture["operation"]));
         },
     )
     .await;
@@ -153,13 +162,15 @@ async fn request_contracts_through_the_mock() {
         |f| async move {
             let mock = MockServerClient::new().unwrap();
             mock.enqueue(200, f["response"].clone());
-            invoke(
+            let result = invoke(
                 &mock,
                 f["operation"].as_str().unwrap(),
                 f["options"].clone(),
             )
             .await
             .unwrap();
+            compare_typed(&result, &expected_result(f))
+                .unwrap_or_else(|path| panic!("{}: {path}", f["operation"]));
             let requests = mock.requests();
             assert_eq!(requests.len(), 1);
             assert_eq!(f["request"], common::describe(&requests[0]));
@@ -297,19 +308,11 @@ async fn webhook_payload_contracts() {
                 calmlens::parse_webhook_event(serde_json::to_vec(expected).unwrap()).unwrap();
             assert_eq!(parsed.id, expected["id"].as_str().unwrap());
             assert_eq!(
-                parsed.event_type.as_str(),
-                expected["type"].as_str().unwrap()
-            );
-            assert_eq!(
-                parsed.data.asset_id.as_deref(),
-                expected["data"]["assetId"].as_str()
-            );
-            assert_eq!(
                 parsed
                     .data
                     .asset
                     .as_ref()
-                    .and_then(|asset| asset.upload_preset_id.as_deref()),
+                    .and_then(|asset| asset.upload_preset_id()),
                 expected["data"]["asset"]["uploadPresetId"].as_str()
             );
             assert_eq!(serde_json::to_value(&parsed).unwrap(), *expected);
@@ -354,6 +357,161 @@ async fn future_webhook_fields_and_types_are_accepted() {
     .await;
 }
 
+/// The fixture's headers as an `http::HeaderMap`, with a list as a repeated header.
+fn header_map(headers: &Value) -> http::HeaderMap {
+    let mut map = http::HeaderMap::new();
+    for (name, value) in headers.as_object().unwrap() {
+        let name = http::HeaderName::from_bytes(name.as_bytes()).unwrap();
+        let values = match value {
+            Value::Array(values) => values.clone(),
+            single => vec![single.clone()],
+        };
+        for value in values {
+            map.append(&name, value.as_str().unwrap().parse().unwrap());
+        }
+    }
+    map
+}
+
+#[tokio::test]
+async fn webhook_header_contracts() {
+    let fixtures = fixture("webhooks");
+    each_case(
+        "webhook headers",
+        named(&fixtures["headerCases"], "name"),
+        |c| async move {
+            let headers = header_map(&c["headers"]);
+            let valid = calmlens::verify_webhook_headers(
+                c["body"].as_str().unwrap(),
+                &headers,
+                c["secret"].as_str().unwrap(),
+                c["now"].as_u64().unwrap(),
+                calmlens::WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
+            );
+            assert_eq!(c["valid"].as_bool().unwrap(), valid, "{}", c["name"]);
+        },
+    )
+    .await;
+}
+
+fn construct(case: &Value) -> calmlens::Result<WebhookEventPayload> {
+    calmlens::construct_webhook_event_at(
+        case["body"].as_str().unwrap(),
+        case["signature"].as_str().unwrap(),
+        case["timestamp"].as_str().unwrap(),
+        case["secret"].as_str().unwrap(),
+        case["now"].as_u64().unwrap(),
+        calmlens::WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
+    )
+}
+
+#[tokio::test]
+async fn webhook_parse_error_contracts() {
+    let fixtures = fixture("webhooks");
+    each_case(
+        "webhook parse errors",
+        named(&fixtures["parseErrors"], "name"),
+        |c| async move {
+            let error = construct(c).unwrap_err();
+            assert_eq!(error.code().as_str(), c["error"], "{}", c["name"]);
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn webhook_parsed_contracts() {
+    let fixtures = fixture("webhooks");
+    each_case(
+        "webhook parsed",
+        named(&fixtures["parsed"], "name"),
+        |c| async move {
+            let expected = &c["expected"];
+            let event = construct(c).unwrap();
+            assert_eq!(event.json(), *expected, "{}", c["name"]);
+            assert_eq!(
+                (
+                    event.id.as_str(),
+                    event.event_type.as_str(),
+                    event.created_at
+                ),
+                (
+                    expected["id"].as_str().unwrap(),
+                    expected["type"].as_str().unwrap(),
+                    expected["createdAt"].as_u64().unwrap()
+                )
+            );
+            assert_eq!(event.project_id, expected["projectId"].as_str().unwrap());
+            assert_eq!(
+                event.data.asset_id.as_deref(),
+                expected["data"]["assetId"].as_str()
+            );
+            assert_eq!(event.is_test(), c["isTest"].as_bool().unwrap());
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn webhook_test_fact_contracts() {
+    let fixtures = fixture("webhooks");
+    each_case(
+        "webhook test facts",
+        named(&fixtures["testFacts"], "name"),
+        |c| async move {
+            let event: WebhookEventPayload = typed(c["event"].clone());
+            assert_eq!(
+                event.is_test(),
+                c["isTest"].as_bool().unwrap(),
+                "{}",
+                c["name"]
+            );
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn webhook_round_trip_contracts() {
+    let fixtures = fixture("webhooks");
+    each_case(
+        "webhook round trips",
+        named(&fixtures["roundTrips"], "name"),
+        |c| async move {
+            let event: Event = typed(c["event"].clone());
+            let payload = WebhookEventPayload::from_event(&event);
+            assert_eq!(serde_json::to_value(&payload).unwrap(), c["payload"]);
+            let body = c["body"].as_str().unwrap();
+            let timestamp = c["timestampSeconds"].as_u64().unwrap();
+            let secret = c["secret"].as_str().unwrap();
+            let headers = calmlens::create_webhook_headers(
+                body,
+                c["deliveryId"].as_str().unwrap(),
+                timestamp,
+                secret,
+            )
+            .unwrap();
+            assert_eq!(headers, header_map(&c["headers"]));
+            let parsed = calmlens::construct_webhook_event_at(
+                body,
+                headers[calmlens::WEBHOOK_SIGNATURE_HEADER]
+                    .to_str()
+                    .unwrap(),
+                headers[calmlens::WEBHOOK_TIMESTAMP_HEADER]
+                    .to_str()
+                    .unwrap(),
+                secret,
+                timestamp,
+                calmlens::WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
+            )
+            .unwrap();
+            assert_eq!(parsed.json(), c["payload"]);
+            assert_eq!(parsed.is_test(), c["isTest"].as_bool().unwrap());
+        },
+    )
+    .await;
+}
+
 #[test]
 fn webhook_verification_uses_exact_raw_bytes() {
     // 0xff is not valid UTF-8, so this body cannot be passed through a `&str`.
@@ -369,142 +527,196 @@ fn webhook_verification_uses_exact_raw_bytes() {
     assert!(!verify(&tampered));
 }
 
-fn signed_delivery(body: &str, timestamp: u64) -> http::HeaderMap {
-    let mut headers = http::HeaderMap::new();
-    let stamp = timestamp.to_string();
-    headers.insert(
-        calmlens::WEBHOOK_SIGNATURE_HEADER,
-        calmlens::create_webhook_signature_header(body, &stamp, "secret")
-            .parse()
-            .unwrap(),
-    );
-    headers.insert(calmlens::WEBHOOK_TIMESTAMP_HEADER, stamp.parse().unwrap());
-    headers
-}
-
-fn now() -> u64 {
-    std::time::SystemTime::now()
+/// `construct_webhook_event` reads the real clock, which the fixtures cannot fix.
+#[test]
+fn construct_webhook_event_checks_against_the_current_time() {
+    let body = r#"{"id":"event-1","type":"asset.blocked","createdAt":1,"projectId":"p","data":{}}"#;
+    let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
-        .as_secs()
-}
-
-#[test]
-fn construct_webhook_event_verifies_headers_then_parses() {
-    let body = r#"{"id":"event-1","type":"asset.blocked","data":{"assetId":"asset-1","facts":[]}}"#;
-    let event =
-        calmlens::construct_webhook_event(body, &signed_delivery(body, now()), "secret").unwrap();
-    assert_eq!(
-        (event.id.as_str(), event.data.asset_id.as_deref()),
-        ("event-1", Some("asset-1"))
-    );
-
-    let wrong_secret =
-        calmlens::construct_webhook_event(body, &signed_delivery(body, now()), "another-secret")
-            .unwrap_err();
-    assert_eq!(
-        wrong_secret.code(),
-        &calmlens::ErrorCode::InvalidWebhookSignature
-    );
-
-    let stale = signed_delivery(
+        .as_secs();
+    let fresh = calmlens::create_webhook_headers(body, "delivery-1", now, "secret").unwrap();
+    let event = calmlens::construct_webhook_event(body, &fresh, "secret").unwrap();
+    assert_eq!(event.id, "event-1");
+    let stale = calmlens::create_webhook_headers(
         body,
-        now() - calmlens::WEBHOOK_SIGNATURE_TOLERANCE_SECONDS - 60,
-    );
-    let error = calmlens::construct_webhook_event(body, &stale, "secret").unwrap_err();
-    assert_eq!(error.code(), &"sdk/invalid-webhook-signature");
-
-    let unsigned = calmlens::construct_webhook_event(body, &http::HeaderMap::new(), "secret");
-    assert_eq!(
-        unsigned.unwrap_err().code(),
-        &"sdk/invalid-webhook-signature"
-    );
-
-    let tampered = body.replace("asset-1", "asset-2");
-    let error =
-        calmlens::construct_webhook_event(&tampered, &signed_delivery(body, now()), "secret")
-            .unwrap_err();
-    assert_eq!(error.code(), &"sdk/invalid-webhook-signature");
-
-    let not_a_delivery = r#"{"hello":"world"}"#;
-    let error = calmlens::construct_webhook_event(
-        not_a_delivery,
-        &signed_delivery(not_a_delivery, now()),
+        "delivery-1",
+        now - calmlens::WEBHOOK_SIGNATURE_TOLERANCE_SECONDS - 60,
         "secret",
     )
-    .unwrap_err();
-    assert_eq!(error.code(), &"sdk/invalid-webhook-payload");
+    .unwrap();
+    let error = calmlens::construct_webhook_event(body, &stale, "secret").unwrap_err();
+    assert_eq!(error.code(), &"sdk/invalid-webhook-signature");
 }
 
 #[test]
-fn invalid_webhook_payloads() {
-    for body in [
-        "",
-        "not json",
-        "[]",
-        r#"{"type":"asset.classified","data":{}}"#,
-        r#"{"id":"event-1","data":{}}"#,
-        r#"{"id":"event-1","type":"asset.classified"}"#,
-        r#"{"id":"","type":"asset.classified","data":{}}"#,
-    ] {
-        assert_eq!(
-            calmlens::parse_webhook_event(body).unwrap_err().code(),
-            &"sdk/invalid-webhook-payload",
-            "{body}"
-        );
-    }
-    let minimal =
-        calmlens::parse_webhook_event(r#"{"id":"event-1","type":"test.sent","data":{}}"#).unwrap();
-    assert!(minimal.data.facts.is_empty());
-}
-
-#[test]
-fn create_webhook_headers_sign_a_delivery_construct_webhook_event_accepts() {
-    let body = r#"{"id":"event-1","type":"asset.allowed","data":{"facts":[]}}"#;
-    let headers = calmlens::create_webhook_headers(body, "delivery-1", now(), "secret").unwrap();
-    assert_eq!(headers[calmlens::WEBHOOK_DELIVERY_HEADER], "delivery-1");
-    assert_eq!(headers[http::header::CONTENT_TYPE], "application/json");
-    let event = calmlens::construct_webhook_event(body, &headers, "secret").unwrap();
-    assert_eq!(event.id, "event-1");
-    let error = calmlens::construct_webhook_event(body, &headers, "other").unwrap_err();
-    assert_eq!(error.code().as_str(), "sdk/invalid-webhook-signature");
-    let invalid = calmlens::create_webhook_headers(body, "bad\nid", now(), "secret").unwrap_err();
+fn create_webhook_headers_refuses_a_delivery_id_a_header_cannot_hold() {
+    let invalid = calmlens::create_webhook_headers("{}", "bad\nid", 0, "secret").unwrap_err();
     assert_eq!(invalid.code().as_str(), "sdk/invalid-argument");
 }
 
-// errors.json
+// upload-tokens.json
 
-#[test]
-fn error_codes_match_the_api() {
-    let fixtures = fixture("errors");
-    let expected: Vec<(String, u16)> = fixtures
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|e| {
-            let status = e["status"].as_u64().unwrap() as u16;
-            (e["code"].as_str().unwrap().to_owned(), status)
-        })
-        .collect();
-    let generated: Vec<(String, u16)> = calmlens::ErrorCode::API_CODES
-        .iter()
-        .map(|(code, status)| ((*code).to_owned(), *status))
-        .collect();
-    assert_eq!(generated, expected);
+fn token_options(options: &Value) -> Result<SignUploadToken, serde_json::Error> {
+    serde_json::from_value(options.clone())
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn hmac_hex(key: &str, message: &str) -> String {
+    use hmac::{Hmac, Mac};
+    let mut mac = Hmac::<sha2::Sha256>::new_from_slice(key.as_bytes()).unwrap();
+    mac.update(message.as_bytes());
+    hex(&mac.finalize().into_bytes())
+}
+
+/// The claims of a well-formed `clut_<body>.<signature>` token, its body and its signature.
+fn decode_token(token: &str, prefix: &str) -> Option<(Map<String, Value>, String, String)> {
+    use base64::Engine;
+    let (body, signature) = token.strip_prefix(prefix)?.split_once('.')?;
+    if signature.contains('.') || body.is_empty() {
+        return None;
+    }
+    let claims = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(body)
+        .ok()?;
+    let claims: Map<String, Value> = serde_json::from_slice(&claims).ok()?;
+    Some((claims, body.into(), signature.into()))
 }
 
 #[tokio::test]
-async fn each_api_error_code_parses_with_its_status() {
-    let fixtures = fixture("errors");
-    each_case("errors", named(&fixtures, "code"), |e| async move {
-        let code = e["code"].as_str().unwrap();
-        let parsed = calmlens::ErrorCode::parse(code);
-        assert!(!matches!(parsed, calmlens::ErrorCode::Other(_)), "{code}");
-        assert_eq!(
-            parsed.http_status(),
-            Some(e["status"].as_u64().unwrap() as u16)
-        );
-    })
+async fn upload_token_signing_contracts() {
+    use sha2::Digest;
+    let file = &fixture("upload-tokens");
+    let (prefix, context) = (
+        file["prefix"].as_str().unwrap(),
+        file["signingContext"].as_str().unwrap(),
+    );
+    each_case(
+        "upload token signing",
+        named(&file["signing"], "name"),
+        |c| async move {
+            let api_key = c["apiKey"].as_str().unwrap();
+            let expected = &c["expected"];
+            let signed = testing::sign_upload_token(
+                api_key,
+                token_options(&c["options"]).unwrap(),
+                c["now"].as_u64().unwrap(),
+                c["nonce"].as_str().unwrap(),
+            )
+            .unwrap();
+            assert_eq!(signed.token, expected["token"].as_str().unwrap());
+            assert_eq!(signed.expires_at, expected["expiresAt"].as_u64().unwrap());
+
+            // The real client: the same claims with a fresh nonce and the real clock.
+            let before = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            let client = ServerClient::new(api_key, "project-1").unwrap();
+            let live = client
+                .upload_tokens()
+                .sign(token_options(&c["options"]).unwrap())
+                .unwrap();
+            let (claims, body, signature) = decode_token(&live.token, prefix).unwrap();
+            let mut wanted = expected["claims"].as_object().unwrap().clone();
+            wanted.remove("n");
+            wanted.remove("e");
+            let mut compared = claims.clone();
+            compared.remove("n");
+            compared.remove("e");
+            assert_eq!(compared, wanted);
+            assert_ne!(claims["n"], expected["claims"]["n"]);
+            let lifetime = c["options"]["expiresInSeconds"]
+                .as_u64()
+                .unwrap_or(file["defaultExpiresInSeconds"].as_u64().unwrap())
+                * 1000;
+            let expiry = claims["e"].as_u64().unwrap();
+            assert!((before + lifetime..before + lifetime + 5_000).contains(&expiry));
+            let secret = hex(&sha2::Sha256::digest(api_key.as_bytes()));
+            assert_eq!(secret, expected["signingSecret"].as_str().unwrap());
+            assert_eq!(signature, hmac_hex(&secret, &format!("{context}{body}")));
+        },
+    )
+    .await;
+}
+
+/// Lifetimes a `u32` cannot hold, so `SignUploadToken` cannot express them.
+const TOKEN_OPTIONS_REFUSED_BY_TYPE: [(&str, &str); 2] = [
+    (
+        "negative lifetime",
+        "SignUploadToken::expires_in_seconds is a u32",
+    ),
+    (
+        "fractional lifetime",
+        "SignUploadToken::expires_in_seconds is a u32",
+    ),
+];
+
+#[tokio::test]
+async fn upload_token_rejection_contracts() {
+    let file = &fixture("upload-tokens");
+    each_case(
+        "upload token rejections",
+        named(&file["rejections"], "name"),
+        |c| async move {
+            let name = c["name"].as_str().unwrap();
+            let options = token_options(&c["options"]);
+            if let Some((_, reason)) = TOKEN_OPTIONS_REFUSED_BY_TYPE
+                .iter()
+                .find(|(case, _)| *case == name)
+            {
+                assert!(options.is_err(), "{name}: {reason}, yet it decoded");
+                return;
+            }
+            let api_key = c["apiKey"].as_str().unwrap();
+            let client = ServerClient::new(api_key, "project-1").unwrap();
+            let error = client.upload_tokens().sign(options.unwrap()).unwrap_err();
+            assert_eq!(error.code().as_str(), c["error"], "{name}");
+            let error =
+                testing::sign_upload_token(api_key, token_options(&c["options"]).unwrap(), 0, "n")
+                    .unwrap_err();
+            assert_eq!(error.code().as_str(), c["error"], "{name}");
+        },
+    )
+    .await;
+}
+
+/// The server's check that a token is well formed and its signature verifies with the key's
+/// hash; the Rust SDK signs tokens but never decodes them, so this documents the rules the
+/// tokens it signs must meet.
+#[tokio::test]
+async fn upload_token_verification_contracts() {
+    use sha2::Digest;
+    let file = &fixture("upload-tokens");
+    let (prefix, context) = (
+        file["prefix"].as_str().unwrap(),
+        file["signingContext"].as_str().unwrap(),
+    );
+    each_case(
+        "upload token verification",
+        named(&file["verification"], "name"),
+        |c| async move {
+            let secret = hex(&sha2::Sha256::digest(
+                c["apiKey"].as_str().unwrap().as_bytes(),
+            ));
+            let verified = decode_token(c["token"].as_str().unwrap(), prefix).is_some_and(
+                |(claims, body, signature)| {
+                    let text = |key: &str| claims.get(key).is_some_and(Value::is_string);
+                    let well_formed = claims.get("v") == Some(&json!(1))
+                        && text("u")
+                        && text("k")
+                        && claims.get("e").is_some_and(|e| e.is_u64())
+                        && text("n")
+                        && claims.get("x").is_none_or(Value::is_string);
+                    well_formed && signature == hmac_hex(&secret, &format!("{context}{body}"))
+                },
+            );
+            assert_eq!(verified, c["decodesAndVerifies"].as_bool().unwrap());
+        },
+    )
     .await;
 }
 
@@ -608,32 +820,35 @@ fn at(value: &Value, path: &str) -> Value {
         })
 }
 
-/// `value` with whole floats as integers: typed `f64` fields serialize `950` as `950.0`, and JSON
-/// compares them as one number.
-fn whole_numbers(value: Value) -> Value {
-    match value {
-        Value::Number(number) => match number.as_f64() {
-            Some(float) if number.is_f64() && float.fract() == 0.0 && float.abs() < 1e15 => {
-                json!(float as i64)
-            }
-            _ => Value::Number(number),
-        },
-        Value::Array(items) => Value::Array(items.into_iter().map(whole_numbers).collect()),
-        Value::Object(map) => Value::Object(
-            map.into_iter()
-                .map(|(key, value)| (key, whole_numbers(value)))
-                .collect(),
-        ),
-        other => other,
-    }
-}
-
+/// `value` with its markers replaced: `$ref` (a saved result or a path in it), `$concat` and
+/// `$base64Repeat`.
 fn resolve(value: &Value, saved: &HashMap<String, Value>) -> Value {
+    use base64::Engine;
     match value {
         Value::Object(map) if map.contains_key("$ref") => {
             let reference = map["$ref"].as_str().unwrap();
-            let (name, rest) = reference.split_once('.').unwrap();
-            at(&saved[name], rest)
+            match reference.split_once('.') {
+                Some((name, rest)) => at(&saved[name], rest),
+                None => saved[reference].clone(),
+            }
+        }
+        Value::Object(map) if map.contains_key("$concat") => {
+            let parts = map["$concat"].as_array().unwrap();
+            json!(parts
+                .iter()
+                .map(|part| match resolve(part, saved) {
+                    Value::String(text) => text,
+                    other => other.to_string(),
+                })
+                .collect::<String>())
+        }
+        Value::Object(map) if map.contains_key("$base64Repeat") => {
+            let spec = &map["$base64Repeat"];
+            let text = spec["text"]
+                .as_str()
+                .unwrap()
+                .repeat(spec["count"].as_u64().unwrap() as usize);
+            json!(base64::engine::general_purpose::STANDARD.encode(text))
         }
         Value::Object(map) => Value::Object(
             map.iter()
@@ -644,6 +859,24 @@ fn resolve(value: &Value, saved: &HashMap<String, Value>) -> Value {
             Value::Array(items.iter().map(|item| resolve(item, saved)).collect())
         }
         other => other.clone(),
+    }
+}
+
+/// Collects an iterator's items, as scenarios expect them.
+async fn collect<T: serde::Serialize>(
+    stream: futures_util::stream::BoxStream<'static, calmlens::Result<T>>,
+) -> calmlens::Result<Value> {
+    use futures_util::TryStreamExt;
+    let items: Vec<T> = stream.try_collect().await?;
+    Ok(serde_json::to_value(items).unwrap())
+}
+
+/// A scenario failure for `mock.failNext`.
+fn failure(name: &str) -> testing::MockFailure {
+    match name {
+        "transport-error" => testing::MockFailure::TransportError,
+        "timeout" => testing::MockFailure::Timeout,
+        code => testing::MockFailure::Api(ErrorCode::parse(code)),
     }
 }
 
@@ -663,7 +896,18 @@ async fn run_step(
             event["id"] = json!("");
             Ok(serde_json::to_value(mock.enqueue_event(typed(event))).unwrap())
         }
+        "mock.grant" => {
+            let grants: Vec<testing::MockApiKeyGrant> = typed(args["grants"].clone());
+            mock.set_api_key_grants(&grants);
+            Ok(Value::Null)
+        }
+        "mock.failNext" => {
+            let failure = failure(args["failure"].as_str().unwrap());
+            mock.fail_next_request(failure, args["operation"].as_str());
+            Ok(Value::Null)
+        }
         "cdn.serve" => {
+            use base64::Engine;
             let response = mock.cdn().serve(input(args)?).await?;
             let status = response.status().as_u16();
             // HTTP header names are lowercase; expectations name them case-insensitively.
@@ -676,21 +920,49 @@ async fn run_step(
                 .headers()
                 .get("content-type")
                 .is_some_and(|value| value == "application/json");
-            let body = response.text().await?;
+            let body = response.bytes().await?;
             let code = if json {
-                serde_json::from_str::<Value>(&body).unwrap()["code"].clone()
+                serde_json::from_slice::<Value>(&body).unwrap()["code"].clone()
             } else {
                 Value::Null
             };
-            Ok(json!({"status": status, "code": code, "body": body, "headers": headers}))
+            Ok(json!({
+                "status": status, "code": code, "body": String::from_utf8_lossy(&body),
+                "bodyBase64": base64::engine::general_purpose::STANDARD.encode(&body),
+                "headers": headers,
+            }))
         }
         "assets.waitForDecision" => {
-            let timeout = Duration::from_millis(args["timeoutMs"].as_u64().unwrap());
-            let request = WaitForDecision::new(args["assetId"].as_str().unwrap()).timeout(timeout);
+            let mut request = WaitForDecision::new(args["assetId"].as_str().unwrap());
+            if let Some(timeout) = args["timeoutMs"].as_u64() {
+                request = request.timeout(Duration::from_millis(timeout));
+            }
             Ok(serde_json::to_value(mock.assets().wait_for_decision(request).await?).unwrap())
         }
+        "ensureLens" => Ok(serde_json::to_value(mock.ensure_lens(input(args)?).await?).unwrap()),
+        "assets.iterate" => collect(mock.assets().iterate(input(args)?)).await,
+        "assets.iterateChildren" => collect(mock.assets().iterate_children(input(args)?)).await,
+        "events.pages" => collect(mock.events().pages(input(args)?)).await,
         _ => invoke(mock, operation, args).await,
     }
+}
+
+/// Whether `actual` holds every key of `wanted` with deep-equal values (other keys are free).
+fn has_details(actual: &Map<String, Value>, wanted: &Value) -> bool {
+    wanted
+        .as_object()
+        .unwrap()
+        .iter()
+        .all(|(key, value)| actual.get(key) == Some(value))
+}
+
+/// Steps a Rust type cannot express, so the type refuses what the scenario expects refused.
+fn step_refused_by_type(operation: &str, args: &Value) -> Option<&'static str> {
+    (operation == "assets.waitForDecision"
+        && args
+            .get("timeoutMs")
+            .is_some_and(|timeout| timeout.as_u64().is_none()))
+    .then_some("WaitForDecision::timeout is a Duration, which cannot be negative")
 }
 
 async fn check_step(
@@ -702,28 +974,59 @@ async fn check_step(
     let operation = step["operation"].as_str().unwrap();
     let label = format!("{scenario}: {operation} {}", step["args"]);
     let args = resolve(step.get("args").unwrap_or(&json!({})), saved);
+    if let Some(reason) = step_refused_by_type(operation, &args) {
+        assert!(step["expect"].get("error").is_some(), "{label}");
+        println!("refused by type: {label}: {reason}");
+        return;
+    }
     let empty = Value::Object(Map::new());
-    let expect = step.get("expect").unwrap_or(&empty);
+    let expect = resolve(step.get("expect").unwrap_or(&empty), saved);
     let outcome = run_step(mock, operation, args).await;
     if let Some(wanted) = expect.get("error") {
         let error = outcome.expect_err(&label);
         assert_eq!(
             json!({"code": error.code().as_str(), "status": error.status()}),
-            *wanted,
+            json!({"code": wanted["code"], "status": wanted["status"]}),
             "{label}"
         );
+        if let Some(details) = wanted.get("details") {
+            assert!(
+                has_details(error.details(), details),
+                "{label}: details {:?} lack {details}",
+                error.details()
+            );
+        }
         return;
     }
     let result = whole_numbers(outcome.unwrap_or_else(|error| panic!("{label}: {error:?}")));
     if let Some(Value::Object(cdn)) = expect.get("cdn") {
         for (key, wanted) in cdn {
-            if key == "headers" {
-                for (name, value) in wanted.as_object().unwrap() {
-                    let served = &result["headers"][name.to_ascii_lowercase()];
-                    assert_eq!(served, value, "{label}: cdn header {name}");
+            match key.as_str() {
+                "headers" => {
+                    for (name, value) in wanted.as_object().unwrap() {
+                        let served = &result["headers"][name.to_ascii_lowercase()];
+                        assert_eq!(served, value, "{label}: cdn header {name}");
+                    }
                 }
-            } else {
-                assert_eq!(result[key], *wanted, "{label}: cdn {key}");
+                "headersPresent" => {
+                    for name in wanted.as_array().unwrap() {
+                        let name = name.as_str().unwrap().to_ascii_lowercase();
+                        assert!(
+                            result["headers"].get(&name).is_some(),
+                            "{label}: cdn header {name} missing"
+                        );
+                    }
+                }
+                "bodyPrefixBase64" => {
+                    use base64::Engine;
+                    let engine = base64::engine::general_purpose::STANDARD;
+                    let body = engine
+                        .decode(result["bodyBase64"].as_str().unwrap())
+                        .unwrap();
+                    let prefix = engine.decode(wanted.as_str().unwrap()).unwrap();
+                    assert!(body.starts_with(&prefix), "{label}: cdn body prefix");
+                }
+                _ => assert_eq!(result[key], *wanted, "{label}: cdn {key}"),
             }
         }
     }
@@ -734,19 +1037,18 @@ async fn check_step(
         assert_eq!(result, *first, "{label}: same as {name}");
     }
     if let Some(Value::Object(paths)) = expect.get("result") {
-        for (path, raw) in paths {
+        for (path, wanted) in paths {
             let actual = at(&result, path);
-            if let Some(member) = raw.get("$contains") {
-                let member = resolve(member, saved);
+            if let Some(member) = wanted.get("$contains") {
                 let items = actual
                     .as_array()
                     .unwrap_or_else(|| panic!("{label}: {path} is not an array"));
                 assert!(
-                    items.contains(&member),
+                    items.contains(member),
                     "{label}: {path} {actual} lacks {member}"
                 );
             } else {
-                assert_eq!(actual, resolve(raw, saved), "{label}: {path}");
+                assert_eq!(actual, *wanted, "{label}: {path}");
             }
         }
     }
@@ -798,7 +1100,9 @@ async fn mock_scenarios() {
             let started = std::time::Instant::now();
             let mut saved = HashMap::new();
             for step in scenario["steps"].as_array().unwrap() {
-                check_step(&mock, name, step, &mut saved).await;
+                for _ in 0..step["repeat"].as_u64().unwrap_or(1) {
+                    check_step(&mock, name, step, &mut saved).await;
+                }
             }
             // Mock waits take no real time.
             assert!(started.elapsed() < Duration::from_secs(5), "{name}");
@@ -856,6 +1160,8 @@ fn references() -> BTreeSet<&'static str> {
         "create_webhook_signature_header" => |body: &[u8]| calmlens::create_webhook_signature_header(body, "", "");
         "create_webhook_headers" => |body: &[u8]| calmlens::create_webhook_headers(body, "", 0, "");
         "models::WebhookEventPayload::from_event" => WebhookEventPayload::from_event;
+        "models::WebhookEventPayload::is_test" => WebhookEventPayload::is_test;
+        "testing::sign_upload_token" => testing::sign_upload_token;
         "CdnRequest::allow_age_restricted" => |request: &CdnRequest| request.allow_age_restricted;
         "testing::MockServerClient::in_memory" => MockServerClient::in_memory;
         "MockOptions::queued_outcome" => MockOptions::queued_outcome;
@@ -888,6 +1194,35 @@ fn values() -> BTreeMap<&'static str, String> {
         (
             "ErrorCode::InvalidArgument",
             ErrorCode::InvalidArgument.as_str().to_owned(),
+        ),
+        (
+            "ErrorCode::TransportError",
+            ErrorCode::TransportError.as_str().to_owned(),
+        ),
+        ("ErrorCode::Timeout", ErrorCode::Timeout.as_str().to_owned()),
+        (
+            "ErrorCode::InvalidResponse",
+            ErrorCode::InvalidResponse.as_str().to_owned(),
+        ),
+        (
+            "ErrorCode::HttpError",
+            ErrorCode::HttpError.as_str().to_owned(),
+        ),
+        (
+            "ErrorCode::ResponseTooLarge",
+            ErrorCode::ResponseTooLarge.as_str().to_owned(),
+        ),
+        (
+            "ErrorCode::InvalidConfig",
+            ErrorCode::InvalidConfig.as_str().to_owned(),
+        ),
+        (
+            "ErrorCode::InvalidWebhookSignature",
+            ErrorCode::InvalidWebhookSignature.as_str().to_owned(),
+        ),
+        (
+            "ErrorCode::InvalidWebhookPayload",
+            ErrorCode::InvalidWebhookPayload.as_str().to_owned(),
         ),
         (
             "CdnResource::Original",
@@ -956,6 +1291,10 @@ async fn offers_every_capability() {
         |capability| async move {
             let id = capability["id"].as_str().unwrap();
             let name = capability["names"]["rust"].as_str().unwrap();
+            if let Some(reason) = capability["notApplicable"]["rust"].as_str() {
+                println!("not applicable to Rust: {id} ({name}): {reason}");
+                return;
+            }
             let value = capability["value"].as_str();
             let present = match capability["kind"].as_str().unwrap() {
                 "constant" => values.get(name).map(String::as_str) == value,
@@ -983,6 +1322,7 @@ async fn offers_every_capability() {
         .as_array()
         .unwrap()
         .iter()
+        .filter(|capability| capability["notApplicable"]["rust"].is_null())
         .map(|capability| capability["names"]["rust"].as_str().unwrap())
         .collect();
     let known: BTreeSet<&str> = references

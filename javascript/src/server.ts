@@ -2,6 +2,7 @@
 
 export { default as CalmLensServerClient } from "./client/CalmLensServerClient";
 export {
+  isTestWebhookEvent,
   parseWebhookEvent,
   verifyWebhookSignature,
   WEBHOOK_DELIVERY_HEADER,

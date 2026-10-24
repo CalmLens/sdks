@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import email.utils
 import fnmatch
 import hashlib
 import io
@@ -19,20 +20,24 @@ import re
 import threading
 import time
 import uuid
+import zlib
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict, Union, cast
-from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
+from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from urllib.request import Request
 
 from . import error_codes
-from .client import DEFAULT_CONNECT_TIMEOUT, DEFAULT_TIMEOUT, CalmLensServerClient, _invalid, _json
+from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_TIMEOUT, CalmLensServerClient, _invalid, _json, _merge,
+                     _sign_upload_token)
 from .errors import CalmLensError
-from .types import Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder
+from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, SignedUploadToken,
+                    SignUploadTokenOptions)
 
-__all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetOutcome", "MockApiKeyGrant",
-           "StoredContent",
-           "InMemoryMockDatabaseStorage", "InMemoryMockImageStorage", "create_mock_api_key"]
+__all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetOutcome", "MockAssetOutcomeOption",
+           "MockApiKeyGrant",
+           "MockFailure", "StoredContent",
+           "InMemoryMockDatabaseStorage", "InMemoryMockImageStorage", "create_mock_api_key", "sign_upload_token"]
 
 _MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "queued_outcome",
                  "analyzed_outcome", "signed_url_base_url"}
@@ -42,6 +47,8 @@ _MOCK_OUTCOMES = ("pending", "allowed", "limited", "age-restricted", "blocked", 
 #: ``blocked`` or ``purged`` (processing done with that moderation status; ``purged`` also removes
 #: the content) or ``failed`` (processing failed, retryable).
 MockAssetOutcome = Literal["pending", "allowed", "limited", "age-restricted", "blocked", "purged", "failed"]
+#: A mock outcome, or a function choosing one from the uploaded asset.
+MockAssetOutcomeOption = Union[MockAssetOutcome, Callable[[Asset], MockAssetOutcome]]
 _INT_QUERY = {"pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal", "searchAll", "resolveOnly"}
 _JSON_QUERY = {"metadata", "processingOptions"}
@@ -55,6 +62,15 @@ class MockApiKeyGrant(TypedDict):
     #: Folder the grant covers; ``None`` covers the whole project.
     folderId: Union[str, None]
     includeSubfolders: bool
+
+
+def sign_upload_token(api_key: str, options: SignUploadTokenOptions | None = None, /, *, now: int, nonce: str,
+                      **keywords: Any) -> SignedUploadToken:
+    """Sign an upload token like ``client.upload_tokens.sign``, with the same validation, at a
+    fixed ``now`` (milliseconds since the epoch) with a fixed ``nonce``, so the token is the
+    same every time, for comparing with known tokens in tests. Options are an options dict or
+    the same keyword arguments as ``upload_tokens.sign``."""
+    return _sign_upload_token(api_key, _merge(options, **keywords), now, nonce)
 
 
 def create_mock_api_key(grants: list[MockApiKeyGrant] | None = None) -> str:
@@ -302,12 +318,147 @@ class MockOptions(TypedDict, total=False):
     #: A clock you pass is used as is.
     now: Callable[[], int]
     #: Outcome of assets submitted with ``create`` (and queued multipart uploads). Defaults to
-    #: ``pending``.
-    queued_outcome: MockAssetOutcome
+    #: ``pending``. Pass a function of the asset to choose per upload, for example from its name.
+    queued_outcome: MockAssetOutcomeOption
     #: Outcome of assets submitted with ``classify`` and ``text.classify``. Defaults to
-    #: ``allowed``.
-    analyzed_outcome: MockAssetOutcome
+    #: ``allowed``. Also accepts a function of the asset.
+    analyzed_outcome: MockAssetOutcomeOption
     signed_url_base_url: str
+
+
+#: The ThumbHash the mock gives every classified image, standing in for one computed from its
+#: pixels. The ``placeholder`` resource serves it as a PNG, like the CDN.
+_MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
+_DEFAULT_EVENTS_LIMIT = 50
+_MAX_EVENTS_LIMIT = 100
+_MAX_SEARCH_LIMIT = 20
+_MAX_SEARCH_QUERY_LENGTH = 200
+_MAX_FOLDER_PAGE_SIZE = 100
+_REVIEW_DECISIONS = ("allowed", "limited", "age-restricted", "blocked", "purged")
+#: Like the API: 1 to 255 printable ASCII characters, once HTTP has trimmed the header value.
+_IDEMPOTENCY_KEY = re.compile(r"[\x21-\x7e](?:[\x20-\x7e]{0,253}[\x21-\x7e])?")
+#: Content a browser could run as a document, which the CDN serves as a download.
+_ACTIVE_CONTENT_TYPES = {"image/svg+xml", "application/xhtml+xml", "text/html", "application/xml", "text/xml"}
+
+#: What :meth:`MockCalmLensServerClient.fail_next_request` makes a request fail with:
+#: ``transport-error`` (``sdk/transport-error``), ``timeout`` (``sdk/timeout``), an API error code
+#: such as ``upload/limit-exceeded`` (that error with its HTTP status) or an exception to raise.
+MockFailure = Union[str, BaseException]
+
+
+def _thumbhash_png(hash_base64: str) -> bytes:
+    """The PNG the CDN renders from a ThumbHash for the ``placeholder`` resource
+    (``packages/shared/src/PlaceholderHashDecode.ts``)."""
+    data = base64.b64decode(hash_base64)
+
+    def at(index: int) -> int:
+        return data[index] if index < len(data) else 0
+    header24 = at(0) | at(1) << 8 | at(2) << 16
+    header16 = at(3) | at(4) << 8
+    l_dc, p_dc, q_dc = (header24 & 63) / 63, (header24 >> 6 & 63) / 31.5 - 1, (header24 >> 12 & 63) / 31.5 - 1
+    l_scale, has_alpha = (header24 >> 18 & 31) / 31, bool(header24 >> 23)
+    p_scale, q_scale, landscape = (header16 >> 3 & 63) / 63, (header16 >> 9 & 63) / 63, bool(header16 >> 15)
+    lx = max(3, (5 if has_alpha else 7) if landscape else header16 & 7)
+    ly = max(3, header16 & 7 if landscape else (5 if has_alpha else 7))
+    a_dc = (at(5) & 15) / 15 if has_alpha else 1.0
+    a_scale = (at(5) >> 4) / 15
+    ac_start = 6 if has_alpha else 5
+    ac_index = 0
+
+    def channel(nx: int, ny: int, scale: float) -> list[float]:
+        nonlocal ac_index
+        ac = []
+        for cy in range(ny):
+            cx = 0 if cy else 1
+            while cx * ny < nx * (ny - cy):
+                ac.append(((at(ac_start + (ac_index >> 1)) >> ((ac_index & 1) << 2) & 15) / 7.5 - 1) * scale)
+                ac_index += 1
+                cx += 1
+        return ac
+    l_ac, p_ac, q_ac = channel(lx, ly, l_scale), channel(3, 3, p_scale * 1.25), channel(3, 3, q_scale * 1.25)
+    a_ac = channel(5, 5, a_scale) if has_alpha else []
+    ratio = ((5 if has_alpha else 7) if landscape else at(3) & 7) / (at(3) & 7 if landscape else (5 if has_alpha else 7))
+    width, height = round(32 if ratio > 1 else 32 * ratio), round(32 / ratio if ratio > 1 else 32)
+
+    def terms(n: int) -> list[tuple[int, int]]:
+        return [(cx, cy) for cy in range(n) for cx in range(0 if cy else 1, n - cy)]
+    rows = []
+    for y in range(height):
+        row = bytearray([0])  # PNG filter: none
+        fy = [math.cos(math.pi / height * (y + 0.5) * cy) for cy in range(max(ly, 5 if has_alpha else 3))]
+        for x in range(width):
+            fx = [math.cos(math.pi / width * (x + 0.5) * cx) for cx in range(max(lx, 5 if has_alpha else 3))]
+            lum, p, q, a = l_dc, p_dc, q_dc, a_dc
+            j = 0
+            for cy in range(ly):
+                cx = 0 if cy else 1
+                while cx * ly < lx * (ly - cy):
+                    lum += l_ac[j] * fx[cx] * fy[cy] * 2
+                    cx, j = cx + 1, j + 1
+            for j, (cx, cy) in enumerate(terms(3)):
+                f = fx[cx] * fy[cy] * 2
+                p, q = p + p_ac[j] * f, q + q_ac[j] * f
+            if has_alpha:
+                for j, (cx, cy) in enumerate(terms(5)):
+                    a += a_ac[j] * fx[cx] * fy[cy] * 2
+            b = lum - 2 / 3 * p
+            r = (3 * lum - b + q) / 2
+            row += bytes(int(max(0.0, 255 * min(1.0, v))) for v in (r, r - q, b, a))
+        rows.append(bytes(row))
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return len(body).to_bytes(4, "big") + kind + body + zlib.crc32(kind + body).to_bytes(4, "big")
+    header = width.to_bytes(4, "big") + height.to_bytes(4, "big") + bytes([8, 6, 0, 0, 0])
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(b"".join(rows)))
+            + chunk(b"IEND", b""))
+
+
+def _without_placeholder(image: Any) -> Any:
+    """Removing content removes the ThumbHash and average colour with it."""
+    return {**image, "thumbhash": None, "averageColor": None} if isinstance(image, dict) else image
+
+
+def _event_asset(asset: Mapping[str, Any]) -> EventAsset:
+    """The asset snapshot events carry (getEventAsset in the API)."""
+    return {"id": asset["id"], "externalId": asset.get("externalId"), "uploadPresetId": asset.get("uploadPresetId"),
+            "upload": {"status": asset["upload"]["status"]},
+            "classification": {"status": asset["classification"]["status"],
+                               "moderation": {"status": asset["classification"]["moderation"]["status"]}},
+            "content": {"status": asset["content"]["status"]}}
+
+
+def _grants_of(api_key: str) -> list[dict[str, Any]]:
+    try:
+        raw = api_key.removeprefix("sk_test_")
+        grants = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+        return grants if isinstance(grants, list) else []
+    except (ValueError, TypeError):
+        return []
+
+
+def _invalid_field(code: str, path: str) -> _Failure:
+    """A request the API's schema refuses: ``validation/<issue>`` with HTTP 400 and the field."""
+    return _Failure(code, f"Invalid {path}", 400, {"path": path})
+
+
+def _bounded_int(value: Any, path: str, maximum: int) -> int:
+    """A query integer from 1 to ``maximum``, refused like the API's schema."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise _invalid_field("validation/invalid-type", path) from None
+    if not math.isfinite(number) or number < 1:
+        raise _invalid_field("validation/too-small", path)
+    if number > maximum:
+        raise _invalid_field("validation/too-big", path)
+    if not isinstance(value, int):
+        raise _invalid_field("validation/invalid-type", path)
+    return value
+
+
+def _code_points(value: str) -> list[int]:
+    # Like the database: names compare by code point (UTF-16 code units in JavaScript), so case matters.
+    return [ord(char) for char in value]
 
 
 class MockCalmLensServerClient(CalmLensServerClient):
@@ -321,7 +472,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
     case-insensitive) must appear in a searchable field, and results carry the API's keyword
     ``score`` and ``matchedFields``, ranked by score and then newest first. List filters support
     ``( … )`` groups, with ``;`` binding tighter than ``,``, and list cursors resume after the last
-    item returned."""
+    item returned and only continue the query they came from."""
 
     def __init__(self, *, api_key: str | None = None, project_id: str = "mock-project",
                  base_url: str = "https://api.calmlens.invalid/v1",
@@ -335,9 +486,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
         super().__init__(api_key=api_key or create_mock_api_key(), project_id=project_id, base_url=base_url,
                          cdn_base_url=cdn_base_url, timeout=timeout, connect_timeout=connect_timeout,
                          max_retries=max_retries, transport=self._serve)
+        # The fake API answers multipart size checks in the API's order.
+        self._defer_upload_checks = True
         self._state_lock = threading.RLock()
         self._requests: list[MockRequest] = []
         self._errors: list[BaseException] = []
+        self._pending_failures: list[tuple[MockFailure, str | None]] = []
+        self._grants = _grants_of(self.api_key)
         self._idempotent: dict[str, tuple[str, int, bytes]] = {}
         self._uploads: dict[str, dict[str, Any]] = {}
         self._mock_lenses: dict[str, dict[str, Any]] = {}
@@ -347,10 +502,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self.image_storage = options.get("image_storage") or InMemoryMockImageStorage()
         self.create_id: Callable[[], str] = options.get("create_id", lambda: str(uuid.uuid4()))
         self.now: Callable[[], int] = options.get("now") or _monotonic_clock()
-        self.queued_outcome: MockAssetOutcome = options.get("queued_outcome", "pending")
-        self.analyzed_outcome: MockAssetOutcome = options.get("analyzed_outcome", "allowed")
+        self.queued_outcome: MockAssetOutcomeOption = options.get("queued_outcome", "pending")
+        self.analyzed_outcome: MockAssetOutcomeOption = options.get("analyzed_outcome", "allowed")
         for outcome in (self.queued_outcome, self.analyzed_outcome):
-            if outcome not in _MOCK_OUTCOMES:
+            if not callable(outcome) and outcome not in _MOCK_OUTCOMES:
                 raise _invalid(f"Unknown mock outcome {outcome!r}", error_codes.SDK_INVALID_CONFIG)
         self.signed_url_base_url: str = options.get("signed_url_base_url", "https://mock.calmlens.invalid")
         # Waits (retry backoff, ``assets.wait_for_decision``) take no real time: sleeping only
@@ -386,6 +541,30 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self._errors.append(error)
         return self
 
+    def fail_next_request(self, failure: MockFailure = "transport-error", *,
+                          operation: str | None = None) -> MockCalmLensServerClient:
+        """Make the next request (or the next one to ``operation``, a JavaScript-style method path
+        such as ``assets.create`` or ``cdn.serve``) fail without running, as if it never
+        completed. ``failure`` is ``transport-error`` (``sdk/transport-error``), ``timeout``
+        (``sdk/timeout``), an API error code (that error with its HTTP status) or an exception
+        to raise. Each queued failure is used once.
+
+        Operations are told apart by their requests, so ``text.classify`` counts as
+        ``assets.classify`` and ``ensureLens`` as ``ensureLenses``."""
+        if isinstance(failure, str) and failure not in ("transport-error", "timeout") \
+                and failure not in error_codes.STATUS_BY_CODE:
+            raise _invalid(f"Unknown failure {failure!r}: use transport-error, timeout or an API error code")
+        with self._state_lock:
+            self._pending_failures.append((failure, operation))
+        return self
+
+    def set_api_key_grants(self, grants: list[MockApiKeyGrant]) -> None:
+        """Change the grants of the mock's API key, as editing the key in the portal would: later
+        requests, such as ``cdn.serve``, use them. The key itself stays the same, so idempotency
+        keys it used still replay."""
+        with self._state_lock:
+            self._grants = copy.deepcopy([dict(grant) for grant in grants])
+
     def enqueue_event(self, type: EventType, *, facts: list[EventFact] | None = None, severity: EventSeverity = "low",
                       title: str | None = None, description: str | None = None,
                       asset_id: str | None = None) -> Event:
@@ -395,27 +574,22 @@ class MockCalmLensServerClient(CalmLensServerClient):
         the API's events do."""
         with self._state_lock:
             stored = self.database_storage.assets.get(asset_id) if asset_id else None
-            asset: EventAsset | None = None
-            if stored is not None:
-                asset = {"id": stored["id"], "externalId": stored.get("externalId"),
-                         "uploadPresetId": stored.get("uploadPresetId"),
-                         "upload": {"status": stored["upload"]["status"]},
-                         "classification": {'status': stored['classification']['status'], 'moderation': {'status': stored['classification']['moderation']['status']}},
-                         "content": {"status": stored["content"]["status"]}}
+            asset = _event_asset(stored) if stored is not None else None
             now = self.now()
             event: Event = {"id": self.create_id(), "projectId": self.project_id, "userId": None, "type": type,
-                     "severity": severity, "title": title or type, "description": description, "assetId": asset_id,
-                     "asset": asset, "facts": copy.deepcopy(facts or []), "notify": False,
-                     "createdAt": now, "updatedAt": now, "readAt": None}
+                            "severity": severity, "title": title or type, "description": description,
+                            "assetId": asset_id, "asset": asset, "facts": copy.deepcopy(facts or []),
+                            "notify": False, "createdAt": now, "updatedAt": now, "readAt": None}
             self.database_storage.events.append(event)
             return copy.deepcopy(event)
 
     def decide(self, asset_id: str, decision: Literal["allowed", "limited", "age-restricted", "blocked", "purged"]) -> Asset:
         """Apply a reviewer's decision to a stored asset, as the portal or API would: the
-        moderation status changes (``purged`` also removes the content), the review joins
+        moderation status changes (``purged`` also removes the content, with reason
+        ``requested`` and an ``asset.content-removed`` event), the review joins
         ``manualReviews``, and an ``asset.<decision>`` event with a ``decided-by: reviewer`` fact
         joins the events feed. Raises ``asset/not-found`` for an unknown asset."""
-        if decision not in ("allowed", "limited", "age-restricted", "blocked", "purged"):
+        if decision not in _REVIEW_DECISIONS:
             raise _invalid(f"Unknown review decision {decision!r}")
         with self._state_lock:
             asset = self.database_storage.assets.get(asset_id)
@@ -423,16 +597,33 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 raise CalmLensError(error_codes.ASSET_NOT_FOUND, "Asset not found",
                                     status=error_codes.STATUS_BY_CODE[error_codes.ASSET_NOT_FOUND])
             record = cast(dict[str, Any], asset)
+            self._apply_outcome(record, decision, "requested")
             now = self.now()
-            self._apply_outcome(record, decision, now)
             record["classification"]["moderation"].setdefault("manualReviews", []).append(
                 {"id": self.create_id(), "decision": decision, "note": None, "reviewerUserId": None,
                  "reviewedAt": now, "appliedToAsset": True})
-            # Like the event catalog: only allowing is low severity.
+            if decision == "purged":
+                self._lifecycle_event("asset.content-removed", record)
+            # Like the event catalog: only allowing and limiting are low severity.
             self.enqueue_event("asset." + decision, asset_id=asset_id,
                                severity="low" if decision in ("allowed", "limited") else "high",
-                               facts=[{"key": "decided-by", "value": "reviewer"}])
+                               facts=[{"key": "decided-by", "value": "reviewer"},
+                                      {"key": "asset-type", "value": record["type"]},
+                                      {"key": "asset-name", "value": record["name"],
+                                       "url": f"/portal/assets/{record['id']}"},
+                                      {"key": "note", "value": None}])
             return copy.deepcopy(asset)
+
+    def _lifecycle_event(self, type: str, asset: Mapping[str, Any]) -> None:
+        """An ``asset.deleted``, ``asset.content-removed`` or ``asset.retried`` event, like the API."""
+        name: dict[str, Any] = {"key": "asset-name", "value": asset["name"]}
+        if type != "asset.deleted":  # A deleted asset has no portal page to link to.
+            name["url"] = f"/portal/assets/{asset['id']}"
+        self.enqueue_event(type, asset_id=asset["id"],
+                           facts=cast(list[EventFact], [name, {"key": "asset-type", "value": asset["type"]}]))
+        if type == "asset.deleted":
+            # The asset is gone, so the snapshot comes from the record just deleted.
+            self.database_storage.events[-1]["asset"] = _event_asset(asset)
 
     # Transport -------------------------------------------------------------------------
 
@@ -454,6 +645,28 @@ class MockCalmLensServerClient(CalmLensServerClient):
             body["details"] = failure.details
         return self._respond(status, body, headers)
 
+    @staticmethod
+    def _operation(method: str, parts: list[str], query: Mapping[str, Any], upload: str, cdn: bool) -> str:
+        """The JavaScript client method a request comes from, for ``fail_next_request``."""
+        if cdn:
+            return "cdn.serve"
+        if parts[0] == "projects":
+            resource = parts[2] if len(parts) > 2 else ""
+            suffix = parts[3] if len(parts) > 3 else ""
+            if resource == "assets":
+                if suffix:
+                    return {"search": "assets.search", "page": "assets.list"}.get(suffix, "assets." + suffix)
+                return "assets.create" if query.get("queue") else "assets.classify"
+            if resource == "folders":
+                return "folders.list" if method == "GET" else "folders.create"
+            return {"events": "events.list", "lenses": "ensureLenses"}.get(resource, resource)
+        resource = parts[0]
+        suffix = parts[2] if len(parts) > 2 else ""
+        if suffix:
+            return {"children": "assets.listChildren", "part": "assets.uploadPart", "signed-url": "assets.createSignedUrl",
+                    "content": "assets.deleteContent"}.get(suffix, f"{resource}.{suffix}")
+        return f"{resource}." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, method.lower())
+
     def _serve(self, request: Request, timeout: float) -> _Response:
         data: Any = request.data
         raw: bytes | None = data.read() if hasattr(data, "read") else data
@@ -463,26 +676,48 @@ class MockCalmLensServerClient(CalmLensServerClient):
         url = urlsplit(relative)
         query = _decode_query(parse_qsl(url.query, keep_blank_values=True))
         content_type = next((v for k, v in headers.items() if k.lower() == "content-type"), "")
+        upload = next((v for k, v in headers.items() if k.lower() == "x-calmlens-upload"), "")
         body: Any = raw
         if raw is not None and content_type == "application/json":
             body = json.loads(raw)
+        parts = [unquote(p) for p in url.path.strip("/").split("/")]
+        operation = self._operation(request.get_method(), parts, query, upload, cdn)
         with self._state_lock:
             self._requests.append(MockRequest(method=request.get_method(), url=request.full_url, path=url.path,
                                               query=copy.deepcopy(query), body=copy.deepcopy(body),
                                               headers=copy.deepcopy(headers)))
             error = self._errors.pop(0) if self._errors else None
+            failure: MockFailure | None = None
+            if error is None:
+                index = next((i for i, (_, target) in enumerate(self._pending_failures)
+                              if target is None or target == operation), None)
+                if index is not None:
+                    failure = self._pending_failures.pop(index)[0]
         if isinstance(error, CalmLensError):
             return self._failure_response(error, error.retry_after)
         if error is not None:
             raise error
+        if failure == "transport-error":
+            raise ConnectionResetError("Simulated network failure")
+        if failure == "timeout":
+            raise TimeoutError("The operation timed out.")
+        if isinstance(failure, str):
+            return self._failure_response(_Failure(failure))
+        if failure is not None:
+            raise failure
         if cdn:
             return self._serve_cdn(request.get_method(), url.path, query)
         key = next((v for k, v in headers.items() if k.lower() == "idempotency-key"), None)
-        upload = next((v for k, v in headers.items() if k.lower() == "x-calmlens-upload"), "")
-        fingerprint = hashlib.sha256(_json([request.get_method(), url.path, sorted(query.items(), key=str),
-                                            base64.b64encode(raw or b"").decode()]).encode()).hexdigest()
+        if key is not None:
+            # HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
+            key = key.strip(" \t\r\n")
+        # Like the API: raw uploads are told apart by their query, type and length, not their bytes.
+        fingerprint = _json([request.get_method(), url.path, sorted(([k, v] for k, v in query.items()), key=str),
+                             content_type, upload, len(raw or b"") if upload else body])
         with self._state_lock:
             if key is not None:
+                if not _IDEMPOTENCY_KEY.fullmatch(key):
+                    return self._failure_response(_Failure(error_codes.INVALID_IDEMPOTENCY_KEY))
                 saved = self._idempotent.get(key)
                 if saved is not None:
                     if saved[0] != fingerprint:
@@ -490,10 +725,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     return self._respond(saved[1], body=saved[2], headers={
                         "Idempotent-Replayed": "true", "Content-Type": "application/json"})
             try:
-                result = copy.deepcopy(self._dispatch(request.get_method(), url.path, query,
+                result = copy.deepcopy(self._dispatch(request.get_method(), parts, query,
                                                       body if isinstance(body, dict) else {}, raw, upload))
-            except _Failure as failure:
-                return self._failure_response(failure)
+            except _Failure as failure_response:
+                # A failed request frees its idempotency key.
+                return self._failure_response(failure_response)
             response = self._respond(200, result) if result is not None else self._respond(204)
             if key is not None:
                 self._idempotent[key] = (fingerprint, response.status, response.getvalue())
@@ -518,15 +754,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
         for folder in self.database_storage.folders.values():
             if folder["projectId"] == self.project_id and folder["id"] != exclude and folder["name"] == name \
                     and folder.get("parentId") == parent_id:
-                raise _Failure(error_codes.DUPLICATE_FOLDER_NAME)
+                raise _Failure(error_codes.DUPLICATE_FOLDER_NAME,
+                               f'A folder named "{name}" already exists in this location.')
 
     def _project_assets(self) -> list[dict[str, Any]]:
         return [cast(dict[str, Any], a) for a in self.database_storage.assets.values()
                 if a["projectId"] == self.project_id]
 
-    def _dispatch(self, method: str, path: str, query: dict[str, Any], body: dict[str, Any], raw: bytes | None,
-                  upload: str) -> Any:
-        parts = [unquote(p) for p in path.strip("/").split("/")]
+    def _project_folders(self) -> list[dict[str, Any]]:
+        return [cast(dict[str, Any], f) for f in self.database_storage.folders.values()
+                if f["projectId"] == self.project_id]
+
+    def _dispatch(self, method: str, parts: list[str], query: dict[str, Any], body: dict[str, Any],
+                  raw: bytes | None, upload: str) -> Any:
         if parts[0] == "projects":
             if parts[1] != self.project_id:
                 raise _Failure(error_codes.PROJECT_NOT_FOUND)
@@ -546,39 +786,47 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if resource == "lenses":
             return self._lenses_put(body, now)
         if resource == "folders":
-            folders = self.database_storage.folders
             if method == "GET":
-                all_folders = [f for f in folders.values() if f["projectId"] == self.project_id]
-                found = [f for f in all_folders if ((query.get("searchAll") and query.get("search")) or f.get("parentId") == query.get("parentId")) and (not query.get("search") or query["search"].lower() in f["name"].lower())]
-                found.sort(key=lambda f: (f.get("createdAt", 0) if query.get("sort") == "createdAt" else f["name"], f["id"]), reverse=query.get("direction") == "DESC")
-                size = query.get("pageSize", 100)
-                start = query.get("pageIndex", 0) * size
-                page = [] if query.get("resolveOnly") else found[start:start + size]
-                ids = set(query.get("ids") or []) | {f["id"] for f in page}
-                if query.get("parentId"): ids.add(query["parentId"])
-                queue = list(ids)
-                while queue:
-                    node = folders.get(queue.pop())
-                    parent = node.get("parentId") if node else None
-                    if parent and parent not in ids: ids.add(parent); queue.append(parent)
-                return {"folders": page, "ancestors": [f for f in all_folders if f["id"] in ids and f not in page], "hasMore": not query.get("resolveOnly", False) and len(found) > start + size}
+                return self._folders_list(query)
             if body.get("parentId"):
                 self._folder(body["parentId"])
             self._unique(body["name"], body.get("parentId"))
-            folder = {**body, "parentId": body.get("parentId"), "id": self.create_id(), "projectId": self.project_id,
-                      "createdAt": now, "updatedAt": now}
-            folders[folder["id"]] = cast(Folder, folder)
+            folder = {"id": self.create_id(), "projectId": self.project_id, "parentId": body.get("parentId"),
+                      "name": body["name"], "createdAt": now, "updatedAt": now}
+            self.database_storage.folders[folder["id"]] = cast(Folder, folder)
             return folder
         suffix = parts[1] if len(parts) > 1 else ""
         if suffix == "search":
             return self._search(query)
         if suffix == "page":
             items = self._project_assets()
-            if query.get("folderId"):
-                self._folder(query["folderId"])
+            if "folderId" in query:
                 items = [a for a in items if a.get("folderId") == query["folderId"]]
-            return self._page(items, query)
+            return self._page(items, query, [self.project_id, query.get("filter"), query.get("folderId")])
         return self._create_asset(upload, query, body, raw, now)
+
+    def _folders_list(self, query: dict[str, Any]) -> dict[str, Any]:
+        everything = self._project_folders()
+        size = _bounded_int(query.get("pageSize", _MAX_FOLDER_PAGE_SIZE), "pageSize", _MAX_FOLDER_PAGE_SIZE)
+        search = query.get("search")
+        found = [f for f in everything
+                 if ((query.get("searchAll") and search) or f.get("parentId") == query.get("parentId"))
+                 and (not search or str(search).lower() in f["name"].lower())]
+        by_created = query.get("sort") == "createdAt"
+        found.sort(key=lambda f: (f["createdAt"] if by_created else _code_points(f["name"]), _code_points(f["id"])),
+                   reverse=query.get("direction") == "DESC")
+        start = query.get("pageIndex", 0) * size
+        page = [] if query.get("resolveOnly") else found[start:start + size]
+        ids = list(dict.fromkeys([*(query.get("ids") or []), *([query["parentId"]] if query.get("parentId") else []),
+                                  *(f["id"] for f in page)]))
+        by_id = {f["id"]: f for f in everything}
+        for identifier in ids:  # Grows while it runs, adding each ancestor.
+            parent = by_id.get(identifier, {}).get("parentId")
+            if parent and parent not in ids:
+                ids.append(parent)
+        page_ids = {f["id"] for f in page}
+        return {"folders": page, "ancestors": [f for f in everything if f["id"] in ids and f["id"] not in page_ids],
+                "hasMore": not query.get("resolveOnly", False) and len(found) > start + size}
 
     def _create_asset(self, upload: str, query: dict[str, Any], body: dict[str, Any], raw: bytes | None,
                       now: int) -> dict[str, Any]:
@@ -592,85 +840,127 @@ class MockCalmLensServerClient(CalmLensServerClient):
             (k for k in ("image", "video", "audio") if mime.startswith(k + "/")),
             "plaintext-document" if mime.startswith("text/") else
             "multimedia-document" if "pdf" in mime or "document" in mime else "file")
+        total = query.get("totalSizeInBytes")
+        size = len(raw or b"") if raw_upload else None
+        final = not multipart or bool(query.get("isFinal"))
+        if multipart:
+            # Like the API, a declared total is checked before anything is stored, then a single
+            # final part is checked as the whole upload.
+            failure = (self._image_size_error(kind, total, True) if total is not None else None) or (
+                (self._total_size_error(total, cast(int, size), True) or self._image_size_error(kind, cast(int, size), True))
+                if final else self._total_size_error(total, cast(int, size), False))
+            if failure:
+                raise _Failure(failure)
+        if options.get("folderId"):
+            self._folder(options["folderId"])
         external_id = options.get("externalId")
         if external_id and any(a.get("externalId") == external_id for a in self._project_assets()):
             raise _Failure(error_codes.DUPLICATE_EXTERNAL_ID)
-        if options.get("folderId"):
-            self._folder(options["folderId"])
-        total = query.get("totalSizeInBytes")
-        if multipart and kind == "image" and total is not None:
-            if total > 20 * _MIB:
-                raise _Failure(error_codes.MULTIPART_IMAGE_TOO_LARGE)
-            if total < 10 * _MIB:
-                raise _Failure(error_codes.MULTIPART_IMAGE_TOO_SMALL)
         queue = bool(query.get("queue"))
-        final = not multipart or bool(query.get("isFinal"))
         processing_options = options.get("processingOptions")
-        keep = isinstance(processing_options, dict) and processing_options.get("keepContentAfterProcessing") is True
-        asset = {k: v for k, v in options.items()
-                 if k in ("name", "description", "metadata", "externalId", "externalUrl", "processingOptions")}
-        asset.update(
-            id=self.create_id(), projectId=self.project_id, folderId=options.get("folderId"), type=kind,
-            visibility=options.get("visibility", "private"), createdAt=now, updatedAt=now,
-            upload={"status": "completed" if final else "uploading", "updatedAt": now, "partsReceived": 1 if multipart else None},
-            classification={'status': 'processing' if final else 'pending', 'updatedAt': now, 'completedAt': None, 'moderation': {'status': 'pending', 'manualReviews': []}},
-            content={"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
-                     "safetyHold": None, "format": mime or None,
-                     "extension": None, "sizeInBytes": len(raw) if raw_upload and raw is not None else None,
-                     "checksums": None, "image": None, "extractedText": None})
-        if "url" in options:
-            asset["externalUrl"] = options["url"]
-        if multipart and not final:
-            self._uploads[asset["id"]] = {"queue": queue, "total": total, "image": kind == "image"}
+        if not isinstance(processing_options, dict):
+            processing_options = {"keepContentAfterProcessing": False}
+        keep = processing_options.get("keepContentAfterProcessing") is True
+        # Fields the API returns as null when they are not set.
+        asset: dict[str, Any] = {
+            "id": self.create_id(), "projectId": self.project_id, "userId": None, "parentId": None,
+            "folderId": options.get("folderId"), "uploadPresetId": options.get("uploadPresetId"),
+            "createdAt": now, "updatedAt": now, "name": options.get("name"), "description": options.get("description"),
+            "externalId": external_id, "externalUrl": options.get("url", options.get("externalUrl")), "type": kind,
+            "metadata": options.get("metadata"), "tags": None, "processingOptions": processing_options,
+            "visibility": options.get("visibility", "private"),
+            "content": {"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
+                        "safetyHold": None, "format": mime or None, "extension": None, "sizeInBytes": size,
+                        "checksums": None, "image": None, "extractedText": None},
+            "upload": {"status": "completed" if final else "uploading", "updatedAt": now,
+                       "partsReceived": None if final else 1},
+            "classification": {"status": "processing" if final else "pending", "updatedAt": now, "completedAt": None,
+                               "moderation": {"status": "pending", "manualReviews": []}},
+        }
+        if not final:
+            self._uploads[asset["id"]] = {"queue": queue, "total": total}
         self.database_storage.assets[asset["id"]] = cast(Asset, asset)
         if raw_upload and raw is not None:
             self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: raw}}
         if final:
-            self._apply_outcome(asset, self.queued_outcome if queue else self.analyzed_outcome, now)
+            self._apply_outcome(asset, self._outcome_for(asset, queue))
         return asset
 
-    def _apply_outcome(self, asset: dict[str, Any], outcome: str, now: int) -> None:
+    @staticmethod
+    def _image_size_error(kind: str, size: int, final: bool) -> str | None:
+        """Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB."""
+        if kind != "image":
+            return None
+        if size > 20 * _MIB:
+            return error_codes.MULTIPART_IMAGE_TOO_LARGE
+        return error_codes.MULTIPART_IMAGE_TOO_SMALL if final and size < 10 * _MIB else None
+
+    @staticmethod
+    def _total_size_error(total: int | None, received: int, final: bool) -> str | None:
+        """Like the API: the parts may not overshoot a declared total, and must reach it at the end."""
+        if total is None:
+            return None
+        return error_codes.UPLOAD_SIZE_MISMATCH if received > total or (final and received != total) else None
+
+    def _outcome_for(self, asset: dict[str, Any], queue: bool) -> str:
+        outcome: Any = self.queued_outcome if queue else self.analyzed_outcome
+        return str(outcome(cast(Asset, copy.deepcopy(asset))) if callable(outcome) else outcome)
+
+    def _apply_outcome(self, asset: dict[str, Any], outcome: str, purge_reason: str = "policy") -> None:
         """Move ``asset`` to ``outcome`` like the pipeline would: a decision finishes processing,
-        ``purged`` deletes the content, and finished processing removes content kept only
-        temporarily."""
+        ``purged`` deletes the content (``purge_reason``: ``policy`` for the pipeline, ``requested``
+        for a reviewer), and finished processing removes content kept only temporarily. A classified
+        image gets a ThumbHash for its placeholder, which goes with removed content."""
+        now = self.now()
         decided = outcome not in ("pending", "failed")
         status = "completed" if decided else "failed" if outcome == "failed" else "processing"
+        content = asset["content"]
+        purge = outcome == "purged" and content["status"] != "removed"
+        remove = purge or (status == "completed" and content["status"] == "temporary")
+        if decided and asset["type"] == "image" and content["status"] != "removed" and not purge:
+            content["image"] = {"width": None, "height": None, "perceptualHash": None, **(content.get("image") or {}),
+                                "thumbhash": _MOCK_THUMBHASH,
+                                "averageColor": (content.get("image") or {}).get("averageColor") or "#7f7f7f"}
+        elif outcome == "purged":
+            content["image"] = _without_placeholder(content.get("image"))
+        if remove:
+            self.image_storage.content.pop(asset["id"], None)
+            content.update(status="removed", removalReason=purge_reason if purge else "retention", updatedAt=now,
+                           extractedText=None, image=_without_placeholder(content.get("image")))
         asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None)
-        asset["upload"].update(status="completed", updatedAt=now)
         asset["classification"]["moderation"].update(status=outcome if decided else "pending")
-        if outcome == "purged":
-            self._remove_content(asset, "policy", now)
-        elif status == "completed" and asset["content"]["status"] == "temporary":
-            self._remove_content(asset, "retention", now)
+        asset["upload"].update(status="completed", updatedAt=now)
         asset["updatedAt"] = now
 
-    def _remove_content(self, asset: dict[str, Any], reason: str, now: int) -> None:
-        self.image_storage.content.pop(asset["id"], None)
-        if asset["content"]["status"] != "removed":
-            asset["content"].update(status="removed", removalReason=reason, updatedAt=now, extractedText=None)
-
     def _upload_part(self, asset: dict[str, Any], query: dict[str, Any], raw: bytes | None, now: int) -> None:
+        # In the API's order: the upload must be open, parts arrive in order, image totals and the
+        # declared total are checked, then the part itself.
         upload = self._uploads.get(asset["id"])
         if upload is None or asset["upload"]["status"] != "uploading":
             raise _Failure(error_codes.UPLOAD_NOT_OPEN)
-        stored = self.image_storage.content[asset["id"]]
+        expected = (asset["upload"].get("partsReceived") or 0) + 1
         number = query.get("partNumber")
-        if number != max(stored["parts"]) + 1:
-            raise _Failure(error_codes.INVALID_UPLOAD_PART_NUMBER)
-        size = sum(len(p) for p in stored["parts"].values()) + len(raw or b"")
+        if number != expected:
+            raise _Failure(error_codes.INVALID_UPLOAD_PART_NUMBER, f"Expected part {expected}",
+                           details={"expectedPartNumber": expected, "receivedPartNumber": number})
         final = bool(query.get("isFinal"))
-        if upload["image"] and (size > 20 * _MIB or (final and size < 10 * _MIB)):
-            raise _Failure(error_codes.MULTIPART_IMAGE_TOO_LARGE if size > 20 * _MIB
-                           else error_codes.MULTIPART_IMAGE_TOO_SMALL)
-        if upload["total"] is not None and (size > upload["total"] or (final and size != upload["total"])):
-            raise _Failure(error_codes.UPLOAD_SIZE_MISMATCH)
-        stored["parts"][number] = raw or b""
-        asset["content"]["sizeInBytes"] = size
-        asset["upload"]["partsReceived"] = number
+        received = (asset["content"].get("sizeInBytes") or 0) + len(raw or b"")
+        failure = (self._image_size_error(asset["type"], received, final)
+                   or self._total_size_error(upload["total"], received, final))
+        if failure:
+            raise _Failure(failure)
+        if not final and len(raw or b"") < 5 * _MIB:
+            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Multipart upload parts must be at least 5MiB except "
+                                                               "the final part.")
+        self.image_storage.content[asset["id"]]["parts"][number] = raw or b""
+        asset["content"]["sizeInBytes"] = received
+        # Like the API, a completed upload no longer counts parts.
+        asset["upload"].update(updatedAt=now, partsReceived=None if final else number)
+        asset["updatedAt"] = now
         if final:
             queue = query["queue"] if "queue" in query else upload["queue"]
             del self._uploads[asset["id"]]
-            self._apply_outcome(asset, self.queued_outcome if queue else self.analyzed_outcome, now)
+            self._apply_outcome(asset, self._outcome_for(asset, queue))
 
     def _dispatch_asset(self, method: str, identifier: str, suffix: str, query: dict[str, Any],
                         body: dict[str, Any], raw: bytes | None) -> Any:
@@ -678,30 +968,35 @@ class MockCalmLensServerClient(CalmLensServerClient):
         now = self.now()
         asset = self._asset(identifier)
         if method == "DELETE":
-            # Like the API: deleting content keeps the record and report; deleting the
-            # asset removes both. Either way the CDN stops serving the stored bytes.
             if suffix == "content":
-                self._remove_content(asset, "requested", now)
-                asset["updatedAt"] = now
-                return asset
+                return self._delete_content(asset, now)
             self.image_storage.content.pop(identifier, None)
             del assets[identifier]
             self._uploads.pop(identifier, None)
+            self._lifecycle_event("asset.deleted", asset)
             return None
-        if suffix == "children":
-            return self._page([a for a in self._project_assets() if a.get("parentId") == identifier], query)
+        if method == "GET":
+            if suffix == "children":
+                return self._page([a for a in self._project_assets() if a.get("parentId") == identifier], query,
+                                  identifier)
+            return asset
         if suffix == "signed-url":
-            selector: dict[str, Any] = {k: body[k] for k in ("expiresInSeconds", "lens", "transform") if k in body}
-            return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body.get('resource', 'rendered')}?{urlencode(selector)}",
-                    "expiresAt": now + body["expiresInSeconds"] * 1000}
+            expires = body["expiresInSeconds"]
+            selector = "".join(f"&{k}={quote(str(body[k]), safe='')}" for k in ("lens", "transform") if body.get(k))
+            return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body.get('resource', 'rendered')}"
+                           f"?expiresInSeconds={expires}{selector}",
+                    "expiresAt": now + expires * 1000}
         if suffix == "retry":
-            if asset["classification"]["status"] != "failed":
+            if asset["classification"]["status"] != "failed" or \
+                    asset["classification"]["moderation"]["status"] != "pending":
                 raise _Failure(error_codes.ASSET_NOT_RETRYABLE)
             if asset["content"]["status"] == "removed":
                 raise _Failure(error_codes.ASSET_CONTENT_UNAVAILABLE)
-            # Like the API: back to processing, to be moderated again.
-            self._apply_outcome(asset, "pending", now)
-        elif suffix == "explain":
+            # Like the API: back to processing, to be moderated again, with an asset.retried event.
+            self._apply_outcome(asset, "pending")
+            self._lifecycle_event("asset.retried", asset)
+            return asset
+        if suffix == "explain":
             if asset["classification"]["status"] != "completed":
                 raise _Failure(error_codes.ASSET_NOT_DECIDED)
             moderation = asset["classification"]["moderation"]
@@ -710,105 +1005,125 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 policy = moderation.get("policy")
                 if policy and policy.get("evidence") == "decision":
                     policy["evidence"] = "full"
-            elif moderation.get("manualReviews"):
+                    asset["updatedAt"] = now
+                return asset
+            if moderation.get("manualReviews"):
                 raise _Failure(error_codes.ASSET_REVIEWED)
-            elif asset["content"]["status"] == "removed":
+            if asset["content"]["status"] == "removed":
                 raise _Failure(error_codes.ASSET_CONTENT_UNAVAILABLE)
-            else:
-                # Like the API: back to processing, to be moderated again under the current policy.
-                self._apply_outcome(asset, "pending", now)
-        elif suffix == "move":
+            # Like the API: back to processing, to be moderated again under the current policy.
+            self._apply_outcome(asset, "pending")
+            return asset
+        if suffix == "move":
             if body["folderId"]:
                 self._folder(body["folderId"])
             asset["folderId"] = body["folderId"]
         elif suffix == "part":
             self._upload_part(asset, query, raw, now)
+            return asset
         elif method == "PATCH":
+            # Like the API: an externalId stays unique in the project; null clears a field.
+            if body.get("externalId") and any(other["id"] != identifier and other.get("externalId") == body["externalId"]
+                                              for other in self._project_assets()):
+                raise _Failure(error_codes.DUPLICATE_EXTERNAL_ID)
             asset.update(body)
-        if method != "GET":
+        asset["updatedAt"] = now
+        return asset
+
+    def _delete_content(self, asset: dict[str, Any], now: int) -> dict[str, Any]:
+        # Like the API: the record and report stay; stored content, extracted text and the
+        # placeholder go. Content already removed keeps its reason, and an asset.content-removed
+        # event is recorded either way.
+        self.image_storage.content.pop(asset["id"], None)
+        content = asset["content"]
+        if content["status"] == "removed":
+            content["image"] = _without_placeholder(content.get("image"))
+        else:
+            content.update(status="removed", removalReason="requested", updatedAt=now, extractedText=None,
+                           image=_without_placeholder(content.get("image")))
             asset["updatedAt"] = now
+        self._lifecycle_event("asset.content-removed", asset)
         return asset
 
     def _dispatch_folder(self, method: str, identifier: str, suffix: str, body: dict[str, Any]) -> Any:
         folders = self.database_storage.folders
         folder = self._folder(identifier)
+        if method == "GET":
+            return folder
         if method == "DELETE":
-            if any(a.get("folderId") == identifier for a in self.database_storage.assets.values()) or any(
-                    f.get("parentId") == identifier for f in folders.values()):
-                raise _Failure(error_codes.FOLDER_NOT_EMPTY)
+            has_assets = any(a.get("folderId") == identifier for a in self._project_assets())
+            has_children = any(f.get("parentId") == identifier for f in self._project_folders())
+            if has_assets or has_children:
+                raise _Failure(error_codes.FOLDER_NOT_EMPTY,
+                               details={"hasAssets": has_assets, "hasChildren": has_children})
             del folders[identifier]
             return None
         if suffix == "move":
             parent = body["parentId"]
-            visited = {identifier}
-            current = parent
+            current, visited = parent, set()
             while current:
-                if current in visited:
+                if current == identifier or current in visited:
                     raise _Failure(error_codes.FOLDER_PARENT_CYCLE)
                 visited.add(current)
                 current = self._folder(current).get("parentId")
-            self._unique(folder["name"], parent, identifier)
+            if parent != folder.get("parentId"):
+                self._unique(folder["name"], parent, identifier)
             folder["parentId"] = parent
-        elif method == "PATCH" and "name" in body:
+        elif "name" in body and body["name"] != folder["name"]:
             self._unique(body["name"], folder.get("parentId"), identifier)
             folder["name"] = body["name"]
-        if method != "GET":
-            folder["updatedAt"] = self.now()
+        folder["updatedAt"] = self.now()
         return folder
 
     def _lenses_put(self, body: dict[str, Any], now: int) -> dict[str, Any]:
+        # Each definition is saved in turn, so earlier ones stay saved when a later one conflicts.
         result = []
-        pending = copy.deepcopy(self._mock_lenses)
         for definition in body["lenses"]:
-            old = pending.get(definition["identifier"])
-            same = old and all(old.get(k) == definition.get(k)
-                               for k in ("name", "description", "type", "active", "transforms", "version"))
-            if old and not same and definition["version"] <= old["version"]:
-                raise _Failure(error_codes.LENS_VERSION_CONFLICT)
-            lens: dict[str, Any] = old if old and same else {**definition, "id": old["id"] if old else self.create_id(),
-                                     "projectId": self.project_id, "userId": None,
-                                     "createdAt": old["createdAt"] if old else now, "updatedAt": now}
-            pending[lens["identifier"]] = lens
-            result.append(lens)
-        self._mock_lenses = pending
+            old = self._mock_lenses.get(definition["identifier"])
+            if old is None:
+                lens = {"id": self.create_id(), "projectId": self.project_id, "userId": None, **definition,
+                        "createdAt": now, "updatedAt": now}
+            elif all(old.get(k) == definition.get(k) for k in ("name", "description", "type", "active",
+                                                                  "transforms", "version")):
+                lens = old
+            elif definition["version"] > old["version"]:
+                lens = {**old, **definition, "updatedAt": now}
+            else:
+                raise _Failure(error_codes.LENS_VERSION_CONFLICT, details={
+                    "currentVersion": old["version"], "minimumVersion": old["version"] + 1,
+                    "requestedVersion": definition["version"]})
+            self._mock_lenses[lens["identifier"]] = lens
+            result.append(copy.deepcopy(lens))
         return {"lenses": result}
 
-    @staticmethod
-    def _cursor(event: Mapping[str, Any]) -> str:
-        return f"{event['createdAt']}_{event['id']}"
-
     def _events(self, query: dict[str, Any]) -> dict[str, Any]:
-        events = sorted((e for e in self.database_storage.events if e["projectId"] == self.project_id),
-                        key=lambda e: (e["createdAt"], e["id"]))
+        # Cursors are positions in the feed (``mock_<n>``), so events added later reach cursors
+        # taken before them.
+        limit = _bounded_int(query.get("limit", _DEFAULT_EVENTS_LIMIT), "limit", _MAX_EVENTS_LIMIT)
+        events = [e for e in self.database_storage.events if e["projectId"] == self.project_id]
         after = query.get("after")
-        if after is None:
-            # A cursor for now: no events, and later calls only return newer ones.
-            latest = self._cursor(events[-1]) if events else ""
-            now = f"{self.now()}_"
-            return {"events": [], "cursor": max((latest, now), key=self._cursor_key), "hasMore": False}
-        if not isinstance(after, str) or not re.fullmatch(r"[0-9]+_.*", after):
-            raise _Failure(error_codes.INVALID_EVENT_CURSOR)
-        limit = query.get("limit", 50)
-        if not isinstance(limit, int) or not 1 <= limit <= 100:
-            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "limit must be from 1 to 100")
-        newer = [e for e in events if self._cursor_key(self._cursor(e)) > self._cursor_key(after)]
-        page = newer[:limit]
-        return {"events": page, "cursor": self._cursor(page[-1]) if page else after, "hasMore": len(newer) > limit}
-
-    @staticmethod
-    def _cursor_key(cursor: str) -> tuple[int, str]:
-        stamp, _, identifier = cursor.partition("_")
-        return (int(stamp) if stamp.isdigit() else -1, identifier)
+        if not after:
+            return {"events": [], "cursor": f"mock_{len(events)}", "hasMore": False}
+        found = re.fullmatch(r"mock_([0-9]+)", str(after))
+        if not found or int(found.group(1)) > len(events):
+            raise _Failure(error_codes.INVALID_EVENT_CURSOR, details={"after": after})
+        position = int(found.group(1))
+        page = events[position:position + limit]
+        following = position + len(page)
+        return {"events": page, "cursor": f"mock_{following}", "hasMore": following < len(events)}
 
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
         # Keyword search like the API's; the mock has no semantic index, so every mode is
-        # keyword matching.
+        # keyword matching. Like the API's query schema: a trimmed query of 1 to 200 characters
+        # and a limit of 1 to 20.
         text = str(query.get("query", "")).strip()
         if not text:
-            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "query is required")
+            raise _invalid_field("validation/too-small", "query")
+        if len(text) > _MAX_SEARCH_QUERY_LENGTH:
+            raise _invalid_field("validation/too-big", "query")
+        limit = _bounded_int(query.get("limit", 10), "limit", _MAX_SEARCH_LIMIT)
         normalized = text.lower()
         tokens = list(dict.fromkeys(normalized.split()))[:_MAX_SEARCH_TOKENS]
-        limit = query.get("limit", 10)
         items: list[dict[str, Any]] = []
         for asset in self._project_assets():
             content = asset.get("content") or {}
@@ -828,47 +1143,47 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return {"query": text, "items": items[:limit], "semanticStatus": "disabled"}
 
     @staticmethod
-    def _page(items: list[dict[str, Any]], query: dict[str, Any]) -> dict[str, Any]:
+    def _page(items: list[dict[str, Any]], query: dict[str, Any], scope: Any) -> dict[str, Any]:
+        """One keyset page like the API's: ordered by ``createdAt`` and ``id`` (an ``id``
+        tie-breaker is added), after the cursor's values. The cursor is tied to ``scope`` (the
+        filter, folder or parent) and the ordering, so it only continues the query it came from."""
+        size = _bounded_int(query.get("pageSize", 10), "pageSize", 100)
         if query.get("filter"):
             matches = _rsql(query["filter"])
             items = [item for item in items if matches(item)]
-        ordering = query.get("ordering") or [{"field": "createdAt", "direction": "DESC"}]
-        if any(o["field"] not in ("createdAt", "id") for o in ordering):
+        ordering = [dict(order) for order in query.get("ordering") or [{"field": "createdAt", "direction": "DESC"}]]
+        if any(o.get("field") not in ("createdAt", "id") for o in ordering):
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Invalid ordering")
-        ordering = list(ordering)
         if not any(o["field"] == "id" for o in ordering):
             ordering.append({"field": "id", "direction": ordering[0]["direction"]})
+        signature = _json([scope, ordering])
         for order in reversed(ordering):
-            def key(item: dict[str, Any], name: str = order["field"]) -> tuple[bool, Any]:
-                value: Any = item
-                for part in name.split("."):
-                    value = value.get(part) if isinstance(value, Mapping) else None
-                return (value is None, "" if value is None else value)
-            items = sorted(items, key=key, reverse=str(order.get("direction", "ASC")).upper() == "DESC")
-        size = query.get("pageSize", 10)
-        if not isinstance(size, int) or not 1 <= size <= 100:
-            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "pageSize must be from 1 to 100")
+            field_name = str(order["field"])
+            items = sorted(items, key=lambda item: cast(Any, item[field_name]),
+                           reverse=str(order.get("direction", "ASC")).upper() == "DESC")
         if query.get("cursor"):
             try:
-                boundary = json.loads(base64.b64decode(query["cursor"], validate=True))
-                if not isinstance(boundary, dict) or any(
-                    not isinstance(boundary.get(o["field"]), str) if o["field"] == "id" else
-                    not isinstance(boundary.get(o["field"]), (int, float)) or not math.isfinite(boundary[o["field"]])
-                    for o in ordering
-                ):
+                decoded = json.loads(base64.b64decode(query["cursor"], validate=True).decode("utf-8"))
+                values = decoded.get("values") if isinstance(decoded, dict) else None
+                if decoded.get("scope") != signature or not isinstance(values, list) or len(values) != len(ordering) \
+                        or any(not isinstance(value, str) if o["field"] == "id" else
+                               isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+                               for o, value in zip(ordering, values)):
                     raise ValueError("Invalid cursor")
-            except (ValueError, TypeError):
-                raise _Failure(error_codes.INVALID_CURSOR, "Invalid cursor")
+            except (ValueError, TypeError, AttributeError):
+                raise _Failure(error_codes.INVALID_CURSOR) from None
+
             def follows(item: dict[str, Any]) -> bool:
-                for order in ordering:
-                    a, b = item[order["field"]], boundary[order["field"]]
-                    if a != b:
-                        return bool(a < b) if order["direction"] == "DESC" else bool(a > b)
+                for order, boundary in zip(ordering, values):
+                    if item[order["field"]] != boundary:
+                        return bool(item[order["field"]] < boundary) if order["direction"] == "DESC" \
+                            else bool(item[order["field"]] > boundary)
                 return False
             items = [item for item in items if follows(item)]
         selected = items[:size]
         more = len(items) > size
-        cursor = base64.b64encode(json.dumps({o["field"]: selected[-1][o["field"]] for o in ordering}).encode()).decode() if more else None
+        cursor = base64.b64encode(_json({"scope": signature, "values": [selected[-1][o["field"]] for o in ordering]})
+                                  .encode("utf-8")).decode() if more else None
         return {"items": selected, "nextCursor": cursor, "pageSize": size, "ordering": ordering, "hasMore": more}
 
     # CDN ---------------------------------------------------------------------------------
@@ -876,46 +1191,69 @@ class MockCalmLensServerClient(CalmLensServerClient):
     def _serve_cdn(self, method: str, path: str, query: Mapping[str, Any]) -> _Response:
         segments = path.strip("/").split("/")
         if len(segments) < 4 or segments[0] != "assets":
-            return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, status=404))
-        project, identifier = unquote(segments[1]), unquote(segments[2])
+            return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
+        project, identifier, resource = unquote(segments[1]), unquote(segments[2]), segments[3]
+        not_available = _Failure("asset/not-available", "Asset is not available", 403)
         with self._state_lock:
             asset = next((a for a in self.database_storage.assets.values()
                           if a["projectId"] == project == self.project_id
                           and (a["id"] == identifier or a.get("externalId") == identifier)), None)
             if asset is None:
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
+            status = asset["classification"]["moderation"].get("status")
+            if resource == "placeholder":
+                # Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
+                # whatever their moderation status; refused for purged assets, assets without one
+                # (not yet classified, or content removed) and, for private assets, keys without
+                # assets:download.
+                thumbhash = cast(dict[str, Any], asset["content"].get("image") or {}).get("thumbhash")
+                public = asset["visibility"] == "public"
+                if not thumbhash or status == "purged" or (not public and not self._can_download(asset.get("folderId"))):
+                    return self._failure_response(not_available)
+                return self._cdn_response(method, _thumbhash_png(thumbhash), {
+                    "Content-Type": "image/png", "Cache-Control": f"{'public' if public else 'private'}, max-age=3600",
+                    "Cache-Tag": f"asset-{asset['id']}", "ETag": f'"{thumbhash}"'})
             # Like the CDN, delivery checks come first and refuse everyone: content still uploading,
             # blocked or purged, failed processing or removed content.
             stored = self.image_storage.content.get(asset["id"])
-            if (asset["upload"]["status"] == "uploading"
-                    or asset["classification"]["moderation"].get("status") in ("blocked", "purged")
+            if (asset["upload"]["status"] == "uploading" or status in ("blocked", "purged")
                     or asset["classification"]["status"] == "failed"
                     or asset["content"]["status"] == "removed" or stored is None):
-                return self._failure_response(_Failure("asset/not-available", "Asset is not available", 403))
+                return self._failure_response(not_available)
             # Then access: private assets, and public age-restricted ones requested without
             # ``allowAgeRestricted=true``, need the download permission for the asset's folder.
-            age_restricted = asset["classification"]["moderation"].get("status") == "age-restricted"
-            is_private = asset["visibility"] != "public" or age_restricted
-            public_url_allowed = (asset["visibility"] == "public" and age_restricted
-                                  and query.get("allowAgeRestricted") in (True, "true"))
-            if is_private and not public_url_allowed and not self._can_download(asset.get("folderId")):
-                return self._failure_response(_Failure("asset/api-key-missing-permission",
-                                                       "This API key needs assets:download permission for this asset's folder.", 403))
+            private = asset["visibility"] != "public" or (
+                status == "age-restricted" and query.get("allowAgeRestricted") not in (True, "true"))
+            if private and not self._can_download(asset.get("folderId")):
+                return self._failure_response(_Failure(
+                    "asset/api-key-missing-permission",
+                    "This API key needs assets:download permission for this asset’s folder.", 403))
             content = b"".join(v for _, v in sorted(stored["parts"].items()))
+            content_type = stored["type"] or "application/octet-stream"
+            image = asset["type"] == "image"
             # Like the CDN: an image's bytes are immutable for a year, other content is kept for an
             # hour, by shared caches only when delivery is public.
-            access = "private" if is_private and not public_url_allowed else "public"
-            lifetime = "max-age=31536000, immutable" if asset["type"] == "image" else "max-age=3600"
-        headers = {"Content-Type": stored["type"], "Content-Length": str(len(content)),
-                   "Cache-Control": f"{access}, {lifetime}",
-                   "ETag": '"' + hashlib.sha256(content).hexdigest()[:32] + '"'}
-        return self._respond(200, headers=headers, body=b"" if method == "HEAD" else content)
+            headers = {"Content-Type": content_type,
+                       "Cache-Control": f"{'private' if private else 'public'}, "
+                                        f"{'max-age=31536000, immutable' if image else 'max-age=3600'}",
+                       "Cache-Tag": f"asset-{asset['id']}"}
+            if image:
+                headers["ETag"] = f'"{asset["id"]}"'
+                headers["Expires"] = email.utils.formatdate(self.now() / 1000 + 31536000, usegmt=True)
+            headers.update({"X-Content-Type-Options": "nosniff",
+                            "Content-Security-Policy": "sandbox; default-src 'none'"})
+            normalized = content_type.lower().split(";", 1)[0].strip()
+            if normalized in _ACTIVE_CONTENT_TYPES or normalized.endswith("+xml"):
+                headers["Content-Disposition"] = "attachment"
+        return self._cdn_response(method, content, headers)
+
+    def _cdn_response(self, method: str, content: bytes, headers: dict[str, str]) -> _Response:
+        return self._respond(200, headers={**headers, "Content-Length": str(len(content))},
+                             body=b"" if method == "HEAD" else content)
 
     def _can_download(self, folder_id: str | None) -> bool:
         try:
-            raw = self.api_key.removeprefix("sk_test_")
-            grants = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
-            for grant in grants:
+            for grant in self._grants:
                 if "assets:download" not in grant["actions"]:
                     continue
                 if grant["folderId"] is None:
@@ -928,6 +1266,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
                         break
                     seen.add(current)
                     current = self._folder(current).get("parentId")
-        except (ValueError, KeyError, TypeError, _Failure):
+        except (KeyError, TypeError, _Failure):
             return False
         return False

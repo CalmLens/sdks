@@ -62,7 +62,8 @@ import { getAssetPayloadByteLength, validateAssetPayload } from "../contract/Ass
 import type { TypedEvent } from "../contract/Event.js";
 import type { Folder } from "../contract/Folder.js";
 import { stringifyJsonCanonical } from "../contract/JsonUtils.js";
-import { permits } from "../contract/Permissions.js";
+import { type PermissionGrant, permits } from "../contract/Permissions.js";
+import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 import type {
   GetEventsResponse,
   PostAssetSignedUrlResponse,
@@ -70,8 +71,10 @@ import type {
 import {
   getRejectedUploadMimeTypeError,
   isRejectedUploadMimeType,
+  MAX_IMAGE_UPLOAD_BYTES,
+  MIN_MULTIPART_IMAGE_UPLOAD_BYTES,
 } from "../contract/SharedConstants.js";
-import { getMockApiKeyGrants } from "./MockApiKey";
+import { createMockApiKey, getMockApiKeyGrants } from "./MockApiKey";
 import {
   InMemoryMockDatabaseStorage,
   InMemoryMockImageStorage,
@@ -90,6 +93,35 @@ const describeBinary = (value: unknown) => {
   return value;
 };
 const MAX_EVENTS_LIMIT = 100;
+const MAX_SEARCH_LIMIT = 20;
+const MAX_SEARCH_QUERY_LENGTH = 200;
+const MAX_FOLDER_PAGE_SIZE = 100;
+
+/**
+ * The ThumbHash the mock gives every classified image, standing in for one computed from its
+ * pixels. The `placeholder` resource serves it as a PNG, like the CDN.
+ */
+const MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI";
+
+/** Like the API: 1 to 255 printable ASCII characters, once HTTP has trimmed the header value. */
+const isValidIdempotencyKey = (key: string) =>
+  key.length > 0 && key.length <= 255 && /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/.test(key);
+
+/** Like the CDN, content a browser could run as a document is served as a download. */
+const isActiveContentType = (type: string | undefined) => {
+  const normalized = type?.toLowerCase().split(";", 1)[0]?.trim();
+  return Boolean(
+    normalized &&
+      ([
+        "image/svg+xml",
+        "application/xhtml+xml",
+        "text/html",
+        "application/xml",
+        "text/xml",
+      ].includes(normalized) ||
+        normalized.endsWith("+xml")),
+  );
+};
 
 const createMonotonicClock = () => {
   let last = 0;
@@ -194,14 +226,15 @@ export type MockCalmLensCall<TOperation extends MockCalmLensOperation = MockCalm
 /**
  * What a simulated request failure throws: `"transport-error"` and `"timeout"` throw the same
  * `CalmLensError` the real client throws for a network failure (`sdk/transport-error`) or a
- * deadline (`sdk/timeout`); any `Error` is thrown as given.
+ * deadline (`sdk/timeout`); an API error code, such as `"upload/limit-exceeded"`, throws that API
+ * error with its HTTP status, message and request ID; any `Error` is thrown as given.
  */
-export type MockRequestFailure = "transport-error" | "timeout" | Error;
+export type MockRequestFailure = "transport-error" | "timeout" | ApiErrorCode | Error;
 
 /** An event to add to the mock feed; omitted fields get defaults. */
 export type MockEventInput = Partial<Omit<TypedEvent, "type">> & { type: TypedEvent["type"] };
 
-const toFailureError = (failure: MockRequestFailure): Error => {
+const toFailureError = (failure: Exclude<MockRequestFailure, ApiErrorCode>): Error => {
   if (failure === "transport-error") {
     return new CalmLensError(SDK_ERROR_CODES.TRANSPORT_ERROR, {
       message: "Request failed",
@@ -216,6 +249,23 @@ const toFailureError = (failure: MockRequestFailure): Error => {
   return failure;
 };
 
+/** The asset snapshot events carry (getEventAsset in the API). */
+const toEventAsset = (asset: Asset) => ({
+  id: asset.id,
+  externalId: asset.externalId ?? null,
+  uploadPresetId: asset.uploadPresetId ?? null,
+  upload: { status: asset.upload.status },
+  classification: {
+    status: asset.classification.status,
+    moderation: { status: asset.classification.moderation.status },
+  },
+  content: { status: asset.content.status },
+});
+
+/** Removing content removes the placeholder and average colour with it. */
+const withoutPlaceholder = (image: Asset["content"]["image"]) =>
+  image ? { ...image, thumbhash: null, averageColor: null } : image;
+
 /**
  * An in-memory stand-in for `CalmLensServerClient` with the same methods, validation and error
  * codes. API errors carry the HTTP status, a `requestId` and response headers like the real
@@ -228,15 +278,15 @@ export class MockCalmLensServerClient {
   private readonly now: () => number;
   private readonly queuedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
   private readonly analyzedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
-  private readonly apiKeyGrants: ReturnType<typeof getMockApiKeyGrants>;
+  private apiKeyGrants: PermissionGrant[];
   private readonly signedUrlBaseUrl: string;
   private readonly cdnBaseUrl: string;
   private readonly projectId: string;
   private readonly apiKey: string;
   private readonly lenses = new Map<string, Lens>();
   private readonly eventFeed: TypedEvent[] = [];
-  /** The queue mode each open multipart upload was started with, as the API saves it. */
-  private readonly uploadQueues = new Map<string, boolean>();
+  /** What each open multipart upload was started with, as the API saves it. */
+  private readonly openUploads = new Map<string, { queue: boolean; totalSizeInBytes?: number }>();
   private readonly idempotentResults = new Map<string, { fingerprint: string; asset: Asset }>();
   private requestCount = 0;
   /** Time `waitForDecision` has spent waiting: mock waits advance it instead of sleeping. */
@@ -281,6 +331,15 @@ export class MockCalmLensServerClient {
     this.pendingFailures.push({ failure, operation });
   }
 
+  /**
+   * Changes the grants of the mock's API key, as editing the key in the portal would: later
+   * requests, such as `cdn.serve`, use them. The key itself stays the same, so idempotency keys
+   * it used still replay.
+   */
+  setApiKeyGrants(grants: PermissionGrant[]): void {
+    this.apiKeyGrants = getMockApiKeyGrants(createMockApiKey(grants));
+  }
+
   /** Calls recorded for one operation, oldest first. */
   callsTo<TOperation extends MockCalmLensOperation>(
     operation: TOperation,
@@ -312,8 +371,9 @@ export class MockCalmLensServerClient {
 
   /**
    * Applies a reviewer's decision to a stored asset, as the portal or API would: the moderation
-   * status changes (`purged` also removes the content), the review joins `manualReviews`, and an
-   * `asset.<decision>` event with a `decided-by: reviewer` fact joins the events feed. Rejects with
+   * status changes (`purged` also removes the content, with reason `requested` and an
+   * `asset.content-removed` event), the review joins `manualReviews`, and an `asset.<decision>`
+   * event with a `decided-by: reviewer` fact joins the events feed. Rejects with
    * `asset/not-found` for an unknown asset.
    */
   async decide(assetId: string, decision: MockReviewDecision): Promise<Asset> {
@@ -321,7 +381,7 @@ export class MockCalmLensServerClient {
       throw invalidArgument(`decision must be one of ${REVIEW_DECISIONS.join(", ")}`);
     }
     const asset = await this.findOwnAsset(assetId);
-    const decided = await this.applyOutcome(asset, decision);
+    const decided = await this.applyOutcome(asset, decision, "requested");
     const now = this.now();
     decided.classification.moderation.manualReviews = [
       ...(decided.classification.moderation.manualReviews ?? []),
@@ -335,24 +395,20 @@ export class MockCalmLensServerClient {
       },
     ];
     const stored = await this.databaseStorage.updateAsset(decided);
+    if (decision === "purged") this.recordLifecycleEvent("asset.content-removed", stored);
     this.enqueueEvent({
       type: `asset.${decision}`,
       // Like the event catalog: only allowing and limiting are low severity.
       severity: decision === "allowed" || decision === "limited" ? "low" : "high",
       title: `asset.${decision}`,
       assetId: stored.id,
-      asset: {
-        id: stored.id,
-        externalId: stored.externalId ?? null,
-        uploadPresetId: stored.uploadPresetId ?? null,
-        upload: { status: stored.upload.status },
-        classification: {
-          status: stored.classification.status,
-          moderation: { status: stored.classification.moderation.status },
-        },
-        content: { status: stored.content.status },
-      },
-      facts: [{ key: "decided-by", value: "reviewer" }],
+      asset: toEventAsset(stored),
+      facts: [
+        { key: "decided-by", value: "reviewer" },
+        { key: "asset-type", value: stored.type },
+        { key: "asset-name", value: stored.name, url: `/portal/assets/${stored.id}` },
+        { key: "note", value: null },
+      ],
     } as MockEventInput);
     return stored;
   }
@@ -372,6 +428,27 @@ export class MockCalmLensServerClient {
       headers: new Headers({ "content-type": "application/json", "x-request-id": requestId }),
     });
   }
+
+  /** A request the API's schema refuses: `validation/<zod issue>` with HTTP 400 and the field. */
+  private validationError(code: string, path?: string, message?: string): CalmLensError {
+    const requestId = `mock-request-${++this.requestCount}`;
+    return new CalmLensError(code, {
+      message: message ?? (path ? `Invalid ${path}` : "Invalid request"),
+      status: 400,
+      details: path === undefined ? undefined : { path },
+      requestId,
+      headers: new Headers({ "content-type": "application/json", "x-request-id": requestId }),
+    });
+  }
+
+  /** Fails a page request like the API (see `createPage`). */
+  private readonly pageFailure = (
+    code: "validation/too-small" | "validation/too-big" | "validation/invalid-cursor",
+    path?: string,
+  ): Error =>
+    code === "validation/invalid-cursor"
+      ? this.apiError(API_ERROR_CODES.INVALID_CURSOR)
+      : this.validationError(code, path);
 
   private assertValidUploadMimeType(mimeType: string) {
     if (isRejectedUploadMimeType(mimeType)) {
@@ -405,7 +482,10 @@ export class MockCalmLensServerClient {
     );
     if (index !== -1) {
       const [pending] = this.pendingFailures.splice(index, 1);
-      throw toFailureError(pending!.failure);
+      const { failure } = pending!;
+      throw typeof failure === "string" && failure in API_ERROR_DEFINITIONS
+        ? this.apiError(failure as ApiErrorCode)
+        : toFailureError(failure as Exclude<MockRequestFailure, ApiErrorCode>);
     }
   }
 
@@ -432,8 +512,9 @@ export class MockCalmLensServerClient {
 
       /**
        * Serves stored content like the CDN: `200` with `Content-Type`, `Content-Length`,
-       * `ETag` and `X-Request-Id`, or a JSON error body with `404`/`403`. Never throws for
-       * HTTP errors, like the real client.
+       * `Cache-Control`, `Cache-Tag`, the CDN's protection headers and, for images, `ETag` and
+       * `Expires`; or a JSON error body with `404`/`403`. A `placeholder` is the asset's
+       * ThumbHash as a PNG. Never throws for HTTP errors, like the real client.
        */
       serve: async (serveOptions: CdnServeOptions): Promise<Response> => {
         this.begin("cdn.serve", serveOptions);
@@ -444,26 +525,52 @@ export class MockCalmLensServerClient {
         const asset = assets.find(
           (asset) => asset.id === assetIdentifier || asset.externalId === assetIdentifier,
         );
-        const notFound = () =>
-          this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
-        if (!asset) return notFound();
-
-        // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
-        // blocked or purged, failed processing or removed content. A placeholder is served whatever
-        // the moderation status, except for purged assets.
-        const status = asset.classification.moderation.status;
-        const isPlaceholder = options.resource === "placeholder";
+        if (!asset) {
+          return this.jsonResponse(
+            404,
+            { code: "asset/not-found", message: "Asset not found" },
+            url,
+          );
+        }
         const notAvailable = () =>
           this.jsonResponse(
             403,
             { code: "asset/not-available", message: "Asset is not available" },
             url,
           );
+        const folders = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
+        const canDownload = () =>
+          permits(this.apiKeyGrants, "assets:download", asset.folderId ?? null, folders);
+        const status = asset.classification.moderation.status;
+
+        if (options.resource === "placeholder") {
+          // Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
+          // whatever their moderation status; refused for purged assets, assets without one
+          // (not yet classified, or content removed) and, for private assets, keys without
+          // `assets:download`.
+          const thumbhash = asset.content.image?.thumbhash;
+          if (!thumbhash || status === "purged") return notAvailable();
+          const isPublic = asset.visibility === "public";
+          if (!isPublic && !canDownload()) return notAvailable();
+          const png = Uint8Array.from(
+            atob(placeholderHashToDataURL(thumbhash).split(",", 2)[1]!),
+            (char) => char.charCodeAt(0),
+          );
+          return this.cdnResponse(init, png, url, {
+            "Content-Type": "image/png",
+            "Cache-Control": `${isPublic ? "public" : "private"}, max-age=3600`,
+            "Cache-Tag": `asset-${asset.id}`,
+            ETag: `"${thumbhash}"`,
+          });
+        }
+
+        // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
+        // blocked or purged, failed processing or removed content.
         const storedContent = await this.imageStorage.getContent(asset.id);
         if (
           asset.upload.status === "uploading" ||
           status === "purged" ||
-          (!isPlaceholder && status === "blocked") ||
+          status === "blocked" ||
           asset.classification.status === "failed" ||
           asset.content.status === "removed" ||
           !storedContent
@@ -474,16 +581,8 @@ export class MockCalmLensServerClient {
         // `allowAgeRestricted`, need an API key with `assets:download` for the asset's folder.
         const isPrivate =
           asset.visibility !== "public" ||
-          (!isPlaceholder && status === "age-restricted" && !options.allowAgeRestricted);
-        if (
-          isPrivate &&
-          !permits(
-            this.apiKeyGrants,
-            "assets:download",
-            asset.folderId ?? null,
-            (await this.databaseStorage.listFolders?.(this.projectId)) ?? [],
-          )
-        ) {
+          (status === "age-restricted" && !options.allowAgeRestricted);
+        if (isPrivate && !canDownload()) {
           return this.jsonResponse(
             403,
             {
@@ -504,29 +603,49 @@ export class MockCalmLensServerClient {
           bytes.set(part, offset);
           offset += part.byteLength;
         }
-        const requestId = `mock-request-${++this.requestCount}`;
-        const isHead = init?.method?.toUpperCase() === "HEAD";
-        const response = new Response(isHead ? null : bytes, {
-          status: 200,
-          headers: {
-            "Content-Type": storedContent.type ?? "application/octet-stream",
-            "Content-Length": String(byteLength),
-            // Like the CDN: an image's bytes are immutable for a year, other content and
-            // placeholders are kept for an hour, publicly only when delivery is public.
-            "Cache-Control": `${isPrivate ? "private" : "public"}, ${
-              asset.type === "image" && !isPlaceholder
-                ? "max-age=31536000, immutable"
-                : "max-age=3600"
-            }`,
-            ETag: `"${asset.id}-${asset.updatedAt}"`,
-            "X-Request-Id": requestId,
-            "X-Mock-CalmLens-CDN-URL": url,
-          },
+        const contentType = storedContent.type ?? "application/octet-stream";
+        const isImage = asset.type === "image";
+        return this.cdnResponse(init, bytes, url, {
+          "Content-Type": contentType,
+          // Like the CDN: an image's bytes are immutable for a year, other content is kept for
+          // an hour, publicly only when delivery is public.
+          "Cache-Control": `${isPrivate ? "private" : "public"}, ${
+            isImage ? "max-age=31536000, immutable" : "max-age=3600"
+          }`,
+          "Cache-Tag": `asset-${asset.id}`,
+          ...(isImage
+            ? {
+                ETag: `"${asset.id}"`,
+                Expires: new Date(this.now() + 31536000 * 1000).toUTCString(),
+              }
+            : {}),
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "sandbox; default-src 'none'",
+          ...(isActiveContentType(contentType) ? { "Content-Disposition": "attachment" } : {}),
         });
-        Object.defineProperty(response, "url", { value: url });
-        return response;
       },
     };
+  }
+
+  private cdnResponse(
+    init: RequestInit | undefined,
+    bytes: Uint8Array<ArrayBuffer>,
+    url: string,
+    headers: Record<string, string>,
+  ): Response {
+    const requestId = `mock-request-${++this.requestCount}`;
+    const isHead = init?.method?.toUpperCase() === "HEAD";
+    const response = new Response(isHead ? null : bytes, {
+      status: 200,
+      headers: {
+        ...headers,
+        "Content-Length": String(bytes.byteLength),
+        "X-Request-Id": requestId,
+        "X-Mock-CalmLens-CDN-URL": url,
+      },
+    });
+    Object.defineProperty(response, "url", { value: url });
+    return response;
   }
 
   get events() {
@@ -547,18 +666,21 @@ export class MockCalmLensServerClient {
 
   private listEvents(options: ListEventsOptions): GetEventsResponse {
     const limit = options.limit ?? DEFAULT_EVENTS_LIMIT;
-    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_EVENTS_LIMIT) {
-      throw this.apiError(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
-        message: `limit must be an integer from 1 to ${MAX_EVENTS_LIMIT}`,
-      });
+    // Like the API's query schema: an integer from 1 to 100.
+    if (typeof limit !== "number" || !Number.isFinite(limit) || limit < 1) {
+      throw this.validationError("validation/too-small", "limit");
     }
+    if (limit > MAX_EVENTS_LIMIT) throw this.validationError("validation/too-big", "limit");
+    if (!Number.isInteger(limit)) throw this.validationError("validation/invalid-type", "limit");
     if (!options.after) {
       return { events: [], cursor: `mock_${this.eventFeed.length}`, hasMore: false };
     }
     const match = /^mock_(\d+)$/.exec(options.after);
     const position = match ? Number(match[1]) : Number.NaN;
     if (!Number.isSafeInteger(position) || position > this.eventFeed.length) {
-      throw this.apiError(API_ERROR_CODES.INVALID_EVENT_CURSOR);
+      throw this.apiError(API_ERROR_CODES.INVALID_EVENT_CURSOR, {
+        details: { after: options.after },
+      });
     }
     const events = this.eventFeed.slice(position, position + limit);
     const next = position + events.length;
@@ -611,14 +733,21 @@ export class MockCalmLensServerClient {
        */
       search: async (options: SearchAssetsOptions): Promise<AssetSearchResponse> => {
         this.begin("assets.search", options);
+        // Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
         const query = typeof options?.query === "string" ? options.query.trim() : "";
-        if (!query || query.length > 200) {
-          throw this.invalidPayload("query must be 1 to 200 characters");
+        if (!query) throw this.validationError("validation/too-small", "query");
+        if (query.length > MAX_SEARCH_QUERY_LENGTH) {
+          throw this.validationError("validation/too-big", "query");
         }
+        const limit = options.limit ?? 10;
+        if (typeof limit !== "number" || !Number.isFinite(limit) || limit < 1) {
+          throw this.validationError("validation/too-small", "limit");
+        }
+        if (limit > MAX_SEARCH_LIMIT) throw this.validationError("validation/too-big", "limit");
         const items = searchAssets(
           await this.databaseStorage.listAssets(this.projectId),
           query,
-          options.limit ?? 10,
+          limit,
         );
         return { query, items, semanticStatus: "disabled" };
       },
@@ -631,7 +760,10 @@ export class MockCalmLensServerClient {
           assets = assets.filter((asset) => (asset.folderId ?? null) === options.folderId);
         }
         assets = filterAssets(assets, options.filter);
-        return createPage(assets, options);
+        return createPage(assets, options, {
+          scope: JSON.stringify([this.projectId, options.filter ?? null, options.folderId ?? null]),
+          fail: this.pageFailure,
+        });
       },
 
       iterate: (options: IterateAssetsOptions = {}) =>
@@ -647,11 +779,12 @@ export class MockCalmLensServerClient {
       ): Promise<AssetChildrenPage> => {
         this.begin("assets.listChildren", childrenOptions);
         const { assetId, ...options } = childrenOptions;
-        encodePathSegment(assetId, "Asset ID");
+        const parent = await this.findOwnAsset(assetId);
         const assets = await this.databaseStorage.listAssets(this.projectId);
         return createPage(
-          assets.filter((asset) => asset.parentId === assetId),
+          assets.filter((asset) => asset.parentId === parent.id),
           options,
+          { scope: parent.id, fail: this.pageFailure },
         );
       },
 
@@ -667,6 +800,15 @@ export class MockCalmLensServerClient {
         const changes = Object.fromEntries(
           Object.entries(body).filter(([, value]) => value !== undefined),
         );
+        // Like the API: an externalId stays unique in the project; `null` clears a field.
+        if (body.externalId) {
+          const assets = await this.databaseStorage.listAssets(this.projectId);
+          if (
+            assets.some((other) => other.id !== asset.id && other.externalId === body.externalId)
+          ) {
+            throw this.apiError(API_ERROR_CODES.DUPLICATE_EXTERNAL_ID);
+          }
+        }
         return this.databaseStorage.updateAsset({ ...asset, ...changes, updatedAt: this.now() });
       },
 
@@ -690,35 +832,49 @@ export class MockCalmLensServerClient {
         if (!part) throw invalidArgument("Part options are required");
         assertDeclaredPayloadSize(part);
         return this.withIdempotency("assets.uploadPart", options, async () => {
+          // In the API's order: the upload must be open, parts arrive in order, image totals and
+          // the declared total are checked, then the part itself (5 MiB unless it is the last).
           const asset = await this.findOwnAsset(assetId);
-          const validation = validateAssetPayload(part, {
-            multipart: true,
-            isFinal: part.isFinal,
-          });
-          if (!validation.ok) throw this.invalidPayload(validation.error);
           if (asset.upload.status !== "uploading") {
             throw this.apiError(API_ERROR_CODES.UPLOAD_NOT_OPEN);
           }
-          const expectedPartNumber = (asset.upload.partsReceived ?? 1) + 1;
+          const expectedPartNumber = (asset.upload.partsReceived ?? 0) + 1;
           if (part.partNumber !== expectedPartNumber) {
             throw this.apiError(API_ERROR_CODES.INVALID_UPLOAD_PART_NUMBER, {
-              details: { expectedPartNumber },
+              message: `Expected part ${expectedPartNumber}`,
+              details: { expectedPartNumber, receivedPartNumber: part.partNumber },
             });
           }
+          const isFinal = part.isFinal === true;
+          const partSize = part.sizeInBytes ?? getAssetPayloadByteLength(part);
+          const received = (asset.content.sizeInBytes ?? 0) + (partSize ?? 0);
+          const upload = this.openUploads.get(assetId);
+          if (partSize !== undefined) {
+            const sizeError =
+              this.multipartImageSizeError(asset.type, received, isFinal) ??
+              this.multipartTotalSizeError(upload?.totalSizeInBytes, received, isFinal);
+            if (sizeError) throw this.apiError(sizeError);
+          }
+          const validation = validateAssetPayload(part, { multipart: true, isFinal });
+          if (!validation.ok) throw this.invalidPayload(validation.error);
 
           await this.imageStorage.putPart(assetId, part);
-          const queue = options.queue ?? this.uploadQueues.get(assetId) ?? false;
-          if (part.isFinal) this.uploadQueues.delete(assetId);
+          const queue = options.queue ?? upload?.queue ?? false;
+          if (isFinal) this.openUploads.delete(assetId);
           const now = this.now();
-          const received: Asset = {
+          const next: Asset = {
             ...asset,
             updatedAt: now,
-            upload: { ...asset.upload, updatedAt: now, partsReceived: part.partNumber },
+            content: { ...asset.content, sizeInBytes: received },
+            // Like the API, a completed upload no longer counts parts.
+            upload: {
+              ...asset.upload,
+              updatedAt: now,
+              partsReceived: isFinal ? null : part.partNumber,
+            },
           };
           return this.databaseStorage.updateAsset(
-            part.isFinal
-              ? await this.applyOutcome(received, this.outcomeFor(received, queue))
-              : received,
+            isFinal ? await this.applyOutcome(next, this.outcomeFor(next, queue)) : next,
           );
         });
       },
@@ -759,14 +915,21 @@ export class MockCalmLensServerClient {
       retry: async (options: RetryAssetOptions): Promise<Asset> => {
         this.begin("assets.retry", options);
         const asset = await this.findOwnAsset(options?.assetId);
-        if (asset.classification.status !== "failed") {
+        if (
+          asset.classification.status !== "failed" ||
+          asset.classification.moderation.status !== "pending"
+        ) {
           throw this.apiError(API_ERROR_CODES.ASSET_NOT_RETRYABLE);
         }
         if (asset.content.status === "removed") {
           throw this.apiError(API_ERROR_CODES.ASSET_CONTENT_UNAVAILABLE);
         }
-        // Like the API: back to processing, to be moderated again.
-        return this.databaseStorage.updateAsset(await this.applyOutcome(asset, "pending"));
+        // Like the API: back to processing, to be moderated again, with an `asset.retried` event.
+        const retried = await this.databaseStorage.updateAsset(
+          await this.applyOutcome(asset, "pending"),
+        );
+        this.recordLifecycleEvent("asset.retried", retried);
+        return retried;
       },
 
       explain: async (options: ExplainAssetOptions): Promise<Asset> => {
@@ -824,22 +987,34 @@ export class MockCalmLensServerClient {
         this.begin("assets.deleteContent", options);
         const asset = await this.findOwnAsset(options?.assetId);
         await this.imageStorage.deleteContent(asset.id);
-        // Like the API: the record and report stay; stored content and extracted text go.
-        const now = this.now();
-        return this.databaseStorage.updateAsset({
-          ...asset,
-          content:
-            asset.content.status === "removed"
-              ? asset.content
-              : {
-                  ...asset.content,
-                  status: "removed",
-                  removalReason: "requested",
+        // Like the API: the record and report stay; stored content, extracted text and the
+        // placeholder go. Content already removed keeps its reason, and an `asset.content-removed`
+        // event is recorded either way.
+        const removed =
+          asset.content.status === "removed"
+            ? asset.content.image?.thumbhash
+              ? await this.databaseStorage.updateAsset({
+                  ...asset,
+                  content: { ...asset.content, image: withoutPlaceholder(asset.content.image) },
+                })
+              : asset
+            : await (async () => {
+                const now = this.now();
+                return this.databaseStorage.updateAsset({
+                  ...asset,
+                  content: {
+                    ...asset.content,
+                    status: "removed",
+                    removalReason: "requested",
+                    updatedAt: now,
+                    extractedText: null,
+                    image: withoutPlaceholder(asset.content.image),
+                  },
                   updatedAt: now,
-                  extractedText: null,
-                },
-          updatedAt: now,
-        });
+                });
+              })();
+        this.recordLifecycleEvent("asset.content-removed", removed);
+        return removed;
       },
 
       delete: async (options: DeleteAssetOptions): Promise<void> => {
@@ -847,6 +1022,7 @@ export class MockCalmLensServerClient {
         const asset = await this.findOwnAsset(options?.assetId);
         await this.imageStorage.deleteContent(asset.id);
         await this.databaseStorage.deleteAsset(asset.id);
+        this.recordLifecycleEvent("asset.deleted", asset);
       },
     };
   }
@@ -869,8 +1045,12 @@ export class MockCalmLensServerClient {
       list: async (options: ListFoldersOptions = {}): Promise<FolderPage> => {
         this.begin("folders.list", options);
         const all = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
-        const size = options.pageSize ?? 100;
-        if (size < 1 || size > 100) throw this.invalidPayload("Invalid folder page size");
+        const size = options.pageSize ?? MAX_FOLDER_PAGE_SIZE;
+        if (typeof size !== "number" || !Number.isFinite(size) || size < 1) {
+          throw this.validationError("validation/too-small", "pageSize");
+        }
+        if (size > MAX_FOLDER_PAGE_SIZE)
+          throw this.validationError("validation/too-big", "pageSize");
         const matching = all
           .filter(
             (folder) =>
@@ -879,10 +1059,13 @@ export class MockCalmLensServerClient {
               (!options.search || folder.name.toLowerCase().includes(options.search.toLowerCase())),
           )
           .sort((a, b) => {
+            // Like the database: names compare by code point, so case matters.
+            const byCodePoint = (left: string, right: string) =>
+              left < right ? -1 : left > right ? 1 : 0;
             const order =
               (options.sort === "createdAt"
                 ? a.createdAt - b.createdAt
-                : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id);
+                : byCodePoint(a.name, b.name)) || byCodePoint(a.id, b.id);
             return options.direction === "DESC" ? -order : order;
           });
         const start = (options.pageIndex ?? 0) * size;
@@ -1055,13 +1238,19 @@ export class MockCalmLensServerClient {
     options: SubmitAssetOptions | UploadAssetPartOptions,
     run: () => Promise<Asset>,
   ): Promise<Asset> {
-    const key = options?.idempotencyKey;
-    if (key === undefined) return run();
-    if (!key || key.length > 255 || !/^[\x21-\x7e]+$/.test(key)) {
+    if (options?.idempotencyKey === undefined) return run();
+    // HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
+    const key =
+      typeof options.idempotencyKey === "string"
+        ? options.idempotencyKey.replace(/^[\t\n\r ]+|[\t\n\r ]+$/g, "")
+        : undefined;
+    if (key === undefined || !isValidIdempotencyKey(key)) {
       throw this.apiError(API_ERROR_CODES.INVALID_IDEMPOTENCY_KEY);
     }
     const fingerprint = `${operation}:${stringifyJsonCanonical(
-      JSON.parse(JSON.stringify(options, (_key, value) => describeBinary(value))),
+      JSON.parse(
+        JSON.stringify({ ...options, idempotencyKey: key }, (_key, value) => describeBinary(value)),
+      ),
     )}`;
     const saved = this.idempotentResults.get(key);
     if (saved) {
@@ -1112,15 +1301,31 @@ export class MockCalmLensServerClient {
         if (!validation.ok) throw this.invalidPayload(validation.error);
       }
     }
+    const type = inferAssetType(options);
     if ("part" in options) {
       assertDeclaredPayloadSize(options.part, options.part.sizeInBytes ?? options.sizeInBytes);
       this.assertValidUploadMimeType(options.part.type);
-      const validation = validateAssetPayload(options.part, {
-        multipart: true,
-        isFinal: options.part.isFinal,
-      });
+      // Like the API, a declared total is checked before anything is stored, then a single final
+      // part is checked as the whole upload, then the part itself.
+      const isFinal = options.part.isFinal === true;
+      const partSize = this.getSizeInBytes(options) ?? 0;
+      const sizeError =
+        (options.totalSizeInBytes === undefined
+          ? undefined
+          : this.multipartImageSizeError(type, options.totalSizeInBytes, true)) ??
+        (isFinal
+          ? (this.multipartTotalSizeError(options.totalSizeInBytes, partSize, true) ??
+            this.multipartImageSizeError(type, partSize, true))
+          : undefined);
+      if (sizeError) throw this.apiError(sizeError);
+      const validation = validateAssetPayload(options.part, { multipart: true, isFinal });
       if (!validation.ok) throw this.invalidPayload(validation.error);
+      if (!isFinal) {
+        const totalError = this.multipartTotalSizeError(options.totalSizeInBytes, partSize, false);
+        if (totalError) throw this.apiError(totalError);
+      }
     }
+    if (options.folderId) await this.findOwnFolder(options.folderId);
     if (options.externalId) {
       const assets = await this.databaseStorage.listAssets(this.projectId);
       if (assets.some((asset) => asset.externalId === options.externalId)) {
@@ -1131,21 +1336,28 @@ export class MockCalmLensServerClient {
     const id = this.createId();
     const now = this.now();
     const isOpenUpload = "part" in options && !options.part.isFinal;
-    const keepContent = options.processingOptions?.keepContentAfterProcessing === true;
+    const processingOptions = options.processingOptions ?? { keepContentAfterProcessing: false };
+    const keepContent = processingOptions.keepContentAfterProcessing === true;
+    // Fields the API returns as `null` when they are not set.
     const asset: Asset = {
       id,
       projectId: this.projectId,
+      userId: null,
+      parentId: null,
       folderId: options.folderId ?? null,
+      uploadPresetId: options.uploadPresetId ?? null,
       createdAt: now,
       updatedAt: now,
       name: options.name,
-      description: options.description,
-      externalId: options.externalId,
+      description: options.description ?? null,
+      externalId: options.externalId ?? null,
       externalUrl:
-        "url" in options ? options.url : "content" in options ? options.externalUrl : undefined,
-      type: inferAssetType(options),
-      metadata: options.metadata,
-      processingOptions: options.processingOptions,
+        ("url" in options ? options.url : "content" in options ? options.externalUrl : undefined) ??
+        null,
+      type,
+      metadata: options.metadata ?? null,
+      tags: null,
+      processingOptions,
       visibility: options.visibility ?? "private",
       content: {
         status: keepContent ? "stored" : "temporary",
@@ -1162,7 +1374,8 @@ export class MockCalmLensServerClient {
       upload: {
         status: isOpenUpload ? "uploading" : "completed",
         updatedAt: now,
-        partsReceived: "part" in options ? (options.part.partNumber ?? 1) : null,
+        // Like the API, only an open upload counts the parts received.
+        partsReceived: isOpenUpload ? (options.part.partNumber ?? 1) : null,
       },
       classification: {
         status: isOpenUpload ? "pending" : "processing",
@@ -1176,17 +1389,52 @@ export class MockCalmLensServerClient {
     };
 
     if ("content" in options) {
-      if (!("plainText" in options.content)) {
-        await this.imageStorage.putContent(id, options.content);
-      }
+      await this.imageStorage.putContent(
+        id,
+        "plainText" in options.content
+          ? {
+              uint8Array: new TextEncoder().encode(options.content.plainText),
+              type: options.content.type,
+            }
+          : options.content,
+      );
     } else if ("part" in options) {
       await this.imageStorage.putPart(id, options.part);
-      if (isOpenUpload) this.uploadQueues.set(id, queue);
+      if (isOpenUpload) {
+        this.openUploads.set(id, { queue, totalSizeInBytes: options.totalSizeInBytes });
+      }
     }
 
     return this.databaseStorage.createAsset(
       isOpenUpload ? asset : await this.applyOutcome(asset, this.outcomeFor(asset, queue)),
     );
+  }
+
+  /** Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB. */
+  private multipartImageSizeError(
+    type: string,
+    sizeInBytes: number,
+    isFinal: boolean,
+  ): ApiErrorCode | undefined {
+    if (type !== "image") return undefined;
+    if (sizeInBytes > MAX_IMAGE_UPLOAD_BYTES) return API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE;
+    if (isFinal && sizeInBytes < MIN_MULTIPART_IMAGE_UPLOAD_BYTES) {
+      return API_ERROR_CODES.MULTIPART_IMAGE_TOO_SMALL;
+    }
+    return undefined;
+  }
+
+  /** Like the API: the parts may not overshoot a declared total, and must reach it at the end. */
+  private multipartTotalSizeError(
+    totalSizeInBytes: number | undefined,
+    receivedSizeInBytes: number,
+    isFinal: boolean,
+  ): ApiErrorCode | undefined {
+    if (totalSizeInBytes === undefined) return undefined;
+    return receivedSizeInBytes > totalSizeInBytes ||
+      (isFinal && receivedSizeInBytes !== totalSizeInBytes)
+      ? API_ERROR_CODES.UPLOAD_SIZE_MISMATCH
+      : undefined;
   }
 
   private outcomeFor(asset: Asset, queue: boolean): MockAssetOutcome {
@@ -1196,10 +1444,15 @@ export class MockCalmLensServerClient {
 
   /**
    * Moves an asset to `outcome` like the pipeline would: a decision finishes processing, `purged`
-   * deletes the content, and finished processing removes content kept only temporarily
-   * (`keepContentAfterProcessing` off).
+   * deletes the content (with `purgeReason`, `policy` for the pipeline), and finished processing
+   * removes content kept only temporarily (`keepContentAfterProcessing` off). A classified image
+   * gets a ThumbHash for its placeholder, which goes with purged content.
    */
-  private async applyOutcome(asset: Asset, outcome: MockAssetOutcome): Promise<Asset> {
+  private async applyOutcome(
+    asset: Asset,
+    outcome: MockAssetOutcome,
+    purgeReason: "policy" | "requested" = "policy",
+  ): Promise<Asset> {
     const now = this.now();
     const decided = outcome !== "pending" && outcome !== "failed";
     const classificationStatus = decided
@@ -1211,6 +1464,22 @@ export class MockCalmLensServerClient {
     const removeContent =
       purge || (classificationStatus === "completed" && asset.content.status === "temporary");
     if (removeContent) await this.imageStorage.deleteContent(asset.id);
+    const classifiedImage =
+      decided && asset.type === "image" && asset.content.status !== "removed" && !purge;
+    // Like the API, removing content (when processing finishes or by purging) removes the
+    // ThumbHash and average colour with it, so no placeholder outlives the content.
+    const image = classifiedImage
+      ? {
+          width: null,
+          height: null,
+          perceptualHash: null,
+          ...asset.content.image,
+          thumbhash: MOCK_THUMBHASH,
+          averageColor: asset.content.image?.averageColor ?? "#7f7f7f",
+        }
+      : outcome === "purged"
+        ? withoutPlaceholder(asset.content.image)
+        : asset.content.image;
     return {
       ...asset,
       updatedAt: now,
@@ -1218,11 +1487,12 @@ export class MockCalmLensServerClient {
         ? {
             ...asset.content,
             status: "removed",
-            removalReason: purge ? "policy" : "retention",
+            removalReason: purge ? purgeReason : "retention",
             updatedAt: now,
             extractedText: null,
+            image: withoutPlaceholder(image),
           }
-        : asset.content,
+        : { ...asset.content, image },
       upload: { ...asset.upload, status: "completed", updatedAt: now },
       classification: {
         ...asset.classification,
@@ -1232,6 +1502,28 @@ export class MockCalmLensServerClient {
         moderation: { ...asset.classification.moderation, status: decided ? outcome : "pending" },
       },
     };
+  }
+
+  /** Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API. */
+  private recordLifecycleEvent(
+    type: "asset.deleted" | "asset.content-removed" | "asset.retried",
+    asset: Asset,
+  ): void {
+    this.enqueueEvent({
+      type,
+      severity: "low",
+      assetId: asset.id,
+      asset: toEventAsset(asset),
+      facts: [
+        {
+          key: "asset-name",
+          value: asset.name,
+          // A deleted asset has no portal page to link to.
+          ...(type === "asset.deleted" ? {} : { url: `/portal/assets/${asset.id}` }),
+        },
+        { key: "asset-type", value: asset.type },
+      ],
+    } as MockEventInput);
   }
 
   private async resolveFolder(folderId: string): Promise<Folder | undefined> {

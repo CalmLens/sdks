@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -31,6 +32,10 @@ type WebhookEventPayload struct {
 	CreatedAt int64            `json:"createdAt"`
 	ProjectID string           `json:"projectId"`
 	Data      WebhookEventData `json:"data"`
+	// Raw is the whole body, including fields added to CalmLens after this SDK (at the top
+	// level, in data, in the asset snapshot and in facts). ParseWebhookEvent and
+	// ToWebhookEventPayload set it; marshal Raw to reproduce the body.
+	Raw JSON `json:"-"`
 }
 
 // WebhookEventData holds the event fields of a webhook delivery.
@@ -44,8 +49,26 @@ type WebhookEventData struct {
 	Facts       EventFacts  `json:"facts"`
 }
 
-// ToWebhookEventPayload converts a feed event into the body a webhook connector delivers.
+// ToWebhookEventPayload converts a feed event into the body a webhook connector delivers. Raw
+// holds that body with every field of the event's Raw (or, for an event built in code, of its
+// typed fields), so fields this SDK does not know are delivered too.
 func ToWebhookEventPayload(event Event) WebhookEventPayload {
+	source := event.Raw
+	if source == nil {
+		if data, err := json.Marshal(event); err == nil {
+			_ = decodeJSON(data, &source)
+		}
+	}
+	orNull := func(key string) any {
+		if value, ok := source[key]; ok {
+			return value
+		}
+		return nil
+	}
+	data := JSON{"severity": source["severity"], "title": source["title"], "description": orNull("description"), "assetId": orNull("assetId"), "asset": orNull("asset")}
+	if facts, ok := source["facts"]; ok {
+		data["facts"] = facts
+	}
 	return WebhookEventPayload{
 		ID:        event.ID,
 		Type:      event.Type,
@@ -59,6 +82,7 @@ func ToWebhookEventPayload(event Event) WebhookEventPayload {
 			Asset:       event.Asset,
 			Facts:       event.Facts,
 		},
+		Raw: JSON{"id": source["id"], "type": source["type"], "createdAt": source["createdAt"], "projectId": source["projectId"], "data": data},
 	}
 }
 
@@ -98,14 +122,16 @@ type WebhookOption func(*webhookConfig)
 
 type webhookConfig struct {
 	tolerance    time.Duration
+	toleranceSet bool
 	now          time.Time
 	maxBodyBytes int64
 }
 
 // WithTolerance sets the maximum distance between the delivery timestamp and now, compared
-// in whole seconds. Zero or negative keeps DefaultWebhookTolerance (5 minutes).
+// in whole seconds (default DefaultWebhookTolerance, 5 minutes). Zero accepts only the
+// current second; a negative tolerance accepts nothing.
 func WithTolerance(tolerance time.Duration) WebhookOption {
-	return func(c *webhookConfig) { c.tolerance = tolerance }
+	return func(c *webhookConfig) { c.tolerance, c.toleranceSet = tolerance, true }
 }
 
 // WithNow sets the current time used to check the timestamp (default time.Now()).
@@ -124,7 +150,7 @@ func webhookOptions(options []WebhookOption) webhookConfig {
 	for _, option := range options {
 		option(&config)
 	}
-	if config.tolerance <= 0 {
+	if !config.toleranceSet {
 		config.tolerance = DefaultWebhookTolerance
 	}
 	if config.now.IsZero() {
@@ -157,7 +183,7 @@ func VerifyWebhookSignature(payload []byte, signature, timestamp, secret string,
 	if age < 0 {
 		age = -age
 	}
-	if age < 0 || age > int64(config.tolerance/time.Second) {
+	if age < 0 || config.tolerance < 0 || age > int64(config.tolerance/time.Second) {
 		return false
 	}
 	expected := []byte(webhookHMAC(secret, timestamp, payload))
@@ -174,30 +200,96 @@ func VerifyWebhookSignature(payload []byte, signature, timestamp, secret string,
 	return matched
 }
 
+// VerifyWebhookHeaders is VerifyWebhookSignature with the signature and timestamp read from a
+// delivery's headers. Names match in any case, and repeated signature headers are joined into one
+// list (so a signature in any of them verifies); a repeated timestamp header does not verify.
+func VerifyWebhookHeaders(payload []byte, header http.Header, secret string, options ...WebhookOption) bool {
+	return VerifyWebhookSignature(payload, webhookHeader(header, WebhookSignatureHeader), webhookHeader(header, WebhookTimestampHeader), secret, options...)
+}
+
+// webhookHeader joins every value of the header name with ",", matching names in any case
+// (http.Header keys set without canonicalization included).
+func webhookHeader(header http.Header, name string) string {
+	var values []string
+	for key, list := range header {
+		if strings.EqualFold(key, name) {
+			values = append(values, list...)
+		}
+	}
+	return strings.Join(values, ",")
+}
+
 // ParseWebhookEvent verifies a delivery with VerifyWebhookSignature and then decodes it.
 // It returns a *Error with code sdk/invalid-webhook-signature when verification fails and
-// sdk/invalid-webhook-payload when the verified body is not an event.
+// sdk/invalid-webhook-payload when the verified body is not an event: a JSON object with string
+// id, type and projectId, a numeric createdAt and an object data whose known fields, when
+// present, have the API's types. Unknown fields are kept in Raw.
 func ParseWebhookEvent(payload []byte, signature, timestamp, secret string, options ...WebhookOption) (*WebhookEventPayload, error) {
-	if secret == "" {
-		return nil, invalid(CodeSDKInvalidArgument, "A webhook secret is required")
-	}
 	if !VerifyWebhookSignature(payload, signature, timestamp, secret, options...) {
-		return nil, invalid(CodeSDKInvalidWebhookSignature, "Webhook signature or timestamp is invalid")
+		return nil, invalid(CodeSDKInvalidWebhookSignature, "Webhook signature or timestamp did not verify")
+	}
+	var raw any
+	if err := decodeJSON(payload, &raw); err != nil {
+		return nil, &Error{Code: CodeSDKInvalidWebhookPayload, Message: "Webhook body is not JSON", Cause: err}
+	}
+	object, ok := raw.(map[string]any)
+	if !ok || !isWebhookEvent(object) {
+		return nil, invalid(CodeSDKInvalidWebhookPayload, "Webhook body is not a CalmLens event")
 	}
 	var event WebhookEventPayload
 	if err := decodeJSON(payload, &event); err != nil {
-		return nil, &Error{Code: CodeSDKInvalidWebhookPayload, Message: "Webhook body is not valid JSON", Cause: err}
+		return nil, &Error{Code: CodeSDKInvalidWebhookPayload, Message: "Webhook body does not match the event type", Cause: err}
 	}
-	if event.ID == "" || event.Type == "" {
-		return nil, invalid(CodeSDKInvalidWebhookPayload, "Webhook body is not a CalmLens event")
-	}
+	event.Raw = object
 	return &event, nil
 }
 
+// isWebhookEvent applies the API's rules for a received webhook body.
+func isWebhookEvent(value map[string]any) bool {
+	isString := func(v any) bool { _, ok := v.(string); return ok }
+	_, numeric := value["createdAt"].(json.Number)
+	data, isObject := value["data"].(map[string]any)
+	if !isString(value["id"]) || !isString(value["type"]) || !isString(value["projectId"]) || !numeric || !isObject {
+		return false
+	}
+	optional := func(key string, nullable bool) bool {
+		v, present := data[key]
+		return !present || nullable && v == nil || isString(v)
+	}
+	if !optional("severity", false) || !optional("title", false) || !optional("description", true) || !optional("assetId", true) {
+		return false
+	}
+	if asset, present := data["asset"]; present && asset != nil {
+		object, ok := asset.(map[string]any)
+		if !ok || !isString(object["id"]) {
+			return false
+		}
+	}
+	if facts, present := data["facts"]; present {
+		list, ok := facts.([]any)
+		if !ok {
+			return false
+		}
+		for _, item := range list {
+			fact, ok := item.(map[string]any)
+			if !ok || !isString(fact["key"]) {
+				return false
+			}
+			if _, hasValue := fact["value"]; !hasValue {
+				return false
+			}
+			if url, hasURL := fact["url"]; hasURL && !isString(url) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // VerifyWebhookRequest reads r.Body (up to WithMaxBodyBytes, default 1 MiB), verifies it
-// with the signature and timestamp headers and returns the decoded event. Call it before
-// anything else reads the body. Afterwards r.Body is replaced with the raw bytes so later
-// handlers can read them again.
+// with the signature and timestamp headers (see VerifyWebhookHeaders) and returns the decoded
+// event. Call it before anything else reads the body. Afterwards r.Body is replaced with the
+// raw bytes so later handlers can read them again.
 func VerifyWebhookRequest(r *http.Request, secret string, options ...WebhookOption) (*WebhookEventPayload, error) {
 	config := webhookOptions(options)
 	if r.Body == nil {
@@ -212,5 +304,5 @@ func VerifyWebhookRequest(r *http.Request, secret string, options ...WebhookOpti
 		return nil, invalid(CodeSDKInvalidWebhookPayload, "Webhook body is too large")
 	}
 	r.Body = io.NopCloser(bytes.NewReader(raw))
-	return ParseWebhookEvent(raw, r.Header.Get(WebhookSignatureHeader), r.Header.Get(WebhookTimestampHeader), secret, options...)
+	return ParseWebhookEvent(raw, webhookHeader(r.Header, WebhookSignatureHeader), webhookHeader(r.Header, WebhookTimestampHeader), secret, options...)
 }

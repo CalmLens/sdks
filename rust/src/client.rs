@@ -2,7 +2,8 @@
 use crate::error::{invalid_argument, invalid_config, invalid_payload, ErrorCode};
 use crate::models::*;
 use crate::transport::{
-    decode, execute, stream_error, upload_body, uuid, CallOptions, Exchange, Prepared, Transport,
+    decode, execute, stream_error, upload_body, uuid, CallOptions, Deadline, Exchange, Prepared,
+    Transport, DEFAULT_MAX_RESPONSE_BYTES,
 };
 use crate::{Error, Result};
 use bytes::Bytes;
@@ -24,16 +25,31 @@ pub const DEFAULT_CDN_BASE_URL: &str = "https://cdn.calmlens.com/v1";
 pub const ENSURE_LENSES_MAX_PER_REQUEST: usize = 100;
 /// The longest signed URL lifetime the API accepts, in seconds: 24 hours.
 pub const MAX_SIGNED_URL_SECONDS: u64 = 24 * 60 * 60;
-const MIN_PART: u64 = 5 * 1024 * 1024;
-const DECISION_POLL_FIRST_DELAY: Duration = Duration::from_millis(500);
-const DECISION_POLL_MAX_DELAY: Duration = Duration::from_secs(5);
-const DEFAULT_DECISION_TIMEOUT: Duration = Duration::from_secs(60);
+/// The default timeout of each API call attempt.
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
+/// The default timeout of each binary upload attempt: none.
+pub const DEFAULT_UPLOAD_TIMEOUT: Option<Duration> = None;
+/// How many times a repeatable request is retried by default.
+pub const DEFAULT_MAX_RETRIES: u32 = 2;
+/// A signed URL's lifetime in seconds when the options give none: 15 minutes.
+pub const DEFAULT_SIGNED_URL_SECONDS: u64 = 15 * 60;
+/// An upload token's lifetime in seconds when the options give none: 10 minutes.
+pub const DEFAULT_UPLOAD_TOKEN_SECONDS: u32 = 10 * 60;
+/// How long [`AssetsClient::wait_for_decision`] waits by default.
+pub const DEFAULT_DECISION_TIMEOUT: Duration = Duration::from_secs(60);
+/// The wait before [`AssetsClient::wait_for_decision`]'s second check.
+pub const DECISION_POLL_FIRST_INTERVAL: Duration = Duration::from_millis(500);
+/// How much longer each wait between decision checks is than the one before.
+pub const DECISION_POLL_INTERVAL_FACTOR: f64 = 1.5;
+/// The longest wait between decision checks.
+pub const DECISION_POLL_MAX_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Configures a [`ServerClient`]. Create it with [`ServerClient::builder`].
 ///
-/// Defaults: a 60-second `timeout` for API calls, no whole-request timeout for uploads and
-/// CDN downloads, a 10-second `connect_timeout`, a 60-second `read_timeout` between response
-/// bytes, and 2 retries of repeatable requests.
+/// Defaults: a 120-second `timeout` for API calls (and for the response headers of CDN
+/// downloads), no `upload_timeout` for binary uploads, a 10-second `connect_timeout`, a
+/// 120-second `read_timeout` between response bytes, 2 retries of repeatable requests and a
+/// 32 MiB `max_response_bytes`.
 #[derive(Clone)]
 pub struct ServerClientBuilder {
     api_key: String,
@@ -41,9 +57,11 @@ pub struct ServerClientBuilder {
     base_url: String,
     cdn_base_url: String,
     timeout: Duration,
+    upload_timeout: Option<Duration>,
     connect_timeout: Duration,
     read_timeout: Duration,
     max_retries: u32,
+    max_response_bytes: usize,
     http_client: Option<reqwest::Client>,
 }
 
@@ -55,9 +73,11 @@ impl fmt::Debug for ServerClientBuilder {
             .field("base_url", &self.base_url)
             .field("cdn_base_url", &self.cdn_base_url)
             .field("timeout", &self.timeout)
+            .field("upload_timeout", &self.upload_timeout)
             .field("connect_timeout", &self.connect_timeout)
             .field("read_timeout", &self.read_timeout)
             .field("max_retries", &self.max_retries)
+            .field("max_response_bytes", &self.max_response_bytes)
             .field("http_client", &self.http_client.is_some())
             .finish()
     }
@@ -70,10 +90,12 @@ impl ServerClientBuilder {
             project_id,
             base_url: DEFAULT_BASE_URL.into(),
             cdn_base_url: DEFAULT_CDN_BASE_URL.into(),
-            timeout: Duration::from_secs(60),
+            timeout: DEFAULT_TIMEOUT,
+            upload_timeout: DEFAULT_UPLOAD_TIMEOUT,
             connect_timeout: Duration::from_secs(10),
-            read_timeout: Duration::from_secs(60),
-            max_retries: 2,
+            read_timeout: Duration::from_secs(120),
+            max_retries: DEFAULT_MAX_RETRIES,
+            max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES,
             http_client: None,
         }
     }
@@ -87,11 +109,25 @@ impl ServerClientBuilder {
         self.cdn_base_url = value.into();
         self
     }
-    /// The whole-request timeout for API calls (60 seconds by default). Uploads and CDN
-    /// downloads have none, so large transfers are not cut off; bound them with
-    /// [`ServerClient::with_timeout`] or rely on `read_timeout`.
+    /// The timeout of each API call attempt, response body included (120 seconds by default).
+    /// It also covers text uploads and the wait for a CDN download's response headers; binary
+    /// uploads use [`upload_timeout`](Self::upload_timeout) instead, and a CDN body streams for
+    /// as long as it takes.
     pub fn timeout(mut self, value: Duration) -> Self {
         self.timeout = value;
+        self
+    }
+    /// The timeout of each binary upload attempt (none by default, so large files are not cut
+    /// off; `read_timeout` still bounds a stalled connection).
+    pub fn upload_timeout(mut self, value: Duration) -> Self {
+        self.upload_timeout = Some(value);
+        self
+    }
+    /// The largest API response body the client reads, in bytes (32 MiB by default). A larger
+    /// one, or a larger declared `Content-Length`, fails with `sdk/response-too-large` before
+    /// it is read. CDN downloads stream and have no limit.
+    pub fn max_response_bytes(mut self, value: usize) -> Self {
+        self.max_response_bytes = value;
         self
     }
     /// The timeout for establishing a connection (10 seconds by default).
@@ -100,7 +136,7 @@ impl ServerClientBuilder {
         self
     }
     /// The longest wait for the next response bytes, for every request including CDN streams
-    /// (60 seconds by default).
+    /// (120 seconds by default).
     pub fn read_timeout(mut self, value: Duration) -> Self {
         self.read_timeout = value;
         self
@@ -152,13 +188,17 @@ impl ServerClientBuilder {
     }
     fn validate(&self) -> Result<Config> {
         for (name, value) in [
-            ("timeout", self.timeout),
-            ("connect_timeout", self.connect_timeout),
-            ("read_timeout", self.read_timeout),
+            ("timeout", Some(self.timeout)),
+            ("upload_timeout", self.upload_timeout),
+            ("connect_timeout", Some(self.connect_timeout)),
+            ("read_timeout", Some(self.read_timeout)),
         ] {
-            if value.is_zero() {
+            if value.is_some_and(|value| value.is_zero()) {
                 return Err(invalid_config(format!("{name} must be positive")));
             }
+        }
+        if self.max_response_bytes == 0 {
+            return Err(invalid_config("max_response_bytes must be positive"));
         }
         if self.api_key.is_empty() || self.project_id.is_empty() {
             return Err(invalid_config("API key and project ID are required"));
@@ -188,7 +228,9 @@ impl ServerClientBuilder {
             cdn_base_url: urls.pop().unwrap_or_default(),
             base_url: urls.pop().unwrap_or_default(),
             timeout: self.timeout,
+            upload_timeout: self.upload_timeout,
             max_retries: self.max_retries,
+            max_response_bytes: self.max_response_bytes,
         })
     }
 }
@@ -199,7 +241,9 @@ struct Config {
     base_url: String,
     cdn_base_url: String,
     timeout: Duration,
+    upload_timeout: Option<Duration>,
     max_retries: u32,
+    max_response_bytes: usize,
 }
 
 struct Inner {
@@ -207,6 +251,9 @@ struct Inner {
     transport: Transport,
     user_agent: HeaderValue,
     lenses: Mutex<HashMap<String, Lens>>,
+    /// Held while lenses are ensured, so concurrent calls for the same definitions send one
+    /// request and the others answer from the cache it fills.
+    ensuring: tokio::sync::Mutex<()>,
 }
 
 /// The async CalmLens client.
@@ -259,6 +306,7 @@ impl ServerClient {
                 transport,
                 user_agent,
                 lenses: Mutex::new(HashMap::new()),
+                ensuring: tokio::sync::Mutex::new(()),
             }),
             timeout: None,
             max_retries: None,
@@ -318,12 +366,16 @@ impl ServerClient {
             .ok_or_else(|| Error::new(ErrorCode::InvalidResponse, "Unexpected lens response"))
     }
     /// Creates or updates named lenses and returns them in request order. Definitions this
-    /// client has already ensured are answered from its cache without a request. More than
+    /// client has already ensured are answered from its cache without a request, and
+    /// concurrent calls wait for each other, so one definition is sent once. More than
     /// [`ENSURE_LENSES_MAX_PER_REQUEST`] new definitions are sent in consecutive requests, in order.
+    /// A response that does not return each definition's lens at its position fails with
+    /// `sdk/invalid-response`.
     pub async fn ensure_lenses(&self, options: EnsureLenses) -> Result<Vec<Lens>> {
         if options.lenses.is_empty() {
             return Err(invalid_argument("At least one lens is required"));
         }
+        let _ensuring = self.inner.ensuring.lock().await;
         let mut keys = Vec::with_capacity(options.lenses.len());
         let mut missing: Vec<(String, &LensDefinition)> = Vec::new();
         let mut resolved = HashMap::new();
@@ -362,7 +414,11 @@ impl ServerClient {
             if response.lenses.len() != chunk.len() {
                 return Err(Error::new(
                     ErrorCode::InvalidResponse,
-                    "Unexpected lens response",
+                    format!(
+                        "Expected {} lenses but CalmLens returned {}",
+                        chunk.len(),
+                        response.lenses.len()
+                    ),
                 ));
             }
             let mut cache = self.inner.lenses.lock().unwrap_or_else(|e| e.into_inner());
@@ -370,7 +426,7 @@ impl ServerClient {
                 if lens.identifier != definition.identifier {
                     return Err(Error::new(
                         ErrorCode::InvalidResponse,
-                        "Unexpected lens identifier",
+                        format!("Expected lens {:?} at its position", definition.identifier),
                     ));
                 }
                 cache.retain(|_, cached| cached.identifier != lens.identifier);
@@ -385,10 +441,13 @@ impl ServerClient {
     }
 
     fn options(&self) -> CallOptions {
+        let config = &self.inner.config;
         CallOptions {
-            timeout: self.inner.config.timeout,
+            timeout: config.timeout,
+            upload_timeout: config.upload_timeout,
             timeout_override: self.timeout,
-            max_retries: self.max_retries.unwrap_or(self.inner.config.max_retries),
+            max_retries: self.max_retries.unwrap_or(config.max_retries),
+            max_response_bytes: config.max_response_bytes,
         }
     }
     fn project_path(&self, path: &str) -> Result<String> {
@@ -397,9 +456,15 @@ impl ServerClient {
             id(&self.inner.config.project_id)?
         ))
     }
+    /// An API request, which accepts JSON.
     fn prepare(&self, method: Method, path: &str, query: &[(String, String)]) -> Result<Prepared> {
         let url = format!("{}{path}", self.inner.config.base_url);
-        self.prepare_url(method, &url, query)
+        let mut request = self.prepare_url(method, &url, query)?;
+        request.headers.insert(
+            http::header::ACCEPT,
+            HeaderValue::from_static("application/json"),
+        );
+        Ok(request)
     }
     fn prepare_url(
         &self,
@@ -423,9 +488,10 @@ impl ServerClient {
         Ok(request)
     }
     async fn send(&self, request: Prepared) -> Result<(u16, HeaderMap, Bytes)> {
-        let exchange = execute(&self.inner.transport, request, self.options(), true).await?;
+        let options = self.options();
+        let exchange = execute(&self.inner.transport, request, options, true).await?;
         let (status, headers) = (exchange.status, exchange.headers.clone());
-        let body = exchange.read().await?;
+        let body = exchange.read(options.max_response_bytes).await?;
         Ok((status, headers, body))
     }
     async fn call<T: serde::de::DeserializeOwned>(&self, request: Prepared) -> Result<T> {
@@ -434,6 +500,26 @@ impl ServerClient {
     }
     async fn call_empty(&self, request: Prepared) -> Result<()> {
         self.send(request).await.map(|_| ())
+    }
+    /// An upload's response, which must be an asset with an ID.
+    async fn call_upload(&self, request: Prepared) -> Result<Asset> {
+        let (status, headers, body) = self.send(request).await?;
+        let value: serde_json::Value = decode(status, &headers, &body)?;
+        if !value["id"].as_str().is_some_and(|id| !id.is_empty()) {
+            return Err(Error::new(
+                ErrorCode::InvalidResponse,
+                "Expected an uploaded asset response",
+            )
+            .with_status(status));
+        }
+        serde_json::from_value(value).map_err(|cause| {
+            Error::new(
+                ErrorCode::InvalidResponse,
+                format!("Invalid asset response: {cause}"),
+            )
+            .with_status(status)
+            .with_source(cause)
+        })
     }
 
     async fn submit(&self, options: SubmitAsset, queue: bool) -> Result<Asset> {
@@ -506,7 +592,7 @@ impl ServerClient {
                     folder_id: &options.folder_id,
                     upload_preset_id: options.upload_preset_id.as_ref(),
                 })?;
-            return self.call(request).await;
+            return self.call_upload(request).await;
         }
         let multipart = options.part.is_some();
         let content = match (options.content, options.part) {
@@ -520,7 +606,7 @@ impl ServerClient {
             .unwrap_or("")
             .trim()
             .to_lowercase();
-        if mime.is_empty() || mime == "application/octet-stream" || mime.starts_with("multipart/") {
+        if REJECTED_UPLOAD_MIME_TYPES.contains(&mime.as_str()) {
             return Err(Error::new(
                 ErrorCode::InvalidUploadMimeType,
                 format!("{mime} is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain."),
@@ -533,15 +619,16 @@ impl ServerClient {
             ));
         }
         let is_final = content.is_final.unwrap_or(false);
+        let deadline = upload_deadline(&content.payload);
         let (body, size) = upload_body(content.payload, multipart, content.size_in_bytes)?;
-        if multipart {
-            check_part_size(size, is_final)?;
+        if multipart && !self.inner.transport.defers_upload_checks() {
             if mime.starts_with("image/") {
                 check_image_size(size, is_final)?;
             }
+            check_part_size(size, is_final)?;
         }
         query.push("contentType", &content.mime_type);
-        query.push("sizeInBytes", size);
+        query.opt("sizeInBytes", size);
         if multipart {
             query.push("partNumber", 1);
             query.push("isFinal", is_final);
@@ -556,8 +643,8 @@ impl ServerClient {
             )?
             .header("idempotency-key", &idempotency_key)?;
         request.body = body;
-        request.transfer = true;
-        self.call(request).await
+        request.deadline = deadline;
+        self.call_upload(request).await
     }
 
     async fn upload_part(&self, options: UploadPart) -> Result<Asset> {
@@ -570,22 +657,25 @@ impl ServerClient {
             ));
         }
         let is_final = options.part.is_final.unwrap_or(false);
+        let deadline = upload_deadline(&options.part.payload);
         let (body, size) = upload_body(options.part.payload, true, options.part.size_in_bytes)?;
-        check_part_size(size, is_final)?;
+        if !self.inner.transport.defers_upload_checks() {
+            check_part_size(size, is_final)?;
+        }
         let mut query = Query::default();
-        query.opt("queue", options.queue);
         query.push("partNumber", part_number);
         query.push("isFinal", is_final);
-        query.push("sizeInBytes", size);
+        query.opt("queue", options.queue);
+        query.opt("sizeInBytes", size);
         let idempotency_key = options.idempotency_key.unwrap_or_else(uuid);
+        // Later parts carry no Content-Type: the API reads the upload's saved type.
         let mut request = self
             .prepare(Method::POST, &path, &query.0)?
-            .header("content-type", "application/octet-stream")?
             .header("x-calmlens-upload", "part")?
             .header("idempotency-key", &idempotency_key)?;
         request.body = body;
-        request.transfer = true;
-        self.call(request).await
+        request.deadline = deadline;
+        self.call_upload(request).await
     }
 
     async fn list_page(&self, options: &ListAssets) -> Result<AssetPage> {
@@ -616,15 +706,20 @@ impl ServerClient {
     }
 }
 
-fn check_part_size(size: u64, is_final: bool) -> Result<()> {
-    if !is_final && size < MIN_PART {
+/// Refuses a multipart part under 5 MiB that is not the last, before it is sent.
+fn check_part_size(size: Option<u64>, is_final: bool) -> Result<()> {
+    if !is_final && size.is_some_and(|size| size < 5 * 1024 * 1024) {
         return Err(invalid_payload(
             "Multipart upload parts must be at least 5MiB except the final part.",
         ));
     }
     Ok(())
 }
-fn check_image_size(size: u64, is_final: bool) -> Result<()> {
+
+/// Refuses a first multipart image part over 20 MiB, or a final one (the whole image) under
+/// 10 MiB, before it is sent.
+fn check_image_size(size: Option<u64>, is_final: bool) -> Result<()> {
+    let Some(size) = size else { return Ok(()) };
     if size > 20 * 1024 * 1024 {
         return Err(Error::new(
             ErrorCode::MultipartImageTooLarge,
@@ -638,6 +733,25 @@ fn check_image_size(size: u64, is_final: bool) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// MIME types an upload cannot use: they name no concrete file type.
+const REJECTED_UPLOAD_MIME_TYPES: [&str; 7] = [
+    "application/octet-stream",
+    "multipart/form-data",
+    "multipart/mixed",
+    "multipart/alternative",
+    "multipart/related",
+    "multipart/signed",
+    "multipart/encrypted",
+];
+
+/// Text is small, so it keeps the API timeout; binary files may be arbitrarily large.
+fn upload_deadline(payload: &Payload) -> Deadline {
+    match payload {
+        Payload::Text(_) => Deadline::Api,
+        _ => Deadline::Upload,
+    }
 }
 
 #[derive(Default)]
@@ -750,45 +864,51 @@ impl AssetsClient<'_> {
     pub async fn list(&self, options: ListAssets) -> Result<AssetPage> {
         self.0.list_page(&options).await
     }
-    /// Every asset from `options.cursor` on, fetching pages as the stream is read.
+    /// Every asset from `options.cursor` on, fetching pages as the stream is read. It ends
+    /// at a page without a next cursor, with `has_more: false` or without items, and fails with
+    /// `sdk/invalid-response` (`details.cursor`) instead of yielding a page that hands back a
+    /// cursor it already sent.
     pub fn iterate(&self, options: ListAssets) -> BoxStream<'static, Result<Asset>> {
         let client = self.0.clone();
-        paginate(options, move |options| {
-            let client = client.clone();
-            async move {
-                let page = client.list_page(&options).await?;
-                let more = page.has_more.unwrap_or(false)
-                    && page.next_cursor.is_some()
-                    && !page.items.is_empty();
-                let next = more.then_some(ListAssets {
-                    cursor: page.next_cursor,
-                    ..options
-                });
-                Ok((page.items, next))
-            }
-        })
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.list_page(&options).await?;
+                    let next = next_asset_cursor(&page).map(|cursor| ListAssets {
+                        cursor: Some(cursor),
+                        ..options
+                    });
+                    Ok((page.items, next))
+                }
+            },
+        )
     }
     /// One page of an asset's children.
     pub async fn list_children(&self, options: ListChildren) -> Result<AssetPage> {
         self.0.children_page(&options).await
     }
-    /// Every child of an asset from `options.cursor` on.
+    /// Every child of an asset from `options.cursor` on, ending and failing like
+    /// [`iterate`](Self::iterate).
     pub fn iterate_children(&self, options: ListChildren) -> BoxStream<'static, Result<Asset>> {
         let client = self.0.clone();
-        paginate(options, move |options| {
-            let client = client.clone();
-            async move {
-                let page = client.children_page(&options).await?;
-                let more = page.has_more.unwrap_or(false)
-                    && page.next_cursor.is_some()
-                    && !page.items.is_empty();
-                let next = more.then_some(ListChildren {
-                    cursor: page.next_cursor,
-                    ..options
-                });
-                Ok((page.items, next))
-            }
-        })
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.children_page(&options).await?;
+                    let next = next_asset_cursor(&page).map(|cursor| ListChildren {
+                        cursor: Some(cursor),
+                        ..options
+                    });
+                    Ok((page.items, next))
+                }
+            },
+        )
     }
     /// Retrieves an asset's current state.
     pub async fn retrieve(&self, options: AssetId) -> Result<Asset> {
@@ -807,7 +927,7 @@ impl AssetsClient<'_> {
         // A timeout too large to add to the clock never runs out.
         let transport = &self.0.inner.transport;
         let deadline = transport.now().checked_add(timeout);
-        let mut delay = DECISION_POLL_FIRST_DELAY;
+        let mut delay = DECISION_POLL_FIRST_INTERVAL;
         loop {
             let asset = self.retrieve(asset_id.clone()).await?;
             if asset.is_decided() {
@@ -834,7 +954,9 @@ impl AssetsClient<'_> {
             transport
                 .sleep(remaining.map_or(delay, |remaining| remaining.min(delay)))
                 .await;
-            delay = delay.mul_f64(1.5).min(DECISION_POLL_MAX_DELAY);
+            delay = delay
+                .mul_f64(DECISION_POLL_INTERVAL_FACTOR)
+                .min(DECISION_POLL_MAX_INTERVAL);
         }
     }
     /// Updates an asset; [`Patch::Missing`] fields are left unchanged.
@@ -911,7 +1033,11 @@ impl AssetsClient<'_> {
         };
         let options = SignedUrlOptions {
             transform,
-            expires_in_seconds: Some(options.expires_in_seconds.unwrap_or(900)),
+            expires_in_seconds: Some(
+                options
+                    .expires_in_seconds
+                    .unwrap_or(DEFAULT_SIGNED_URL_SECONDS),
+            ),
             ..options
         };
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
@@ -919,31 +1045,74 @@ impl AssetsClient<'_> {
     }
 }
 
-/// Yields the items of successive pages; `fetch` returns a page and the next page's options.
-fn paginate<O, F, Fut, T>(first: O, fetch: F) -> BoxStream<'static, Result<T>>
+/// The cursor of the page after `page`, or `None` when the iteration ends there.
+fn next_asset_cursor(page: &AssetPage) -> Option<String> {
+    let more = page.has_more.unwrap_or(false) && !page.items.is_empty();
+    page.next_cursor.clone().filter(|_| more)
+}
+
+/// The error for a page that hands back a cursor the iteration already sent, which would
+/// otherwise repeat pages forever.
+fn repeated_cursor(cursor: &str) -> Error {
+    let mut details = serde_json::Map::new();
+    details.insert("cursor".into(), cursor.into());
+    Error::new(
+        ErrorCode::InvalidResponse,
+        "The API returned a cursor it had already returned, with more pages to follow",
+    )
+    .with_details(details)
+}
+
+/// Yields the pages `fetch` returns, each with the next page's options; `cursor` reads the
+/// cursor options send. A page whose next cursor was already sent fails, and is not yielded.
+fn pages<O, P, C, F, Fut>(first: O, cursor: C, fetch: F) -> BoxStream<'static, Result<P>>
 where
     O: Send + 'static,
-    T: Send + 'static,
+    P: Send + 'static,
+    C: Fn(&O) -> Option<String> + Send + Sync + 'static,
     F: Fn(O) -> Fut + Send + 'static,
-    Fut: std::future::Future<Output = Result<(Vec<T>, Option<O>)>> + Send + 'static,
+    Fut: std::future::Future<Output = Result<(P, Option<O>)>> + Send + 'static,
 {
-    futures_util::stream::try_unfold(Some(first), move |next| {
+    let mut sent = std::collections::HashSet::new();
+    if let Some(first) = cursor(&first) {
+        sent.insert(first);
+    }
+    let cursor = Arc::new(cursor);
+    futures_util::stream::try_unfold((Some(first), sent), move |(next, mut sent)| {
         let page = next.map(&fetch);
-        async move {
-            match page {
-                None => Ok(None),
-                Some(page) => {
-                    let (items, next) = page.await?;
-                    Ok(Some((
-                        futures_util::stream::iter(items.into_iter().map(Ok)),
-                        next,
-                    )))
+        let cursor = cursor.clone();
+        let checked = page.map(|page| async move {
+            let (page, next) = page.await?;
+            if let Some(next_cursor) = next.as_ref().and_then(|next| cursor(next)) {
+                if !sent.insert(next_cursor.clone()) {
+                    return Err(repeated_cursor(&next_cursor));
                 }
+            }
+            Ok((page, (next, sent)))
+        });
+        async move {
+            match checked {
+                None => Ok(None),
+                Some(checked) => checked.await.map(Some),
             }
         }
     })
-    .try_flatten()
     .boxed()
+}
+
+/// Yields the items of successive pages, as [`pages`] fetches them.
+fn paginate<O, C, F, Fut, T>(first: O, cursor: C, fetch: F) -> BoxStream<'static, Result<T>>
+where
+    O: Send + 'static,
+    T: Send + 'static,
+    C: Fn(&O) -> Option<String> + Send + Sync + 'static,
+    F: Fn(O) -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = Result<(Vec<T>, Option<O>)>> + Send + 'static,
+{
+    pages(first, cursor, fetch)
+        .map_ok(|items| futures_util::stream::iter(items.into_iter().map(Ok)))
+        .try_flatten()
+        .boxed()
 }
 
 /// Folder operations. Get it from [`ServerClient::folders`].
@@ -1013,26 +1182,26 @@ impl EventsClient<'_> {
         self.0.events_page(&options).await
     }
     /// Pages of events from `options.after`, following each page's cursor until a page has
-    /// `has_more: false`. Store the last page's `cursor` and continue from it later.
+    /// `has_more: false`. Store the last page's `cursor` and continue from it later. A page
+    /// with more to follow that hands back a cursor already sent fails with
+    /// `sdk/invalid-response` (`details.cursor`) and is not yielded.
     pub fn pages(&self, options: ListEvents) -> BoxStream<'static, Result<EventsPage>> {
         let client = self.0.clone();
-        futures_util::stream::try_unfold(Some(options), move |next| {
-            let client = client.clone();
-            async move {
-                let Some(options) = next else {
-                    return Ok(None);
-                };
-                let page = client.events_page(&options).await?;
-                // A page that does not advance the cursor ends the stream instead of repeating.
-                let advanced = options.after.as_deref() != Some(page.cursor.as_str());
-                let next = (page.has_more && advanced).then(|| ListEvents {
-                    after: Some(page.cursor.clone()),
-                    ..options
-                });
-                Ok(Some((page, next)))
-            }
-        })
-        .boxed()
+        pages(
+            options,
+            |options| options.after.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.events_page(&options).await?;
+                    let next = page.has_more.then(|| ListEvents {
+                        after: Some(page.cursor.clone()),
+                        ..options
+                    });
+                    Ok((page, next))
+                }
+            },
+        )
     }
 }
 
@@ -1044,65 +1213,80 @@ impl UploadTokensClient<'_> {
     /// Signs a single-use token. Hand it to the browser as its bearer token and give each
     /// upload its own.
     pub fn sign(&self, options: SignUploadToken) -> Result<SignedUploadToken> {
-        use base64::Engine;
-        use hmac::{Hmac, Mac};
-        use sha2::{Digest, Sha256};
-
-        id(&options.upload_preset_id)
-            .map_err(|_| invalid_argument("Upload preset ID is required"))?;
-        let ttl = options.expires_in_seconds.unwrap_or(600);
-        if !(1..=3600).contains(&ttl) {
-            return Err(invalid_argument(
-                "expiresInSeconds must be a whole number from 1 to 3600",
-            ));
-        }
-        if options.external_id.as_deref() == Some("") {
-            return Err(invalid_argument("externalId must be a non-empty string"));
-        }
         let api_key = String::from_utf8_lossy(self.0.inner.config.api_key.as_bytes()).into_owned();
-        let prefix_length = if api_key.starts_with("clsk_") { 13 } else { 8 };
-        let expires_at = SystemTime::now()
+        let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_or(0, |elapsed| elapsed.as_millis() as u64)
-            + u64::from(ttl) * 1000;
-        #[derive(Serialize)]
-        struct Claims<'a> {
-            v: u8,
-            u: &'a str,
-            k: &'a str,
-            e: u64,
-            n: String,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            x: Option<&'a str>,
-        }
-        let claims = Claims {
-            v: 1,
-            u: &options.upload_preset_id,
-            k: &api_key[..prefix_length.min(api_key.len())],
-            e: expires_at,
-            n: uuid(),
-            x: options.external_id.as_deref(),
-        };
-        let body = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .encode(serde_json::to_vec(&claims).map_err(|e| invalid_argument(e.to_string()))?);
-        let secret: String = Sha256::digest(api_key.as_bytes())
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
-            .map_err(|e| invalid_argument(e.to_string()))?;
-        mac.update(format!("calmlens-upload-token:v1:{body}").as_bytes());
-        let signature: String = mac
-            .finalize()
-            .into_bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        Ok(SignedUploadToken {
-            token: format!("clut_{body}.{signature}"),
-            expires_at,
-        })
+            .map_or(0, |elapsed| elapsed.as_millis() as u64);
+        sign_upload_token(&api_key, options, now, &uuid())
     }
+}
+
+/// Signs an upload token for `api_key` at `now` (epoch milliseconds) with `nonce`.
+pub(crate) fn sign_upload_token(
+    api_key: &str,
+    options: SignUploadToken,
+    now: u64,
+    nonce: &str,
+) -> Result<SignedUploadToken> {
+    use base64::Engine;
+    use hmac::{Hmac, Mac};
+    use sha2::{Digest, Sha256};
+
+    id(&options.upload_preset_id).map_err(|_| invalid_argument("Upload preset ID is required"))?;
+    let ttl = options
+        .expires_in_seconds
+        .unwrap_or(DEFAULT_UPLOAD_TOKEN_SECONDS);
+    if !(1..=3600).contains(&ttl) {
+        return Err(invalid_argument(
+            "expiresInSeconds must be a whole number from 1 to 3600",
+        ));
+    }
+    if options.external_id.as_deref() == Some("") {
+        return Err(invalid_argument("externalId must be a non-empty string"));
+    }
+    let prefix_length = if api_key.starts_with("clsk_") { 13 } else { 8 };
+    let prefix: String = api_key.chars().take(prefix_length).collect();
+    let expires_at = now + u64::from(ttl) * 1000;
+    // Field order and escaping as JavaScript's JSON.stringify writes them, which serde_json
+    // matches: no whitespace, raw UTF-8, and only quotes, backslashes and control characters
+    // escaped.
+    #[derive(Serialize)]
+    struct Claims<'a> {
+        v: u8,
+        u: &'a str,
+        k: &'a str,
+        e: u64,
+        n: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        x: Option<&'a str>,
+    }
+    let claims = Claims {
+        v: 1,
+        u: &options.upload_preset_id,
+        k: &prefix,
+        e: expires_at,
+        n: nonce,
+        x: options.external_id.as_deref(),
+    };
+    let body = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json::to_vec(&claims).map_err(|e| invalid_argument(e.to_string()))?);
+    let secret: String = Sha256::digest(api_key.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
+        .map_err(|e| invalid_argument(e.to_string()))?;
+    mac.update(format!("calmlens-upload-token:v1:{body}").as_bytes());
+    let signature: String = mac
+        .finalize()
+        .into_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    Ok(SignedUploadToken {
+        token: format!("clut_{body}.{signature}"),
+        expires_at,
+    })
 }
 
 /// Text moderation. Get it from [`ServerClient::text`].
@@ -1200,7 +1384,7 @@ impl CdnClient<'_> {
                 .map_err(|_| invalid_argument(format!("Invalid {name} header value")))?;
             request.headers.insert(name, value);
         }
-        request.transfer = true;
+        request.deadline = Deadline::Headers;
         let exchange: Exchange =
             execute(&self.0.inner.transport, request, self.0.options(), false).await?;
         Ok(CdnResponse {

@@ -169,6 +169,146 @@
       "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
       "now": 1700000000,
       "valid": false
+    },
+    {
+      "name": "zero tolerance at the signing second",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "toleranceSeconds": 0,
+      "valid": true
+    },
+    {
+      "name": "zero tolerance a second later",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000001,
+      "toleranceSeconds": 0,
+      "valid": false
+    },
+    {
+      "name": "future timestamp within a custom tolerance",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1699999400,
+      "toleranceSeconds": 600,
+      "valid": true
+    },
+    {
+      "name": "future timestamp beyond a custom tolerance",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1699999399,
+      "toleranceSeconds": 600,
+      "valid": false
+    },
+    {
+      "name": "past timestamp beyond a custom tolerance",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000601,
+      "toleranceSeconds": 600,
+      "valid": false
+    },
+    {
+      "name": "timestamp beyond the 64-bit range",
+      "secret": "key",
+      "timestamp": "99999999999999999999",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "negative timestamp",
+      "secret": "key",
+      "timestamp": "-1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "fractional timestamp",
+      "secret": "key",
+      "timestamp": "1700000000.5",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "timestamp with surrounding whitespace",
+      "secret": "key",
+      "timestamp": " 1700000000 ",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "uppercase hex signature",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9D713ED406BB7076D4123F0DC2C39D2DF5C654ED4B0CD56B52C8B4C940BD63AE",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "uppercase scheme",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "V1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "whitespace and empty entries in a signature list",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": " , v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae ,, ",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "only other schemes",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v0=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae, v2=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "truncated signature",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "empty secret",
+      "secret": "",
+      "timestamp": "1700000000",
+      "body": "{}",
+      "signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+      "now": 1700000000,
+      "valid": false
     }
   ],
   "payloads": [
@@ -411,6 +551,1160 @@
           ]
         }
       }
+    }
+  ],
+  "headerCases": [
+    {
+      "name": "lowercase header names",
+      "headers": {
+        "x-calmlens-signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "mixed-case header names",
+      "headers": {
+        "X-CalmLens-Signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "X-CalmLens-Timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "uppercase header names",
+      "headers": {
+        "X-CALMLENS-SIGNATURE": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "X-CALMLENS-TIMESTAMP": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "the headers of a real delivery, among others",
+      "headers": {
+        "content-type": "application/json",
+        "x-calmlens-delivery": "delivery-1",
+        "user-agent": "CalmLens",
+        "x-calmlens-signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "a signature list split across repeated headers",
+      "headers": {
+        "x-calmlens-signature": [
+          "v1=0000000000000000000000000000000000000000000000000000000000000000",
+          "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae"
+        ],
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "the matching signature in the first of repeated headers",
+      "headers": {
+        "x-calmlens-signature": [
+          "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+          "v0=abc"
+        ],
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "a single header value given as a list",
+      "headers": {
+        "x-calmlens-signature": [
+          "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae"
+        ],
+        "x-calmlens-timestamp": [
+          "1700000000"
+        ]
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": true
+    },
+    {
+      "name": "repeated timestamp headers",
+      "headers": {
+        "x-calmlens-signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "x-calmlens-timestamp": [
+          "1700000000",
+          "1700000000"
+        ]
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "missing signature header",
+      "headers": {
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "missing timestamp header",
+      "headers": {
+        "x-calmlens-signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "no headers",
+      "headers": {},
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "empty signature header",
+      "headers": {
+        "x-calmlens-signature": "",
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "headers of a stale delivery",
+      "headers": {
+        "x-calmlens-signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000301,
+      "valid": false
+    },
+    {
+      "name": "headers with a tampered body",
+      "headers": {
+        "x-calmlens-signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{ }",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": false
+    },
+    {
+      "name": "headers named like the signature header with a prefix",
+      "headers": {
+        "x-x-calmlens-signature": "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae",
+        "x-calmlens-timestamp": "1700000000"
+      },
+      "body": "{}",
+      "secret": "key",
+      "now": 1700000000,
+      "valid": false
+    }
+  ],
+  "parseErrors": [
+    {
+      "name": "signature by another secret",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=ef643db94b4f98c41f9baeb83a159c490214fff70471ac34ecc886bb1b773815",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-signature"
+    },
+    {
+      "name": "stale delivery",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=f9a78d46e40c35cd7dac64e89fc921d1b47799b53f4dfc23a66eee1ee1455f1e",
+      "now": 1700000301,
+      "error": "sdk/invalid-webhook-signature"
+    },
+    {
+      "name": "body is not JSON",
+      "body": "not json",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=eea7afa786f9a793f7a1fb498843dca7fc094e4c7515657ba3b3874cb5ecd802",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "empty body",
+      "body": "",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=0f1cc1f811f42fd12af9618acf321769899fa521fe07a642f70a61785e130770",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "body is a JSON array",
+      "body": "[]",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=2afce10b4f37880815b715635811bcfa4d5334e7213eea5bc2e130e1008055c3",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "body is JSON null",
+      "body": "null",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=38a5f9466a538642b5bc3fd33b459141944a30cff3bb3552960cc85e82343d14",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "body is a JSON string",
+      "body": "\"event\"",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=73b95f1fe3f8edde523e248183b0e2d1ed296a8004ad0601a7d22f2839b60c78",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "only an id",
+      "body": "{\"id\":\"x\"}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=c275209bfed50f54f9b0d8dafaf250f3f08155fdaadece7fc4d3f5c7e3c8b6ba",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "missing id",
+      "body": "{\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=049f9ddf169cd09254e8b04637522fbf924254f116a425d5cb0f0774a5befb54",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "numeric id",
+      "body": "{\"id\":1,\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=fe8bd09681d9a6057753241b3ad107ab7df557d9c6fae5f10f8f5ea262410ccd",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "missing type",
+      "body": "{\"id\":\"event-1\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=4bff24dc750f1585c034ea57135c9ca4096efc8d1e038a281980cecee46fa9c3",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "missing projectId",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=8b8885a175cef8c9f53800c5d4d1e31447864d14ca5860356202200f76fbf6da",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "missing createdAt",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=bf624e45b24e625ec990d88661cecc40ce1e54f754949557a1c25097bbbb927e",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "createdAt as a string",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":\"1700000000000\",\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=d339d8152af140e011c484fca70c6a2bde339be52a5dbc2545e35ac69f0e4ff0",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "missing data",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\"}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=d147939a036438645e8ab99f72426ecaff14dfe7d3b62046b4306d1438d63072",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "data is null",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":null}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=764d8ee7f794af23de3efa41bc6cf3d2b3663df91a249483bbee7e2b65a3225c",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "data is an array",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":[]}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=91e4d00fcc3a8565e2380ee55d3a5f0a45439e4e1c9f76e825712f62bf68c8f1",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "severity is null",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":null,\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=ef0436400e7bc57d78007f732858ecf5748b91d8d59bb2705063675224a7b8c5",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "title is a number",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":1,\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=12d32d01389da2c32ba4c8c415246a4a3765275be2417a5488659308a164e912",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "description is a number",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":1,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=602bb16e9e3c3a61140311505c923774ca38adf0d74381fbab65c7e61683fe1e",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "assetId is a number",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":1,\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=372c50553b741de6516e5b36f853e057210e6ad6ec8692eed869647fddae79c7",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "asset without an id",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"status\":\"stored\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=d476da147e46c0271332a42097aca6f287bd0c228bba367b317a8c318ad65dde",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "asset is an array",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":[],\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=13170e87973695c87e645e201f2cc101747db9b2a5dd2ec2e9e85b890d7ace87",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "facts is an object",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":{\"key\":\"test\",\"value\":true}}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=370f6f0bce36a72b113f14552ab74dc215bea988787f5124bdbe69daf1a1aca7",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "facts is null",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":null}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=12748a031cbabf45174ee30ff266f51b748ea77d0c4e4c28c69c0e64231edcfc",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "fact without a key",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"value\":true}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=787ebb23cf83ec0d3a188028be47a95984e090a259062ce1e770cada12b6a8b8",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "fact without a value",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"k\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=6dcde7dc696b79bdf2a255ae771b2d60ddeffdd1fc88e1e7b39634041334e5d1",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "fact is a string",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[\"test\"]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=aba9abe084932f9f462251227d3aff55c6734ce11a316276eec07e2f0e37ce9e",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    },
+    {
+      "name": "fact with a numeric url",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"k\",\"value\":1,\"url\":1}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=961baf6cf58451279180e730a39d1bdfabb514682d4093d2c444a600461ca23e",
+      "now": 1700000000,
+      "error": "sdk/invalid-webhook-payload"
+    }
+  ],
+  "parsed": [
+    {
+      "name": "a full event",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=f9a78d46e40c35cd7dac64e89fc921d1b47799b53f4dfc23a66eee1ee1455f1e",
+      "now": 1700000000,
+      "expected": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "decided-by",
+              "value": "automated"
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "an envelope with empty data",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=4642d305e4f8ad1aa30094d804cdc07e6e2a99caf256982aa54b7c0c7a6eb63d",
+      "now": 1700000000,
+      "expected": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {}
+      },
+      "isTest": false
+    },
+    {
+      "name": "nullable data fields set to null",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":null,\"asset\":null,\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=f8e33a05afce5c7d2a8207500830dbcca92c4616d98230007b8d3f55b8b8b60e",
+      "now": 1700000000,
+      "expected": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": null,
+          "asset": null,
+          "facts": [
+            {
+              "key": "decided-by",
+              "value": "automated"
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "unknown top-level and data fields are kept",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}],\"region\":\"eu\",\"nested\":{\"list\":[1,null,\"x\"]}},\"version\":2,\"delivery\":{\"attempt\":3}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=a392c3b90cf0f5b991974bf57ea65032f9b7428e8706f5d096dda986200b4216",
+      "now": 1700000000,
+      "expected": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "decided-by",
+              "value": "automated"
+            }
+          ],
+          "region": "eu",
+          "nested": {
+            "list": [
+              1,
+              null,
+              "x"
+            ]
+          }
+        },
+        "version": 2,
+        "delivery": {
+          "attempt": 3
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "unknown asset and fact fields and fact URLs are kept",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"status\":\"stored\",\"future\":{\"flag\":true}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"photo.jpg\",\"url\":\"/projects/project-1/assets/asset-1\"},{\"key\":\"future-fact\",\"value\":{\"nested\":[1,2]},\"futureField\":\"kept\"},{\"key\":\"cleared\",\"value\":null}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=1e0df138a2a65ba70c39bf141952e43686c5e1bcb8b889ce1a8621f4e86184ac",
+      "now": 1700000000,
+      "expected": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1",
+            "status": "stored",
+            "future": {
+              "flag": true
+            }
+          },
+          "facts": [
+            {
+              "key": "asset-name",
+              "value": "photo.jpg",
+              "url": "/projects/project-1/assets/asset-1"
+            },
+            {
+              "key": "future-fact",
+              "value": {
+                "nested": [
+                  1,
+                  2
+                ]
+              },
+              "futureField": "kept"
+            },
+            {
+              "key": "cleared",
+              "value": null
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "non-ASCII and escaped characters",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"héllo 🌍   \\\"quoted\\\" \\\\ /\",\"description\":\"<b>&</b>\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\"},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"}]}}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=b7061b268d6730a1db58398a09b72d35893500017f4cdf874cdf277fc8a78d00",
+      "now": 1700000000,
+      "expected": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "héllo 🌍   \"quoted\" \\ /",
+          "description": "<b>&</b>",
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "decided-by",
+              "value": "automated"
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "whitespace between JSON tokens",
+      "body": "{ \"id\": \"event-1\", \"type\": \"asset.allowed\", \"createdAt\": 1700000000000,\n  \"projectId\": \"project-1\", \"data\": { \"facts\": [] } }\n",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=dc50457845b8f094554642dae940891872a446b1642098db51e20ac85d58bd12",
+      "now": 1700000000,
+      "expected": {
+        "id": "event-1",
+        "type": "asset.allowed",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "facts": []
+        }
+      },
+      "isTest": false
+    }
+  ],
+  "testFacts": [
+    {
+      "name": "the test fact",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "test",
+              "value": true
+            }
+          ]
+        }
+      },
+      "isTest": true
+    },
+    {
+      "name": "the test fact among others",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "decided-by",
+              "value": "automated"
+            },
+            {
+              "key": "test",
+              "value": true
+            }
+          ]
+        }
+      },
+      "isTest": true
+    },
+    {
+      "name": "the test fact with a URL",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "test",
+              "value": true,
+              "url": "/projects/p"
+            }
+          ]
+        }
+      },
+      "isTest": true
+    },
+    {
+      "name": "test fact set to false",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "test",
+              "value": false
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "test fact set to the string \"true\"",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "test",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "test fact set to 1",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "test",
+              "value": 1
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "a fact named Test",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "Test",
+              "value": true
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "a fact whose value is test",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": [
+            {
+              "key": "mode",
+              "value": "test"
+            }
+          ]
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "no facts",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          },
+          "facts": []
+        }
+      },
+      "isTest": false
+    },
+    {
+      "name": "facts missing",
+      "event": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": null,
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1"
+          }
+        }
+      },
+      "isTest": false
+    }
+  ],
+  "roundTrips": [
+    {
+      "name": "an asset event with its snapshot and facts",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "userId": "user-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": "héllo 🌍",
+        "assetId": "asset-1",
+        "asset": {
+          "id": "asset-1",
+          "externalId": "post-1",
+          "content": {
+            "status": "stored"
+          },
+          "classification": {
+            "status": "done",
+            "moderation": {
+              "decision": "blocked",
+              "action": "hide"
+            }
+          }
+        },
+        "facts": [
+          {
+            "key": "decided-by",
+            "value": "automated"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "harassment"
+            ]
+          }
+        ],
+        "createdAt": 1700000000000,
+        "updatedAt": 1700000000001
+      },
+      "payload": {
+        "id": "event-1",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "Asset blocked",
+          "description": "héllo 🌍",
+          "assetId": "asset-1",
+          "asset": {
+            "id": "asset-1",
+            "externalId": "post-1",
+            "content": {
+              "status": "stored"
+            },
+            "classification": {
+              "status": "done",
+              "moderation": {
+                "decision": "blocked",
+                "action": "hide"
+              }
+            }
+          },
+          "facts": [
+            {
+              "key": "decided-by",
+              "value": "automated"
+            },
+            {
+              "key": "flagged-categories",
+              "value": [
+                "harassment"
+              ]
+            }
+          ]
+        }
+      },
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"content\":{\"status\":\"stored\"},\"classification\":{\"status\":\"done\",\"moderation\":{\"decision\":\"blocked\",\"action\":\"hide\"}}},\"facts\":[{\"key\":\"decided-by\",\"value\":\"automated\"},{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}}",
+      "secret": "key",
+      "deliveryId": "delivery-1",
+      "timestampSeconds": 1700000000,
+      "headers": {
+        "content-type": "application/json",
+        "x-calmlens-delivery": "delivery-1",
+        "x-calmlens-timestamp": "1700000000",
+        "x-calmlens-signature": "v1=142443a7baa4623a82f0873a3fd2a46af83e810b1d6f3cb78a56452b4d54e824"
+      },
+      "isTest": false
+    },
+    {
+      "name": "an event without an asset",
+      "event": {
+        "id": "event-2",
+        "projectId": "project-1",
+        "type": "api-key.created",
+        "severity": "low",
+        "title": "API key created",
+        "facts": [],
+        "createdAt": 1700000000000,
+        "updatedAt": 1700000000000
+      },
+      "payload": {
+        "id": "event-2",
+        "type": "api-key.created",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "low",
+          "title": "API key created",
+          "description": null,
+          "assetId": null,
+          "asset": null,
+          "facts": []
+        }
+      },
+      "body": "{\"id\":\"event-2\",\"type\":\"api-key.created\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"low\",\"title\":\"API key created\",\"description\":null,\"assetId\":null,\"asset\":null,\"facts\":[]}}",
+      "secret": "key",
+      "deliveryId": "delivery-2",
+      "timestampSeconds": 1700000000,
+      "headers": {
+        "content-type": "application/json",
+        "x-calmlens-delivery": "delivery-2",
+        "x-calmlens-timestamp": "1700000000",
+        "x-calmlens-signature": "v1=869a1f598c6d9a4b8a5fbd1966fc07f040c1de4cea27b672bb1663c19b943ecd"
+      },
+      "isTest": false
+    },
+    {
+      "name": "a test send",
+      "event": {
+        "projectId": "project-1",
+        "userId": null,
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "beach.jpg blocked",
+        "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
+        "assetId": "00000000-0000-4000-8000-000000000123",
+        "asset": {
+          "id": "00000000-0000-4000-8000-000000000123",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "moderation": {
+              "status": "blocked"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "decided-by",
+            "value": "automated"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "sexual"
+            ]
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "notify": false,
+        "readAt": null,
+        "id": "event-test-send",
+        "createdAt": 1700000000000,
+        "updatedAt": 1700000000000
+      },
+      "payload": {
+        "id": "event-test-send",
+        "type": "asset.blocked",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "data": {
+          "severity": "high",
+          "title": "beach.jpg blocked",
+          "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
+          "assetId": "00000000-0000-4000-8000-000000000123",
+          "asset": {
+            "id": "00000000-0000-4000-8000-000000000123",
+            "externalId": "post-123",
+            "uploadPresetId": null,
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "status": "blocked"
+              }
+            },
+            "content": {
+              "status": "stored"
+            }
+          },
+          "facts": [
+            {
+              "key": "asset-name",
+              "value": "beach.jpg"
+            },
+            {
+              "key": "asset-type",
+              "value": "image"
+            },
+            {
+              "key": "decided-by",
+              "value": "automated"
+            },
+            {
+              "key": "flagged-categories",
+              "value": [
+                "sexual"
+              ]
+            },
+            {
+              "key": "test",
+              "value": true
+            }
+          ]
+        }
+      },
+      "body": "{\"id\":\"event-test-send\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"00000000-0000-4000-8000-000000000123\",\"asset\":{\"id\":\"00000000-0000-4000-8000-000000000123\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"decided-by\",\"value\":\"automated\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}]}}",
+      "secret": "key",
+      "deliveryId": "delivery-test",
+      "timestampSeconds": 1700000000,
+      "headers": {
+        "content-type": "application/json",
+        "x-calmlens-delivery": "delivery-test",
+        "x-calmlens-timestamp": "1700000000",
+        "x-calmlens-signature": "v1=ac5991196b703ee341239e0b2f6a42749ae5d618014d821bb23c049044e6b10b"
+      },
+      "isTest": true
     }
   ]
 }

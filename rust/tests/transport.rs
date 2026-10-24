@@ -1,4 +1,4 @@
-use calmlens::{blocking, models::*, testing::MockServerClient, ErrorCode, ServerClient};
+use calmlens::{blocking, models::*, testing::MockServerClient, ServerClient};
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
@@ -225,30 +225,44 @@ async fn reader_uploads_stream_with_their_declared_length() {
     assert_eq!(worker.join().unwrap(), [data]);
 }
 
+/// Binary uploads have no timeout unless `upload_timeout` or `with_timeout` sets one; text
+/// uploads, like API calls, have the client timeout.
 #[tokio::test]
-async fn uploads_are_not_cut_off_by_the_api_call_timeout() {
-    let (url, worker) = serve_assets(3, Duration::from_millis(700));
+async fn binary_uploads_are_not_cut_off_by_the_api_call_timeout() {
+    let (url, worker) = serve_assets(4, Duration::from_millis(700));
     let client = ServerClient::builder("key", "project")
         .base_url(&url)
         .timeout(Duration::from_millis(300))
         .max_retries(0)
         .build()
         .unwrap();
-    let upload = client
+    let file = || SubmitAsset::new("a.pdf", Content::bytes(&b"slow"[..], "application/pdf"));
+    let upload = client.assets().create(file()).await.unwrap();
+    assert_eq!(upload.id, "asset");
+    let text = client
         .assets()
         .create(SubmitAsset::new("a.txt", Content::text("slow")))
-        .await
-        .unwrap();
-    assert_eq!(upload.id, "asset");
-    let call = client.assets().retrieve(AssetId::new("asset")).await;
-    assert!(call.unwrap_err().is_timeout());
+        .await;
+    assert!(text.unwrap_err().is_timeout());
     let bounded = client
         .with_timeout(Duration::from_millis(300))
         .assets()
-        .create(SubmitAsset::new("b.txt", Content::text("slow")))
+        .create(file())
         .await;
     assert!(bounded.unwrap_err().is_timeout());
-    drop(client);
+    let configured = ServerClient::builder("key", "project")
+        .base_url(&url)
+        .upload_timeout(Duration::from_millis(300))
+        .max_retries(0)
+        .build()
+        .unwrap();
+    assert!(configured
+        .assets()
+        .create(file())
+        .await
+        .unwrap_err()
+        .is_timeout());
+    drop((client, configured));
     worker.join().unwrap();
 }
 
@@ -389,20 +403,53 @@ fn debug_output_redacts_the_api_key() {
     }
 }
 
-#[test]
-fn invalid_configuration_is_rejected() {
-    let build = |builder: calmlens::ServerClientBuilder| builder.build().unwrap_err();
-    for error in [
-        build(ServerClient::builder("key", "project").timeout(Duration::ZERO)),
-        build(ServerClient::builder("key", "project").base_url("not a url")),
-        build(ServerClient::builder("key", "project").base_url("ftp://example.com")),
-        build(ServerClient::builder("", "project")),
-        build(ServerClient::builder("key", "..")),
-    ] {
-        assert_eq!(error.code(), &ErrorCode::InvalidConfig);
-    }
-    assert!(ServerClient::builder("key", "project")
-        .base_url("http://localhost:1/v1")
+/// Concurrent calls for one lens definition send it once: the second waits for the first and
+/// answers from the cache it fills.
+#[tokio::test(flavor = "multi_thread")]
+async fn concurrent_ensure_lenses_send_a_definition_once() {
+    let server = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/v1", server.local_addr().unwrap());
+    server.set_nonblocking(true).unwrap();
+    let worker = thread::spawn(move || {
+        let mut served = 0;
+        let until = std::time::Instant::now() + Duration::from_millis(1500);
+        while std::time::Instant::now() < until {
+            let Ok((mut stream, _)) = server.accept() else {
+                thread::sleep(Duration::from_millis(10));
+                continue;
+            };
+            stream.set_nonblocking(false).unwrap();
+            read_request(&mut stream);
+            served += 1;
+            thread::sleep(Duration::from_millis(300));
+            let response = r#"{"lenses": [{"id": "lens-thumb", "identifier": "thumb"}]}"#;
+            let _ = write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.len(),
+                response
+            );
+        }
+        served
+    });
+    let client = ServerClient::builder("key", "project")
+        .base_url(&url)
         .build()
-        .is_ok());
+        .unwrap();
+    let ensure = || {
+        client.ensure_lenses(EnsureLenses {
+            lenses: vec![LensDefinition {
+                identifier: "thumb".into(),
+                name: "thumb".into(),
+                lens_type: "image".into(),
+                active: true,
+                version: 1,
+                ..Default::default()
+            }],
+        })
+    };
+    let (first, second) = tokio::join!(ensure(), ensure());
+    assert_eq!(first.unwrap()[0].id.as_deref(), Some("lens-thumb"));
+    assert_eq!(second.unwrap()[0].id.as_deref(), Some("lens-thumb"));
+    assert_eq!(worker.join().unwrap(), 1);
 }

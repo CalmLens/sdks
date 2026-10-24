@@ -3,18 +3,19 @@
 require 'minitest/autorun'
 require 'calmlens'
 require 'calmlens/testing'
-require 'stringio'
+require_relative 'contract_fixtures'
 require 'pp'
+require 'rbs'
+require 'stringio'
 
 # Replays the shared SDK contract fixtures that packages/sdk-contract/generate.ts writes to testdata
-# (format in packages/sdk-contract/README.md): requests captured from the JavaScript SDK (against the
-# real client and the mock's queued responses), error codes, path safety and CDN URLs, webhooks,
-# transform options, the mock behaviour scenarios, the server SDK surface and rejections. Each
-# fixture case is its own test.
+# (format in packages/sdk-contract/README.md): transform options, the mock behaviour scenarios, the
+# server SDK surface (its capabilities, errorResponse and retryable errors) and rejections.
+# contract_client_test.rb replays the real client's fixtures and contract_webhooks_test.rb the
+# webhook and upload token ones; each fixture is replayed in one of them, read through
+# ContractFixtures. Each fixture case is its own test.
 class ContractTest < Minitest::Test
-  FIXTURES = File.expand_path('../testdata', __dir__)
-
-  def self.fixture(name) = JSON.parse(File.read("#{FIXTURES}/#{name}.json", encoding: 'UTF-8'))
+  extend ContractFixtures
 
   # Defines one test per fixture case, named after the case and its position.
   def self.each_case(prefix, cases)
@@ -26,97 +27,6 @@ class ContractTest < Minitest::Test
 
   def replay(prefix, item) = public_send("replay_#{prefix}", item)
 
-  def invoke(client, operation, options)
-    parts = operation.split('.')
-    target = parts.size == 1 ? client : client.public_send(parts.first)
-    target.public_send(parts.last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase, options)
-  end
-
-  # Converts option names to snake_case symbols the way Ruby callers write them; metadata keys stay.
-  def snake(value)
-    case value
-    when Hash
-      value.to_h do |key, item|
-        name = key.gsub(/([a-z])([A-Z])/, '\1_\2').downcase.to_sym
-        [name, key == 'metadata' ? item : snake(item)]
-      end
-    when Array then value.map { |item| snake(item) }
-    else value
-    end
-  end
-
-  def capture(fixture)
-    captured = nil
-    transport = lambda do |request|
-      uri = URI(request.url)
-      body = request.body
-      body = body.dup.force_encoding(Encoding::UTF_8) if body
-      body = JSON.parse(body) if body && request.headers['Content-Type'] == 'application/json'
-      captured = { 'method' => request.method, 'path' => uri.path, 'query' => URI.decode_www_form(uri.query || '').to_h,
-                   'body' => body }
-      assert_equal 'key', request.headers['X-Api-Key']
-      CalmLens::Response.new(status: 200, body: JSON.generate(fixture['response']))
-    end
-    client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', transport: transport)
-    yield client
-    captured
-  end
-
-  # requests.json, in camelCase and snake_case.
-  def replay_request(fixture)
-    [fixture['options'], snake(fixture['options'])].each do |options|
-      captured = capture(fixture) { |client| invoke(client, fixture['operation'], options) }
-      assert_equal fixture['request'], captured, "#{fixture['operation']} #{options.inspect}"
-    end
-  end
-  each_case('request', fixture('requests')) { |fixture| fixture['operation'] }
-
-  # requests.json against the mock: queued responses answer each request contract.
-  def replay_mock_request(fixture)
-    mock = CalmLens::MockServerClient.new.enqueue(body: fixture['response'])
-    result = invoke(mock, fixture['operation'], fixture['options'])
-    expected = case fixture['operation']
-               when /\.delete\z/ then nil
-               when 'ensureLenses' then fixture['response']['lenses']
-               else fixture['response']
-               end
-    expected.nil? ? assert_nil(result) : assert_equal(expected, result, fixture['operation'])
-    request = mock.requests.fetch(0)
-    body = request.headers['Content-Type'] == 'application/json' ? request.json : request.body&.force_encoding('UTF-8')
-    assert_equal fixture['request'].merge('path' => fixture['request']['path'].delete_prefix('/v1')),
-                 { 'method' => request.method, 'path' => request.path, 'query' => request.query, 'body' => body },
-                 fixture['operation']
-    assert_equal 0, mock.remaining_responses
-  end
-  each_case('mock_request', fixture('requests')) { |fixture| fixture['operation'] }
-
-  # The mock answers each error code with this status, so a stale generated file would mislead tests.
-  def test_generated_error_codes_match_the_shared_errors_fixture
-    assert_equal self.class.fixture('errors').to_h { |entry| [entry['code'], entry['status']] }, CalmLens::ErrorCodes::STATUSES
-  end
-
-  def refusing_client
-    CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', transport: ->(request) { flunk "Sent #{request.url}" })
-  end
-
-  def replay_path_rejection(rejection)
-    error = assert_raises(CalmLens::InvalidArgumentError) { invoke(refusing_client, rejection['operation'], rejection['options']) }
-    assert_equal rejection['error'], error.code, rejection.inspect
-  end
-  each_case('path_rejection', fixture('paths')['rejections']) { |rejection| "#{rejection['operation']} #{rejection['options']}" }
-
-  def replay_cdn_url(cdn)
-    client = refusing_client
-    [cdn['options'], snake(cdn['options'])].each do |options|
-      if cdn['url']
-        assert_equal cdn['url'], client.cdn.get_asset_url(options)
-      else
-        assert_equal cdn['error'], assert_raises(CalmLens::Error) { client.cdn.get_asset_url(options) }.code, options.inspect
-      end
-    end
-  end
-  each_case('cdn_url', fixture('paths')['cdnUrls']) { |cdn| JSON.generate(cdn['options']) }
-
   def test_inspect_redacts_the_api_key
     client = CalmLens::ServerClient.new(api_key: 'secret-api-key', project_id: 'project-1', transport: ->(_) { flunk })
     [client.inspect, client.assets.inspect, client.folders.inspect, client.cdn.inspect, client.pretty_inspect,
@@ -125,64 +35,7 @@ class ContractTest < Minitest::Test
     end
   end
 
-  WEBHOOKS = fixture('webhooks')
-
-  def replay_webhook_parsing(entry)
-    parsed = CalmLens.parse_webhook_event(payload: entry['body'], signature: entry['signature'],
-                                          timestamp: entry['timestamp'], secret: entry['secret'], now: entry['now'])
-    assert_equal JSON.parse(entry['body'])['data'], parsed.data
-    assert_equal entry['expectedType'], parsed['type']
-    assert_equal entry['expectedFactKey'], parsed['data']['facts'][0]['key']
-  end
-  each_case('webhook_parsing', WEBHOOKS['parsing']) { |entry| "#{entry['expectedType']} #{entry['expectedFactKey']}" }
-
-  def replay_webhook_signature(vector)
-    assert_equal vector['signature'],
-                 CalmLens.create_webhook_signature_header(payload: vector['body'], timestamp: vector['timestamp'],
-                                                          secret: vector['secret'])
-  end
-  each_case('webhook_signature', WEBHOOKS['signatures']) { |vector| vector['timestamp'] }
-
-  def replay_webhook_verification(vector)
-    valid = CalmLens.verify_webhook_signature(payload: vector['body'], signature: vector['signature'], timestamp: vector['timestamp'],
-                                              secret: vector['secret'], now: vector['now'],
-                                              tolerance_seconds: vector.fetch('toleranceSeconds', 300))
-    assert_equal vector['valid'], valid, vector['name']
-  end
-  each_case('webhook_verification', WEBHOOKS['verification']) { |vector| vector['name'] }
-
-  def replay_webhook_payload(entry)
-    assert_equal entry['payload'], CalmLens.to_webhook_event_payload(entry['event'])
-  end
-  each_case('webhook_payload', WEBHOOKS['payloads']) { |entry| "#{entry['event']['type']} #{entry['event']['id']}" }
-
-  # parse_webhook_event parses every payload fixture into the event it came from.
-  def replay_webhook_payload_parsing(fixture)
-    body = JSON.generate(fixture['payload'])
-    signature = CalmLens.create_webhook_signature_header(payload: body, timestamp: 1_760_000_000, secret: 'whsec')
-    event = CalmLens.parse_webhook_event(payload: body, signature: signature, timestamp: '1760000000', secret: 'whsec',
-                                         now: 1_760_000_000)
-    assert_equal fixture['event']['id'], event.id
-    assert_equal fixture['event']['type'], event.type
-    assert_equal fixture['event']['createdAt'], event.created_at
-    assert_equal fixture['event']['facts'], event.facts
-    assert_equal fixture['payload']['data'], event.data
-    if fixture['event']['assetId']
-      assert_equal fixture['event']['assetId'], event.asset_id
-    else
-      assert_nil event.asset_id
-    end
-  end
-  each_case('webhook_payload_parsing', WEBHOOKS['payloads']) { |entry| "#{entry['event']['type']} #{entry['event']['id']}" }
-
-  def test_webhook_headers_carry_the_first_signature_vector
-    vector = WEBHOOKS['signatures'].first
-    headers = CalmLens.create_webhook_headers(payload: vector['body'], delivery_id: 'delivery-1',
-                                              secret: vector['secret'], timestamp: vector['timestamp'].to_i)
-    assert_equal({ 'content-type' => 'application/json', CalmLens::WEBHOOK_DELIVERY_HEADER => 'delivery-1',
-                   CalmLens::WEBHOOK_TIMESTAMP_HEADER => vector['timestamp'],
-                   CalmLens::WEBHOOK_SIGNATURE_HEADER => vector['signature'] }, headers)
-  end
+  TRANSFORM_OPTIONS = fixture('transform-options')
 
   # Every transform option serializes to the step the CDN writes for it.
   def replay_transform(item)
@@ -191,7 +44,19 @@ class ContractTest < Minitest::Test
     url = client.cdn.get_asset_url(asset_identifier: 'asset-1', transform: step)
     assert_equal item['selector'], url.split('/rendered/', 2).last, item['options'].inspect
   end
-  each_case('transform', fixture('transform-options')['cases']) { |item| item['selector'] }
+  each_case('transform', TRANSFORM_OPTIONS['cases']) { |item| item['selector'] }
+
+  # The option names the signatures accept, and the options written as colours, are the schema's.
+  def test_transform_options_and_colour_keys_follow_the_schema
+    loader = RBS::EnvironmentLoader.new
+    loader.add(path: Pathname(File.expand_path('../sig', __dir__)))
+    env = RBS::Environment.from_loader(loader).resolve_type_names
+    options = env.type_alias_decls.fetch(RBS::TypeName.parse('::CalmLens::image_transform_options_input')).decl.type
+    assert_equal TRANSFORM_OPTIONS['options'].sort, options.fields.keys.map(&:to_s).concat(options.optional_fields.keys.map(&:to_s)).sort
+    assert_equal TRANSFORM_OPTIONS['colourKeys'], CalmLens.const_get(:Transforms)::COLOUR_KEYS
+    used = TRANSFORM_OPTIONS['cases'].flat_map { |item| item['options'].keys }.uniq
+    assert_empty TRANSFORM_OPTIONS['options'] - used, 'every option has a serialization case'
+  end
 
   # The shared mock behaviour scenarios (packages/sdk-contract/mockScenarios.ts), replayed by every
   # SDK's offline mock.
@@ -205,11 +70,14 @@ class ContractTest < Minitest::Test
     end
   end
 
+  # Resolves the `$ref`, `$concat` and `$base64Repeat` markers.
   def resolve(value, saved)
     if value.is_a?(Hash) && value.key?('$ref')
       name, rest = value['$ref'].split('.', 2)
-      return at(saved.fetch(name), rest)
+      return rest ? at(saved.fetch(name), rest) : saved.fetch(name)
     end
+    return value['$concat'].map { |part| resolve(part, saved).to_s }.join if value.is_a?(Hash) && value.key?('$concat')
+    return [value['$base64Repeat']['text'] * value['$base64Repeat']['count']].pack('m0') if value.is_a?(Hash) && value.key?('$base64Repeat')
 
     case value
     when Array then value.map { |item| resolve(item, saved) }
@@ -218,45 +86,66 @@ class ContractTest < Minitest::Test
     end
   end
 
+  def json(value) = JSON.parse(JSON.generate(value))
+
   def run_step(mock, operation, args)
     case operation
     when 'mock.decide' then mock.decide(args['assetId'], args['outcome'])
     when 'mock.enqueueEvent' then mock.enqueue_event(args)
+    when 'mock.grant' then mock.api_key_grants = args['grants']
+    when 'mock.failNext' then mock.fail_next_request(args['failure'], operation: args['operation'])
     when 'cdn.serve'
       response = mock.cdn.serve(args)
       body = response.body.to_s
-      code = response.content_type == 'application/json' ? JSON.parse(body)['code'] : nil
-      { 'status' => response.status, 'code' => code, 'body' => body.dup.force_encoding('UTF-8'),
-        'headers' => response.headers }
+      code = response.content_type.to_s.start_with?('application/json') ? JSON.parse(body)['code'] : nil
+      { 'status' => response.status, 'code' => code, 'bytes' => body, 'headers' => response.headers }
+    when 'assets.iterate' then json(mock.assets.each(args).to_a)
+    when 'assets.iterateChildren' then json(mock.assets.each_child(args).to_a)
+    when 'events.pages' then json(mock.events.each_page(args).to_a)
     when 'assets.waitForDecision'
-      mock.assets.wait_for_decision(args.except('timeoutMs').merge('timeout' => args['timeoutMs'] / 1000.0))
+      json(mock.assets.wait_for_decision(args.except('timeoutMs').merge('timeout' => args['timeoutMs'] / 1000.0)))
     else
       options = args.except('idempotencyKey')
       options['request_options'] = { idempotency_key: args['idempotencyKey'] } if args.key?('idempotencyKey')
-      resource, method = operation.split('.')
-      mock.public_send(resource).public_send(method.gsub(/([a-z])([A-Z])/, '\1_\2').downcase, options)
+      *resources, method = operation.split('.')
+      target = resources.reduce(mock) { |value, resource| value.public_send(resource) }
+      json(target.public_send(method.gsub(/([a-z])([A-Z])/, '\1_\2').downcase, options))
     end
   end
 
   # Header names are case-insensitive; Response#headers has lowercase names.
   def check_cdn(wanted, result, label)
-    served = result.slice(*wanted.keys)
+    served = { 'status' => result['status'] }
+    served['code'] = result['code'] if wanted.key?('code')
+    served['body'] = result['bytes'].dup.force_encoding('UTF-8') if wanted.key?('body')
     served['headers'] = wanted['headers'].to_h { |name, _| [name, result['headers'][name.downcase]] } if wanted.key?('headers')
-    assert_equal wanted, served, label
+    assert_equal wanted.slice('status', 'code', 'body', 'headers'), served, label
+    wanted.fetch('headersPresent', []).each { |name| assert result['headers'].key?(name.downcase), "#{label}: #{name} header" }
+    return unless wanted.key?('bodyPrefixBase64')
+
+    prefix = wanted['bodyPrefixBase64'].unpack1('m0')
+    assert_equal prefix, result['bytes'].b[0, prefix.bytesize], "#{label}: body prefix"
   end
 
-  def check_step(mock, step, saved)
-    label = "#{step['operation']} #{step['args'].inspect}"
+  def check_error(wanted, error, saved, label)
+    assert_equal wanted.slice('code', 'status'), { 'code' => error.code, 'status' => error.status }, label
+    wanted.fetch('details', {}).each do |key, value|
+      expected = resolve(value, saved)
+      actual = error.details&.fetch(key, nil)
+      expected.nil? ? assert_nil(actual, "#{label}: details.#{key}") : assert_equal(expected, actual, "#{label}: details.#{key}")
+    end
+  end
+
+  def check_step(mock, step, saved, label)
     args = resolve(step.fetch('args', {}), saved)
     expect = step.fetch('expect', {})
     if (wanted = expect['error'])
       error = assert_raises(CalmLens::Error, label) { run_step(mock, step['operation'], args) }
-      assert_equal wanted, { 'code' => error.code, 'status' => error.status }, label
-      return
+      return check_error(wanted, error, saved, label)
     end
 
     result = run_step(mock, step['operation'], args)
-    check_cdn(expect['cdn'], result, label) if expect['cdn']
+    check_cdn(resolve(expect['cdn'], saved), result, label) if expect['cdn']
     if (name = expect['sameAs'])
       assert saved.key?(name), "#{label}: nothing saved as #{name}"
       assert_equal saved[name], result, "#{label}: same as #{name}"
@@ -281,7 +170,11 @@ class ContractTest < Minitest::Test
     )
     saved = {}
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    scenario['steps'].each { |step| check_step(mock, step, saved) }
+    scenario['steps'].each_with_index do |step, index|
+      step.fetch('repeat', 1).times do |run|
+        check_step(mock, step, saved, "step #{index + 1}#{" run #{run + 1}" if step['repeat']} (#{step['operation']})")
+      end
+    end
     # Mock waits take no real time.
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 5
   end
@@ -329,7 +222,7 @@ class ContractTest < Minitest::Test
       target = resources.reduce(client) { |value, resource| value.public_send(resource) }
       target.respond_to?(method)
     when 'function', 'mock-function'
-      receiver, method = name.split(/\.(?=[a-z_]+\z)/)
+      receiver, method = name.split(/\.(?=[a-z_]+\??\z)/)
       constant(receiver)&.respond_to?(method)
     when 'constant' then constant(name) == capability['value']
     when 'error-field'
@@ -362,6 +255,9 @@ class ContractTest < Minitest::Test
   each_case('retryable', SURFACE['retryable']) { |entry| "#{entry['code']} #{entry['status']}" }
 
   def replay_surface(capability)
+    reason = capability.dig('notApplicable', 'ruby')
+    skip "not applicable: #{reason}" if reason
+
     assert present?(capability, SURFACE), "missing #{capability['id']} (#{capability['names']['ruby']})"
   end
   each_case('surface', SURFACE['capabilities']) { |capability| capability['id'] }

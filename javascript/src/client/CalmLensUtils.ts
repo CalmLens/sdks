@@ -233,6 +233,9 @@ const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
   "placeholder",
 ]);
 
+/** A signed URL's lifetime when `expiresInSeconds` is omitted: 15 minutes. */
+export const DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 15;
+
 /** The longest signed URL lifetime the API accepts: 24 hours. */
 const MAX_SIGNED_URL_SECONDS = 60 * 60 * 24;
 
@@ -366,8 +369,9 @@ export const stringifyQuery = (query: Record<string, unknown>): string => {
 export const isAssetDecided = (asset: Pick<Asset, "classification">): boolean =>
   asset.classification.moderation.status !== "pending" || asset.classification.status === "failed";
 
-const DECISION_POLL_FIRST_DELAY_MS = 500;
-const DECISION_POLL_MAX_DELAY_MS = 5_000;
+export const DECISION_POLL_FIRST_DELAY_MS = 500;
+export const DECISION_POLL_DELAY_FACTOR = 1.5;
+export const DECISION_POLL_MAX_DELAY_MS = 5_000;
 export const DEFAULT_DECISION_TIMEOUT_MS = 60_000;
 
 /**
@@ -406,6 +410,6 @@ export const pollForDecision = async (
       });
     }
     await sleep(Math.min(delay, remaining), signal);
-    delay = Math.min(DECISION_POLL_MAX_DELAY_MS, delay * 1.5);
+    delay = Math.min(DECISION_POLL_MAX_DELAY_MS, delay * DECISION_POLL_DELAY_FACTOR);
   }
 };

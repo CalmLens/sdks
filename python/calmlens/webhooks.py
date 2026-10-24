@@ -11,7 +11,7 @@ import json
 import math
 import re
 import time
-from typing import Mapping, cast
+from typing import Any, Mapping, cast
 
 from . import error_codes
 from .errors import WebhookVerificationError
@@ -20,7 +20,7 @@ from .types import Event, WebhookEventPayload
 __all__ = [
     "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_TIMESTAMP_HEADER", "WEBHOOK_SIGNATURE_HEADER",
     "WEBHOOK_SIGNATURE_TOLERANCE_SECONDS", "to_webhook_event_payload", "create_webhook_signature_header",
-    "create_webhook_headers", "verify_webhook_signature", "parse_webhook_event",
+    "create_webhook_headers", "verify_webhook_signature", "parse_webhook_event", "is_test_webhook_event",
 ]
 
 WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery"
@@ -85,21 +85,32 @@ def create_webhook_headers(payload: str | bytes, delivery_id: str, secret: str, 
     }
 
 
-def _header(headers: Mapping[str, object] | None, name: str) -> str | None:
+def _text(value: object) -> str:
+    return value.decode("latin-1") if isinstance(value, bytes) else str(value)
+
+
+def _header(headers: Any, name: str) -> str | None:
+    """A header's value, its name matched in any case. A header repeated in the request (a list
+    value, or several entries in an ``email.message.Message``/``http.client.HTTPMessage`` or a
+    Werkzeug ``Headers``) is joined with ``,``."""
     if headers is None:
         return None
-    value = headers.get(name)
-    if value is None:
-        # Plain dicts are case-sensitive; framework header objects usually are not.
-        value = next((v for k, v in headers.items() if isinstance(k, str) and k.lower() == name), None)
-    if isinstance(value, bytes):
-        value = value.decode("latin-1")
-    return value if value is None or isinstance(value, str) else str(value)
+    values: list[object] = []
+    if callable(getattr(headers, "get_all", None)):  # email.message.Message, http.client.HTTPMessage
+        values = list(headers.get_all(name) or [])
+    elif callable(getattr(headers, "getlist", None)):  # Werkzeug Headers, Django QueryDict-like
+        values = list(headers.getlist(name) or [])
+    else:
+        for key, value in headers.items():
+            if isinstance(key, (str, bytes)) and _text(key).lower() == name:
+                values.extend(value if isinstance(value, (list, tuple)) else [value])
+    values = [value for value in values if value is not None]
+    return ",".join(_text(value) for value in values) if values else None
 
 
 def verify_webhook_signature(payload: str | bytes, *, signature: str | None = None,
                              timestamp: str | int | None = None, secret: str,
-                             headers: Mapping[str, object] | None = None,
+                             headers: Mapping[str, object] | Any = None,
                              tolerance_seconds: float = WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
                              now: float | None = None) -> bool:
     """Return True when ``payload`` is a delivery signed with ``secret``.
@@ -111,8 +122,10 @@ def verify_webhook_signature(payload: str | bytes, *, signature: str | None = No
             list is allowed and any matching ``v1=`` entry is accepted).
         timestamp: The ``x-calmlens-timestamp`` header (unix seconds).
         secret: The webhook's signing secret.
-        headers: Alternatively, the request headers; ``signature`` and ``timestamp`` are
-            read from them when not given.
+        headers: Alternatively, the request headers (a mapping, ``email.message.Message``,
+            ``http.client.HTTPMessage`` or a framework's header object); ``signature`` and
+            ``timestamp`` are read from them when not given, by name in any case, and a header
+            repeated in the request is joined with ``,``.
         tolerance_seconds: Maximum distance between ``timestamp`` and ``now``.
         now: Current unix time in seconds; defaults to ``time.time()``.
 
@@ -143,15 +156,17 @@ def verify_webhook_signature(payload: str | bytes, *, signature: str | None = No
 
 
 def parse_webhook_event(payload: str | bytes, *, signature: str | None = None, timestamp: str | int | None = None,
-                    secret: str, headers: Mapping[str, object] | None = None,
+                    secret: str, headers: Mapping[str, object] | Any = None,
                     tolerance_seconds: float = WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
                     now: float | None = None) -> WebhookEventPayload:
     """Verify a delivery, then parse it.
 
     Takes the same arguments as :func:`verify_webhook_signature` and returns the parsed
-    :class:`~calmlens.types.WebhookEventPayload`. Raises :class:`WebhookVerificationError`
-    with code ``sdk/invalid-webhook-signature`` when verification fails, or
-    ``sdk/invalid-webhook-payload`` when the verified body is not a webhook event object.
+    :class:`~calmlens.types.WebhookEventPayload`, unknown fields included. Raises
+    :class:`WebhookVerificationError` with code ``sdk/invalid-webhook-signature`` when
+    verification fails, or ``sdk/invalid-webhook-payload`` when the verified body is not a
+    webhook event: a JSON object with string ``id``, ``type`` and ``projectId``, a numeric
+    ``createdAt`` and a ``data`` object whose known fields have the API's types.
     """
     body = _raw(payload)
     if not verify_webhook_signature(body, signature=signature, timestamp=timestamp, secret=secret, headers=headers,
@@ -162,6 +177,40 @@ def parse_webhook_event(payload: str | bytes, *, signature: str | None = None, t
         event = json.loads(body)
     except (ValueError, UnicodeDecodeError) as error:
         raise WebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not valid JSON") from error
-    if not isinstance(event, dict) or not isinstance(event.get("type"), str) or not isinstance(event.get("data"), dict):
-        raise WebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not an event")
+    if not _is_webhook_event(event):
+        raise WebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event")
     return cast(WebhookEventPayload, event)
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _optional(data: Mapping[str, object], key: str, nullable: bool) -> bool:
+    return key not in data or (nullable and data[key] is None) or isinstance(data[key], str)
+
+
+def _is_webhook_event(value: object) -> bool:
+    """Whether ``value`` is a webhook body: the envelope fields CalmLens always sends, and the
+    API's types for the known ``data`` fields when present. Unknown fields are accepted."""
+    if not isinstance(value, dict) or not all(isinstance(value.get(key), str) for key in ("id", "type", "projectId")):
+        return False
+    data = value.get("data")
+    if not _is_number(value.get("createdAt")) or not isinstance(data, dict):
+        return False
+    asset, facts = data.get("asset"), data.get("facts", [])
+    return (_optional(data, "severity", False) and _optional(data, "title", False)
+            and _optional(data, "description", True) and _optional(data, "assetId", True)
+            and (asset is None or (isinstance(asset, dict) and isinstance(asset.get("id"), str)))
+            and isinstance(facts, list)
+            and all(isinstance(fact, dict) and isinstance(fact.get("key"), str) and "value" in fact
+                    and _optional(fact, "url", False) for fact in facts))
+
+
+def is_test_webhook_event(event: Mapping[str, Any]) -> bool:
+    """Whether a webhook event is a test send from the portal or the CLI rather than a real
+    event: it carries the registered ``{"key": "test", "value": True}`` fact."""
+    data = event.get("data") if isinstance(event, Mapping) else None
+    facts = data.get("facts") if isinstance(data, Mapping) else None
+    return isinstance(facts, list) and any(
+        isinstance(fact, Mapping) and fact.get("key") == "test" and fact.get("value") is True for fact in facts)

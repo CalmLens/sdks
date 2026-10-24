@@ -26,7 +26,14 @@ module CalmLens
     # @option options [Integer] :expires_in_seconds lifetime, 1 to 3600 (default 600)
     # @return [Hash] `{'token' => String, 'expiresAt' => Integer}` (milliseconds since the Unix epoch)
     def sign(options)
-      api, = call(options) { |*split| split }
+      call(options) { UploadTokens.sign_at(@api_key, options, now: (Time.now.to_f * 1000).to_i, nonce: SecureRandom.uuid) }
+    end
+
+    # Signs like {#sign} at a fixed time with a fixed nonce. {MockServerClient.sign_upload_token}
+    # exposes it to tests that need exact tokens.
+    # @api private
+    def self.sign_at(api_key, options, now:, nonce:)
+      api, = Internal.options(options)
       preset_id = api['uploadPresetId']
       Internal.segment(preset_id)
       ttl = api.fetch('expiresInSeconds', DEFAULT_TTL_SECONDS)
@@ -39,12 +46,13 @@ module CalmLens
         raise Internal.invalid('externalId must be a non-empty string')
       end
 
-      expires_at = (Time.now.to_f * 1000).to_i + (ttl * 1000)
-      claims = { 'v' => 1, 'u' => preset_id, 'k' => @api_key[0, @api_key.start_with?('clsk_') ? 13 : 8],
-                 'e' => expires_at, 'n' => SecureRandom.uuid }
+      expires_at = now + (ttl * 1000)
+      claims = { 'v' => 1, 'u' => preset_id, 'k' => api_key[0, api_key.start_with?('clsk_') ? 13 : 8],
+                 'e' => expires_at, 'n' => nonce }
       claims['x'] = external_id if external_id
-      body = [JSON.generate(claims)].pack('m0').tr('+/', '-_').delete('=')
-      secret = Digest::SHA256.hexdigest(@api_key)
+      # Written as JavaScript's JSON.stringify writes it: raw UTF-8, `/` and `<>&` unescaped.
+      body = [JSON.generate(claims, script_safe: false, ascii_only: false)].pack('m0').tr('+/', '-_').delete('=')
+      secret = Digest::SHA256.hexdigest(api_key)
       signature = OpenSSL::HMAC.hexdigest('SHA256', secret, SIGNING_CONTEXT + body)
       { 'token' => "#{TOKEN_PREFIX}#{body}.#{signature}", 'expiresAt' => expires_at }
     end

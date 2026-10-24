@@ -120,11 +120,11 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "upload/limit-exceeded": {
     status: 403,
-    message: "Upload limit exceeded. You have used all your free uploads. Please upgrade to Plus or Pro for unlimited uploads.",
+    message: "Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.",
   },
   "upload/spend-limit-reached": {
     status: 402,
-    message: "The project owner's spend limit for this billing period has been reached. Raise the limit in Billing to resume uploads.",
+    message: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner or billing admin can review them in Billing.",
   },
   "upload/invalid-mime-type": {
     status: 400,

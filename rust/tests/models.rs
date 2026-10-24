@@ -315,6 +315,10 @@ fn flagged_content_policy_encodes_as_an_object() {
         serde_json::to_value(options).unwrap(),
         json!({ "flaggedContentPolicy": { "action": "age-restrict" } })
     );
+    assert_eq!(
+        serde_json::to_value(FlaggedContentPolicy::new(FlaggedContentAction::Limit)).unwrap(),
+        json!({ "action": "limit" })
+    );
 }
 
 #[test]
@@ -369,18 +373,18 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
     let asset = blocked.asset.as_ref().unwrap();
     assert_eq!(
         (
-            asset.id.as_str(),
-            asset.external_id.as_deref(),
-            &asset.classification.status,
-            &asset.classification.moderation.status,
-            &asset.content.status
+            asset.id(),
+            asset.external_id(),
+            asset.classification_status(),
+            asset.moderation_status(),
+            asset.content_status()
         ),
         (
             "a1",
             Some("x1"),
-            &AssetClassificationStatus::Completed,
-            &AssetModerationStatus::Blocked,
-            &AssetContentStatus::Removed
+            Some(AssetClassificationStatus::Completed),
+            Some(AssetModerationStatus::Blocked),
+            Some(AssetContentStatus::Removed)
         )
     );
     let future = &page.events[1];

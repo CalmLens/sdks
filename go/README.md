@@ -45,18 +45,24 @@ safe for concurrent use. `Options`, `ServerClient` and errors never print the AP
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `BaseURL`, `CDNBaseURL` | `https://api.calmlens.com/v1`, `https://cdn.calmlens.com/v1` | API and CDN endpoints. |
-| `Timeout` | `DefaultTimeout` (120 s) | Bounds each attempt of a JSON API call, including the response body. Uploads and `CDN.Serve` are never cut off by it. |
+| `Timeout` | `DefaultTimeout` (120 s) | Bounds each attempt of an API call, including the response body, and text uploads. For `CDN.Serve` it ends when the response headers arrive. |
+| `UploadTimeout` | none | Bounds each attempt of a binary upload (file content and multipart parts); zero leaves large files uncut. |
 | `ConnectTimeout` | `DefaultConnectTimeout` (10 s) | Dial and TLS handshake (default transport only). |
 | `ResponseHeaderTimeout` | `DefaultResponseHeaderTimeout` (120 s) | Wait for response headers after the request is sent (default transport only). |
 | `MaxRetries` | `DefaultMaxRetries` (2) | Retries for retryable failures; `calmlens.Ptr(0)` disables them. |
 | `MaxResponseBytes` | `DefaultMaxResponseBytes` (32 MiB) | Largest API response body read; larger ones fail with `sdk/response-too-large`. |
-| `HTTPClient` | a client with the timeouts above | Sends every request. A copy is used with redirects disabled, so credentials stay on the configured endpoint. |
+| `HTTPClient` | a client with the timeouts above | Sends every request. A copy is used with redirects disabled, so credentials stay on the configured endpoint: a `3xx` fails with `sdk/http-error` and its status, and is not retried. |
+
+`client.WithRequestOptions(calmlens.RequestOptions{Timeout, UploadTimeout, MaxRetries})` returns
+a client with other deadlines or retries for the calls made through it. It shares the
+credentials, HTTP client and lens cache; the original client is unchanged.
 
 ### Timeouts and large transfers
 
 The default transport bounds connecting and waiting for headers, never the transfer
-itself, so uploading a large file or streaming a CDN download can take as long as it
-needs. Bound any call, including those, with a context deadline:
+itself, and binary uploads have no deadline unless you set `UploadTimeout`, so uploading a
+large file or streaming a CDN download can take as long as it needs. Bound any call,
+including those, with a context deadline:
 
 ```go
 ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -67,8 +73,8 @@ asset, err := client.Assets.Create(ctx, options)
 If you supply `HTTPClient`, keep its `Timeout` at zero: `http.Client.Timeout` covers the
 whole request, including upload and download bodies.
 
-Every request sends `User-Agent: calmlens-go/<Version> (<Go version>; <OS>/<arch>)`.
-`calmlens.Version` is the SDK version.
+Every request sends `User-Agent: calmlens-go/<Version> (go/<Go version>)`, and API requests
+send `Accept: application/json`. `calmlens.Version` is the SDK version.
 
 ## API mapping
 
@@ -119,8 +125,8 @@ signed, err := client.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{
 `pending`, or its `Classification.Status` is `failed`, and returns that asset, checking every few seconds. It
 returns `sdk/timeout`, with `Details` `{"assetId", "classificationStatus", "moderationStatus"}`, if
 there is no decision within `Timeout` (default
-`DefaultDecisionTimeout`, 60s); cancel `ctx` to stop early (`sdk/cancelled`). Webhooks
-report decisions without polling:
+`DefaultDecisionTimeout`, 60s; `calmlens.Ptr(time.Duration(0))` checks once); cancel `ctx` to
+stop early (`sdk/cancelled`). Webhooks report decisions without polling:
 
 ```go
 queued, err := client.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.jpg", Content: &calmlens.Content{Type: "image/jpeg", Data: file}})
@@ -154,6 +160,10 @@ for it.Next(ctx) {
 }
 if err := it.Err(); err != nil { return err }
 ```
+
+Iteration stops when a page has no next cursor or says no more follow. A page that says more
+follow but hands back a cursor the iteration already used fails with `sdk/invalid-response`
+(the cursor in `Details["cursor"]`) instead of repeating pages; that page is not yielded.
 
 On Go 1.23 or later you can range over `All`, which yields `(item, error)` pairs; a
 failure is yielded once and ends the loop:
@@ -290,8 +300,9 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets). The `calm
 
 ## Retries and idempotency
 
-The SDK retries, with jittered exponential backoff (0.5 s, 1 s, … up to 8 s), up to
-`MaxRetries` times when it is safe to:
+The SDK retries up to `MaxRetries` times when it is safe to. Retry n (from 0) waits between
+half and all of min(8 s, 0.5 s × 2ⁿ), unless a `Retry-After` header (seconds or an HTTP date;
+`0` retries at once) says otherwise:
 
 - `GET` and `HEAD` requests, and
 - `Create`, `Classify`, `Text.Classify` and `UploadPart`, which always send an
@@ -299,11 +310,12 @@ The SDK retries, with jittered exponential backoff (0.5 s, 1 s, … up to 8 s), 
   retries; CalmLens returns the saved response instead of running the request twice.
 
 They are retried after a connection failure or timeout, `429`, `502`, `503`, `504`, and
-`idempotency/request-in-progress`. A `Retry-After` header is honoured; one longer than a
-minute is returned to you as the error instead. Other writes (`Update`, `Move`, `Delete`,
+`idempotency/request-in-progress`. A `Retry-After` longer than a minute is returned to you as
+the error instead. Other writes (`Update`, `Move`, `Delete`,
 `Retry`, folder changes, `CreateSignedURL`) are never retried automatically. An upload
 from a `Data` reader is only retried when the reader implements `io.Seeker` (such as
-`*os.File`); other streams are sent once.
+`*os.File`); other streams are sent once. `CDN.Serve` retries `GET` and `HEAD` requests the
+same way and, once retries run out, returns the last response.
 
 To retry across processes or restarts, pass your own key, for example derived from your
 record ID, and send the same key every time:
@@ -320,7 +332,8 @@ asset, err := client.Assets.Create(ctx, calmlens.SubmitAssetOptions{
 `{events, cursor, hasMore}` as `Events []Event`, `Cursor string`, and `HasMore bool`.
 Calling it without `After` returns **no events** and a cursor for "now", so you only
 see events created after you connect. `Events.ListAll` follows the cursor until no more
-events are available; save `Cursor()` and continue from it later:
+events are available (`NextPage` and `Page` walk it a page at a time, empty pages included);
+save `Cursor()` and continue from it later:
 
 ```go
 start, err := client.Events.List(ctx, calmlens.ListEventsOptions{})
@@ -371,8 +384,8 @@ if calmlens.ErrorCode(err) == calmlens.CodeDuplicateExternalID { /* ... */ }
 | `Code` | An API code (constants such as `calmlens.CodeAssetNotFound`, generated from the API's error list) or an `sdk/` code below. |
 | `Status` | HTTP status, or 0 when no response arrived. |
 | `RequestID` | The `X-Request-Id` response header; include it when contacting support. |
-| `Header`, `RetryAfter` | Response headers and the parsed `Retry-After` delay. |
-| `Details` | Structured API details, with `network: true` and any `traceId`. |
+| `Header`, `RetryAfter` | Response headers and the parsed `Retry-After` delay (`*time.Duration`, nil without the header). |
+| `Details` | Structured API details with any `traceId`, or SDK details such as `cursor`; nil when there are none, as for transport failures. |
 | `Cause` | The underlying error; `errors.Is` and `errors.As` reach it through `Unwrap`. |
 
 `Error()` includes the code, status, message and request ID. `IsRetryable(err)` (or
@@ -384,7 +397,7 @@ if calmlens.ErrorCode(err) == calmlens.CodeDuplicateExternalID { /* ... */ }
 | `sdk/timeout`, `sdk/cancelled` | A timeout or context deadline expired, or the context was cancelled. |
 | `sdk/invalid-response` | A success body was empty, not JSON or unexpected. |
 | `sdk/response-too-large` | A response body was larger than `MaxResponseBytes`. |
-| `sdk/http-error` | A non-2xx response without a CalmLens error body. |
+| `sdk/http-error` | A non-2xx response without a CalmLens error body, or a redirect. |
 | `sdk/invalid-argument` | An argument (such as an empty, `.` or `..` ID) was rejected, or could not be encoded, before any request. |
 | `sdk/invalid-config` | `NewServerClient` rejected an option. |
 | `sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload` | Webhook verification or decoding failed. |
@@ -406,7 +419,12 @@ Deliveries are JSON `{id, type, createdAt, projectId, data}` (`WebhookEventPaylo
 signed as `v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. Verification needs the
 **exact raw bytes** of the body: the functions take `[]byte`, never a decoded value, and
 re-encoding JSON changes the bytes. Any matching `v1=` entry is accepted, and timestamps
-more than `DefaultWebhookTolerance` (5 minutes) from now are rejected.
+more than `DefaultWebhookTolerance` (5 minutes) from now are rejected. Header names match in
+any case, and repeated signature headers are joined into one list. A verified body must be an
+event (string `id`, `type` and `projectId`, numeric `createdAt`, object `data` whose known
+fields have the API's types), or parsing fails with `sdk/invalid-webhook-payload`. The parsed
+`WebhookEventPayload` keeps the whole body, including fields added after this SDK, in `Raw`, and
+`event.Data.Facts.IsTest()` reports a test send from the portal or CLI.
 
 With `net/http`, `VerifyWebhookRequest` reads the body (up to 1 MiB), verifies it and
 returns the event. It leaves the raw bytes in `r.Body` for later handlers:
@@ -441,8 +459,9 @@ router.POST("/webhooks", func(c *gin.Context) {
 
 When you already have the raw bytes (from a queue, or a framework that buffers the
 body), use `ParseWebhookEvent(rawBody, signature, timestamp, secret)` to verify and
-decode, or `VerifyWebhookSignature` for a plain boolean. Options:
-`calmlens.WithTolerance(d)`, `calmlens.WithNow(t)` and `calmlens.WithMaxBodyBytes(n)`.
+decode, `VerifyWebhookHeaders(rawBody, header, secret)` to verify against an `http.Header`, or
+`VerifyWebhookSignature` for a plain boolean. Options: `calmlens.WithTolerance(d)` (zero
+accepts only the signing second), `calmlens.WithNow(t)` and `calmlens.WithMaxBodyBytes(n)`.
 `SignWebhookPayload(rawBody, timestamp, secret)` produces the signature header value
 (arguments in the same order as `VerifyWebhookSignature`), for example to sign test
 deliveries.
@@ -450,8 +469,9 @@ deliveries.
 ## CDN
 
 `CDN.Serve` returns the response, including non-2xx statuses, with the body streamed:
-`defer response.Body.Close()` is required. It is not bounded by `Options.Timeout`, so
-large downloads finish; pass a context deadline to bound them. `Resource` is `calmlens.ResourceRendered`
+`defer response.Body.Close()` is required. `Options.Timeout` ends when the response headers
+arrive, so large downloads finish; pass a context deadline to bound them. Retryable responses
+are retried as described under Retries, and a redirect fails with `sdk/http-error`. `Resource` is `calmlens.ResourceRendered`
 (the default), `calmlens.ResourceOriginal` or `calmlens.ResourcePlaceholder`; only the rendered resource
 takes a lens or transform. Supply a lens, a direct transform, or both. When combined, the lens runs first. Private content should be delivered through a signed URL.
 
@@ -513,11 +533,16 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
 `OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:
 
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
-  `folder/not-empty`, ...) and error body, with an `X-Request-Id` on every response.
+  `folder/not-empty`, ...), details and error body, with an `X-Request-Id` on every response.
+  Requests the API's schema refuses fail with `validation/<issue>` and the field in
+  `details.path` (page sizes from 1 to 100, event limits from 1 to 100, search limits from 1 to
+  20 and queries of 1 to 200 characters). Refusals the client makes before sending, such as
+  multipart part and image sizes, carry the status the API would answer with.
 - `Assets.List` and `ListChildren` apply RSQL filters (`==`, `!=`, `=in=`, `=out=`,
   comparisons, `;` binding tighter than `,`, parentheses), ordering, `FolderID` and paging.
   Cursors resume after the last returned asset, so creates and deletes between pages don't
-  shift later pages.
+  shift later pages, and a cursor only continues the query (filter, folder and ordering) it
+  came from.
 - `Assets.Search` runs the API's keyword search: every query word (case-insensitive, up to
   8) must appear in the name, ID, external ID, description, tags, type, content format or
   extension, or moderation status, and results are ranked by the API's score, then newest first.
@@ -526,17 +551,27 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
 - A decided upload finishes processing (`completed`); like the API, its content is then removed
   (`Content.Status` `removed`, `RemovalReason` `retention`) and no longer served unless the
   upload set `KeepContentAfterProcessing`. `OutcomePurged` always removes the content, with
-  `RemovalReason` `policy`. `Retry` needs failed processing and content that
-  was not removed.
+  `RemovalReason` `policy`. A classified image gets a ThumbHash, which the `placeholder`
+  resource serves as a PNG and which goes with its content. Fields that are not set are `null`.
+  `Retry` needs failed processing and content that was not removed.
+- Like the API, retrying an asset records an `asset.retried` event, removing its content an
+  `asset.content-removed` event and deleting it an `asset.deleted` event.
 - Multipart uploads keep the queue mode chosen at the start, check part numbers
-  (`details.expectedPartNumber`) and `TotalSizeInBytes`.
+  (`details.expectedPartNumber` and `receivedPartNumber`), image totals (10 to 20 MiB) and
+  `TotalSizeInBytes`.
 - `Idempotency-Key` requests are replayed, and a key reused for another request returns
-  `idempotency/key-reused`.
-- `EnqueueEvent` adds events to the feed, which `Events.List` and `ListAll` return after
-  cursors taken earlier.
+  `idempotency/key-reused`. A failed request frees its key, and keys must be 1 to 255
+  printable ASCII characters without a space at either end (`idempotency/invalid-key`).
+- Lenses: an unchanged definition returns the stored lens, a change needs a greater version
+  (`lens/version-conflict` with `currentVersion`, `requestedVersion` and `minimumVersion`), and
+  lenses saved before a conflict stay saved. Folder names are unique among siblings (case
+  matters), lists sort by code point, and moves refuse cycles.
+- `EnqueueEvent` adds events to the feed, and returns them as stored, which `Events.List` and
+  `ListAll` return after cursors taken earlier (50 per page by default).
 - `CDN.Serve` answers with content type and length, and `Cache-Control` as the CDN sets it
   (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable`
-  for images, `max-age=3600` otherwise), and supports single byte ranges. Like the
+  for images, `max-age=3600` otherwise), `Cache-Tag`, `X-Content-Type-Options: nosniff`,
+  `Content-Security-Policy` and, for images, `ETag` and `Expires`. Like the
   CDN, blocked, purged and failed assets and removed content return 403 `asset/not-available`
   whatever the key. A private asset, or a public age-restricted one requested without
   `AllowAgeRestricted: true`, returns 403 `asset/api-key-missing-permission` unless the key has
@@ -546,7 +581,8 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
   permission.
 - `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeLimited`, `OutcomeAgeRestricted`,
   `OutcomePurged`) applies a reviewer's decision and adds the matching `asset.<decision>` event
-  with a `decided-by: reviewer` fact.
+  with a `decided-by: reviewer` fact; purging removes the content with `RemovalReason`
+  `requested` and records `asset.content-removed` first.
 - Waits take no real time: retry backoff and `Assets.WaitForDecision` only advance the mock
   client's clock, so `WaitForDecision` returns `sdk/timeout` straight away for an asset whose
   moderation stays pending.
@@ -558,7 +594,9 @@ accepts grants for private and age-restricted CDN permission tests. Retries are 
 (`MaxRetries` 0) so that `FailNext` fails exactly one call.
 
 Every request is captured, decoded, for assertions; `FailNext` queues transport
-failures so you can test error handling without a network:
+failures, and `FailNextRequest(failure, operation)` fails the next request (or the next one of
+`operation`, such as `"assets.create"` or `"cdn.serve"`) with `calmlenstest.FailureTransportError`,
+`FailureTimeout` or an API error code, so you can test error handling without a network:
 
 ```go
 mock.FailNext(errors.New("connection reset"), context.DeadlineExceeded)
@@ -575,6 +613,8 @@ mock.ClearRequests()
 ```
 
 Failed requests are captured too, then fail before reaching the in-memory backend.
+`calmlenstest.SignUploadToken(apiKey, options, now, nonce)` signs an upload token at a fixed
+time and nonce, for comparing exact tokens.
 
 ```sh
 go test -race ./...
@@ -595,4 +635,4 @@ App; no Go registry token is needed.
 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
-Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.
+Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names (in Go, `SearchAll` and `ResolveOnly` are `*bool`, so an explicit `false` is sent).

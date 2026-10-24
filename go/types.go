@@ -599,9 +599,9 @@ type ExplainAssetOptions struct {
 // WaitForDecisionOptions selects the asset AssetsService.WaitForDecision waits for.
 type WaitForDecisionOptions struct {
 	AssetID string
-	// Timeout is how long to wait for a decision. Zero means DefaultDecisionTimeout;
-	// negative values are rejected.
-	Timeout time.Duration
+	// Timeout is how long to wait for a decision: nil means DefaultDecisionTimeout, zero checks
+	// once and negative values are rejected.
+	Timeout *time.Duration
 }
 
 // ListAssetChildrenOptions selects a page of an asset's children.
@@ -978,8 +978,8 @@ type ListFoldersOptions struct {
 	PageIndex   int      `json:"pageIndex,omitempty"`
 	PageSize    int      `json:"pageSize,omitempty"`
 	Search      string   `json:"search,omitempty"`
-	SearchAll   bool     `json:"searchAll,omitempty"`
-	ResolveOnly bool     `json:"resolveOnly,omitempty"`
+	SearchAll   *bool    `json:"searchAll,omitempty"`
+	ResolveOnly *bool    `json:"resolveOnly,omitempty"`
 	IDs         []string `json:"ids,omitempty"`
 	Sort        string   `json:"sort,omitempty"`
 	Direction   string   `json:"direction,omitempty"`

@@ -2,8 +2,10 @@ package calmlens
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -83,24 +85,25 @@ const DefaultDecisionTimeout = 60 * time.Second
 
 const (
 	decisionPollFirstDelay = 500 * time.Millisecond
+	decisionPollFactor     = 1.5
 	decisionPollMaxDelay   = 5 * time.Second
 )
 
 // WaitForDecision retrieves an asset until it has a moderation decision (Moderation.Status is no
 // longer ModerationStatusPending) or its processing failed
 // (Processing.Status ClassificationStatusFailed), and returns that asset. It waits 0.5s before the
-// second check and 1.5 times longer each time after that, up to 5s. When Timeout
-// (default DefaultDecisionTimeout) passes without a decision it returns a *Error with code
+// second check and 1.5 times longer each time after that, up to 5s. A zero Timeout checks once.
+// When Timeout (default DefaultDecisionTimeout) passes without a decision it returns a *Error with code
 // sdk/timeout and Details {"assetId", "classificationStatus", "moderationStatus"} holding the last
 // statuses seen. Cancelling ctx
 // stops waiting with sdk/cancelled. Webhooks report decisions without polling.
 func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDecisionOptions) (*Asset, error) {
-	if options.Timeout < 0 {
-		return nil, invalid(CodeSDKInvalidArgument, "Timeout cannot be negative")
+	timeout := DefaultDecisionTimeout
+	if options.Timeout != nil {
+		timeout = *options.Timeout
 	}
-	timeout := options.Timeout
-	if timeout == 0 {
-		timeout = DefaultDecisionTimeout
+	if timeout < 0 {
+		return nil, invalid(CodeSDKInvalidArgument, "Timeout cannot be negative")
 	}
 	deadline := s.c.now().Add(timeout)
 	delay := decisionPollFirstDelay
@@ -127,7 +130,7 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 		if err = s.c.sleep(ctx, min(delay, remaining)); err != nil {
 			return nil, transportError(err)
 		}
-		delay = min(decisionPollMaxDelay, delay*3/2)
+		delay = min(decisionPollMaxDelay, time.Duration(float64(delay)*decisionPollFactor))
 	}
 }
 
@@ -186,6 +189,9 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 // MaxSignedURLSeconds is the longest signed URL lifetime the API accepts: 24 hours.
 const MaxSignedURLSeconds = 24 * 60 * 60
 
+// DefaultSignedURLSeconds is the lifetime CreateSignedURL sends when ExpiresInSeconds is zero.
+const DefaultSignedURLSeconds = 900
+
 // CreateSignedURL returns a short-lived URL for private CDN content.
 func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOptions) (*SignedURL, error) {
 	path, err := resourcePath("assets", options.AssetID, "/signed-url")
@@ -207,7 +213,7 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	}
 	options.Transform, options.TransformSteps = transform, nil
 	if options.ExpiresInSeconds == 0 {
-		options.ExpiresInSeconds = 900
+		options.ExpiresInSeconds = DefaultSignedURLSeconds
 	}
 	var result SignedURL
 	if err = s.c.request(ctx, "POST", path, nil, options, &result); err != nil {
@@ -338,8 +344,11 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 }
 
 // Serve fetches CDN content and returns the raw response, including non-2xx statuses. The
-// body is streamed: the caller must close it. Serve is not bounded by Options.Timeout, so
-// large downloads are never cut off; pass a context with a deadline to bound it.
+// body is streamed: the caller must close it. Options.Timeout bounds each attempt only until the
+// response headers arrive, so long downloads are not cut off; pass a context with a deadline to
+// bound the whole download. GET and HEAD requests are retried like API reads (429, 502, 503, 504
+// and transport failures, honouring Retry-After); when retries run out, the last response is
+// returned. A redirect is never followed: it fails with sdk/http-error and its status.
 func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.Response, error) {
 	endpoint, err := s.GetAssetURL(options.CDNAssetURLOptions)
 	if err != nil {
@@ -349,21 +358,86 @@ func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.
 	if method == "" {
 		method = "GET"
 	}
+	retryable := method == http.MethodGet || method == http.MethodHead
+	for attempt := 0; ; attempt++ {
+		canRetry := retryable && attempt < s.c.maxRetries
+		response, err := s.attempt(ctx, method, endpoint, options.Headers)
+		if err != nil {
+			sdkErr, ok := err.(*Error)
+			if !ok || !canRetry || !sdkErr.Retryable() || ctx.Err() != nil {
+				return nil, err
+			}
+			if waitErr := s.c.sleep(ctx, backoff(attempt)); waitErr != nil {
+				return nil, transportError(waitErr)
+			}
+			continue
+		}
+		if isRedirect(response) {
+			response.Body.Close()
+			return nil, redirectError(response)
+		}
+		if response.StatusCode >= 200 && response.StatusCode < 300 || !canRetry {
+			return response, nil
+		}
+		failure := &Error{Status: response.StatusCode, RetryAfter: parseRetryAfter(response.Header.Get("Retry-After"), s.c.now())}
+		delay, wait := retryDelay(failure, attempt)
+		if !failure.Retryable() || !wait {
+			return response, nil
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
+		response.Body.Close()
+		if waitErr := s.c.sleep(ctx, delay); waitErr != nil {
+			return nil, transportError(waitErr)
+		}
+	}
+}
+
+// attempt sends one CDN request. Options.Timeout ends when the response headers arrive.
+func (s *CDNService) attempt(ctx context.Context, method, endpoint string, headers http.Header) (*http.Response, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	var timedOut atomic.Bool
+	timer := time.AfterFunc(s.c.options.Timeout, func() {
+		timedOut.Store(true)
+		cancel()
+	})
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {
+		timer.Stop()
+		cancel()
 		return nil, argumentError("Could not build the CDN request", err)
 	}
-	req.Header = options.Headers.Clone()
+	req.Header = headers.Clone()
 	if req.Header == nil {
 		req.Header = http.Header{}
 	}
 	req.Header.Set("X-Api-Key", s.c.options.APIKey)
 	req.Header.Set("User-Agent", userAgent)
 	response, err := s.c.http.Do(req)
+	if !timer.Stop() && timedOut.Load() {
+		cancel()
+		if response != nil {
+			response.Body.Close()
+		}
+		return nil, &Error{Code: CodeSDKTimeout, Message: "CDN request timed out", Cause: context.DeadlineExceeded}
+	}
 	if err != nil {
+		cancel()
 		return nil, transportError(err)
 	}
+	response.Body = &cancelOnClose{ReadCloser: response.Body, cancel: cancel}
 	return response, nil
+}
+
+// cancelOnClose releases a CDN request's context once its body is closed.
+type cancelOnClose struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b *cancelOnClose) Close() error {
+	err := b.ReadCloser.Close()
+	b.cancel()
+	return err
 }
 
 // Classify moderates plain text and waits for the decision.

@@ -185,7 +185,7 @@ class TransportErrorTest {
     assertArrayEquals(data, received[0]);
     assertEquals(Integer.toString(data.length), header(head, "content-length"));
     assertNull(header(head, "transfer-encoding"));
-    assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (Java " + Runtime.version() + ")", header(head, "user-agent"));
+    assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (java/" + Runtime.version() + ")", header(head, "user-agent"));
     assertTrue(header(head, "idempotency-key").matches("[0-9a-f-]{36}"), head);
     assertTrue(head.toLowerCase(Locale.ROOT).startsWith("post /v1/projects/project/assets?"), head);
     assertEquals("content", header(head, "x-calmlens-upload"));

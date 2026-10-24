@@ -51,19 +51,24 @@ pub use webhooks::*;
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use client::{
     AssetsClient, CdnClient, CdnResponse, EventsClient, FoldersClient, ServerClient,
-    ServerClientBuilder, TextClient, UploadTokensClient, DEFAULT_BASE_URL, DEFAULT_CDN_BASE_URL,
-    ENSURE_LENSES_MAX_PER_REQUEST, MAX_SIGNED_URL_SECONDS,
+    ServerClientBuilder, TextClient, UploadTokensClient, DECISION_POLL_FIRST_INTERVAL,
+    DECISION_POLL_INTERVAL_FACTOR, DECISION_POLL_MAX_INTERVAL, DEFAULT_BASE_URL,
+    DEFAULT_CDN_BASE_URL, DEFAULT_DECISION_TIMEOUT, DEFAULT_MAX_RETRIES,
+    DEFAULT_SIGNED_URL_SECONDS, DEFAULT_TIMEOUT, DEFAULT_UPLOAD_TIMEOUT,
+    DEFAULT_UPLOAD_TOKEN_SECONDS, ENSURE_LENSES_MAX_PER_REQUEST, MAX_SIGNED_URL_SECONDS,
 };
 #[cfg(feature = "async")]
-pub use transport::MAX_RESPONSE_BYTES;
+pub use transport::{
+    DEFAULT_MAX_RESPONSE_BYTES, RETRY_AFTER_MAX, RETRY_BASE_DELAY, RETRY_MAX_DELAY,
+};
 
 /// This SDK's version, from its Cargo manifest.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The `User-Agent` the SDK sends: `calmlens-rust/<version> (rustc <compiler version>)`.
+/// The `User-Agent` the SDK sends: `calmlens-rust/<version> (rustc/<compiler version>)`.
 pub fn user_agent() -> String {
     format!(
-        "calmlens-rust/{VERSION} (rustc {})",
+        "calmlens-rust/{VERSION} (rustc/{})",
         env!("CALMLENS_RUSTC_VERSION")
     )
 }

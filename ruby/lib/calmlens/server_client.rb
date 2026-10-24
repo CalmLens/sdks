@@ -14,6 +14,19 @@ module CalmLens
   class ServerClient
     DEFAULT_BASE_URL = 'https://api.calmlens.com/v1'
     DEFAULT_CDN_BASE_URL = 'https://cdn.calmlens.com/v1'
+    # Seconds allowed for each socket read or write.
+    DEFAULT_TIMEOUT = 120
+    DEFAULT_OPEN_TIMEOUT = 10
+    DEFAULT_MAX_RETRIES = 2
+    # Seconds before the first retry; later retries wait twice as long each time, up to RETRY_MAX_DELAY.
+    DEFAULT_RETRY_BASE_DELAY = 0.5
+    RETRY_MAX_DELAY = 8
+    # A `Retry-After` longer than this many seconds is returned to the caller instead of waited out.
+    RETRY_AFTER_MAX = 60
+    # The largest response body read, in bytes (32 MiB).
+    DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+    # The most lens definitions {#ensure_lenses} sends in one request.
+    ENSURE_LENSES_MAX_PER_REQUEST = 100
 
     # @return [Assets]
     attr_reader :assets
@@ -36,6 +49,11 @@ module CalmLens
     #   moderation decision. It is not a deadline for a whole transfer, so large uploads and downloads
     #   are not cut off. Override per call with `request_options: {timeout:}`.
     # @param open_timeout [Numeric] seconds allowed to open a connection.
+    # @param upload_timeout [Numeric, nil] seconds allowed for each attempt of a binary upload (file
+    #   content or a multipart part) as a whole. Uploads have no such deadline unless you set one; text
+    #   content follows `timeout` like other requests.
+    # @param max_response_bytes [Integer] the largest response body read; a larger one fails with
+    #   `sdk/response-too-large`, before it is read when its `Content-Length` says so.
     # @param max_retries [Integer] retries of requests that are safe to repeat: GET/HEAD, and uploads,
     #   which carry an `Idempotency-Key`. Connection failures, timeouts, 429, 502, 503, 504 and
     #   `idempotency/request-in-progress` are retried with jittered exponential backoff, honouring
@@ -45,14 +63,18 @@ module CalmLens
     # @param transport [#call, nil] a custom {Transport}; defaults to {Transport::NetHTTP}.
     # @raise [ConfigurationError] `sdk/invalid-config` for a missing or malformed setting.
     def initialize(api_key:, project_id:, base_url: DEFAULT_BASE_URL, cdn_base_url: DEFAULT_CDN_BASE_URL,
-                   timeout: 120, open_timeout: 10, max_retries: 2, retry_base_delay: 0.5, transport: nil)
+                   timeout: DEFAULT_TIMEOUT, open_timeout: DEFAULT_OPEN_TIMEOUT, upload_timeout: nil,
+                   max_retries: DEFAULT_MAX_RETRIES, retry_base_delay: DEFAULT_RETRY_BASE_DELAY,
+                   max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES, transport: nil)
       check_config(api_key, project_id, timeout, open_timeout, max_retries, retry_base_delay, transport)
+      check_limits(upload_timeout, max_response_bytes)
       @project_id = project_id
       @base_url = ServerClient.check_url(base_url, 'base_url')
       @cdn_base_url = ServerClient.check_url(cdn_base_url, 'cdn_base_url')
       @session = Session.new(api_key: api_key, project_id: project_id, base_url: @base_url,
                              cdn_base_url: @cdn_base_url, timeout: timeout, open_timeout: open_timeout,
                              max_retries: max_retries, retry_base_delay: retry_base_delay,
+                             max_response_bytes: max_response_bytes, upload_timeout: upload_timeout,
                              transport: transport || Transport::NetHTTP.new)
       @assets = Assets.new(@session)
       @folders = Folders.new(@session)
@@ -109,6 +131,15 @@ module CalmLens
     end
 
     private
+
+    def check_limits(upload_timeout, max_response_bytes)
+      unless upload_timeout.nil? || Internal.positive?(upload_timeout)
+        raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG, 'upload_timeout must be nil or a positive number of seconds')
+      end
+      return if max_response_bytes.is_a?(Integer) && max_response_bytes.positive?
+
+      raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG, 'max_response_bytes must be a positive Integer')
+    end
 
     def check_config(api_key, project_id, timeout, open_timeout, max_retries, retry_base_delay, transport)
       unless api_key.is_a?(String) && !api_key.empty? && api_key.match?(/\A[\x21-\x7e]+\z/)

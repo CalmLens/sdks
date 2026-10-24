@@ -10,20 +10,6 @@ import (
 	"time"
 )
 
-func TestWebhookTestVector(t *testing.T) {
-	const want = "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae"
-	if got := SignWebhookPayload([]byte("{}"), 1700000000, "key"); got != want {
-		t.Fatal(got)
-	}
-	at := WithNow(time.Unix(1700000000, 0))
-	if !VerifyWebhookSignature([]byte("{}"), want, "1700000000", "key", at) {
-		t.Fatal("test vector rejected")
-	}
-	if VerifyWebhookSignature([]byte("{}"), want, "1700000000", "key") {
-		t.Fatal("expired test vector accepted with the real clock")
-	}
-}
-
 func TestWebhookTimestampFarInTheFutureDoesNotOverflow(t *testing.T) {
 	// 18446744074 seconds is 2^64 nanoseconds plus 0.29s: as a time.Duration it wraps to 0.29s.
 	body := []byte("{}")
@@ -68,26 +54,7 @@ func TestParseAndVerifyWebhookRequest(t *testing.T) {
 	if _, err = VerifyWebhookRequest(notEvent, "secret", WithNow(now)); ErrorCode(err) != CodeSDKInvalidWebhookPayload {
 		t.Fatal(err)
 	}
-	if _, err = ParseWebhookEvent([]byte(body), "", "", "", WithNow(now)); ErrorCode(err) != CodeSDKInvalidArgument {
+	if _, err = ParseWebhookEvent([]byte(body), "", "", "", WithNow(now)); ErrorCode(err) != CodeSDKInvalidWebhookSignature {
 		t.Fatal("empty secret accepted", err)
-	}
-}
-
-func TestCreateWebhookHeadersSignADeliveryVerifyWebhookRequestAccepts(t *testing.T) {
-	now := time.Unix(1760000000, 0)
-	body := `{"id":"event-1","type":"asset.allowed","createdAt":1760000000000,"projectId":"p","data":{"severity":"low","title":"t","facts":[]}}`
-	header := CreateWebhookHeaders([]byte(body), "delivery-1", now.Unix(), "secret")
-	if header.Get(WebhookDeliveryHeader) != "delivery-1" || header.Get(WebhookTimestampHeader) != "1760000000" || header.Get("Content-Type") != "application/json" {
-		t.Fatal(header)
-	}
-	req := httptest.NewRequest("POST", "/webhooks", strings.NewReader(body))
-	req.Header = header
-	if event, err := VerifyWebhookRequest(req, "secret", WithNow(now)); err != nil || event.ID != "event-1" {
-		t.Fatal(event, err)
-	}
-	req = httptest.NewRequest("POST", "/webhooks", strings.NewReader(body))
-	req.Header = header
-	if _, err := VerifyWebhookRequest(req, "other", WithNow(now)); ErrorCode(err) != CodeSDKInvalidWebhookSignature {
-		t.Fatal("signed with the wrong secret", err)
 	}
 }

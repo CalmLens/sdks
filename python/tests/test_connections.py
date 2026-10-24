@@ -28,8 +28,15 @@ class _RecordingServer:
             def answer(self):
                 length = int(self.headers.get('Content-Length') or 0)
                 body = self.rfile.read(length) if length else b''
+                if self.headers.get('Transfer-Encoding') == 'chunked':
+                    while True:
+                        size = int(self.rfile.readline().split(b';')[0], 16)
+                        body += self.rfile.read(size)
+                        self.rfile.readline()
+                        if not size:
+                            break
                 recorder.requests.append((self.requestline, self.headers, body))
-                payload = b'{"id":"asset","status":"approved"}'
+                payload = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Content-Length', str(len(payload)))
@@ -72,6 +79,23 @@ class StreamingUploadTests(unittest.TestCase):
             self.assertEqual(headers.get('Content-Length'), '300000')
             self.assertNotIn('Transfer-Encoding', headers)
             self.assertEqual(body, b'x' * 300_000)
+        finally:
+            server.close()
+
+
+    def test_streams_of_unknown_length_are_sent_chunked(self):
+        server = _RecordingServer()
+        read, write = os.pipe()
+        try:
+            os.write(write, b'y' * 30_000)
+            os.close(write)
+            with open(read, 'rb', buffering=0) as pipe, CalmLensServerClient(
+                    api_key='key', project_id='project', base_url=f'http://{server.address}/v1') as client:
+                client.assets.create(name='doc.pdf', content={'data': pipe, 'type': 'application/pdf'})
+            line, headers, body = server.requests[-1]
+            self.assertNotIn('sizeInBytes', line)
+            self.assertEqual((headers.get('Transfer-Encoding'), headers.get('Content-Length')), ('chunked', None))
+            self.assertEqual(body, b'y' * 30_000)
         finally:
             server.close()
 

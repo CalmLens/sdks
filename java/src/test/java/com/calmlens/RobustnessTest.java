@@ -57,77 +57,6 @@ class RobustnessTest {
     return request -> Fixtures.json(status, body, Map.of("Retry-After", List.of(retryAfter)));
   }
 
-  @Test void readsAreRetriedOnTransientFailuresWithBackoff() {
-    var transport = new Scripted(request -> null, reply(503, "{}"), reply(200, ALLOWED));
-    assertEquals("asset", transport.client().assets.retrieve(new Models.AssetId("asset")).id());
-    assertEquals(3, transport.requests.size());
-    assertEquals(2, transport.delays.size());
-    for (Duration delay : transport.delays) assertTrue(delay.toMillis() > 0 && delay.toMillis() <= 8000, delay.toString());
-  }
-
-  @Test void retriesHonourRetryAfterAndStopAtMaxRetries() {
-    var throttled = new Scripted(reply(429, "{}", "3"), reply(200, ALLOWED));
-    throttled.client().assets.retrieve(new Models.AssetId("asset"));
-    assertEquals(List.of(Duration.ofSeconds(3)), throttled.delays);
-
-    var unavailable = new Scripted(reply(503, "{\"code\":\"x/unavailable\"}"));
-    ApiException error = assertThrows(ApiException.class, () -> unavailable.client(CalmLensServerClient.builder("key", "project").maxRetries(1)).assets.retrieve(new Models.AssetId("a")));
-    assertEquals(503, error.getStatus());
-    assertTrue(error.isRetryable());
-    assertEquals(2, unavailable.requests.size());
-
-    var disabled = new Scripted(reply(503, "{}"));
-    assertThrows(ApiException.class, () -> disabled.client(CalmLensServerClient.builder("key", "project").maxRetries(0)).assets.retrieve(new Models.AssetId("a")));
-    assertEquals(1, disabled.requests.size());
-
-    // A Retry-After longer than the client waits on its own is returned to the caller instead.
-    var longWait = new Scripted(reply(429, "{}", "3600"));
-    ApiException later = assertThrows(ApiException.class, () -> longWait.client().assets.retrieve(new Models.AssetId("a")));
-    assertEquals(Duration.ofHours(1), later.getRetryAfter().orElseThrow());
-    assertEquals(1, longWait.requests.size());
-  }
-
-  @Test void writesWithoutAnIdempotencyKeyAreNotRetried() {
-    var transport = new Scripted(reply(503, "{}"), request -> null);
-    assertThrows(ApiException.class, () -> transport.client().folders.create(new Models.CreateFolder("Folder")));
-    assertThrows(TransportException.class, () -> transport.client().assets.retry(new Models.AssetId("a")));
-    assertEquals(2, transport.requests.size());
-    assertNull(transport.requests.get(0).headers().get("Idempotency-Key"));
-  }
-
-  @Test void uploadsCarryOneIdempotencyKeyPerCallAcrossRetries() {
-    String inProgress = "{\"code\":\"idempotency/request-in-progress\"}";
-    var transport = new Scripted(request -> null, reply(409, inProgress, "1"), reply(200, ALLOWED), reply(200, ALLOWED));
-    CalmLensServerClient client = transport.client();
-    client.assets.create(Models.SubmitAsset.text("hello"));
-    client.assets.create(Models.SubmitAsset.text("hello"));
-    List<String> keys = transport.requests.stream().map(request -> request.headers().get("Idempotency-Key")).toList();
-    assertEquals(4, keys.size());
-    assertEquals(keys.get(0), keys.get(1));
-    assertEquals(keys.get(0), keys.get(2));
-    assertNotEquals(keys.get(0), keys.get(3));
-    assertEquals(Duration.ofSeconds(1), transport.delays.get(1));
-    for (byte[] body : transport.bodies) assertEquals("hello", new String(body, StandardCharsets.UTF_8));
-
-    var supplied = new Scripted(reply(200, ALLOWED));
-    supplied.client().assets.uploadPart(new Models.UploadPart("a", Models.Content.text("end").partNumber(2).isFinal(true)), new RequestOptions().idempotencyKey("order-42:part-2"));
-    assertEquals("order-42:part-2", supplied.requests.get(0).headers().get("Idempotency-Key"));
-  }
-
-  @Test void multipartPartsUseTheSavedQueueChoiceUnlessOverridden() {
-    var transport = new Scripted(reply(200, Fixtures.assetJson("asset", "uploading", "pending")), reply(200, ALLOWED), reply(200, ALLOWED));
-    CalmLensServerClient client = transport.client();
-    client.assets.classify(new Models.SubmitAsset().name("big.pdf").totalSizeInBytes(5242885L)
-        .part(Models.Content.bytes(new byte[5 * 1024 * 1024], "application/pdf").partNumber(1).isFinal(false)));
-    client.assets.uploadPart(new Models.UploadPart("asset", Models.Content.text("final").partNumber(2).isFinal(true)));
-    client.assets.uploadPart(new Models.UploadPart("asset", Models.Content.text("final").partNumber(2).isFinal(true)).queue(true));
-    var start = query(transport.requests.get(0));
-    assertEquals("false", start.get("queue"));
-    assertEquals("5242885", start.get("totalSizeInBytes"));
-    assertFalse(query(transport.requests.get(1)).containsKey("queue"));
-    assertEquals("true", query(transport.requests.get(2)).get("queue"));
-  }
-
   private static Map<String, String> query(Transport.Request request) {
     return java.util.Arrays.stream(request.uri().getRawQuery().split("&")).map(pair -> pair.split("=", 2))
         .collect(Collectors.toMap(pair -> java.net.URLDecoder.decode(pair[0], StandardCharsets.UTF_8), pair -> java.net.URLDecoder.decode(pair[1], StandardCharsets.UTF_8)));
@@ -227,16 +156,8 @@ class RobustnessTest {
     assertEquals("sk_live_secret", transport.requests.get(0).headers().get("X-Api-Key"));
   }
 
-  @Test void iteratorsFollowPagesAndTheEventCursor() {
-    var assets = new Scripted(
-        reply(200, "{\"items\":[" + Fixtures.assetJson("a", "completed", "allowed") + "," + Fixtures.assetJson("b", "completed", "allowed") + "],\"nextCursor\":\"next-token\",\"pageSize\":2,\"total\":3,\"hasMore\":true}"),
-        reply(200, "{\"items\":[" + Fixtures.assetJson("c", "processing", "pending") + "],\"nextCursor\":null,\"pageSize\":2,\"total\":3,\"hasMore\":false}"));
-    CalmLensServerClient client = assets.client();
-    assertEquals(List.of("a", "b", "c"), client.assets.iterate(new Models.ListAssets().pageSize(2).filter("classification.moderation.status==allowed")).stream().map(Models.Asset::id).toList());
-    assertNull(query(assets.requests.get(0)).get("cursor"));
-    assertEquals("next-token", query(assets.requests.get(1)).get("cursor"));
-    assertEquals("classification.moderation.status==allowed", query(assets.requests.get(1)).get("filter"));
-
+  /** client-cases.json covers the pages and requests; {@code AutoPager.cursor()} is Java's own. */
+  @Test void theEventPagerKeepsTheLatestCursor() {
     var events = new Scripted(
         reply(200, "{\"events\":[{\"id\":\"e1\",\"type\":\"asset.classified\",\"facts\":[]}],\"cursor\":\"c1\",\"hasMore\":true}"),
         reply(200, "{\"events\":[{\"id\":\"e2\",\"type\":\"asset.allowed\"}],\"cursor\":\"c2\",\"hasMore\":false}"));
@@ -250,12 +171,7 @@ class RobustnessTest {
     assertEquals(List.of("e1", "e2"), ids);
     assertEquals(List.of("c1", "c2"), cursors);
     assertEquals("c2", feed.cursor());
-    assertEquals(List.of("c0", "c1"), events.requests.stream().map(request -> query(request).get("after")).toList());
     assertEquals(List.of(), events.client().events.list(new Models.ListEvents()).events().get(0).facts());
-
-    var children = new Scripted(reply(200, "{\"items\":[" + Fixtures.assetJson("child", "completed", "allowed") + "],\"hasMore\":false}"));
-    assertEquals(List.of("child"), children.client().assets.iterateChildren(new Models.ListChildren("parent")).stream().map(Models.Asset::id).toList());
-    assertEquals("/v1/assets/parent/children", children.requests.get(0).uri().getRawPath());
   }
 
   @Test void closedClientsRefuseRequests() {
@@ -347,22 +263,6 @@ class RobustnessTest {
     }
     assertEquals(List.of(Duration.ofMillis(500), Duration.ofMillis(750), Duration.ofMillis(1125), Duration.ofNanos(1_687_500_000),
         Duration.ofNanos(2_531_250_000L), Duration.ofNanos(3_796_875_000L), Duration.ofSeconds(5), Duration.ofSeconds(5)), transport.delays);
-  }
-
-  @Test void waitForDecisionTimesOutWithTheAssetAndItsLastStatus() {
-    var transport = new Scripted(reply(200, Fixtures.assetJson("asset", "processing", "pending")));
-    CalmLensException error = assertThrows(CalmLensException.class,
-        () -> transport.client().assets.waitForDecision(new Models.WaitForDecision("asset").timeout(Duration.ZERO)));
-    assertEquals(ErrorCodes.SDK_TIMEOUT, error.getCode());
-    assertEquals(Map.of("assetId", "asset", "classificationStatus", "processing", "moderationStatus", "pending"), error.getDetails());
-    // Waiting again later may still see a decision.
-    assertTrue(error.isRetryable());
-    assertEquals(1, transport.requests.size());
-
-    var unsent = new Scripted(reply(200, ALLOWED));
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
-        () -> unsent.client().assets.waitForDecision(new Models.WaitForDecision("asset").timeout(Duration.ofSeconds(-1)))).getCode());
-    assertEquals(0, unsent.requests.size());
   }
 
   @Test void waitForDecisionStopsWhenTheThreadIsInterrupted() {

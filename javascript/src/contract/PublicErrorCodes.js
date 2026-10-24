@@ -342,12 +342,12 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	UPLOAD_LIMIT_EXCEEDED: new ErrorCode({
 		id: "upload/limit-exceeded",
-		defaultMessage: "Upload limit exceeded. You have used all your free uploads. Please upgrade to Plus or Pro for unlimited uploads.",
+		defaultMessage: "Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.",
 		status: 403
 	}),
 	SPEND_LIMIT_REACHED: new ErrorCode({
 		id: "upload/spend-limit-reached",
-		defaultMessage: "The project owner's spend limit for this billing period has been reached. Raise the limit in Billing to resume uploads.",
+		defaultMessage: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner or billing admin can review them in Billing.",
 		status: 402
 	}),
 	INVALID_UPLOAD_MIME_TYPE: new ErrorCode({

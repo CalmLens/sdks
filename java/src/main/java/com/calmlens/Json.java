@@ -1,5 +1,7 @@
 package com.calmlens;
 
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -24,7 +26,57 @@ final class Json {
     return new GsonBuilder()
         .disableHtmlEscaping()
         .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
-        .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE);
+        .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+        .setExclusionStrategies(new ExclusionStrategy() {
+          @Override public boolean shouldSkipField(FieldAttributes field) {
+            return field.getName().equals("json") && KEEPS_JSON.contains(field.getDeclaringClass());
+          }
+
+          @Override public boolean shouldSkipClass(Class<?> type) { return false; }
+        })
+        .registerTypeAdapterFactory(new KeepsJsonFactory());
+  }
+
+  /** Records whose {@code json} component holds the object they were read from. */
+  private static final java.util.Set<Class<?>> KEEPS_JSON = java.util.Set.of(Models.Event.class, Models.WebhookEventPayload.class);
+
+  /**
+   * Reads {@link Models.Event} and {@link Models.WebhookEventPayload} keeping the whole JSON object
+   * in their {@code json} component, unknown fields included, and writes that object back when
+   * they have one.
+   */
+  static final class KeepsJsonFactory implements TypeAdapterFactory {
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> token) {
+      if (!KEEPS_JSON.contains(token.getRawType())) return null;
+      TypeAdapter<T> delegate = gson.getDelegateAdapter(this, token);
+      TypeAdapter<JsonElement> elements = gson.getAdapter(JsonElement.class);
+      TypeAdapter<Object> objects = gson.getAdapter(Object.class);
+      return new TypeAdapter<T>() {
+        @Override public void write(JsonWriter out, T value) throws IOException {
+          java.util.Map<String, Object> json = value instanceof Models.Event event ? event.json()
+              : value instanceof Models.WebhookEventPayload payload ? payload.json() : null;
+          if (json == null) { delegate.write(out, value); return; }
+          boolean serializeNulls = out.getSerializeNulls();
+          out.setSerializeNulls(true);
+          try {
+            objects.write(out, json);
+          } finally {
+            out.setSerializeNulls(serializeNulls);
+          }
+        }
+
+        @Override public T read(JsonReader in) throws IOException {
+          JsonElement tree = elements.read(in);
+          if (tree == null || tree.isJsonNull()) return null;
+          T typed = delegate.fromJsonTree(tree);
+          if (!tree.isJsonObject() || typed == null) return typed;
+          java.util.Map<String, Object> json = (java.util.Map<String, Object>) objects.fromJsonTree(tree);
+          return typed instanceof Models.Event event ? (T) event.withJson(json) : (T) ((Models.WebhookEventPayload) typed).withJson(json);
+        }
+      };
+    }
   }
 
   /** Reads responses strictly and turns models into trees; unset fields are omitted. */

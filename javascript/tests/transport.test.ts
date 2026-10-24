@@ -37,7 +37,14 @@ test("rejects redirects before credentials reach another origin on every transpo
       () => client.assets.retrieve({ assetId: "a" }),
       () => client.cdn.serve({ assetIdentifier: "a", init: { redirect: "follow" } }),
     ]) {
-      await expect(call()).rejects.toBeInstanceOf(CalmLensError);
+      const error = await call().then(
+        () => undefined,
+        (failure: unknown) => failure,
+      );
+      expect(error).toBeInstanceOf(CalmLensError);
+      // An HTTP failure with the redirect's status, which repeating would not change.
+      expect(error).toMatchObject({ code: "sdk/http-error", status: 307 });
+      expect((error as CalmLensError).isRetryable()).toBe(false);
     }
     expect(forwarded).toBe(0);
   } finally {

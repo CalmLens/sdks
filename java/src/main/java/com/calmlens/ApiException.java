@@ -44,7 +44,7 @@ public class ApiException extends CalmLensException {
     return values == null || values.isEmpty() ? null : values.get(0);
   }
 
-  /** Parses a {@code Retry-After} value in seconds, or an HTTP date as the delay from now. */
+  /** Parses a {@code Retry-After} value in seconds, or an HTTP date as the whole seconds from now (0 when past). */
   static Duration retryAfter(String value) {
     if (value == null || value.isBlank()) return null;
     String text = value.strip();
@@ -54,8 +54,9 @@ public class ApiException extends CalmLensException {
     } catch (NumberFormatException notSeconds) {
       try {
         Instant at = ZonedDateTime.parse(text, DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(Locale.ROOT)).toInstant();
-        Duration delay = Duration.between(Instant.now(), at);
-        return delay.isNegative() ? Duration.ZERO : delay;
+        // Whole seconds from now, rounded up, as the API means them.
+        long millis = Duration.between(Instant.now(), at).toMillis();
+        return millis <= 0 ? Duration.ZERO : Duration.ofSeconds((millis + 999) / 1000);
       } catch (DateTimeParseException invalid) {
         return null;
       }

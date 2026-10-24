@@ -3,6 +3,7 @@ use crate::error::ErrorCode;
 use crate::models::WebhookEventPayload;
 use crate::{Error, Result};
 use hmac::{Hmac, Mac};
+use serde_json::{Map, Value};
 use sha2::Sha256;
 
 /// Header carrying `v1=<hex HMAC-SHA256>` signatures of `"<timestamp>.<raw body>"`.
@@ -119,50 +120,140 @@ pub fn verify_webhook_signature(
 }
 
 /// Parses a webhook delivery body without verifying it; prefer [`construct_webhook_event`].
-/// A body that is not valid JSON, or lacks `id`, `type` or `data`, returns
-/// `sdk/invalid-webhook-payload`.
+///
+/// The body must be a JSON object with string `id`, `type` and `projectId`, a numeric
+/// `createdAt` and an object `data` whose fields, when present, have the API's types:
+/// `severity` and `title` strings, `description` and `assetId` strings or null, `asset` null or
+/// an object with a string `id`, and `facts` an array of `{key, value, url?}` objects with a
+/// string `key` and `url`. Anything else returns `sdk/invalid-webhook-payload`. Unknown fields
+/// are kept: [`WebhookEventPayload::json`] returns the body as received.
 pub fn parse_webhook_event(body: impl AsRef<[u8]>) -> Result<WebhookEventPayload> {
-    let payload: WebhookEventPayload = serde_json::from_slice(body.as_ref()).map_err(|cause| {
-        Error::new(
-            ErrorCode::InvalidWebhookPayload,
-            "Webhook body is not a delivery payload",
-        )
-        .with_source(cause)
+    let invalid = |message: &str| Error::new(ErrorCode::InvalidWebhookPayload, message);
+    let value: Value = serde_json::from_slice(body.as_ref())
+        .map_err(|cause| invalid("Webhook body is not a delivery payload").with_source(cause))?;
+    check_payload(&value).map_err(|field| {
+        invalid(&format!(
+            "Webhook body is not a delivery payload: invalid {field}"
+        ))
     })?;
-    if payload.id.is_empty() || payload.event_type.as_str().is_empty() {
-        return Err(Error::new(
-            ErrorCode::InvalidWebhookPayload,
-            "Webhook body needs id, type and data",
-        ));
+    let payload: WebhookEventPayload = serde_json::from_value(value.clone())
+        .map_err(|cause| invalid("Webhook body is not a delivery payload").with_source(cause))?;
+    Ok(payload.received(value))
+}
+
+/// Checks a delivery's field types as the API's received-payload schema does, returning the
+/// first invalid field.
+fn check_payload(value: &Value) -> std::result::Result<(), &'static str> {
+    let payload = value.as_object().ok_or("body")?;
+    let string = |object: &Map<String, Value>, key| object.get(key).is_some_and(Value::is_string);
+    let optional = |object: &Map<String, Value>, key, nullable: bool| match object.get(key) {
+        None | Some(Value::String(_)) => true,
+        Some(Value::Null) => nullable,
+        Some(_) => false,
+    };
+    for key in ["id", "type", "projectId"] {
+        if !string(payload, key) {
+            return Err(match key {
+                "id" => "id",
+                "type" => "type",
+                _ => "projectId",
+            });
+        }
     }
-    Ok(payload)
+    if !payload.get("createdAt").is_some_and(Value::is_number) {
+        return Err("createdAt");
+    }
+    let data = payload
+        .get("data")
+        .and_then(Value::as_object)
+        .ok_or("data")?;
+    if !optional(data, "severity", false) {
+        return Err("data.severity");
+    }
+    if !optional(data, "title", false) {
+        return Err("data.title");
+    }
+    if !optional(data, "description", true) {
+        return Err("data.description");
+    }
+    if !optional(data, "assetId", true) {
+        return Err("data.assetId");
+    }
+    match data.get("asset") {
+        None | Some(Value::Null) => {}
+        Some(Value::Object(asset)) if string(asset, "id") => {}
+        Some(_) => return Err("data.asset"),
+    }
+    match data.get("facts") {
+        None => {}
+        Some(Value::Array(facts)) => {
+            for fact in facts {
+                let fact = fact.as_object().ok_or("data.facts")?;
+                if !string(fact, "key") || !fact.contains_key("value") {
+                    return Err("data.facts");
+                }
+                if !optional(fact, "url", false) {
+                    return Err("data.facts");
+                }
+            }
+        }
+        Some(_) => return Err("data.facts"),
+    }
+    Ok(())
+}
+
+/// The value of header `name` (any case), with repeated headers joined by `,`.
+fn joined_header(headers: &http::HeaderMap, name: &str) -> String {
+    headers
+        .get_all(name)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// Verifies a delivery from its request headers: [`WEBHOOK_SIGNATURE_HEADER`] and
+/// [`WEBHOOK_TIMESTAMP_HEADER`], whose names `http::HeaderMap` matches in any case. Repeated
+/// headers are joined with `,`, so a signature list split across headers verifies (and a
+/// repeated timestamp does not). Takes the raw body, `now` in Unix seconds and the tolerance in
+/// seconds, like [`verify_webhook_signature`].
+pub fn verify_webhook_headers(
+    body: impl AsRef<[u8]>,
+    headers: &http::HeaderMap,
+    secret: &str,
+    now: u64,
+    tolerance: u64,
+) -> bool {
+    verify_webhook_signature(
+        body,
+        &joined_header(headers, WEBHOOK_SIGNATURE_HEADER),
+        &joined_header(headers, WEBHOOK_TIMESTAMP_HEADER),
+        secret,
+        now,
+        tolerance,
+    )
 }
 
 /// Verifies a delivery's signature and freshness from its headers, then parses it.
 ///
 /// Pass the raw request body exactly as received and the request headers, e.g. axum's
-/// `axum::body::Bytes` and `http::HeaderMap`. A missing, wrong or stale signature returns
-/// `sdk/invalid-webhook-signature` (answer 401); a body that is not a delivery returns
-/// `sdk/invalid-webhook-payload` (answer 400).
+/// `axum::body::Bytes` and `http::HeaderMap`; headers are read as [`verify_webhook_headers`]
+/// reads them. A missing, wrong or stale signature returns `sdk/invalid-webhook-signature`
+/// (answer 401); a body that is not a delivery returns `sdk/invalid-webhook-payload` (answer
+/// 400).
 pub fn construct_webhook_event(
     body: impl AsRef<[u8]>,
     headers: &http::HeaderMap,
     secret: &str,
 ) -> Result<WebhookEventPayload> {
-    let header = |name: &str| {
-        headers
-            .get(name)
-            .and_then(|value| value.to_str().ok())
-            .unwrap_or("")
-    };
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs())
         .unwrap_or(0);
     construct_webhook_event_at(
         body,
-        header(WEBHOOK_SIGNATURE_HEADER),
-        header(WEBHOOK_TIMESTAMP_HEADER),
+        &joined_header(headers, WEBHOOK_SIGNATURE_HEADER),
+        &joined_header(headers, WEBHOOK_TIMESTAMP_HEADER),
         secret,
         now,
         WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
@@ -170,8 +261,8 @@ pub fn construct_webhook_event(
 }
 
 /// [`construct_webhook_event`] for frameworks with their own header types (such as
-/// actix-web), and for tests: takes the header values, the current Unix time and the
-/// tolerance in seconds.
+/// actix-web), and for tests: takes the header values (repeated headers joined with `,`), the
+/// current Unix time and the tolerance in seconds.
 pub fn construct_webhook_event_at(
     body: impl AsRef<[u8]>,
     signature: &str,

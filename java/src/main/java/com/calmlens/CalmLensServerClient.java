@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonPrimitive;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
 import java.io.InputStream;
@@ -78,13 +79,32 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final long MAX_SIGNED_URL_SECONDS = 24 * 60 * 60;
 
   private static final long MULTIPART_MIN_PART_BYTES = 5L * 1024 * 1024;
-  private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(60);
   private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
   private static final Set<String> RESTRICTED_HEADERS = Set.of("connection", "content-length", "expect", "host", "upgrade", "x-api-key");
-  private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[\\x20-\\x7e]{1,255}");
-  private static final long DECISION_POLL_FIRST_DELAY_NANOS = 500_000_000L;
-  private static final long DECISION_POLL_MAX_DELAY_NANOS = 5_000_000_000L;
-  private static final Duration DEFAULT_DECISION_TIMEOUT = Duration.ofSeconds(60);
+  /** The API deadline of each request attempt when {@link Builder#timeout(Duration)} is not set: 120 seconds. */
+  public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
+  /** Automatic retries when {@link Builder#maxRetries(int)} is not set. */
+  public static final int DEFAULT_MAX_RETRIES = 2;
+  /** The largest API response body read when {@link Builder#maxResponseBytes(long)} is not set: 32 MiB. */
+  public static final long DEFAULT_MAX_RESPONSE_BYTES = 32L * 1024 * 1024;
+  /** The backoff before the first retry is up to this long; it doubles per retry. */
+  public static final Duration RETRY_BASE_DELAY = Duration.ofMillis(500);
+  /** The longest backoff before a retry. */
+  public static final Duration RETRY_MAX_DELAY = Duration.ofSeconds(8);
+  /** A {@code Retry-After} longer than this is not waited out: the error goes back to the caller. */
+  public static final Duration RETRY_AFTER_MAX = Duration.ofSeconds(60);
+  /** {@code assets.createSignedUrl}'s lifetime when none is given, in seconds. */
+  public static final long DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 900;
+  /** {@code uploadTokens.sign}'s lifetime when none is given, in seconds. */
+  public static final int DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS = 600;
+  /** {@code assets.waitForDecision}'s timeout when none is given. */
+  public static final Duration DEFAULT_DECISION_TIMEOUT = Duration.ofSeconds(60);
+  /** The wait before {@code waitForDecision}'s second check. */
+  public static final Duration DECISION_POLL_FIRST_DELAY = Duration.ofMillis(500);
+  /** How much longer each {@code waitForDecision} wait is than the one before. */
+  public static final double DECISION_POLL_DELAY_FACTOR = 1.5;
+  /** The longest wait between {@code waitForDecision} checks. */
+  public static final Duration DECISION_POLL_MAX_DELAY = Duration.ofSeconds(5);
 
   /** Asset uploads, moderation, listing and management. */
   public final Assets assets = new Assets();
@@ -107,8 +127,16 @@ public final class CalmLensServerClient implements AutoCloseable {
   private final HttpClient ownedHttpClient;
   private final Sleeper sleeper;
   private final LongSupplier nanoTime;
-  private final AtomicBoolean closed = new AtomicBoolean();
-  private final Map<String, Models.Lens> lenses = new ConcurrentHashMap<>();
+  private final AtomicBoolean closed;
+  private final LensCache lenses;
+  /** Leaves multipart size checks to the API; set by the mock so its API answers them in the API's order. */
+  boolean deferUploadChecks;
+
+  /** Lenses ensured by a client and the clients derived from it, and the requests in flight. */
+  private static final class LensCache {
+    final Map<String, Models.Lens> ensured = new ConcurrentHashMap<>();
+    final Map<String, java.util.concurrent.CompletableFuture<Void>> pending = new ConcurrentHashMap<>();
+  }
 
   /** Waits between retries; replaced in mocks so tests do not sleep. */
   @FunctionalInterface
@@ -123,6 +151,26 @@ public final class CalmLensServerClient implements AutoCloseable {
    */
   public CalmLensServerClient(String apiKey, String projectId) { this(builder(apiKey, projectId), null, null, null); }
 
+  /** A client like {@code base} with other deadlines or retries, sharing its transport, state and lens cache. */
+  private CalmLensServerClient(CalmLensServerClient base, Duration timeout, Duration uploadTimeout, int maxRetries) {
+    this.apiKey = base.apiKey;
+    this.projectId = base.projectId;
+    this.baseUrl = base.baseUrl;
+    this.cdnBaseUrl = base.cdnBaseUrl;
+    this.userAgent = base.userAgent;
+    this.timeout = timeout;
+    this.uploadTimeout = uploadTimeout;
+    this.maxRetries = maxRetries;
+    this.maxResponseBytes = base.maxResponseBytes;
+    this.transport = base.transport;
+    this.ownedHttpClient = null;
+    this.sleeper = base.sleeper;
+    this.nanoTime = base.nanoTime;
+    this.closed = base.closed;
+    this.lenses = base.lenses;
+    this.deferUploadChecks = base.deferUploadChecks;
+  }
+
   private CalmLensServerClient(Builder options, Transport override, Sleeper sleeper, LongSupplier nanoTime) {
     // Validate every option before building anything.
     if (options.apiKey == null || options.apiKey.isBlank() || options.projectId == null || options.projectId.isBlank())
@@ -132,7 +180,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     positive("connectTimeout", options.connectTimeout, false);
     positive("uploadTimeout", options.uploadTimeout, true);
     if (options.maxRetries < 0 || options.maxRetries > 10) throw config("maxRetries must be between 0 and 10");
-    if (options.maxResponseBytes < 1024) throw config("maxResponseBytes must be at least 1024");
+    if (options.maxResponseBytes < 1) throw config("maxResponseBytes must be a positive number of bytes");
+    this.closed = new AtomicBoolean();
+    this.lenses = new LensCache();
     this.baseUrl = baseUrl("baseUrl", options.baseUrl);
     this.cdnBaseUrl = baseUrl("cdnBaseUrl", options.cdnBaseUrl);
     this.apiKey = options.apiKey;
@@ -141,7 +191,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.uploadTimeout = options.uploadTimeout;
     this.maxRetries = options.maxRetries;
     this.maxResponseBytes = options.maxResponseBytes;
-    this.userAgent = "calmlens-java/" + VERSION + " (Java " + Runtime.version() + ")";
+    this.userAgent = "calmlens-java/" + VERSION + " (java/" + Runtime.version() + ")";
     this.sleeper = sleeper != null ? sleeper : delay -> Thread.sleep(delay.toMillis());
     this.nanoTime = nanoTime != null ? nanoTime : System::nanoTime;
     Transport custom = override != null ? override : options.transport;
@@ -198,11 +248,11 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final class Builder {
     private final String apiKey, projectId;
     private String baseUrl = DEFAULT_BASE_URL, cdnBaseUrl = DEFAULT_CDN_BASE_URL;
-    private Duration timeout = Duration.ofSeconds(60);
+    private Duration timeout = DEFAULT_TIMEOUT;
     private Duration connectTimeout = Duration.ofSeconds(10);
-    private Duration uploadTimeout = Duration.ofMinutes(15);
-    private int maxRetries = 2;
-    private long maxResponseBytes = 32L * 1024 * 1024;
+    private Duration uploadTimeout;
+    private int maxRetries = DEFAULT_MAX_RETRIES;
+    private long maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES;
     private Transport transport;
     private HttpClient httpClient;
 
@@ -215,8 +265,10 @@ public final class CalmLensServerClient implements AutoCloseable {
     public Builder cdnBaseUrl(String value) { cdnBaseUrl = value; return this; }
 
     /**
-     * Time allowed for an API request to return its response (60 seconds by default), for reading a
-     * response body, and between bytes of a CDN stream. Uploads use {@link #uploadTimeout(Duration)}.
+     * Deadline of each API request attempt, from sending it to reading its response body (120
+     * seconds by default). Text uploads use it too; binary uploads use {@link
+     * #uploadTimeout(Duration)}. For {@code cdn.serve} it ends when the response headers arrive, and
+     * a CDN stream then fails when no data arrives for this long.
      *
      * @param value a positive duration
      * @return this builder
@@ -227,9 +279,10 @@ public final class CalmLensServerClient implements AutoCloseable {
     public Builder connectTimeout(Duration value) { connectTimeout = value; return this; }
 
     /**
-     * Time allowed for an upload to be sent and answered (15 minutes by default), so large files
-     * are not cut off by {@link #timeout(Duration)}. Null removes the limit. Override it per call
-     * with {@link RequestOptions#timeout(Duration)}.
+     * Deadline of each binary upload attempt (file, byte and stream content and multipart parts).
+     * There is none by default, so large files are never cut off; text content and URL submissions
+     * use {@link #timeout(Duration)}. Override it per call with {@link
+     * RequestOptions#uploadTimeout(Duration)}.
      *
      * @param value a positive duration, or null for no limit
      * @return this builder
@@ -244,7 +297,14 @@ public final class CalmLensServerClient implements AutoCloseable {
      */
     public Builder maxRetries(int value) { maxRetries = value; return this; }
 
-    /** @param value the largest API response body read into memory (32 MiB by default) @return this builder */
+    /**
+     * The largest API response body the client reads (32 MiB by default). A larger declared {@code
+     * Content-Length} or body fails with {@link ErrorCodes#SDK_RESPONSE_TOO_LARGE}; {@code cdn.serve}
+     * bodies are not limited.
+     *
+     * @param value a positive number of bytes
+     * @return this builder
+     */
     public Builder maxResponseBytes(long value) { maxResponseBytes = value; return this; }
 
     /**
@@ -298,10 +358,47 @@ public final class CalmLensServerClient implements AutoCloseable {
     return "CalmLensServerClient[projectId=" + projectId + ", baseUrl=" + baseUrl + ", cdnBaseUrl=" + cdnBaseUrl + "]";
   }
 
+  /**
+   * A client whose calls use other deadlines or retries, sharing this client's credentials,
+   * connection and lens cache. This client is unchanged, and closing either closes both.
+   *
+   * <pre>{@code
+   * var patient = client.withRequestOptions(new RequestOptions().timeout(Duration.ofMinutes(5)).maxRetries(5));
+   * }</pre>
+   *
+   * @param options {@code timeout}, {@code uploadTimeout} and {@code maxRetries}; an idempotency
+   *     key belongs to one call, so it is refused here
+   * @return the derived client
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for invalid options
+   */
+  public CalmLensServerClient withRequestOptions(RequestOptions options) {
+    if (options == null) throw argument("Request options are required");
+    if (options.idempotencyKeyValue() != null) throw argument("An idempotency key applies to one call; pass it to that call");
+    return with(options);
+  }
+
+  /** This client, or a derived one with the overrides in {@code options}. */
+  private CalmLensServerClient with(RequestOptions options) {
+    if (options == null || options.timeoutValue() == null && options.uploadTimeoutValue() == null && options.maxRetriesValue() == null) return this;
+    Duration callTimeout = options.timeoutValue() != null ? options.timeoutValue() : timeout;
+    Duration callUploadTimeout = options.uploadTimeoutValue() != null ? options.uploadTimeoutValue() : uploadTimeout;
+    int retries = options.maxRetriesValue() != null ? options.maxRetriesValue() : maxRetries;
+    if (callTimeout.isZero() || callTimeout.isNegative()) throw argument("timeout must be a positive duration");
+    if (callUploadTimeout != null && (callUploadTimeout.isZero() || callUploadTimeout.isNegative())) throw argument("uploadTimeout must be a positive duration");
+    if (retries < 0 || retries > 10) throw argument("maxRetries must be between 0 and 10");
+    return new CalmLensServerClient(this, callTimeout, callUploadTimeout, retries);
+  }
+
+  private static String key(RequestOptions options) { return options == null ? null : options.idempotencyKeyValue(); }
+
   // For MockCalmLensServerClient, which answers requests at these addresses.
   String projectId() { return projectId; }
   String baseUrl() { return baseUrl; }
   String cdnBaseUrl() { return cdnBaseUrl; }
+  Duration timeout() { return timeout; }
+  Duration uploadTimeout() { return uploadTimeout; }
+  int maxRetries() { return maxRetries; }
+  long maxResponseBytes() { return maxResponseBytes; }
 
   // ------------------------------------------------------------------ Encoding helpers
 
@@ -324,7 +421,18 @@ public final class CalmLensServerClient implements AutoCloseable {
   private static String id(String value) {
     if (value == null || value.isEmpty()) throw argument("Identifier is required");
     if (value.equals(".") || value.equals("..")) throw argument("Identifier cannot be \".\" or \"..\"");
-    return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    return encodeComponent(value);
+  }
+
+  /** Percent-encodes UTF-8 like JavaScript's {@code encodeURIComponent}: all but {@code A-Z a-z 0-9 - _ . ! ~ * ' ( )}. */
+  static String encodeComponent(String value) {
+    StringBuilder out = new StringBuilder();
+    for (byte b : value.getBytes(StandardCharsets.UTF_8)) {
+      int c = b & 0xff;
+      if (c < 0x80 && (Character.isLetterOrDigit(c) || "-_.!~*'()".indexOf(c) >= 0)) out.append((char) c);
+      else out.append(String.format("%%%02X", c));
+    }
+    return out.toString();
   }
 
   /** Encodes a CDN transform selector string like JavaScript's encodeURI, keeping its separators. */
@@ -491,17 +599,17 @@ public final class CalmLensServerClient implements AutoCloseable {
     headers.put(name, value);
   }
 
-  private String idempotencyKey(RequestOptions options) {
-    String key = options == null ? null : options.idempotencyKeyValue();
+  /**
+   * The caller's key, or a new one. The API decides which keys are valid ({@link
+   * ErrorCodes#INVALID_IDEMPOTENCY_KEY}); only values no HTTP header can carry are refused here.
+   */
+  private static String idempotencyKey(String key) {
     if (key == null) return UUID.randomUUID().toString();
-    if (!IDEMPOTENCY_KEY.matcher(key).matches()) throw argument("Idempotency keys are 1 to 255 printable ASCII characters");
+    for (int i = 0; i < key.length(); i++) {
+      char c = key.charAt(i);
+      if (c < 0x20 || c == 0x7f || c > 0xff) throw argument("An idempotency key cannot contain control or non-Latin-1 characters");
+    }
     return key;
-  }
-
-  private Duration uploadTimeout(RequestOptions options) {
-    Duration override = options == null ? null : options.timeoutValue();
-    if (override != null && (override.isZero() || override.isNegative())) throw argument("timeout must be a positive duration");
-    return override != null ? override : uploadTimeout;
   }
 
   // ------------------------------------------------------------------ Requests, retries and errors
@@ -515,11 +623,12 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (closed.get()) throw new CalmLensException(ErrorCodes.SDK_CLIENT_CLOSED, "The client is closed");
   }
 
+  /** The API key and User-Agent, and {@code accept} unless it is null. */
   private Map<String, String> baseHeaders(String accept) {
     Map<String, String> headers = new LinkedHashMap<>();
     headers.put("X-Api-Key", apiKey);
     headers.put("User-Agent", userAgent);
-    headers.put("Accept", accept);
+    if (accept != null) headers.put("Accept", accept);
     return headers;
   }
 
@@ -527,12 +636,16 @@ public final class CalmLensServerClient implements AutoCloseable {
     return attempt < maxRetries && call.retryable() && (call.body() == null || call.body().replayable());
   }
 
-  private void backoff(int attempt, Duration retryAfter) {
-    Duration delay = retryAfter;
-    if (delay == null) {
-      long cap = Math.min(8000, 500L << Math.min(attempt, 4));
-      delay = Duration.ofMillis(cap / 2 + ThreadLocalRandom.current().nextLong(cap / 2 + 1));
-    }
+  /**
+   * The backoff before retry {@code attempt} (0-based) without a {@code Retry-After}: {@code d =
+   * min(RETRY_MAX_DELAY, RETRY_BASE_DELAY * 2^attempt)}, waiting {@code d/2 + random * d/2}, rounded.
+   */
+  static Duration retryDelay(int attempt, double random) {
+    double delay = Math.min(RETRY_MAX_DELAY.toMillis(), RETRY_BASE_DELAY.toMillis() * Math.pow(2, attempt));
+    return Duration.ofMillis(Math.round(delay / 2 + random * (delay / 2)));
+  }
+
+  private void pause(Duration delay) {
     try {
       sleeper.sleep(delay);
     } catch (InterruptedException interrupted) {
@@ -553,6 +666,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     } catch (CalmLensException failure) {
       throw failure;
     } catch (IOException | RuntimeException failure) {
+      if (Thread.currentThread().isInterrupted())
+        throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Request interrupted", failure);
       throw transportError(failure);
     }
   }
@@ -566,41 +681,68 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   private static boolean retryableStatus(int status) { return status == 429 || status == 502 || status == 503 || status == 504; }
 
-  /** Sends a JSON API request, retrying when allowed, and reads its body within the limits. */
+  private static boolean isRedirect(int status) { return status >= 300 && status < 400; }
+
+  /** The declared {@code Content-Length}, or -1. */
+  private static long declaredLength(Transport.Response response) {
+    String value = response.header("content-length");
+    try { return value == null ? -1 : Long.parseLong(value.strip()); } catch (NumberFormatException invalid) { return -1; }
+  }
+
+  private ApiException tooLarge(Transport.Response response) {
+    return new ApiException(ErrorCodes.SDK_RESPONSE_TOO_LARGE, "Response body exceeds " + maxResponseBytes + " bytes",
+        null, response.status(), response.headers(), null);
+  }
+
+  /** The time left of an attempt that started at {@code started} (nanoTime), or null without a deadline. */
+  private Duration remaining(Duration deadline, long started) {
+    if (deadline == null) return null;
+    Duration left = deadline.minusNanos(System.nanoTime() - started);
+    return left.isNegative() || left.isZero() ? Duration.ofMillis(1) : left;
+  }
+
+  /**
+   * Sends a JSON API request and reads its body within the size limit and the attempt's deadline,
+   * retrying when allowed. A 2xx reply is returned; anything else is thrown.
+   */
   private Reply execute(Call call) {
     for (int attempt = 0; ; attempt++) {
       Transport.Response response;
       byte[] body;
       try {
+        long started = System.nanoTime();
         response = send(call);
         try (response) {
-          body = Timeouts.readAll(response.body(), maxResponseBytes, timeout);
+          // A redirect is an HTTP failure like any other: repeating the request redirects again.
+          if (isRedirect(response.status()))
+            throw new ApiException(ErrorCodes.SDK_HTTP_ERROR, "Unexpected redirect (HTTP " + response.status() + ")", null, response.status(), response.headers(), null);
+          if (declaredLength(response) > maxResponseBytes) throw tooLarge(response);
+          body = Timeouts.readAll(response.body(), maxResponseBytes, remaining(call.timeout(), started));
         } catch (IOException failure) {
           throw transportError(failure);
         }
       } catch (TransportException failure) {
-        if (canRetry(call, attempt)) { backoff(attempt, null); continue; }
+        if (canRetry(call, attempt) && !Thread.currentThread().isInterrupted()) { pause(retryDelay(attempt, ThreadLocalRandom.current().nextDouble())); continue; }
         throw failure;
       }
-      if (body == null)
-        throw new ApiException(ErrorCodes.SDK_RESPONSE_TOO_LARGE, "Response is larger than " + maxResponseBytes + " bytes",
-            null, response.status(), response.headers(), null);
+      if (body == null) throw tooLarge(response);
       Reply reply = parse(response, body);
-      boolean inProgress = reply.status() == 409 && ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS.equals(errorCode(reply.json()));
-      if ((retryableStatus(reply.status()) || inProgress) && canRetry(call, attempt)) {
-        Duration retryAfter = ApiException.retryAfter(response.header("retry-after"));
-        if (retryAfter == null || retryAfter.compareTo(MAX_RETRY_AFTER) <= 0) {
-          backoff(attempt, retryAfter);
+      if (reply.status() >= 200 && reply.status() < 300) return reply;
+      ApiException error = error(reply);
+      if (canRetry(call, attempt) && error.isRetryable()) {
+        Duration wait = error.getRetryAfter().isPresent() ? error.getRetryAfter().get() : retryDelay(attempt, ThreadLocalRandom.current().nextDouble());
+        if (wait.compareTo(RETRY_AFTER_MAX) <= 0) {
+          pause(wait);
           continue;
         }
       }
-      return reply;
+      throw error;
     }
   }
 
   private static String errorCode(JsonElement json) {
-    return json != null && json.isJsonObject() && json.getAsJsonObject().has("code") && json.getAsJsonObject().get("code").isJsonPrimitive()
-        ? json.getAsJsonObject().get("code").getAsString() : null;
+    return json != null && json.isJsonObject() && json.getAsJsonObject().get("code") instanceof JsonPrimitive code && code.isString()
+        ? code.getAsString() : null;
   }
 
   private static Reply parse(Transport.Response response, byte[] body) {
@@ -616,21 +758,24 @@ public final class CalmLensServerClient implements AutoCloseable {
     return new Reply(response.status(), response.headers(), body, json);
   }
 
-  /** Throws the API error for a failed reply and returns the JSON body of a successful one. */
-  private static JsonElement success(Reply reply) {
-    if (reply.status() >= 200 && reply.status() < 300) return reply.json();
+  /**
+   * The error for a non-2xx reply: the API's code, message and details (with its {@code traceId}),
+   * or {@link ErrorCodes#SDK_HTTP_ERROR} when the body carries no code.
+   */
+  private static ApiException error(Reply reply) {
     String code = errorCode(reply.json());
-    if (code != null) {
-      JsonObject failure = reply.json().getAsJsonObject();
-      Map<String, Object> details = new LinkedHashMap<>();
-      if (failure.has("details") && failure.get("details").isJsonObject())
-        details.putAll(Json.GSON.fromJson(failure.get("details"), new TypeToken<Map<String, Object>>() {}.getType()));
-      details.put("network", true);
-      if (failure.has("traceId") && failure.get("traceId").isJsonPrimitive()) details.put("traceId", failure.get("traceId").getAsString());
-      throw new ApiException(code, str(failure, "message", null), details, reply.status(), reply.headers(), null);
-    }
-    throw new ApiException(ErrorCodes.SDK_HTTP_ERROR, "HTTP " + reply.status(), Map.of("network", true), reply.status(), reply.headers(), null);
+    if (code == null) return new ApiException(ErrorCodes.SDK_HTTP_ERROR, "HTTP " + reply.status(), null, reply.status(), reply.headers(), null);
+    JsonObject failure = reply.json().getAsJsonObject();
+    Map<String, Object> details = new LinkedHashMap<>();
+    if (failure.has("details") && failure.get("details").isJsonObject())
+      details.putAll(Json.GSON.fromJson(failure.get("details"), new TypeToken<Map<String, Object>>() {}.getType()));
+    if (failure.get("traceId") instanceof JsonPrimitive trace && trace.isString()) details.put("traceId", trace.getAsString());
+    String message = failure.get("message") instanceof JsonPrimitive text && text.isString() ? text.getAsString() : code;
+    return new ApiException(code, message, details, reply.status(), reply.headers(), null);
   }
+
+  /** The JSON body of a successful reply. */
+  private static JsonElement success(Reply reply) { return reply.json(); }
 
   private Reply json(String method, String path, JsonObject query, JsonElement body) {
     Map<String, String> headers = baseHeaders("application/json");
@@ -651,7 +796,8 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (result == null) throw new JsonParseException("Expected a JSON " + (type.isArray() ? "array" : "object"));
       if (result instanceof Models.Asset asset && (asset.id() == null || asset.id().isEmpty()
           || asset.upload() == null || asset.upload().status() == null || asset.classification() == null || asset.classification().status() == null || asset.classification().moderation() == null || asset.classification().moderation().status() == null))
-        throw new JsonParseException("Expected an asset with an id, a classification status and a moderation status");
+        // A JSON object that is not an asset: the body was read, but it is not what was asked for.
+        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected an asset with an id, upload, classification and moderation status", null, reply.status(), Map.of(), null);
       return result;
     } catch (JsonParseException | IllegalStateException | IllegalArgumentException | NullPointerException cause) {
       throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Invalid response model: " + cause.getMessage(), null, reply.status(), reply.headers(), cause);
@@ -667,9 +813,33 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   // ------------------------------------------------------------------ Uploads
 
-  private static void imageSize(long size, boolean last) {
-    if (size > 20L * 1024 * 1024) throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, null);
-    if (last && size < 10L * 1024 * 1024) throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_SMALL, null);
+  /** MIME types the API refuses for uploads, after dropping parameters and lowercasing. */
+  private static final Set<String> REJECTED_UPLOAD_MIME_TYPES = Set.of("application/octet-stream", "multipart/form-data",
+      "multipart/mixed", "multipart/alternative", "multipart/related", "multipart/signed", "multipart/encrypted");
+
+  private static void checkMimeType(String type) {
+    String lower = type.toLowerCase(Locale.ROOT);
+    String mime = lower.split(";", -1)[0].strip();
+    if (mime.isEmpty()) mime = lower.strip();
+    if (REJECTED_UPLOAD_MIME_TYPES.contains(mime))
+      throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, mime
+          + " is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process,"
+          + " such as image/png, image/jpeg, application/pdf, or text/plain.", Map.of("mimeType", type), null);
+  }
+
+  /**
+   * Refuses, before anything is sent, a multipart part under 5 MiB that is not the last and, for
+   * images, a first part over 20 MiB or a final first part (the whole image) under 10 MiB. A
+   * stream of unknown length is left to the API.
+   */
+  private void checkPartSize(long size, boolean last, boolean firstImagePart) {
+    if (deferUploadChecks || size < 0) return;
+    if (firstImagePart && size > 20L * 1024 * 1024)
+      throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, "Multipart image uploads cannot exceed 20MB.");
+    if (firstImagePart && last && size < 10L * 1024 * 1024)
+      throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_SMALL, "Multipart image uploads must total at least 10MB.");
+    if (!last && size < MULTIPART_MIN_PART_BYTES)
+      throw payloadError("Multipart upload parts must be at least 5MiB except the final part.");
   }
 
   /** The request body for upload content: exactly one source, sent without copying files or streams. */
@@ -681,6 +851,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (content != null && content.stream != null) sources.add("stream");
     if (sources.size() != 1) throw payloadError("Supply exactly one payload representation");
     Long declared = encoded.has("sizeInBytes") && !encoded.get("sizeInBytes").isJsonNull() ? encoded.get("sizeInBytes").getAsLong() : null;
+    if (declared != null && declared < 0) throw payloadError("sizeInBytes must match the payload byte length");
     Transport.Body body;
     switch (sources.get(0)) {
       case "plainText" -> body = Transport.Body.ofBytes(encoded.get("plainText").getAsString().getBytes(StandardCharsets.UTF_8));
@@ -709,64 +880,79 @@ public final class CalmLensServerClient implements AutoCloseable {
           body = Transport.Body.ofFile(content.file, Files.size(content.file));
         } catch (IOException e) { throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Content file cannot be read", e); }
       }
-      default -> {
-        if (declared == null || declared < 0) throw argument("Streamed content needs its exact sizeInBytes");
-        body = Transport.Body.ofStream(content.stream, declared);
-      }
+      // A stream without a declared size is sent chunked, without sizeInBytes.
+      default -> body = Transport.Body.ofStream(content.stream, declared == null ? -1 : declared);
     }
-    if (declared != null && declared != body.length()) throw payloadError("sizeInBytes must match the payload byte length");
-    if (multipart && !flag(encoded, "isFinal") && body.length() < MULTIPART_MIN_PART_BYTES)
-      throw payloadError("Multipart upload parts must be at least 5MiB except the final part.");
+    if (declared != null && body.length() >= 0 && declared != body.length()) throw payloadError("sizeInBytes must match the payload byte length");
     return body;
   }
 
-  private Reply upload(String path, JsonObject query, Transport.Body body, String contentType, String mode, RequestOptions options) {
+  /** Sends an upload: text keeps the API deadline, binary content uses the upload deadline. */
+  private Reply upload(String path, JsonObject query, Transport.Body body, String contentType, String mode, String key, boolean text) {
     Map<String, String> headers = baseHeaders("application/json");
-    headers.put("Content-Type", contentType);
+    if (contentType != null) headers.put("Content-Type", contentType);
     headers.put("X-CalmLens-Upload", mode);
-    headers.put("Idempotency-Key", idempotencyKey(options));
-    return execute(new Call("POST", baseUrl + path + query(query), headers, body, uploadTimeout(options), true));
+    headers.put("Idempotency-Key", idempotencyKey(key));
+    return execute(new Call("POST", baseUrl + path + query(query), headers, body, text ? timeout : uploadTimeout, true));
   }
 
-  private Models.Asset submit(Models.SubmitAsset options, boolean queue, RequestOptions requestOptions) {
+  private Models.Asset submit(Models.SubmitAsset options, boolean queue, String key) {
     JsonObject o = Models.encode(options);
+    if (List.of("content", "part", "url").stream().noneMatch(k -> o.has(k) && !o.get(k).isJsonNull()))
+      throw payloadError("Either file content, URL, or multipart part is required");
     if (str(o, "name", "").isEmpty()) throw payloadError("Asset name is required");
-    if (List.of("content", "part", "url").stream().filter(key -> o.has(key) && !o.get(key).isJsonNull()).count() != 1)
+    if (List.of("content", "part", "url").stream().filter(k -> o.has(k) && !o.get(k).isJsonNull()).count() != 1)
       throw payloadError("Supply exactly one of content, part, or url");
     JsonObject query = new JsonObject();
     query.addProperty("queue", queue);
     if (o.has("url")) {
       Map<String, String> headers = baseHeaders("application/json");
       headers.put("Content-Type", "application/json");
-      headers.put("Idempotency-Key", idempotencyKey(requestOptions));
+      headers.put("Idempotency-Key", idempotencyKey(key));
       Transport.Body body = Transport.Body.ofBytes(Json.write(o).getBytes(StandardCharsets.UTF_8));
       return decode(execute(new Call("POST", baseUrl + project("assets") + query(query), headers, body, timeout, true)), Models.Asset.class);
     }
     boolean multipart = o.has("part");
     Models.Content content = multipart ? options.partValue() : options.contentValue();
     JsonObject encoded = o.getAsJsonObject(multipart ? "part" : "content");
-    String type = str(encoded, "type", "");
-    String mime = type.split(";", -1)[0].strip().toLowerCase(Locale.ROOT);
-    if (mime.isEmpty() || mime.equals("application/octet-stream") || mime.startsWith("multipart/"))
-      throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, mime
-          + " is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process,"
-          + " such as image/png, image/jpeg, application/pdf, or text/plain.");
-    if (multipart && encoded.has("partNumber") && encoded.get("partNumber").getAsInt() != 1)
+    if (multipart && encoded.has("partNumber") && encoded.get("partNumber").getAsLong() > 1)
       throw new CalmLensException(ErrorCodes.USE_UPLOAD_PART, "Use uploadPart for multipart upload parts after the first part");
+    String type = str(encoded, "type", "");
+    checkMimeType(type);
     Transport.Body body = payload(content, encoded, multipart);
-    if (multipart && mime.startsWith("image/")) imageSize(body.length(), flag(encoded, "isFinal"));
-    for (String key : List.of("name", "description", "processingOptions", "visibility", "metadata", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
-      if (o.has(key)) query.add(key, o.get(key));
+    if (multipart) checkPartSize(body.length(), flag(encoded, "isFinal"), type.strip().toLowerCase(Locale.ROOT).startsWith("image/"));
+    for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
+      if (o.has(k)) query.add(k, o.get(k));
     query.addProperty("contentType", type);
-    query.addProperty("sizeInBytes", body.length());
+    if (body.length() >= 0) query.addProperty("sizeInBytes", body.length());
     if (multipart) {
       query.addProperty("partNumber", 1);
       query.addProperty("isFinal", flag(encoded, "isFinal"));
     }
-    return decode(upload(project("assets"), query, body, type, multipart ? "part" : "content", requestOptions), Models.Asset.class);
+    boolean text = encoded.has("plainText") && !encoded.get("plainText").isJsonNull();
+    return decode(upload(project("assets"), query, body, type, multipart ? "part" : "content", key, text), Models.Asset.class);
   }
 
   // ------------------------------------------------------------------ Resources
+
+  /** A later part of a multipart upload, sent without a {@code Content-Type}, as the API reads it. */
+  private Models.Asset sendPart(Models.UploadPart options, String key) {
+    JsonObject o = Models.encode(options);
+    String path = "/assets/" + id(str(o, "assetId", null)) + "/part";
+    if (!o.has("part")) throw argument("Part options are required");
+    JsonObject part = o.getAsJsonObject("part");
+    if (!part.has("partNumber") || part.get("partNumber").getAsLong() < 1)
+      throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_PART_NUMBER, "partNumber must be a positive integer");
+    Transport.Body body = payload(options.partValue(), part, true);
+    checkPartSize(body.length(), flag(part, "isFinal"), false);
+    JsonObject query = new JsonObject();
+    if (o.has("queue")) query.add("queue", o.get("queue"));
+    query.add("partNumber", part.get("partNumber"));
+    query.addProperty("isFinal", flag(part, "isFinal"));
+    if (body.length() >= 0) query.addProperty("sizeInBytes", body.length());
+    boolean text = part.has("plainText") && !part.get("plainText").isJsonNull();
+    return decode(upload(path, query, body, null, "part", key, text), Models.Asset.class);
+  }
 
   private AutoPager<Models.Asset> pages(String path, JsonObject options) {
     String first = options.has("cursor") && !options.get("cursor").isJsonNull() ? options.get("cursor").getAsString() : null;
@@ -776,7 +962,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       Models.AssetPage page = decode(json("GET", path, query, null), Models.AssetPage.class);
       boolean more = page.hasMore() && page.nextCursor() != null && !page.items().isEmpty();
       return new AutoPager.Chunk<>(page.items(), more ? page.nextCursor() : null, more);
-    }, first);
+    }, first, false);
   }
 
   /** Assets: uploads, moderation, listing and management. */
@@ -795,10 +981,10 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * @param options name and content, part or url
-     * @param requestOptions idempotency key and timeout for this call
+     * @param requestOptions idempotency key, deadlines and retries for this call
      * @return the new asset
      */
-    public Models.Asset create(Models.SubmitAsset options, RequestOptions requestOptions) { return submit(options, true, requestOptions); }
+    public Models.Asset create(Models.SubmitAsset options, RequestOptions requestOptions) { return with(requestOptions).submit(options, true, key(requestOptions)); }
 
     /**
      * Uploads bytes and queues them for processing.
@@ -820,7 +1006,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * @param options name and content, part or url
-     * @param requestOptions idempotency key and timeout for this call
+     * @param requestOptions idempotency key, deadlines and retries for this call
      * @return the classified asset
      */
     public Models.Asset classify(Models.SubmitAsset options, RequestOptions requestOptions) {
@@ -829,7 +1015,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (o.has("content") && o.getAsJsonObject("content").has("plainText") && str(o.getAsJsonObject("content"), "plainText", "").isBlank())
           throw payloadError("Text to classify must be a non-empty string");
       }
-      return submit(options, false, requestOptions);
+      return with(requestOptions).submit(options, false, key(requestOptions));
     }
 
     /** @param options search query @return matches, best first */
@@ -879,7 +1065,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       long limitNanos;
       try { limitNanos = limit.toNanos(); } catch (ArithmeticException tooLong) { limitNanos = Long.MAX_VALUE; }
       long started = nanoTime.getAsLong();
-      long delay = DECISION_POLL_FIRST_DELAY_NANOS;
+      long delay = DECISION_POLL_FIRST_DELAY.toNanos();
       for (;;) {
         if (Thread.currentThread().isInterrupted())
           throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision");
@@ -901,7 +1087,7 @@ public final class CalmLensServerClient implements AutoCloseable {
           Thread.currentThread().interrupt();
           throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision", interrupted);
         }
-        delay = Math.min(DECISION_POLL_MAX_DELAY_NANOS, delay + delay / 2);
+        delay = Math.min(DECISION_POLL_MAX_DELAY.toNanos(), Math.round(delay * DECISION_POLL_DELAY_FACTOR));
       }
     }
 
@@ -992,23 +1178,11 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * @param options the asset and the part
-     * @param requestOptions idempotency key and timeout for this call
+     * @param requestOptions idempotency key, deadlines and retries for this call
      * @return the asset
      */
     public Models.Asset uploadPart(Models.UploadPart options, RequestOptions requestOptions) {
-      JsonObject o = Models.encode(options);
-      String path = "/assets/" + id(str(o, "assetId", null)) + "/part";
-      if (!o.has("part")) throw payloadError("A part is required");
-      JsonObject part = o.getAsJsonObject("part");
-      if (!part.has("partNumber") || part.get("partNumber").getAsInt() < 1)
-        throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_PART_NUMBER, null);
-      Transport.Body body = payload(options.partValue(), part, true);
-      JsonObject query = new JsonObject();
-      if (o.has("queue")) query.add("queue", o.get("queue"));
-      query.add("partNumber", part.get("partNumber"));
-      query.addProperty("isFinal", flag(part, "isFinal"));
-      query.addProperty("sizeInBytes", body.length());
-      return decode(upload(path, query, body, "application/octet-stream", "part", requestOptions), Models.Asset.class);
+      return with(requestOptions).sendPart(options, key(requestOptions));
     }
 
     /**
@@ -1032,7 +1206,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (seconds < 1 || seconds > MAX_SIGNED_URL_SECONDS) throw argument("expiresInSeconds must be from 1 to 86400");
       }
       JsonObject body = new JsonObject();
-      body.addProperty("expiresInSeconds", 900);
+      body.addProperty("expiresInSeconds", DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS);
       without(o, "assetId").entrySet().forEach(entry -> body.add(entry.getKey(), entry.getValue()));
       String transform = transformSelector(options.transformValue());
       if (transform != null) body.addProperty("transform", transform);
@@ -1078,32 +1252,64 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @return the token and when it expires
      */
     public Models.SignedUploadToken sign(Models.SignUploadToken options) {
-      if (options == null) throw argument("Options are required");
-      String presetId = options.uploadPresetIdValue();
-      id(presetId);
-      int ttl = options.expiresInSecondsValue() == null ? 600 : options.expiresInSecondsValue();
-      if (ttl < 1 || ttl > 3600) throw argument("expiresInSeconds must be a whole number from 1 to 3600");
-      String externalId = options.externalIdValue();
-      if (externalId != null && externalId.isEmpty()) throw argument("externalId must be a non-empty string");
-      long expiresAt = System.currentTimeMillis() + ttl * 1000L;
-      JsonObject claims = new JsonObject();
-      claims.addProperty("v", 1);
-      claims.addProperty("u", presetId);
-      claims.addProperty("k", apiKey.substring(0, Math.min(apiKey.length(), apiKey.startsWith("clsk_") ? 13 : 8)));
-      claims.addProperty("e", expiresAt);
-      claims.addProperty("n", UUID.randomUUID().toString());
-      if (externalId != null) claims.addProperty("x", externalId);
-      String body = Base64.getUrlEncoder().withoutPadding().encodeToString(claims.toString().getBytes(StandardCharsets.UTF_8));
-      try {
-        String secret = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(apiKey.getBytes(StandardCharsets.UTF_8)));
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        String signature = HexFormat.of().formatHex(mac.doFinal(("calmlens-upload-token:v1:" + body).getBytes(StandardCharsets.UTF_8)));
-        return new Models.SignedUploadToken("clut_" + body + "." + signature, expiresAt);
-      } catch (GeneralSecurityException e) {
-        throw new IllegalStateException(e);
+      return signUploadToken(apiKey, options, System.currentTimeMillis(), UUID.randomUUID().toString());
+    }
+  }
+
+  /**
+   * Signs an upload token at {@code now} (epoch milliseconds) with {@code nonce}. The claims are
+   * written as JavaScript's {@code JSON.stringify} writes them, which the API verifies byte for byte.
+   */
+  static Models.SignedUploadToken signUploadToken(String apiKey, Models.SignUploadToken options, long now, String nonce) {
+    if (options == null) throw argument("Options are required");
+    String presetId = options.uploadPresetIdValue();
+    id(presetId);
+    int ttl = options.expiresInSecondsValue() == null ? DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS : options.expiresInSecondsValue();
+    if (ttl < 1 || ttl > 3600) throw argument("expiresInSeconds must be a whole number from 1 to 3600");
+    String externalId = options.externalIdValue();
+    if (externalId != null && externalId.isEmpty()) throw argument("externalId must be a non-empty string");
+    long expiresAt = now + ttl * 1000L;
+    String prefix = apiKey.substring(0, Math.min(apiKey.length(), apiKey.startsWith("clsk_") ? 13 : 8));
+    String claims = "{\"v\":1,\"u\":" + jsonString(presetId) + ",\"k\":" + jsonString(prefix) + ",\"e\":" + expiresAt
+        + ",\"n\":" + jsonString(nonce) + (externalId == null ? "" : ",\"x\":" + jsonString(externalId)) + "}";
+    String body = Base64.getUrlEncoder().withoutPadding().encodeToString(claims.getBytes(StandardCharsets.UTF_8));
+    try {
+      String secret = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(apiKey.getBytes(StandardCharsets.UTF_8)));
+      Mac mac = Mac.getInstance("HmacSHA256");
+      mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+      String signature = HexFormat.of().formatHex(mac.doFinal(("calmlens-upload-token:v1:" + body).getBytes(StandardCharsets.UTF_8)));
+      return new Models.SignedUploadToken("clut_" + body + "." + signature, expiresAt);
+    } catch (GeneralSecurityException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * A JSON string as {@code JSON.stringify} writes it: only quotes, backslashes, control characters
+   * and lone surrogates are escaped; everything else, {@code /}, {@code <}, {@code >} and {@code &}
+   * included, is written as it is.
+   */
+  static String jsonString(String value) {
+    StringBuilder out = new StringBuilder("\"");
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      switch (c) {
+        case '"' -> out.append("\\\"");
+        case '\\' -> out.append("\\\\");
+        case '\b' -> out.append("\\b");
+        case '\f' -> out.append("\\f");
+        case '\n' -> out.append("\\n");
+        case '\r' -> out.append("\\r");
+        case '\t' -> out.append("\\t");
+        default -> {
+          boolean lone = Character.isHighSurrogate(c) ? i + 1 >= value.length() || !Character.isLowSurrogate(value.charAt(i + 1))
+              : Character.isLowSurrogate(c) && (i == 0 || !Character.isHighSurrogate(value.charAt(i - 1)));
+          if (c < 0x20 || lone) out.append(String.format("\\u%04x", (int) c));
+          else out.append(c);
+        }
       }
     }
+    return out.append('"').toString();
   }
 
   /** Folders. */
@@ -1181,7 +1387,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (page.cursor() == null || page.cursor().isEmpty())
           throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Events page has no cursor", null, 200, Map.of(), null);
         return new AutoPager.Chunk<>(List.of(page), page.cursor(), page.hasMore());
-      }, str(o, "after", null));
+      }, str(o, "after", null), true);
     }
   }
 
@@ -1220,47 +1426,56 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Streams an asset from the CDN with the API key. The response is returned for any status;
-     * close it when done.
+     * Streams an asset from the CDN with the API key. Every status but a redirect is returned
+     * (redirects fail with {@link ErrorCodes#SDK_HTTP_ERROR} and are never followed); close the
+     * response when done. Transport failures and HTTP 429, 502, 503 and 504 are retried like API
+     * reads, and once retries run out the last response is returned.
      *
-     * @param options the asset, selector, method and headers (such as {@code Range})
+     * @param options the asset, selector, method and headers
      * @return the streamed response
      */
     public CdnResponse serve(Models.CdnRequest options) { return serve(options, null); }
 
     /**
      * @param options the asset, selector, method and headers
-     * @param requestOptions {@code timeout} overrides the idle timeout between received bytes
+     * @param requestOptions {@code timeout} (the wait for the response headers and between received
+     *     bytes) and {@code maxRetries} for this call
      * @return the streamed response
      */
     public CdnResponse serve(Models.CdnRequest options, RequestOptions requestOptions) {
+      CalmLensServerClient derived = with(requestOptions);
+      if (derived != CalmLensServerClient.this) return derived.cdn.serve(options);
       String url = getAssetUrl(options);
-      Map<String, String> headers = baseHeaders("*/*");
+      // No Accept unless the caller sets one: the CDN answers with the content's own type.
+      Map<String, String> headers = baseHeaders(null);
       Models.HttpOptions init = options.initValue();
       String method = init == null || init.methodValue() == null ? "GET" : init.methodValue().toUpperCase(Locale.ROOT);
       if (!method.equals("GET") && !method.equals("HEAD")) throw argument("CDN requests use GET or HEAD");
       if (init != null && init.headersValue() != null)
         init.headersValue().forEach((name, value) -> { if (name == null || !name.equalsIgnoreCase("X-Api-Key")) header(headers, name, value); });
-      Duration idle = requestOptions != null && requestOptions.timeoutValue() != null ? requestOptions.timeoutValue() : timeout;
-      if (idle.isZero() || idle.isNegative()) throw argument("timeout must be a positive duration");
       Call call = new Call(method, url, headers, null, timeout, true);
       for (int attempt = 0; ; attempt++) {
         Transport.Response response;
         try {
           response = send(call);
         } catch (TransportException failure) {
-          if (canRetry(call, attempt)) { backoff(attempt, null); continue; }
+          if (canRetry(call, attempt) && !Thread.currentThread().isInterrupted()) { pause(retryDelay(attempt, ThreadLocalRandom.current().nextDouble())); continue; }
           throw failure;
+        }
+        if (isRedirect(response.status())) {
+          try { response.close(); } catch (IOException ignored) { /* failing */ }
+          throw new ApiException(ErrorCodes.SDK_HTTP_ERROR, "Unexpected redirect (HTTP " + response.status() + ")", null, response.status(), response.headers(), null);
         }
         if (retryableStatus(response.status()) && canRetry(call, attempt)) {
           Duration retryAfter = ApiException.retryAfter(response.header("retry-after"));
-          if (retryAfter == null || retryAfter.compareTo(MAX_RETRY_AFTER) <= 0) {
+          Duration wait = retryAfter != null ? retryAfter : retryDelay(attempt, ThreadLocalRandom.current().nextDouble());
+          if (wait.compareTo(RETRY_AFTER_MAX) <= 0) {
             try { response.close(); } catch (IOException ignored) { /* retrying */ }
-            backoff(attempt, retryAfter);
+            pause(wait);
             continue;
           }
         }
-        return new CdnResponse(response, new Timeouts.IdleTimeoutInputStream(response.body(), idle));
+        return new CdnResponse(response, new Timeouts.IdleTimeoutInputStream(response.body(), timeout));
       }
     }
   }
@@ -1281,9 +1496,10 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final int ENSURE_LENSES_MAX_PER_REQUEST = 100;
 
   /**
-   * Creates or updates lenses. Definitions already ensured by this client are not sent again; more
-   * than {@link #ENSURE_LENSES_MAX_PER_REQUEST} new definitions are sent in consecutive requests, in
-   * order.
+   * Creates or updates lenses. Definitions already ensured by this client (or a client derived from
+   * it with {@link #withRequestOptions}) are not sent again, and concurrent calls for the same new
+   * definitions share one request. More than {@link #ENSURE_LENSES_MAX_PER_REQUEST} new definitions
+   * are sent in consecutive requests, in order.
    *
    * @param options the lens definitions
    * @return the lenses, in the order given
@@ -1291,52 +1507,92 @@ public final class CalmLensServerClient implements AutoCloseable {
   public List<Models.Lens> ensureLenses(Models.EnsureLenses options) {
     JsonObject o = Models.encode(options);
     JsonArray definitions = o.has("lenses") && o.get("lenses").isJsonArray() ? o.getAsJsonArray("lenses") : null;
-    if (definitions == null || definitions.isEmpty()) throw argument("At least one lens with an identifier is required");
+    if (definitions == null || definitions.isEmpty()) throw argument("At least one lens is required");
     LinkedHashMap<String, JsonObject> missing = new LinkedHashMap<>();
     List<String> keys = new ArrayList<>();
     for (JsonElement lens : definitions) {
-      if (!lens.isJsonObject()) throw argument("Lens definitions must be objects");
+      if (!lens.isJsonObject() || str(lens.getAsJsonObject(), "identifier", "").isEmpty()) throw argument("Lens identifier is required");
       JsonObject value = lens.getAsJsonObject();
       id(str(value, "identifier", null));
-      String key = Json.write(Json.GSON.toJsonTree(new TreeMap<>(value.asMap())));
+      String key = Json.write(canonical(value));
       keys.add(key);
-      if (!lenses.containsKey(key)) missing.put(key, value);
+      if (!lenses.ensured.containsKey(key)) missing.putIfAbsent(key, value);
     }
-    Map<String, Models.Lens> resolved = new LinkedHashMap<>();
-    List<Map.Entry<String, JsonObject>> queue = new ArrayList<>(missing.entrySet());
-    for (int start = 0; start < queue.size(); start += ENSURE_LENSES_MAX_PER_REQUEST) {
-      List<Map.Entry<String, JsonObject>> chunk = queue.subList(start, Math.min(start + ENSURE_LENSES_MAX_PER_REQUEST, queue.size()));
-      JsonArray pending = new JsonArray();
-      chunk.forEach(entry -> pending.add(entry.getValue()));
-      JsonObject body = new JsonObject();
-      body.add("lenses", pending);
-      // The PUT is idempotent, so concurrent callers may both send it; no lock is held across I/O.
-      Reply reply = json("PUT", project("lenses"), null, body);
-      JsonElement returned = object(reply).get("lenses");
-      if (returned == null || !returned.isJsonArray() || returned.getAsJsonArray().size() != chunk.size())
-        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Unexpected lens response", null, reply.status(), reply.headers(), null);
-      Models.Lens[] created = decode(new Reply(reply.status(), reply.headers(), reply.body(), returned), Models.Lens[].class);
-      Map<String, Models.Lens> chunkResolved = new LinkedHashMap<>();
-      int index = 0;
-      for (var entry : chunk) {
-        Models.Lens lens = created[index++];
-        if (lens == null || !str(entry.getValue(), "identifier", "").equals(lens.identifier()))
-          throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Unexpected lens identifier", null, reply.status(), reply.headers(), null);
-        chunkResolved.put(entry.getKey(), lens);
+    if (!missing.isEmpty()) {
+      String batch = Json.write(Json.GSON.toJsonTree(new java.util.TreeSet<>(missing.keySet())));
+      java.util.concurrent.CompletableFuture<Void> mine = new java.util.concurrent.CompletableFuture<>();
+      java.util.concurrent.CompletableFuture<Void> running = lenses.pending.putIfAbsent(batch, mine);
+      if (running == null) {
+        try {
+          submitLenses(new ArrayList<>(missing.values()));
+          mine.complete(null);
+        } catch (RuntimeException failure) {
+          mine.completeExceptionally(failure);
+          throw failure;
+        } finally {
+          lenses.pending.remove(batch, mine);
+        }
+      } else {
+        try {
+          running.get();
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for lenses", interrupted);
+        } catch (java.util.concurrent.ExecutionException failed) {
+          if (failed.getCause() instanceof RuntimeException cause) throw cause;
+          throw new IllegalStateException(failed.getCause());
+        }
       }
-      chunkResolved.forEach((key, lens) -> {
-        lenses.entrySet().removeIf(cached -> lens.identifier().equals(cached.getValue().identifier()));
-        lenses.put(key, lens);
-      });
-      resolved.putAll(chunkResolved);
     }
     List<Models.Lens> result = new ArrayList<>();
-    for (String key : keys) {
-      Models.Lens lens = resolved.containsKey(key) ? resolved.get(key) : lenses.get(key);
-      if (lens == null) throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Lens is missing from the response", null, 200, Map.of(), null);
+    for (int i = 0; i < keys.size(); i++) {
+      Models.Lens lens = lenses.ensured.get(keys.get(i));
+      // Another call may have replaced this definition with a newer version meanwhile.
+      if (lens == null) throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE,
+          "CalmLens did not return lens \"" + str(definitions.get(i).getAsJsonObject(), "identifier", "") + "\"");
       result.add(lens);
     }
     return List.copyOf(result);
+  }
+
+  /** {@code value} with object keys sorted at every level, so equal definitions share a cache key. */
+  private static JsonElement canonical(JsonElement value) {
+    if (value.isJsonObject()) {
+      JsonObject sorted = new JsonObject();
+      new TreeMap<>(value.getAsJsonObject().asMap()).forEach((key, item) -> sorted.add(key, canonical(item)));
+      return sorted;
+    }
+    if (value.isJsonArray()) {
+      JsonArray items = new JsonArray();
+      value.getAsJsonArray().forEach(item -> items.add(canonical(item)));
+      return items;
+    }
+    return value;
+  }
+
+  /** Sends new definitions in chunks, in order, caching each chunk before sending the next. */
+  private void submitLenses(List<JsonObject> definitions) {
+    for (int start = 0; start < definitions.size(); start += ENSURE_LENSES_MAX_PER_REQUEST) {
+      List<JsonObject> chunk = definitions.subList(start, Math.min(start + ENSURE_LENSES_MAX_PER_REQUEST, definitions.size()));
+      JsonArray pending = new JsonArray();
+      chunk.forEach(pending::add);
+      JsonObject body = new JsonObject();
+      body.add("lenses", pending);
+      Reply reply = json("PUT", project("lenses"), null, body);
+      JsonElement returned = object(reply).get("lenses");
+      int count = returned != null && returned.isJsonArray() ? returned.getAsJsonArray().size() : 0;
+      if (count != chunk.size())
+        throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected " + chunk.size() + " lenses but CalmLens returned " + count);
+      Models.Lens[] created = decode(new Reply(reply.status(), reply.headers(), reply.body(), returned), Models.Lens[].class);
+      for (int index = 0; index < chunk.size(); index++) {
+        Models.Lens lens = created[index];
+        String identifier = str(chunk.get(index), "identifier", "");
+        if (lens == null || !identifier.equals(lens.identifier()))
+          throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected lens \"" + identifier + "\" at position " + index);
+        lenses.ensured.entrySet().removeIf(cached -> identifier.equals(cached.getValue().identifier()));
+        lenses.ensured.put(Json.write(canonical(chunk.get(index))), lens);
+      }
+    }
   }
 
   // ------------------------------------------------------------------ Webhooks
@@ -1391,8 +1647,46 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @return its delivery payload
    */
   public static Models.WebhookEventPayload toWebhookEventPayload(Models.Event event) {
-    return new Models.WebhookEventPayload(event.id(), event.type(), event.createdAt(), event.projectId(),
-        new Models.WebhookEventData(event.severity(), event.title(), event.description(), event.assetId(), event.asset(), event.facts()));
+    if (event.json() == null)
+      return new Models.WebhookEventPayload(event.id(), event.type(), event.createdAt(), event.projectId(),
+          new Models.WebhookEventData(event.severity(), event.title(), event.description(), event.assetId(), event.asset(), event.facts()));
+    // From the event as received, so asset and fact fields this SDK version does not model are kept.
+    Map<String, Object> json = event.json();
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("severity", json.get("severity"));
+    data.put("title", json.get("title"));
+    data.put("description", json.get("description"));
+    data.put("assetId", json.get("assetId"));
+    data.put("asset", json.get("asset"));
+    data.put("facts", json.containsKey("facts") ? json.get("facts") : List.of());
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("id", json.get("id"));
+    payload.put("type", json.get("type"));
+    payload.put("createdAt", json.get("createdAt"));
+    payload.put("projectId", json.get("projectId"));
+    payload.put("data", data);
+    return Json.GSON.fromJson(Json.WRITE.toJsonTree(payload), Models.WebhookEventPayload.class);
+  }
+
+  /**
+   * Whether an event is a test send from the portal or API: its facts include {@code { key: "test",
+   * value: true }}. Other values, keys in another case and missing facts are not.
+   *
+   * @param event a parsed delivery
+   * @return whether it is a test send
+   */
+  public static boolean isTestWebhookEvent(Models.WebhookEventPayload event) {
+    return event != null && event.data() != null && isTestFacts(event.data().facts());
+  }
+
+  /**
+   * @param event an event from {@code events.list}
+   * @return whether it is a test send
+   */
+  public static boolean isTestWebhookEvent(Models.Event event) { return event != null && isTestFacts(event.facts()); }
+
+  private static boolean isTestFacts(List<Models.EventFact> facts) {
+    return facts != null && facts.stream().anyMatch(fact -> fact != null && "test".equals(fact.key()) && Boolean.TRUE.equals(fact.value()));
   }
 
   private static byte[] webhookMac(String secret, String timestamp, byte[] body) {
@@ -1457,10 +1751,12 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @return whether the delivery is authentic and fresh
    */
   public static boolean verifyWebhookSignature(byte[] payload, String signature, String timestamp, String secret, long nowSeconds, long toleranceSeconds) {
-    if (payload == null || secret == null || secret.isEmpty() || signature == null || timestamp == null) return false;
+    if (payload == null || secret == null || secret.isEmpty() || signature == null || signature.isEmpty() || timestamp == null) return false;
     String time = timestamp.strip();
-    if (!time.matches("[0-9]{1,18}")) return false;
-    if (Math.abs(nowSeconds - Long.parseLong(time)) > toleranceSeconds) return false;
+    if (!time.matches("[0-9]+")) return false;
+    // Timestamps too large for a long are further than any tolerance from now.
+    String digits = time.replaceFirst("^0+(?=.)", "");
+    if (digits.length() > 18 || Math.abs(nowSeconds - Long.parseLong(digits)) > toleranceSeconds) return false;
     byte[] expected = HexFormat.of().formatHex(webhookMac(secret, time, payload)).getBytes(StandardCharsets.UTF_8);
     boolean matched = false;
     for (String part : signature.split(",")) {
@@ -1469,6 +1765,89 @@ public final class CalmLensServerClient implements AutoCloseable {
         matched |= MessageDigest.isEqual(expected, candidate.substring(3).toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
     }
     return matched;
+  }
+
+  /**
+   * Verifies a delivery from its request headers against the current time with {@link
+   * #WEBHOOK_SIGNATURE_TOLERANCE_SECONDS}. Header names match in any case, and a header repeated in
+   * the request (a list value) is joined with commas, so a signature list split across headers
+   * verifies.
+   *
+   * <pre>{@code
+   * boolean ok = CalmLensServerClient.verifyWebhookRequest(request.headers().map(), rawBody, secret);
+   * }</pre>
+   *
+   * @param headers the request headers: names to a {@code String} or a collection of strings
+   * @param payload the exact raw request body
+   * @param secret the webhook signing secret
+   * @return whether the delivery is authentic and fresh
+   */
+  public static boolean verifyWebhookRequest(Map<String, ?> headers, byte[] payload, String secret) {
+    return verifyWebhookRequest(headers, payload, secret, System.currentTimeMillis() / 1000, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS);
+  }
+
+  /**
+   * @param headers the request headers: names to a {@code String} or a collection of strings
+   * @param payload the exact raw request body
+   * @param secret the webhook signing secret
+   * @param nowSeconds the current Unix time in seconds
+   * @param toleranceSeconds the largest accepted clock distance
+   * @return whether the delivery is authentic and fresh
+   */
+  public static boolean verifyWebhookRequest(Map<String, ?> headers, byte[] payload, String secret, long nowSeconds, long toleranceSeconds) {
+    return verifyWebhookSignature(payload, webhookHeader(headers, WEBHOOK_SIGNATURE_HEADER), webhookHeader(headers, WEBHOOK_TIMESTAMP_HEADER),
+        secret, nowSeconds, toleranceSeconds);
+  }
+
+  /**
+   * @param headers the request headers: names to a {@code String} or a collection of strings
+   * @param payload the raw request body, encoded as UTF-8
+   * @param secret the webhook signing secret
+   * @param nowSeconds the current Unix time in seconds
+   * @param toleranceSeconds the largest accepted clock distance
+   * @return whether the delivery is authentic and fresh
+   */
+  public static boolean verifyWebhookRequest(Map<String, ?> headers, String payload, String secret, long nowSeconds, long toleranceSeconds) {
+    return payload != null && verifyWebhookRequest(headers, payload.getBytes(StandardCharsets.UTF_8), secret, nowSeconds, toleranceSeconds);
+  }
+
+  /**
+   * Verifies a delivery from its request headers, then parses it; see {@link
+   * #verifyWebhookRequest(Map, byte[], String)} and {@link #parseWebhookEvent(byte[], String, String, String)}.
+   *
+   * @param headers the request headers: names to a {@code String} or a collection of strings
+   * @param payload the exact raw request body
+   * @param secret the webhook signing secret
+   * @return the delivery
+   */
+  public static Models.WebhookEventPayload parseWebhookRequest(Map<String, ?> headers, byte[] payload, String secret) {
+    return parseWebhookRequest(headers, payload, secret, System.currentTimeMillis() / 1000, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS);
+  }
+
+  /**
+   * @param headers the request headers: names to a {@code String} or a collection of strings
+   * @param payload the exact raw request body
+   * @param secret the webhook signing secret
+   * @param nowSeconds the current Unix time in seconds
+   * @param toleranceSeconds the largest accepted clock distance
+   * @return the delivery
+   */
+  public static Models.WebhookEventPayload parseWebhookRequest(Map<String, ?> headers, byte[] payload, String secret, long nowSeconds, long toleranceSeconds) {
+    return parseWebhookEvent(payload, webhookHeader(headers, WEBHOOK_SIGNATURE_HEADER), webhookHeader(headers, WEBHOOK_TIMESTAMP_HEADER),
+        secret, nowSeconds, toleranceSeconds);
+  }
+
+  /** A header's value by case-insensitive name, repeated values joined with commas, or null. */
+  private static String webhookHeader(Map<String, ?> headers, String name) {
+    if (headers == null) return null;
+    List<String> values = new ArrayList<>();
+    for (var entry : headers.entrySet()) {
+      if (entry.getKey() == null || !entry.getKey().equalsIgnoreCase(name) || entry.getValue() == null) continue;
+      if (entry.getValue() instanceof java.util.Collection<?> list) list.forEach(item -> { if (item != null) values.add(item.toString()); });
+      else if (entry.getValue() instanceof String[] array) values.addAll(java.util.Arrays.asList(array));
+      else values.add(entry.getValue().toString());
+    }
+    return values.isEmpty() ? null : String.join(",", values);
   }
 
   /**
@@ -1526,19 +1905,49 @@ public final class CalmLensServerClient implements AutoCloseable {
     return parseWebhookEvent(payload.getBytes(StandardCharsets.UTF_8), signature, timestamp, secret);
   }
 
-  /** Reads a verified body; requires {@code id}, {@code type}, {@code projectId} and {@code data}. */
+  /**
+   * Reads a verified body like the API's receiver schema: a JSON object with string {@code id},
+   * {@code type} and {@code projectId}, numeric {@code createdAt} and object {@code data} whose known
+   * fields, when present, have the API's types. Unknown fields are kept in {@code json()}.
+   */
   static Models.WebhookEventPayload readWebhookEvent(String payload) {
-    Models.WebhookEventPayload event;
+    JsonElement json;
     try {
-      JsonElement json = payload == null ? null : Json.GSON.fromJson(payload, JsonElement.class);
-      event = json == null || !json.isJsonObject() ? null : Json.GSON.fromJson(json, Models.WebhookEventPayload.class);
-    } catch (JsonParseException | IllegalStateException | IllegalArgumentException cause) {
+      json = payload == null ? null : Json.GSON.fromJson(payload, JsonElement.class);
+    } catch (JsonParseException | IllegalStateException cause) {
       throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not JSON", cause);
     }
-    if (event == null || event.id() == null || event.id().isEmpty() || event.type() == null || event.type().isEmpty()
-        || event.projectId() == null || event.data() == null)
+    if (json == null || !isWebhookEvent(json))
       throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event");
-    return event;
+    try {
+      return Json.GSON.fromJson(json, Models.WebhookEventPayload.class);
+    } catch (JsonParseException | IllegalStateException | IllegalArgumentException cause) {
+      throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event", cause);
+    }
+  }
+
+  private static boolean isString(JsonElement value) { return value instanceof JsonPrimitive primitive && primitive.isString(); }
+
+  /** Absent, or a string (or, when {@code nullable}, JSON null). */
+  private static boolean optionalString(JsonObject object, String key, boolean nullable) {
+    JsonElement value = object.get(key);
+    return value == null || nullable && value.isJsonNull() || isString(value);
+  }
+
+  private static boolean isWebhookEvent(JsonElement json) {
+    if (!(json instanceof JsonObject event) || !isString(event.get("id")) || !isString(event.get("type")) || !isString(event.get("projectId"))
+        || !(event.get("createdAt") instanceof JsonPrimitive createdAt && createdAt.isNumber()) || !(event.get("data") instanceof JsonObject data))
+      return false;
+    if (!optionalString(data, "severity", false) || !optionalString(data, "title", false)
+        || !optionalString(data, "description", true) || !optionalString(data, "assetId", true)) return false;
+    JsonElement asset = data.get("asset");
+    if (asset != null && !asset.isJsonNull() && !(asset instanceof JsonObject snapshot && isString(snapshot.get("id")))) return false;
+    JsonElement facts = data.get("facts");
+    if (facts == null) return true;
+    if (!(facts instanceof JsonArray list)) return false;
+    for (JsonElement fact : list)
+      if (!(fact instanceof JsonObject item) || !isString(item.get("key")) || !item.has("value") || !optionalString(item, "url", false)) return false;
+    return true;
   }
 
   // ------------------------------------------------------------------ Default transport
@@ -1558,9 +1967,14 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (body == null) publisher = HttpRequest.BodyPublishers.noBody();
       else if (body.bytes() != null) publisher = HttpRequest.BodyPublishers.ofByteArray(body.bytes());
       else if (body.file() != null) publisher = HttpRequest.BodyPublishers.ofFile(body.file());
-      else publisher = HttpRequest.BodyPublishers.fromPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> {
-        try { return body.open(); } catch (IOException e) { throw new UncheckedIOException(e); }
-      }), body.length());
+      else {
+        HttpRequest.BodyPublisher stream = HttpRequest.BodyPublishers.ofInputStream(() -> {
+          try { return body.open(); } catch (IOException e) { throw new UncheckedIOException(e); }
+        });
+        // A stream of unknown length is sent chunked; an empty one has no body.
+        publisher = body.length() < 0 ? stream : body.length() == 0 ? HttpRequest.BodyPublishers.noBody()
+            : HttpRequest.BodyPublishers.fromPublisher(stream, body.length());
+      }
       HttpResponse<InputStream> response = http.send(builder.method(request.method(), publisher).build(), HttpResponse.BodyHandlers.ofInputStream());
       return new Response(response.statusCode(), response.headers().map(), response.body());
     }

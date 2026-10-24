@@ -3,6 +3,13 @@
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 
+/// The one loader of the shared SDK contract fixtures: `testdata/<name>.json`
+/// (packages/sdk-contract/README.md, "Runners").
+pub fn fixture(name: &str) -> Value {
+    let path = format!("{}/testdata/{name}.json", env!("CARGO_MANIFEST_DIR"));
+    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
 /// Decodes JSON options into a native options type.
 pub fn input<T: DeserializeOwned>(value: Value) -> calmlens::Result<T> {
     serde_json::from_value(value).map_err(|cause| {
@@ -78,4 +85,82 @@ pub fn describe(request: &calmlens::testing::Request) -> Value {
         serde_json::json!(String::from_utf8(request.body.clone()).unwrap())
     };
     serde_json::json!({"method": request.method, "path": request.path, "query": query, "body": body})
+}
+
+/// `value` with whole floats as integers: typed `f64` fields serialize `950` as `950.0`, and JSON
+/// compares them as one number.
+pub fn whole_numbers(value: Value) -> Value {
+    match value {
+        Value::Number(number) => match number.as_f64() {
+            Some(float) if number.is_f64() && float.fract() == 0.0 && float.abs() < 1e15 => {
+                serde_json::json!(float as i64)
+            }
+            _ => Value::Number(number),
+        },
+        Value::Array(items) => Value::Array(items.into_iter().map(whole_numbers).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(key, value)| (key, whole_numbers(value)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
+/// Whether a typed result serialized to JSON equals the API's JSON `expected`. Typed models
+/// write every field they declare, so a field `expected` lacks must hold that field's empty
+/// default (`null`, `""`, `[]` or `{}`); every field `expected` has must be equal. Returns the
+/// path of the first difference.
+pub fn compare_typed(actual: &Value, expected: &Value) -> Result<(), String> {
+    fn walk(actual: &Value, expected: &Value, path: &str) -> Result<(), String> {
+        match (actual, expected) {
+            (Value::Object(actual), Value::Object(expected)) => {
+                for (key, wanted) in expected {
+                    let here = format!("{path}.{key}");
+                    match actual.get(key) {
+                        Some(value) => walk(value, wanted, &here)?,
+                        None => return Err(format!("{here}: missing, expected {wanted}")),
+                    }
+                }
+                for (key, value) in actual {
+                    let empty = match value {
+                        Value::Null => true,
+                        Value::String(text) => text.is_empty(),
+                        Value::Array(items) => items.is_empty(),
+                        Value::Object(map) => map.is_empty(),
+                        _ => false,
+                    };
+                    if !expected.contains_key(key) && !empty {
+                        return Err(format!("{path}.{key}: unexpected {value}"));
+                    }
+                }
+                Ok(())
+            }
+            (Value::Array(actual), Value::Array(expected)) if actual.len() == expected.len() => {
+                for (index, (value, wanted)) in actual.iter().zip(expected).enumerate() {
+                    walk(value, wanted, &format!("{path}.{index}"))?;
+                }
+                Ok(())
+            }
+            _ if actual == expected => Ok(()),
+            _ => Err(format!("{path}: {actual} != {expected}")),
+        }
+    }
+    walk(&whole_numbers(actual.clone()), expected, "$")
+}
+
+/// An error as the fixtures describe it: `{code, status, requestId, retryAfter, details}`, with
+/// `null` for what it lacks (no details is `null`).
+pub fn error_json(error: &calmlens::Error) -> Value {
+    serde_json::json!({
+        "code": error.code().as_str(),
+        "status": error.status(),
+        "requestId": error.request_id(),
+        "retryAfter": error.retry_after().map(|delay| delay.as_secs()),
+        "details": if error.details().is_empty() {
+            Value::Null
+        } else {
+            Value::Object(error.details().clone())
+        },
+    })
 }

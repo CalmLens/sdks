@@ -1,3 +1,4 @@
+export { signUploadTokenWithApiKey as signUploadToken } from "./client/CalmLensUploadTokens";
 export { generateMediaTestCode, MEDIA_TEST_SIGNALS } from "./contract/MediaTestTriggers.js";
 export { createMockApiKey, MOCK_API_KEY_PREFIX } from "./testing/MockApiKey";
 export type {

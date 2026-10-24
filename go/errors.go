@@ -3,6 +3,7 @@ package calmlens
 import (
 	"context"
 	"errors"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -47,8 +48,9 @@ type Error struct {
 	Code string `json:"code"`
 	// Message is a human-readable description. Do not match on it.
 	Message string `json:"message"`
-	// Details holds structured details from the API. API errors always include
-	// "network": true and, when the API sent one, "traceId".
+	// Details holds structured details from the API, with the API's "traceId" when it sent one,
+	// or local details such as "cursor" for a repeated iterator cursor. It is nil when there are
+	// none, as for transport failures.
 	Details JSON `json:"details"`
 	// Status is the HTTP status, or 0 when no response was received.
 	Status int `json:"-"`
@@ -56,8 +58,9 @@ type Error struct {
 	RequestID string `json:"-"`
 	// Header holds the response headers, or nil when no response was received.
 	Header http.Header `json:"-"`
-	// RetryAfter is the delay from the Retry-After header, or 0 when absent.
-	RetryAfter time.Duration `json:"-"`
+	// RetryAfter is the delay from the Retry-After header (seconds or an HTTP date), or nil when
+	// the response had none. Zero means retry at once.
+	RetryAfter *time.Duration `json:"-"`
 	// Cause is the underlying error, if any. It is returned by Unwrap.
 	Cause error `json:"-"`
 }
@@ -144,23 +147,30 @@ func argumentError(message string, cause error) error {
 	return &Error{Code: CodeSDKInvalidArgument, Message: message + ": " + cause.Error(), Cause: cause}
 }
 
-// parseRetryAfter reads delay-seconds or an HTTP date.
-func parseRetryAfter(value string, now time.Time) time.Duration {
+// parseRetryAfter reads delay-seconds or an HTTP date (rounded up to whole seconds, and zero
+// when it has passed). It returns nil when value is absent or neither.
+func parseRetryAfter(value string, now time.Time) *time.Duration {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return 0
+		return nil
 	}
-	if seconds, err := strconv.ParseInt(value, 10, 64); err == nil {
-		if seconds <= 0 {
-			return 0
+	if strings.Trim(value, "0123456789") == "" {
+		seconds, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || seconds > int64(math.MaxInt64/time.Second) {
+			seconds = int64(math.MaxInt64 / time.Second)
 		}
-		if seconds > int64(24*time.Hour/time.Second) {
-			return 24 * time.Hour
-		}
-		return time.Duration(seconds) * time.Second
+		delay := time.Duration(seconds) * time.Second
+		return &delay
 	}
-	if at, err := http.ParseTime(value); err == nil && at.After(now) {
-		return at.Sub(now)
+	at, err := http.ParseTime(value)
+	if err != nil {
+		return nil
 	}
-	return 0
+	delay := time.Duration(0)
+	if remaining := at.Sub(now); remaining > 0 {
+		// Sub saturates for far dates; round up without overflowing.
+		delay = min(remaining, time.Duration(math.MaxInt64)-time.Second)
+		delay = (delay + time.Second - 1).Truncate(time.Second)
+	}
+	return &delay
 }

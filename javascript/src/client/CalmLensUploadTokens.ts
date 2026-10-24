@@ -10,7 +10,9 @@ import { encodePathSegment } from "./CalmLensUtils";
 
 /**
  * Signs a single-use upload token with `apiKey`, locally. `CalmLensServerClient` and
- * `MockCalmLensServerClient` share it so both check options the same way.
+ * `MockCalmLensServerClient` share it so both check options the same way. `@calmlens/sdk/testing`
+ * exports it as `signUploadToken`, whose fixed `now` (milliseconds since the epoch) and `nonce`
+ * give the same token every time, for comparing with known tokens in tests.
  */
 export const signUploadTokenWithApiKey = async (
   apiKey: string,

@@ -12,9 +12,11 @@
 //! calmlens = { version = "0.1", features = ["testing"] }
 //! ```
 mod memory;
+mod placeholder;
 
 pub use memory::{
-    create_mock_api_key, MockApiKeyGrant, MockOptions, MockOutcome, MockStorage, StoredContent,
+    create_mock_api_key, MockApiKeyGrant, MockFailure, MockOptions, MockOutcome, MockStorage,
+    StoredContent,
 };
 
 use crate::error::ErrorCode;
@@ -44,7 +46,7 @@ pub struct Request {
     pub path: String,
     /// Decoded query parameters in request order.
     pub query: Vec<(String, String)>,
-    /// Header names are lowercase. The API key is replaced with `[redacted]`.
+    /// Header names are lowercase; repeated headers keep their last value.
     pub headers: HashMap<String, String>,
     /// The request body, including streamed uploads.
     pub body: Vec<u8>,
@@ -119,14 +121,18 @@ impl MockResponse {
 enum Reply {
     Response(MockResponse),
     Error(Error),
+    /// No response until the attempt's timeout.
+    Hang,
 }
 #[derive(Default)]
 struct State {
     replies: VecDeque<Reply>,
     requests: Vec<Request>,
     backend: Option<memory::Backend>,
-    /// Virtual time the client's waits have advanced.
+    /// Virtual time the client's waits and timeouts have advanced.
     elapsed: Duration,
+    /// Each wait between attempts and polls, in order.
+    sleeps: Vec<Duration>,
 }
 pub(crate) struct MockTransport {
     state: Mutex<State>,
@@ -144,6 +150,10 @@ impl MockTransport {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+    /// Whether an in-memory API answers requests, which then makes the multipart size checks.
+    pub(crate) fn defers_upload_checks(&self) -> bool {
+        self.state().backend.is_some()
+    }
     /// The virtual clock: the time the mock was created plus the waits since.
     pub(crate) fn now(&self) -> tokio::time::Instant {
         self.started + self.state().elapsed
@@ -153,16 +163,21 @@ impl MockTransport {
         {
             let mut state = self.state();
             state.elapsed = state.elapsed.saturating_add(duration);
+            state.sleeps.push(duration);
         }
         tokio::task::yield_now().await;
     }
-    pub(crate) async fn exchange(&self, attempt: Attempt) -> Result<Exchange> {
+    pub(crate) async fn exchange(
+        &self,
+        attempt: Attempt,
+        timeout: Option<Duration>,
+    ) -> Result<Exchange> {
         let body = match attempt.body {
             AttemptBody::Empty => Vec::new(),
             AttemptBody::Bytes(bytes) => bytes.to_vec(),
             AttemptBody::Stream(stream, size) => {
                 let body = crate::transport::collect(stream).await?;
-                if body.len() as u64 != size {
+                if let Some(size) = size.filter(|size| body.len() as u64 != *size) {
                     return Err(Error::new(
                         ErrorCode::TransportError,
                         format!("Upload stream yielded {} bytes, not {size}", body.len()),
@@ -177,7 +192,28 @@ impl MockTransport {
         let reply = match state.replies.pop_front() {
             Some(reply) => Some(reply),
             None => state.backend.as_mut().map(|backend| {
-                Reply::Response(backend.handle(&attempt.method, url, &attempt.headers, &body))
+                match backend.take_failure(&attempt.method, url, &attempt.headers) {
+                    Some(MockFailure::TransportError) => Reply::Error(io_failure(
+                        ErrorCode::TransportError,
+                        io::ErrorKind::ConnectionReset,
+                        "connection reset",
+                    )),
+                    Some(MockFailure::Timeout) => Reply::Error(io_failure(
+                        ErrorCode::Timeout,
+                        io::ErrorKind::TimedOut,
+                        "operation timed out",
+                    )),
+                    Some(MockFailure::Api(code)) => {
+                        let message = format!("Injected {code} failure");
+                        Reply::Response(MockResponse::api_error(code, message))
+                    }
+                    None => Reply::Response(backend.handle(
+                        &attempt.method,
+                        url,
+                        &attempt.headers,
+                        &body,
+                    )),
+                }
             }),
         };
         state.requests.push(Request {
@@ -188,14 +224,7 @@ impl MockTransport {
             headers: attempt
                 .headers
                 .iter()
-                .map(|(name, value)| {
-                    let value = if name == "x-api-key" {
-                        "[redacted]".into()
-                    } else {
-                        value.to_str().unwrap_or("").to_string()
-                    };
-                    (name.to_string(), value)
-                })
+                .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_string()))
                 .collect(),
             body,
         });
@@ -215,6 +244,18 @@ impl MockTransport {
                 })
             }
             Some(Reply::Error(error)) => Err(error),
+            Some(Reply::Hang) => {
+                // The attempt's deadline passes on the virtual clock; without one it would
+                // wait forever, so it fails at once.
+                if let Some(timeout) = timeout {
+                    state.elapsed = state.elapsed.saturating_add(timeout);
+                }
+                Err(io_failure(
+                    ErrorCode::Timeout,
+                    io::ErrorKind::TimedOut,
+                    "operation timed out",
+                ))
+            }
             None => Err(Error::new(
                 ErrorCode::TransportError,
                 "No queued mock response",
@@ -331,7 +372,7 @@ impl MockServerClient {
     /// Applies a reviewer decision to a stored asset, as the portal would: the moderation
     /// status changes (`purged` removes the content), the review is added to `manual_reviews`,
     /// and an `asset.<status>` event with a `decided-by: reviewer` fact joins the events feed.
-    /// Fails with `asset/not-found` for an unknown asset.
+    /// Fails with `asset/not-found` (status 404) for an unknown asset.
     ///
     /// # Panics
     ///
@@ -339,9 +380,42 @@ impl MockServerClient {
     pub fn decide(&self, asset_id: &str, decision: AssetModerationDecision) -> Result<Asset> {
         let asset = self
             .backend(|backend| backend.decide(asset_id, decision.as_str()))
-            .ok_or_else(|| Error::new(ErrorCode::AssetNotFound, "Asset not found"))?;
+            .ok_or_else(|| {
+                Error::new(ErrorCode::AssetNotFound, "Asset not found").with_status(404)
+            })?;
         serde_json::from_value(asset)
             .map_err(|cause| Error::new(ErrorCode::InvalidResponse, cause.to_string()))
+    }
+    /// Replaces the grants of the mock's API key, as editing the key in the portal would: later
+    /// requests, such as CDN downloads, use them. The key itself stays the same, so its
+    /// idempotency keys still replay.
+    ///
+    /// # Panics
+    ///
+    /// When the mock was not created with [`MockServerClient::in_memory`].
+    pub fn set_api_key_grants(&self, grants: &[MockApiKeyGrant]) {
+        self.backend(|backend| backend.set_grants(grants));
+    }
+    /// Makes the next request (or, with `operation`, the next request of that operation) fail
+    /// with `failure` instead of reaching the in-memory API, which it leaves unchanged. Each
+    /// queued failure is used once; queue several to fail several requests. `operation` is the
+    /// JavaScript SDK's method path, such as `assets.create`, `assets.uploadPart` or
+    /// `cdn.serve`; a convenience fails with the request it sends (`assets.waitForDecision`
+    /// with `assets.retrieve`, `text.classify` with `assets.classify`, `ensureLens` with
+    /// `ensureLenses`, iterators with their list).
+    ///
+    /// # Panics
+    ///
+    /// When the mock was not created with [`MockServerClient::in_memory`], or for an unknown
+    /// operation.
+    pub fn fail_next_request(&self, failure: MockFailure, operation: Option<&str>) {
+        if let Some(operation) = operation {
+            assert!(
+                memory::OPERATIONS.contains(&operation),
+                "unknown operation {operation:?}"
+            );
+        }
+        self.backend(|backend| backend.queue_failure(failure, operation));
     }
     /// Appends `event` to the in-memory events feed and returns it. A missing ID, project ID
     /// or creation time is filled in; when `asset_id` names a stored asset and `asset` is
@@ -434,6 +508,11 @@ impl MockServerClient {
             message,
         ));
     }
+    /// Queues a request that gets no response: it fails with `sdk/timeout` once the attempt's
+    /// timeout passes on the virtual clock (at once for an attempt without one).
+    pub fn enqueue_hang(&self) {
+        self.transport.state().replies.push_back(Reply::Hang);
+    }
     /// Queues an `sdk/timeout` whose `source()` is an `io::Error` of kind `TimedOut`.
     pub fn enqueue_timeout(&self) {
         self.enqueue_error(io_failure(
@@ -454,12 +533,30 @@ impl MockServerClient {
     pub fn remaining_responses(&self) -> usize {
         self.transport.state().replies.len()
     }
-    /// The virtual time this mock's clients have waited: retry backoff and
-    /// `wait_for_decision` advance it instead of sleeping.
+    /// The virtual time this mock's clients have waited: retry backoff, `wait_for_decision`
+    /// and the timeouts of [`enqueue_hang`](Self::enqueue_hang) advance it instead of sleeping.
     pub fn elapsed(&self) -> Duration {
         self.transport.state().elapsed
     }
+    /// Each wait the clients made between attempts (retry backoff, `Retry-After`) and
+    /// between `wait_for_decision` checks, in order.
+    pub fn sleeps(&self) -> Vec<Duration> {
+        self.transport.state().sleeps.clone()
+    }
 }
+/// Signs an upload token exactly as
+/// [`UploadTokensClient::sign`](crate::UploadTokensClient::sign) does, with the same
+/// validation, but at `now` (milliseconds since the Unix epoch) and with `nonce`, so a test can
+/// compare the whole token.
+pub fn sign_upload_token(
+    api_key: &str,
+    options: crate::models::SignUploadToken,
+    now: u64,
+    nonce: &str,
+) -> Result<crate::models::SignedUploadToken> {
+    crate::client::sign_upload_token(api_key, options, now, nonce)
+}
+
 fn io_failure(code: ErrorCode, kind: io::ErrorKind, message: &str) -> Error {
     Error::new(code, message).with_source(io::Error::new(kind, message.to_string()))
 }

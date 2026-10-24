@@ -21,7 +21,7 @@ class TransportTests(unittest.TestCase):
             protocol_version = 'HTTP/1.1'
             def do_GET(self):
                 ports.append(self.client_address[1])
-                body = b'{"id":"asset","status":"approved"}'
+                body = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'
                 self.send_response(200)
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
@@ -40,7 +40,7 @@ class TransportTests(unittest.TestCase):
         barrier = threading.Barrier(2)
         def transport(request, timeout):
             barrier.wait(timeout=2)
-            response = io.BytesIO(b'{"id":"asset","status":"approved"}'); response.status = 200
+            response = io.BytesIO(b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'); response.status = 200
             return response
         client = CalmLensServerClient(api_key='key', project_id='project', transport=transport)
         with ThreadPoolExecutor(2) as pool:
@@ -192,7 +192,7 @@ class _KeepAliveServer:
     before answering request ``index`` on a connection (with the socket) and after it (with
     None); returning False closes the connection at that point."""
 
-    BODY = b'{"id":"asset","status":"approved"}'
+    BODY = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'
 
     def __init__(self, on_request):
         self.sock = socket.socket()

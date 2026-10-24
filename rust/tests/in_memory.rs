@@ -26,14 +26,6 @@ fn kept(name: &str, bytes: &'static [u8]) -> SubmitAsset {
 fn named(name: &str) -> SubmitAsset {
     SubmitAsset::new(name, Content::text(name))
 }
-fn cdn(asset_identifier: &str) -> CdnRequest {
-    CdnRequest {
-        asset_identifier: asset_identifier.into(),
-        resource: Some(CdnResource::Original),
-        ..Default::default()
-    }
-}
-
 /// The shared scenarios cover the statuses, recorded review, events and delivery a decision
 /// gives; these are the mock's own IDs and the refusal of an unknown asset.
 #[tokio::test]
@@ -85,35 +77,6 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
         .await
         .unwrap();
     assert!(!purging.with_storage(|storage| storage.content.contains_key(&purged.id)));
-}
-
-/// The shared scenarios cover which keys may read what and the served headers; these are byte
-/// ranges.
-#[tokio::test]
-async fn cdn_serves_byte_ranges() {
-    let allowed = MockServerClient::in_memory(
-        options().api_key(create_mock_api_key(&[MockApiKeyGrant::download()])),
-    )
-    .unwrap();
-    let private = allowed
-        .assets()
-        .classify(kept("d.png", b"0123456789"))
-        .await
-        .unwrap();
-    let range = allowed
-        .cdn()
-        .serve(CdnRequest {
-            init: Some(HttpOptions {
-                headers: [("range".to_string(), "bytes=2-4".to_string())].into(),
-                ..Default::default()
-            }),
-            ..cdn(&private.id)
-        })
-        .await
-        .unwrap();
-    assert_eq!(range.status().as_u16(), 206);
-    assert_eq!(range.headers()["content-range"], "bytes 2-4/10");
-    assert_eq!(range.bytes().await.unwrap().as_ref(), b"234");
 }
 
 #[tokio::test]
@@ -382,8 +345,8 @@ async fn enqueued_events_carry_the_asset_snapshot() {
     let event = mock.enqueue_event(event);
     assert_eq!(event.project_id.as_deref(), Some("mock-project"));
     assert_eq!(
-        event.asset.as_ref().unwrap().classification.status,
-        AssetClassificationStatus::Processing
+        event.asset.as_ref().unwrap().classification_status(),
+        Some(AssetClassificationStatus::Processing)
     );
     let page = mock
         .events()

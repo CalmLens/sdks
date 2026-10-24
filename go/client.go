@@ -34,9 +34,15 @@ const (
 	DefaultMaxRetries = 2
 	// DefaultMaxResponseBytes caps how much of an API response body is read.
 	DefaultMaxResponseBytes int64 = 32 << 20
-	// maxRetryAfter is the longest Retry-After the SDK waits for; longer delays are returned
-	// to the caller as the error instead.
-	maxRetryAfter = time.Minute
+	// RetryBaseDelay is the backoff before the first retry. Retry n (0-based) waits between half
+	// and all of min(RetryMaxDelay, RetryBaseDelay * 2^n), unless a Retry-After header says
+	// otherwise.
+	RetryBaseDelay = 500 * time.Millisecond
+	// RetryMaxDelay is the longest backoff before a retry.
+	RetryMaxDelay = 8 * time.Second
+	// RetryAfterMax is the longest Retry-After the SDK waits for; a longer delay is returned to
+	// the caller (as the error, or for CDN.Serve as the response) instead.
+	RetryAfterMax = time.Minute
 )
 
 // Options configures NewServerClient. APIKey and ProjectID are required.
@@ -49,11 +55,14 @@ type Options struct {
 	BaseURL string
 	// CDNBaseURL overrides the CDN base URL (default https://cdn.calmlens.com/v1).
 	CDNBaseURL string
-	// Timeout bounds each attempt of a JSON API call, including reading the body. Zero means
-	// DefaultTimeout; negative values are rejected. Uploads and CDN.Serve are never cut off
-	// by it, so large transfers can take as long as they need: bound them with a context
-	// deadline instead.
+	// Timeout bounds each attempt of an API call, including reading the response body. Zero
+	// means DefaultTimeout; negative values are rejected. Text uploads use it too. For
+	// CDN.Serve it ends when the response headers arrive, so long downloads are not cut off.
+	// Binary uploads use UploadTimeout instead.
 	Timeout time.Duration
+	// UploadTimeout bounds each attempt of a binary upload (file content and multipart parts).
+	// Zero means no deadline, so large files are never cut off; negative values are rejected.
+	UploadTimeout time.Duration
 	// ConnectTimeout bounds dialing and the TLS handshake (default DefaultConnectTimeout).
 	// It only applies when HTTPClient is nil.
 	ConnectTimeout time.Duration
@@ -102,12 +111,15 @@ type ServerClient struct {
 	options    Options
 	maxRetries int
 	http       *http.Client
-	lenses     map[string]Lens
-	lensLock   chan struct{}
+	// lenses is shared with the clients WithRequestOptions returns.
+	lenses *lensCache
 	// sleep waits between retries and decision checks; tests replace it.
 	sleep func(context.Context, time.Duration) error
 	// now reads the clock for decision deadlines; tests replace it.
 	now func() time.Time
+	// deferUploadChecks leaves multipart size checks to the API; calmlenstest sets it so its
+	// in-memory API answers them in the API's order.
+	deferUploadChecks bool
 }
 
 // String describes the client without its API key.
@@ -127,7 +139,7 @@ func NewServerClient(options Options) (*ServerClient, error) {
 	if options.ProjectID == "." || options.ProjectID == ".." {
 		return nil, invalid(CodeSDKInvalidConfig, `ProjectID cannot be "." or ".."`)
 	}
-	if options.Timeout < 0 || options.ConnectTimeout < 0 || options.ResponseHeaderTimeout < 0 || options.MaxResponseBytes < 0 {
+	if options.Timeout < 0 || options.UploadTimeout < 0 || options.ConnectTimeout < 0 || options.ResponseHeaderTimeout < 0 || options.MaxResponseBytes < 0 {
 		return nil, invalid(CodeSDKInvalidConfig, "Timeouts and MaxResponseBytes cannot be negative")
 	}
 	if options.MaxRetries != nil && *options.MaxRetries < 0 {
@@ -168,11 +180,48 @@ func NewServerClient(options Options) (*ServerClient, error) {
 	if options.MaxRetries != nil {
 		maxRetries = *options.MaxRetries
 	}
-	c := &ServerClient{options: options, maxRetries: maxRetries, http: &safeClient, lenses: map[string]Lens{}, lensLock: make(chan struct{}, 1), sleep: sleep, now: time.Now}
+	c := &ServerClient{options: options, maxRetries: maxRetries, http: &safeClient, lenses: &lensCache{lenses: map[string]Lens{}, lock: make(chan struct{}, 1)}, sleep: sleep, now: time.Now}
+	c.services()
+	return c, nil
+}
+
+func (c *ServerClient) services() {
 	c.Assets, c.Text = &AssetsService{c}, &TextService{c}
 	c.Folders, c.Events, c.CDN = &FoldersService{c}, &EventsService{c}, &CDNService{c}
 	c.UploadTokens = &UploadTokensService{c}
-	return c, nil
+}
+
+// RequestOptions changes the deadlines and retries of the calls made through the client
+// WithRequestOptions returns. Zero fields keep the client's settings. Cancel a call with its
+// context.
+type RequestOptions struct {
+	// Timeout replaces Options.Timeout; negative values are rejected.
+	Timeout time.Duration
+	// UploadTimeout replaces Options.UploadTimeout; negative values are rejected.
+	UploadTimeout time.Duration
+	// MaxRetries replaces Options.MaxRetries. Use Ptr(0) to disable retries.
+	MaxRetries *int
+}
+
+// WithRequestOptions returns a client with other deadlines or retries for the calls made
+// through it. It shares this client's credentials, HTTP client and lens cache; this client is
+// unchanged. Invalid options return a *Error with code sdk/invalid-config.
+func (c *ServerClient) WithRequestOptions(options RequestOptions) (*ServerClient, error) {
+	if options.Timeout < 0 || options.UploadTimeout < 0 || options.MaxRetries != nil && *options.MaxRetries < 0 {
+		return nil, invalid(CodeSDKInvalidConfig, "Timeouts and MaxRetries cannot be negative")
+	}
+	copied := *c
+	if options.Timeout > 0 {
+		copied.options.Timeout = options.Timeout
+	}
+	if options.UploadTimeout > 0 {
+		copied.options.UploadTimeout = options.UploadTimeout
+	}
+	if options.MaxRetries != nil {
+		copied.maxRetries = *options.MaxRetries
+	}
+	copied.services()
+	return &copied, nil
 }
 
 // defaultTransport bounds connecting and waiting for headers, never the body transfer.
@@ -197,6 +246,7 @@ func init() {
 		c := client.(*ServerClient)
 		c.now, c.sleep = now, sleep
 	}
+	clock.DeferUploadChecks = func(client any) { client.(*ServerClient).deferUploadChecks = true }
 }
 
 func sleep(ctx context.Context, d time.Duration) error {
@@ -304,8 +354,8 @@ type call struct {
 	headers http.Header
 	// idempotencyKey makes a POST safe to retry.
 	idempotencyKey string
-	// transfer calls (uploads) are not bounded by Options.Timeout.
-	transfer bool
+	// binary uploads are bounded by Options.UploadTimeout rather than Options.Timeout.
+	binary bool
 }
 
 // rewinder returns a function that resets raw to its start, or nil when it cannot.
@@ -340,6 +390,28 @@ func (c *ServerClient) request(ctx context.Context, method, path string, params 
 	return c.send(ctx, call{method: method, path: path, params: params, body: body}, out)
 }
 
+// encodeJSON encodes value as JavaScript's JSON.stringify does: without escaping <, > and &.
+func encodeJSON(value any) ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buffer.Bytes(), []byte("\n")), nil
+}
+
+// retryDelay is how long to wait before repeating a request that failed with err, and whether
+// to repeat it at all: a Retry-After header replaces the backoff, and one over RetryAfterMax
+// is not waited out.
+func retryDelay(err *Error, attempt int) (time.Duration, bool) {
+	delay := backoff(attempt)
+	if err.RetryAfter != nil {
+		delay = *err.RetryAfter
+	}
+	return delay, delay <= RetryAfterMax
+}
+
 // send performs a call, retrying it when that is safe, and decodes the response into out.
 func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 	endpoint := c.options.BaseURL + spec.path
@@ -350,11 +422,12 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 	for key, values := range spec.headers {
 		headers[key] = append([]string(nil), values...)
 	}
+	headers.Set("Accept", "application/json")
 	var payload []byte
 	rewind := func() error { return nil }
 	if spec.body != nil {
 		var err error
-		if payload, err = json.Marshal(spec.body); err != nil {
+		if payload, err = encodeJSON(spec.body); err != nil {
 			return argumentError("Could not encode the request body", err)
 		}
 		headers.Set("Content-Type", "application/json")
@@ -363,6 +436,10 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 	}
 	if spec.idempotencyKey != "" {
 		headers.Set("Idempotency-Key", spec.idempotencyKey)
+	}
+	timeout := c.options.Timeout
+	if spec.binary {
+		timeout = c.options.UploadTimeout
 	}
 	retryable := spec.method == http.MethodGet || spec.method == http.MethodHead || spec.idempotencyKey != ""
 	for attempt := 0; ; attempt++ {
@@ -374,7 +451,7 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 		case spec.raw != nil:
 			reader, size = spec.raw, spec.size
 		}
-		err := c.attempt(ctx, spec, endpoint, headers, reader, size, out)
+		err := c.attempt(ctx, spec.method, endpoint, headers, reader, size, timeout, out)
 		if err == nil {
 			return nil
 		}
@@ -386,12 +463,9 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 			// A stream that cannot be rewound cannot be sent again.
 			return err
 		}
-		delay := sdkErr.RetryAfter
-		if delay > maxRetryAfter {
+		delay, wait := retryDelay(sdkErr, attempt)
+		if !wait {
 			return err
-		}
-		if delay == 0 {
-			delay = backoff(attempt)
 		}
 		if waitErr := c.sleep(ctx, delay); waitErr != nil {
 			return transportError(waitErr)
@@ -399,21 +473,22 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 	}
 }
 
-// backoff is capped exponential backoff with jitter: 0.5s, 1s, 2s ... up to 8s, each
-// randomized to between half and all of that value.
+// backoff is capped exponential backoff with jitter: retry n waits between half and all of
+// min(RetryMaxDelay, RetryBaseDelay * 2^n), rounded to the millisecond.
 func backoff(attempt int) time.Duration {
-	delay := 500 * time.Millisecond << min(attempt, 4)
-	return delay/2 + time.Duration(mathrand.Int63n(int64(delay/2)+1))
+	delay := min(RetryMaxDelay, RetryBaseDelay<<min(attempt, 16))
+	jittered := float64(delay/2) + mathrand.Float64()*float64(delay/2)
+	return time.Duration(jittered).Round(time.Millisecond)
 }
 
-// attempt sends one HTTP request.
-func (c *ServerClient) attempt(ctx context.Context, spec call, endpoint string, headers http.Header, body io.Reader, size int64, out any) error {
-	if !spec.transfer {
+// attempt sends one HTTP request and reads its response.
+func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, headers http.Header, body io.Reader, size int64, timeout time.Duration, out any) error {
+	if timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.options.Timeout)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	req, err := http.NewRequestWithContext(ctx, spec.method, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {
 		return argumentError("Could not build the request", err)
 	}
@@ -433,20 +508,20 @@ func (c *ServerClient) attempt(ctx context.Context, spec call, endpoint string, 
 		return transportError(err)
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(res.Body, c.options.MaxResponseBytes+1))
-	if err != nil {
-		return transportError(err)
+	if isRedirect(res) {
+		return redirectError(res)
 	}
-	requestID := res.Header.Get("X-Request-Id")
-	if int64(len(data)) > c.options.MaxResponseBytes {
-		return &Error{Code: CodeSDKResponseTooLarge, Message: "Response body exceeds MaxResponseBytes", Status: res.StatusCode, RequestID: requestID, Header: res.Header}
+	data, err := readLimited(res, c.options.MaxResponseBytes)
+	if err != nil {
+		return err
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return responseError(res, data)
+		return responseError(res, data, c.now())
 	}
 	if out == nil {
 		return nil
 	}
+	requestID := res.Header.Get("X-Request-Id")
 	if len(data) == 0 {
 		return &Error{Code: CodeSDKInvalidResponse, Message: "Empty JSON response", Status: res.StatusCode, RequestID: requestID, Header: res.Header}
 	}
@@ -456,24 +531,56 @@ func (c *ServerClient) attempt(ctx context.Context, spec call, endpoint string, 
 	return nil
 }
 
-// responseError converts a non-2xx response into *Error.
-func responseError(res *http.Response, data []byte) error {
-	result := &Error{Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header, RetryAfter: parseRetryAfter(res.Header.Get("Retry-After"), time.Now())}
-	var failure struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-		Details JSON   `json:"details"`
-		TraceID string `json:"traceId"`
+// readLimited reads a response body of at most limit bytes. A larger declared Content-Length
+// fails before the body is read.
+func readLimited(res *http.Response, limit int64) ([]byte, error) {
+	tooLarge := func() error {
+		return &Error{Code: CodeSDKResponseTooLarge, Message: "Response body exceeds MaxResponseBytes", Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header}
 	}
-	if decodeJSON(data, &failure) == nil && failure.Code != "" {
-		if failure.Details == nil {
-			failure.Details = JSON{}
-		}
-		failure.Details["network"] = true
+	if res.ContentLength > limit {
+		return nil, tooLarge()
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
+	if err != nil {
+		return nil, transportError(err)
+	}
+	if int64(len(data)) > limit {
+		return nil, tooLarge()
+	}
+	return data, nil
+}
+
+// isRedirect reports a 3xx response, which the client never follows: following it could send
+// the API key to another origin.
+func isRedirect(res *http.Response) bool { return res.StatusCode >= 300 && res.StatusCode < 400 }
+
+// redirectError is the sdk/http-error of a redirect. It is not retried: the request would be
+// redirected again.
+func redirectError(res *http.Response) error {
+	return &Error{Code: CodeSDKHTTPError, Message: "Unexpected redirect (HTTP " + strconv.Itoa(res.StatusCode) + ")", Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header}
+}
+
+// responseError converts a non-2xx response into *Error.
+func responseError(res *http.Response, data []byte, now time.Time) error {
+	result := &Error{Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header, RetryAfter: parseRetryAfter(res.Header.Get("Retry-After"), now)}
+	var failure struct {
+		Code    *string `json:"code"`
+		Message *string `json:"message"`
+		Details JSON    `json:"details"`
+		TraceID string  `json:"traceId"`
+	}
+	if decodeJSON(data, &failure) == nil && failure.Code != nil {
+		details := failure.Details
 		if failure.TraceID != "" {
-			failure.Details["traceId"] = failure.TraceID
+			if details == nil {
+				details = JSON{}
+			}
+			details["traceId"] = failure.TraceID
 		}
-		result.Code, result.Message, result.Details = failure.Code, failure.Message, failure.Details
+		result.Code, result.Message, result.Details = *failure.Code, *failure.Code, details
+		if failure.Message != nil {
+			result.Message = *failure.Message
+		}
 		return result
 	}
 	result.Code, result.Message = CodeSDKHTTPError, "HTTP "+strconv.Itoa(res.StatusCode)
@@ -503,6 +610,13 @@ func (c *ServerClient) EnsureLens(ctx context.Context, options EnsureLensOptions
 	return &lenses[0], nil
 }
 
+// lensCache holds the lenses a client has ensured, by definition. lock serializes ensures, so
+// concurrent identical calls send the definition once.
+type lensCache struct {
+	lenses map[string]Lens
+	lock   chan struct{}
+}
+
 // EnsureLensesMaxPerRequest is the most lens definitions EnsureLenses sends in one request.
 const EnsureLensesMaxPerRequest = 100
 
@@ -524,24 +638,25 @@ func (c *ServerClient) EnsureLenses(ctx context.Context, options EnsureLensesOpt
 		}
 		keys[i] = string(encoded)
 	}
+	cache := c.lenses
 	select {
-	case c.lensLock <- struct{}{}:
+	case cache.lock <- struct{}{}:
 	case <-ctx.Done():
 		return nil, transportError(ctx.Err())
 	}
-	defer func() { <-c.lensLock }()
+	defer func() { <-cache.lock }()
 	missing := []EnsureLensOptions{}
 	missingKeys := []string{}
 	seen := map[string]bool{}
 	for i, key := range keys {
-		if _, ok := c.lenses[key]; !ok && !seen[key] {
+		if _, ok := cache.lenses[key]; !ok && !seen[key] {
 			missing = append(missing, options.Lenses[i])
 			missingKeys = append(missingKeys, key)
 			seen[key] = true
 		}
 	}
 	resolved := map[string]Lens{}
-	for key, lens := range c.lenses {
+	for key, lens := range cache.lenses {
 		resolved[key] = lens
 	}
 	for start := 0; start < len(missing); start += EnsureLensesMaxPerRequest {
@@ -563,12 +678,12 @@ func (c *ServerClient) EnsureLenses(ctx context.Context, options EnsureLensesOpt
 			}
 		}
 		for i, lens := range response.Lenses {
-			for key, old := range c.lenses {
+			for key, old := range cache.lenses {
 				if old.Identifier == lens.Identifier {
-					delete(c.lenses, key)
+					delete(cache.lenses, key)
 				}
 			}
-			c.lenses[chunkKeys[i]] = lens
+			cache.lenses[chunkKeys[i]] = lens
 			resolved[chunkKeys[i]] = lens
 		}
 	}

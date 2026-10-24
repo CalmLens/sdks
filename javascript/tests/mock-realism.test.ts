@@ -216,7 +216,8 @@ describe("MockCalmLensServerClient CDN", () => {
     });
     const served = await client.cdn.serve({ assetIdentifier: asset.id });
     expect(served.headers.get("content-length")).toBe("3");
-    expect(served.headers.get("etag")).toBeString();
+    // Like the CDN, only images carry an ETag (their bytes never change).
+    expect(served.headers.get("etag")).toBeNull();
     expect(served.url).toBe(client.cdn.getAssetUrl({ assetIdentifier: asset.id }));
     const head = await client.cdn.serve({ assetIdentifier: asset.id, init: { method: "HEAD" } });
     expect(await head.text()).toBe("");

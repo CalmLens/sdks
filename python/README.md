@@ -40,23 +40,28 @@ values this SDK version doesn't list never fail: treat an unknown status as "not
 | `api_key` | `CALMLENS_API_KEY` | Project API key |
 | `project_id` | `CALMLENS_PROJECT_ID` | Project ID |
 | `base_url`, `cdn_base_url` | `https://api.calmlens.com/v1`, `https://cdn.calmlens.com/v1` | Endpoints |
-| `timeout` | `60` | Seconds a connection may stay silent before `sdk/timeout`. An inactivity limit, not a limit on the whole transfer, so large uploads and downloads are never cut off |
+| `timeout` | `120` | Seconds a connection may stay silent before `sdk/timeout`. An inactivity limit, not a limit on the whole transfer, so large uploads and downloads are never cut off |
+| `upload_timeout` | `None` | The `timeout` of binary uploads (file content and multipart parts); `None` uses `timeout`. Text uploads always use `timeout` |
 | `connect_timeout` | `10` | Seconds to open a connection (TCP, proxy and TLS) |
 | `max_retries` | `2` | Retries for requests that are safe to resend (see [Retries](#retries)); `0` disables them |
+| `max_response_bytes` | `33554432` (32 MiB) | The largest API response body the client reads; a larger one (or a larger declared `Content-Length`, before reading) raises `sdk/response-too-large`. CDN downloads are not limited |
 | `transport` | pooled `http.client` | `transport(request, timeout)` returning a context-managed response with `status`, `headers` and `read()` |
 
 Invalid options raise `CalmLensValidationError` with code `sdk/invalid-config` before the
-client creates any state. `client.with_options(timeout=..., max_retries=...)` returns a client
-that shares the connections and caches with different per-call settings, e.g.
+client creates any state. `client.with_options(timeout=..., upload_timeout=..., max_retries=...,
+max_response_bytes=...)` returns a client that shares the connections and lens cache with
+different per-call settings, e.g.
 `client.with_options(timeout=300).cdn.serve(...)`.
 
 Reuse one client: it pools HTTP keep-alive connections and is **thread-safe**, so share it
 between threads. Use `with CalmLensServerClient() as client:` or `client.close()` to close the pool;
 custom transports remain caller-owned. After `os.fork()` (gunicorn, Celery, multiprocessing)
 the child opens its own connections instead of sharing the parent's sockets. Redirects are
-not followed, so the API key never leaves the configured endpoint. `repr(client)` never
-includes the API key. Requests send `User-Agent: calmlens-python/<version> (<Python> <version>;
-<platform>)`; the version is `calmlens.__version__`.
+not followed, so the API key never leaves the configured endpoint: a `3xx` response raises
+`sdk/http-error` with its status and request ID, and is not retried (`cdn.serve` included).
+`repr(client)` never includes the API key. API requests send `Accept: application/json` and
+every request `User-Agent: calmlens-python/<version> (<implementation>/<Python version>)`, such
+as `calmlens-python/0.1.2 (cpython/3.12.4)`; the version is `calmlens.__version__`.
 
 ### Async applications
 
@@ -85,12 +90,14 @@ Every failure raises `CalmLensError` or a subclass, with a stable `code` (consta
 | `CalmLensTimeoutError` | Connecting or waiting for data timed out | `sdk/timeout` | `None` |
 | `CalmLensTransportError` | Any other network or protocol failure (refused, reset, DNS, TLS, truncated response) | `sdk/transport-error` | `None` |
 | `CalmLensValidationError` | Invalid arguments or configuration, before anything is sent | `sdk/invalid-argument`, `sdk/invalid-config`, or the API's code for the same problem, e.g. `upload/invalid-payload`, `upload/invalid-mime-type` | `None` |
-| `CalmLensError` | A 2xx response that isn't valid JSON, or a JSON response larger than 32 MiB | `sdk/invalid-response`, `sdk/response-too-large` | HTTP status |
+| `CalmLensError` | A 2xx response that isn't the JSON the operation returns (an upload answered with something other than an asset included), or a response larger than `max_response_bytes` | `sdk/invalid-response`, `sdk/response-too-large` | HTTP status |
+| `CalmLensError` | An iterator received a page that says more follow with a cursor it had already sent; `details` has the `cursor` | `sdk/invalid-response` | `None` |
 | `CalmLensError` | `assets.wait_for_decision` saw no decision within its `timeout`; `details` has `assetId` and the last `classificationStatus` and `moderationStatus` | `sdk/timeout` | `None` |
 
-Each error also has `message`, `details` (the API's details, plus `traceId` when sent),
-`request_id` (the response's `X-Request-Id`, to quote to support), `headers` (lower-case
-names), `retry_after` (seconds from `Retry-After`), `is_not_found` and `is_retryable`.
+Each error also has `message`, `details` (the API's details, plus `traceId` when sent; empty for
+transport errors), `request_id` (the response's `X-Request-Id`, to quote to support), `headers`
+(lower-case names), `retry_after` (whole seconds from `Retry-After`, given in seconds or as an
+HTTP date), `is_not_found` and `is_retryable`.
 `is_retryable` depends only on `code` and `status`, so every error class agrees: it is True for
 `sdk/transport-error`, `sdk/timeout` (including `wait_for_decision`'s) and
 `idempotency/request-in-progress`, and for HTTP 429, 502, 503 and 504.
@@ -115,16 +122,19 @@ except CalmLensAPIError as error:
 The client retries a request when resending it cannot duplicate work: `GET` requests, and
 uploads (`create`, `classify`, `text.classify`, `upload_part`), which always carry an
 `Idempotency-Key`. It retries network failures and timeouts, `429`, `502`, `503`, `504` and
-`idempotency/request-in-progress`, up to `max_retries` times with jittered exponential
-backoff (0.5s doubling, at most 8s), or after the `Retry-After` delay when the response sends
-one (a `Retry-After` above 60 seconds raises the error instead). Other writes (`update`,
-`move`, `retry`, folder changes, signed URLs) and CDN downloads are never retried.
+`idempotency/request-in-progress`, up to `max_retries` times. Retry `n` (from 0) waits between
+half and all of `min(8, 0.5 × 2ⁿ)` seconds, or the `Retry-After` delay when the response sends
+one (`0` retries at once; a `Retry-After` above 60 seconds raises the error instead). Other
+writes (`update`, `move`, `retry`, `explain`, deletes, folder changes, signed URLs and lens
+definitions) are never retried. `cdn.serve` retries network failures, timeouts and `429`, `502`,
+`503` and `504` the same way and returns the last response once retries run out.
 
 Each upload call generates one `Idempotency-Key` and reuses it for its own retries; the API
 replays the saved response for 24 hours instead of creating a second asset. Pass
 `idempotency_key=` to retry across processes, e.g. a key derived from your own record ID.
 Reusing a key for a different request raises `idempotency/key-reused`. A stream body is
-rewound for a retry when it is seekable; uploads from non-seekable streams are not retried.
+rewound for a retry when it is seekable; uploads from one-shot (non-seekable) streams are not
+retried.
 
 ## Operations
 
@@ -228,10 +238,10 @@ Supply exactly one of `content`, `url` or `part`. A payload has exactly one of:
 | `data` | `bytes`, `bytearray`, `memoryview`, or a binary file object (`open(path, "rb")`, `io.BytesIO`, a socket file, ...) |
 
 File objects are streamed in chunks, never read into memory. The size is computed for bytes
-and for seekable files (from the current position); for non-seekable streams (pipes,
-sockets, generators wrapped in a reader) pass `sizeInBytes`, or the call raises
-`upload/invalid-payload`. Exactly `sizeInBytes` bytes are sent; a stream that ends early
-raises `upload/invalid-payload`. Text-mode files are rejected. Use a concrete MIME `type`
+and for seekable files (from the current position). A non-seekable stream (a pipe, socket or
+generator wrapped in a reader) without `sizeInBytes` is sent to its end with chunked transfer
+encoding and no `sizeInBytes`; multipart parts from such streams need `sizeInBytes`. Exactly
+`sizeInBytes` bytes are sent; a stream that ends early raises `upload/invalid-payload`. Text-mode files are rejected. Use a concrete MIME `type`
 (e.g. `image/jpeg`) on the first request. Metadata and processing options accompany raw bytes
 as query data; URL submissions use JSON.
 
@@ -294,8 +304,8 @@ A selector has one path segment per step, such as `fit=cover,width=640/format=we
 and a transform are joined with `/` (`/rendered/@thumbnail/width=320`). Structured options are
 sorted, nested options are dotted (`border.color`), hex colours drop the `#` and values are
 percent-encoded, so both calls return the same URL. `serve` returns a `CDNResponse` (`status`, `ok`, `headers`,
-`content_type`, `request_id`, `read()`, `iter_bytes()`, `close()`) even for non-2xx responses;
-check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
+`content_type`, `request_id`, `read()`, `iter_bytes()`, `close()`) even for non-2xx responses
+(after retrying retryable ones, see [Retries](#retries)); check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
 with `allow_age_restricted=True` (`?allowAgeRestricted=true`); otherwise it needs a signed URL or an API
@@ -326,11 +336,17 @@ except WebhookVerificationError:
 
 `parse_webhook_event` verifies, then parses into a `WebhookEventPayload` dict
 (`{id, type, createdAt, projectId, data}`, with `data` holding `severity`, `title`,
-`description`, `assetId`, `asset` and `facts`). It raises `WebhookVerificationError` with code
-`sdk/invalid-webhook-signature` or `sdk/invalid-webhook-payload`. `verify_webhook_signature` takes the
-same keyword arguments and returns `True`/`False`. Pass `headers=` (any mapping; names are
-matched case-insensitively), or `signature=` and `timestamp=` from the `x-calmlens-signature`
-and `x-calmlens-timestamp` headers. Any matching `v1=` entry of a comma-separated signature
+`description`, `assetId`, `asset` and `facts`); unknown fields are kept. It raises
+`WebhookVerificationError` with code `sdk/invalid-webhook-signature`, or
+`sdk/invalid-webhook-payload` when the verified body is not an event: a JSON object with string
+`id`, `type` and `projectId`, a numeric `createdAt` and a `data` object whose known fields have
+the API's types (each fact needs a string `key` and a `value`). `verify_webhook_signature` takes
+the same keyword arguments and returns `True`/`False`. Pass `headers=` (a mapping, an
+`email.message.Message`/`http.client.HTTPMessage` or a framework's header object; names are
+matched case-insensitively and a header repeated in the request is joined with `,`), or
+`signature=` and `timestamp=` from the `x-calmlens-signature` and `x-calmlens-timestamp`
+headers. `is_test_webhook_event(event)` is `True` for a test send from the portal or the CLI
+(an event with the `{"key": "test", "value": True}` fact). Any matching `v1=` entry of a comma-separated signature
 list is accepted; timestamps more than `tolerance_seconds` (default
 `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS`, 300) from `now` are rejected.
 
@@ -406,8 +422,11 @@ event has `id`, `type` (e.g. `asset.allowed`), `createdAt`, `severity`, `title`,
 - `hasMore` is True when more events are already waiting. An invalid cursor raises
   `CalmLensAPIError` with code `events/invalid-cursor`.
 
-`events.iter_pages(after=...)` follows the cursor until a page reports `hasMore=False`, and
-`events.iter(after=...)` yields the events of those pages:
+`events.iter_pages(after=...)` follows the cursor until a page reports `hasMore=False` (without
+`after` it yields the one empty page for now), and `events.iter(after=...)` yields the events of
+those pages. A page that says more follow but repeats a cursor already sent raises
+`sdk/invalid-response` with `details["cursor"]` instead of looping; `assets.iter` and
+`assets.iter_children` do the same with `nextCursor`:
 
 ```python
 import time
@@ -465,18 +484,22 @@ API answers with the real status codes, JSON error bodies and headers (`X-Reques
 `Retry-After`, `Idempotent-Replayed`). It accepts the real client's configuration (validated
 the same way; `max_retries` defaults to 0 so enqueued failures surface), plus `mock_options`:
 `database_storage`, `image_storage`, `create_id`, `now`, `queued_outcome`, `analyzed_outcome`
-and `signed_url_base_url`. Unknown mock options raise.
+and `signed_url_base_url`. Unknown mock options raise. Unset asset fields are `None`, as the API
+returns them.
 
 - `queued_outcome` (default `pending`) applies to `assets.create` and queued multipart uploads;
   `analyzed_outcome` (default `allowed`) to `assets.classify` and `text.classify`. An outcome
   is `pending` (processing `processing`, moderation `pending`), `allowed`, `limited`, `age-restricted`,
   `blocked` or `purged` (processing `completed` with that moderation status; `purged` also
   removes the content with `removalReason` `policy`) or `failed` (processing `failed`, retryable).
+  Either option can also be a function that takes the uploaded asset and returns its outcome.
+  A classified image gets a ThumbHash (`content.image.thumbhash` and `averageColor`), which goes
+  when its content is removed.
   `cdn.serve` serves a `limited` asset like an `allowed` one, and treats an `age-restricted` asset like a private one: it needs the
   `assets:download` permission, unless a public one is requested with `allow_age_restricted=True`.
 - Like the API, content is `stored` when `processingOptions.keepContentAfterProcessing` is
   `True`; otherwise it is `temporary` and is removed (`removalReason` `retention`) once
-  classification is `completed`, after which `cdn.serve` answers 404. Pass
+  classification is `completed`, after which `cdn.serve` answers 403 `asset/not-available`. Pass
   `keepContentAfterProcessing: True` to serve content after a decision.
 
 - `client.requests` returns copies of every captured request, oldest first, as
@@ -489,23 +512,49 @@ and `signed_url_base_url`. Unknown mock options raise.
   `CalmLensAPIError`. Network exceptions are raised like real failures (`TimeoutError` →
   `sdk/timeout`, other `OSError`s and `http.client` errors → `sdk/transport-error`, with the
   exception as `__cause__`).
+- `client.fail_next_request(failure="transport-error", operation=None)` makes the next request
+  (or the next to `operation`, a JavaScript-style method path such as `assets.create` or
+  `cdn.serve`) fail without running: `transport-error` raises `sdk/transport-error`, `timeout`
+  `sdk/timeout`, and an API error code that error with its HTTP status. Each queued failure is
+  used once. Operations are told apart by their requests, so `text.classify` counts as
+  `assets.classify`.
+- `client.set_api_key_grants(grants)` replaces the mock key's grants for later requests, as
+  editing the key in the portal would; the key, and the idempotency keys it used, stay the same.
 - `client.enqueue_event(type, facts=..., asset_id=..., severity=..., title=...)` adds an event
-  to the feed; `events.list`, `events.iter` and cursors behave like the API's.
+  to the feed; `events.list`, `events.iter` and cursors behave like the API's (cursors are
+  positions in the feed, so events added later reach cursors taken before them; `limit` is 1 to
+  100, default 50). Like the API, deleting an asset, removing its content and retrying it record
+  `asset.deleted`, `asset.content-removed` and `asset.retried` events with `asset-name` and
+  `asset-type` facts.
 - `client.decide(asset_id, decision)` applies a reviewer's decision (`allowed`, `limited`,
-  `age-restricted`, `blocked` or `purged`, which also removes the content) and adds the matching
-  `asset.<decision>` event with a `decided-by: reviewer` fact.
+  `age-restricted`, `blocked` or `purged`, which also removes the content with `removalReason`
+  `requested` after an `asset.content-removed` event) and adds the matching `asset.<decision>`
+  event with `decided-by: reviewer`, `asset-type`, `asset-name` and `note` facts.
 - `cdn.serve` answers like the CDN: blocked, purged and failed assets and removed content get
   `403` `asset/not-available` whatever the key; private assets, and public age-restricted ones
   requested without `allowAgeRestricted`, get `403` `asset/api-key-missing-permission` unless the
   key has `assets:download` (the default key has no grants). Served content has `Cache-Control`
   as the CDN sets it: `public` only when anyone may see the asset, otherwise `private`, with
-  `max-age=31536000, immutable` for images and `max-age=3600` for other content.
+  `max-age=31536000, immutable` for images and `max-age=3600` for other content. It also carries
+  `Cache-Tag: asset-<id>`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox;
+  default-src 'none'`, `Content-Disposition: attachment` for content a browser could run, and,
+  for images, an `ETag` and an `Expires` a year ahead. The `placeholder` resource is the image's
+  ThumbHash as a PNG, served for public assets whatever their moderation status (`max-age=3600`)
+  and refused with `asset/not-available` once purged or removed, for assets without one, and for
+  private assets without `assets:download`.
 - `assets.wait_for_decision` reads the mock's `database_storage` and takes no real time: it
   returns an asset that is already decided (or whose processing failed) and raises
   `sdk/timeout` at once for one whose moderation stays `pending`. Set the stored asset's
   `classification.moderation.status` or `classification.status` to simulate a decision or failure.
-- Idempotency keys are honoured: a repeated key replays the saved response, and a key reused
-  for a different request raises `idempotency/key-reused`.
+- Idempotency keys are honoured like the API: a repeated key replays the saved response, a key
+  reused for a different request raises `idempotency/key-reused` (raw uploads are compared by
+  their query, type and length, not their bytes), a failed request frees its key, and keys must
+  be 1 to 255 printable ASCII characters without a space at either end
+  (`idempotency/invalid-key`).
+- Requests the API's schema refuses fail with `validation/<issue>` (`too-small`, `too-big`,
+  `invalid-type`), HTTP 400 and the field in `details["path"]`: list `pageSize` (1 to 100, default
+  10), folder `pageSize` (1 to 100), events `limit` and search `query` (1 to 200 characters) and
+  `limit` (1 to 20, default 10).
 - `assets.search` is keyword search like the API's: the query is split on whitespace (at most
   8 distinct words, case-insensitive) and an asset matches when every word appears in its name,
   ID, external ID, description, tags, type, content format or extension, or moderation status.
@@ -514,7 +563,16 @@ and `signed_url_base_url`. Unknown mock options raise.
   name 600, tags 500, otherwise 100), results are ranked by score then newest first, and
   `semanticStatus` is `disabled` whatever the `mode`.
 - List cursors resume after the last item returned, so assets created or deleted between pages
-  are neither skipped nor repeated.
+  are neither skipped nor repeated, and only continue the query (filter, folder or parent and
+  ordering) they came from; another query raises `validation/invalid-cursor`.
+- Folder names are unique among siblings (case-sensitive) and list in code-point order;
+  deleting a folder that is not empty raises `folder/not-empty` with `hasAssets` and
+  `hasChildren` in `details`. Unchanged lens definitions return the saved lens, a changed one
+  needs a greater `version` (`lens/version-conflict` with `currentVersion`, `minimumVersion` and
+  `requestedVersion`), and earlier lenses in the same call stay saved.
+- `calmlens.testing.sign_upload_token(api_key, options, now=..., nonce=...)` signs exactly what
+  `upload_tokens.sign` signs at a fixed `now` (milliseconds since the epoch) and `nonce`, for
+  comparing with known tokens.
 - The default `now` clock moves on by at least a millisecond per reading, so assets created in a
   row have increasing `createdAt` values; a `now` you pass is used as is.
 
