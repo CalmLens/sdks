@@ -8,6 +8,8 @@ required. Blade escapes displayed input and Laravel protects the form with CSRF.
 
 ## Run
 
+PHP 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later is required because of PHP2Shell (CVE-2026-109618, CVE-2026-109619).
+
 From this directory:
 
 ```sh

@@ -4,7 +4,7 @@
   "type": "library",
   "license": "MIT",
   "require": {
-    "php": "^8.2",
+    "php": "~8.2.35 || ~8.3.36 || ~8.4.27 || ^8.5.12",
     "guzzlehttp/guzzle": "^7.9",
     "guzzlehttp/psr7": "^2.7",
     "psr/http-message": "^2.0"

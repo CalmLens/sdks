@@ -172,7 +172,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php: ["8.2", "8.5"]
+        # Patched for PHP2Shell (CVE-2026-109618, CVE-2026-109619).
+        php: ["8.2.35", "8.5.12"]
     defaults:
       run:
         working-directory: php

@@ -5,6 +5,8 @@ upload tokens, named lenses and CDN delivery. Uses Guzzle 7 and PSR-7 streams.
 Methods and option keys use camelCase; responses are associative arrays with the
 API's field names. Unknown response fields and event types are preserved.
 
+PHP 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later is required because of PHP2Shell (CVE-2026-109618, CVE-2026-109619).
+
 ## Install from this checkout
 
 This SDK is pre-release and has not been published to Packagist. In your application's

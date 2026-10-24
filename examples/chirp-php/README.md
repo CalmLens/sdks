@@ -28,6 +28,8 @@ Chirp mirrors [Calmgram](../calmgram)'s behaviour; `Content::mediaFor` is its `p
 PHP 8.2+ with the `fileinfo` and `gd` extensions, and Composer. The SDK is installed from
 `../../php` through a Composer path repository, so keep the repository layout intact.
 
+PHP 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later is required because of PHP2Shell (CVE-2026-109618, CVE-2026-109619).
+
 ```sh
 cd examples/chirp-php
 composer install

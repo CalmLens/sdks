@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "eef222d225a3fe52a4a5f33e14eef4ec",
+    "content-hash": "93d761f5ee77d34c9e9339747024e4ab",
     "packages": [
         {
             "name": "calmlens/sdk",
@@ -12,12 +12,12 @@
             "dist": {
                 "type": "path",
                 "url": "../../php",
-                "reference": "79e8ae40c6a18e9a4cd9c74535953d1e675743e9"
+                "reference": "2c81b5d851b181997802cc26fae0f2cb236bb1ac"
             },
             "require": {
                 "guzzlehttp/guzzle": "^7.9",
                 "guzzlehttp/psr7": "^2.7",
-                "php": "^8.2",
+                "php": "~8.2.35 || ~8.3.36 || ~8.4.27 || ^8.5.12",
                 "psr/http-message": "^2.0"
             },
             "require-dev": {
@@ -2522,13 +2522,13 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.2",
+        "php": "~8.2.35 || ~8.3.36 || ~8.4.27 || ^8.5.12",
         "ext-fileinfo": "*",
         "ext-gd": "*"
     },
     "platform-dev": {},
     "platform-overrides": {
-        "php": "8.2.0"
+        "php": "8.2.35"
     },
     "plugin-api-version": "2.9.0"
 }
