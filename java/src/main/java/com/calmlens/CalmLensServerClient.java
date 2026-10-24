@@ -1146,8 +1146,10 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Cdn() {}
 
     /**
-     * Builds the CDN URL of an asset's content or preview, optionally through a lens or transform,
-     * with {@code ?ageRestricted=true} when {@link Models.CdnRequest#ageRestricted(Boolean)} is true.
+     * Builds the CDN URL of an asset's content, preview or placeholder, optionally through a lens or
+     * transform, with {@code ?ageRestricted=true} when {@link Models.CdnRequest#ageRestricted(Boolean)}
+     * is true. A placeholder is a small blurred PNG, public for public assets whatever their moderation
+     * status; it takes no lens, transform or {@code ageRestricted}.
      *
      * @param options the asset and selector
      * @return the URL
@@ -1156,7 +1158,11 @@ public final class CalmLensServerClient implements AutoCloseable {
       JsonObject o = Models.encode(options);
       Object transform = options.transformValue();
       String resource = str(o, "resource", "content");
-      if (!List.of("content", "preview").contains(resource)) throw argument("Resource must be content or preview");
+      if (!List.of("content", "preview", "placeholder").contains(resource)) throw argument("Resource must be content, preview or placeholder");
+      if (resource.equals("placeholder") && (o.has("lens") && !o.get("lens").isJsonNull() || transform != null
+          || o.has("ageRestricted") && !o.get("ageRestricted").isJsonNull() && o.get("ageRestricted").getAsBoolean())) {
+        throw argument("A placeholder takes no lens, transform or ageRestricted");
+      }
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
       if (o.has("lens") && !o.get("lens").isJsonNull()) url += "/@" + id(o.get("lens").getAsString());
       String separator = o.has("lens") && !o.get("lens").isJsonNull() ? "," : "/";

@@ -50,8 +50,8 @@ import type {
 } from "../client/CalmLensTypes";
 import { signUploadTokenWithApiKey } from "../client/CalmLensUploadTokens";
 import {
-  appendCdnSelector,
   encodePathSegment,
+  getAssetUrl,
   pollForDecision,
   toTextAssetOptions,
   transformSelector,
@@ -343,9 +343,12 @@ export class MockCalmLensServerClient {
   get cdn() {
     return {
       getAssetUrl: ({ assetIdentifier, ...options }: CdnAssetUrlOptions): string => {
-        const resource = options.resource ?? "content";
-        const url = `${this.cdnBaseUrl}/assets/${encodeURIComponent(this.projectId)}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${resource}`;
-        return appendCdnSelector(url, options);
+        return getAssetUrl({
+          projectId: this.projectId,
+          cdnBaseUrl: this.cdnBaseUrl,
+          assetIdentifier,
+          ...options,
+        });
       },
 
       /**

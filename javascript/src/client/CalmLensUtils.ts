@@ -1,12 +1,15 @@
+import { DOMAIN } from "../contract/SharedConstants.js";
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
 import { API_ERROR_CODES } from "./CalmLensErrorCodes";
 import type {
   Asset,
   CalmLensAppClientOptions,
   CalmLensServerClientOptions,
+  CdnResource,
   CdnTransform,
   ClassifyTextOptions,
   ConnectionOptions,
+  GetAssetUrlOptions,
   LensTransform,
   SubmitAssetOptions,
   WaitForAssetDecisionOptions,
@@ -206,6 +209,45 @@ export const transformSelector = (transform: CdnTransform | undefined): string |
   transform === undefined || typeof transform === "string"
     ? transform
     : serializeTransform(transform);
+
+export const DEFAULT_CDN_BASE_URL = `https://cdn.${DOMAIN}/v1`;
+
+const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
+  "content",
+  "preview",
+  "placeholder",
+]);
+
+/**
+ * Builds an asset's CDN URL without a client: no API key and no request, so it works in browsers.
+ * `CalmLensServerClient`'s `cdn.getAssetUrl` uses it too.
+ *
+ * `resource` is `content` (default), `preview` or `placeholder`. A placeholder is a small blurred
+ * PNG that the CDN serves for public assets whatever their moderation status, so it takes no
+ * lens, transform or `ageRestricted`.
+ */
+export const getAssetUrl = ({
+  projectId,
+  assetIdentifier,
+  cdnBaseUrl = DEFAULT_CDN_BASE_URL,
+  resource = "content",
+  ...options
+}: GetAssetUrlOptions): string => {
+  if (!CDN_RESOURCES.has(resource)) {
+    throw invalidArgument("resource must be content, preview or placeholder");
+  }
+  if (
+    resource === "placeholder" &&
+    (options.lens !== undefined || options.transform !== undefined || options.ageRestricted)
+  ) {
+    throw invalidArgument("A placeholder takes no lens, transform or ageRestricted");
+  }
+  if (options.ageRestricted !== undefined && typeof options.ageRestricted !== "boolean") {
+    throw invalidArgument("ageRestricted must be true or false");
+  }
+  const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${resource}`;
+  return appendCdnSelector(url, options);
+};
 
 /**
  * Appends a CDN lens (`/@name`) followed by any direct transform selector to an asset URL, and

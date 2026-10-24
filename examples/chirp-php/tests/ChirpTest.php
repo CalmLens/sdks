@@ -53,7 +53,7 @@ final class ChirpTest extends TestCase
     {
         $store = new Store($this->dir . '/chirp.json');
         $now = fn () => $this->time;
-        $content = new Content($store, new Moderation($mock->client(), self::CDN), $now);
+        $content = new Content($store, new Moderation($mock->client()), $now);
         return new App($store, $content, new Webhooks($store, $content, 'project-1', self::SECRET), new View($content, false), 'app-secret');
     }
 

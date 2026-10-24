@@ -4,7 +4,6 @@ import type {
   GetEventsResponse,
   PostAssetSignedUrlResponse,
 } from "../contract/PublicApiSchemas.js";
-import { DOMAIN } from "../contract/SharedConstants.js";
 import {
   CalmLensConnection,
   expectAsset,
@@ -56,8 +55,9 @@ import type {
 } from "./CalmLensTypes";
 import { signUploadTokenWithApiKey } from "./CalmLensUploadTokens";
 import {
-  appendCdnSelector,
+  DEFAULT_CDN_BASE_URL,
   encodePathSegment,
+  getAssetUrl,
   pollForDecision,
   toTextAssetOptions,
   transformSelector,
@@ -137,7 +137,7 @@ export default class CalmLensServerClient {
     this.#apiKey = apiKey;
     this.#settings = {
       ...resolveConnectionOptions(rest),
-      cdnBaseUrl: (rest.cdnBaseUrl ?? `https://cdn.${DOMAIN}/v1`).replace(/\/+$/, ""),
+      cdnBaseUrl: (rest.cdnBaseUrl ?? DEFAULT_CDN_BASE_URL).replace(/\/+$/, ""),
     };
     this.#lenses = lenses ?? { ensuredLenses: new Map(), pendingEnsureLenses: new Map() };
     this.#connection = new CalmLensConnection(this.#settings, apiKey);
@@ -201,10 +201,8 @@ export default class CalmLensServerClient {
        * age-restricted assets need one too unless `ageRestricted` adds `ageRestricted=true`.
        */
       getAssetUrl: ({ assetIdentifier, ...options }: CdnAssetUrlOptions): string => {
-        const resource = options.resource ?? "content";
-        const { projectId } = this.#settings;
-        const url = `${this.#settings.cdnBaseUrl}/assets/${encodeURIComponent(projectId)}/${requireId(assetIdentifier, "Asset identifier")}/${resource}`;
-        return appendCdnSelector(url, options);
+        const { projectId, cdnBaseUrl } = this.#settings;
+        return getAssetUrl({ projectId, cdnBaseUrl, assetIdentifier, ...options });
       },
 
       /**

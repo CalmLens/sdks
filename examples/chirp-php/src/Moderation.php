@@ -25,12 +25,7 @@ final class Moderation
         'transforms' => [['type' => 'imageTransform', 'options' => ['fit' => 'scale-down', 'width' => 1200, 'format' => 'webp']]],
     ];
 
-    public function __construct(
-        public readonly ServerClient $client,
-        private string $cdnBaseUrl,
-    ) {
-        $this->cdnBaseUrl = rtrim($cdnBaseUrl, '/');
-    }
+    public function __construct(public readonly ServerClient $client) {}
 
     /**
      * Classifies text and waits for the decision, which is fast for short text. CalmLens doesn't
@@ -87,7 +82,7 @@ final class Moderation
     /** A small blurred PNG of the image, served for public assets whatever their status (not purged). */
     public function placeholderUrl(string $assetId): string
     {
-        return $this->cdnBaseUrl . '/assets/' . rawurlencode($this->client->projectId) . '/' . rawurlencode($assetId) . '/placeholder';
+        return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'resource' => 'placeholder']);
     }
 
     public function deleteAsset(string $assetId): void

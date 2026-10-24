@@ -277,8 +277,11 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Resource == "" {
 		options.Resource = "content"
 	}
-	if options.Resource != "content" && options.Resource != "preview" {
-		return "", invalid(CodeSDKInvalidArgument, "resource must be content or preview")
+	if options.Resource != ResourceContent && options.Resource != ResourcePreview && options.Resource != ResourcePlaceholder {
+		return "", invalid(CodeSDKInvalidArgument, "resource must be content, preview or placeholder")
+	}
+	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil || options.AgeRestricted) {
+		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or ageRestricted")
 	}
 	asset, err := segment(options.AssetIdentifier)
 	if err != nil {

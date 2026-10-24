@@ -464,6 +464,9 @@ string_enum! {
         Content = "content",
         /// The generated preview image.
         Preview = "preview",
+        /// A small blurred PNG, public for public assets whatever their moderation status. Only
+        /// for CDN URLs, without a lens, transform or `age_restricted`; signed URLs don't take it.
+        Placeholder = "placeholder",
     }
 }
 

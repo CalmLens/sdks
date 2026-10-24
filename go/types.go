@@ -682,6 +682,9 @@ type MoveAssetOptions struct {
 const (
 	ResourceContent = "content"
 	ResourcePreview = "preview"
+	// ResourcePlaceholder is a small blurred PNG, public for public assets whatever their
+	// moderation status. It takes no Lens, Transform, TransformSteps or AgeRestricted.
+	ResourcePlaceholder = "placeholder"
 )
 
 // SignedURLOptions requests a signed CDN URL. Resource defaults to ResourceContent and
@@ -810,7 +813,7 @@ type EventsPage struct {
 }
 
 // CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
-// ID; Resource is "content" (default) or "preview". Lens runs before extra transforms.
+// ID; Resource is "content" (default), "preview" or "placeholder". Lens runs before extra transforms.
 // Supply Transform (a selector string such as "imageTransform[format=png,width=1024]")
 // or TransformSteps (structured steps; a non-nil empty slice is rejected), not both.
 type CDNAssetURLOptions struct {

@@ -1096,15 +1096,27 @@ impl TextClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
-    /// The CDN URL of an asset's content or preview, optionally through a lens or transform, with
-    /// `?ageRestricted=true` when [`CdnRequest::age_restricted`] is `Some(true)`.
+    /// The CDN URL of an asset's content, preview or placeholder, optionally through a lens or
+    /// transform, with `?ageRestricted=true` when [`CdnRequest::age_restricted`] is `Some(true)`.
+    /// A placeholder takes no lens, transform or `age_restricted`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource
             .as_ref()
             .map_or("content", |value| value.as_str());
-        if !["content", "preview"].contains(&resource) {
-            return Err(invalid_argument("Resource must be content or preview"));
+        if !["content", "preview", "placeholder"].contains(&resource) {
+            return Err(invalid_argument(
+                "Resource must be content, preview or placeholder",
+            ));
+        }
+        if resource == "placeholder"
+            && (options.lens.is_some()
+                || options.transform.is_some()
+                || options.age_restricted == Some(true))
+        {
+            return Err(invalid_argument(
+                "A placeholder takes no lens, transform or ageRestricted",
+            ));
         }
         let config = &self.0.inner.config;
         let mut url = format!(

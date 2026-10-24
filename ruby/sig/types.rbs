@@ -611,7 +611,8 @@ module CalmLens
   type asset_url_options = {
     # The asset ID or external ID.
     asset_identifier: String,
-    ?resource: "content" | "preview",
+    # `placeholder` is a small blurred PNG and takes no lens, transform or age_restricted.
+    ?resource: "content" | "preview" | "placeholder",
     # A lens runs before any additional transforms.
     ?lens: String,
     ?transform: transform_input,

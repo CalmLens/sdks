@@ -255,6 +255,64 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
+        "resource": "placeholder"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/placeholder"
+    },
+    {
+      "options": {
+        "assetIdentifier": "a/b c",
+        "resource": "placeholder"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/placeholder"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "placeholder",
+        "lens": "thumbnail"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "placeholder",
+        "transform": "imageTransform[width=10]"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "placeholder",
+        "transform": {
+          "type": "imageTransform",
+          "options": {
+            "width": 10
+          }
+        }
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "placeholder",
+        "ageRestricted": true
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "original"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
         "transform": []
       },
       "error": "sdk/invalid-argument"

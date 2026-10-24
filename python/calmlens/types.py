@@ -79,8 +79,9 @@ MediaSegmentSource = Union[Literal["frame", "speech", "frame-text", "clip"], str
 ProcessingFeatureStage = Union[Literal["beta", "ga"], str]
 #: Asset type a lens applies to (request values).
 LensType = Literal["image", "video", "audio", "document", "website"]
-#: Which CDN resource of an asset to address.
-CdnResource = Literal["content", "preview"]
+#: Which CDN resource of an asset to address. ``placeholder`` is a small blurred PNG, public for
+#: public assets whatever their moderation status; it takes no lens, transform or ``ageRestricted``.
+CdnResource = Literal["content", "preview", "placeholder"]
 #: How ``assets.search`` matches.
 SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
@@ -898,7 +899,7 @@ class UpdateAssetOptions(AssetIdOptions, total=False):
 
 
 class SignedUrlOptions(AssetIdOptions, total=False):
-    resource: CdnResource
+    resource: Literal["content", "preview"]
     expiresInSeconds: int
     lens: str
     transform: CdnTransform

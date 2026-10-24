@@ -1348,7 +1348,7 @@ public final class Models {
     /** @param assetIdentifier an asset ID or external ID */
     public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
     public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code content} (default) or {@code preview} @return these options */
+    /** @param value {@code content} (default), {@code preview} or {@code placeholder} (no lens, transform or ageRestricted) @return these options */
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**

@@ -23,7 +23,7 @@ import zlib
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from types import TracebackType
-from typing import Any, BinaryIO, Callable, List, Protocol, cast
+from typing import Any, BinaryIO, Callable, List, Literal, Protocol, cast
 from urllib.parse import quote, unquote, urlencode, urlsplit
 from urllib.request import Request, getproxies, proxy_bypass
 
@@ -1125,7 +1125,7 @@ class Assets:
             idempotency_key=idempotency_key if idempotency_key is not None else str(uuid.uuid4())))
 
     def create_signed_url(self, options: SignedUrlOptions | None = None, /, *, asset_id: str = _UNSET,
-                          resource: CdnResource = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,
+                          resource: Literal["content", "preview"] = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,
                           transform: CdnTransform = _UNSET) -> SignedUrl:
         """Sign a temporary CDN URL for private content (defaults: ``content``, 900 seconds)."""
         merged = _merge(options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
@@ -1250,8 +1250,11 @@ class CDN:
     def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, asset_identifier: str = _UNSET,
                       resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
                       age_restricted: bool = _UNSET) -> str:
-        """The CDN URL of an asset's ``content`` or ``preview``, optionally through a named
+        """The CDN URL of an asset's ``content``, ``preview`` or ``placeholder``, optionally through a named
         ``lens``, a ``transform``, or both (the lens runs first). Private assets need an API key or a signed URL.
+
+        ``placeholder`` is a small blurred PNG that the CDN serves for public assets whatever their
+        moderation status. It takes no ``lens``, ``transform`` or ``age_restricted``.
 
         ``age_restricted=True`` appends ``?ageRestricted=true``, which lets the public URL serve a
         public asset whose moderation status is ``age-restricted``. Set it only where your app has
@@ -1262,8 +1265,10 @@ class CDN:
         if not isinstance(age, bool):
             raise _invalid("ageRestricted must be a boolean")
         selected = merged.get("resource", "content")
-        if selected not in ("content", "preview"):
-            raise _invalid("Resource must be content or preview")
+        if selected not in ("content", "preview", "placeholder"):
+            raise _invalid("Resource must be content, preview or placeholder")
+        if selected == "placeholder" and (merged.get("lens") is not None or merged.get("transform") is not None or age):
+            raise _invalid("A placeholder takes no lens, transform or ageRestricted")
         url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
                f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{selected}")
         if merged.get("lens"):

@@ -37,7 +37,6 @@ final class App
         if (($env['CHIRP_DEMO'] ?? '') === '1') {
             $demo = new Demo("$dataDir/demo-calmlens.ser", "$origin/demo-cdn/v1", $now);
             $client = $demo->mock->client();
-            $cdnBaseUrl = "$origin/demo-cdn/v1";
             $projectId = Demo::PROJECT_ID;
             $webhookSecret = Demo::WEBHOOK_SECRET;
         } else {
@@ -53,7 +52,7 @@ final class App
             $webhookSecret = $env['CALMLENS_WEBHOOK_SECRET'] ?? '';
         }
         $store = new Store("$dataDir/chirp.json");
-        $moderation = new Moderation($client, $cdnBaseUrl);
+        $moderation = new Moderation($client);
         $content = new Content($store, $moderation, $now);
         $secretFile = "$dataDir/secret";
         if (!is_file($secretFile)) {

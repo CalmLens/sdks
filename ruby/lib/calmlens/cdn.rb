@@ -3,10 +3,12 @@
 module CalmLens
   # CDN URLs and authenticated content delivery. Reach it through {ServerClient#cdn}.
   class CDN < Resource
-    # Builds the CDN URL of an asset's content or preview. Private assets need the API key
+    # Builds the CDN URL of an asset's content, preview or placeholder. Private assets need the API key
     # ({#serve}) or a signed URL ({Assets#create_signed_url}).
     # @option options [String] :asset_identifier the asset ID or external ID
-    # @option options [String] :resource `content` (default) or `preview`
+    # @option options [String] :resource `content` (default), `preview` or `placeholder`: a small blurred PNG
+    #   that the CDN serves for public assets whatever their moderation status. A placeholder takes no lens,
+    #   transform or age_restricted.
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash, Array<Hash>] :transform a selector such as `imageTransform[width=200]`,
     #   or structured steps: `{type: 'imageTransform', options: {width: 200}}` or an Array of them
@@ -54,7 +56,10 @@ module CalmLens
 
     def url(api)
       resource = api.fetch('resource', 'content')
-      raise Internal.invalid('Resource must be content or preview') unless %w[content preview].include?(resource)
+      raise Internal.invalid('Resource must be content, preview or placeholder') unless %w[content preview placeholder].include?(resource)
+      if resource == 'placeholder' && (!api['lens'].nil? || !api['transform'].nil? || api['ageRestricted'] == true)
+        raise Internal.invalid('A placeholder takes no lens, transform or ageRestricted')
+      end
 
       url = "#{@session.cdn_base_url}/assets/#{Internal.segment(@session.project_id)}/" \
             "#{Internal.segment(api['assetIdentifier'])}/#{resource}"

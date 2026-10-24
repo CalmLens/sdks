@@ -414,6 +414,25 @@ A public asset whose moderation status is `age-restricted` is served from its pu
 `ageRestricted=true`, which `ageRestricted: true` adds; otherwise it needs a signed URL or an API key. Set it only
 where your app has already decided the viewer may see age-restricted content.
 
+`resource` is `content` (default), `preview` or `placeholder`. The placeholder is a small blurred PNG made from the
+asset's ThumbHash, which the CDN serves for public assets whatever their moderation status, for example in place of an
+age-restricted image. It takes no `lens`, `transform` or `ageRestricted`; passing one throws `sdk/invalid-argument`.
+
+##### Building CDN URLs in the browser
+
+`getAssetUrl`, exported from `@calmlens/sdk/app` and `@calmlens/sdk`, builds the same URLs as `cdn.getAssetUrl` from
+the project ID alone. It takes no API key and sends no request.
+
+```typescript
+import { getAssetUrl } from "@calmlens/sdk/app";
+
+const placeholder = getAssetUrl({ projectId, assetIdentifier: assetId, resource: "placeholder" });
+const thumbnail = getAssetUrl({ projectId, assetIdentifier: assetId, lens: "thumbnail" });
+```
+
+It takes `projectId`, `assetIdentifier`, `resource`, `lens`, `transform`, `ageRestricted` and `cdnBaseUrl` (default
+`https://cdn.calmlens.com/v1`).
+
 ##### Multipart upload flow
 
 Use `create` with `part` to start multipart uploads, and `uploadPart` for subsequent chunks. `partNumber` defaults to `1` and `isFinal` defaults to `false` when starting an upload.

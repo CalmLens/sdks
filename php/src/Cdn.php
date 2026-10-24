@@ -13,8 +13,12 @@ final class Cdn extends Resource
     public function getAssetUrl(array $options): string
     {
         $resource = $options['resource'] ?? 'content';
-        if (!in_array($resource, ['content', 'preview'], true)) {
-            Values::invalid('Resource must be content or preview');
+        if (!in_array($resource, ['content', 'preview', 'placeholder'], true)) {
+            Values::invalid('Resource must be content, preview or placeholder');
+        }
+        // A placeholder is a small blurred PNG, public for public assets whatever their moderation status.
+        if ($resource === 'placeholder' && (isset($options['lens']) || isset($options['transform']) || ($options['ageRestricted'] ?? false) === true)) {
+            Values::invalid('A placeholder takes no lens, transform or ageRestricted');
         }
         $url = $this->session->cdnBaseUrl . '/assets/' . Values::segment($this->session->projectId)
             . '/' . Values::segment($options['assetIdentifier'] ?? null) . '/' . $resource;

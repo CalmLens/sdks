@@ -291,9 +291,16 @@ export interface IdempotencyOptions {
   idempotencyKey?: string;
 }
 
+/**
+ * What a CDN URL serves: the asset's `content` (default), its `preview`, or its `placeholder`, a
+ * small blurred PNG that is public for public assets whatever their moderation status. A
+ * placeholder takes no lens, transform or `ageRestricted`.
+ */
+export type CdnResource = "content" | "preview" | "placeholder";
+
 export interface CdnAssetUrlOptions {
   assetIdentifier: string;
-  resource?: "content" | "preview";
+  resource?: CdnResource;
   lens?: string;
   transform?: CdnTransform;
   /**
@@ -302,6 +309,16 @@ export interface CdnAssetUrlOptions {
    * it only where your app has already decided the viewer may see age-restricted content.
    */
   ageRestricted?: boolean;
+}
+
+/**
+ * Options for the standalone `getAssetUrl`: a CDN URL from the project ID alone, with no API key
+ * and no request, so it works in browsers.
+ */
+export interface GetAssetUrlOptions extends CdnAssetUrlOptions {
+  projectId: string;
+  /** Defaults to `https://cdn.calmlens.com/v1`. */
+  cdnBaseUrl?: string;
 }
 
 export interface CdnServeOptions extends CdnAssetUrlOptions {
