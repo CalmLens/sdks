@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-B-VFkMT1.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-CGJ8YEs7.js";
 import "./SharedConstants-DSItflG6.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -306,7 +306,7 @@ const PROCESSING_OPTIONS_SCHEMA = zod.object({
 		defaultValue: false
 	})])),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta(metaStore([docPropertyInfo({
-		description: "Override the project moderation action for this asset. Allow takes no action, age-restrict delivers the asset only through signed URLs or API keys, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
+		description: "Override the project moderation action for this asset. Allow takes no action, age-restrict serves the asset only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
 		defaultValue: void 0
 	})])),
 	features: PROCESSING_FEATURES_SCHEMA.nullish()
@@ -393,7 +393,7 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 })]));
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
-	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `age-restricted` (delivered only through signed URLs or API keys), `blocked` or `purged`. A reviewer's decision takes precedence."),
+	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `age-restricted` (served only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
 	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),

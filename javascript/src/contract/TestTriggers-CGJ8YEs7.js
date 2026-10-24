@@ -7888,7 +7888,7 @@ const backfill = noop;
 const MODERATION_CATEGORY_DEFINITIONS = {
 	sexual: {
 		summary: "Sexual acts, explicit sexual anatomy, sexual services, sexual assault depictions and clearly erotic material.",
-		definition: "covers sexual acts, explicit sexual anatomy, sexual services and clearly erotic material. Actual exposed adult breasts or nipples, genitals or buttocks, and descriptions of masturbation, oral sex, ejaculation or orgasm count in clinical, educational and non-erotic material too. Descriptions of sexual assault can qualify without erotic intent. Fictional, illustrated and generated depictions can also qualify. In images, people shown in swimwear or other revealing clothing also count, so that a policy can allow or restrict them.",
+		definition: "covers sexual acts, explicit sexual anatomy, sexual services and clearly erotic material. Actual exposed adult breasts or nipples, genitals or buttocks, and descriptions of masturbation, oral sex, ejaculation or orgasm count in clinical, educational and non-erotic material too. Descriptions of sexual assault can qualify without erotic intent. Fictional, illustrated and generated depictions can also qualify. Flirtation, innuendo and sexual jokes, and in images people shown in swimwear or other revealing clothing, also count, so that a policy can allow or restrict them.",
 		exclusions: "Ordinary affection, diagrams without exposed sexual anatomy or acts, and general sexual-health education without a qualifying sexual description do not qualify on their own. Clinical, medical or educational framing does not erase actual sexual anatomy or activity; educational qualifiers control allowances.",
 		docsHref: "/docs/guides/moderation-categories#sexual-content"
 	},
@@ -8162,6 +8162,13 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "People shown in swimwear, underwear or lingerie-style clothing, or other clothing that exposes much of the body, with no exposed sexual anatomy, sexual act or explicit erotic display. Fitness clothing counts only when it exposes much of the body.",
 		exclusions: "Exposed sexual anatomy, a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.",
 		inputs: ["image"]
+	},
+	"sexual-suggestive": {
+		category: "sexual",
+		kind: "harm",
+		displayName: "Suggestive content",
+		description: "Flirtation, innuendo, sexual jokes or suggestive romance, such as kissing, caressing or a suggestive pose, with no sexual act, exposed sexual anatomy or explicit sexual language.",
+		exclusions: "A sexual act, exposed sexual anatomy or explicit sexual language; sexual solicitation or adult content promotion; ordinary affection or romance without sexual suggestion."
 	},
 	"sexual-non-erotic-nudity": {
 		category: "sexual",
@@ -8725,8 +8732,9 @@ const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[
 //#endregion
 //#region packages/shared/src/PolicyRule.ts
 /**
-* What a policy does with content: deliver it (`allow`), deliver it only through signed URLs or API
-* keys so your backend can limit it to adults (`age-restrict`), stop delivering it (`hide`), or
+* What a policy does with content: deliver it (`allow`), keep it off its plain URL so your app
+* limits it to adults (`age-restrict`: signed URLs, API keys or `allowAgeRestricted=true`), stop
+* delivering it (`block`), or
 * stop delivering it and delete its stored content (`purge`).
 */
 const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([

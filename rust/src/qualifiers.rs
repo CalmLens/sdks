@@ -66,6 +66,8 @@ string_enum! {
         SexualAdultPromotion = "sexual-adult-promotion",
         /// Sexual: Revealing clothing.
         SexualRevealingClothing = "sexual-revealing-clothing",
+        /// Sexual: Suggestive content.
+        SexualSuggestive = "sexual-suggestive",
         /// Sexual: Non-erotic nudity.
         SexualNonEroticNudity = "sexual-non-erotic-nudity",
         /// Sexual: Historical.
@@ -164,7 +166,7 @@ string_enum! {
         HateSlurs = "hate-slurs",
         /// Hate: Dehumanization.
         HateDehumanization = "hate-dehumanization",
-        /// Hate: Claims of inferiority.
+        /// Hate: Inferiority or harmful stereotypes.
         HateInferiority = "hate-inferiority",
         /// Hate: Exclusion or discrimination.
         HateExclusion = "hate-exclusion",

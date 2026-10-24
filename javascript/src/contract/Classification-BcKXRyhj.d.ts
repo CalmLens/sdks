@@ -226,6 +226,13 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly exclusions: "Exposed sexual anatomy, a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.";
     readonly inputs: readonly ["image"];
   };
+  readonly "sexual-suggestive": {
+    readonly category: "sexual";
+    readonly kind: "harm";
+    readonly displayName: "Suggestive content";
+    readonly description: "Flirtation, innuendo, sexual jokes or suggestive romance, such as kissing, caressing or a suggestive pose, with no sexual act, exposed sexual anatomy or explicit sexual language.";
+    readonly exclusions: "A sexual act, exposed sexual anatomy or explicit sexual language; sexual solicitation or adult content promotion; ordinary affection or romance without sexual suggestion.";
+  };
   readonly "sexual-non-erotic-nudity": {
     readonly category: "sexual";
     readonly kind: "context";
@@ -783,8 +790,9 @@ type ModerationQualifier = keyof typeof MODERATION_QUALIFIER_INFO;
 //#endregion
 //#region packages/shared/src/PolicyRule.d.ts
 /**
- * What a policy does with content: deliver it (`allow`), deliver it only through signed URLs or API
- * keys so your backend can limit it to adults (`age-restrict`), stop delivering it (`hide`), or
+ * What a policy does with content: deliver it (`allow`), keep it off its plain URL so your app
+ * limits it to adults (`age-restrict`: signed URLs, API keys or `allowAgeRestricted=true`), stop
+ * delivering it (`block`), or
  * stop delivering it and delete its stored content (`purge`).
  */
 declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
@@ -913,6 +921,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "sexual-nudity": "sexual-nudity";
   "sexual-revealing-clothing": "sexual-revealing-clothing";
   "sexual-solicitation": "sexual-solicitation";
+  "sexual-suggestive": "sexual-suggestive";
   "sexual-support-prevention": "sexual-support-prevention";
   "violence-attack": "violence-attack";
   "violence-discussion": "violence-discussion";
@@ -1059,6 +1068,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-nudity": "sexual-nudity";
     "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
+    "sexual-suggestive": "sexual-suggestive";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
     "violence-discussion": "violence-discussion";
@@ -1208,6 +1218,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-nudity": "sexual-nudity";
     "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
+    "sexual-suggestive": "sexual-suggestive";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
     "violence-discussion": "violence-discussion";
@@ -1353,6 +1364,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-nudity": "sexual-nudity";
     "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
+    "sexual-suggestive": "sexual-suggestive";
     "sexual-support-prevention": "sexual-support-prevention";
     "violence-attack": "violence-attack";
     "violence-discussion": "violence-discussion";
@@ -1505,6 +1517,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -1654,6 +1667,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -1799,6 +1813,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -1949,6 +1964,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -2098,6 +2114,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -2243,6 +2260,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -2393,6 +2411,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -2542,6 +2561,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -2687,6 +2707,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -2837,6 +2858,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -2986,6 +3008,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -3131,6 +3154,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -3281,6 +3305,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -3430,6 +3455,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -3575,6 +3601,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -3725,6 +3752,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -3874,6 +3902,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -4019,6 +4048,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -4169,6 +4199,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -4318,6 +4349,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -4463,6 +4495,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -4613,6 +4646,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -4762,6 +4796,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
@@ -4907,6 +4942,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-nudity": "sexual-nudity";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "violence-attack": "violence-attack";
       "violence-discussion": "violence-discussion";
