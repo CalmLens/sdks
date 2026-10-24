@@ -178,14 +178,14 @@ export const createCalmLensProvider = (options: {
       }
     },
 
-    imageUrl(assetId, variant, { ageRestricted = false } = {}) {
+    imageUrl(assetId, variant, { allowAgeRestricted = false } = {}) {
       // Use the unguessable asset ID, not our externalId (post IDs appear in app URLs).
       return client.cdn.getAssetUrl({
         assetIdentifier: assetId,
         lens: variant === "feed" ? "calmgram-feed" : "calmgram-thumb",
-        // The CDN refuses an age-restricted asset's plain URL. `ageRestricted=true` opts in,
+        // The CDN refuses an age-restricted asset's plain URL. `allowAgeRestricted=true` opts in,
         // so only build it for viewers this app has decided may see sensitive media.
-        ...(ageRestricted ? { ageRestricted: true } : {}),
+        ...(allowAgeRestricted ? { allowAgeRestricted: true } : {}),
       });
     },
 

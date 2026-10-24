@@ -1147,9 +1147,9 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * Builds the CDN URL of an asset's content, preview or placeholder, optionally through a lens or
-     * transform, with {@code ?ageRestricted=true} when {@link Models.CdnRequest#ageRestricted(Boolean)}
+     * transform, with {@code ?allowAgeRestricted=true} when {@link Models.CdnRequest#allowAgeRestricted(Boolean)}
      * is true. A placeholder is a small blurred PNG, public for public assets whatever their moderation
-     * status; it takes no lens, transform or {@code ageRestricted}.
+     * status; it takes no lens, transform or {@code allowAgeRestricted}.
      *
      * @param options the asset and selector
      * @return the URL
@@ -1160,8 +1160,8 @@ public final class CalmLensServerClient implements AutoCloseable {
       String resource = str(o, "resource", "content");
       if (!List.of("content", "preview", "placeholder").contains(resource)) throw argument("Resource must be content, preview or placeholder");
       if (resource.equals("placeholder") && (o.has("lens") && !o.get("lens").isJsonNull() || transform != null
-          || o.has("ageRestricted") && !o.get("ageRestricted").isJsonNull() && o.get("ageRestricted").getAsBoolean())) {
-        throw argument("A placeholder takes no lens, transform or ageRestricted");
+          || o.has("allowAgeRestricted") && !o.get("allowAgeRestricted").isJsonNull() && o.get("allowAgeRestricted").getAsBoolean())) {
+        throw argument("A placeholder takes no lens, transform or allowAgeRestricted");
       }
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
       if (o.has("lens") && !o.get("lens").isJsonNull()) url += "/@" + id(o.get("lens").getAsString());
@@ -1169,7 +1169,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (transform instanceof String text) { if (!text.isEmpty()) url += separator + transformPath(text); }
       // A serialized selector is already path-safe: unreserved characters, escapes, brackets, "=" and ",".
       else if (transform != null) url += separator + serializeTransform(transform);
-      if (o.has("ageRestricted") && !o.get("ageRestricted").isJsonNull() && o.get("ageRestricted").getAsBoolean()) url += "?ageRestricted=true";
+      if (o.has("allowAgeRestricted") && !o.get("allowAgeRestricted").isJsonNull() && o.get("allowAgeRestricted").getAsBoolean()) url += "?allowAgeRestricted=true";
       return url;
     }
 

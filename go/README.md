@@ -470,8 +470,8 @@ and the detailed form. Other transform types take any `Options` value that encod
 object.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
-when the URL carries `?ageRestricted=true`; otherwise it needs a signed URL or an API key. Set
-`AgeRestricted: true` on `CDNAssetURLOptions` (also used by `CDN.Serve`) to append it. Set it
+when the URL carries `?allowAgeRestricted=true`; otherwise it needs a signed URL or an API key. Set
+`AllowAgeRestricted: true` on `CDNAssetURLOptions` (also used by `CDN.Serve`) to append it. Set it
 only where your app has already decided the viewer may see age-restricted content.
 
 ## Local webhook forwarding
@@ -517,7 +517,7 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
   cursors taken earlier.
 - `CDN.Serve` answers with content type and length and supports single byte ranges. Like a
   private asset, an age-restricted asset needs the `assets:download` permission, unless it is
-  public and requested with `AgeRestricted: true`.
+  public and requested with `AllowAgeRestricted: true`.
 - `Assets.WaitForDecision` checks the mock's storage, so change an asset's
   `["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"]` with `WithStorage` to decide it while the call
   waits.

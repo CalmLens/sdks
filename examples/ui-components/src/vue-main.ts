@@ -1,11 +1,11 @@
 import { createApp, h, ref } from "vue";
-import { posts, projectId, show } from "./demo";
+import { posts, projectId, revealedUrls, show } from "./demo";
 import Avatar from "./vue/Avatar.vue";
 import CommentForm from "./vue/CommentForm.vue";
 import Feed from "./vue/Feed.vue";
 import PhotoUpload from "./vue/PhotoUpload.vue";
 
-const canViewSensitiveMedia = ref(false);
+const urls = ref<Record<string, string>>({});
 createApp({
   render: () =>
     h("main", { style: { maxWidth: "480px" } }, [
@@ -18,9 +18,9 @@ createApp({
       h(Feed, {
         projectId,
         posts,
-        canViewSensitiveMedia: canViewSensitiveMedia.value,
+        revealedUrls: urls.value,
         onReveal: () => {
-          canViewSensitiveMedia.value = true;
+          urls.value = revealedUrls();
         },
       }),
     ]),

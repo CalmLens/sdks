@@ -349,7 +349,7 @@ export interface PostMedia {
 
 /**
  * Never builds a content URL for anything that isn't published. Age-restricted photos get the
- * `ageRestricted=true` opt-in only for viewers who turned on "Show sensitive media" (authors
+ * `allowAgeRestricted=true` opt-in only for viewers who turned on "Show sensitive media" (authors
  * included); signed-out viewers and everyone else get the placeholder.
  */
 export const postMediaFor = (
@@ -366,7 +366,7 @@ export const postMediaFor = (
   if (post.status === "age-restricted") {
     return viewer?.showSensitiveMedia
       ? {
-          url: moderation.imageUrl(post.assetId, variant, { ageRestricted: true }),
+          url: moderation.imageUrl(post.assetId, variant, { allowAgeRestricted: true }),
           placeholderUrl: null,
         }
       : { url: null, placeholderUrl: moderation.placeholderUrl(post.assetId) };

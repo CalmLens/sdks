@@ -130,7 +130,7 @@ final class Demo
         }
         $this->mock->downloadPermission = false;
         $response = $this->mock->client()->cdn->serve(['assetIdentifier' => $assetId, 'resource' => $resource === 'preview' ? 'preview' : 'content',
-            'ageRestricted' => ($query['ageRestricted'] ?? null) === 'true']);
+            'allowAgeRestricted' => ($query['allowAgeRestricted'] ?? null) === 'true']);
         return [$response->getStatusCode(), ['Content-Type' => $response->getHeaderLine('Content-Type'),
             'Cache-Control' => $response->getHeaderLine('Cache-Control') ?: 'no-store'], (string) $response->getBody()];
     }

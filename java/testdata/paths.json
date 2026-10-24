@@ -226,14 +226,14 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "ageRestricted": true
+        "allowAgeRestricted": true
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content?ageRestricted=true"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content?allowAgeRestricted=true"
     },
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "ageRestricted": false
+        "allowAgeRestricted": false
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/content"
     },
@@ -248,9 +248,9 @@
             "width": 320
           }
         },
-        "ageRestricted": true
+        "allowAgeRestricted": true
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/preview/@thumbnail,imageTransform[width=320]?ageRestricted=true"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/preview/@thumbnail,imageTransform[width=320]?allowAgeRestricted=true"
     },
     {
       "options": {
@@ -299,7 +299,7 @@
       "options": {
         "assetIdentifier": "asset-1",
         "resource": "placeholder",
-        "ageRestricted": true
+        "allowAgeRestricted": true
       },
       "error": "sdk/invalid-argument"
     },

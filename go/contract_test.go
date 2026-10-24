@@ -245,18 +245,18 @@ func TestJavaScriptPathSafety(t *testing.T) {
 	for _, cdn := range paths.CDNURLs {
 		// Unknown fixture options fail the test instead of being ignored.
 		var fixture struct {
-			AssetIdentifier string          `json:"assetIdentifier"`
-			Resource        string          `json:"resource"`
-			Lens            string          `json:"lens"`
-			Transform       json.RawMessage `json:"transform"`
-			AgeRestricted   bool            `json:"ageRestricted"`
+			AssetIdentifier    string          `json:"assetIdentifier"`
+			Resource           string          `json:"resource"`
+			Lens               string          `json:"lens"`
+			Transform          json.RawMessage `json:"transform"`
+			AllowAgeRestricted bool            `json:"allowAgeRestricted"`
 		}
 		decoder := json.NewDecoder(bytes.NewReader(cdn.Options))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&fixture); err != nil {
 			t.Fatalf("CDN URL fixture %s: %v", cdn.Options, err)
 		}
-		options := CDNAssetURLOptions{AssetIdentifier: fixture.AssetIdentifier, Resource: fixture.Resource, Lens: fixture.Lens, AgeRestricted: fixture.AgeRestricted}
+		options := CDNAssetURLOptions{AssetIdentifier: fixture.AssetIdentifier, Resource: fixture.Resource, Lens: fixture.Lens, AllowAgeRestricted: fixture.AllowAgeRestricted}
 		options.Transform, options.TransformSteps = contractTransform(t, fixture.Transform)
 		got, err := c.CDN.GetAssetURL(options)
 		if got != cdn.URL || cdn.Error != "" && errorCode(err) != cdn.Error || cdn.Error == "" && err != nil {

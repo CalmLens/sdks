@@ -7,10 +7,11 @@
   type Props = {
     projectId: string;
     posts: Post[];
-    viewer: { canViewSensitiveMedia: boolean };
+    /** Signed URLs for the age-restricted images this viewer may see, by asset ID. */
+    revealedUrls: Record<string, string>;
     onReveal: () => void;
   };
-  let { projectId, posts, viewer, onReveal }: Props = $props();
+  let { projectId, posts, revealedUrls, onReveal }: Props = $props();
   const shown = $derived(
     posts.filter((post): post is ShownPost => post.status === "allowed" || post.status === "age-restricted"),
   );
@@ -23,7 +24,7 @@
         {projectId}
         assetId={post.assetId}
         status={post.status}
-        canView={viewer.canViewSensitiveMedia}
+        contentUrl={revealedUrls[post.assetId]}
         alt={post.alt}
         aspectRatio={post.aspectRatio}
         {onReveal}

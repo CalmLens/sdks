@@ -172,7 +172,7 @@ try (CdnResponse response = client.cdn.serve(new CdnRequest(asset.id())
 }
 ```
 
-A public asset whose moderation status is `age-restricted` is served from its public URL only with `ageRestricted(true)`, which appends `?ageRestricted=true`; otherwise it needs a signed URL or the API key. Set it only where your app has already decided the viewer may see age-restricted content.
+A public asset whose moderation status is `age-restricted` is served from its public URL only with `allowAgeRestricted(true)`, which appends `?allowAgeRestricted=true`; otherwise it needs a signed URL or the API key. Set it only where your app has already decided the viewer may see age-restricted content.
 
 To transform an asset without a saved lens, pass `transform` (here or on `SignedUrlOptions`) either a selector string or structured steps, which the SDK serializes with sorted, encoded options:
 

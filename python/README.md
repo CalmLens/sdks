@@ -288,11 +288,11 @@ Structured options are sorted and percent-encoded, so both calls return the same
 check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
-with `age_restricted=True` (`?ageRestricted=true`); otherwise it needs a signed URL or an API
+with `allow_age_restricted=True` (`?allowAgeRestricted=true`); otherwise it needs a signed URL or an API
 key. Set it only where your app has already decided the viewer may see age-restricted content:
 
 ```python
-client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", age_restricted=True)
+client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", allow_age_restricted=True)
 ```
 
 ## Webhooks
@@ -463,7 +463,7 @@ and `signed_url_base_url`. Unknown mock options raise.
   `blocked` or `purged` (processing `completed` with that moderation status; `purged` also
   removes the content with `removalReason` `policy`) or `failed` (processing `failed`, retryable).
   `cdn.serve` treats an `age-restricted` asset like a private one: it needs the
-  `assets:download` permission, unless a public one is requested with `age_restricted=True`.
+  `assets:download` permission, unless a public one is requested with `allow_age_restricted=True`.
 - Like the API, content is `stored` when `processingOptions.keepContentAfterProcessing` is
   `True`; otherwise it is `temporary` and is removed (`removalReason` `retention`) once
   classification is `completed`, after which `cdn.serve` answers 404. Pass

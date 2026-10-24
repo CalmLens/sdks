@@ -294,7 +294,7 @@ export interface IdempotencyOptions {
 /**
  * What a CDN URL serves: the asset's `content` (default), its `preview`, or its `placeholder`, a
  * small blurred PNG that is public for public assets whatever their moderation status. A
- * placeholder takes no lens, transform or `ageRestricted`.
+ * placeholder takes no lens, transform or `allowAgeRestricted`.
  */
 export type CdnResource = "content" | "preview" | "placeholder";
 
@@ -304,11 +304,11 @@ export interface CdnAssetUrlOptions {
   lens?: string;
   transform?: CdnTransform;
   /**
-   * Adds `ageRestricted=true`, which lets the CDN serve a public asset whose moderation status is
+   * Adds `allowAgeRestricted=true`, which lets the CDN serve a public asset whose moderation status is
    * `age-restricted` from this URL. Without it, such an asset needs a signed URL or an API key. Set
    * it only where your app has already decided the viewer may see age-restricted content.
    */
-  ageRestricted?: boolean;
+  allowAgeRestricted?: boolean;
 }
 
 /**

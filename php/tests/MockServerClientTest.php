@@ -104,7 +104,7 @@ final class MockServerClientTest extends TestCase
         $refused = $cdn->serve(['assetIdentifier' => $asset['id']]);
         self::assertSame(403, $refused->getStatusCode());
         self::assertSame('asset/api-key-missing-permission', json_decode((string) $refused->getBody(), true)['code']);
-        $optedIn = $cdn->serve(['assetIdentifier' => $asset['id'], 'ageRestricted' => true]);
+        $optedIn = $cdn->serve(['assetIdentifier' => $asset['id'], 'allowAgeRestricted' => true]);
         self::assertSame(200, $optedIn->getStatusCode());
         self::assertSame('png-bytes', (string) $optedIn->getBody());
         self::assertSame('private, no-store', $optedIn->getHeaderLine('Cache-Control'));
@@ -116,7 +116,7 @@ final class MockServerClientTest extends TestCase
     {
         $mock = new MockServerClient(queuedOutcome: 'allowed', downloadPermission: false);
         $asset = self::image($mock, 'private');
-        self::assertSame(403, $mock->client()->cdn->serve(['assetIdentifier' => $asset['id'], 'ageRestricted' => true])->getStatusCode());
+        self::assertSame(403, $mock->client()->cdn->serve(['assetIdentifier' => $asset['id'], 'allowAgeRestricted' => true])->getStatusCode());
         $public = new MockServerClient(queuedOutcome: 'allowed', downloadPermission: false);
         $allowed = self::image($public);
         $response = $public->client()->cdn->serve(['assetIdentifier' => 'post-1']);

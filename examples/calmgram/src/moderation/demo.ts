@@ -119,9 +119,9 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
     return demoOutcome(assetId, asset);
   },
 
-  imageUrl(assetId, variant, { ageRestricted = false } = {}) {
+  imageUrl(assetId, variant, { allowAgeRestricted = false } = {}) {
     // Mirrors the CalmLens CDN: age-restricted photos are served only with the explicit opt-in.
-    return `/demo-media/${assetId}?variant=${variant}${ageRestricted ? "&ageRestricted=true" : ""}`;
+    return `/demo-media/${assetId}?variant=${variant}${allowAgeRestricted ? "&allowAgeRestricted=true" : ""}`;
   },
 
   placeholderUrl(assetId) {
@@ -140,19 +140,19 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
 const isDemoAssetId = (assetId: string) => /^demo-[0-9a-f-]+$/.test(assetId);
 
 /**
- * Serves allowed photos, and age-restricted ones only with `ageRestricted`, like the CalmLens
- * CDN's `?ageRestricted=true` opt-in.
+ * Serves allowed photos, and age-restricted ones only with `allowAgeRestricted`, like the CalmLens
+ * CDN's `?allowAgeRestricted=true` opt-in.
  */
 export const readDemoUpload = async (
   kv: KVNamespace,
   assetId: string,
-  { ageRestricted = false }: { ageRestricted?: boolean } = {},
+  { allowAgeRestricted = false }: { allowAgeRestricted?: boolean } = {},
 ) => {
   if (!isDemoAssetId(assetId)) return null;
   const asset = await readDemoAsset(kv, assetId);
   if (!asset || Date.now() < asset.readyAt) return null;
   const status = asset.outcome.status;
-  if (status !== "allowed" && !(status === "age-restricted" && ageRestricted)) return null;
+  if (status !== "allowed" && !(status === "age-restricted" && allowAgeRestricted)) return null;
   const bytes = await kv.get(`demo-image:${assetId}`, "arrayBuffer");
   return bytes ? { bytes, mimeType: asset.mimeType } : null;
 };

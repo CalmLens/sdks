@@ -145,7 +145,7 @@ for anything still pending.
       webhook: asset.allowed, asset.blocked, …   or poll: assets.retrieve
                             └──────── allowed → show in feed via CDN lens URL
                                       age-restricted → show in feed: the lens URL with
-                                        ageRestricted=true if the viewer opted in, otherwise
+                                        allowAgeRestricted=true if the viewer opted in, otherwise
                                         the /placeholder image and a notice
                                       blocked, purged → author sees "not published" notice
 ```
@@ -159,7 +159,7 @@ and a reviewer can change it later. The app only needs one field:
 | `classification.moderation.status` | Calmgram does |
 | --- | --- |
 | `allowed` | Publish |
-| `age-restricted` | Publish behind a placeholder. The CDN refuses the plain URL, so viewers who turned on **Show sensitive media** get the URL with `ageRestricted=true`; everyone else, including signed-out visitors and the author with the setting off, gets the asset's blurred `/placeholder` image and a "Sensitive content" notice. The author also sees the status |
+| `age-restricted` | Publish behind a placeholder. The CDN refuses the plain URL, so viewers who turned on **Show sensitive media** get the URL with `allowAgeRestricted=true`; everyone else, including signed-out visitors and the author with the setting off, gets the asset's blurred `/placeholder` image and a "Sensitive content" notice. The author also sees the status |
 | `blocked` | Don't publish; tell the author which category matched (from `classification.moderation`) |
 | `purged` | As `blocked`. CalmLens has also deleted the stored content |
 | `pending` | Show only to the author with a "Checking…" placeholder |
@@ -180,7 +180,7 @@ like any other text that isn't `allowed`.
 | [`src/index.tsx`](src/index.tsx) | Routes, including the upload token endpoint, the webhook handler (signature check on the raw body, idempotent by event ID) and the moderation queue |
 | [`src/sandbox.ts`](src/sandbox.ts) | The public demo's per-visitor storage and 24-hour cleanup |
 | [`src/budget.ts`](src/budget.ts) | The public demo's daily CalmLens budget |
-| [`src/moderation/demo.ts`](src/moderation/demo.ts) | The demo-mode simulator, including its stand-ins for the CDN's `ageRestricted=true` opt-in and blurred `/placeholder` image |
+| [`src/moderation/demo.ts`](src/moderation/demo.ts) | The demo-mode simulator, including its stand-ins for the CDN's `allowAgeRestricted=true` opt-in and blurred `/placeholder` image |
 
 ### Things worth copying
 
@@ -197,11 +197,11 @@ like any other text that isn't `allowed`.
   they are still pending, so Calmgram never sends an image URL to a browser until CalmLens has
   allowed or age-restricted it, and it uses CalmLens's random asset ID in URLs rather than its own
   (guessable) post IDs.
-- **Age-restricted photos opt in on the URL** (`cdn.getAssetUrl({ ..., ageRestricted: true })`),
-  and only for viewers whose setting allows it (`postMediaFor` in `src/content.ts`). An opted-in
-  URL works for anyone who has it, so if you need CalmLens itself to refuse everyone else, issue
-  short-lived signed URLs from your backend instead (see the
-  [age-restricted content guide](https://calmlens.com/docs/guides/age-restricted-content)).
+- **Age-restricted photos opt in on the URL** (`cdn.getAssetUrl({ ..., allowAgeRestricted: true })`),
+  because Calmgram gates viewers itself: only viewers whose setting allows it get the URL
+  (`postMediaFor` in `src/content.ts`). CalmLens checks nothing on an opted-in URL and anyone who
+  has it can open it, so most apps issue short-lived signed URLs from their backend instead (see
+  [Show sensitive media](https://calmlens.com/docs/guides/sensitive-media)).
 - **`not-evaluated` is not zero.** Only `evaluated` and `partial` category results have scores.
 - **Lenses** are named, versioned image presets. Calmgram defines `calmgram-feed` (1080px WebP)
   and `calmgram-thumb` (400px square) once with `ensureLenses`, so it needs no image-resizing code.

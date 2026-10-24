@@ -1249,37 +1249,37 @@ class CDN:
 
     def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, asset_identifier: str = _UNSET,
                       resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
-                      age_restricted: bool = _UNSET) -> str:
+                      allow_age_restricted: bool = _UNSET) -> str:
         """The CDN URL of an asset's ``content``, ``preview`` or ``placeholder``, optionally through a named
         ``lens``, a ``transform``, or both (the lens runs first). Private assets need an API key or a signed URL.
 
         ``placeholder`` is a small blurred PNG that the CDN serves for public assets whatever their
-        moderation status. It takes no ``lens``, ``transform`` or ``age_restricted``.
+        moderation status. It takes no ``lens``, ``transform`` or ``allow_age_restricted``.
 
-        ``age_restricted=True`` appends ``?ageRestricted=true``, which lets the public URL serve a
+        ``allow_age_restricted=True`` appends ``?allowAgeRestricted=true``, which lets the public URL serve a
         public asset whose moderation status is ``age-restricted``. Set it only where your app has
         already decided the viewer may see age-restricted content."""
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
-                        age_restricted=age_restricted)
-        age = merged.get("ageRestricted", False)
+                        allow_age_restricted=allow_age_restricted)
+        age = merged.get("allowAgeRestricted", False)
         if not isinstance(age, bool):
-            raise _invalid("ageRestricted must be a boolean")
+            raise _invalid("allowAgeRestricted must be a boolean")
         selected = merged.get("resource", "content")
         if selected not in ("content", "preview", "placeholder"):
             raise _invalid("Resource must be content, preview or placeholder")
         if selected == "placeholder" and (merged.get("lens") is not None or merged.get("transform") is not None or age):
-            raise _invalid("A placeholder takes no lens, transform or ageRestricted")
+            raise _invalid("A placeholder takes no lens, transform or allowAgeRestricted")
         url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
                f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{selected}")
         if merged.get("lens"):
             url += "/@" + _id(merged["lens"], "lens")
         if _has_transform(merged.get("transform")):
             url += ("," if merged.get("lens") else "/") + _transform_path(merged["transform"])
-        return url + "?ageRestricted=true" if age else url
+        return url + "?allowAgeRestricted=true" if age else url
 
     def serve(self, options: ServeOptions | None = None, /, *, asset_identifier: str = _UNSET,
               resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
-              age_restricted: bool = _UNSET, init: ServeInit = _UNSET) -> CDNResponse:
+              allow_age_restricted: bool = _UNSET, init: ServeInit = _UNSET) -> CDNResponse:
         """Request an asset from the CDN with the client's API key.
 
         Returns a streaming :class:`CDNResponse`, including for non-2xx responses (check
@@ -1287,7 +1287,7 @@ class CDN:
         an inactivity limit, so large downloads are not cut off.
         """
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens,
-                        transform=transform, age_restricted=age_restricted, init=init)
+                        transform=transform, allow_age_restricted=allow_age_restricted, init=init)
         settings = merged.get("init") or {}
         method = settings.get("method", "GET")
         if method not in ("GET", "HEAD"):

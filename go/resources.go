@@ -280,8 +280,8 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Resource != ResourceContent && options.Resource != ResourcePreview && options.Resource != ResourcePlaceholder {
 		return "", invalid(CodeSDKInvalidArgument, "resource must be content, preview or placeholder")
 	}
-	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil || options.AgeRestricted) {
-		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or ageRestricted")
+	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil || options.AllowAgeRestricted) {
+		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or allowAgeRestricted")
 	}
 	asset, err := segment(options.AssetIdentifier)
 	if err != nil {
@@ -309,8 +309,8 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 		}
 		endpoint += separator + path
 	}
-	if options.AgeRestricted {
-		endpoint += "?ageRestricted=true"
+	if options.AllowAgeRestricted {
+		endpoint += "?allowAgeRestricted=true"
 	}
 	return endpoint, nil
 }

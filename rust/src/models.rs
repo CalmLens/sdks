@@ -465,7 +465,7 @@ string_enum! {
         /// The generated preview image.
         Preview = "preview",
         /// A small blurred PNG, public for public assets whatever their moderation status. Only
-        /// for CDN URLs, without a lens, transform or `age_restricted`; signed URLs don't take it.
+        /// for CDN URLs, without a lens, transform or `allow_age_restricted`; signed URLs don't take it.
         Placeholder = "placeholder",
     }
 }
@@ -1136,12 +1136,12 @@ pub struct CdnRequest {
     /// A transform: a selector such as `imageTransform[width=320]` or structured steps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
-    /// `Some(true)` appends `?ageRestricted=true`, so the CDN serves a public asset whose
+    /// `Some(true)` appends `?allowAgeRestricted=true`, so the CDN serves a public asset whose
     /// moderation status is `age-restricted` from its public URL. Without it, such an asset needs
     /// a signed URL or an API key. Set it only where your app has already decided the viewer may
     /// see age-restricted content. `None` and `Some(false)` add nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub age_restricted: Option<bool>,
+    pub allow_age_restricted: Option<bool>,
     /// The HTTP method and headers, e.g. `HEAD` or a `Range` header.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub init: Option<HttpOptions>,

@@ -70,13 +70,13 @@ final class Moderation
     }
 
     /**
-     * Only for allowed images, or with `$ageRestricted` for age-restricted images this viewer may
-     * see. The CDN refuses an age-restricted asset's plain URL; `ageRestricted=true` opts in.
+     * Only for allowed images, or with `$allowAgeRestricted` for age-restricted images this viewer may
+     * see. The CDN refuses an age-restricted asset's plain URL; `allowAgeRestricted=true` opts in.
      */
-    public function imageUrl(string $assetId, bool $ageRestricted = false): string
+    public function imageUrl(string $assetId, bool $allowAgeRestricted = false): string
     {
         // The unguessable asset ID, not the externalId: post IDs appear in Chirp's own URLs.
-        return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'lens' => 'chirp-feed', 'ageRestricted' => $ageRestricted]);
+        return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'lens' => 'chirp-feed', 'allowAgeRestricted' => $allowAgeRestricted]);
     }
 
     /** A small blurred PNG of the image, served for public assets whatever their status (not purged). */

@@ -750,11 +750,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if asset is None:
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
             # Age-restricted assets are delivered like private ones (only with the download
-            # permission), unless a public one is requested with ``ageRestricted=true``.
+            # permission), unless a public one is requested with ``allowAgeRestricted=true``.
             age_restricted = asset["classification"]["moderation"].get("status") == "age-restricted"
             is_private = asset["visibility"] != "public" or age_restricted
             public_url_allowed = (asset["visibility"] == "public" and age_restricted
-                                  and query.get("ageRestricted") in (True, "true"))
+                                  and query.get("allowAgeRestricted") in (True, "true"))
             if is_private and not public_url_allowed and not self._can_download(asset.get("folderId")):
                 return self._failure_response(_Failure("asset/api-key-missing-permission",
                                                        "The API key cannot download this asset", 403))

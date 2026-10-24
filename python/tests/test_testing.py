@@ -132,7 +132,7 @@ class MockTests(unittest.TestCase):
                               processing_options={"keepContentAfterProcessing": True})
         with c.cdn.serve({"assetIdentifier": a["id"]}) as denied:
             self.assertEqual(denied.status, 403)
-        with c.cdn.serve(asset_identifier=a["id"], age_restricted=True) as opted_in:
+        with c.cdn.serve(asset_identifier=a["id"], allow_age_restricted=True) as opted_in:
             self.assertEqual((opted_in.status, opted_in.headers["cache-control"], opted_in.read()),
                              (200, "private, no-store", b"adult"))
         c.api_key = DOWNLOAD

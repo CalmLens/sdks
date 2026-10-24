@@ -17,8 +17,8 @@ final class Cdn extends Resource
             Values::invalid('Resource must be content, preview or placeholder');
         }
         // A placeholder is a small blurred PNG, public for public assets whatever their moderation status.
-        if ($resource === 'placeholder' && (isset($options['lens']) || isset($options['transform']) || ($options['ageRestricted'] ?? false) === true)) {
-            Values::invalid('A placeholder takes no lens, transform or ageRestricted');
+        if ($resource === 'placeholder' && (isset($options['lens']) || isset($options['transform']) || ($options['allowAgeRestricted'] ?? false) === true)) {
+            Values::invalid('A placeholder takes no lens, transform or allowAgeRestricted');
         }
         $url = $this->session->cdnBaseUrl . '/assets/' . Values::segment($this->session->projectId)
             . '/' . Values::segment($options['assetIdentifier'] ?? null) . '/' . $resource;
@@ -30,11 +30,11 @@ final class Cdn extends Resource
         }
         // Opts a public age-restricted asset in to its public URL; only for viewers your app has
         // already decided may see age-restricted content. Without it, use a signed URL or the API key.
-        $ageRestricted = $options['ageRestricted'] ?? false;
-        if (!is_bool($ageRestricted)) {
-            Values::invalid('ageRestricted must be true or false');
+        $allowAgeRestricted = $options['allowAgeRestricted'] ?? false;
+        if (!is_bool($allowAgeRestricted)) {
+            Values::invalid('allowAgeRestricted must be true or false');
         }
-        return $ageRestricted ? $url . '?ageRestricted=true' : $url;
+        return $allowAgeRestricted ? $url . '?allowAgeRestricted=true' : $url;
     }
 
     /** Returns a PSR-7 response with a streaming body; HTTP errors are returned, not thrown. */

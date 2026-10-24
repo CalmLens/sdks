@@ -1097,8 +1097,8 @@ impl TextClient<'_> {
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
     /// The CDN URL of an asset's content, preview or placeholder, optionally through a lens or
-    /// transform, with `?ageRestricted=true` when [`CdnRequest::age_restricted`] is `Some(true)`.
-    /// A placeholder takes no lens, transform or `age_restricted`.
+    /// transform, with `?allowAgeRestricted=true` when [`CdnRequest::allow_age_restricted`] is `Some(true)`.
+    /// A placeholder takes no lens, transform or `allow_age_restricted`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource
@@ -1112,10 +1112,10 @@ impl CdnClient<'_> {
         if resource == "placeholder"
             && (options.lens.is_some()
                 || options.transform.is_some()
-                || options.age_restricted == Some(true))
+                || options.allow_age_restricted == Some(true))
         {
             return Err(invalid_argument(
-                "A placeholder takes no lens, transform or ageRestricted",
+                "A placeholder takes no lens, transform or allowAgeRestricted",
             ));
         }
         let config = &self.0.inner.config;
@@ -1140,8 +1140,8 @@ impl CdnClient<'_> {
                 CdnTransform::Steps(_) => url.push_str(&value.selector()?),
             }
         }
-        if options.age_restricted == Some(true) {
-            url.push_str("?ageRestricted=true");
+        if options.allow_age_restricted == Some(true) {
+            url.push_str("?allowAgeRestricted=true");
         }
         Ok(url)
     }

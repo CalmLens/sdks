@@ -224,7 +224,7 @@ const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
  *
  * `resource` is `content` (default), `preview` or `placeholder`. A placeholder is a small blurred
  * PNG that the CDN serves for public assets whatever their moderation status, so it takes no
- * lens, transform or `ageRestricted`.
+ * lens, transform or `allowAgeRestricted`.
  */
 export const getAssetUrl = ({
   projectId,
@@ -238,12 +238,12 @@ export const getAssetUrl = ({
   }
   if (
     resource === "placeholder" &&
-    (options.lens !== undefined || options.transform !== undefined || options.ageRestricted)
+    (options.lens !== undefined || options.transform !== undefined || options.allowAgeRestricted)
   ) {
-    throw invalidArgument("A placeholder takes no lens, transform or ageRestricted");
+    throw invalidArgument("A placeholder takes no lens, transform or allowAgeRestricted");
   }
-  if (options.ageRestricted !== undefined && typeof options.ageRestricted !== "boolean") {
-    throw invalidArgument("ageRestricted must be true or false");
+  if (options.allowAgeRestricted !== undefined && typeof options.allowAgeRestricted !== "boolean") {
+    throw invalidArgument("allowAgeRestricted must be true or false");
   }
   const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${resource}`;
   return appendCdnSelector(url, options);
@@ -251,14 +251,14 @@ export const getAssetUrl = ({
 
 /**
  * Appends a CDN lens (`/@name`) followed by any direct transform selector to an asset URL, and
- * `?ageRestricted=true` when requested.
+ * `?allowAgeRestricted=true` when requested.
  */
 export const appendCdnSelector = (
   url: string,
-  options: { lens?: string; transform?: CdnTransform; ageRestricted?: boolean },
+  options: { lens?: string; transform?: CdnTransform; allowAgeRestricted?: boolean },
 ): string => {
   const path = appendCdnPathSelector(url, options);
-  return options.ageRestricted ? `${path}?ageRestricted=true` : path;
+  return options.allowAgeRestricted ? `${path}?allowAgeRestricted=true` : path;
 };
 
 const appendCdnPathSelector = (

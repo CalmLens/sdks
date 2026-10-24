@@ -8,11 +8,11 @@ module CalmLens
     # @option options [String] :asset_identifier the asset ID or external ID
     # @option options [String] :resource `content` (default), `preview` or `placeholder`: a small blurred PNG
     #   that the CDN serves for public assets whatever their moderation status. A placeholder takes no lens,
-    #   transform or age_restricted.
+    #   transform or allow_age_restricted.
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash, Array<Hash>] :transform a selector such as `imageTransform[width=200]`,
     #   or structured steps: `{type: 'imageTransform', options: {width: 200}}` or an Array of them
-    # @option options [Boolean] :age_restricted true appends `?ageRestricted=true`, so a public asset whose
+    # @option options [Boolean] :allow_age_restricted true appends `?allowAgeRestricted=true`, so a public asset whose
     #   moderation status is `age-restricted` is served from this URL. Without it such an asset needs a signed
     #   URL or the API key. Set it only where your app has already decided the viewer may see age-restricted content.
     # @return [String]
@@ -28,7 +28,7 @@ module CalmLens
     # not raised; check {Response#status}.
     #
     # @option options [String] :asset_identifier
-    # @option options [Boolean] :age_restricted see {#get_asset_url}
+    # @option options [Boolean] :allow_age_restricted see {#get_asset_url}
     # @option options [Hash] :init `{method: 'GET' | 'HEAD', headers: {...}}`
     # @yieldparam response [Response]
     # @return [Response, Object]
@@ -57,8 +57,8 @@ module CalmLens
     def url(api)
       resource = api.fetch('resource', 'content')
       raise Internal.invalid('Resource must be content, preview or placeholder') unless %w[content preview placeholder].include?(resource)
-      if resource == 'placeholder' && (!api['lens'].nil? || !api['transform'].nil? || api['ageRestricted'] == true)
-        raise Internal.invalid('A placeholder takes no lens, transform or ageRestricted')
+      if resource == 'placeholder' && (!api['lens'].nil? || !api['transform'].nil? || api['allowAgeRestricted'] == true)
+        raise Internal.invalid('A placeholder takes no lens, transform or allowAgeRestricted')
       end
 
       url = "#{@session.cdn_base_url}/assets/#{Internal.segment(@session.project_id)}/" \
@@ -66,10 +66,10 @@ module CalmLens
       url += "/@#{Internal.segment(api['lens'])}" if api['lens']
       transform = api['transform']
       url += "#{api['lens'] ? ',' : '/'}#{Transforms.path(transform)}" unless transform.nil? || transform == ''
-      age_restricted = api.fetch('ageRestricted', false)
-      raise Internal.invalid('ageRestricted must be true or false') unless [true, false, nil].include?(age_restricted)
+      allow_age_restricted = api.fetch('allowAgeRestricted', false)
+      raise Internal.invalid('allowAgeRestricted must be true or false') unless [true, false, nil].include?(allow_age_restricted)
 
-      age_restricted ? "#{url}?ageRestricted=true" : url
+      allow_age_restricted ? "#{url}?allowAgeRestricted=true" : url
     end
   end
 end

@@ -140,7 +140,7 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
 
 Set `lens` to deliver through a named lens, or `transform` to a `CdnTransform`: a selector string, one `Transform` step or a `Vec<Transform>` of steps. Structured steps become a selector with sorted, percent-encoded options, so equal transforms share a URL. `assets().create_signed_url` takes the same `transform`. Set both `lens` and `transform` to apply the lens first, then the extra transforms.
 
-A public asset whose moderation status is `age-restricted` is served from its public URL only with `age_restricted: Some(true)`, which appends `?ageRestricted=true`; otherwise it needs a signed URL or an API key. Set it only where your app has already decided the viewer may see age-restricted content.
+A public asset whose moderation status is `age-restricted` is served from its public URL only with `allow_age_restricted: Some(true)`, which appends `?allowAgeRestricted=true`; otherwise it needs a signed URL or an API key. Set it only where your app has already decided the viewer may see age-restricted content.
 
 ```rust
 let url = client.cdn().get_asset_url(&CdnRequest {

@@ -6,22 +6,22 @@ const props = defineProps<{
   projectId: string;
   assetId: string;
   status: "allowed" | "age-restricted";
-  canView: boolean;
+  /** For an age-restricted image, the URL your server signed once this viewer may see it. */
+  contentUrl?: string;
   alt: string;
   /** Width divided by height, which you store when the image is uploaded. */
   aspectRatio: number;
 }>();
 const emit = defineEmits<{ reveal: [] }>();
 
-const restricted = computed(() => props.status === "age-restricted");
 const asset = computed(() => ({ projectId: props.projectId, assetIdentifier: props.assetId }));
-const contentUrl = computed(() => getAssetUrl({ ...asset.value, ageRestricted: restricted.value }));
+const src = computed(() => (props.status === "allowed" ? getAssetUrl(asset.value) : props.contentUrl));
 const placeholderUrl = computed(() => getAssetUrl({ ...asset.value, resource: "placeholder" }));
 </script>
 
 <template>
   <figure class="sensitive" :style="{ aspectRatio }">
-    <img v-if="!restricted || canView" :src="contentUrl" :alt="alt" />
+    <img v-if="src" :src="src" :alt="alt" />
     <template v-else>
       <img :src="placeholderUrl" alt="" />
       <figcaption>Sensitive content <button type="button" @click="emit('reveal')">View</button></figcaption>

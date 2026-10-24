@@ -575,7 +575,7 @@ func TestMockCDNServesAgeRestrictedAssetsOnlyWithDownloadPermission(t *testing.T
 		t.Fatal(a, err)
 	}
 	serveURL := func(client *MockServerClient, optIn bool) int {
-		res, err := client.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, AgeRestricted: optIn}})
+		res, err := client.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, AllowAgeRestricted: optIn}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -587,13 +587,13 @@ func TestMockCDNServesAgeRestrictedAssetsOnlyWithDownloadPermission(t *testing.T
 		t.Fatal("age-restricted asset served without download permission", status)
 	}
 	if status := serveURL(c, true); status != http.StatusOK {
-		t.Fatal("public age-restricted asset not served with the ageRestricted opt-in", status)
+		t.Fatal("public age-restricted asset not served with the allowAgeRestricted opt-in", status)
 	}
 	private, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "private", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: private.ID, AgeRestricted: true}})
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: private.ID, AllowAgeRestricted: true}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -611,21 +611,21 @@ module CalmLens
   type asset_url_options = {
     # The asset ID or external ID.
     asset_identifier: String,
-    # `placeholder` is a small blurred PNG and takes no lens, transform or age_restricted.
+    # `placeholder` is a small blurred PNG and takes no lens, transform or allow_age_restricted.
     ?resource: "content" | "preview" | "placeholder",
     # A lens runs before any additional transforms.
     ?lens: String,
     ?transform: transform_input,
-    # Appends `?ageRestricted=true`, so a public `age-restricted` asset is served from this URL. Set it
+    # Appends `?allowAgeRestricted=true`, so a public `age-restricted` asset is served from this URL. Set it
     # only where your app has already decided the viewer may see age-restricted content.
-    ?age_restricted: bool?
+    ?allow_age_restricted: bool?
   }
   type serve_options = {
     asset_identifier: String,
     ?resource: "content" | "preview",
     ?lens: String,
     ?transform: transform_input,
-    ?age_restricted: bool?,
+    ?allow_age_restricted: bool?,
     ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] },
     ?request_options: request_options
   }

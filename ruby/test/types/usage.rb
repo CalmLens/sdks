@@ -59,7 +59,7 @@ lenses = client.ensure_lenses(lenses: [{ identifier: 'thumb', name: 'Thumb', typ
 lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image', active: true)
 lens_width = lenses.first&.dig('transforms', 0, 'options', 'width')
 
-url = client.cdn.get_asset_url(asset_identifier: 'post-1', lens: lens['identifier'], age_restricted: true)
+url = client.cdn.get_asset_url(asset_identifier: 'post-1', lens: lens['identifier'], allow_age_restricted: true)
 bytes = client.cdn.serve(asset_identifier: 'post-1', init: { method: 'HEAD', headers: { 'If-None-Match' => 'x' } }) do |response|
   response.success? ? response.body(limit: 1024) : nil
 end

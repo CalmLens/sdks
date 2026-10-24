@@ -77,13 +77,13 @@ export interface ModerationProvider {
     options: { timeoutMs: number; signal?: AbortSignal },
   ): Promise<ModerationOutcome>;
   /**
-   * Only call this for allowed assets, or with `ageRestricted` for age-restricted assets the
+   * Only call this for allowed assets, or with `allowAgeRestricted` for age-restricted assets the
    * viewer may see — see the README section on CDN delivery.
    */
   imageUrl(
     assetId: string,
     variant: "feed" | "thumb",
-    options?: { ageRestricted?: boolean },
+    options?: { allowAgeRestricted?: boolean },
   ): string;
   /** The asset's small blurred placeholder image, served whatever its moderation status. */
   placeholderUrl(assetId: string): string;

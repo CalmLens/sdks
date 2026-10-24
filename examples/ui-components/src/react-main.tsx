@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { posts, projectId, show } from "./demo";
+import { posts, projectId, revealedUrls, show } from "./demo";
 import { Avatar } from "./react/Avatar";
 import { CommentForm } from "./react/CommentForm";
 import { Feed } from "./react/Feed";
 import { PhotoUpload } from "./react/PhotoUpload";
 
 function App() {
-  const [canViewSensitiveMedia, setCanView] = useState(false);
+  const [urls, setUrls] = useState<Record<string, string>>({});
   return (
     <main style={{ maxWidth: 480 }}>
       <PhotoUpload onUploaded={(upload: unknown) => show("Uploaded", upload)} />
@@ -16,8 +16,8 @@ function App() {
       <Feed
         projectId={projectId}
         posts={posts}
-        viewer={{ canViewSensitiveMedia }}
-        onReveal={() => setCanView(true)}
+        revealedUrls={urls}
+        onReveal={() => setUrls(revealedUrls())}
       />
     </main>
   );

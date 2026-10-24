@@ -27,7 +27,7 @@ use Psr\Http\Message\ResponseInterface;
  *
  * Like the CDN, it does not serve `blocked` assets, and serves private and age-restricted assets
  * only with the download permission (the API key) or, for a public age-restricted asset, the
- * `ageRestricted` URL option. Set `downloadPermission: false` to act as a browser without a key.
+ * `allowAgeRestricted` URL option. Set `downloadPermission: false` to act as a browser without a key.
  *
  * Enqueued responses and exceptions are used first, in order, before the stand-in answers.
  * Folders, search and multipart uploads are not emulated: enqueue responses for them.
@@ -394,9 +394,9 @@ final class MockServerClient
             return self::json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
         }
         // Age-restricted assets are delivered like private ones, unless a public one is requested
-        // with `ageRestricted=true`.
+        // with `allowAgeRestricted=true`.
         $ageRestricted = $status === 'age-restricted';
-        $private = $asset['visibility'] !== 'public' || ($ageRestricted && ($query['ageRestricted'] ?? null) !== 'true');
+        $private = $asset['visibility'] !== 'public' || ($ageRestricted && ($query['allowAgeRestricted'] ?? null) !== 'true');
         if ($private && !$this->downloadPermission) {
             return self::json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'The API key cannot download this asset']);
         }

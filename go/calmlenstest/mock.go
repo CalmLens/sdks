@@ -1216,9 +1216,9 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound)
 	}
 	// A public age-restricted asset is served from its public URL only with the
-	// ageRestricted=true opt-in; otherwise it needs the download permission, like a private one.
+	// allowAgeRestricted=true opt-in; otherwise it needs the download permission, like a private one.
 	ageRestricted := section(section(asset, "classification"), "moderation")["status"] == calmlens.ModerationStatusAgeRestricted
-	restricted := asset["visibility"] != calmlens.VisibilityPublic || ageRestricted && req.URL.Query().Get("ageRestricted") != "true"
+	restricted := asset["visibility"] != calmlens.VisibilityPublic || ageRestricted && req.URL.Query().Get("allowAgeRestricted") != "true"
 	if restricted && !m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission")
 	}

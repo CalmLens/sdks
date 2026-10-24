@@ -19,7 +19,7 @@ const codeOf = (build: () => unknown) => {
 describe("getAssetUrl", () => {
   const cases: CdnAssetUrlOptions[] = [
     { assetIdentifier: "asset-1" },
-    { assetIdentifier: "a/b c", resource: "preview", lens: "thumb", ageRestricted: true },
+    { assetIdentifier: "a/b c", resource: "preview", lens: "thumb", allowAgeRestricted: true },
     {
       assetIdentifier: "asset-1",
       transform: { type: "imageTransform", options: { width: 320, format: "webp" } },
@@ -55,12 +55,12 @@ describe("getAssetUrl", () => {
     ).toBe("https://cdn.calmlens.com/v1/assets/project-1/asset-1/placeholder");
   });
 
-  test("rejects a lens, transform or ageRestricted on a placeholder, and unknown resources", () => {
+  test("rejects a lens, transform or allowAgeRestricted on a placeholder, and unknown resources", () => {
     const base = { projectId: "project-1", assetIdentifier: "asset-1" };
     for (const extra of [
       { lens: "thumb" },
       { transform: "imageTransform[width=10]" },
-      { ageRestricted: true },
+      { allowAgeRestricted: true },
     ]) {
       expect(codeOf(() => getAssetUrl({ ...base, resource: "placeholder", ...extra }))).toBe(
         "sdk/invalid-argument",

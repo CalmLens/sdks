@@ -95,7 +95,7 @@ client.cdn.get_asset_url(asset_identifier: asset_id, transform: {type: 'imageTra
 # => ".../content/imageTransform[format=png,width=1024]" in both cases
 ```
 
-A public asset whose moderation status is `age-restricted` is served from its public URL only with `?ageRestricted=true`; otherwise it needs a signed URL or the API key. Pass `age_restricted: true` to `cdn.get_asset_url` (or `cdn.serve`) to add it after any lens or transform. Set it only where your app has already decided the viewer may see age-restricted content.
+A public asset whose moderation status is `age-restricted` is served from its public URL only with `?allowAgeRestricted=true`; otherwise it needs a signed URL or the API key. Pass `allow_age_restricted: true` to `cdn.get_asset_url` (or `cdn.serve`) to add it after any lens or transform. Set it only where your app has already decided the viewer may see age-restricted content.
 
 ## Upload presets
 

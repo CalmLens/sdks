@@ -382,12 +382,12 @@ describe("MockCalmLensServerClient", () => {
         assetIdentifier: "asset-id",
         resource: "preview",
         lens: "thumbnail",
-        ageRestricted: true,
+        allowAgeRestricted: true,
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/preview/@thumbnail?ageRestricted=true`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/preview/@thumbnail?allowAgeRestricted=true`,
     );
-    expect(client.cdn.getAssetUrl({ assetIdentifier: "asset-id", ageRestricted: false })).toBe(
+    expect(client.cdn.getAssetUrl({ assetIdentifier: "asset-id", allowAgeRestricted: false })).toBe(
       `https://cdn.test/v1/assets/${projectId}/asset-id/content`,
     );
 
@@ -556,7 +556,7 @@ describe("MockCalmLensServerClient", () => {
     });
   });
 
-  it("serves public age-restricted assets only with assets:download or the ageRestricted opt-in", async () => {
+  it("serves public age-restricted assets only with assets:download or the allowAgeRestricted opt-in", async () => {
     const upload = {
       name: "public-image.png",
       content: { base64: pngBase64, type: "image/png" },
@@ -570,7 +570,7 @@ describe("MockCalmLensServerClient", () => {
     expect(await refused.json()).toMatchObject({ code: "asset/api-key-missing-permission" });
     const optedIn = await withoutGrant.cdn.serve({
       assetIdentifier: restricted.id,
-      ageRestricted: true,
+      allowAgeRestricted: true,
     });
     expect(optedIn.status).toBe(200);
 

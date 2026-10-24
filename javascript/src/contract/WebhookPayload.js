@@ -90,7 +90,7 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	threshold: zod.number().min(0).max(1).transform((threshold) => Math.max(threshold, MINIMUM_MODERATION_THRESHOLD)).meta({ description: "The policy score at which the category's action applies. The policy score is the category score, lowered by allowances that cover the content and raised to a restriction's presence score." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
-	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `ageRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
+	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
 	const categoryAction = value.flaggedContentPolicy?.action ?? "block";
 	for (const kind of ["allowance", "restriction"]) {
@@ -677,7 +677,7 @@ const ASSET_ALLOWED = defineModerationOutcome({
 const ASSET_AGE_RESTRICTED = defineModerationOutcome({
 	id: "asset.age-restricted",
 	name: "Asset age-restricted",
-	description: "The asset was age-restricted: it is not served from its plain URL, only through signed URLs, API keys or an explicit `ageRestricted=true` opt-in, so your app decides who sees it.",
+	description: "The asset was age-restricted: it is not served from its plain URL, only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, so your app decides who sees it.",
 	severity: "high",
 	notify: true
 });

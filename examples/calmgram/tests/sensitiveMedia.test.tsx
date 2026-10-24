@@ -72,11 +72,11 @@ test("shows an age-restricted photo's placeholder and a sensitive-content notice
 test("opts in to an age-restricted photo for a viewer who turned on sensitive media", async () => {
   const media = postMediaFor(env, post("age-restricted"), "feed", viewer(true));
   expect(media).toEqual({
-    url: `${ASSET}/content/@calmgram-feed?ageRestricted=true`,
+    url: `${ASSET}/content/@calmgram-feed?allowAgeRestricted=true`,
     placeholderUrl: null,
   });
   const card = await renderCard("age-restricted", viewer(true));
-  expect(card.images).toEqual([`${ASSET}/content/@calmgram-feed?ageRestricted=true`]);
+  expect(card.images).toEqual([`${ASSET}/content/@calmgram-feed?allowAgeRestricted=true`]);
   expect(card.figures).not.toContain("Sensitive content");
 });
 

@@ -143,11 +143,11 @@ CDN `serve` returns a streaming PSR-7 response, including HTTP error responses. 
 `init` option accepts `method` (`GET` or `HEAD`) and `headers` (e.g. `Range`). Signed
 URLs let browsers access private content without your API key. URL builders accept
 `resource` (`content`, `preview` or `placeholder`), `lens`, a string or structured
-`transform` and `ageRestricted`. `placeholder` is a small blurred PNG that the CDN serves for
-public assets whatever their moderation status; it takes no lens, transform or `ageRestricted`.
+`transform` and `allowAgeRestricted`. `placeholder` is a small blurred PNG that the CDN serves for
+public assets whatever their moderation status; it takes no lens, transform or `allowAgeRestricted`.
 
 The CDN treats an `age-restricted` asset like a private one: its plain public URL is
-refused. Pass `'ageRestricted' => true` to append `ageRestricted=true`, so a public
+refused. Pass `'allowAgeRestricted' => true` to append `allowAgeRestricted=true`, so a public
 age-restricted asset is served from its public URL. Do that only where your app has
 already decided the viewer may see age-restricted content; otherwise use a signed URL.
 `blocked` assets are not served, and `purged` assets have no content.
@@ -204,7 +204,7 @@ and `classify` gives them `analyzedOutcome` (default `allowed`): `pending`, `all
 the asset and returns either. Content is kept only with `keepContentAfterProcessing`.
 Like the CDN, the mock refuses `blocked` assets and, with `downloadPermission: false`
 (a browser without your key), private assets and public age-restricted ones requested
-without `ageRestricted`. Responses enqueued with `enqueueJson` or `enqueue` are used first;
+without `allowAgeRestricted`. Responses enqueued with `enqueueJson` or `enqueue` are used first;
 folders, search and multipart uploads need enqueued responses.
 
 For exact responses only, `MockTransport` replays a FIFO queue:

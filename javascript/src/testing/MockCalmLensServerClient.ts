@@ -371,7 +371,8 @@ export class MockCalmLensServerClient {
 
         const isPrivate =
           asset.visibility !== "public" ||
-          (asset.classification.moderation.status === "age-restricted" && !options.ageRestricted);
+          (asset.classification.moderation.status === "age-restricted" &&
+            !options.allowAgeRestricted);
         if (
           isPrivate &&
           !permits(

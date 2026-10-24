@@ -1342,13 +1342,13 @@ public final class Models {
     private String resource;
     private String lens;
     private transient Object transform;
-    private Boolean ageRestricted;
+    private Boolean allowAgeRestricted;
     private HttpOptions init;
     public CdnRequest() {}
     /** @param assetIdentifier an asset ID or external ID */
     public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
     public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code content} (default), {@code preview} or {@code placeholder} (no lens, transform or ageRestricted) @return these options */
+    /** @param value {@code content} (default), {@code preview} or {@code placeholder} (no lens, transform or allowAgeRestricted) @return these options */
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
@@ -1362,7 +1362,7 @@ public final class Models {
     public CdnRequest transform(List<Transform> value) { transform = value; return this; }
     Object transformValue() { return transform; }
     /**
-     * Adds {@code ?ageRestricted=true} so the CDN serves a public asset whose moderation status is
+     * Adds {@code ?allowAgeRestricted=true} so the CDN serves a public asset whose moderation status is
      * {@code age-restricted} from its public URL; without it such an asset needs a signed URL or an
      * API key. Set it only where your app has already decided the viewer may see age-restricted
      * content. False or unset adds nothing.
@@ -1370,7 +1370,7 @@ public final class Models {
      * @param value whether to request age-restricted content
      * @return these options
      */
-    public CdnRequest ageRestricted(Boolean value) { ageRestricted = value; return this; }
+    public CdnRequest allowAgeRestricted(Boolean value) { allowAgeRestricted = value; return this; }
     /** @param value the request method and extra headers, such as {@code Range} @return these options */
     public CdnRequest init(HttpOptions value) { init = value; return this; }
     HttpOptions initValue() { return init; }

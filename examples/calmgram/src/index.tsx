@@ -746,7 +746,7 @@ app.post("/bio", async (c) => {
 });
 
 // "Show sensitive media": the visitor confirms they are 18 or older. This stands in for your app's
-// real age check; only viewers with it on get age-restricted photos' `ageRestricted=true` URLs.
+// real age check; only viewers with it on get age-restricted photos' `allowAgeRestricted=true` URLs.
 app.post("/settings/sensitive-media", async (c) => {
   const sandbox = await currentSandbox(c);
   if (!sandbox) return c.redirect("/", 303);
@@ -922,7 +922,7 @@ app.post("/api/webhooks/calmlens", async (c) => {
 // from cdn.calmlens.com and this route is unused.
 app.get("/demo-media/:assetId", async (c) => {
   const upload = await readDemoUpload(c.env.CALMGRAM, c.req.param("assetId"), {
-    ageRestricted: c.req.query("ageRestricted") === "true",
+    allowAgeRestricted: c.req.query("allowAgeRestricted") === "true",
   });
   if (!upload) return c.text("Not available", 403);
   return c.body(upload.bytes, 200, {
