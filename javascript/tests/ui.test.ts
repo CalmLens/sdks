@@ -299,6 +299,44 @@ describe("UploadController", () => {
     expect(uploaded).toEqual([]);
   });
 
+  it("cancels a queued file but keeps it, so it can be retried", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    serve(["allowed", "allowed"]);
+    const served = globalThis.fetch;
+    let first = true;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (first) {
+        first = false;
+        await gate;
+      }
+      return served(input, init);
+    }) as typeof fetch;
+    const controller = createUploadController({
+      uploadPresetId: PRESET_ID,
+      multiple: true,
+      concurrency: 1,
+    });
+    controller.addFiles([photo(), photo()]);
+    const [, queued] = controller.getSnapshot().items;
+    controller.cancel(queued?.key ?? "");
+    release();
+    await settle(controller);
+    expect(controller.getSnapshot().items.map((item) => [item.stage, item.errorCode])).toEqual([
+      ["complete", undefined],
+      ["failed", "sdk/cancelled"],
+    ]);
+
+    controller.retry(queued?.key ?? "");
+    await settle(controller);
+    expect(controller.getSnapshot().items[1]).toMatchObject({
+      stage: "complete",
+      status: "allowed",
+    });
+  });
+
   it("retries a failed upload", async () => {
     let failing = true;
     serve(["allowed"]);

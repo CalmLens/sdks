@@ -53,6 +53,7 @@ export interface UseCalmLensUploadResult {
   controller: UploadController;
   addFiles: UploadController["addFiles"];
   retry: UploadController["retry"];
+  cancel: UploadController["cancel"];
   remove: UploadController["remove"];
   clear: UploadController["clear"];
 }
@@ -80,6 +81,7 @@ export const useCalmLensUpload = (
     controller,
     addFiles: (files) => controller.addFiles(files),
     retry: (key) => controller.retry(key),
+    cancel: (key) => controller.cancel(key),
     remove: (key) => controller.remove(key),
     clear: () => controller.clear(),
   };

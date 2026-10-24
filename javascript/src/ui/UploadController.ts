@@ -226,6 +226,23 @@ export class UploadController {
     this.#pump();
   }
 
+  /**
+   * Stops a queued or running file and keeps it in the list as failed with `sdk/cancelled`, so
+   * `retry` can upload it again. Finished files are left as they are.
+   */
+  cancel(key: string): void {
+    const item = this.#find(key);
+    if (
+      !item ||
+      (item.stage !== "queued" && item.stage !== "uploading" && item.stage !== "checking")
+    )
+      return;
+    this.#aborts.get(key)?.abort();
+    this.#aborts.delete(key);
+    this.#update(key, { stage: "failed", progress: null, errorCode: SDK_ERROR_CODES.CANCELLED });
+    this.#pump();
+  }
+
   /** Cancels a file's upload if it's running and removes it from the list. */
   remove(key: string): void {
     const item = this.#find(key);

@@ -57,6 +57,7 @@ export const DEFAULT_MESSAGES: CalmLensMessages = {
   "upload-preset/content-type-not-allowed": "This type of file isn't accepted.",
   "upload-preset/daily-limit-reached": "You've reached today's upload limit. Try again tomorrow.",
   "upload-token/expired": "Your upload expired. Please try again.",
+  "sdk/cancelled": "Cancelled.",
   retry: "Retry",
   remove: "Remove {name}",
   cancel: "Cancel {name}",
