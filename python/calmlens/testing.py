@@ -36,12 +36,12 @@ __all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetO
 
 _MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "queued_outcome",
                  "analyzed_outcome", "signed_url_base_url"}
-_MOCK_OUTCOMES = ("pending", "allowed", "age-restricted", "blocked", "purged", "failed")
+_MOCK_OUTCOMES = ("pending", "allowed", "limited", "age-restricted", "blocked", "purged", "failed")
 
-#: Where a mock upload ends up: ``pending`` (still processing), ``allowed``, ``age-restricted``,
+#: Where a mock upload ends up: ``pending`` (still processing), ``allowed``, ``limited``, ``age-restricted``,
 #: ``blocked`` or ``purged`` (processing done with that moderation status; ``purged`` also removes
 #: the content) or ``failed`` (processing failed, retryable).
-MockAssetOutcome = Literal["pending", "allowed", "age-restricted", "blocked", "purged", "failed"]
+MockAssetOutcome = Literal["pending", "allowed", "limited", "age-restricted", "blocked", "purged", "failed"]
 _INT_QUERY = {"pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal", "searchAll", "resolveOnly"}
 _JSON_QUERY = {"metadata", "processingOptions"}
@@ -410,12 +410,12 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self.database_storage.events.append(event)
             return copy.deepcopy(event)
 
-    def decide(self, asset_id: str, decision: Literal["allowed", "age-restricted", "blocked", "purged"]) -> Asset:
+    def decide(self, asset_id: str, decision: Literal["allowed", "limited", "age-restricted", "blocked", "purged"]) -> Asset:
         """Apply a reviewer's decision to a stored asset, as the portal or API would: the
         moderation status changes (``purged`` also removes the content), the review joins
         ``manualReviews``, and an ``asset.<decision>`` event with a ``decided-by: reviewer`` fact
         joins the events feed. Raises ``asset/not-found`` for an unknown asset."""
-        if decision not in ("allowed", "age-restricted", "blocked", "purged"):
+        if decision not in ("allowed", "limited", "age-restricted", "blocked", "purged"):
             raise _invalid(f"Unknown review decision {decision!r}")
         with self._state_lock:
             asset = self.database_storage.assets.get(asset_id)
@@ -430,7 +430,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                  "reviewedAt": now, "appliedToAsset": True})
             # Like the event catalog: only allowing is low severity.
             self.enqueue_event("asset." + decision, asset_id=asset_id,
-                               severity="low" if decision == "allowed" else "high",
+                               severity="low" if decision in ("allowed", "limited") else "high",
                                facts=[{"key": "decided-by", "value": "reviewer"}])
             return copy.deepcopy(asset)
 

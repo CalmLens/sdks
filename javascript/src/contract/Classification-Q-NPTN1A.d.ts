@@ -1,4 +1,4 @@
-import "./AssetModerationDecision-BzFBTVPm.js";
+import "./AssetModerationDecision-BZ_vVYoX.js";
 import * as zod from "zod";
 //#region packages/shared/src/ModerationPolicyDimensions.d.ts
 declare const MODERATION_QUALIFIER_INFO: {
@@ -791,15 +791,16 @@ type ModerationQualifier = keyof typeof MODERATION_QUALIFIER_INFO;
 //#endregion
 //#region packages/shared/src/PolicyRule.d.ts
 /**
- * What a policy does with content: deliver it (`allow`), keep it off its plain URL so your app
- * limits it to adults (`age-restrict`: signed URLs, API keys or `allowAgeRestricted=true`), stop
- * delivering it (`block`), or
- * stop delivering it and delete its stored content (`purge`).
+ * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
+ * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
+ * (`age-restrict`: signed URLs, API keys or `allowAgeRestricted=true`), stop delivering it
+ * (`block`), or stop delivering it and delete its stored content (`purge`).
  */
 declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
   "age-restrict": "age-restrict";
   allow: "allow";
   block: "block";
+  limit: "limit";
   purge: "purge";
 }>;
 type FlaggedContentAction = zod.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
@@ -810,6 +811,7 @@ declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{
     "age-restrict": "age-restrict";
     allow: "allow";
     block: "block";
+    limit: "limit";
     purge: "purge";
   }>;
 }, zod.core.$strip>;

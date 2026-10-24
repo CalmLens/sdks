@@ -9,7 +9,7 @@ export function renderAvatar(container, { projectId, assetId, status, name }) {
     initial.textContent = name.charAt(0).toUpperCase();
     container.replaceChildren(initial);
   };
-  if (!assetId || status !== "allowed") return fallback();
+  if (!assetId || (status !== "allowed" && status !== "limited")) return fallback();
 
   const img = document.createElement("img");
   img.className = "avatar";

@@ -26,7 +26,7 @@ def demo_report(result: str) -> dict:
             "criminal-activity": {"status": "evaluated", "score": 0.03, "likelihood": "very-unlikely"},
             "hate": {"status": "evaluated", "score": 0.01, "likelihood": "very-unlikely"},
         }}
-    score = 0.64 if result == "age-restricted" else 0.92
+    score = {"limited": 0.48, "age-restricted": 0.64}.get(result, 0.92)
     return {"processedAt": now, "score": score, "categories": {
         "criminal-activity": {"status": "evaluated", "score": score, "likelihood": "likely"},
         "hate": {"status": "evaluated", "score": 0.02, "likelihood": "very-unlikely"},

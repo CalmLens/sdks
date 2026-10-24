@@ -124,6 +124,10 @@ string_enum! {
         Pending = "pending",
         /// Delivered according to the asset's visibility.
         Allowed = "allowed",
+        /// Delivered like `allowed`, but marked so your app can reduce its reach, such as
+        /// keeping it out of recommendations, trending and notifications, ranking it lower or
+        /// collapsing it.
+        Limited = "limited",
         /// Delivered only through signed URLs or with an API key, like a private asset.
         AgeRestricted = "age-restricted",
         /// Not delivered; the content is kept.
@@ -138,6 +142,8 @@ string_enum! {
     AssetModerationDecision {
         /// Deliver the asset according to its visibility.
         Allowed = "allowed",
+        /// Deliver the asset like `allowed`, marked so your app can reduce its reach.
+        Limited = "limited",
         /// Deliver the asset only through signed URLs or with an API key.
         AgeRestricted = "age-restricted",
         /// Stop delivering the asset and keep its content.
@@ -210,6 +216,8 @@ string_enum! {
     FlaggedContentAction {
         /// Take no action.
         Allow = "allow",
+        /// Deliver normally, but mark the asset `limited` so your app can reduce its reach.
+        Limit = "limit",
         /// Deliver only through signed URLs or with an API key, so your backend can limit it to
         /// adults.
         AgeRestrict = "age-restrict",
@@ -324,6 +332,8 @@ string_enum! {
         AssetClassified = "asset.classified",
         /// `asset.allowed`.
         AssetAllowed = "asset.allowed",
+        /// `asset.limited`.
+        AssetLimited = "asset.limited",
         /// `asset.age-restricted`.
         AssetAgeRestricted = "asset.age-restricted",
         /// `asset.blocked`.

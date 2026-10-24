@@ -86,12 +86,13 @@ public final class Calmmarket {
       "flagged-categories", "Categories", "reviewer-name", "Reviewer", "note", "Note");
   /**
    * Events that can change a listing's decision. Each moderation status has its own event
-   * ({@code asset.allowed}, {@code asset.age-restricted}, {@code asset.blocked}, {@code
-   * asset.purged}), sent for automated moderation and reviewers alike; its {@code decided-by} fact
+   * ({@code asset.allowed}, {@code asset.limited}, {@code asset.age-restricted}, {@code
+   * asset.blocked}, {@code asset.purged}), sent for automated moderation and reviewers alike; its {@code decided-by} fact
    * says which.
    */
   static final Map<String, String> EVENT_LABELS = Map.of(
-      "asset.classified", "Classified", "asset.allowed", "Allowed", "asset.age-restricted", "Age-restricted",
+      "asset.classified", "Classified", "asset.allowed", "Allowed", "asset.limited", "Limited",
+      "asset.age-restricted", "Age-restricted",
       "asset.blocked", "Blocked", "asset.purged", "Purged", "asset.failed", "Processing failed");
 
   /**
@@ -166,13 +167,16 @@ public final class Calmmarket {
 
     boolean decided() { return decided(moderation); }
     static boolean decided(AssetModerationStatus status) { return status != null && status != AssetModerationStatus.PENDING; }
+    /** {@code limited} content is shown like {@code allowed}; the market only ranks it lower. */
+    static boolean shown(AssetModerationStatus status) { return status == AssetModerationStatus.ALLOWED || status == AssetModerationStatus.LIMITED; }
     boolean processingFailed() { return processing == AssetClassificationStatus.FAILED; }
     /**
-     * Only {@code allowed} with a current decision is shown. This marketplace has no age gate, so
-     * {@code age-restricted} holds the photo like {@code blocked}, {@code purged} or an unknown status.
+     * Only {@code allowed} or {@code limited} with a current decision is shown. This marketplace has
+     * no age gate, so {@code age-restricted} holds the photo like {@code blocked}, {@code purged} or
+     * an unknown status.
      */
-    boolean allowed() { return moderation == AssetModerationStatus.ALLOWED && !processingFailed() && refreshError == null; }
-    boolean held() { return (decided() && moderation != AssetModerationStatus.ALLOWED) || processingFailed(); }
+    boolean allowed() { return shown(moderation) && !processingFailed() && refreshError == null; }
+    boolean held() { return (decided() && !shown(moderation)) || processingFailed(); }
     /** The decision shown to the seller: {@code failed} when processing failed, else the moderation status. */
     String decision() { return processingFailed() ? "failed" : moderation == null ? "unknown" : moderation.value(); }
     Driver driver() { return Calmmarket.driver(moderation, reviewed); }
@@ -212,6 +216,8 @@ public final class Calmmarket {
       return State.IN_REVIEW;
     }
     boolean visible() { return state() == State.LIVE; }
+    /** A live listing with a {@code limited} photo is listed after the others on the market. */
+    boolean limited() { return photos.stream().anyMatch(photo -> photo.moderation == AssetModerationStatus.LIMITED); }
     Photo photo(int number) { return number >= 1 && number <= photos.size() ? photos.get(number - 1) : null; }
     Photo photoOwning(String assetId) { return photos.stream().filter(photo -> photo.owns(assetId)).findFirst().orElse(null); }
     String textField(String assetId) {
@@ -498,8 +504,8 @@ public final class Calmmarket {
           .processingOptions(new ProcessingOptions().keepContentAfterProcessing(true)),
           // The listing's own key, so a retried submission never moderates the text twice.
           new RequestOptions().idempotencyKey(externalId));
-      if (moderationStatus(asset) != AssetModerationStatus.ALLOWED) {
-        // No photo is uploaded for a listing whose text was not allowed.
+      if (!Photo.shown(moderationStatus(asset))) {
+        // No photo is uploaded for a listing whose text was not allowed or limited.
         boolean decided = Photo.decided(moderationStatus(asset)) && classificationStatus(asset) != AssetClassificationStatus.FAILED;
         record("held", "A listing was held: its " + field.getKey() + (decided ? " was " + moderationStatus(asset).value() : " did not finish moderation") + ". Nothing was stored.", List.of());
         return decided ? field.getKey() + "-not-allowed" : "moderation-incomplete";
@@ -586,7 +592,7 @@ public final class Calmmarket {
 
   /** The combined report does not identify which moderation pass decided the status. */
   static Driver driver(AssetModerationStatus status, boolean reviewed) {
-    if (!Photo.decided(status) || status == AssetModerationStatus.ALLOWED) return Driver.NONE;
+    if (!Photo.decided(status) || Photo.shown(status)) return Driver.NONE;
     return reviewed ? Driver.REVIEWER : Driver.AUTOMATED;
   }
 
@@ -669,6 +675,7 @@ public final class Calmmarket {
     if (listing.locked(() -> listing.removed)) return text(403, "This listing was removed");
     if (!refreshPhoto(listing, photo)) return text(502, "Preview unavailable");
     // Never serve or sign a photo that is pending, age-restricted, blocked, purged, failed, or unknown.
+    // A limited photo is served like an allowed one.
     Photo current = photo;
     if (!listing.locked(current::allowed)) return text(403, "This photo is not allowed");
     try {
@@ -830,7 +837,7 @@ public final class Calmmarket {
         Asset asset = client.assets.retrieve(new AssetId(assetId));
         if (!externalId.equals(asset.externalId())) throw new NotOurs();
         outcome = listing.locked(() -> {
-          if (moderationStatus(asset) == AssetModerationStatus.ALLOWED) return "is unchanged";
+          if (Photo.shown(moderationStatus(asset))) return "is unchanged";
           listing.removed = true;
           return "was taken down";
         });

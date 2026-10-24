@@ -12,6 +12,6 @@ const src = computed(() =>
 </script>
 
 <template>
-  <img v-if="src && status === 'allowed' && !failed" class="avatar" :src="src" :alt="name" @error="failed = true" />
+  <img v-if="src && (status === 'allowed' || status === 'limited') && !failed" class="avatar" :src="src" :alt="name" @error="failed = true" />
   <span v-else class="avatar" role="img" :aria-label="name">{{ name.charAt(0).toUpperCase() }}</span>
 </template>

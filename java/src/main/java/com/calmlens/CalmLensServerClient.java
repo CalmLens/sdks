@@ -859,7 +859,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * Retrieves the asset until its {@code classification.moderation.status} is no longer {@code
-     * pending} ({@code allowed}, {@code age-restricted}, {@code blocked} or {@code purged}), or its
+     * pending} ({@code allowed}, {@code limited}, {@code age-restricted}, {@code blocked} or {@code purged}), or its
      * {@code classification.status} is {@code failed}, and returns it. It waits 0.5 seconds before the second check and 1.5 times
      * longer each time after that, up to 5 seconds, never past the timeout (60 seconds by default).
      * Webhooks report decisions without polling.

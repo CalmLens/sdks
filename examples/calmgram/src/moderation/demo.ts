@@ -140,7 +140,7 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
 const isDemoAssetId = (assetId: string) => /^demo-[0-9a-f-]+$/.test(assetId);
 
 /**
- * Serves allowed photos, and age-restricted ones only with `allowAgeRestricted`, like the CalmLens
+ * Serves allowed and limited photos, and age-restricted ones only with `allowAgeRestricted`, like the CalmLens
  * CDN's `?allowAgeRestricted=true` opt-in.
  */
 export const readDemoUpload = async (
@@ -152,7 +152,8 @@ export const readDemoUpload = async (
   const asset = await readDemoAsset(kv, assetId);
   if (!asset || Date.now() < asset.readyAt) return null;
   const status = asset.outcome.status;
-  if (status !== "allowed" && !(status === "age-restricted" && allowAgeRestricted)) return null;
+  const delivered = status === "allowed" || status === "limited";
+  if (!delivered && !(status === "age-restricted" && allowAgeRestricted)) return null;
   const bytes = await kv.get(`demo-image:${assetId}`, "arrayBuffer");
   return bytes ? { bytes, mimeType: asset.mimeType } : null;
 };

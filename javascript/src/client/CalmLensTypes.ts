@@ -41,10 +41,12 @@ import type {
 export type AssetClassificationStatus = KnownAssetClassificationStatus | (string & {});
 /**
  * The moderation decision in force, which also decides delivery: `pending`, then `allowed`,
- * `age-restricted` (delivered only through signed URLs or API keys), `blocked` or `purged`.
+ * `limited` (delivered like `allowed`, but marked so your app can reduce its reach, such as
+ * keeping it out of recommendations, trending and notifications, ranking it lower or collapsing
+ * it), `age-restricted` (delivered only through signed URLs or API keys), `blocked` or `purged`.
  */
 export type AssetModerationStatus = KnownAssetModerationStatus | (string & {});
-/** A reviewer's decision: `allowed`, `age-restricted`, `blocked` or `purged`. */
+/** A reviewer's decision: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`. */
 export type AssetModerationDecision = KnownAssetModerationDecision | (string & {});
 /** Whether CalmLens holds the content: `temporary`, `stored` or `removed`. */
 export type AssetContentStatus = KnownAssetContentStatus | (string & {});

@@ -4,11 +4,11 @@ import { computed } from "vue";
 import SensitiveImage from "./SensitiveImage.vue";
 
 type Post = { id: string; assetId: string; status: AssetModerationStatus; alt: string; aspectRatio: number };
-type ShownPost = Post & { status: "allowed" | "age-restricted" };
+type ShownPost = Post & { status: "allowed" | "limited" | "age-restricted" };
 const props = defineProps<{ projectId: string; posts: Post[]; canViewSensitiveMedia: boolean }>();
 const emit = defineEmits<{ reveal: [] }>();
 const shown = computed(() =>
-  props.posts.filter((post): post is ShownPost => post.status === "allowed" || post.status === "age-restricted"),
+  props.posts.filter((post): post is ShownPost => post.status === "allowed" || post.status === "limited" || post.status === "age-restricted"),
 );
 </script>
 

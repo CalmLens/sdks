@@ -8,10 +8,10 @@ type Post = {
   alt: string;
   aspectRatio: number;
 };
-type ShownPost = Post & { status: "allowed" | "age-restricted" };
+type ShownPost = Post & { status: "allowed" | "limited" | "age-restricted" };
 
 const isShown = (post: Post): post is ShownPost =>
-  post.status === "allowed" || post.status === "age-restricted";
+  post.status === "allowed" || post.status === "limited" || post.status === "age-restricted";
 
 type FeedProps = {
   projectId: string;

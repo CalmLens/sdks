@@ -69,6 +69,9 @@ const (
 	OutcomePending = "pending"
 	// OutcomeAllowed finishes processing with moderation allowed.
 	OutcomeAllowed = "allowed"
+	// OutcomeLimited finishes processing with moderation limited; the mock CDN serves the asset
+	// like an allowed one.
+	OutcomeLimited = "limited"
 	// OutcomeAgeRestricted finishes processing with moderation age-restricted; the mock CDN then
 	// serves the asset only to keys allowed to download it, like a private asset.
 	OutcomeAgeRestricted = "age-restricted"
@@ -219,14 +222,14 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) {
 	}
 }
 
-// Decide applies a reviewer's decision (calmlens.ModerationStatusAllowed, ...AgeRestricted,
-// ...Blocked or ...Purged) to a stored asset, as the portal or API would: the moderation status
+// Decide applies a reviewer's decision (calmlens.ModerationStatusAllowed, ...Limited,
+// ...AgeRestricted, ...Blocked or ...Purged) to a stored asset, as the portal or API would: the moderation status
 // changes (purged also removes the content), the review joins manualReviews, and an
 // "asset.<decision>" event with a decided-by: reviewer fact joins the events feed. It returns a
 // *calmlens.Error with code asset/not-found for an unknown asset.
 func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, error) {
 	switch decision {
-	case OutcomeAllowed, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged:
+	case OutcomeAllowed, OutcomeLimited, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged:
 	default:
 		return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Unknown review decision " + strconv.Quote(decision)}
 	}
@@ -244,9 +247,9 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 		"id": m.options.CreateID(), "decision": decision, "note": nil, "reviewerUserId": nil,
 		"reviewedAt": now, "appliedToAsset": true,
 	})
-	// Like the event catalog: only allowing is low severity.
+	// Like the event catalog: only allowing and limiting are low severity.
 	severity := "high"
-	if decision == OutcomeAllowed {
+	if decision == OutcomeAllowed || decision == OutcomeLimited {
 		severity = "low"
 	}
 	m.events = append(m.events, calmlens.JSON{
@@ -314,7 +317,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	}
 	for _, outcome := range []string{options.QueuedOutcome, options.AnalyzedOutcome} {
 		switch outcome {
-		case OutcomePending, OutcomeAllowed, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged, OutcomeFailed:
+		case OutcomePending, OutcomeAllowed, OutcomeLimited, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged, OutcomeFailed:
 		default:
 			return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Unknown mock outcome " + strconv.Quote(outcome)}
 		}

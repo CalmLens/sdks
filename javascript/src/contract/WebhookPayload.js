@@ -1,16 +1,18 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-C1oa02vR.js";
-import "./SharedConstants-DSItflG6.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-ASf7ZITR.js";
+import "./SharedConstants-KcY2LQbA.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
 import * as zod from "zod";
 //#region packages/shared/src/AssetModerationDecision.ts
 /**
 * What moderation decided for an asset, which also decides how it is delivered: served to anyone
-* with access (`allowed`), only through signed URLs, server keys or `allowAgeRestricted=true` (`age-restricted`), not served
+* with access (`allowed`), served the same way but marked for reduced reach (`limited`), only
+* through signed URLs, server keys or `allowAgeRestricted=true` (`age-restricted`), not served
 * (`blocked`), or not served with its stored content deleted (`purged`).
 */
 const ASSET_MODERATION_DECISION_SCHEMA = zod.enum([
 	"allowed",
+	"limited",
 	"age-restricted",
 	"blocked",
 	"purged"
@@ -73,9 +75,10 @@ const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTIO
 /** Ranks actions by strength: allowances must be softer than the category action, restrictions not. */
 const FLAGGED_CONTENT_ACTION_RANK = {
 	allow: 0,
-	"age-restrict": 1,
-	block: 2,
-	purge: 3
+	limit: 1,
+	"age-restrict": 2,
+	block: 3,
+	purge: 4
 };
 /**
 * Why a rule can't be used with its category's action, or undefined when it can. An allowance must
@@ -95,7 +98,7 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	threshold: zod.number().min(0).max(1).transform((threshold) => Math.max(threshold, MINIMUM_MODERATION_THRESHOLD)).meta({ description: "The policy score at which the category's action applies. The policy score is the category score, lowered by allowances that cover the content and raised to a restriction's presence score." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
-	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
+	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, limit it so it is delivered normally but marked for reduced reach, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
 	const categoryAction = value.flaggedContentPolicy?.action ?? "block";
 	for (const kind of ["allowance", "restriction"]) {
@@ -178,7 +181,8 @@ zod.object({
 zod.object({
 	id: primaryUuidField(),
 	humanReadableId: saneStringField(),
-	userId: saneStringField(),
+	/** The organisation that owns the project and is billed for its usage. */
+	orgId: zod.string().uuid(),
 	createdAt: createdAtField(),
 	updatedAt: updatedAtField(),
 	name: saneStringField(),
@@ -306,7 +310,7 @@ const PROCESSING_OPTIONS_SCHEMA = zod.object({
 		defaultValue: false
 	})])),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta(metaStore([docPropertyInfo({
-		description: "Override the project moderation action for this asset. Allow takes no action, age-restrict serves the asset only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
+		description: "Override the project moderation action for this asset. Allow takes no action, limit delivers the asset normally but marks it for reduced reach, age-restrict serves the asset only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
 		defaultValue: void 0
 	})])),
 	features: PROCESSING_FEATURES_SCHEMA.nullish()
@@ -393,7 +397,7 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 })]));
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
-	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `age-restricted` (served only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in), `blocked` or `purged`. A reviewer's decision takes precedence."),
+	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
 	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),
@@ -635,7 +639,7 @@ const ASSET_CLASSIFIED = defineEventType({
 		flaggedCategories: field(zod.array(zod.string()), FLAGGED_CATEGORIES_INFO),
 		moderationStatus: field(ASSET_MODERATION_STATUS_SCHEMA, {
 			label: "Moderation status",
-			description: "The status the policy decided: `allowed`, `age-restricted`, `blocked` or `purged`. A reviewer's earlier decision on the asset keeps precedence.",
+			description: "The status the policy decided: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`. A reviewer's earlier decision on the asset keeps precedence.",
 			display: "enum"
 		})
 	},
@@ -687,6 +691,13 @@ const ASSET_ALLOWED = defineModerationOutcome({
 	severity: "low",
 	notify: false
 });
+const ASSET_LIMITED = defineModerationOutcome({
+	id: "asset.limited",
+	name: "Asset limited",
+	description: "The asset was limited: it is delivered normally, but marked so your app can reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it lower or collapsing it.",
+	severity: "low",
+	notify: false
+});
 const ASSET_AGE_RESTRICTED = defineModerationOutcome({
 	id: "asset.age-restricted",
 	name: "Asset age-restricted",
@@ -734,7 +745,7 @@ const ASSET_FAILED = defineEventType({
 const USAGE_LIMIT_REACHED = defineEventType({
 	id: "usage.limit-reached",
 	name: "Upload limit reached",
-	description: "The project owner used their free upload allowance; new uploads are blocked.",
+	description: "The project's organisation used its free upload allowance; new uploads are blocked until billing is set up.",
 	category: "usage",
 	severity: "high",
 	notify: true,
@@ -750,9 +761,9 @@ const USAGE_LIMIT_REACHED = defineEventType({
 			description: "Number of free uploads used.",
 			display: "number"
 		}),
-		ownerUserId: field(zod.string(), {
-			label: "Owner ID",
-			description: "ID of the project owner whose allowance was used.",
+		organisationId: field(zod.string(), {
+			label: "Organisation ID",
+			description: "ID of the organisation whose allowance was used.",
 			display: "code",
 			hidden: true,
 			inAppOnly: true
@@ -761,7 +772,7 @@ const USAGE_LIMIT_REACHED = defineEventType({
 	example: {
 		limit: 100,
 		used: 100,
-		ownerUserId: "user-123"
+		organisationId: "8f0c3a4e-2b1d-4c5e-9f6a-7b8c9d0e1f2a"
 	}
 });
 const PROJECT_MEMBER_JOINED = defineEventType({
@@ -935,7 +946,7 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 		assetType: assetTypeField,
 		automatedOutcome: field(ASSET_MODERATION_STATUS_SCHEMA, {
 			label: "Automated outcome",
-			description: "The asset's status from automated moderation: `allowed`, `age-restricted`, `blocked` or `purged`.",
+			description: "The asset's status from automated moderation: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`.",
 			display: "enum"
 		})
 	},
@@ -948,17 +959,32 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 const USAGE_SPEND_LIMIT_REACHED = defineEventType({
 	id: "usage.spend-limit-reached",
 	name: "Spend limit reached",
-	description: "The project owner's spend limit for this billing period was reached; new uploads are paused.",
+	description: "The project's organisation reached a limit on its usage; new uploads are paused until it resumes.",
 	category: "usage",
 	severity: "high",
 	notify: true,
 	permission: "assets:read",
-	fields: { resumesOn: field(zod.string().nullish(), {
-		label: "Uploads resume",
-		description: "The date uploads resume, as `YYYY-MM-DD` in UTC: the end of the billing period, or sooner if the owner raises the limit.",
-		display: "text"
-	}) },
-	example: { resumesOn: "2026-11-01" }
+	fields: {
+		reason: field(zod.enum([
+			"spend-limit",
+			"usage-cap",
+			"project-budget",
+			"payment-failed"
+		]), {
+			label: "Reason",
+			description: "Which limit paused uploads: the organisation's `spend-limit`, its `usage-cap`, the project's `project-budget`, or `payment-failed` while an invoice is unpaid.",
+			display: "enum"
+		}),
+		resumesOn: field(zod.string().nullish(), {
+			label: "Uploads resume",
+			description: "The date uploads resume, as `YYYY-MM-DD` in UTC: the end of the billing period, or sooner if the limit is raised. Null while an invoice is unpaid: uploads resume once it is paid.",
+			display: "text"
+		})
+	},
+	example: {
+		reason: "usage-cap",
+		resumesOn: "2026-11-01"
+	}
 });
 const UPLOAD_PRESET_DAILY_LIMIT_REACHED = defineEventType({
 	id: "upload-preset.daily-limit-reached",
@@ -1196,6 +1222,7 @@ const EVENT_TYPE_INFO = {
 	"asset.uploaded": ASSET_UPLOADED,
 	"asset.classified": ASSET_CLASSIFIED,
 	"asset.allowed": ASSET_ALLOWED,
+	"asset.limited": ASSET_LIMITED,
 	"asset.age-restricted": ASSET_AGE_RESTRICTED,
 	"asset.blocked": ASSET_BLOCKED,
 	"asset.purged": ASSET_PURGED,

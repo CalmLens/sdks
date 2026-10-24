@@ -214,7 +214,8 @@ fn writes(mock: &MockServerClient) -> Vec<calmlens::testing::Request> {
 }
 
 /// An asset uploaded by this library in the mock's project, with its file stored and moderation
-/// status `status` (`allowed`, `age-restricted`, `blocked` or `pending`), or `failed` processing.
+/// status `status` (`allowed`, `limited`, `age-restricted`, `blocked` or `pending`), or `failed`
+/// processing.
 fn asset(id: &str, status: &str) -> Value {
     let (processing, moderation) = match status {
         "failed" => ("failed", "pending"),
@@ -600,6 +601,10 @@ async fn live_listing_paginates_and_filters_the_folder() {
 #[tokio::test]
 async fn listing_filters_only_accept_known_statuses() {
     assert_eq!(list_filter(""), "parentId==null");
+    assert_eq!(
+        list_filter("limited"),
+        "parentId==null;classification.moderation.status==limited"
+    );
     // A failed upload has no decision, so it is listed under "failed", never "pending".
     assert_eq!(
         list_filter("failed"),
@@ -691,7 +696,14 @@ async fn demo_search_matches_only_allowed_stored_images() {
 
 #[tokio::test]
 async fn demo_thumbnails_appear_only_for_allowed_images() {
-    for outcome in ["allowed", "age-restricted", "blocked", "purged", "failed"] {
+    for outcome in [
+        "allowed",
+        "limited",
+        "age-restricted",
+        "blocked",
+        "purged",
+        "failed",
+    ] {
         let app = demo();
         let id = app.demo_upload("", outcome, "Ana").await;
         let pending = app.get("/").await;
@@ -706,8 +718,8 @@ async fn demo_thumbnails_appear_only_for_allowed_images() {
         let page = app.get("/").await.html();
         let thumb = app.get(&format!("/assets/{id}/thumb")).await;
         let download = app.get(&format!("/assets/{id}/download")).await;
-        if outcome == "allowed" {
-            assert!(page.contains(&format!("/assets/{id}/thumb")));
+        if matches!(outcome, "allowed" | "limited") {
+            assert!(page.contains(&format!("/assets/{id}/thumb")), "{outcome}");
             assert_eq!(thumb.status, StatusCode::OK);
             assert_eq!(thumb.body, PNG);
             assert_eq!(download.status, StatusCode::OK);

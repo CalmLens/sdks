@@ -40,7 +40,7 @@ module CalmLens
                         'content.format' => %w[content format], 'content.extension' => %w[content extension],
                         'classification.moderation.status' => %w[classification moderation status] }.freeze
       MAX_SEARCH_TOKENS = 8
-      REVIEW_DECISIONS = %w[allowed age-restricted blocked purged].freeze
+      REVIEW_DECISIONS = %w[allowed limited age-restricted blocked purged].freeze
       RESOURCES = %w[original rendered placeholder].freeze
       MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
@@ -85,8 +85,8 @@ module CalmLens
         (item['classification']['moderation']['manualReviews'] ||= []) <<
           { 'id' => @create_id.call, 'decision' => decision, 'note' => nil, 'reviewerUserId' => nil,
             'reviewedAt' => now, 'appliedToAsset' => true }
-        # Like the event catalog: only allowing is low severity.
-        add_event('type' => "asset.#{decision}", 'severity' => decision == 'allowed' ? 'low' : 'high',
+        # Like the event catalog: only allowing and limiting are low severity.
+        add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
                   'assetId' => asset_id, 'asset' => snapshot(item),
                   'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }])
         deep_copy(item)
@@ -628,6 +628,7 @@ module CalmLens
 
       # Processing and moderation status for each outcome.
       OUTCOMES = { 'pending' => %w[processing pending], 'allowed' => %w[completed allowed],
+                   'limited' => %w[completed limited],
                    'age-restricted' => %w[completed age-restricted], 'blocked' => %w[completed blocked],
                    'purged' => %w[completed purged], 'failed' => %w[failed pending] }.freeze
 

@@ -38,6 +38,7 @@ const LENSES: EnsureLensOptions[] = [
  */
 const DECIDED: ReadonlySet<string> = new Set<ModerationStatus>([
   "allowed",
+  "limited",
   "age-restricted",
   "blocked",
   "purged",

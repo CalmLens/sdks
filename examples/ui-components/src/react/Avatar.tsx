@@ -5,7 +5,7 @@ type AvatarProps = { projectId: string; assetId?: string; status?: string; name:
 
 export function Avatar({ projectId, assetId, status, name }: AvatarProps) {
   const [failed, setFailed] = useState(false);
-  if (!assetId || status !== "allowed" || failed) {
+  if (!assetId || (status !== "allowed" && status !== "limited") || failed) {
     return (
       <span className="avatar" role="img" aria-label={name}>
         {name.charAt(0).toUpperCase()}

@@ -8732,13 +8732,14 @@ const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[
 //#endregion
 //#region packages/shared/src/PolicyRule.ts
 /**
-* What a policy does with content: deliver it (`allow`), keep it off its plain URL so your app
-* limits it to adults (`age-restrict`: signed URLs, API keys or `allowAgeRestricted=true`), stop
-* delivering it (`block`), or
-* stop delivering it and delete its stored content (`purge`).
+* What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
+* reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
+* (`age-restrict`: signed URLs, API keys or `allowAgeRestricted=true`), stop delivering it
+* (`block`), or stop delivering it and delete its stored content (`purge`).
 */
 const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([
 	"allow",
+	"limit",
 	"age-restrict",
 	"block",
 	"purge"

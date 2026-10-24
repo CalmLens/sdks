@@ -91,7 +91,7 @@ test("always gives signed-out viewers the placeholder, with no settings link", a
   expect(card.links.some((href) => href.includes("#sensitive-media"))).toBe(false);
 });
 
-test("publishes age-restricted posts but keeps blocked and purged ones from other viewers", () => {
+test("publishes allowed, limited and age-restricted posts but keeps blocked and purged ones from other viewers", () => {
   expect(isVisibleTo(post("age-restricted"), null)).toBe(true);
   for (const status of ["blocked", "purged", "pending", "error"] as const) {
     expect(isVisibleTo(post(status), "someone_else")).toBe(false);
@@ -101,8 +101,12 @@ test("publishes age-restricted posts but keeps blocked and purged ones from othe
       placeholderUrl: null,
     });
   }
-  // Allowed photos never carry the opt-in, whatever the viewer's setting.
-  expect(postMediaFor(env, post("allowed"), "thumb", viewer(true)).url).toBe(
-    `${ASSET}/content/@calmgram-thumb`,
-  );
+  // Allowed and limited photos never carry the opt-in, whatever the viewer's setting.
+  for (const status of ["allowed", "limited"] as const) {
+    expect(isVisibleTo(post(status), null)).toBe(true);
+    expect(postMediaFor(env, post(status), "thumb", viewer(true))).toEqual({
+      url: `${ASSET}/content/@calmgram-thumb`,
+      placeholderUrl: null,
+    });
+  }
 });

@@ -13,7 +13,7 @@ module CalmLens
     # @option options [String] :text
     # @option options [String] :name defaults to `text`
     # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
-    #   `allowed`.
+    #   `allowed` or `limited` (reduce the reach of `limited` content).
     def classify(options)
       api, request = call(options) { |*split| split }
       text = api['text']

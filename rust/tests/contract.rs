@@ -761,6 +761,7 @@ fn outcome(value: Option<&Value>, default: testing::MockOutcome) -> testing::Moc
         None => default,
         Some("pending") => MockOutcome::Pending,
         Some("allowed") => MockOutcome::Allowed,
+        Some("limited") => MockOutcome::Limited,
         Some("age-restricted") => MockOutcome::AgeRestricted,
         Some("blocked") => MockOutcome::Blocked,
         Some("purged") => MockOutcome::Purged,

@@ -55,6 +55,7 @@ module Calmthread
   # since the app already acted on the automated result at upload.
   EVENT_LABELS = {
     'asset.allowed' => 'Allowed by a reviewer',
+    'asset.limited' => 'Limited by a reviewer',
     'asset.age-restricted' => 'Age-restricted by a reviewer',
     'asset.blocked' => 'Blocked by a reviewer',
     'asset.purged' => 'Purged by a reviewer'
@@ -62,6 +63,9 @@ module Calmthread
   # Statuses that keep a field out of the thread. The thread has no age check, so an
   # `age-restricted` field is held like a `blocked` or `purged` one.
   HELD_STATUSES = %w[age-restricted blocked purged].freeze
+  # Statuses shown to everyone. CalmLens delivers a `limited` field like an `allowed` one; a
+  # thread in date order has no recommendations or ranking to keep it out of, so it shows as usual.
+  SHOWN_STATUSES = %w[allowed limited].freeze
 
   # A form value the app refuses. Its message is written by this app, never taken from input
   # or from a library error, so it is safe to show.
@@ -114,13 +118,13 @@ module Calmthread
   def self.processing_failed?(asset) = section(asset, 'classification')['status'] == 'failed'
 
   # :clean publishes, :held waits for a reviewer, :failed never publishes.
-  # Only an `allowed` field is clean; any other decided status holds the reply.
+  # Only an `allowed` or `limited` field is clean; any other decided status holds the reply.
   def self.decision(asset)
     return :failed unless asset.is_a?(Hash) && asset['id'].is_a?(String) && !asset['id'].empty?
     return :failed if processing_failed?(asset)
 
     status = status(asset)
-    return :clean if status == 'allowed'
+    return :clean if SHOWN_STATUSES.include?(status)
 
     HELD_STATUSES.include?(status) ? :held : :failed
   end
@@ -299,9 +303,9 @@ module Calmthread
 
       # Act on the asset's current status, never on the event's snapshot.
       status = Calmthread.current_status(client.assets.retrieve(asset_id: asset_id), asset_id, reply)
-      outcome = if HELD_STATUSES.include?(status) && event['type'] != 'asset.allowed'
+      outcome = if HELD_STATUSES.include?(status) && !%w[asset.allowed asset.limited].include?(event['type'])
                   remove(reply, client)
-                elsif status == 'allowed' && reply[:state] == :held && allowed_elsewhere?(reply, asset_id, client)
+                elsif SHOWN_STATUSES.include?(status) && reply[:state] == :held && allowed_elsewhere?(reply, asset_id, client)
                   @discussion.publish(reply[:id]) ? :released : :unchanged
                 else
                   :unchanged
@@ -312,10 +316,10 @@ module Calmthread
       outcome
     end
 
-    # Every other field of the reply must also be allowed right now.
+    # Every other field of the reply must also be allowed or limited right now.
     def allowed_elsewhere?(reply, asset_id, client)
       reply[:asset_ids].values.reject { |id| id == asset_id }.all? do |id|
-        Calmthread.current_status(client.assets.retrieve(asset_id: id), id, reply) == 'allowed'
+        SHOWN_STATUSES.include?(Calmthread.current_status(client.assets.retrieve(asset_id: id), id, reply))
       end
     end
 

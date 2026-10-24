@@ -3,18 +3,24 @@
 // real API or the local demo simulator.
 
 /**
- * CalmLens's moderation status, plus `error` when processing failed. `allowed` photos are shown
- * to everyone. `age-restricted` photos are published too, but shown only to viewers who turned on
+ * CalmLens's moderation status, plus `error` when processing failed. `allowed` and `limited`
+ * photos are shown to everyone (`limited` ones are only marked so an app can reduce their reach,
+ * for example by keeping them out of recommendations). `age-restricted` photos are published too, but shown only to viewers who turned on
  * "Show sensitive media"; everyone else sees a blurred placeholder. Text has no sensitive view,
- * so text that isn't `allowed` is never saved.
+ * so text that isn't `allowed` or `limited` is never saved.
  */
 export type ModerationStatus =
   | "pending"
   | "allowed"
+  | "limited"
   | "age-restricted"
   | "blocked"
   | "purged"
   | "error";
+
+/** `allowed` and `limited` content is shown to everyone; `limited` only marks it for less reach. */
+export const isShownToEveryone = (status: ModerationStatus) =>
+  status === "allowed" || status === "limited";
 
 export type ContentKind = "post-image" | "caption" | "comment" | "bio";
 
@@ -36,9 +42,9 @@ export interface ModerationOutcome {
   /** The upload preset the asset was uploaded through, when the provider knows it. */
   uploadPresetId?: string | null;
   /**
-   * `allowed` → show it. `age-restricted` → show photos only to viewers who opted in, and a
-   * placeholder to everyone else. `blocked` or `purged` → don't show it. `pending` → still being
-   * classified. `error` → classification failed; treat as not shown.
+   * `allowed` or `limited` → show it. `age-restricted` → show photos only to viewers who opted
+   * in, and a placeholder to everyone else. `blocked` or `purged` → don't show it. `pending` →
+   * still being classified. `error` → classification failed; treat as not shown.
    */
   status: ModerationStatus;
   /** Evaluated categories, highest score first. */
@@ -77,7 +83,7 @@ export interface ModerationProvider {
     options: { timeoutMs: number; signal?: AbortSignal },
   ): Promise<ModerationOutcome>;
   /**
-   * Only call this for allowed assets, or with `allowAgeRestricted` for age-restricted assets the
+   * Only call this for allowed or limited assets, or with `allowAgeRestricted` for age-restricted assets the
    * viewer may see — see the README section on CDN delivery.
    */
   imageUrl(

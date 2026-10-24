@@ -2,7 +2,7 @@ import { renderSensitiveImage } from "./sensitive-image.js";
 
 export function renderFeed(list, { projectId, posts, viewer, onReveal }) {
   const items = posts
-    .filter((post) => ["allowed", "age-restricted"].includes(post.status))
+    .filter((post) => ["allowed", "limited", "age-restricted"].includes(post.status))
     .map((post) => {
       const item = document.createElement("li");
       renderSensitiveImage(item, {

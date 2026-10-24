@@ -72,9 +72,10 @@ pub const LICENCES: [(&str, &str); 4] = [
 ];
 
 /// Status filters for the folder listing. Only these fixed values are turned into a filter.
-pub const STATUS_FILTERS: [(&str, &str); 7] = [
+pub const STATUS_FILTERS: [(&str, &str); 8] = [
     ("", "All statuses"),
     ("allowed", "Allowed"),
+    ("limited", "Limited"),
     ("pending", "In review"),
     ("age-restricted", "Age-restricted"),
     ("blocked", "Blocked"),
@@ -98,11 +99,13 @@ const FACT_LABELS: [(&str, &str); 7] = [
     ("reviewer-name", "Reviewer"),
     ("note", "Note"),
 ];
-/// `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purged` report every
-/// outcome, from automated moderation or a reviewer; their `decided-by` fact says which.
-const EVENT_LABELS: [(&str, &str); 6] = [
+/// `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked` and `asset.purged`
+/// report every outcome, from automated moderation or a reviewer; their `decided-by` fact says
+/// which.
+const EVENT_LABELS: [(&str, &str); 7] = [
     ("asset.classified", "Classified"),
     ("asset.allowed", "Allowed"),
+    ("asset.limited", "Limited"),
     ("asset.age-restricted", "Age-restricted"),
     ("asset.blocked", "Blocked"),
     ("asset.purged", "Purged"),
@@ -459,7 +462,7 @@ impl AppState {
     // ------------------------------------------------------------ delivery
 
     /// Thumbnails and downloads. The asset's current state is retrieved first; only an allowed
-    /// asset whose file is still stored is delivered, and only through a lens.
+    /// or limited asset whose file is still stored is delivered, and only through a lens.
     async fn media(&self, id: &str, lens: &str) -> Response {
         if !valid_id(id) {
             return not_found().await;
@@ -1230,6 +1233,9 @@ pub enum Decision {
     Pending,
     /// Delivered.
     Allowed,
+    /// Delivered like an allowed asset, marked so apps can reduce its reach. This team library
+    /// has no recommendations or feeds, so it shows it like an allowed one.
+    Limited,
     /// CalmLens delivers it only through signed URLs or API keys, for an app that checks ages.
     /// This team library has no age check, so it does not deliver it.
     AgeRestricted,
@@ -1246,6 +1252,7 @@ impl Decision {
         match self {
             Decision::Pending => "pending",
             Decision::Allowed => "allowed",
+            Decision::Limited => "limited",
             Decision::AgeRestricted => "age-restricted",
             Decision::Blocked => "blocked",
             Decision::Purged => "purged",
@@ -1262,6 +1269,7 @@ pub fn decision(asset: &Asset) -> Decision {
     }
     match asset.classification.moderation.status {
         AssetModerationStatus::Allowed => Decision::Allowed,
+        AssetModerationStatus::Limited => Decision::Limited,
         AssetModerationStatus::AgeRestricted => Decision::AgeRestricted,
         AssetModerationStatus::Blocked => Decision::Blocked,
         AssetModerationStatus::Purged => Decision::Purged,
@@ -1274,9 +1282,10 @@ pub fn content_removed(asset: &Asset) -> bool {
     asset.content.status == AssetContentStatus::Removed
 }
 
-/// Only an explicitly allowed asset whose file is still stored is delivered.
+/// Only an explicitly allowed (or limited) asset whose file is still stored is delivered.
 pub fn deliverable(asset: &Asset) -> bool {
-    decision(asset) == Decision::Allowed && asset.content.status == AssetContentStatus::Stored
+    matches!(decision(asset), Decision::Allowed | Decision::Limited)
+        && asset.content.status == AssetContentStatus::Stored
 }
 
 /// The catalogue ID this app issued for an asset, or `None` for an asset it did not upload.

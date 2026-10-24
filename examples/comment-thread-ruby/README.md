@@ -5,7 +5,9 @@ Calmthread is a **pre-moderated** thread: anything the moderation policy does no
 held for a person to review before anyone sees it.
 
 - Each reply has a display name and a message. Both are moderated as separate text assets.
-- A clean reply publishes immediately: every field's `classification.moderation.status` is `allowed`.
+- A clean reply publishes immediately: every field's `classification.moderation.status` is `allowed`
+  or `limited`. CalmLens delivers a limited field like an allowed one, and this thread has no
+  recommendations or ranking to keep it out of, so it shows as usual.
 - A reply with any field `blocked`, `age-restricted` or `purged` is **held**. The thread has no
   age check, so it holds age-restricted fields too. The thread shows a "held for review"
   placeholder, never its name or text, and the **Held for review** panel lists its asset IDs.
@@ -99,8 +101,8 @@ action to `allow`. See the moderation policies guide in the CalmLens docs.
 
 ## Review decisions
 
-The app follows reviewer decisions: `asset.allowed`, `asset.age-restricted`, `asset.blocked`
-and `asset.purged` events whose `decided-by` fact is `reviewer`. CalmLens also sends these
+The app follows reviewer decisions: `asset.allowed`, `asset.limited`, `asset.age-restricted`,
+`asset.blocked` and `asset.purged` events whose `decided-by` fact is `reviewer`. CalmLens also sends these
 events for automated moderation (`decided-by` is `automated`); the app skips those, because it
 already acted on the automated result when the reply was posted. Other events, such as
 `asset.classified`, are skipped.
@@ -109,9 +111,10 @@ For each decision about a local reply, the app retrieves the asset with
 `client.assets.retrieve` and acts on its **current** `classification.moderation.status`, not on
 the event's snapshot:
 
-- Status `allowed`: the app also retrieves the reply's other field. The reply is published
-  only when every field is allowed.
-- Status `age-restricted`, `blocked` or `purged` after an event other than `asset.allowed`: the
+- Status `allowed` or `limited`: the app also retrieves the reply's other field. The reply is
+  published only when every field is allowed or limited.
+- Status `age-restricted`, `blocked` or `purged` after an event other than `asset.allowed` or
+  `asset.limited`: the
   app calls `client.assets.delete_content(asset_id:)` for each field, then forgets the reply. A
   later `allowed` decision on the same asset cannot bring it back.
 - Anything else, or a response for a different asset or another reply's field (checked with

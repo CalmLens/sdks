@@ -8,7 +8,7 @@
   );
 </script>
 
-{#if src && status === "allowed" && !failed}
+{#if src && (status === "allowed" || status === "limited") && !failed}
   <img class="avatar" {src} alt={name} onerror={() => (failed = true)} />
 {:else}
   <span class="avatar" role="img" aria-label={name}>{name.charAt(0).toUpperCase()}</span>

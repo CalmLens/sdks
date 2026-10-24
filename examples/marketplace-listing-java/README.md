@@ -7,10 +7,10 @@ on it offers something the marketplace does not allow.
 
 Calmmarket uploads every listing photo with OCR enabled. Image moderation considers readable text directly; OCR also extracts text and adds a separate text moderation pass.
 
-1. The title and description are moderated synchronously with `text.classify`. If either is not `allowed`, no photo is uploaded.
+1. The title and description are moderated synchronously with `text.classify`. If either is not `allowed` or `limited`, no photo is uploaded.
 2. Up to four photos are uploaded privately with `assets.create` and `processingOptions.features.ocr.enabled: true`.
 3. The page polls `assets.retrieve` for each photo and reads its combined `classification.moderation` and `content.extractedText`. No text child is created or queried. The combined report does not identify which moderation pass decided the status.
-4. A listing goes live only when its text and every photo have the moderation status `allowed`. A pending, `age-restricted`, `blocked`, `purged`, unknown or failed photo holds the listing: this marketplace has no age gate, so it does not show age-restricted photos. Allowed photos use a CDN lens with a 60-second signed URL.
+4. A listing goes live only when its text and every photo have the moderation status `allowed` or `limited`. A `limited` photo is shown like an allowed one, but its listing is ranked after the others on the market. A pending, `age-restricted`, `blocked`, `purged`, unknown or failed photo holds the listing: this marketplace has no age gate, so it does not show age-restricted photos. Allowed photos use a CDN lens with a 60-second signed URL.
 
 An `evaluated` or `partial` category has a score. A `not-evaluated` result has a reason and no score; it is never treated as zero. See the [OCR guide](https://calmlens.com/docs/guides/ocr) for merging and retention.
 
@@ -103,7 +103,7 @@ placed in a link is never displayed.
 `events.list` without a cursor returns a cursor for "now". Later calls pass it as `after`,
 follow `hasMore`, and apply each `asset.*` event about a local listing by retrieving the
 current state; the event's snapshot is not trusted. An event about a photo refreshes its combined decision and extracted text. A title or
-description that is no longer `allowed` takes the listing down. The cursor advances only after a whole page is
+description that is no longer `allowed` or `limited` takes the listing down. The cursor advances only after a whole page is
 applied, so a failed retrieval retries the page. Events already applied are skipped, and
 events about a withdrawn listing change nothing.
 

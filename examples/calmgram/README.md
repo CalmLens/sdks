@@ -109,7 +109,7 @@ local app through `calmlens listen` (below).
 ### Webhooks (recommended)
 
 CalmLens tells your app when an image has been checked. In the portal, go to **Webhooks**, add
-`https://<your-app>/api/webhooks/calmlens`, subscribe to `asset.allowed`, `asset.age-restricted`, `asset.blocked`, `asset.purged` and
+`https://<your-app>/api/webhooks/calmlens`, subscribe to `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked`, `asset.purged` and
 `asset.failed` (the status events are sent for automated decisions and for reviewer decisions made
 in the portal), and put the secret in
 `CALMLENS_WEBHOOK_SECRET`. The handler reads the asset ID from the delivery's `data.assetId`.
@@ -143,7 +143,7 @@ for anything still pending.
                  come through the preset · classify the caption · save post as pending
                             ▲                               │
       webhook: asset.allowed, asset.blocked, …   or poll: assets.retrieve
-                            └──────── allowed → show in feed via CDN lens URL
+                            └──────── allowed, limited → show in feed via CDN lens URL
                                       age-restricted → show in feed: the lens URL with
                                         allowAgeRestricted=true if the viewer opted in, otherwise
                                         the /placeholder image and a notice
@@ -159,6 +159,7 @@ and a reviewer can change it later. The app only needs one field:
 | `classification.moderation.status` | Calmgram does |
 | --- | --- |
 | `allowed` | Publish |
+| `limited` | Publish, like `allowed`. The CDN serves it on the plain URL; the status only marks it so an app can reduce its reach, for example by keeping it out of recommendations |
 | `age-restricted` | Publish behind a placeholder. The CDN refuses the plain URL, so viewers who turned on **Show sensitive media** get the URL with `allowAgeRestricted=true`; everyone else, including signed-out visitors and the author with the setting off, gets the asset's blurred `/placeholder` image and a "Sensitive content" notice. The author also sees the status |
 | `blocked` | Don't publish; tell the author which category matched (from `classification.moderation`) |
 | `purged` | As `blocked`. CalmLens has also deleted the stored content |
@@ -167,7 +168,7 @@ and a reviewer can change it later. The app only needs one field:
 When `classification.status` is `failed`, Calmgram doesn't publish and asks the author to retry.
 
 Text has no sensitive view: a caption, comment or bio that comes back `age-restricted` is refused
-like any other text that isn't `allowed`.
+like any other text that isn't `allowed` or `limited`.
 
 ### Where to look
 

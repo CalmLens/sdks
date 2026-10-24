@@ -199,6 +199,14 @@ function Result({
       switch (state.asset.status) {
         case "allowed":
           return <Status tone="good" title="Allowed" detail="This photo can be shown." />;
+        case "limited":
+          return (
+            <Status
+              tone="good"
+              title="Limited"
+              detail="This photo can be shown, but keep it out of recommendations."
+            />
+          );
         case "age-restricted":
           return <AgeRestricted ageCheck={ageCheck} checking={checkingAge} onCheck={onCheckAge} />;
         case "blocked":

@@ -57,6 +57,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           "age-restrict": "age-restrict";
           allow: "allow";
           block: "block";
+          limit: "limit";
           purge: "purge";
         }>;
       }, zod.core.$strip>>>;
@@ -99,6 +100,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
+          limited: "limited";
           pending: "pending";
           purged: "purged";
         }>;
@@ -108,6 +110,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             "age-restricted": "age-restricted";
             allowed: "allowed";
             blocked: "blocked";
+            limited: "limited";
             purged: "purged";
           }>;
           note: zod.ZodNullable<zod.ZodString>;
@@ -7307,6 +7310,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "age-restrict": "age-restrict";
               allow: "allow";
               block: "block";
+              limit: "limit";
               purge: "purge";
             }>;
             source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -7331,6 +7335,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "age-restrict": "age-restrict";
                 allow: "allow";
                 block: "block";
+                limit: "limit";
                 purge: "purge";
               }>;
               allowances: zod.ZodArray<zod.ZodObject<{
@@ -7566,6 +7571,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "age-restrict": "age-restrict";
                   allow: "allow";
                   block: "block";
+                  limit: "limit";
                   purge: "purge";
                 }>;
               }, zod.core.$strict>>;
@@ -7802,6 +7808,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "age-restrict": "age-restrict";
                   allow: "allow";
                   block: "block";
+                  limit: "limit";
                   purge: "purge";
                 }>;
               }, zod.core.$strict>>;
@@ -7820,6 +7827,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             action: zod.ZodNullable<zod.ZodEnum<{
               "age-restrict": "age-restrict";
               block: "block";
+              limit: "limit";
               purge: "purge";
             }>>;
             flaggedCategories: zod.ZodArray<zod.ZodEnum<{

@@ -20,6 +20,7 @@ var Categories = []string{"sexual", "violence", "self-harm", "harassment", "hate
 // Segments mirror native analysis: 30-second chunks with a one-second overlap.
 var findings = map[string][]map[string]float64{
 	calmlens.ModerationStatusAllowed:       {{}, {}},
+	calmlens.ModerationStatusLimited:       {{}, {"harassment": 0.58}},
 	calmlens.ModerationStatusAgeRestricted: {{}, {"sexual": 0.72}},
 	calmlens.ModerationStatusBlocked:       {{"violence": 0.91}, {"violence": 0.47}},
 	calmlens.ModerationStatusPurged:        {{"criminal-activity": 0.94}, {}},

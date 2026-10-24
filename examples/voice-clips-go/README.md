@@ -43,7 +43,7 @@ selector lets you choose the outcome explicitly: allow, age-restrict, block, pur
 processing error. The clip stays pending for two seconds, then the selected outcome is
 written with a **simulated** report: a fixed 48-second duration and two overlapping
 `clip` segments with synthetic category scores. Nothing is decoded and no moderation
-model runs. Allowed demo clips play through the mock CDN, and a purged demo clip loses its
+model runs. Allowed and limited demo clips play through the mock CDN, and a purged demo clip loses its
 stored content.
 
 ## Live mode
@@ -111,7 +111,7 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   again before applying a decision. The browser's view of the upload is never used.
 - **Decisions.** Audio and video always return with moderation status `pending` and are
   processed in the background. A clip is decided once `Classification.Moderation.Status` is
-  no longer `pending` (`allowed`, `age-restricted`, `blocked` or `purged`), or
+  no longer `pending` (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`), or
   `Classification.Status` is `failed`. While a clip is pending, the page reloads every three seconds (never during
   an upload) and the server calls `Assets.Retrieve`; verified webhooks update a clip
   sooner.
@@ -119,7 +119,9 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   uses overlapping 30-second chunks (`source: "clip"`). Each segment lists the categories
   that were evaluated (or partially evaluated) with a score of at least 0.4 ("possible").
   A `not-evaluated` category is never shown as a zero score. Ranges are approximate.
-- **Playback.** Only an explicit `allowed` status plays. CalmLens delivers an
+- **Playback.** Only an explicit `allowed` or `limited` status plays. CalmLens delivers a
+  `limited` asset exactly like an allowed one and only marks it so your app can reduce its
+  reach; this app collapses a limited clip behind a "Show limited clip" control. CalmLens delivers an
   `age-restricted` asset only through signed URLs or API keys so your backend can put it
   behind an age check; this app has no age check, so it doesn't play those either. `blocked`
   and `purged` clips are never shown (a purged clip's content is deleted). The `/media` route retrieves
@@ -161,7 +163,7 @@ calmlens listen --forward-to http://127.0.0.1:6402/webhooks/calmlens
 ```
 
 The handler verifies the **exact raw body** before parsing JSON. For `asset.allowed`,
-`asset.age-restricted`, `asset.blocked` and `asset.purged` (sent for automated moderation
+`asset.limited`, `asset.age-restricted`, `asset.blocked` and `asset.purged` (sent for automated moderation
 outcomes and reviewer decisions alike) and `asset.failed`, it retrieves the clip's current state instead of trusting the event snapshot. If that
 retrieval fails it returns 502, so delivery is retried. A delivery that was already
 applied has no further effect, and a test send (fact `{ key: "test", value: true }`) is

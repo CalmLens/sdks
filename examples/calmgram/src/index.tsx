@@ -29,7 +29,7 @@ import { EXAMPLE_AUTHORS, exampleContentType } from "./examples";
 import { getModeration, isLoopbackHost, ModerationNotConfigured } from "./moderation";
 import { describeCalmLensError } from "./moderation/calmlens";
 import { readDemoPlaceholder, readDemoUpload } from "./moderation/demo";
-import { describeFindings, type ModerationStatus } from "./moderation/types";
+import { describeFindings, isShownToEveryone, type ModerationStatus } from "./moderation/types";
 import { encodePng } from "./png";
 import {
   currentSandbox,
@@ -528,7 +528,7 @@ app.get("/p/:id", async (c) => {
   const message = await takeFlash(c.env, sandbox);
   const comments = feed.comments.filter((comment) => comment.postId === post.id);
   const visible = comments
-    .filter((comment) => comment.status === "allowed")
+    .filter((comment) => isShownToEveryone(comment.status))
     .sort((a, b) => a.createdAt - b.createdAt);
 
   return page(
@@ -887,7 +887,8 @@ app.get("/api/posts/:id/status", async (c) => {
 });
 
 // Configure in CalmLens: Portal → Webhooks → https://<your-app>/api/webhooks/calmlens
-// Subscribe to asset.allowed, asset.age-restricted, asset.blocked, asset.purged and asset.failed.
+// Subscribe to asset.allowed, asset.limited, asset.age-restricted, asset.blocked, asset.purged and
+// asset.failed.
 // There is one event per moderation status, from automated moderation or a reviewer in the
 // portal; the decided-by fact says which.
 app.post("/api/webhooks/calmlens", async (c) => {

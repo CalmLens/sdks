@@ -10,6 +10,7 @@ const MESSAGES: Record<string, string> = {
   checking: "Checking your photo…",
   pending: "Uploaded. We'll show it once it has been checked.",
   allowed: "Uploaded.",
+  limited: "Uploaded.",
   "age-restricted": "Uploaded. It will only be shown to people who can see sensitive content.",
   blocked: "This photo can't be used because it may break our community guidelines.",
   purged: "This photo can't be used because it breaks our community guidelines.",

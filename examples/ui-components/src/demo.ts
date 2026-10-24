@@ -6,7 +6,7 @@ export const projectId: string = import.meta.env.VITE_CALMLENS_PROJECT_ID ?? "yo
 export type DemoPost = {
   id: string;
   assetId: string;
-  status: "allowed" | "age-restricted" | "blocked";
+  status: "allowed" | "limited" | "age-restricted" | "blocked";
   alt: string;
   aspectRatio: number;
 };

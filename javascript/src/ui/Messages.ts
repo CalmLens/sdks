@@ -18,6 +18,7 @@ export interface CalmLensMessages {
   submitted: string;
   pending: string;
   allowed: string;
+  limited: string;
   "age-restricted": string;
   blocked: string;
   purged: string;
@@ -47,6 +48,7 @@ export const DEFAULT_MESSAGES: CalmLensMessages = {
   submitted: "Uploaded.",
   pending: "Uploaded. It will be shown once it has been checked.",
   allowed: "Uploaded.",
+  limited: "Uploaded.",
   "age-restricted": "Uploaded. It will only be shown to people who can see sensitive content.",
   blocked: "This file can't be used because it may break our community guidelines.",
   purged: "This file can't be used because it breaks our community guidelines.",

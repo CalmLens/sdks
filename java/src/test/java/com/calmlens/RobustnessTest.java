@@ -207,6 +207,8 @@ class RobustnessTest {
     assertEquals(0.5, asset.metadata().get(2).value());
     assertEquals(java.time.Instant.ofEpochMilli(1700000000123L), asset.createdAt());
     assertSame(Models.AssetModerationStatus.AGE_RESTRICTED, Models.AssetModerationStatus.of("age-restricted"));
+    assertSame(Models.AssetModerationStatus.LIMITED, Models.AssetModerationStatus.of("limited"));
+    assertSame(Models.AssetModerationDecision.LIMITED, Models.AssetModerationDecision.of("limited"));
     assertSame(Models.AssetClassificationStatus.FAILED, Models.AssetClassificationStatus.of("failed"));
     assertSame(Models.AssetContentStatus.REMOVED, Models.AssetContentStatus.of("removed"));
     assertThrows(UnsupportedOperationException.class, () -> asset.metadata().add(new Models.MetadataItem("x", 1)));

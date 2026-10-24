@@ -2,6 +2,7 @@ package calmmarket;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,7 +79,9 @@ final class Page {
     html.append("<button type=\"submit\">Submit for review</button></form><div>");
 
     html.append("<section aria-labelledby=\"market\" style=\"margin-top:0\"><h2 id=\"market\">On the market</h2><div class=\"market\">");
-    List<Calmmarket.Listing> visible = listings.stream().filter(listing -> listing.locked(listing::visible)).toList();
+    // Listings with a limited photo are shown, but ranked after the others.
+    List<Calmmarket.Listing> visible = listings.stream().filter(listing -> listing.locked(listing::visible))
+        .sorted(Comparator.comparing((Calmmarket.Listing listing) -> listing.locked(listing::limited))).toList();
     if (visible.isEmpty()) html.append("<p class=\"empty\">No allowed listings yet.</p>");
     for (Calmmarket.Listing listing : visible) listing.locked(() -> card(html, app, listing));
     html.append("</div></section>");

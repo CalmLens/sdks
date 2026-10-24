@@ -160,7 +160,8 @@ h2 {
   border: 1px solid var(--line);
   white-space: nowrap;
 }
-.chip[data-status="allowed"] {
+.chip[data-status="allowed"],
+.chip[data-status="limited"] {
   border-color: #12a26f;
 }
 .chip[data-status="age-restricted"] {

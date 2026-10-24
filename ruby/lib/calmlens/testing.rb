@@ -75,7 +75,7 @@ module CalmLens
     #   increasing `createdAt` and order predictably. A clock you pass is used as is.
     # @param create_id [#call] returns a new ID.
     # @param queued_outcome [String] the outcome of assets created with {Assets#create}: `pending`
-    #   (processing, moderation pending), `allowed`, `age-restricted`, `blocked` or `purged` (processing
+    #   (processing, moderation pending), `allowed`, `limited`, `age-restricted`, `blocked` or `purged` (processing
     #   done with that moderation status; `purged` also removes the content) or `failed` (processing
     #   failed, retryable).
     # @param analyzed_outcome [String, Hash, #call] the result of {Assets#classify}: an outcome, fields
@@ -107,7 +107,7 @@ module CalmLens
     # status changes (`purged` also removes the content), the review joins `manualReviews`, and an
     # `asset.<decision>` event with a `decided-by: reviewer` fact joins the events feed.
     # @param asset_id [String]
-    # @param decision [String] `allowed`, `age-restricted`, `blocked` or `purged`
+    # @param decision [String] `allowed`, `limited`, `age-restricted`, `blocked` or `purged`
     # @return [Hash] the asset
     # @raise [APIError] `asset/not-found` for an unknown asset
     def decide(asset_id, decision)

@@ -64,6 +64,16 @@ class DemoFlowTests(unittest.TestCase):
                          [("plaintext-document", "blocked", ["criminal-activity"]), ("image", "allowed", [])])
         self.assertIsNone(broken["explanation"])
 
+    def test_limited_page_is_linked_like_an_allowed_one_and_explains_the_decision(self):
+        board, clock = demo_board()
+        board.submit("https://example.com/borderline", "Look", "limited")
+        clock.now = 5
+        board.refresh()
+        link = board.links[0]
+        self.assertEqual(link["status"], "limited")
+        self.assertEqual(link["explanation"]["found"], [("criminal-activity", 0.48)])
+        self.assertEqual(clickable(board), [b"https://example.com/borderline"])
+
     def test_age_restricted_page_is_not_linked_and_lists_its_findings(self):
         board, clock = demo_board()
         board.submit("https://example.com/edgy", "Look", "age-restricted")

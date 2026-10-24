@@ -38,8 +38,9 @@ const client = new CalmLensServerClient({
 // Text (comments, captions, bios): waits for the decision
 const comment = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 
-if (comment.classification.moderation.status === "allowed") {
-  // publish it
+const { status } = comment.classification.moderation;
+if (status === "allowed" || status === "limited") {
+  // publish it; keep "limited" out of recommendations, trending and notifications
 } else {
   // "age-restricted": show it only behind your own age check; "blocked" or "purged": don't publish it
 }
@@ -151,7 +152,7 @@ Both resolve to the stored `Asset`, a plain object with camelCase keys exactly a
 const asset = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 asset.id;            // string
 asset.classification.status;  // "pending" | "processing" | "completed" | "failed"; audio and video keep processing in the background
-asset.classification.moderation.status;  // "pending" | "allowed" | "age-restricted" | "blocked" | "purged"
+asset.classification.moderation.status;  // "pending" | "allowed" | "limited" | "age-restricted" | "blocked" | "purged"
 asset.classification.moderation?.score;                         // number, the overall score
 asset.classification.moderation.categories?.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
 asset.content.status;     // "temporary" | "stored" | "removed"
@@ -332,7 +333,8 @@ is no longer `pending`, or `classification.status` is `failed`. The SDK checks t
 ```typescript
 const queued = await client.assets.create({ name: "photo.jpg", content: { blob, type: "image/jpeg" } });
 const decided = await client.assets.waitForDecision({ assetId: queued.id, timeoutMs: 30_000 });
-if (decided.classification.moderation.status !== "allowed") hidePhoto(decided.id);
+const { status } = decided.classification.moderation;
+if (status !== "allowed" && status !== "limited") hidePhoto(decided.id);
 ```
 
 ##### folders.list(options)
@@ -641,7 +643,7 @@ Upload, classification and content each have a status; moderation has its own de
 
 - `upload.status`: `uploading` while source content is arriving, then `completed`
 - `classification.status`: `pending`, `processing`, `completed` or `failed`
-- `classification.moderation.status`: `pending` until moderation finishes, then `allowed`, `age-restricted` (delivered only through signed URLs, API keys or URLs built with `allowAgeRestricted: true`), `blocked` (not delivered) or `purged` (not delivered, content deleted). The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision; each review's `decision` is one of the four decided statuses.
+- `classification.moderation.status`: `pending` until moderation finishes, then `allowed`, `limited` (delivered like `allowed`, but marked so your app can reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it lower or collapsing it), `age-restricted` (delivered only through signed URLs, API keys or URLs built with `allowAgeRestricted: true`), `blocked` (not delivered) or `purged` (not delivered, content deleted). The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision; each review's `decision` is one of the five decided statuses.
 - `content.status`: `temporary` (kept only until processing finishes), `stored` or `removed`, with `content.removalReason` `policy` (purged), `retention` (`keepContentAfterProcessing` off), `requested`, `parent-removed` or `disposed`
 
 ## Moderation Reports
@@ -746,7 +748,7 @@ const client = new MockCalmLensServerClient({
 
 `MockCalmLensServerClient` accepts the same options as `CalmLensServerClient` (`apiKey`, `projectId`, `baseUrl`, `cdnBaseUrl`, `timeoutMs`, ...) and validates them the same way, plus `mockOptions`. `cdn.getAssetUrl` uses `cdnBaseUrl` (default `mock://calmlens/v1`).
 
-It behaves like the API where tests depend on it: errors carry the API's code, HTTP `status`, a `requestId` and `headers`; `assets.list` applies `ordering`, `folderId` and `filter` expressions (comparisons joined by `;`, which binds tighter than `,`, and grouped with parentheses; anything else throws `sdk/invalid-argument` rather than returning wrong results), with cursors that resume after the last asset returned; `assets.search` runs the API's keyword search, where every word must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status, with the API's scores and `matchedFields`; assets created in a row get increasing `createdAt` values; multipart parts must arrive in order and the queue mode chosen at the start applies to the final part; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, `purged` removes it with reason `policy`, and `assets.deleteContent` removes it with reason `requested`; a reused `idempotencyKey` replays the first result; and `cdn.serve` returns CDN-like responses with JSON error bodies: blocked, purged and failed assets and removed content get `403` `asset/not-available` whatever the key, then private assets, and age-restricted ones requested without `allowAgeRestricted: true`, get `403` `asset/api-key-missing-permission` unless the key has `assets:download` (keys from `createMockApiKey()` have no grants); a public asset's `placeholder` is served whatever its status unless it was purged. `client.decide(assetId, decision)` applies a reviewer's decision (`allowed`, `age-restricted`, `blocked` or `purged`) and adds the matching `asset.<decision>` event with a `decided-by: reviewer` fact, and `assets.waitForDecision` takes no real time, failing with `sdk/timeout` straight away for an asset that stays pending. `queuedOutcome` and `analyzedOutcome` can also be functions of the new asset, for example to decide from its name. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
+It behaves like the API where tests depend on it: errors carry the API's code, HTTP `status`, a `requestId` and `headers`; `assets.list` applies `ordering`, `folderId` and `filter` expressions (comparisons joined by `;`, which binds tighter than `,`, and grouped with parentheses; anything else throws `sdk/invalid-argument` rather than returning wrong results), with cursors that resume after the last asset returned; `assets.search` runs the API's keyword search, where every word must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status, with the API's scores and `matchedFields`; assets created in a row get increasing `createdAt` values; multipart parts must arrive in order and the queue mode chosen at the start applies to the final part; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `limited`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, `purged` removes it with reason `policy`, and `assets.deleteContent` removes it with reason `requested`; a reused `idempotencyKey` replays the first result; and `cdn.serve` returns CDN-like responses with JSON error bodies: blocked, purged and failed assets and removed content get `403` `asset/not-available` whatever the key, then private assets, and age-restricted ones requested without `allowAgeRestricted: true`, get `403` `asset/api-key-missing-permission` unless the key has `assets:download` (keys from `createMockApiKey()` have no grants); a public asset's `placeholder` is served whatever its status unless it was purged. `client.decide(assetId, decision)` applies a reviewer's decision (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`) and adds the matching `asset.<decision>` event with a `decided-by: reviewer` fact, and `assets.waitForDecision` takes no real time, failing with `sdk/timeout` straight away for an asset that stays pending. `queuedOutcome` and `analyzedOutcome` can also be functions of the new asset, for example to decide from its name. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
 
 Every call is recorded in `client.calls` as `{ operation, options }`, where `operation` is the method path (`"text.classify"`, `"assets.retrieve"`, `"events.list"`, ...) and `options` is the object you passed. `client.callsTo(operation)` filters them. To test failure handling, `client.failNextRequest()` makes the next call throw the same `CalmLensError` the real client throws when the network fails (`sdk/transport-error`); pass `"timeout"` for `sdk/timeout`, or any `Error` to throw it as is, and `{ operation }` to fail only that method. Each queued failure is used once.
 

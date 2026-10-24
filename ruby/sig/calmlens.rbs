@@ -251,8 +251,8 @@ module CalmLens
       def call: () -> String
     end
 
-    # Where a mock upload ends up: `pending` (still processing), `allowed`, `age-restricted`, `blocked`
-    # or `purged` (processing done with that moderation status; `purged` also removes the content),
+    # Where a mock upload ends up: `pending` (still processing), `allowed`, `limited`, `age-restricted`,
+    # `blocked` or `purged` (processing done with that moderation status; `purged` also removes the content),
     # or `failed` (processing failed, retryable).
     type outcome = "pending" | asset_moderation_decision | "failed"
 

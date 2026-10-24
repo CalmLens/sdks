@@ -3,7 +3,7 @@
   import SensitiveImage from "./SensitiveImage.svelte";
 
   type Post = { id: string; assetId: string; status: AssetModerationStatus; alt: string; aspectRatio: number };
-  type ShownPost = Post & { status: "allowed" | "age-restricted" };
+  type ShownPost = Post & { status: "allowed" | "limited" | "age-restricted" };
   type Props = {
     projectId: string;
     posts: Post[];
@@ -12,7 +12,7 @@
   };
   let { projectId, posts, viewer, onReveal }: Props = $props();
   const shown = $derived(
-    posts.filter((post): post is ShownPost => post.status === "allowed" || post.status === "age-restricted"),
+    posts.filter((post): post is ShownPost => post.status === "allowed" || post.status === "limited" || post.status === "age-restricted"),
   );
 </script>
 

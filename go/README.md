@@ -124,9 +124,14 @@ report decisions without polling:
 
 ```go
 queued, err := client.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.jpg", Content: &calmlens.Content{Type: "image/jpeg", Data: file}})
-decided, err := client.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: 30 * time.Second})
-if err == nil && decided.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
-    blockPhoto(decided.ID)
+decided, err := client.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: calmlens.Ptr(30 * time.Second)})
+if err == nil {
+    switch decided.Classification.Moderation.Status {
+    case calmlens.ModerationStatusAllowed, calmlens.ModerationStatusLimited:
+        // delivered normally; a limited photo is only marked so you can reduce its reach
+    default:
+        blockPhoto(decided.ID)
+    }
 }
 ```
 
@@ -186,6 +191,8 @@ if err != nil { return err }
 switch asset.Classification.Moderation.Status {
 case calmlens.ModerationStatusAllowed:
     publish(comment)
+case calmlens.ModerationStatusLimited:
+    publishWithReducedReach(comment) // delivered normally; keep it out of recommendations and trending
 case calmlens.ModerationStatusAgeRestricted:
     publishBehindAgeGate(comment) // deliver only through signed URLs to verified adults
 default:
@@ -502,7 +509,7 @@ over an in-memory transport. Its `Options` accept the same `APIKey`, `ProjectID`
 `BaseURL`, `CDNBaseURL`, `Timeout` and `MaxRetries` as `calmlens.Options` (validated the
 same way), plus database/content storage, deterministic IDs/timestamps, upload outcomes
 (`QueuedOutcome`, default `OutcomePending`, for `Create`; `AnalyzedOutcome`, default
-`OutcomeAllowed`, for `Classify`; each `OutcomePending`, `OutcomeAllowed`,
+`OutcomeAllowed`, for `Classify`; each `OutcomePending`, `OutcomeAllowed`, `OutcomeLimited`,
 `OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:
 
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
@@ -533,8 +540,11 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
   CDN, blocked, purged and failed assets and removed content return 403 `asset/not-available`
   whatever the key. A private asset, or a public age-restricted one requested without
   `AllowAgeRestricted: true`, returns 403 `asset/api-key-missing-permission` unless the key has
-  the `assets:download` permission; the default key has no grants.
-- `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeAgeRestricted`,
+  the `assets:download` permission; the default key has no grants, and `SetAPIKeyGrants`
+  replaces them (the key stays the same). The placeholder is served for public images whatever
+  their moderation, and refused once purged or removed, and for private images without the
+  permission.
+- `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeLimited`, `OutcomeAgeRestricted`,
   `OutcomePurged`) applies a reviewer's decision and adds the matching `asset.<decision>` event
   with a `decided-by: reviewer` fact.
 - Waits take no real time: retry backoff and `Assets.WaitForDecision` only advance the mock

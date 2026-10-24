@@ -34,6 +34,10 @@ const (
 	ModerationStatusPending = "pending"
 	// ModerationStatusAllowed assets are delivered normally.
 	ModerationStatusAllowed = "allowed"
+	// ModerationStatusLimited assets are delivered exactly like allowed ones, but marked so your
+	// app can reduce their reach: keep them out of recommendations, trending and notifications,
+	// rank them lower or collapse them behind a "show" control.
+	ModerationStatusLimited = "limited"
 	// ModerationStatusAgeRestricted assets are delivered only through signed URLs or API keys,
 	// like private assets, so your backend decides who sees them.
 	ModerationStatusAgeRestricted = "age-restricted"
@@ -47,6 +51,7 @@ const (
 // later still decode.
 const (
 	ModerationDecisionAllowed       = "allowed"
+	ModerationDecisionLimited       = "limited"
 	ModerationDecisionAgeRestricted = "age-restricted"
 	ModerationDecisionBlocked       = "blocked"
 	ModerationDecisionPurged        = "purged"
@@ -94,10 +99,11 @@ const (
 )
 
 // Policy action values of FlaggedContentPolicy.Action, CategoryPolicyScore.Action and policy
-// rules. ReportPolicyDecision.Action is ModerationActionAgeRestrict, ModerationActionBlock or
-// ModerationActionPurge, or nil when nothing was acted on.
+// rules. ReportPolicyDecision.Action is ModerationActionLimit, ModerationActionAgeRestrict,
+// ModerationActionBlock or ModerationActionPurge, or nil when nothing was acted on.
 const (
 	ModerationActionAllow       = "allow"
+	ModerationActionLimit       = "limit"
 	ModerationActionAgeRestrict = "age-restrict"
 	ModerationActionBlock       = "block"
 	ModerationActionPurge       = "purge"
@@ -265,8 +271,9 @@ type ProcessingOptions struct {
 }
 
 // FlaggedContentPolicy is what happens when the asset is flagged. Action is one of the
-// ModerationAction constants: allow takes no action, age-restrict delivers the asset only through
-// signed URLs or API keys, block stops delivery while retaining content and purge deletes content.
+// ModerationAction constants: allow takes no action, limit delivers the asset normally but marks it
+// so your app can reduce its reach, age-restrict delivers the asset only through signed URLs or
+// API keys, block stops delivery while retaining content and purge deletes content.
 type FlaggedContentPolicy struct {
 	Action string `json:"action"`
 }
@@ -328,7 +335,7 @@ const (
 )
 
 // CategoryPolicyScore is how strongly a category meets the policy, from 0 to 1, and the action
-// the policy takes: allow, age-restrict, block or purge.
+// the policy takes: allow, limit, age-restrict, block or purge.
 type CategoryPolicyScore struct {
 	Score    float64                         `json:"score"`
 	Action   string                          `json:"action"`

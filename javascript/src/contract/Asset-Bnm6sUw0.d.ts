@@ -1,4 +1,4 @@
-import "./AssetModerationDecision-BzFBTVPm.js";
+import "./AssetModerationDecision-BZ_vVYoX.js";
 import * as zod from "zod";
 //#region packages/shared/src/Asset.d.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
@@ -17,6 +17,7 @@ declare const ASSET_MODERATION_STATUS_SCHEMA: zod.ZodEnum<{
   "age-restricted": "age-restricted";
   allowed: "allowed";
   blocked: "blocked";
+  limited: "limited";
   pending: "pending";
   purged: "purged";
 }>;
@@ -99,6 +100,7 @@ declare const PROCESSING_OPTIONS_SCHEMA: zod.ZodOptional<zod.ZodNullable<zod.Zod
       "age-restrict": "age-restrict";
       allow: "allow";
       block: "block";
+      limit: "limit";
       purge: "purge";
     }>;
   }, zod.core.$strip>>>;
@@ -131,6 +133,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
     "age-restricted": "age-restricted";
     allowed: "allowed";
     blocked: "blocked";
+    limited: "limited";
     pending: "pending";
     purged: "purged";
   }>;
@@ -140,6 +143,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
       "age-restricted": "age-restricted";
       allowed: "allowed";
       blocked: "blocked";
+      limited: "limited";
       purged: "purged";
     }>;
     note: zod.ZodNullable<zod.ZodString>;
@@ -7339,6 +7343,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "age-restrict": "age-restrict";
         allow: "allow";
         block: "block";
+        limit: "limit";
         purge: "purge";
       }>;
       source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -7363,6 +7368,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "age-restrict": "age-restrict";
           allow: "allow";
           block: "block";
+          limit: "limit";
           purge: "purge";
         }>;
         allowances: zod.ZodArray<zod.ZodObject<{
@@ -7598,6 +7604,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "age-restrict": "age-restrict";
             allow: "allow";
             block: "block";
+            limit: "limit";
             purge: "purge";
           }>;
         }, zod.core.$strict>>;
@@ -7834,6 +7841,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "age-restrict": "age-restrict";
             allow: "allow";
             block: "block";
+            limit: "limit";
             purge: "purge";
           }>;
         }, zod.core.$strict>>;
@@ -7852,6 +7860,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
       action: zod.ZodNullable<zod.ZodEnum<{
         "age-restrict": "age-restrict";
         block: "block";
+        limit: "limit";
         purge: "purge";
       }>>;
       flaggedCategories: zod.ZodArray<zod.ZodEnum<{
@@ -7882,6 +7891,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
       "age-restricted": "age-restricted";
       allowed: "allowed";
       blocked: "blocked";
+      limited: "limited";
       pending: "pending";
       purged: "purged";
     }>;
@@ -7891,6 +7901,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
+        limited: "limited";
         purged: "purged";
       }>;
       note: zod.ZodNullable<zod.ZodString>;
@@ -15090,6 +15101,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "age-restrict": "age-restrict";
           allow: "allow";
           block: "block";
+          limit: "limit";
           purge: "purge";
         }>;
         source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -15114,6 +15126,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "age-restrict": "age-restrict";
             allow: "allow";
             block: "block";
+            limit: "limit";
             purge: "purge";
           }>;
           allowances: zod.ZodArray<zod.ZodObject<{
@@ -15349,6 +15362,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "age-restrict": "age-restrict";
               allow: "allow";
               block: "block";
+              limit: "limit";
               purge: "purge";
             }>;
           }, zod.core.$strict>>;
@@ -15585,6 +15599,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "age-restrict": "age-restrict";
               allow: "allow";
               block: "block";
+              limit: "limit";
               purge: "purge";
             }>;
           }, zod.core.$strict>>;
@@ -15603,6 +15618,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
         action: zod.ZodNullable<zod.ZodEnum<{
           "age-restrict": "age-restrict";
           block: "block";
+          limit: "limit";
           purge: "purge";
         }>>;
         flaggedCategories: zod.ZodArray<zod.ZodEnum<{
@@ -15770,6 +15786,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         "age-restrict": "age-restrict";
         allow: "allow";
         block: "block";
+        limit: "limit";
         purge: "purge";
       }>;
     }, zod.core.$strip>>>;
@@ -15812,6 +15829,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
+        limited: "limited";
         pending: "pending";
         purged: "purged";
       }>;
@@ -15821,6 +15839,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
+          limited: "limited";
           purged: "purged";
         }>;
         note: zod.ZodNullable<zod.ZodString>;
@@ -23020,6 +23039,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "age-restrict": "age-restrict";
             allow: "allow";
             block: "block";
+            limit: "limit";
             purge: "purge";
           }>;
           source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -23044,6 +23064,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "age-restrict": "age-restrict";
               allow: "allow";
               block: "block";
+              limit: "limit";
               purge: "purge";
             }>;
             allowances: zod.ZodArray<zod.ZodObject<{
@@ -23279,6 +23300,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "age-restrict": "age-restrict";
                 allow: "allow";
                 block: "block";
+                limit: "limit";
                 purge: "purge";
               }>;
             }, zod.core.$strict>>;
@@ -23515,6 +23537,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "age-restrict": "age-restrict";
                 allow: "allow";
                 block: "block";
+                limit: "limit";
                 purge: "purge";
               }>;
             }, zod.core.$strict>>;
@@ -23533,6 +23556,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
           action: zod.ZodNullable<zod.ZodEnum<{
             "age-restrict": "age-restrict";
             block: "block";
+            limit: "limit";
             purge: "purge";
           }>>;
           flaggedCategories: zod.ZodArray<zod.ZodEnum<{

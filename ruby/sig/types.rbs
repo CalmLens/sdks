@@ -28,9 +28,10 @@ module CalmLens
   # Where the asset is in the pipeline.
   type asset_classification_status = "pending" | "processing" | "completed" | "failed"
   # A moderation decision, which also decides delivery: served to anyone with access (`allowed`),
-  # only through signed URLs or API keys (`age-restricted`), not served (`blocked`), or not served
-  # with the stored content deleted (`purged`).
-  type asset_moderation_decision = "allowed" | "age-restricted" | "blocked" | "purged"
+  # served like `allowed` but marked so your app reduces its reach (`limited`), only through signed
+  # URLs or API keys (`age-restricted`), not served (`blocked`), or not served with the stored
+  # content deleted (`purged`).
+  type asset_moderation_decision = "allowed" | "limited" | "age-restricted" | "blocked" | "purged"
   # The decision in force: `pending` until classification decides, then a reviewer's decision when
   # there is one, else the policy's.
   type asset_moderation_status = "pending" | asset_moderation_decision
@@ -434,8 +435,8 @@ module CalmLens
 
   # EVENT_TYPES in EventCatalog.ts. Ignore types your code does not handle. Webhook, Slack and email
   # deliveries and the public events feed leave out facts that hold personal or account data.
-  type event_type = "asset.uploaded" | "asset.classified" | "asset.allowed" | "asset.age-restricted" |
-                    "asset.blocked" | "asset.purged" | "asset.failed" | "asset.deleted" | "asset.content-removed" | "asset.retried" |
+  type event_type = "asset.uploaded" | "asset.classified" | "asset.allowed" | "asset.limited" |
+                    "asset.age-restricted" | "asset.blocked" | "asset.purged" | "asset.failed" | "asset.deleted" | "asset.content-removed" | "asset.retried" |
                     "asset.review-requested" | "usage.limit-reached" | "usage.spend-limit-reached" |
                     "upload-preset.daily-limit-reached" | "project.member-joined" | "project.member-removed" |
                     "project.member-role-changed" | "project.invitation-sent" | "api-key.created" |

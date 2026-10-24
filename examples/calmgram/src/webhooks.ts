@@ -9,6 +9,7 @@
 const ASSET_DECISION_EVENTS = new Set([
   "asset.failed",
   "asset.allowed",
+  "asset.limited",
   "asset.age-restricted",
   "asset.blocked",
   "asset.purged",

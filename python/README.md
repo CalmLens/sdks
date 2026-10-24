@@ -193,9 +193,10 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
 `projectId`, `name`, `type`, `createdAt` and three nested objects are always present:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and `manualReviews` (each with a reviewer's `decision`: `allowed`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and `manualReviews` (each with a reviewer's `decision`: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
   `status` is `pending` until moderation decides, then:
   - `allowed`: show the content.
+  - `limited`: delivered like `allowed`, but reduce its reach: keep it out of recommendations, trending and notifications, rank it lower or collapse it.
   - `age-restricted`: delivered only through signed URLs or API keys; show it only behind your own age gate.
   - `blocked`: not delivered, content kept; don't show it.
   - `purged`: not delivered and stored content deleted; don't show it.
@@ -386,7 +387,7 @@ headers = create_webhook_headers(body, "delivery-1", webhook_secret)
 assert verify_webhook_signature(body, headers=headers, secret=webhook_secret)
 ```
 
-Moderation decisions arrive as `asset.allowed`, `asset.age-restricted`, `asset.blocked` and
+Moderation decisions arrive as `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked` and
 `asset.purged` events (`asset.classified` reports each finished classification); the event's
 `asset.classification.moderation.status` holds the status. A `not-evaluated` category has no
 safe zero score and must not be treated as allowed coverage.
@@ -468,10 +469,10 @@ and `signed_url_base_url`. Unknown mock options raise.
 
 - `queued_outcome` (default `pending`) applies to `assets.create` and queued multipart uploads;
   `analyzed_outcome` (default `allowed`) to `assets.classify` and `text.classify`. An outcome
-  is `pending` (processing `processing`, moderation `pending`), `allowed`, `age-restricted`,
+  is `pending` (processing `processing`, moderation `pending`), `allowed`, `limited`, `age-restricted`,
   `blocked` or `purged` (processing `completed` with that moderation status; `purged` also
   removes the content with `removalReason` `policy`) or `failed` (processing `failed`, retryable).
-  `cdn.serve` treats an `age-restricted` asset like a private one: it needs the
+  `cdn.serve` serves a `limited` asset like an `allowed` one, and treats an `age-restricted` asset like a private one: it needs the
   `assets:download` permission, unless a public one is requested with `allow_age_restricted=True`.
 - Like the API, content is `stored` when `processingOptions.keepContentAfterProcessing` is
   `True`; otherwise it is `temporary` and is removed (`removalReason` `retention`) once
@@ -490,7 +491,7 @@ and `signed_url_base_url`. Unknown mock options raise.
   exception as `__cause__`).
 - `client.enqueue_event(type, facts=..., asset_id=..., severity=..., title=...)` adds an event
   to the feed; `events.list`, `events.iter` and cursors behave like the API's.
-- `client.decide(asset_id, decision)` applies a reviewer's decision (`allowed`,
+- `client.decide(asset_id, decision)` applies a reviewer's decision (`allowed`, `limited`,
   `age-restricted`, `blocked` or `purged`, which also removes the content) and adds the matching
   `asset.<decision>` event with a `decided-by: reviewer` fact.
 - `cdn.serve` answers like the CDN: blocked, purged and failed assets and removed content get

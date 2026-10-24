@@ -122,23 +122,25 @@ export interface MockCalmLensServerClientOptions extends CalmLensServerClientOpt
 }
 
 /**
- * Where a mock upload ends up: `pending` (still processing), `allowed`, `age-restricted`, `blocked`
- * or `purged` (processing done with that moderation status; `purged` also removes the content),
+ * Where a mock upload ends up: `pending` (still processing), `allowed`, `limited`, `age-restricted`,
+ * `blocked` or `purged` (processing done with that moderation status; `purged` also removes the content),
  * or `failed` (processing failed, retryable).
  */
 export type MockAssetOutcome =
   | "pending"
   | "allowed"
+  | "limited"
   | "age-restricted"
   | "blocked"
   | "purged"
   | "failed";
 
 /** A reviewer's decision for `decide`: the moderation status it gives the asset. */
-export type MockReviewDecision = "allowed" | "age-restricted" | "blocked" | "purged";
+export type MockReviewDecision = "allowed" | "limited" | "age-restricted" | "blocked" | "purged";
 
 const REVIEW_DECISIONS: readonly MockReviewDecision[] = [
   "allowed",
+  "limited",
   "age-restricted",
   "blocked",
   "purged",
@@ -335,8 +337,8 @@ export class MockCalmLensServerClient {
     const stored = await this.databaseStorage.updateAsset(decided);
     this.enqueueEvent({
       type: `asset.${decision}`,
-      // Like the event catalog: only allowing is low severity.
-      severity: decision === "allowed" ? "low" : "high",
+      // Like the event catalog: only allowing and limiting are low severity.
+      severity: decision === "allowed" || decision === "limited" ? "low" : "high",
       title: `asset.${decision}`,
       assetId: stored.id,
       asset: {

@@ -17,26 +17,28 @@ moderation:
   it between folders with `assets().move_asset`.
 - **Listing.** Each folder lists 12 images a page with `assets().list`, using `cursor`,
   `folder_id` and a `filter` built only from fixed values: `parentId==null`, optionally with
-  one status: `classification.moderation.status==allowed`, `==age-restricted`, `==blocked` or
+  one status: `classification.moderation.status==allowed`, `==limited`, `==age-restricted`, `==blocked` or
   `==purged`, `classification.moderation.status==pending;classification.status!=failed` for
   images in review, or `classification.status==failed`. See
   [Pagination and filtering](https://calmlens.com/docs/guides/pagination-and-filtering).
 - **Search.** Describe an image in natural language with `assets().search` in `hybrid`,
   `keyword` or `semantic` mode. Results show `semanticStatus` and each item's `matchedFields`.
   Search never returns blocked, purged, safety-held or removed content.
-- **Delivery.** Only an image whose `classification.moderation.status` is `allowed` and whose
+- **Delivery.** Only an image whose `classification.moderation.status` is `allowed` or `limited` and whose
   `content.status` is `stored` gets a thumbnail or a download. Each request retrieves the asset's current state, calls `ensure_lens` for a 320px
   square thumbnail lens (`calmlibrary-thumb`) or a 1600px web lens (`calmlibrary-web`), and
   redirects to a 60-second signed URL from `assets().create_signed_url`. Pending, blocked,
   purged and failed images never get either. CalmLens delivers `age-restricted` images only
   through signed URLs or API keys so an app can show them behind its own age check; this team
-  library has no age check, so it doesn't deliver them either.
+  library has no age check, so it doesn't deliver them either. CalmLens delivers `limited`
+  images like allowed ones and marks them so an app can reduce their reach; this library has no
+  recommendations or feeds, so it shows them like allowed images.
 - **Lifecycle.** **Remove file** calls `assets().delete_content`: the record, its metadata and
   classification results stay, `content.status` becomes `removed`, and the CDN stops serving the
   content. **Delete** calls
   `assets().delete` and removes the asset.
 - **Moderation decisions.** Verified webhooks for `asset.classified`, `asset.allowed`,
-  `asset.age-restricted`, `asset.blocked`, `asset.purged` (sent for automated and reviewer
+  `asset.limited`, `asset.age-restricted`, `asset.blocked`, `asset.purged` (sent for automated and reviewer
   decisions alike, with a `decided-by` fact saying which) and `asset.failed` refresh the asset
   from the API and log its status.
 
@@ -69,8 +71,8 @@ API. Demo mode does not use the SDK's test mock.
 Each upload takes the moderation outcome you select: **Allow**, **Age-restrict**, **Block**,
 **Purge** or **Processing error**. Nothing is classified. A demo upload stays in review for two
 seconds, then takes the selected outcome when the page refreshes; **Purge** also deletes the
-kept file, with removal reason `policy`. Allowed demo images are served from the bytes the app
-kept. An allowed image offers **Simulate a reviewer blocking it**, which applies a synthetic
+kept file, with removal reason `policy`. Allowed and limited demo images are served from the bytes
+the app kept. An allowed or limited image offers **Simulate a reviewer blocking it**, which applies a synthetic
 `asset.blocked` event through the same code as a webhook.
 
 Demo search results are **simulated** and labelled as such: local keyword matching over names,

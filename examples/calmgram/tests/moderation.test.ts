@@ -9,6 +9,7 @@ test("preserves pending and failed decisions without inventing safe scores", () 
     { processing: "processing", moderation: "pending", expected: "pending" },
     { processing: "failed", moderation: "pending", expected: "error" },
     { processing: "completed", moderation: "allowed", expected: "allowed" },
+    { processing: "completed", moderation: "limited", expected: "limited" },
     { processing: "completed", moderation: "age-restricted", expected: "age-restricted" },
     { processing: "completed", moderation: "blocked", expected: "blocked" },
     { processing: "completed", moderation: "purged", expected: "purged" },

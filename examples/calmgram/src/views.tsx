@@ -4,7 +4,12 @@ import { CalmLensIcon } from "./CalmLensIcons";
 import type { Comment, Flash, ModerationFields, Post } from "./data";
 import { examplePostArtworkUrl } from "./example-artwork";
 import { EXAMPLE_POSTS_BY_ID } from "./examples";
-import { CATEGORY_LABELS, describeFindings, type ModerationStatus } from "./moderation/types";
+import {
+  CATEGORY_LABELS,
+  describeFindings,
+  isShownToEveryone,
+  type ModerationStatus,
+} from "./moderation/types";
 
 // Server-rendered HTML. Every action is a plain form post that redirects back, so the only
 // JavaScript is a confirmation dialog before deletes (browser/confirm.ts), an image preview, and
@@ -379,9 +384,9 @@ export const PostCard = (props: {
   linkToPost?: boolean;
 }) => {
   const { post, comments, likes, viewer, linkToPost = true } = props;
-  const visibleComments = comments.filter((c) => c.status === "allowed");
+  const visibleComments = comments.filter((c) => isShownToEveryone(c.status));
   const liked = !!viewer && likes.includes(viewer);
-  const published = post.status === "allowed" || post.status === "age-restricted";
+  const published = isShownToEveryone(post.status) || post.status === "age-restricted";
   const image = (
     <PostImage
       post={post}
@@ -526,6 +531,7 @@ export const Decision = ({ item }: { item: ModerationFields }) => {
   const status = item.status;
   const labels: Record<ModerationStatus, string> = {
     allowed: "Allowed",
+    limited: "Limited",
     "age-restricted": "Age-restricted",
     blocked: "Blocked",
     purged: "Purged",

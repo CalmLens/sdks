@@ -198,8 +198,8 @@ func TestMultipartAboveThreshold(t *testing.T) {
 	}
 }
 
-func TestOnlyAllowedClipsPlay(t *testing.T) {
-	for _, choice := range []string{calmlens.ModerationStatusAllowed, calmlens.ModerationStatusAgeRestricted, calmlens.ModerationStatusBlocked, calmlens.ModerationStatusPurged, clipError} {
+func TestOnlyAllowedAndLimitedClipsPlay(t *testing.T) {
+	for _, choice := range []string{calmlens.ModerationStatusAllowed, calmlens.ModerationStatusLimited, calmlens.ModerationStatusAgeRestricted, calmlens.ModerationStatusBlocked, calmlens.ModerationStatusPurged, clipError} {
 		t.Run(choice, func(t *testing.T) {
 			a := demoApp(t)
 			item := mustUpload(t, a, upload{choice: choice})
@@ -213,7 +213,7 @@ func TestOnlyAllowedClipsPlay(t *testing.T) {
 			decide(item)
 			page := get(a, "/").Body.String()
 			media := get(a, mediaURL)
-			if choice == calmlens.ModerationStatusAllowed {
+			if choice == calmlens.ModerationStatusAllowed || choice == calmlens.ModerationStatusLimited {
 				if media.Code != 200 || !bytes.Equal(media.Body.Bytes(), clipBytes) || media.Header().Get("Content-Type") != "audio/mpeg" || !strings.Contains(page, mediaURL) {
 					t.Fatal(media.Code, page)
 				}

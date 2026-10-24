@@ -290,6 +290,9 @@ class CalmmarketTest {
     listing.photos.get(1).processing = AssetClassificationStatus.COMPLETED;
     listing.photos.get(1).moderation = AssetModerationStatus.ALLOWED;
     assertTrue(listing.visible());
+    // A limited photo is shown like an allowed one.
+    listing.photos.get(1).moderation = AssetModerationStatus.LIMITED;
+    assertTrue(listing.visible());
     // This marketplace has no age gate, so every other decided status holds the listing.
     for (AssetModerationStatus status : List.of(AssetModerationStatus.AGE_RESTRICTED, AssetModerationStatus.BLOCKED, AssetModerationStatus.PURGED)) {
       listing.photos.get(1).moderation = status;

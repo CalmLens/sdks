@@ -368,7 +368,7 @@ fn detail(
         h(&asset.tags.clone().unwrap_or_default().join(", ")),
         h(asset.description.as_deref().unwrap_or("")),
     );
-    if app.demo && decision(asset) == Decision::Allowed {
+    if app.demo && matches!(decision(asset), Decision::Allowed | Decision::Limited) {
         let _ = write!(
             html,
             r#"<form action="/demo/review" method="post">{csrf}<input type="blocked" name="asset" value="{id}"><button class="secondary" type="submit">Simulate a reviewer blocking it</button></form>"#
@@ -412,6 +412,7 @@ fn state_label(asset: &Asset) -> &'static str {
     }
     match decision {
         Decision::Allowed => "Allowed",
+        Decision::Limited => "Limited",
         Decision::AgeRestricted => "Age-restricted: not shown",
         Decision::Blocked => "Blocked: not shown",
         Decision::Purged => "Purged: file deleted",
@@ -427,6 +428,7 @@ fn badge(asset: &Asset) -> String {
     } else {
         match decision {
             Decision::Allowed => ("allowed", "Allowed"),
+            Decision::Limited => ("allowed", "Limited"),
             Decision::AgeRestricted => ("restricted", "Age-restricted"),
             Decision::Blocked => ("blocked", "Blocked"),
             Decision::Purged => ("blocked", "Purged"),

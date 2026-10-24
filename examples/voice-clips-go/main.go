@@ -81,8 +81,8 @@ var categoryLabels = map[string]string{
 // Events that can change a clip's decision. There is one event per moderation status, sent for
 // automated moderation and reviewer decisions alike.
 var webhookEvents = map[string]bool{
-	calmlens.EventAssetAllowed: true, calmlens.EventAssetAgeRestricted: true, calmlens.EventAssetBlocked: true,
-	calmlens.EventAssetPurged: true, calmlens.EventAssetFailed: true,
+	calmlens.EventAssetAllowed: true, calmlens.EventAssetLimited: true, calmlens.EventAssetAgeRestricted: true,
+	calmlens.EventAssetBlocked: true, calmlens.EventAssetPurged: true, calmlens.EventAssetFailed: true,
 }
 
 //go:embed index.html
@@ -297,15 +297,17 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 		item.Duration, item.Segments = timeline(report.Timeline)
 	}
 	item.Error = ""
-	if item.Status != clipAllowed {
+	if !playable(item.Status) {
 		item.signedURL = ""
 	}
 	return nil
 }
 
 // Clip states shown on the page, derived from the asset's processing and moderation status. A
-// decided clip shows its moderation status (allowed, age-restricted, blocked or purged). Only an
-// allowed clip plays: this app has no age check, so it does not play age-restricted clips either.
+// decided clip shows its moderation status (allowed, limited, age-restricted, blocked or purged).
+// Only allowed and limited clips play: a limited clip is delivered like an allowed one, and the page
+// only collapses it behind a "show" control. This app has no age check, so it does not play
+// age-restricted clips either.
 const (
 	clipUploading = "uploading"
 	clipPending   = "pending"
@@ -313,14 +315,19 @@ const (
 	clipError     = "error"
 )
 
+// playable reports whether a clip with status may play.
+func playable(status string) bool {
+	return status == calmlens.ModerationStatusAllowed || status == calmlens.ModerationStatusLimited
+}
+
 // clipStatus reads the clip's state from the asset. Failed processing is final; statuses this
 // app doesn't know count as still pending, so the clip never plays before it is allowed.
 func clipStatus(asset *calmlens.Asset) string {
 	switch status := asset.Classification.Moderation.Status; {
 	case asset.Classification.Status == calmlens.ClassificationStatusFailed:
 		return clipError
-	case status == calmlens.ModerationStatusAllowed, status == calmlens.ModerationStatusAgeRestricted,
-		status == calmlens.ModerationStatusBlocked, status == calmlens.ModerationStatusPurged:
+	case status == calmlens.ModerationStatusAllowed, status == calmlens.ModerationStatusLimited,
+		status == calmlens.ModerationStatusAgeRestricted, status == calmlens.ModerationStatusBlocked, status == calmlens.ModerationStatusPurged:
 		return status
 	case asset.Classification.Status == calmlens.ClassificationStatusPending:
 		return clipUploading
@@ -423,7 +430,7 @@ func (a *app) demoChoice(r *http.Request) (string, bool) {
 	}
 	choice := r.FormValue("demo_result")
 	switch choice {
-	case calmlens.ModerationStatusAllowed, calmlens.ModerationStatusAgeRestricted, calmlens.ModerationStatusBlocked, calmlens.ModerationStatusPurged, clipError:
+	case calmlens.ModerationStatusAllowed, calmlens.ModerationStatusLimited, calmlens.ModerationStatusAgeRestricted, calmlens.ModerationStatusBlocked, calmlens.ModerationStatusPurged, clipError:
 		return choice, true
 	}
 	return "", false
@@ -694,7 +701,7 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	status, id, contentType := item.Status, item.ID, item.Type
 	a.mu.Unlock()
-	if status != clipAllowed {
+	if !playable(status) {
 		http.Error(w, "This clip is not allowed", 403)
 		return
 	}
@@ -714,7 +721,7 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.Lock()
-	if item.Status == clipAllowed {
+	if playable(item.Status) {
 		item.signedURL, item.signedUntil = signed.URL, time.UnixMilli(signed.ExpiresAt)
 	}
 	a.mu.Unlock()

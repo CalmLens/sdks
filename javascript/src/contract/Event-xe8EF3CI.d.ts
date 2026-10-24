@@ -1,5 +1,5 @@
-import "./Asset-CWeFOzMO.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-BN7QY46A.js";
+import "./Asset-Bnm6sUw0.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-BEqpjGaY.js";
 import "./Page-Bpd8G-D0.js";
 import * as zod from "zod";
 //#region packages/shared/src/Event.d.ts
@@ -25,6 +25,7 @@ declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
+        limited: "limited";
         pending: "pending";
         purged: "purged";
       }>;
@@ -55,6 +56,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "asset.content-removed": "asset.content-removed";
     "asset.deleted": "asset.deleted";
     "asset.failed": "asset.failed";
+    "asset.limited": "asset.limited";
     "asset.purged": "asset.purged";
     "asset.retried": "asset.retried";
     "asset.review-requested": "asset.review-requested";
@@ -97,6 +99,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
+          limited: "limited";
           pending: "pending";
           purged: "purged";
         }>;

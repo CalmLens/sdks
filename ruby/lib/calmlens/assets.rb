@@ -91,7 +91,7 @@ module CalmLens
     end
 
     # Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
-    # `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns
+    # `limited`, `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns
     # the asset. It retrieves the asset, waiting 0.5 seconds before the second check and 1.5 times
     # longer each time after that, up to 5 seconds.
     # Webhooks report decisions without polling.
@@ -199,8 +199,8 @@ module CalmLens
     end
 
     # Uploads content and queues moderation; the call returns before classification finishes.
-    # Watch for `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purged` events or
-    # retrieve the asset later.
+    # Watch for `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked` and
+    # `asset.purged` events or retrieve the asset later.
     #
     # Give exactly one of `content:` (a whole file), `part:` (the first part of a multipart upload) or
     # `url:` (a web page or file to fetch). Content is `{type:, plain_text:}`, `{type:, base64:}` or
@@ -222,7 +222,8 @@ module CalmLens
     # Uploads content and waits for the moderation decision where the content type supports it.
     # Audio and video are always processed asynchronously. Takes the options of {#create}.
     # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
-    #   `allowed`. Serve `age-restricted` assets only behind your own age check, through signed URLs.
+    #   `allowed` or `limited` (reduce the reach of `limited` assets). Serve `age-restricted` assets
+    #   only behind your own age check, through signed URLs.
     def classify(options)
       call(options) do |api, request|
         content = api['content']

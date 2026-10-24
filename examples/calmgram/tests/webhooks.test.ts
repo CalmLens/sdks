@@ -29,6 +29,7 @@ test("syncs the asset named in the delivery's data for decision events", () => {
   for (const type of [
     "asset.failed",
     "asset.allowed",
+    "asset.limited",
     "asset.age-restricted",
     "asset.blocked",
     "asset.purged",

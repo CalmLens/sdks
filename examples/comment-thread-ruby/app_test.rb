@@ -107,13 +107,16 @@ class SubmissionTest < Minitest::Test
   end
 
   def test_clean_replies_publish_immediately
-    app, = live_app(CURSOR, asset('name-1', 'allowed'), asset('text-1', 'allowed'))
-    _, headers, = post_reply(app, name: 'Ada', text: 'Ten minutes outside.')
-    assert_equal '/?notice=published', headers['location']
-    assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
-    page = home(app)
-    assert_includes page, 'Ten minutes outside.'
-    assert_includes page, '>Ada<'
+    # A limited field is delivered like an allowed one, so it shows too.
+    %w[allowed limited].each do |status|
+      app, = live_app(CURSOR, asset('name-1', 'allowed'), asset('text-1', status))
+      _, headers, = post_reply(app, name: 'Ada', text: 'Ten minutes outside.')
+      assert_equal '/?notice=published', headers['location'], status
+      assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }, status
+      page = home(app)
+      assert_includes page, 'Ten minutes outside.'
+      assert_includes page, '>Ada<'
+    end
   end
 
   def test_a_blocked_reply_is_held_and_its_text_is_never_rendered
@@ -250,6 +253,16 @@ class ReviewTest < Minitest::Test
     assert_includes home(app), 'Held reply text'
     assert_includes home(app), '<dt>Reviewer</dt><dd>Sam</dd>'
     assert_equal 'c1', app.feed.cursor
+  end
+
+  def test_reviewer_limiting_releases_the_reply_like_allowing
+    app, mock = held_app
+    mock.enqueue(body: page_of(event('e1', 'asset.limited', 'text-1', snapshot: 'blocked')))
+        .enqueue(body: asset('text-1', 'limited')).enqueue(body: asset('name-1', 'allowed'))
+    sync(app)
+    assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
+    assert_includes home(app), 'Held reply text'
+    assert_equal [%w[GET /assets/text-1], %w[GET /assets/name-1]], calls(mock).last(2)
   end
 
   def test_allowed_event_releases_nothing_unless_the_retrieved_assets_are_allowed

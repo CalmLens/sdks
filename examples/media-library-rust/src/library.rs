@@ -360,6 +360,7 @@ impl Library {
 pub fn list_filter(status: &str) -> String {
     let status = match status {
         "allowed" => "classification.moderation.status==allowed",
+        "limited" => "classification.moderation.status==limited",
         "age-restricted" => "classification.moderation.status==age-restricted",
         "blocked" => "classification.moderation.status==blocked",
         "purged" => "classification.moderation.status==purged",

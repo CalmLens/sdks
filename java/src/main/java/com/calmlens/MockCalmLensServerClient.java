@@ -47,7 +47,8 @@ import java.util.function.Supplier;
  * mock.client.assets.waitForDecision(new Models.WaitForDecision(asset.id()));
  * }</pre>
  *
- * <p>The CDN refuses {@code blocked} and {@code purged} assets, and serves private and
+ * <p>The CDN refuses {@code blocked} and {@code purged} assets, serves {@code limited} ones like
+ * {@code allowed} ones, and serves private and
  * age-restricted ones only to an API key with the {@code assets:download} grant (see {@link
  * #createMockApiKey}); a public age-restricted asset is also served with {@code allowAgeRestricted}.
  *
@@ -116,6 +117,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     PENDING("pending"),
     /** Processing done; moderation {@code allowed}. */
     ALLOWED("allowed"),
+    /** Processing done; moderation {@code limited}, delivered like {@code allowed}. */
+    LIMITED("limited"),
     /** Processing done; moderation {@code age-restricted}. */
     AGE_RESTRICTED("age-restricted"),
     /** Processing done; moderation {@code blocked}. */
@@ -408,7 +411,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * Gives an asset a new outcome, as a reviewer would: a decided status records a manual review,
    * and every outcome but {@code pending} adds the matching {@code asset.<status>} (or {@code
    * asset.failed}) event with the asset's snapshot, the event catalog's severity ({@code low} for
-   * {@code allowed}, {@code high} otherwise) and a {@code decided-by: reviewer} fact.
+   * {@code allowed} and {@code limited}, {@code high} otherwise) and a {@code decided-by: reviewer} fact.
    * Finished processing removes temporary content, and {@code purged} removes it in any case.
    *
    * @param assetId a stored asset
@@ -433,8 +436,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     }
     if (outcome != Outcome.PENDING) {
       enqueueEvent("asset." + outcome.value(), assetId, new Models.EventFact("decided-by", "reviewer", null));
-      // Like the event catalog: only allowing is low severity.
-      api.storage.events.get(api.storage.events.size() - 1).addProperty("severity", outcome == Outcome.ALLOWED ? "low" : "high");
+      // Like the event catalog: only allowing and limiting are low severity.
+      api.storage.events.get(api.storage.events.size() - 1).addProperty("severity", outcome == Outcome.ALLOWED || outcome == Outcome.LIMITED ? "low" : "high");
     }
     return Json.GSON.fromJson(asset, Models.Asset.class);
   }

@@ -549,6 +549,7 @@ fn search_models_use_typed_mode_status_and_fields() {
 #[test]
 fn newer_event_types_decode_to_their_own_variants() {
     let decode = |wire: &str| serde_json::from_value::<EventType>(json!(wire)).unwrap();
+    assert_eq!(decode("asset.limited"), EventType::AssetLimited);
     assert_eq!(decode("asset.deleted"), EventType::AssetDeleted);
     assert_eq!(
         decode("asset.content-removed"),

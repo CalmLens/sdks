@@ -397,7 +397,7 @@ export default class CalmLensServerClient {
 
       /**
        * Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
-       * `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
+       * `limited`, `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
        * decision within `timeoutMs` (default 60000). Webhooks report decisions without polling.
        */
       waitForDecision: async ({

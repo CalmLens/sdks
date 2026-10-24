@@ -10,7 +10,7 @@ import {
 } from "./data";
 import { exampleFeedFor } from "./examples";
 import { getModeration } from "./moderation";
-import { describeFindings, type ModerationOutcome } from "./moderation/types";
+import { describeFindings, isShownToEveryone, type ModerationOutcome } from "./moderation/types";
 import { rememberAsset, sandboxForAsset, saveSandbox } from "./sandbox";
 
 // All of Calmgram's moderation logic lives here. The pattern:
@@ -87,7 +87,7 @@ const checkCaption = async (env: Env, sandbox: Sandbox, postId: string, caption:
     externalId: `caption-${postId}`,
     username: sandbox.username,
   });
-  if (outcome.status !== "allowed") {
+  if (!isShownToEveryone(outcome.status)) {
     throw new ModerationRejection("post", describeFindings(outcome.findings));
   }
 };
@@ -273,7 +273,7 @@ export const addComment = async (
   // Comments that aren't allowed are stored too (but never shown) so moderators can see them.
   sandbox.comments.push(comment);
   await saveSandbox(env, sandbox);
-  if (outcome.status !== "allowed") {
+  if (!isShownToEveryone(outcome.status)) {
     throw new ModerationRejection("comment", describeFindings(outcome.findings));
   }
   return comment;
@@ -288,7 +288,7 @@ export const updateBio = async (env: Env, sandbox: Sandbox, bio: string) => {
       externalId: `bio-${sandbox.id}-${Date.now()}`,
       username: sandbox.username,
     });
-    if (outcome.status !== "allowed") {
+    if (!isShownToEveryone(outcome.status)) {
       throw new ModerationRejection("bio", describeFindings(outcome.findings), "saved");
     }
   }
@@ -333,7 +333,7 @@ export const viewerOf = (sandbox: Sandbox | null): Viewer | null =>
 
 /** Published posts: shown to everyone, age-restricted ones behind a placeholder. */
 export const isPublished = (post: Post) =>
-  post.status === "allowed" || post.status === "age-restricted";
+  isShownToEveryone(post.status) || post.status === "age-restricted";
 
 /** Published posts for everyone; the viewer also sees their own posts that aren't published. */
 export const isVisibleTo = (post: Post, viewer: string | null) =>
@@ -360,7 +360,7 @@ export const postMediaFor = (
 ): PostMedia => {
   if (post.exampleId) return { url: null, placeholderUrl: null };
   const moderation = getModeration(env);
-  if (post.status === "allowed") {
+  if (isShownToEveryone(post.status)) {
     return { url: moderation.imageUrl(post.assetId, variant), placeholderUrl: null };
   }
   if (post.status === "age-restricted") {

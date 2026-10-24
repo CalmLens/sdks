@@ -26,8 +26,9 @@ pub const MAX_DEMO_ASSETS: usize = 40;
 pub const MAX_DEMO_FOLDERS: usize = 30;
 
 /// Explicitly selected fake moderation outcomes for demo uploads.
-pub const DEMO_OUTCOMES: [(&str, &str); 5] = [
+pub const DEMO_OUTCOMES: [(&str, &str); 6] = [
     ("allowed", "Allow"),
+    ("limited", "Limit"),
     ("age-restricted", "Age-restrict"),
     ("blocked", "Block"),
     ("purged", "Purge"),
@@ -38,6 +39,7 @@ pub const DEMO_OUTCOMES: [(&str, &str); 5] = [
 pub fn demo_outcome(value: &str) -> Option<Decision> {
     match value {
         "allowed" => Some(Decision::Allowed),
+        "limited" => Some(Decision::Limited),
         "age-restricted" => Some(Decision::AgeRestricted),
         "blocked" => Some(Decision::Blocked),
         "purged" => Some(Decision::Purged),
@@ -87,6 +89,7 @@ impl DemoStore {
                 asset.classification.updated_at = Some(now_ms());
                 let status = match entry.outcome {
                     Decision::Allowed => Some(AssetModerationStatus::Allowed),
+                    Decision::Limited => Some(AssetModerationStatus::Limited),
                     Decision::AgeRestricted => Some(AssetModerationStatus::AgeRestricted),
                     Decision::Blocked => Some(AssetModerationStatus::Blocked),
                     Decision::Purged => Some(AssetModerationStatus::Purged),
@@ -426,7 +429,10 @@ impl DemoStore {
         if mode != "semantic" && !terms.is_empty() {
             for entry in &self.assets {
                 let asset = &entry.asset;
-                let listed = matches!(decision(asset), Decision::Allowed | Decision::AgeRestricted);
+                let listed = matches!(
+                    decision(asset),
+                    Decision::Allowed | Decision::Limited | Decision::AgeRestricted
+                );
                 if !listed || content_removed(asset) {
                     continue;
                 }

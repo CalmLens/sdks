@@ -145,6 +145,7 @@ declare const EVENT_TYPE_INFO: {
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
+        limited: "limited";
         pending: "pending";
         purged: "purged";
       }>>;
@@ -154,7 +155,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       flaggedCategories: string[];
-      moderationStatus: "age-restricted" | "allowed" | "blocked" | "pending" | "purged";
+      moderationStatus: "age-restricted" | "allowed" | "blocked" | "limited" | "pending" | "purged";
     }>;
     factInfo: {
       label: string;
@@ -188,6 +189,7 @@ declare const EVENT_TYPE_INFO: {
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
+        limited: "limited";
         pending: "pending";
         purged: "purged";
       }>;
@@ -195,6 +197,88 @@ declare const EVENT_TYPE_INFO: {
   };
   readonly "asset.allowed": {
     id: "asset.allowed";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      assetName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      assetType: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>>;
+      decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        automated: "automated";
+        reviewer: "reviewer";
+      }>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
+      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      assetName?: string | null | undefined;
+      assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      decidedBy: "automated" | "reviewer";
+      flaggedCategories?: string[] | undefined;
+      reviewerUserId?: string | null | undefined;
+      reviewerName?: string | null | undefined;
+      note?: string | null | undefined;
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      assetName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      assetType: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>;
+      decidedBy: zod.ZodEnum<{
+        automated: "automated";
+        reviewer: "reviewer";
+      }>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
+      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, zod.core.$strip>;
+  };
+  readonly "asset.limited": {
+    id: "asset.limited";
     name: string;
     description: string;
     category: EventCategory;
@@ -808,6 +892,7 @@ declare const EVENT_TYPE_INFO: {
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
+        limited: "limited";
         pending: "pending";
         purged: "purged";
       }>>;
@@ -816,7 +901,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      automatedOutcome: "age-restricted" | "allowed" | "blocked" | "pending" | "purged";
+      automatedOutcome: "age-restricted" | "allowed" | "blocked" | "limited" | "pending" | "purged";
     }>;
     factInfo: {
       label: string;
@@ -849,6 +934,7 @@ declare const EVENT_TYPE_INFO: {
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
+        limited: "limited";
         pending: "pending";
         purged: "purged";
       }>;
@@ -872,13 +958,13 @@ declare const EVENT_TYPE_INFO: {
     fields: {
       limit: EventFieldDefinition<zod.ZodNumber>;
       used: EventFieldDefinition<zod.ZodNumber>;
-      ownerUserId: EventFieldDefinition<zod.ZodString>;
+      organisationId: EventFieldDefinition<zod.ZodString>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       limit: number;
       used: number;
-      ownerUserId: string;
+      organisationId: string;
     }>;
     factInfo: {
       label: string;
@@ -899,7 +985,7 @@ declare const EVENT_TYPE_INFO: {
     values: zod.ZodObject<{
       limit: zod.ZodNumber;
       used: zod.ZodNumber;
-      ownerUserId: zod.ZodString;
+      organisationId: zod.ZodString;
     }, zod.core.$strip>;
   };
   readonly "usage.spend-limit-reached": {
@@ -918,10 +1004,17 @@ declare const EVENT_TYPE_INFO: {
     /** Types of unreleased features are left out of the published contract until enabled. */
     enabled?: boolean;
     fields: {
+      reason: EventFieldDefinition<zod.ZodEnum<{
+        "payment-failed": "payment-failed";
+        "project-budget": "project-budget";
+        "spend-limit": "spend-limit";
+        "usage-cap": "usage-cap";
+      }>>;
       resumesOn: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
+      reason: "payment-failed" | "project-budget" | "spend-limit" | "usage-cap";
       resumesOn?: string | null | undefined;
     }>;
     factInfo: {
@@ -941,6 +1034,12 @@ declare const EVENT_TYPE_INFO: {
       key: string;
     }[];
     values: zod.ZodObject<{
+      reason: zod.ZodEnum<{
+        "payment-failed": "payment-failed";
+        "project-budget": "project-budget";
+        "spend-limit": "spend-limit";
+        "usage-cap": "usage-cap";
+      }>;
       resumesOn: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };

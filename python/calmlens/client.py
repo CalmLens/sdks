@@ -961,7 +961,7 @@ class Assets:
     def wait_for_decision(self, options: WaitForDecisionOptions | None = None, /, *, asset_id: str = _UNSET,
                           timeout: float = _UNSET) -> Asset:
         """Retrieve an asset until ``classification.moderation.status`` is no longer ``pending``
-        (``allowed``, ``age-restricted``, ``blocked`` or ``purged``), or ``classification.status`` is
+        (``allowed``, ``limited``, ``age-restricted``, ``blocked`` or ``purged``), or ``classification.status`` is
         ``failed``, and return that asset.
 
         Checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5

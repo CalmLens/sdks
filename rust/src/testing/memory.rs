@@ -24,6 +24,9 @@ pub enum MockOutcome {
     Pending,
     /// Processing completes with moderation `allowed`.
     Allowed,
+    /// Processing completes with moderation `limited`; the CDN serves the asset like an
+    /// allowed one.
+    Limited,
     /// Processing completes with moderation `age-restricted`; the CDN then serves the asset
     /// only with the download permission, or a public one with `allow_age_restricted`.
     AgeRestricted,
@@ -40,6 +43,7 @@ impl MockOutcome {
         match self {
             Self::Pending => "pending",
             Self::Allowed => "allowed",
+            Self::Limited => "limited",
             Self::AgeRestricted => "age-restricted",
             Self::Blocked => "blocked",
             Self::Purged => "purged",
@@ -459,8 +463,12 @@ impl Backend {
             }));
         let asset = asset.clone();
         let event_type = format!("asset.{decision}");
-        // Like the event catalog: only allowing is low severity.
-        let severity = if decision == "allowed" { "low" } else { "high" };
+        // Like the event catalog: only allowing and limiting are low severity.
+        let severity = if matches!(decision, "allowed" | "limited") {
+            "low"
+        } else {
+            "high"
+        };
         storage.events.push(json!({
             "id": event_id, "projectId": project_id, "userId": null, "type": event_type,
             "severity": severity, "title": event_type, "description": null, "assetId": asset_id,

@@ -145,6 +145,11 @@ public final class Models {
     public static final AssetModerationStatus PENDING = new AssetModerationStatus("pending");
     /** Delivered to anyone with access. */
     public static final AssetModerationStatus ALLOWED = new AssetModerationStatus("allowed");
+    /**
+     * Delivered like {@link #ALLOWED}, but marked so your app reduces its reach: keep it out of
+     * recommendations, trending and notifications, rank it lower or collapse it.
+     */
+    public static final AssetModerationStatus LIMITED = new AssetModerationStatus("limited");
     /** Delivered only through signed URLs or API keys, like a private asset; show it only behind your own age gate. */
     public static final AssetModerationStatus AGE_RESTRICTED = new AssetModerationStatus("age-restricted");
     /** Blocked: not delivered; the content is kept. */
@@ -152,7 +157,7 @@ public final class Models {
     /** Not delivered, and the stored content is deleted. */
     public static final AssetModerationStatus PURGED = new AssetModerationStatus("purged");
     private static final Map<String, AssetModerationStatus> KNOWN = Map.of("pending", PENDING, "allowed", ALLOWED,
-        "age-restricted", AGE_RESTRICTED, "blocked", BLOCKED, "purged", PURGED);
+        "limited", LIMITED, "age-restricted", AGE_RESTRICTED, "blocked", BLOCKED, "purged", PURGED);
     private final String value;
 
     private AssetModerationStatus(String value) { this.value = value; }
@@ -193,6 +198,8 @@ public final class Models {
   public static final class AssetModerationDecision {
     /** Deliver to anyone with access. */
     public static final AssetModerationDecision ALLOWED = new AssetModerationDecision("allowed");
+    /** Deliver to anyone with access, but mark it so your app reduces its reach. */
+    public static final AssetModerationDecision LIMITED = new AssetModerationDecision("limited");
     /** Deliver only through signed URLs or API keys. */
     public static final AssetModerationDecision AGE_RESTRICTED = new AssetModerationDecision("age-restricted");
     /** Don't deliver; keep the content. */
@@ -200,7 +207,7 @@ public final class Models {
     /** Don't deliver, and delete the stored content. */
     public static final AssetModerationDecision PURGED = new AssetModerationDecision("purged");
     private static final Map<String, AssetModerationDecision> KNOWN = Map.of("allowed", ALLOWED,
-        "age-restricted", AGE_RESTRICTED, "blocked", BLOCKED, "purged", PURGED);
+        "limited", LIMITED, "age-restricted", AGE_RESTRICTED, "blocked", BLOCKED, "purged", PURGED);
     private final String value;
 
     private AssetModerationDecision(String value) { this.value = value; }
@@ -397,7 +404,8 @@ public final class Models {
   /**
    * What happens to flagged content for one asset, overriding the project's moderation action.
    *
-   * @param action {@code allow} takes no action, {@code age-restrict} delivers the asset only through
+   * @param action {@code allow} takes no action, {@code limit} delivers the asset normally but marks
+   *     it so your app reduces its reach, {@code age-restrict} delivers the asset only through
    *     signed URLs or API keys, {@code block} stops delivery while keeping the content, and {@code
    *     purge} deletes it
    */
@@ -1610,7 +1618,7 @@ public final class Models {
    * How strongly a category meets the policy and what the policy does with it.
    *
    * @param score policy score from 0 to 1
-   * @param action {@code allow}, {@code age-restrict}, {@code block} or {@code purge}
+   * @param action {@code allow}, {@code limit}, {@code age-restrict}, {@code block} or {@code purge}
    */
   public record CategoryPolicyScore(Double score, String action, CategoryPolicySource source,
       CategoryPolicySettingsSnapshot settings) {}

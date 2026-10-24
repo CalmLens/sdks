@@ -8,9 +8,9 @@ show these files, so they are type-checked and built here.
 | --------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Photo upload    | `PhotoUpload`, `photo-upload.js`        | Uploads a file with a token from your server and waits for the moderation decision.              |
 | Comment form    | `CommentForm`, `comment-form.js`        | Posts a comment to your server and shows why it was refused.                                     |
-| Avatar          | `Avatar`, `avatar.js`                   | Shows an allowed profile picture through the `avatar` lens, or the person's initial.             |
+| Avatar          | `Avatar`, `avatar.js`                   | Shows an allowed or limited profile picture through the `avatar` lens, or the person's initial.  |
 | Sensitive image | `SensitiveImage`, `sensitive-image.js`  | Shows the blurred placeholder for age-restricted images until your app lets the viewer see them. |
-| Feed            | `Feed`, `media-feed.js`                 | Lists allowed and age-restricted posts through the sensitive image component.                    |
+| Feed            | `Feed`, `media-feed.js`                 | Lists allowed, limited and age-restricted posts through the sensitive image component.           |
 | Upload widget   | `PhotoUploader`, `photo-uploader.js`    | The SDK's ready-made uploader, through an upload preset with tokens from your server.            |
 | Own API upload  | `OwnApiUploader`, `own-api-uploader.js` | The same uploader, sending files to your own API with progress and status checks.                |
 | Post photo      | `PostPhoto`, `post-photo.js`            | The SDK's media component, with responsive sources and the age-restricted gate.                  |

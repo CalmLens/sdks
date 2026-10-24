@@ -35,6 +35,11 @@ describe("getMediaState", () => {
     );
   });
 
+  it("shows limited assets like allowed ones, without the placeholder or the opt-in", () => {
+    const shown = getMediaState({ projectId: PROJECT_ID, assetId: "a1", status: "limited" });
+    expect(shown.kind === "image" && shown.src).toBe(`${CDN}/assets/${PROJECT_ID}/a1/rendered`);
+  });
+
   it("offers each width from the rendered resource and falls back to the largest", () => {
     const state = getMediaState({
       projectId: PROJECT_ID,

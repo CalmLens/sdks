@@ -7,6 +7,7 @@ const (
 	EventAssetUploaded                 = "asset.uploaded"
 	EventAssetClassified               = "asset.classified"
 	EventAssetAllowed                  = "asset.allowed"
+	EventAssetLimited                  = "asset.limited"
 	EventAssetAgeRestricted            = "asset.age-restricted"
 	EventAssetBlocked                  = "asset.blocked"
 	EventAssetPurged                   = "asset.purged"
@@ -231,9 +232,9 @@ const (
 	DecidedByReviewer  = "reviewer"
 )
 
-// AssetDecisionFacts are the facts of EventAssetAllowed, EventAssetAgeRestricted,
-// EventAssetBlocked and EventAssetPurged, one event per moderation status, whether automated
-// moderation or a reviewer set it. DecidedBy is DecidedByAutomated or DecidedByReviewer.
+// AssetDecisionFacts are the facts of EventAssetAllowed, EventAssetLimited,
+// EventAssetAgeRestricted, EventAssetBlocked and EventAssetPurged, one event per moderation
+// status, whether automated moderation or a reviewer set it. DecidedBy is DecidedByAutomated or DecidedByReviewer.
 // FlaggedCategories, when present, are the parent policy categories whose findings decided the
 // status. ReviewerUserID, ReviewerName and Note are set only for reviewer decisions;
 // ReviewerUserID is nil when an API key made the decision, and ReviewerName stays in the portal

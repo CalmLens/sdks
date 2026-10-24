@@ -5,7 +5,7 @@ import { computed } from "vue";
 const props = defineProps<{
   projectId: string;
   assetId: string;
-  status: "allowed" | "age-restricted";
+  status: "allowed" | "limited" | "age-restricted";
   canView: boolean;
   alt: string;
   /** Width divided by height, which you store when the image is uploaded. */

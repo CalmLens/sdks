@@ -101,6 +101,14 @@ const FIRST_PARTY_COOKIES = {
 		type: "functional",
 		providerName: "CalmLens"
 	},
+	SELECTED_ORGANISATION_ID: {
+		name: "CL_selectedOrganisationId",
+		description: "Remembers the organisation you last selected in the portal",
+		expirationDescription: "1 year",
+		expirationMs: YEAR_MS,
+		type: "functional",
+		providerName: "CalmLens"
+	},
 	ASSET_DASHBOARD_STATE: {
 		name: "CL_assetDashboardState",
 		description: "Remembers your asset dashboard view (view mode, filters, sorting and folder)",

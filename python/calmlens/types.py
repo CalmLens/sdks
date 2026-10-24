@@ -45,12 +45,14 @@ __all__ = [
 #: Where an asset is in the pipeline (``classification.status``). New statuses may be added.
 AssetClassificationStatus = Union[Literal["pending", "processing", "completed", "failed"], str]
 #: The moderation decision in force, which also decides delivery (``classification.moderation.status``):
-#: ``pending``, then ``allowed``, ``age-restricted`` (delivered only through signed URLs or API keys),
+#: ``pending``, then ``allowed``, ``limited`` (delivered like ``allowed``, but marked so your app can
+#: reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it
+#: lower or collapsing it), ``age-restricted`` (delivered only through signed URLs or API keys),
 #: ``blocked`` (not delivered, content kept) or ``purged`` (not delivered, content deleted). New
 #: statuses may be added; never treat an unknown one as allowed.
-AssetModerationStatus = Union[Literal["pending", "allowed", "age-restricted", "blocked", "purged"], str]
+AssetModerationStatus = Union[Literal["pending", "allowed", "limited", "age-restricted", "blocked", "purged"], str]
 #: A reviewer's decision (``classification.moderation.manualReviews[].decision``). New values may be added.
-AssetModerationDecision = Union[Literal["allowed", "age-restricted", "blocked", "purged"], str]
+AssetModerationDecision = Union[Literal["allowed", "limited", "age-restricted", "blocked", "purged"], str]
 #: Whether CalmLens holds the content (``content.status``). New statuses may be added.
 AssetContentStatus = Union[Literal["temporary", "stored", "removed"], str]
 #: Why the content was removed (``content.removalReason``). New reasons may be added.
@@ -92,8 +94,8 @@ AssetSearchMatchField = Union[Literal["name", "id", "externalId", "description",
 #: State of the project's semantic search index. New values may be added.
 SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], str]
 #: Event types. New types may be added; ignore ones you don't handle.
-EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.allowed", "asset.age-restricted",
-                          "asset.blocked", "asset.purged", "asset.failed", "asset.deleted", "asset.content-removed",
+EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.allowed", "asset.limited",
+                          "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed", "asset.deleted", "asset.content-removed",
                           "asset.retried", "usage.limit-reached", "usage.spend-limit-reached",
                           "upload-preset.daily-limit-reached", "project.member-joined",
                           "project.member-removed", "project.member-role-changed",

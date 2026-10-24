@@ -25,15 +25,18 @@ MAX_LINKS = 50
 SHOWN_SCORE = 0.4
 DEMO_RESULTS = {
     "allowed": "Allow the page",
+    "limited": "Limit the page",
     "age-restricted": "Age-restrict the page",
     "blocked": "Block the page",
     "purged": "Purge the page",
     "error": "Processing error",
     "note-blocked": "Block the note",
 }
-# Moderation statuses once CalmLens has decided. Only `allowed` pages become links: the board has
-# no age gate, so it does not link `age-restricted` pages either.
-DECIDED_STATUSES = ("allowed", "age-restricted", "blocked", "purged")
+# Moderation statuses once CalmLens has decided. Only `allowed` and `limited` pages become links
+# (a `limited` one collapsed behind "Show link", so it reaches fewer members): the board has no age
+# gate, so it does not link `age-restricted` pages either.
+DECIDED_STATUSES = ("allowed", "limited", "age-restricted", "blocked", "purged")
+SHOWN_STATUSES = ("allowed", "limited")
 # Redirects carry one of these keys, never free text, so a crafted link cannot put words on the page.
 NOTICES = {
     "shared": "Shared. The page is being checked before the link goes live.",
@@ -186,7 +189,7 @@ class Board:
             with self.lock:
                 link["note_asset_id"] = note_asset["id"]
             note_status = note_asset["classification"]["moderation"]["status"]
-            if note_status != "allowed":
+            if note_status not in SHOWN_STATUSES:
                 with self.lock:
                     link["status"] = "note-not-allowed"
                 return "note-not-allowed" if note_status in DECIDED_STATUSES else "note-unfinished"
@@ -280,9 +283,11 @@ footer{{color:#526e61;font-size:12px;margin-top:32px}}@media(max-width:700px){{.
 
     def _card(self, link: dict) -> str:
         status = link["status"]
-        if status == "allowed":
-            badge = '<span class="badge">Allowed</span>'
+        if status in SHOWN_STATUSES:
+            badge = '<span class="badge">Allowed</span>' if status == "allowed" else '<span class="badge warn">Limited</span>'
             target = f'<a class="url" href="{escape(link["url"])}" rel="noopener noreferrer nofollow ugc">{escape(link["url"])}</a>'
+            if status == "limited":
+                target = f'<details><summary>Show link</summary>{target}</details>'
         else:
             label = {"pending": "Checking the page", "checking-note": "Checking the note",
                      "note-not-allowed": "Not shared: note not allowed",

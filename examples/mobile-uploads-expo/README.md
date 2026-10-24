@@ -30,9 +30,10 @@ never holds an API key: a tiny token server signs a single-use upload token for 
 - [`App.tsx`](App.tsx) picks a photo with `expo-image-picker`, reads it with `expo-file-system`
   and uploads it with `assets.classify`. Photos are checked after they're stored, so the first
   answer is usually `pending`; the app shows **Still checking** and polls `assets.retrieve`
-  until CalmLens decides. After 60 seconds it stops and offers **Check again**. `allowed` photos
-  are shown, and `age-restricted` photos are hidden until the person shares an age range of 18
-  or older (see [Age-restricted photos](#age-restricted-photos)).
+  until CalmLens decides. After 60 seconds it stops and offers **Check again**. `allowed` and
+  `limited` photos are shown (`limited` ones are only marked so your app can reduce their reach,
+  such as keeping them out of recommendations), and `age-restricted` photos are hidden until the
+  person shares an age range of 18 or older (see [Age-restricted photos](#age-restricted-photos)).
 - Errors show a message for the person using the app and the error code for you. The app handles
   every `upload-preset/*` and `upload-token/*` code, timeouts, network errors and an unreachable
   token server.
