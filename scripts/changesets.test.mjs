@@ -20,7 +20,11 @@ test("Changesets versions all seven SDKs and generates native changelogs and a r
   try {
     cpSync(join(original, "package.json"), join(root, "package.json"));
     cpSync(join(original, "bun.lock"), join(root, "bun.lock"));
-    cpSync(join(original, ".changeset"), join(root, ".changeset"), { recursive: true });
+    // Only the configuration: pending changesets would change the versions this test expects.
+    mkdirSync(join(root, ".changeset"));
+    for (const file of ["config.json", "release.json"]) {
+      cpSync(join(original, ".changeset", file), join(root, ".changeset", file));
+    }
     cpSync(join(original, "scripts"), join(root, "scripts"), { recursive: true });
     symlinkSync(join(original, "node_modules"), join(root, "node_modules"));
     for (const lang of ["javascript", "python", "ruby", "rust", "java", "go", "php"]) {
