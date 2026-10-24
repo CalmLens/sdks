@@ -296,6 +296,11 @@ public final class CalmLensServerClient implements AutoCloseable {
     return "CalmLensServerClient[projectId=" + projectId + ", baseUrl=" + baseUrl + ", cdnBaseUrl=" + cdnBaseUrl + "]";
   }
 
+  // For MockCalmLensServerClient, which answers requests at these addresses.
+  String projectId() { return projectId; }
+  String baseUrl() { return baseUrl; }
+  String cdnBaseUrl() { return cdnBaseUrl; }
+
   // ------------------------------------------------------------------ Encoding helpers
 
   private static String str(JsonObject o, String key, String fallback) {

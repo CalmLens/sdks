@@ -1,5 +1,6 @@
 package com.calmlens;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.io.InputStream;
@@ -9,37 +10,58 @@ import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /**
  * An offline client for tests. {@link #client} is a real {@link CalmLensServerClient} (validation,
- * encoding, retries, error mapping) whose transport answers from a queue you fill, and records
- * every request it receives. It does not classify content or keep state between requests.
+ * encoding, retries, error mapping) whose transport answers from an in-memory API, and records
+ * every request it receives.
+ *
+ * <p>The in-memory API keeps assets, folders, events and content: uploads create assets you can
+ * retrieve, list (RSQL filters such as {@code classification.moderation.status==blocked},
+ * ordering, folder and cursor paging), search, update, move and delete, and the CDN serves their
+ * stored bytes. It does not classify content: {@code assets.create} (and queued multipart uploads)
+ * end at {@link Options#queuedOutcome} ({@code pending} by default), {@code assets.classify} and
+ * {@code text.classify} at {@link Options#analyzedOutcome} ({@code allowed} by default). Finished
+ * processing removes the content unless the upload sets {@code keepContentAfterProcessing}, and
+ * {@code purged} always removes it. {@link #decide} changes an asset's status as a reviewer would.
+ * Errors use the API's codes, statuses and body, every response has an {@code X-Request-Id}, and
+ * idempotency keys replay the first response.
  *
  * <pre>{@code
- * var mock = new MockCalmLensServerClient();
- * mock.enqueue(200, Map.of("id", "asset-1", "upload", Map.of("status", "completed"),
- *     "classification", Map.of("status", "completed",
- *     "moderation", Map.of("status", "allowed")), "content", Map.of("status", "removed")));
- * mock.enqueueError(ErrorCodes.ASSET_NOT_FOUND);            // HTTP 404 with the API's error body
- * mock.enqueue("GET", "/events", 200, Map.of("events", List.of(event), "cursor", "c1", "hasMore", false));
+ * var mock = new MockCalmLensServerClient(new MockCalmLensServerClient.Options().queuedOutcome(MockCalmLensServerClient.Outcome.PENDING));
+ * Models.Asset asset = mock.client.assets.create("photo.png", bytes, "image/png");
+ * mock.decide(asset.id(), MockCalmLensServerClient.Outcome.BLOCKED);      // adds an asset.blocked event
+ * mock.client.assets.waitForDecision(new Models.WaitForDecision(asset.id()));
  * }</pre>
  *
- * <p>Like the real client, reads and uploads are retried on HTTP 429, 502, 503 and 504 and on
- * network failures (without waiting), so queue one response per attempt, or build the mock from a
- * builder with {@code maxRetries(0)}. A request with an empty queue, or whose next response is
- * bound to another route, fails with {@link ErrorCodes#SDK_TRANSPORT_ERROR}.
+ * <p>The CDN refuses {@code blocked} and {@code purged} assets, and serves private and
+ * age-restricted ones only to an API key with the {@code assets:download} grant (see {@link
+ * #createMockApiKey}); a public age-restricted asset is also served with {@code allowAgeRestricted}.
  *
- * <p>{@code assets.waitForDecision} retrieves the asset from the queue until a response's
- * {@code classification.moderation.status} is no longer {@code pending} or its classification failed. Its waits are skipped but still count towards its timeout, so a test of the timeout
- * finishes at once: queue one response per check.
+ * <p>Queued responses take precedence, in order: {@link #enqueue(int, Object)}, {@link
+ * #enqueueError}, {@link #enqueueEvents}, {@link #enqueueCdn} and the other {@code enqueue}
+ * methods answer the next request instead of the in-memory API. A response queued for a route
+ * ({@link #enqueue(String, String, int, Object)}) waits until a request for that route arrives;
+ * other requests meanwhile go to the in-memory API. Like the real client, reads and uploads are
+ * retried on HTTP 429, 502, 503 and 504 and on network failures (without waiting), so queue one
+ * response per attempt, or build the mock from a builder with {@code maxRetries(0)}.
+ *
+ * <p>{@code assets.waitForDecision} retrieves the asset until its {@code
+ * classification.moderation.status} is no longer {@code pending} or its classification failed.
+ * Its waits are skipped but still count towards its timeout, so a pending asset times out at once.
  */
 public final class MockCalmLensServerClient implements AutoCloseable {
   /**
@@ -88,16 +110,148 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     }
   }
 
+  /** Where a mock upload ends up. */
+  public enum Outcome {
+    /** Still processing. */
+    PENDING("pending"),
+    /** Processing done; moderation {@code allowed}. */
+    ALLOWED("allowed"),
+    /** Processing done; moderation {@code age-restricted}. */
+    AGE_RESTRICTED("age-restricted"),
+    /** Processing done; moderation {@code blocked}. */
+    BLOCKED("blocked"),
+    /** Processing done; moderation {@code purged}, and the content is removed. */
+    PURGED("purged"),
+    /** Processing failed; the asset can be retried. */
+    FAILED("failed");
+
+    private final String value;
+
+    Outcome(String value) { this.value = value; }
+
+    /** @return the API value, such as {@code age-restricted} */
+    public String value() { return value; }
+  }
+
+  /** Outcome, ID and clock controls for the in-memory API. */
+  public static final class Options {
+    Outcome queuedOutcome = Outcome.PENDING, analyzedOutcome = Outcome.ALLOWED;
+    Supplier<String> createId = () -> UUID.randomUUID().toString();
+    LongSupplier now = System::currentTimeMillis;
+    String signedUrlBaseUrl = "https://mock.calmlens.invalid";
+
+    /** Defaults: queued uploads stay pending, analyzed ones are allowed. */
+    public Options() {}
+
+    /** @param value outcome of {@code assets.create} and queued multipart uploads @return these options */
+    public Options queuedOutcome(Outcome value) { queuedOutcome = Objects.requireNonNull(value, "queuedOutcome"); return this; }
+
+    /** @param value outcome of {@code assets.classify} and {@code text.classify} @return these options */
+    public Options analyzedOutcome(Outcome value) { analyzedOutcome = Objects.requireNonNull(value, "analyzedOutcome"); return this; }
+
+    /** @param value returns new asset, folder, lens and event IDs @return these options */
+    public Options createId(Supplier<String> value) { createId = Objects.requireNonNull(value, "createId"); return this; }
+
+    /** @param value the current time in milliseconds since the Unix epoch @return these options */
+    public Options now(LongSupplier value) { now = Objects.requireNonNull(value, "now"); return this; }
+
+    /** @param value base URL of returned signed URLs (not production URLs) @return these options */
+    public Options signedUrlBaseUrl(String value) { signedUrlBaseUrl = Objects.requireNonNull(value, "signedUrlBaseUrl").replaceAll("/+$", ""); return this; }
+
+    private Options copy() {
+      return new Options().queuedOutcome(queuedOutcome).analyzedOutcome(analyzedOutcome).createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
+    }
+  }
+
+  /**
+   * A CDN download grant carried by a mock API key.
+   *
+   * @param actions granted actions, such as {@code assets:download}
+   * @param folderId the folder the grant covers, or null for the whole project
+   * @param includeSubfolders whether it also covers the folder's subfolders
+   */
+  public record Grant(List<String> actions, String folderId, boolean includeSubfolders) {
+    /** Copies the actions. */
+    public Grant { actions = List.copyOf(actions); }
+
+    /** @return {@code assets:download} for the whole project */
+    public static Grant download() { return new Grant(List.of("assets:download"), null, true); }
+  }
+
+  /**
+   * Upload bytes of one asset.
+   *
+   * @param type the content's MIME type
+   * @param parts the bytes by part number
+   */
+  public record StoredContent(String type, SortedMap<Integer, byte[]> parts) {
+    /** @return the parts joined in order */
+    public byte[] bytes() {
+      var out = new java.io.ByteArrayOutputStream();
+      parts.values().forEach(out::writeBytes);
+      return out.toByteArray();
+    }
+  }
+
+  /**
+   * The in-memory API's records, with the API's field names. Change them inside {@link
+   * #withStorage} to arrange a test, for example to set an asset's {@code
+   * classification.moderation.status}.
+   */
+  public static final class Storage {
+    /** Assets by ID. */
+    public final Map<String, JsonObject> assets = new LinkedHashMap<>();
+    /** Folders by ID. */
+    public final Map<String, JsonObject> folders = new LinkedHashMap<>();
+    /** The events feed, oldest first. */
+    public final List<JsonObject> events = new ArrayList<>();
+    /** Stored content by asset ID. */
+    public final Map<String, StoredContent> content = new LinkedHashMap<>();
+
+    Storage() {}
+  }
+
+  /**
+   * A mock API key carrying CDN download grants. Pass it to the builder ({@code
+   * CalmLensServerClient.builder(createMockApiKey(Grant.download()), "project-1")}) so {@code
+   * cdn.serve} may read private and age-restricted assets.
+   *
+   * @param grants the grants
+   * @return the key
+   */
+  public static String createMockApiKey(Grant... grants) {
+    JsonArray list = new JsonArray();
+    for (Grant grant : grants) {
+      JsonObject item = new JsonObject();
+      JsonArray actions = new JsonArray();
+      grant.actions().forEach(actions::add);
+      item.add("actions", actions);
+      item.addProperty("folderId", grant.folderId());
+      item.addProperty("includeSubfolders", grant.includeSubfolders());
+      list.add(item);
+    }
+    return "sk_test_" + Base64.getUrlEncoder().withoutPadding().encodeToString(Json.write(list).getBytes(StandardCharsets.UTF_8));
+  }
+
   private final Deque<Queued> responses = new ArrayDeque<>();
+  private final MockApi api;
+  private final String projectId;
   private final List<Request> requests = new ArrayList<>();
   /** Time the client spent in skipped waits; it moves the client's clock forward. */
   private final AtomicLong skippedNanos = new AtomicLong();
   /** The client under test. */
   public final CalmLensServerClient client;
 
-  /** A mock for project {@code project-1} with unreachable base URLs. */
-  public MockCalmLensServerClient() {
-    this(CalmLensServerClient.builder("mock-key", "project-1").baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"));
+  /** A mock for project {@code project-1} with unreachable base URLs and default {@link Options}. */
+  public MockCalmLensServerClient() { this(new Options()); }
+
+  /**
+   * A mock for project {@code project-1} with unreachable base URLs.
+   *
+   * @param options outcome, ID and clock controls (copied)
+   */
+  public MockCalmLensServerClient(Options options) {
+    this(CalmLensServerClient.builder("mock-key", "project-1").baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"), options);
   }
 
   /**
@@ -106,8 +260,16 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    *
    * @param builder client options
    */
-  public MockCalmLensServerClient(CalmLensServerClient.Builder builder) {
+  public MockCalmLensServerClient(CalmLensServerClient.Builder builder) { this(builder, new Options()); }
+
+  /**
+   * @param builder client options
+   * @param options outcome, ID and clock controls (copied)
+   */
+  public MockCalmLensServerClient(CalmLensServerClient.Builder builder, Options options) {
     client = builder.build(this::send, delay -> skippedNanos.addAndGet(delay.toNanos()), () -> System.nanoTime() + skippedNanos.get());
+    projectId = client.projectId();
+    api = new MockApi(projectId, client.baseUrl(), client.cdnBaseUrl(), Objects.requireNonNull(options, "options").copy());
   }
 
   private static Map<String, List<String>> headers(Object... pairs) {
@@ -116,7 +278,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     return headers;
   }
 
-  private static String requestId() { return "req_mock_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12); }
+  static String requestId() { return "req_mock_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12); }
 
   private synchronized MockCalmLensServerClient add(String method, String path, Transport.Response response, Exception failure) {
     responses.add(new Queued(method, path, response, failure));
@@ -233,6 +395,75 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /** @return this mock, with a request timeout queued ({@link RequestTimeoutException}) */
   public MockCalmLensServerClient enqueueTimeout() { return enqueueFailure(new HttpTimeoutException("request timed out")); }
 
+  /**
+   * Gives an asset a new outcome, as a reviewer would: a decided status records a manual review,
+   * and every outcome but {@code pending} adds the matching {@code asset.<status>} (or {@code
+   * asset.failed}) event with the asset's snapshot and a {@code decided-by: reviewer} fact.
+   * Finished processing removes temporary content, and {@code purged} removes it in any case.
+   *
+   * @param assetId a stored asset
+   * @param outcome the new outcome
+   * @return the asset
+   * @throws IllegalArgumentException when the asset is not stored
+   */
+  public synchronized Models.Asset decide(String assetId, Outcome outcome) {
+    JsonObject asset = api.storage.assets.get(assetId);
+    if (asset == null) throw new IllegalArgumentException("No mock asset " + assetId);
+    long now = api.now();
+    api.applyOutcome(asset, Objects.requireNonNull(outcome, "outcome"), now);
+    if (outcome != Outcome.PENDING && outcome != Outcome.FAILED) {
+      JsonObject review = new JsonObject();
+      review.addProperty("id", api.createId());
+      review.addProperty("decision", outcome.value());
+      review.add("note", null);
+      review.add("reviewerUserId", null);
+      review.addProperty("reviewedAt", now);
+      review.addProperty("appliedToAsset", true);
+      asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);
+    }
+    if (outcome != Outcome.PENDING) enqueueEvent("asset." + outcome.value(), assetId, new Models.EventFact("decided-by", "reviewer", null));
+    return Json.GSON.fromJson(asset, Models.Asset.class);
+  }
+
+  /**
+   * Adds an event to the feed that {@code events.list} and {@code events.pages} return after
+   * cursors taken earlier. When {@code assetId} names a stored asset, the event carries a snapshot
+   * of its status, as the API's events do.
+   *
+   * @param type a registered event type, such as {@code asset.blocked}
+   * @param assetId the asset the event is about, or null
+   * @param facts the event's registered facts
+   * @return the event
+   */
+  public synchronized Models.Event enqueueEvent(String type, String assetId, Models.EventFact... facts) {
+    long now = api.now();
+    JsonObject event = new JsonObject();
+    event.addProperty("id", api.createId());
+    event.addProperty("projectId", projectId);
+    event.add("userId", null);
+    event.addProperty("type", Objects.requireNonNull(type, "type"));
+    event.addProperty("severity", "low");
+    event.addProperty("title", type);
+    event.add("description", null);
+    event.addProperty("assetId", assetId);
+    JsonObject asset = assetId == null ? null : api.storage.assets.get(assetId);
+    event.add("asset", asset == null ? null : MockApi.snapshot(asset));
+    event.add("facts", Json.GSON.toJsonTree(List.of(facts)));
+    event.addProperty("notify", false);
+    event.addProperty("createdAt", now);
+    event.addProperty("updatedAt", now);
+    event.add("readAt", null);
+    api.storage.events.add(event);
+    return Json.GSON.fromJson(event, Models.Event.class);
+  }
+
+  /**
+   * Reads or changes the in-memory records while no request is being answered.
+   *
+   * @param change receives the storage
+   */
+  public synchronized void withStorage(Consumer<Storage> change) { change.accept(api.storage); }
+
   /** @return every request received so far */
   public synchronized List<Request> requests() { return List.copyOf(requests); }
 
@@ -247,11 +478,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     Queued next;
     synchronized (this) {
       requests.add(captured);
-      if (responses.isEmpty()) throw new IOException("No queued mock response for " + request.method() + " " + captured.path());
-      if (!responses.peek().matches(request.method(), captured.path()))
-        throw new IOException("The next queued mock response is for " + responses.peek().method() + " " + responses.peek().path()
-            + ", not " + request.method() + " " + captured.path());
-      next = responses.remove();
+      if (!responses.isEmpty() && responses.peek().matches(request.method(), captured.path())) next = responses.remove();
+      else return api.answer(captured);
     }
     if (next.failure() != null) {
       if (next.failure() instanceof IOException e) throw e;

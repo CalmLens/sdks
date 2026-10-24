@@ -89,12 +89,15 @@ class MockClientTest {
 
   @Test void routedResponsesOnlyAnswerTheirRoute() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(CalmLensServerClient.builder("key", "project-1").maxRetries(0))
-        .enqueue("GET", "/assets/search", 200, Map.of("query", "cats", "items", List.of()));
-    TransportException wrongRoute = assertThrows(TransportException.class, () -> mock.client.assets.list(new Models.ListAssets()));
-    assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, wrongRoute.getCode());
+        .enqueue("GET", "/assets/search", 200, Map.of("query", "cats", "items",
+            List.of(Map.of("asset", Fixtures.asset("queued-1", "completed", "allowed"), "score", 1, "matchedFields", List.of("name")))));
+    mock.client.assets.create("stored.png", new byte[] {1}, "image/png");
+    // Other routes go to the in-memory API while the routed response waits for its route.
+    assertEquals(List.of("stored.png"), mock.client.assets.list(new Models.ListAssets()).items().stream().map(Models.Asset::name).toList());
     assertEquals(1, mock.remainingResponses());
-    assertEquals("cats", mock.client.assets.search(new Models.SearchAssets().query("cats")).query());
+    assertEquals("queued-1", mock.client.assets.search(new Models.SearchAssets().query("stored")).items().get(0).asset().id());
     assertEquals(0, mock.remainingResponses());
+    assertEquals("stored.png", mock.client.assets.search(new Models.SearchAssets().query("stored")).items().get(0).asset().name());
   }
 
   @Test void eventsAndCdnResponsesLookReal() {

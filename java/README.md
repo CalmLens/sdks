@@ -238,18 +238,24 @@ The Java SDK follows the JavaScript SDK's names (`assets.classify`, `cdn.serve`,
 See [Java testing](https://calmlens.com/docs/sdk/java/testing). In short:
 
 ```java
-var mock = new MockCalmLensServerClient();
-mock.enqueue(200, Map.of("id", "asset-1", "upload", Map.of("status", "completed"),
-    "classification", Map.of("status", "completed", "moderation", Map.of("status", "allowed")),
-    "content", Map.of("status", "removed")));
-mock.enqueueError(ErrorCodes.ASSET_NOT_FOUND);            // HTTP 404 with the API's error body and a request ID
-mock.enqueueEvents("cursor-2", false, Map.of("id", "e1", "type", "asset.blocked", "assetId", "asset-1"));
-mock.enqueueCdn(200, "image/webp", bytes);
-Asset asset = mock.client.text.classify("hello");
-MockCalmLensServerClient.Request sent = mock.requests().get(0); // method(), path(), query(), header(...), bodyText()
+var mock = new MockCalmLensServerClient(new MockCalmLensServerClient.Options()
+    .queuedOutcome(MockCalmLensServerClient.Outcome.PENDING)          // assets.create (default)
+    .analyzedOutcome(MockCalmLensServerClient.Outcome.ALLOWED));      // assets.classify and text.classify (default)
+Asset asset = mock.client.assets.create("photo.png", bytes, "image/png");
+mock.decide(asset.id(), MockCalmLensServerClient.Outcome.BLOCKED);   // records a review and adds an asset.blocked event
+mock.client.assets.retrieve(new Models.AssetId(asset.id()));         // classification.moderation.status is blocked
+MockCalmLensServerClient.Request sent = mock.requests().get(0);      // method(), path(), query(), header(...), bodyText()
 ```
 
-The mock is the real client with a queued transport: validation, encoding, retries and error mapping all run, without waiting between retries. `assets.waitForDecision` reads queued responses until one's moderation status is no longer `pending` (or its classification failed); its waits are skipped but count towards its timeout. `enqueue(method, path, status, body)` binds a response to one route; `enqueueFailure(exception)` and `enqueueTimeout()` simulate network failures. Queue one response per retry attempt, or build the mock with `maxRetries(0)`. It does not classify content or keep state.
+The mock is the real client in front of an in-memory API: validation, encoding, retries and error mapping all run, without waiting between retries. It keeps assets, folders, events and content, so uploads can be retrieved, listed (RSQL filters such as `classification.moderation.status==blocked`, ordering, folder and cursor paging), searched, updated, moved and deleted. It does not classify content: outcomes are `PENDING`, `ALLOWED`, `AGE_RESTRICTED`, `BLOCKED`, `PURGED` (which also removes the content) and `FAILED`. Finished processing removes content unless the upload sets `keepContentAfterProcessing`.
+
+- **Errors** use the API's codes, HTTP statuses and error body, and every response has an `X-Request-Id`. Idempotency keys replay the first response; a key reused for a different request fails with `idempotency/key-reused`.
+- **Events** from `decide` and `enqueueEvent(type, assetId, facts...)` are returned by `events.list` and `events.pages` after cursors taken earlier.
+- **Waiting for decisions** with `assets.waitForDecision` checks storage; its waits are skipped but count towards its timeout, so a pending asset times out at once. Use `mock.withStorage(storage -> ...)` to read or change stored records.
+- **CDN responses** from `cdn.serve` carry the stored bytes, content type and length. Blocked and purged assets are refused, and private and age-restricted assets need a key with the download grant: build the mock from `CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(MockCalmLensServerClient.Grant.download()), "project-1")`. A public age-restricted asset is also served with `allowAgeRestricted(true)`.
+- **Options** `createId` and `now` make IDs and timestamps deterministic; `signedUrlBaseUrl` sets the base of signed URLs, which are not production URLs.
+
+Queued responses take precedence, in order: `enqueue(status, body)`, `enqueueError(code)`, `enqueueRateLimited`, `enqueueEvents`, `enqueueCdn`, `enqueueFailure(exception)` and `enqueueTimeout()` answer the next request instead of the in-memory API. `enqueue(method, path, status, body)` binds a response to one route and waits for a request to it. Queue one response per retry attempt, or build the mock with `maxRetries(0)`.
 
 ## Development
 
