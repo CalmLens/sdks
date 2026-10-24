@@ -451,7 +451,12 @@ export const CalmLensMedia = defineComponent({
                 ),
             ]),
           (current.kind === "unavailable" || failed) &&
-            notice([h("p", [icon("unavailable"), text.unavailable])]),
+            notice([
+              h("p", [
+                icon("unavailable"),
+                h("span", { class: "calmlens-media__label" }, text.unavailable),
+              ]),
+            ]),
         ],
       );
     };

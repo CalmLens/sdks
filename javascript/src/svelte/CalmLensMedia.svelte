@@ -123,7 +123,7 @@
   {/if}
   {#if state.kind === "unavailable" || failed}
     <figcaption class="calmlens-media__notice">
-      <p><Icon name="unavailable" />{messages.unavailable}</p>
+      <p><Icon name="unavailable" /><span class="calmlens-media__label">{messages.unavailable}</span></p>
     </figcaption>
   {/if}
 </figure>

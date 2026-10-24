@@ -119,6 +119,13 @@ export const CALMLENS_STYLES = `
   padding: 12px; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.45);
 }
 .calmlens-media__notice p { margin: 0; display: flex; gap: 6px; align-items: center; }
+/* Thumbnails keep the notice's icon and leave its text to screen readers. */
+.calmlens-media[data-sized] { container-type: inline-size; }
+@container (max-width: 119px) {
+  .calmlens-media__label, .calmlens-media__notice > strong, .calmlens-media__notice > p:not(:has(svg)) {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+}
 .calmlens-media__notice strong { font-weight: 600; }
 .calmlens-media__notice .calmlens-button { margin-top: 4px; border-color: #fff; background: #fff; color: #111; }
 .calmlens-media[data-state="error"] .calmlens-media__notice, .calmlens-media[data-kind="unavailable"] .calmlens-media__notice {

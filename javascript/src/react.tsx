@@ -440,7 +440,7 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
         <figcaption className="calmlens-media__notice">
           <p>
             <Icon name="unavailable" />
-            {messages.unavailable}
+            <span className="calmlens-media__label">{messages.unavailable}</span>
           </p>
         </figcaption>
       )}

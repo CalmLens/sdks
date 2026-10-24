@@ -471,7 +471,13 @@ export class CalmLensMediaElement extends BaseElement {
           })
         : undefined;
     const notice = (children: Child[]) => el("div", { class: "calmlens-media__notice" }, children);
-    const unavailable = () => notice([el("p", {}, [icon("unavailable"), messages.unavailable])]);
+    const unavailable = () =>
+      notice([
+        el("p", {}, [
+          icon("unavailable"),
+          el("span", { class: "calmlens-media__label" }, [messages.unavailable]),
+        ]),
+      ]);
     const fail = () => {
       this.dataset.state = "error";
       this.replaceChildren(unavailable());
