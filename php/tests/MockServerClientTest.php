@@ -11,11 +11,6 @@ use PHPUnit\Framework\TestCase;
 
 final class MockServerClientTest extends TestCase
 {
-    private static function downloadKey(): string
-    {
-        return MockServerClient::createApiKey([['actions' => ['assets:download'], 'folderId' => null, 'includeSubfolders' => true]]);
-    }
-
     private static function image(MockServerClient $mock, string $visibility = 'public'): array
     {
         return $mock->client()->assets->create([
@@ -73,77 +68,30 @@ final class MockServerClientTest extends TestCase
         new MockServerClient(queuedOutcome: 'approved');
     }
 
-    public function testWaitForDecisionReturnsAfterDecideAndDecideAddsTheStatusEvent(): void
-    {
-        $mock = new MockServerClient();
-        $client = $mock->client();
-        $asset = self::image($mock);
-        $cursor = $client->events->list()['cursor'];
-        try {
-            $client->assets->waitForDecision(['assetId' => $asset['id'], 'timeout' => 0]);
-            self::fail('Expected a timeout');
-        } catch (CalmLensException $error) {
-            self::assertSame('sdk/timeout', $error->errorCode);
-        }
-        $mock->decide($asset['id'], 'age-restricted');
-        self::assertSame('age-restricted', $client->assets->waitForDecision(['assetId' => $asset['id']])['classification']['moderation']['status']);
-        $events = $client->events->list(['after' => $cursor])['events'];
-        self::assertSame(['asset.age-restricted'], array_column($events, 'type'));
-        self::assertSame($asset['id'], $events[0]['assetId']);
-        self::assertSame('age-restricted', $events[0]['asset']['classification']['moderation']['status']);
-        self::assertSame([['key' => 'decided-by', 'value' => 'reviewer']], $events[0]['facts']);
-    }
-
-    public function testCdnRefusesBlockedAssets(): void
-    {
-        $mock = new MockServerClient(queuedOutcome: 'blocked');
-        $asset = self::image($mock);
-        $response = $mock->client()->cdn->serve(['assetIdentifier' => $asset['id']]);
-        self::assertSame(403, $response->getStatusCode());
-        self::assertSame('asset/not-available', json_decode((string) $response->getBody(), true)['code']);
-    }
-
-    public function testCdnServesPublicAgeRestrictedAssetsOnlyWithTheOptInOrDownloadPermission(): void
+    /** The shared scenarios cover which keys may read what; these are the cache headers on each kind of response. */
+    public function testCdnCachesPublicResponsesButNotOptedInAgeRestrictedOnes(): void
     {
         $mock = new MockServerClient(queuedOutcome: 'age-restricted');
         $asset = self::image($mock);
-        $cdn = $mock->client()->cdn;
-        $refused = $cdn->serve(['assetIdentifier' => $asset['id']]);
-        self::assertSame(403, $refused->getStatusCode());
-        self::assertSame('asset/api-key-missing-permission', json_decode((string) $refused->getBody(), true)['code']);
-        $optedIn = $cdn->serve(['assetIdentifier' => $asset['id'], 'allowAgeRestricted' => true]);
+        $optedIn = $mock->client()->cdn->serve(['assetIdentifier' => $asset['id'], 'allowAgeRestricted' => true]);
         self::assertSame(200, $optedIn->getStatusCode());
-        self::assertSame('png-bytes', (string) $optedIn->getBody());
         self::assertSame('private, no-store', $optedIn->getHeaderLine('Cache-Control'));
-        $granted = new MockServerClient(queuedOutcome: 'age-restricted', apiKey: self::downloadKey());
-        $grantedAsset = self::image($granted);
-        self::assertSame(200, $granted->client()->cdn->serve(['assetIdentifier' => $grantedAsset['id']])->getStatusCode());
-    }
-
-    public function testCdnServesPrivateAssetsOnlyWithDownloadPermission(): void
-    {
-        $mock = new MockServerClient(queuedOutcome: 'allowed');
-        $asset = self::image($mock, 'private');
-        self::assertSame(403, $mock->client()->cdn->serve(['assetIdentifier' => $asset['id'], 'allowAgeRestricted' => true])->getStatusCode());
         $public = new MockServerClient(queuedOutcome: 'allowed');
-        $allowed = self::image($public);
+        self::image($public);
         $response = $public->client()->cdn->serve(['assetIdentifier' => 'post-1']);
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('public, max-age=31536000', $response->getHeaderLine('Cache-Control'));
-        self::assertSame($allowed['id'], $public->client()->assets->list()['items'][0]['id']);
     }
 
-    public function testListFiltersByModerationStatusAndPages(): void
+    public function testEachPagesThroughEveryAsset(): void
     {
         $time = 1000;
-        $mock = new MockServerClient(analyzedOutcome: fn (array $asset) => $asset['name'], now: function () use (&$time) { return $time++; });
+        $mock = new MockServerClient(now: function () use (&$time) { return $time++; });
         $client = $mock->client();
-        foreach (['allowed', 'blocked', 'allowed'] as $status) {
-            $client->text->classify(['name' => $status, 'text' => 'x']);
+        foreach (['a', 'b', 'c'] as $name) {
+            $client->text->classify(['name' => $name, 'text' => 'x']);
         }
-        $blocked = $client->assets->list(['filter' => 'classification.moderation.status==blocked'])['items'];
-        self::assertSame(['blocked'], array_column($blocked, 'name'));
-        self::assertCount(3, iterator_to_array($client->assets->each(['pageSize' => 1]), false));
+        self::assertSame(['c', 'b', 'a'], array_column(iterator_to_array($client->assets->each(['pageSize' => 1]), false), 'name'));
     }
 
     public function testEnqueuedResponsesComeFirstAndMissingAssetsAreNotFound(): void
@@ -268,16 +216,14 @@ final class MockServerClientTest extends TestCase
         self::assertSame(ErrorCodes::UPLOAD_SIZE_MISMATCH, self::code(fn () => $assets->uploadPart(['assetId' => $sized['id'], 'part' => ['data' => 'x', 'partNumber' => 2, 'isFinal' => true]])));
     }
 
-    public function testIdempotencyKeysReplayTheSavedResponseAndRejectADifferentRequest(): void
+    /** The shared scenario checks the replayed ID and the refusal; the replay must also be the whole saved response. */
+    public function testIdempotencyKeysReplayTheWholeSavedResponse(): void
     {
         $mock = new MockServerClient();
         $assets = $mock->client()->assets;
         $options = ['name' => 'a.txt', 'content' => ['plainText' => 'one', 'type' => 'text/plain'], 'requestOptions' => ['idempotencyKey' => 'key-1']];
         $first = $assets->create($options);
         self::assertSame($first, $assets->create($options));
-        self::assertCount(1, $mock->assets);
-        $options['content']['plainText'] = 'two';
-        self::assertSame(ErrorCodes::IDEMPOTENCY_KEY_REUSED, self::code(fn () => $assets->create($options)));
     }
 
     public function testFailNextRequestSimulatesConnectionFailuresAndApiErrors(): void

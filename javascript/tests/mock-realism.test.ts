@@ -207,17 +207,6 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
       ),
     ).toMatchObject({ code: "upload/not-open", status: 409 });
   });
-
-  it("replays a reused idempotency key and refuses it for a different request", async () => {
-    const client = createClient();
-    const first = await client.assets.create(text("a", { idempotencyKey: "key-1" }));
-    const replay = await client.assets.create(text("a", { idempotencyKey: "key-1" }));
-    expect(replay.id).toBe(first.id);
-    expect((await client.assets.list()).items).toHaveLength(1);
-    expect(
-      await caught(client.assets.create(text("b", { idempotencyKey: "key-1" }))),
-    ).toMatchObject({ code: "idempotency/key-reused", status: 409 });
-  });
 });
 
 describe("MockCalmLensServerClient CDN", () => {

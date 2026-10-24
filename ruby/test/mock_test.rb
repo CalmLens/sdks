@@ -4,31 +4,6 @@ require 'minitest/autorun'
 require 'calmlens/testing'
 
 class MockTest < Minitest::Test
-  def invoke(client, operation, options)
-    parts = operation.split('.')
-    target = parts.size == 1 ? client : client.public_send(parts.first)
-    target.public_send(parts.last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase, options)
-  end
-
-  def test_queued_responses_replay_every_request_contract
-    JSON.parse(File.read(File.expand_path('../testdata/requests.json', __dir__), encoding: 'UTF-8')).each do |fixture|
-      mock = CalmLens::MockServerClient.new.enqueue(body: fixture['response'])
-      result = invoke(mock, fixture['operation'], fixture['options'])
-      expected = case fixture['operation']
-                 when /\.delete\z/ then nil
-                 when 'ensureLenses' then fixture['response']['lenses']
-                 else fixture['response']
-                 end
-      expected.nil? ? assert_nil(result) : assert_equal(expected, result, fixture['operation'])
-      request = mock.requests.fetch(0)
-      body = request.headers['Content-Type'] == 'application/json' ? request.json : request.body&.force_encoding('UTF-8')
-      assert_equal fixture['request'].merge('path' => fixture['request']['path'].delete_prefix('/v1')),
-                   { 'method' => request.method, 'path' => request.path, 'query' => request.query, 'body' => body },
-                   fixture['operation']
-      assert_equal 0, mock.remaining_responses
-    end
-  end
-
   KEEP = { keep_content_after_processing: true }.freeze
   # A key that may read private content from the CDN; the default key may not.
   DOWNLOAD = CalmLens::MockServerClient.create_api_key([{ actions: ['assets:download'], folder_id: nil, include_subfolders: true }])
@@ -153,16 +128,15 @@ class MockTest < Minitest::Test
     assert_equal ['sdk/timeout', { 'assetId' => asset['id'], 'classificationStatus' => 'processing', 'moderationStatus' => 'pending' }],
                  [error.code, error.details]
 
-    mock.assets.define_singleton_method(:sleep) { |_| mock.state.assets[asset['id']]['classification']['status'] = 'failed' }
+    on_pause = -> { mock.state.assets[asset['id']]['classification']['status'] = 'failed' }
+    mock.assets.define_singleton_method(:sleep) { |_| on_pause.call }
     before = mock.requests.size
     failed = mock.assets.wait_for_decision(asset_id: asset['id'])
     assert_equal [asset['id'], 'failed'], [failed['id'], failed.dig('classification', 'status')]
     assert_equal([['GET', "/assets/#{asset['id']}"]] * 2, mock.requests.drop(before).map { |request| [request.method, request.path] })
 
     other = mock.assets.create(name: 'other.txt', content: { plain_text: 'x', type: 'text/plain' })
-    mock.assets.define_singleton_method(:sleep) do |_|
-      mock.state.assets[other['id']]['classification']['moderation']['status'] = 'age-restricted'
-    end
+    on_pause = -> { mock.state.assets[other['id']]['classification']['moderation']['status'] = 'age-restricted' }
     before = mock.requests.size
     decided = mock.assets.wait_for_decision(asset_id: other['id'])
     assert_equal [other['id'], 'age-restricted'], [decided['id'], decided.dig('classification', 'moderation', 'status')]

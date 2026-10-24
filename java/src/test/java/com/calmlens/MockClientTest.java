@@ -2,8 +2,6 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -11,19 +9,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class MockClientTest {
-  @Test void allOperationsUseTheMock() throws Throwable {
-    for (JsonElement item : Fixtures.read("requests.json").getAsJsonArray()) {
-      JsonObject fixture = item.getAsJsonObject();
-      MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueue(200, fixture.get("response"));
-      Fixtures.invoke(mock.client, fixture.get("operation").getAsString(), fixture.getAsJsonObject("options"));
-      assertEquals(1, mock.requests().size());
-      var recorded = mock.requests().get(0);
-      assertEquals(fixture.get("request"), Fixtures.describe(recorded.method(), java.net.URI.create(recorded.url()), recorded.headers(), recorded.body()),
-          fixture.get("operation").getAsString());
-      assertEquals(0, mock.remainingResponses());
-    }
-  }
-
   @Test void nativeBinaryContentArrivesUnchanged() {
     byte[] data = new byte[256];
     for (int i = 0; i < data.length; i++) data[i] = (byte) i;

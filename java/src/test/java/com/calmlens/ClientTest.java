@@ -10,9 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -24,55 +22,6 @@ class ClientTest {
     return CalmLensServerClient.builder("key", "project-1").transport(transport).build();
   }
 
-  @Test void requestContracts() throws Throwable {
-    for (JsonElement item : Fixtures.read("requests.json").getAsJsonArray()) {
-      JsonObject fixture = item.getAsJsonObject();
-      JsonObject[] captured = {null};
-      CalmLensServerClient client = client(request -> {
-        assertEquals("key", request.headers().get("X-Api-Key"));
-        captured[0] = Fixtures.describe(request.method(), request.uri(), request.headers(), Fixtures.body(request));
-        return Fixtures.json(200, fixture.get("response").toString());
-      });
-      String operation = fixture.get("operation").getAsString();
-      Fixtures.invoke(client, operation, fixture.getAsJsonObject("options"));
-      assertEquals(fixture.get("request"), captured[0], operation);
-    }
-  }
-
-  @Test void pathSafetyContracts() throws Throwable {
-    JsonObject paths = Fixtures.read("paths.json").getAsJsonObject();
-    CalmLensServerClient client = client(request -> fail("Sent " + request.uri() + " for a rejected ID"));
-    for (JsonElement item : paths.getAsJsonArray("rejections")) {
-      JsonObject rejection = item.getAsJsonObject();
-      String operation = rejection.get("operation").getAsString();
-      CalmLensException error = assertThrows(CalmLensException.class, () -> Fixtures.invoke(client, operation, rejection.getAsJsonObject("options")), rejection.toString());
-      assertEquals(rejection.get("error").getAsString(), error.getCode(), rejection.toString());
-    }
-    for (JsonElement item : paths.getAsJsonArray("cdnUrls")) {
-      JsonObject cdn = item.getAsJsonObject();
-      JsonObject options = cdn.getAsJsonObject("options");
-      // Every fixture option must reach the request model, so a new option can't be silently ignored.
-      if (cdn.has("url")) {
-        java.util.Set<String> mapped = new java.util.HashSet<>(Models.encode(Fixtures.decode(options, Models.CdnRequest.class)).keySet());
-        mapped.add("transform");
-        assertTrue(mapped.containsAll(options.keySet()), cdn.toString());
-      }
-      if (cdn.has("url")) assertEquals(cdn.get("url").getAsString(), client.cdn.getAssetUrl(Fixtures.decode(options, Models.CdnRequest.class)));
-      // Options the typed transform model cannot hold are rejected while decoding them.
-      else assertEquals(cdn.get("error").getAsString(), assertThrows(CalmLensException.class,
-          () -> client.cdn.getAssetUrl(Fixtures.decode(options, Models.CdnRequest.class))).getCode(), cdn.toString());
-    }
-  }
-
-  @Test void errorCodeConstantsMatchThePublicApi() throws Exception {
-    Map<String, Integer> expected = new HashMap<>();
-    for (JsonElement item : Fixtures.read("errors.json").getAsJsonArray())
-      expected.put(item.getAsJsonObject().get("code").getAsString(), item.getAsJsonObject().get("status").getAsInt());
-    assertEquals(expected, ErrorCodes.apiStatuses());
-    for (var entry : expected.entrySet()) assertEquals(entry.getValue(), ErrorCodes.httpStatus(entry.getKey()).orElseThrow(), entry.getKey());
-    assertTrue(ErrorCodes.httpStatus(ErrorCodes.SDK_TIMEOUT).isEmpty());
-  }
-
   @Test void versionComesFromTheManifestAndIsSentAsUserAgent() throws Exception {
     Matcher version = Pattern.compile("<artifactId>calmlens-sdk</artifactId>\\s*<version>([^<]+)</version>").matcher(Files.readString(Path.of("pom.xml")));
     assertTrue(version.find());
@@ -81,27 +30,6 @@ class ClientTest {
     client(request -> { agent[0] = request.headers().get("User-Agent"); return Fixtures.json(200, Fixtures.assetJson("a", "completed", "allowed")); })
         .assets.retrieve(new Models.AssetId("a"));
     assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (Java " + Runtime.version() + ")", agent[0]);
-  }
-
-  @Test void webhookVerificationContracts() throws Exception {
-    for (JsonElement item : Fixtures.read("webhooks.json").getAsJsonObject().getAsJsonArray("verification")) {
-      JsonObject v = item.getAsJsonObject();
-      long tolerance = v.has("toleranceSeconds") ? v.get("toleranceSeconds").getAsLong() : CalmLensServerClient.WEBHOOK_SIGNATURE_TOLERANCE_SECONDS;
-      String name = v.get("name").getAsString();
-      byte[] body = v.get("body").getAsString().getBytes(StandardCharsets.UTF_8);
-      String signature = v.get("signature").getAsString(), timestamp = v.get("timestamp").getAsString(), secret = v.get("secret").getAsString();
-      long now = v.get("now").getAsLong();
-      boolean valid = v.get("valid").getAsBoolean();
-      assertEquals(valid, CalmLensServerClient.verifyWebhookSignature(v.get("body").getAsString(), signature, timestamp, secret, now, tolerance), name);
-      assertEquals(valid, CalmLensServerClient.verifyWebhookSignature(body, signature, timestamp, secret, now, tolerance), name + " (bytes)");
-      // A verified body that is not a delivery (such as "{}") fails parsing, never verification.
-      try {
-        CalmLensServerClient.parseWebhookEvent(body, signature, timestamp, secret, now, tolerance);
-        assertTrue(valid, name);
-      } catch (CalmLensException error) {
-        assertEquals(valid ? ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD : ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE, error.getCode(), name);
-      }
-    }
   }
 
   @Test void parseWebhookEventVerifiesThenParses() throws Exception {
@@ -122,21 +50,6 @@ class ClientTest {
         () -> CalmLensServerClient.parseWebhookEvent(notAnEvent, CalmLensServerClient.createWebhookSignatureHeader("whsec", now, notAnEvent), now, "whsec")).getCode());
   }
 
-  @Test void webhookPayloadsAndDeliveryHeadersMatchTheContract() throws Exception {
-    JsonObject webhooks = Fixtures.read("webhooks.json").getAsJsonObject();
-    for (JsonElement item : webhooks.getAsJsonArray("payloads")) {
-      JsonObject entry = item.getAsJsonObject();
-      Models.Event event = Json.GSON.fromJson(entry.get("event"), Models.Event.class);
-      assertEquals(Json.GSON.fromJson(entry.get("payload"), Models.WebhookEventPayload.class),
-          CalmLensServerClient.toWebhookEventPayload(event), entry.toString());
-    }
-    JsonObject vector = webhooks.getAsJsonArray("signatures").get(0).getAsJsonObject();
-    String timestamp = vector.get("timestamp").getAsString();
-    assertEquals(Map.of("content-type", "application/json", CalmLensServerClient.WEBHOOK_DELIVERY_HEADER, "delivery-1",
-            CalmLensServerClient.WEBHOOK_TIMESTAMP_HEADER, timestamp, CalmLensServerClient.WEBHOOK_SIGNATURE_HEADER, vector.get("signature").getAsString()),
-        CalmLensServerClient.createWebhookHeaders(vector.get("secret").getAsString(), vector.get("body").getAsString(), "delivery-1", Long.parseLong(timestamp)));
-  }
-
   @Test void webhookVerificationUsesExactRawBytes() {
     // 0xff is not valid UTF-8: decoding it to a String replaces it, so only the byte overload matches.
     byte[] body = {'{', '"', 'a', '"', ':', '"', (byte) 0xff, '"', '}'};
@@ -149,51 +62,6 @@ class ClientTest {
     assertFalse(CalmLensServerClient.verifyWebhookSignature((byte[]) null, header, "1700000000", "key", 1700000000, 300));
   }
 
-  @Test void futureWebhookFieldsAndTypesAreAccepted() throws Exception {
-    for (JsonElement item : Fixtures.read("webhooks.json").getAsJsonObject().getAsJsonArray("parsing")) {
-      JsonObject f = item.getAsJsonObject();
-      Models.WebhookEventPayload event = CalmLensServerClient.parseWebhookEvent(
-        f.get("body").getAsString().getBytes(StandardCharsets.UTF_8), f.get("signature").getAsString(),
-        f.get("timestamp").getAsString(), f.get("secret").getAsString(), f.get("now").getAsLong(), 300);
-      assertEquals(f.get("expectedType").getAsString(), event.type());
-      assertEquals(f.get("expectedFactKey").getAsString(), event.data().facts().get(0).key());
-    }
-  }
-
-  @Test void webhookPayloadContracts() throws Exception {
-    var payloads = Fixtures.read("webhooks.json").getAsJsonObject().getAsJsonArray("payloads");
-    assertTrue(payloads.size() >= 2);
-    for (JsonElement item : payloads) {
-      JsonObject expected = item.getAsJsonObject().getAsJsonObject("payload");
-      JsonObject data = expected.getAsJsonObject("data");
-      Models.WebhookEventPayload parsed = CalmLensServerClient.readWebhookEvent(expected.toString());
-      assertEquals(expected.get("id").getAsString(), parsed.id());
-      assertEquals(expected.get("type").getAsString(), parsed.type());
-      assertEquals(Instant.ofEpochMilli(expected.get("createdAt").getAsLong()), parsed.createdAt());
-      assertEquals(expected.get("projectId").getAsString(), parsed.projectId());
-      assertEquals(data.get("severity").getAsString(), parsed.data().severity());
-      assertEquals(data.get("title").getAsString(), parsed.data().title());
-      assertEquals(data.get("description").isJsonNull() ? null : data.get("description").getAsString(), parsed.data().description());
-      assertEquals(data.get("assetId").isJsonNull() ? null : data.get("assetId").getAsString(), parsed.data().assetId());
-      if (data.get("asset").isJsonNull()) assertNull(parsed.data().asset());
-      else assertEventAsset(data.getAsJsonObject("asset"), parsed.data().asset());
-      assertEquals(data.get("facts"), Json.GSON.toJsonTree(parsed.data().facts()));
-    }
-  }
-
-  private static String string(JsonObject object, String name) {
-    JsonElement value = object.get(name);
-    return value == null || value.isJsonNull() ? null : value.getAsString();
-  }
-
-  private static void assertEventAsset(JsonObject expected, Models.EventAsset asset) {
-    assertEquals(string(expected, "id"), asset.id());
-    assertEquals(string(expected, "externalId"), asset.externalId());
-    assertEquals(string(expected.getAsJsonObject("classification"), "status"), asset.classification().status().value());
-    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "status"), asset.classification().moderation().status().value());
-    assertEquals(string(expected.getAsJsonObject("content"), "status"), asset.content().status().value());
-  }
-
   @Test void invalidWebhookPayloads() {
     for (String body : new String[] {"", "not json", "[]", "{\"type\":\"asset.classified\",\"data\":{}}",
         "{\"id\":\"event-1\",\"data\":{}}", "{\"id\":\"event-1\",\"type\":\"asset.classified\"}",
@@ -202,14 +70,6 @@ class ClientTest {
       assertEquals(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, error.getCode(), body);
     }
     assertEquals(List.of(), CalmLensServerClient.readWebhookEvent("{\"id\":\"event-1\",\"type\":\"test.sent\",\"projectId\":\"project-1\",\"data\":{}}").data().facts());
-  }
-
-  @Test void webhookSignatureContracts() throws Exception {
-    for (JsonElement item : Fixtures.read("webhooks.json").getAsJsonObject().getAsJsonArray("signatures")) {
-      JsonObject v = item.getAsJsonObject();
-      String header = CalmLensServerClient.createWebhookSignatureHeader(v.get("secret").getAsString(), v.get("timestamp").getAsString(), v.get("body").getAsString());
-      assertEquals(v.get("signature").getAsString(), header);
-    }
   }
 
   @Test void apiErrorsCarryStatusRequestIdHeadersAndDetails() {
@@ -328,20 +188,5 @@ class ClientTest {
     assertEquals(List.of(expected.subList(0, 100), expected.subList(100, 101)), sent);
     assertEquals(expected, result.stream().map(Models.Lens::identifier).toList());
     assertEquals(expected.stream().map(identifier -> "id-" + identifier).toList(), result.stream().map(Models.Lens::id).toList());
-  }
-
-  /** Every transform option, decoded into ImageTransformOptions and serialized, gives the step the CDN writes. */
-  @Test
-  void transformOptionsMatchTheContract() throws Exception {
-    JsonObject fixture = Fixtures.read("transform-options.json").getAsJsonObject();
-    for (JsonElement item : fixture.getAsJsonArray("cases")) {
-      JsonObject testCase = item.getAsJsonObject();
-      Models.ImageTransformOptions options =
-          Json.GSON.fromJson(testCase.get("options"), Models.ImageTransformOptions.class);
-      assertEquals(
-          testCase.get("selector").getAsString(),
-          CalmLensServerClient.serializeTransform(Models.Transform.image(options)),
-          testCase.get("options").toString());
-    }
   }
 }

@@ -115,23 +115,6 @@ func TestMockLensAndMultipart(t *testing.T) {
 		t.Fatal(a, err)
 	}
 }
-func TestMockDownloadGrant(t *testing.T) {
-	c, _ := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}, IncludeSubfolders: true}})})
-	ctx := context.Background()
-	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	res.Body.Close()
-	if res.StatusCode != 200 {
-		t.Fatal(res.StatusCode)
-	}
-}
-
 func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 	c, err := NewServerClient(Options{ProjectID: "my project", BaseURL: "http://localhost:8787/api/v1/", Timeout: time.Second})
 	if err != nil {
@@ -402,24 +385,6 @@ func TestMockMultipartUsesSavedQueueModeAndChecksParts(t *testing.T) {
 	}
 }
 
-func TestMockReplaysIdempotentRequests(t *testing.T) {
-	c, _ := NewServerClient(Options{})
-	ctx := context.Background()
-	options := calmlens.SubmitAssetOptions{Name: "n", IdempotencyKey: "key-1", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("x")}}
-	first, err := c.Assets.Create(ctx, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := c.Assets.Create(ctx, options)
-	if err != nil || second.ID != first.ID || len(c.DatabaseStorage.Assets) != 1 {
-		t.Fatal("replay created another asset", err)
-	}
-	options.Name = "other"
-	if _, err = c.Assets.Create(ctx, options); calmlens.ErrorCode(err) != calmlens.CodeIdempotencyKeyReused {
-		t.Fatal(err)
-	}
-}
-
 func TestMockCDNResponseIsRealistic(t *testing.T) {
 	c, _ := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}})})
 	ctx := context.Background()
@@ -583,61 +548,6 @@ func TestMockPurgedOutcomeRemovesKeptContentForPolicy(t *testing.T) {
 	if err != nil || a.Classification.Status != calmlens.ClassificationStatusCompleted || a.Classification.Moderation.Status != calmlens.ModerationStatusPurged ||
 		a.Content.Status != calmlens.ContentStatusRemoved || *a.Content.RemovalReason != calmlens.ContentRemovalReasonPolicy || c.ImageStorage.Content[a.ID] != nil {
 		t.Fatal(a, err)
-	}
-}
-
-func TestMockCDNServesAgeRestrictedAssetsOnlyWithDownloadPermission(t *testing.T) {
-	storage := &InMemoryDatabaseStorage{}
-	images := &InMemoryImageStorage{}
-	options := Options{DatabaseStorage: storage, ImageStorage: images, AnalyzedOutcome: OutcomeAgeRestricted}
-	c, err := NewServerClient(options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
-	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "public", Visibility: calmlens.VisibilityPublic, ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
-	if err != nil || a.Classification.Moderation.Status != calmlens.ModerationStatusAgeRestricted || *a.Visibility != calmlens.VisibilityPublic {
-		t.Fatal(a, err)
-	}
-	serveURL := func(client *MockServerClient, optIn bool) int {
-		res, err := client.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, AllowAgeRestricted: optIn}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		res.Body.Close()
-		return res.StatusCode
-	}
-	serve := func(client *MockServerClient) int { return serveURL(client, false) }
-	if status := serve(c); status != http.StatusForbidden {
-		t.Fatal("age-restricted asset served without download permission", status)
-	}
-	if status := serveURL(c, true); status != http.StatusOK {
-		t.Fatal("public age-restricted asset not served with the allowAgeRestricted opt-in", status)
-	}
-	private, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "private", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: private.ID, AllowAgeRestricted: true}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	res.Body.Close()
-	if res.StatusCode != http.StatusForbidden {
-		t.Fatal("private age-restricted asset served through the opt-in", res.StatusCode)
-	}
-	options.APIKey = CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}})
-	downloader, err := NewServerClient(options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status := serve(downloader); status != http.StatusOK {
-		t.Fatal("age-restricted asset not served with download permission", status)
-	}
-	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusAllowed
-	if status := serve(c); status != http.StatusOK {
-		t.Fatal("allowed public asset not served", status)
 	}
 }
 

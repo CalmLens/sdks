@@ -33,47 +33,19 @@ fn cdn(asset_identifier: &str) -> CdnRequest {
         ..Default::default()
     }
 }
-async fn cdn_code(mock: &MockServerClient, request: CdnRequest) -> (u16, String) {
-    let response = mock.cdn().serve(request).await.unwrap();
-    let status = response.status().as_u16();
-    let body: serde_json::Value = serde_json::from_slice(&response.bytes().await.unwrap()).unwrap();
-    (status, body["code"].as_str().unwrap().to_owned())
-}
 
+/// The shared scenarios cover the statuses, events and delivery a decision gives; these are the
+/// mock's own IDs, the recorded review, and an event feed that delivers each event once.
 #[tokio::test]
-async fn created_asset_stays_pending_until_a_reviewer_blocks_it() {
+async fn decide_records_a_manual_review_once_on_a_deterministic_id() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let start = mock.events().list(ListEvents::default()).await.unwrap();
     let created = mock.assets().create(kept("a.png", b"png")).await.unwrap();
     assert_eq!(created.id, "id-1");
-    assert_eq!(
-        created.classification.status,
-        AssetClassificationStatus::Processing
-    );
-    assert_eq!(
-        created.classification.moderation.status,
-        AssetModerationStatus::Pending
-    );
-    let error = mock
-        .assets()
-        .wait_for_decision(
-            WaitForDecision::new(&created.id).timeout(std::time::Duration::from_millis(1)),
-        )
-        .await
-        .unwrap_err();
-    assert!(error.is_timeout());
 
-    mock.decide(&created.id, AssetModerationDecision::Blocked)
-        .unwrap();
     let asset = mock
-        .assets()
-        .retrieve(AssetId::new(&created.id))
-        .await
+        .decide(&created.id, AssetModerationDecision::Blocked)
         .unwrap();
-    assert_eq!(
-        asset.classification.moderation.status,
-        AssetModerationStatus::Blocked
-    );
     assert_eq!(
         asset.classification.status,
         AssetClassificationStatus::Completed
@@ -81,15 +53,6 @@ async fn created_asset_stays_pending_until_a_reviewer_blocks_it() {
     let reviews = &asset.classification.moderation.manual_reviews;
     assert_eq!(reviews.len(), 1);
     assert_eq!(reviews[0].decision, AssetModerationDecision::Blocked);
-    let waited = mock
-        .assets()
-        .wait_for_decision(WaitForDecision::new(&created.id))
-        .await
-        .unwrap();
-    assert_eq!(
-        waited.classification.moderation.status,
-        AssetModerationStatus::Blocked
-    );
 
     let page = mock
         .events()
@@ -100,22 +63,6 @@ async fn created_asset_stays_pending_until_a_reviewer_blocks_it() {
         .await
         .unwrap();
     assert_eq!(page.events.len(), 1);
-    let event = &page.events[0];
-    assert_eq!(event.event_type, Some(EventType::AssetBlocked));
-    assert_eq!(event.asset_id.as_deref(), Some(created.id.as_str()));
-    let snapshot = event.asset.as_ref().unwrap();
-    assert_eq!(
-        snapshot.classification.moderation.status,
-        AssetModerationStatus::Blocked
-    );
-    assert_eq!(
-        event.facts,
-        vec![EventFact {
-            key: "decided-by".into(),
-            value: json!("reviewer"),
-            url: None
-        }]
-    );
     let later = mock
         .events()
         .list(ListEvents {
@@ -125,13 +72,6 @@ async fn created_asset_stays_pending_until_a_reviewer_blocks_it() {
         .await
         .unwrap();
     assert!(later.events.is_empty());
-
-    // Blocked content is kept but not delivered, even with the download permission.
-    assert!(mock.with_storage(|storage| storage.content.contains_key(&created.id)));
-    assert_eq!(
-        cdn_code(&mock, cdn(&created.id)).await,
-        (403, "asset/not-available".into())
-    );
     assert_eq!(
         mock.decide("missing", AssetModerationDecision::Allowed)
             .unwrap_err()
@@ -140,80 +80,43 @@ async fn created_asset_stays_pending_until_a_reviewer_blocks_it() {
     );
 }
 
+/// The shared scenarios cover the content statuses; these are the stored bytes behind them.
 #[tokio::test]
-async fn classify_uses_the_analyzed_outcome_and_removes_temporary_content() {
-    let mock = MockServerClient::in_memory(options().analyzed_outcome(MockOutcome::AgeRestricted))
-        .unwrap();
+async fn storage_keeps_only_kept_content_and_drops_purged_content() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
     let asset = mock
         .text()
         .classify(ClassifyText::new("hello"))
         .await
         .unwrap();
-    assert_eq!(
-        asset.classification.moderation.status,
-        AssetModerationStatus::AgeRestricted
-    );
-    assert_eq!(
-        asset.classification.status,
-        AssetClassificationStatus::Completed
-    );
     assert_eq!(asset.asset_type, Some(AssetType::PlaintextDocument));
-    assert_eq!(asset.content.status, AssetContentStatus::Removed);
-    assert_eq!(
-        asset.content.removal_reason,
-        Some(AssetContentRemovalReason::Retention)
-    );
     assert!(!mock.with_storage(|storage| storage.content.contains_key(&asset.id)));
 
-    let kept = mock.assets().classify(kept("b.png", b"png")).await.unwrap();
-    assert_eq!(kept.content.status, AssetContentStatus::Stored);
+    let stored = mock.assets().classify(kept("b.png", b"png")).await.unwrap();
     assert_eq!(
-        mock.with_storage(|storage| storage.content[&kept.id].bytes()),
+        mock.with_storage(|storage| storage.content[&stored.id].bytes()),
         b"png"
     );
-    // `create` still uses the queued outcome.
-    let queued = mock.assets().create(named("later")).await.unwrap();
-    assert_eq!(
-        queued.classification.moderation.status,
-        AssetModerationStatus::Pending
-    );
-    assert_eq!(queued.content.status, AssetContentStatus::Temporary);
+    mock.decide(&stored.id, AssetModerationDecision::Blocked)
+        .unwrap();
+    assert!(mock.with_storage(|storage| storage.content.contains_key(&stored.id)));
+    mock.decide(&stored.id, AssetModerationDecision::Purged)
+        .unwrap();
+    assert!(!mock.with_storage(|storage| storage.content.contains_key(&stored.id)));
+
+    let purging =
+        MockServerClient::in_memory(options().analyzed_outcome(MockOutcome::Purged)).unwrap();
+    let purged = purging
+        .assets()
+        .classify(kept("e.png", b"png"))
+        .await
+        .unwrap();
+    assert!(!purging.with_storage(|storage| storage.content.contains_key(&purged.id)));
 }
 
+/// The shared scenarios cover which keys may read what; these are the served type and byte ranges.
 #[tokio::test]
-async fn cdn_needs_the_download_permission_for_private_and_age_restricted_assets() {
-    let denied =
-        MockServerClient::in_memory(options().analyzed_outcome(MockOutcome::AgeRestricted))
-            .unwrap();
-    let asset = denied
-        .assets()
-        .classify(kept("c.png", b"bytes"))
-        .await
-        .unwrap();
-    assert_eq!(
-        cdn_code(&denied, cdn(&asset.id)).await,
-        (403, "asset/api-key-missing-permission".into())
-    );
-    // Public, but age-restricted: only with allow_age_restricted.
-    denied.with_storage(|storage| {
-        storage.assets.get_mut(&asset.id).unwrap()["visibility"] = json!("public")
-    });
-    assert_eq!(
-        cdn_code(&denied, cdn(&asset.id)).await,
-        (403, "asset/api-key-missing-permission".into())
-    );
-    let opted_in = denied
-        .cdn()
-        .serve(CdnRequest {
-            allow_age_restricted: Some(true),
-            ..cdn(&asset.id)
-        })
-        .await
-        .unwrap();
-    assert_eq!(opted_in.status().as_u16(), 200);
-    assert_eq!(opted_in.headers()["content-type"], "image/png");
-    assert_eq!(opted_in.bytes().await.unwrap().as_ref(), b"bytes");
-
+async fn cdn_serves_the_stored_type_and_byte_ranges() {
     let allowed = MockServerClient::in_memory(
         options().api_key(create_mock_api_key(&[MockApiKeyGrant::download()])),
     )
@@ -225,7 +128,7 @@ async fn cdn_needs_the_download_permission_for_private_and_age_restricted_assets
         .unwrap();
     let response = allowed.cdn().serve(cdn(&private.id)).await.unwrap();
     assert_eq!(response.status().as_u16(), 200);
-    assert_eq!(response.bytes().await.unwrap().as_ref(), b"0123456789");
+    assert_eq!(response.headers()["content-type"], "image/png");
     let range = allowed
         .cdn()
         .serve(CdnRequest {
@@ -240,41 +143,6 @@ async fn cdn_needs_the_download_permission_for_private_and_age_restricted_assets
     assert_eq!(range.status().as_u16(), 206);
     assert_eq!(range.headers()["content-range"], "bytes 2-4/10");
     assert_eq!(range.bytes().await.unwrap().as_ref(), b"234");
-    assert_eq!(
-        cdn_code(&allowed, cdn("missing")).await,
-        (404, "asset/not-found".into())
-    );
-}
-
-#[tokio::test]
-async fn purged_outcomes_and_decisions_remove_the_content() {
-    let mock =
-        MockServerClient::in_memory(options().analyzed_outcome(MockOutcome::Purged)).unwrap();
-    let asset = mock.assets().classify(kept("e.png", b"png")).await.unwrap();
-    assert_eq!(
-        asset.classification.moderation.status,
-        AssetModerationStatus::Purged
-    );
-    assert_eq!(asset.content.status, AssetContentStatus::Removed);
-    assert_eq!(
-        asset.content.removal_reason,
-        Some(AssetContentRemovalReason::Policy)
-    );
-    assert!(!mock.with_storage(|storage| storage.content.contains_key(&asset.id)));
-
-    let allowed = mock.assets().create(kept("f.png", b"png")).await.unwrap();
-    let purged = mock
-        .decide(&allowed.id, AssetModerationDecision::Purged)
-        .unwrap();
-    assert_eq!(
-        purged.content.removal_reason,
-        Some(AssetContentRemovalReason::Policy)
-    );
-    assert!(!mock.with_storage(|storage| storage.content.contains_key(&allowed.id)));
-    assert_eq!(
-        cdn_code(&mock, cdn(&allowed.id)).await,
-        (403, "asset/not-available".into())
-    );
 }
 
 #[tokio::test]
@@ -512,36 +380,9 @@ async fn update_patches_and_search_matches_keywords() {
 }
 
 #[tokio::test]
-async fn idempotency_keys_replay_and_queued_responses_come_first() {
+async fn queued_responses_come_before_the_in_memory_state() {
     let mock = MockServerClient::in_memory(options()).unwrap();
-    let upload = || SubmitAsset {
-        idempotency_key: Some("key-1".into()),
-        external_id: Some("ext".into()),
-        ..named("x")
-    };
-    let first = mock.assets().create(upload()).await.unwrap();
-    let replayed = mock.assets().create(upload()).await.unwrap();
-    assert_eq!(replayed.id, first.id);
-    assert_eq!(mock.with_storage(|storage| storage.assets.len()), 1);
-    let reused = mock
-        .assets()
-        .create(SubmitAsset {
-            idempotency_key: Some("key-1".into()),
-            ..named("different")
-        })
-        .await
-        .unwrap_err();
-    assert_eq!(reused.code(), &ErrorCode::IdempotencyKeyReused);
-    let duplicate = mock
-        .assets()
-        .create(SubmitAsset {
-            external_id: Some("ext".into()),
-            ..named("x")
-        })
-        .await
-        .unwrap_err();
-    assert_eq!(duplicate.code(), &ErrorCode::DuplicateExternalId);
-
+    let first = mock.assets().create(named("x")).await.unwrap();
     mock.enqueue_api_error(ErrorCode::SpendLimitReached, "limit");
     let error = mock
         .assets()
@@ -591,4 +432,44 @@ async fn enqueued_events_carry_the_asset_snapshot() {
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidEventCursor);
+}
+
+#[tokio::test]
+async fn mock_options_set_the_base_urls() {
+    let mock = MockServerClient::in_memory(
+        MockOptions::new()
+            .api_base_url("http://localhost:8787/api/v1")
+            .cdn_base_url("http://localhost:8788/cdn/v1"),
+    )
+    .unwrap();
+    let asset = mock
+        .assets()
+        .create(SubmitAsset::text("hello"))
+        .await
+        .unwrap();
+    let response = mock
+        .cdn()
+        .serve(CdnRequest {
+            asset_identifier: asset.id.clone(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 403);
+    let urls: Vec<_> = mock
+        .requests()
+        .into_iter()
+        .map(|request| request.url)
+        .collect();
+    assert!(
+        urls[0].starts_with("http://localhost:8787/api/v1/projects/mock-project/assets?"),
+        "{urls:?}"
+    );
+    assert!(
+        urls[1].starts_with(&format!(
+            "http://localhost:8788/cdn/v1/assets/mock-project/{}/",
+            asset.id
+        )),
+        "{urls:?}"
+    );
 }

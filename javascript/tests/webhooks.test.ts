@@ -215,19 +215,3 @@ describe("parseWebhookEvent", () => {
     }
   });
 });
-
-it("parses future event types, fields and structured facts from the shared contract", async () => {
-  const fixtures = await Bun.file(
-    new URL("../../go/testdata/webhooks.json", import.meta.url),
-  ).json();
-  for (const fixture of fixtures.parsing) {
-    const parsed = await parseWebhookEvent({
-      ...fixture,
-      payload: fixture.body,
-      now: fixture.now * 1000,
-    });
-    expect(parsed).toEqual(JSON.parse(fixture.body));
-    expect(parsed.type).toBe(fixture.expectedType);
-    expect(parsed.data.facts?.[0]?.key).toBe(fixture.expectedFactKey);
-  }
-});

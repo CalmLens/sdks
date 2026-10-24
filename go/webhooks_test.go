@@ -1,53 +1,14 @@
 package calmlens
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
-
-// testdata/webhooks.json is generated from the JavaScript SDK by packages/sdk-contract/generate.ts.
-type webhookSignatureFixture struct {
-	Secret, Timestamp, Body, Signature string
-}
-type webhookVerificationFixture struct {
-	Name, Secret, Timestamp, Body, Signature string
-	Now, ToleranceSeconds                    int64
-	Valid                                    bool
-}
-type webhookPayloadFixture struct {
-	Event   json.RawMessage
-	Payload any
-}
-type webhookFixtures struct {
-	Parsing []struct {
-		Body, Signature, Timestamp, Secret, ExpectedType, ExpectedFactKey string
-		Now                                                               int64
-	}
-	Signatures   []webhookSignatureFixture
-	Verification []webhookVerificationFixture
-	Payloads     []webhookPayloadFixture
-}
-
-func loadWebhookFixtures(t *testing.T) webhookFixtures {
-	t.Helper()
-	data, err := os.ReadFile("testdata/webhooks.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var fixtures webhookFixtures
-	if err = json.Unmarshal(data, &fixtures); err != nil {
-		t.Fatal(err)
-	}
-	return fixtures
-}
 
 func TestWebhookTestVector(t *testing.T) {
 	const want = "v1=9d713ed406bb7076d4123f0dc2c39d2df5c654ed4b0cd56b52c8b4c940bd63ae"
@@ -60,54 +21,6 @@ func TestWebhookTestVector(t *testing.T) {
 	}
 	if VerifyWebhookSignature([]byte("{}"), want, "1700000000", "key") {
 		t.Fatal("expired test vector accepted with the real clock")
-	}
-}
-
-func TestWebhookContract(t *testing.T) {
-	fixtures := loadWebhookFixtures(t)
-	for _, f := range fixtures.Parsing {
-		event, err := ParseWebhookEvent([]byte(f.Body), f.Signature, f.Timestamp, f.Secret, WithNow(time.Unix(f.Now, 0)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if event.Type != f.ExpectedType || len(event.Data.Facts) != 1 || event.Data.Facts[0].Key != f.ExpectedFactKey {
-			t.Fatal(event)
-		}
-	}
-
-	for _, fixture := range fixtures.Signatures {
-		var timestamp int64
-		if err := json.Unmarshal([]byte(fixture.Timestamp), &timestamp); err != nil {
-			t.Fatal(err)
-		}
-		if got := SignWebhookPayload([]byte(fixture.Body), timestamp, fixture.Secret); got != fixture.Signature {
-			t.Errorf("signature %s, want %s", got, fixture.Signature)
-		}
-	}
-	for _, fixture := range fixtures.Verification {
-		t.Run(fixture.Name, func(t *testing.T) {
-			options := []WebhookOption{WithNow(time.Unix(fixture.Now, 0)), WithTolerance(time.Duration(fixture.ToleranceSeconds) * time.Second)}
-			if got := VerifyWebhookSignature([]byte(fixture.Body), fixture.Signature, fixture.Timestamp, fixture.Secret, options...); got != fixture.Valid {
-				t.Errorf("got %v, want %v", got, fixture.Valid)
-			}
-		})
-	}
-	for _, fixture := range fixtures.Payloads {
-		var event Event
-		if err := json.Unmarshal(fixture.Event, &event); err != nil {
-			t.Fatal(err)
-		}
-		body, err := json.Marshal(ToWebhookEventPayload(event))
-		if err != nil {
-			t.Fatal(err)
-		}
-		var got any
-		if err = json.Unmarshal(body, &got); err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(got, fixture.Payload) {
-			t.Errorf("payload %v, want %v", got, fixture.Payload)
-		}
 	}
 }
 

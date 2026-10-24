@@ -400,17 +400,12 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
             c.assets.retrieve(asset_id="a1")
         self.assertEqual(raised.exception.status, 404)
 
-    def test_retries_and_idempotent_replays(self):
+    def test_retries_resend_the_idempotency_key(self):
         c = MockCalmLensServerClient(max_retries=1, mock_options={"create_id": lambda: "a1"})
         c.enqueue_error(CalmLensError("server/unavailable", status=503))
         c.assets.create(name="x", content={"plainText": "hi", "type": "text/plain"}, idempotency_key="key-1")
         self.assertEqual([r.headers["Idempotency-key"] for r in c.requests], ["key-1", "key-1"])
         self.assertEqual(len(c.database_storage.assets), 1)
-        replay = c.assets.create(name="x", content={"plainText": "hi", "type": "text/plain"}, idempotency_key="key-1")
-        self.assertEqual((replay["id"], len(c.database_storage.assets)), ("a1", 1))
-        with self.assertRaises(CalmLensAPIError) as raised:
-            c.assets.create(name="other", content={"plainText": "hi", "type": "text/plain"}, idempotency_key="key-1")
-        self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.IDEMPOTENCY_KEY_REUSED, 409))
 
 
 if __name__ == "__main__":

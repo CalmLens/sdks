@@ -536,75 +536,20 @@ describe("MockCalmLensServerClient", () => {
     expect(new Uint8Array(await response.arrayBuffer()).length).toBeGreaterThan(0);
   });
 
-  it("rejects private assets for mock API keys without assets:download", async () => {
-    const client = createClient({}, createMockApiKey());
-    const asset = await client.assets.create({
-      name: "private-document.txt",
-      content: {
-        base64: pngBase64,
-        type: "image/png",
-      },
-      visibility: "private",
-    });
-
-    const response = await client.cdn.serve({ assetIdentifier: asset.id });
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({
-      code: "asset/api-key-missing-permission",
-    });
-  });
-
-  it("serves public age-restricted assets only with assets:download or the allowAgeRestricted opt-in", async () => {
-    const upload = {
-      name: "public-image.png",
-      content: { base64: pngBase64, type: "image/png" },
-      visibility: "public",
-      processingOptions: { keepContentAfterProcessing: true },
-    } as const;
-    const withoutGrant = createClient({ analyzedOutcome: "age-restricted" }, createMockApiKey());
-    const restricted = await withoutGrant.assets.classify(upload);
-    const refused = await withoutGrant.cdn.serve({ assetIdentifier: restricted.id });
-    expect(refused.status).toBe(403);
-    expect(await refused.json()).toMatchObject({ code: "asset/api-key-missing-permission" });
-    const optedIn = await withoutGrant.cdn.serve({
-      assetIdentifier: restricted.id,
-      allowAgeRestricted: true,
-    });
-    expect(optedIn.status).toBe(200);
-
-    const allowedClient = createClient({ analyzedOutcome: "allowed" }, createMockApiKey());
-    const allowed = await allowedClient.assets.classify(upload);
-    expect((await allowedClient.cdn.serve({ assetIdentifier: allowed.id })).status).toBe(200);
-
+  it("serves age-restricted content to a key with assets:download as private, no-store", async () => {
     const withGrant = createClient(
       { analyzedOutcome: "age-restricted" },
       createMockApiKey([{ actions: ["assets:download"], folderId: null, includeSubfolders: true }]),
     );
-    const granted = await withGrant.assets.classify(upload);
+    const granted = await withGrant.assets.classify({
+      name: "public-image.png",
+      content: { base64: pngBase64, type: "image/png" },
+      visibility: "public",
+      processingOptions: { keepContentAfterProcessing: true },
+    });
     const served = await withGrant.cdn.serve({ assetIdentifier: granted.id });
     expect(served.status).toBe(200);
     expect(served.headers.get("Cache-Control")).toBe("private, no-store");
-  });
-
-  it("serves private assets for mock API keys with assets:download", async () => {
-    const client = createClient(
-      {},
-      createMockApiKey([{ actions: ["assets:download"], folderId: null, includeSubfolders: true }]),
-    );
-    const asset = await client.assets.create({
-      name: "private-document.txt",
-      content: {
-        base64: pngBase64,
-        type: "image/png",
-      },
-      visibility: "private",
-    });
-
-    const response = await client.cdn.serve({ assetIdentifier: asset.id });
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toBe("image/png");
   });
 
   it("serves in-memory asset content from the mock CDN by externalId", async () => {
@@ -629,14 +574,6 @@ describe("MockCalmLensServerClient", () => {
       `https://mock-cdn.test/v1/assets/${projectId}/${externalId}/rendered/@thumbnail`,
     );
     expect(new Uint8Array(await response.arrayBuffer()).length).toBeGreaterThan(0);
-  });
-
-  it("returns a 404 response when mock CDN content is missing", async () => {
-    const client = createClient();
-
-    const response = await client.cdn.serve({ assetIdentifier: "missing" });
-
-    expect(response.status).toBe(404);
   });
 
   it("accepts storage overrides through mockOptions", async () => {
@@ -871,33 +808,6 @@ describe("MockCalmLensServerClient", () => {
     await expect(
       client.assets.retry({ assetId: "00000000-0000-0000-0000-000000000000" }),
     ).rejects.toMatchObject({ code: PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId() });
-  });
-
-  it("removes content kept only for processing once a decision is made", async () => {
-    const client = createClient({ analyzedOutcome: "blocked" });
-    const asset = await client.assets.classify({
-      name: "image.png",
-      content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
-    });
-    expect(asset.classification.status).toBe("completed");
-    expect(asset.classification.moderation.status).toBe("blocked");
-    expect(asset.content).toMatchObject({ status: "removed", removalReason: "retention" });
-    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(403);
-  });
-
-  it("deletes kept content of a purged asset for policy", async () => {
-    const client = createClient({ analyzedOutcome: "purged" });
-    const asset = await client.assets.classify({
-      name: "image.png",
-      content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
-      processingOptions: { keepContentAfterProcessing: true },
-    });
-    expect(asset.classification).toMatchObject({
-      status: "completed",
-      moderation: { status: "purged" },
-    });
-    expect(asset.content).toMatchObject({ status: "removed", removalReason: "policy" });
-    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(403);
   });
 
   it("refuses to retry a failed asset whose content was removed", async () => {

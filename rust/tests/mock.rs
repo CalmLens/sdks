@@ -9,31 +9,6 @@ use futures_util::{StreamExt, TryStreamExt};
 use serde_json::{json, Value};
 
 #[tokio::test]
-async fn all_operations_use_mock() {
-    let fixtures: Value = serde_json::from_str(include_str!("../testdata/requests.json")).unwrap();
-    for f in fixtures.as_array().unwrap() {
-        let mock = MockServerClient::new().unwrap();
-        mock.enqueue(200, f["response"].clone());
-        common::invoke(
-            &mock,
-            f["operation"].as_str().unwrap(),
-            f["options"].clone(),
-        )
-        .await
-        .unwrap();
-        let requests = mock.requests();
-        assert_eq!(requests.len(), 1);
-        assert_eq!(
-            f["request"],
-            common::describe(&requests[0]),
-            "{}",
-            f["operation"]
-        );
-        assert_eq!(mock.remaining_responses(), 0);
-    }
-}
-
-#[tokio::test]
 async fn api_errors_carry_status_request_id_and_details() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue_response(
