@@ -1,5 +1,4 @@
 import { CalmLensError, SDK_ERROR_CODES } from "./CalmLensError";
-import { API_ERROR_CODES } from "./CalmLensErrorCodes";
 import { getUserAgent, isBrowserRuntime } from "./CalmLensVersion";
 
 /** Retry delays grow from this base, doubling per attempt, with jitter. */
@@ -254,7 +253,7 @@ export class CalmLensTransport {
   }
 
   /**
-   * Sends a request and returns the response, retrying transport failures, 429, 502–504 and
+   * Sends a request and returns the response, retrying transport failures, timeouts, 429, 502–504 and
    * `idempotency/request-in-progress` when the request is safe to repeat. Non-2xx responses
    * throw unless `allowHttpErrors` is set. Call `release` once the body has been read.
    */
@@ -294,7 +293,8 @@ export class CalmLensTransport {
       } catch (cause) {
         attempt.release();
         const failure = toFailure(cause, attempt);
-        if (canRetryAgain && failure.code === SDK_ERROR_CODES.TRANSPORT_ERROR) {
+        // Transport failures and timeouts; a cancellation is never retried.
+        if (canRetryAgain && failure.isRetryable()) {
           await sleep(getRetryDelayMs(attemptNumber), this.settings.signal);
           continue;
         }
@@ -330,10 +330,7 @@ export class CalmLensTransport {
       const retryDelayMs =
         error.retryAfter !== undefined ? error.retryAfter * 1000 : getRetryDelayMs(attemptNumber);
       const shouldRetry =
-        canRetryAgain &&
-        retryDelayMs <= RETRY_AFTER_MAX_MS &&
-        ((error.status !== undefined && RETRYABLE_STATUSES.has(error.status)) ||
-          error.code === API_ERROR_CODES.IDEMPOTENT_REQUEST_IN_PROGRESS);
+        canRetryAgain && retryDelayMs <= RETRY_AFTER_MAX_MS && error.isRetryable();
       if (shouldRetry) {
         await sleep(retryDelayMs, this.settings.signal);
         continue;

@@ -218,6 +218,7 @@ const surface: {
     body: unknown;
     expected: { code: string; status: number; requestId: string; retryAfterSeconds: number };
   };
+  retryable: { code: string; status: number | null; retryable: boolean }[];
 } = testdata("surface.json");
 
 // Server entry exports, and `testing.*` for `@calmlens/sdk/testing`.
@@ -319,6 +320,15 @@ describe("SDK surface", () => {
   for (const capability of surface.capabilities) {
     test(`offers ${capability.id} as ${capability.names.javascript}`, async () => {
       expect(await present(capability)).toBe(true);
+    });
+  }
+});
+
+describe("retryable errors", () => {
+  for (const { code, status, retryable } of surface.retryable) {
+    test(`${code}${status === null ? "" : ` (HTTP ${status})`} is ${retryable ? "" : "not "}retryable`, () => {
+      const error = new CalmLensError(code, status === null ? {} : { status });
+      expect(error.isRetryable()).toBe(retryable);
     });
   }
 });

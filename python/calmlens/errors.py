@@ -28,6 +28,8 @@ __all__ = [
 ]
 
 _RETRYABLE_STATUSES = frozenset({429, 502, 503, 504})
+_RETRYABLE_CODES = frozenset({error_codes.SDK_TRANSPORT_ERROR, error_codes.SDK_TIMEOUT,
+                              error_codes.IDEMPOTENT_REQUEST_IN_PROGRESS})
 
 
 def _parse_retry_after(value: str | None) -> float | None:
@@ -91,24 +93,19 @@ class CalmLensError(Exception):
     def is_retryable(self) -> bool:
         """True when sending the same request again later may succeed: network failures,
         timeouts, 429, 502, 503, 504 and ``idempotency/request-in-progress``. Retrying a
-        non-idempotent write without an ``Idempotency-Key`` can still create duplicates."""
-        return False
+        non-idempotent write without an ``Idempotency-Key`` can still create duplicates.
+
+        Decided from ``code`` and ``status`` alone, so every error class agrees: an
+        ``sdk/timeout`` from ``wait_for_decision`` is retryable too."""
+        return self.code in _RETRYABLE_CODES or self.status in _RETRYABLE_STATUSES
 
 
 class CalmLensAPIError(CalmLensError):
     """The API answered with a non-2xx status."""
 
-    @property
-    def is_retryable(self) -> bool:
-        return self.status in _RETRYABLE_STATUSES or self.code == error_codes.IDEMPOTENT_REQUEST_IN_PROGRESS
-
 
 class CalmLensTransportError(CalmLensError):
     """The request failed before a complete response was received."""
-
-    @property
-    def is_retryable(self) -> bool:
-        return True
 
 
 class CalmLensTimeoutError(CalmLensTransportError):

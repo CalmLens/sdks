@@ -74,9 +74,4 @@ public class ApiException extends CalmLensException {
 
   /** @return the {@code Retry-After} delay sent with the response (HTTP 429 and in-progress idempotent requests) */
   public Optional<Duration> getRetryAfter() { return Optional.ofNullable(retryAfter); }
-
-  @Override public boolean isRetryable() {
-    return status == 429 || status == 502 || status == 503 || status == 504
-        || ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS.equals(getCode());
-  }
 }

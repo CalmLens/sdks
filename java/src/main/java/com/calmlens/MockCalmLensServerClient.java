@@ -137,7 +137,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   public static final class Options {
     Outcome queuedOutcome = Outcome.PENDING, analyzedOutcome = Outcome.ALLOWED;
     Supplier<String> createId = () -> UUID.randomUUID().toString();
-    LongSupplier now = System::currentTimeMillis;
+    LongSupplier now = monotonicClock();
     String signedUrlBaseUrl = "https://mock.calmlens.invalid";
 
     /** Defaults: queued uploads stay pending, analyzed ones are allowed. */
@@ -152,11 +152,20 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     /** @param value returns new asset, folder, lens and event IDs @return these options */
     public Options createId(Supplier<String> value) { createId = Objects.requireNonNull(value, "createId"); return this; }
 
-    /** @param value the current time in milliseconds since the Unix epoch @return these options */
+    /**
+     * @param value the current time in milliseconds since the Unix epoch; by default the system
+     *     clock, moved on by at least a millisecond per reading so each asset is created after the last
+     * @return these options
+     */
     public Options now(LongSupplier value) { now = Objects.requireNonNull(value, "now"); return this; }
 
     /** @param value base URL of returned signed URLs (not production URLs) @return these options */
     public Options signedUrlBaseUrl(String value) { signedUrlBaseUrl = Objects.requireNonNull(value, "signedUrlBaseUrl").replaceAll("/+$", ""); return this; }
+
+    private static LongSupplier monotonicClock() {
+      java.util.concurrent.atomic.AtomicLong last = new java.util.concurrent.atomic.AtomicLong(Long.MIN_VALUE);
+      return () -> last.updateAndGet(previous -> Math.max(previous + 1, System.currentTimeMillis()));
+    }
 
     private Options copy() {
       return new Options().queuedOutcome(queuedOutcome).analyzedOutcome(analyzedOutcome).createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);

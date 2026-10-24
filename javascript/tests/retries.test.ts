@@ -53,6 +53,92 @@ describe("retries", () => {
     expect(calls).toBe(2);
   });
 
+  /** A fetch whose first `stalled` calls never answer, so their attempt times out. */
+  const stallingFetch = (stalled: number) => {
+    const requests: Request[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(new Request(input, init));
+      if (requests.length > stalled) return Response.json(asset);
+      return new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+      });
+    }) as typeof fetch;
+    return { fetchImpl, requests };
+  };
+
+  test("retries a read that timed out", async () => {
+    const { fetchImpl, requests } = stallingFetch(1);
+    const client = new CalmLensServerClient({
+      apiKey: "key",
+      projectId,
+      fetch: fetchImpl,
+      timeoutMs: 20,
+    });
+    await expect(client.assets.retrieve({ assetId: "asset-1" })).resolves.toEqual(asset);
+    expect(requests).toHaveLength(2);
+  });
+
+  test("retries a timed-out upload with the same Idempotency-Key", async () => {
+    const { fetchImpl, requests } = stallingFetch(1);
+    const client = new CalmLensServerClient({
+      apiKey: "key",
+      projectId,
+      fetch: fetchImpl,
+      timeoutMs: 20,
+    });
+    await expect(client.assets.create(text)).resolves.toEqual(asset);
+    expect(requests).toHaveLength(2);
+    const keys = requests.map((request) => request.headers.get("idempotency-key"));
+    expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(keys[1]).toBe(keys[0]!);
+  });
+
+  test("returns sdk/timeout after the last retry, and never retries a timed-out write without a key", async () => {
+    const reads = stallingFetch(3);
+    const client = new CalmLensServerClient({
+      apiKey: "key",
+      projectId,
+      fetch: reads.fetchImpl,
+      timeoutMs: 20,
+      maxRetries: 1,
+    });
+    const error = (await client.assets
+      .retrieve({ assetId: "asset-1" })
+      .catch((caught: unknown) => caught)) as CalmLensError;
+    expect({ code: error.code, retryable: error.isRetryable() }).toEqual({
+      code: "sdk/timeout",
+      retryable: true,
+    });
+    expect(reads.requests).toHaveLength(2);
+
+    const writes = stallingFetch(1);
+    const writer = new CalmLensServerClient({
+      apiKey: "key",
+      projectId,
+      fetch: writes.fetchImpl,
+      timeoutMs: 20,
+    });
+    await expect(writer.assets.move({ assetId: "asset-1", folderId: null })).rejects.toMatchObject({
+      code: "sdk/timeout",
+    });
+    expect(writes.requests).toHaveLength(1);
+  });
+
+  test("never retries a cancelled request", async () => {
+    const { fetchImpl, requests } = stallingFetch(1);
+    const controller = new AbortController();
+    const client = new CalmLensServerClient({
+      apiKey: "key",
+      projectId,
+      fetch: fetchImpl,
+      signal: controller.signal,
+    });
+    const pending = client.assets.retrieve({ assetId: "asset-1" });
+    setTimeout(() => controller.abort(), 5);
+    await expect(pending).rejects.toMatchObject({ code: "sdk/cancelled" });
+    expect(requests).toHaveLength(1);
+  });
+
   test("retries uploads with the same Idempotency-Key, including while the first is in progress", async () => {
     const { fetchImpl, requests } = scriptedFetch([
       apiError(409, "idempotency/request-in-progress", { "Retry-After": "0" }),

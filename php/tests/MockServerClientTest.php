@@ -150,15 +150,11 @@ final class MockServerClientTest extends TestCase
         self::assertSame(ErrorCodes::FOLDER_NOT_FOUND, self::code(fn () => $mock->client()->assets->move(['assetId' => $asset['id'], 'folderId' => 'gone'])));
     }
 
-    public function testSearchMatchesKeywordsAndChildrenListOnlyChildren(): void
+    public function testChildrenListOnlyChildren(): void
     {
         $mock = new MockServerClient();
         $client = $mock->client();
         $cat = $client->text->classify(['name' => 'Black cat', 'text' => 'meow']);
-        $client->text->classify(['name' => 'Dog', 'text' => 'woof']);
-        $result = $client->assets->search(['query' => 'CAT']);
-        self::assertSame([$cat['id']], array_map(fn ($item) => $item['asset']['id'], $result['items']));
-        self::assertSame(['name'], $result['items'][0]['matchedFields']);
         $mock->assets['child'] = ['id' => 'child', 'parentId' => $cat['id'], 'createdAt' => 1] + $cat;
         self::assertSame(['child'], array_column($client->assets->listChildren(['assetId' => $cat['id']])['items'], 'id'));
         self::assertNotContains('child', array_column($client->assets->list()['items'], 'id'));
@@ -177,8 +173,6 @@ final class MockServerClientTest extends TestCase
         self::assertSame(['photo.png', 'note-a.txt'], $names('classification.moderation.status==blocked,name==note-a.txt'));
         self::assertSame(['note-b.txt'], $names('name==note-*;classification.moderation.status=out=(allowed,blocked)'));
         self::assertSame(['photo.png'], $names('classification.moderation.status=in=("blocked")'));
-        $this->expectException(\LogicException::class);
-        $names('(name==a,name==b);type==file');
     }
 
     public function testMultipartUploadsAppendPartsAndUseTheSavedQueueMode(): void
@@ -222,7 +216,6 @@ final class MockServerClientTest extends TestCase
         } catch (Exception\RateLimitException $error) {
             self::assertSame([ErrorCodes::UPLOAD_LIMIT_EXCEEDED, 429, 7.0, 5], [$error->errorCode, $error->status, $error->retryAfter(), $error->details['limit']]);
             self::assertStringStartsWith('mock-', (string) $error->requestId);
-            self::assertTrue($error->isRetryable());
         }
         self::assertCount(0, $mock->assets);
         // Retries run without real waiting: the backoff advances the mock's clock.

@@ -377,6 +377,25 @@ class ContractTest {
     });
   }
 
+  // surface.json retryable: whether an error is retryable follows from its code and status alone.
+
+  @TestFactory Stream<DynamicTest> retryableFollowsTheCodeAndStatus() throws Exception {
+    return cases(array("surface.json", "retryable"), r -> r.get("code").getAsString() + " " + r.get("status"), entry -> {
+      String code = entry.get("code").getAsString();
+      boolean expected = entry.get("retryable").getAsBoolean();
+      List<CalmLensException> errors = new ArrayList<>();
+      if (entry.get("status").isJsonNull()) {
+        errors.add(new CalmLensException(code, null));
+        // The classes the client raises for failures without a response.
+        if (code.equals(ErrorCodes.SDK_TRANSPORT_ERROR)) errors.add(new TransportException(code, null, null));
+        if (code.equals(ErrorCodes.SDK_TIMEOUT)) errors.add(new RequestTimeoutException(null, null));
+      } else {
+        errors.add(new ApiException(code, null, null, entry.get("status").getAsInt(), Map.of(), null));
+      }
+      for (CalmLensException error : errors) assertEquals(expected, error.isRetryable(), error.getClass().getSimpleName());
+    });
+  }
+
   // surface.json: every capability a server SDK must offer exists under its Java name.
 
   private static CalmLensServerClient refusing() {

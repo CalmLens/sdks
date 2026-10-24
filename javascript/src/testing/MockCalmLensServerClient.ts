@@ -78,7 +78,7 @@ import {
   type MockDatabaseStorage,
   type MockImageStorage,
 } from "./MockStorage";
-import { createPage, filterAssets, inferAssetType } from "./MockUtils";
+import { createPage, filterAssets, inferAssetType, searchAssets } from "./MockUtils";
 
 const DEFAULT_EVENTS_LIMIT = 50;
 
@@ -91,11 +91,24 @@ const describeBinary = (value: unknown) => {
 };
 const MAX_EVENTS_LIMIT = 100;
 
+const createMonotonicClock = () => {
+  let last = 0;
+  return () => {
+    last = Math.max(Date.now(), last + 1);
+    return last;
+  };
+};
+
 export interface MockCalmLensServerClientOptions extends CalmLensServerClientOptions {
   mockOptions?: {
     databaseStorage?: MockDatabaseStorage;
     imageStorage?: MockImageStorage;
     createId?: () => string;
+    /**
+     * The clock, in epoch milliseconds. The default is the system clock, moved on by at least a
+     * millisecond per reading, so assets created in a row have increasing `createdAt` values and
+     * orderings by `createdAt` don't depend on IDs.
+     */
     now?: () => number;
     /**
      * Outcome of `assets.create` (and queued multipart uploads). Defaults to `pending`. Pass a
@@ -242,7 +255,7 @@ export class MockCalmLensServerClient {
       options.mockOptions?.databaseStorage ?? new InMemoryMockDatabaseStorage();
     this.imageStorage = options.mockOptions?.imageStorage ?? new InMemoryMockImageStorage();
     this.createId = options.mockOptions?.createId ?? crypto.randomUUID.bind(crypto);
-    this.now = options.mockOptions?.now ?? Date.now;
+    this.now = options.mockOptions?.now ?? createMonotonicClock();
     this.queuedOutcome = options.mockOptions?.queuedOutcome ?? "pending";
     this.analyzedOutcome = options.mockOptions?.analyzedOutcome ?? "allowed";
     this.apiKeyGrants = getMockApiKeyGrants(options.apiKey);
@@ -588,9 +601,11 @@ export class MockCalmLensServerClient {
   get assets() {
     return {
       /**
-       * Matches `query` (case-insensitively) against each asset's name, ID, external ID,
-       * description and tags, best match first. Mock scores are 1 for an exact match and 0.5
-       * otherwise; `mode` is accepted but there is no semantic search.
+       * Keyword search like the API's: every whitespace-separated token must appear,
+       * case-insensitively, in the asset's name, ID, external ID, description, tags, type,
+       * content format or extension, or moderation status. Results carry the API's keyword
+       * scores and are ranked by score, then newest first. `mode` is accepted but there is no
+       * semantic search, so `semanticStatus` is `disabled`.
        */
       search: async (options: SearchAssetsOptions): Promise<AssetSearchResponse> => {
         this.begin("assets.search", options);
@@ -598,32 +613,11 @@ export class MockCalmLensServerClient {
         if (!query || query.length > 200) {
           throw this.invalidPayload("query must be 1 to 200 characters");
         }
-        const limit = options.limit ?? 10;
-        const needle = query.toLowerCase();
-        const fields = ["name", "id", "externalId", "description"] as const;
-        const items = (await this.databaseStorage.listAssets(this.projectId))
-          .map((asset) => {
-            const matchedFields: AssetSearchResponse["items"][number]["matchedFields"] = [];
-            for (const field of fields) {
-              if (
-                String(asset[field] ?? "")
-                  .toLowerCase()
-                  .includes(needle)
-              ) {
-                matchedFields.push(field);
-              }
-            }
-            if (asset.tags?.some((tag) => tag.toLowerCase().includes(needle))) {
-              matchedFields.push("tags");
-            }
-            const exact = fields.some(
-              (field) => String(asset[field] ?? "").toLowerCase() === needle,
-            );
-            return { asset, score: exact ? 1 : 0.5, matchedFields };
-          })
-          .filter((result) => result.matchedFields.length > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, limit);
+        const items = searchAssets(
+          await this.databaseStorage.listAssets(this.projectId),
+          query,
+          options.limit ?? 10,
+        );
         return { query, items, semanticStatus: "disabled" };
       },
 

@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	calmlens "github.com/CalmLens/sdks/go"
@@ -97,7 +98,9 @@ type Options struct {
 	DatabaseStorage *InMemoryDatabaseStorage
 	ImageStorage    *InMemoryImageStorage
 	CreateID        func() string
-	// Now returns the current time in unix milliseconds.
+	// Now returns the current time in unix milliseconds. The default clock is the wall clock,
+	// advanced by at least 1 ms per reading so assets created in a row have strictly increasing
+	// createdAt values; a Now you supply is used as is.
 	Now func() int64
 	// QueuedOutcome is the Outcome constant of queued uploads (Assets.Create and queued
 	// multipart uploads; default OutcomePending).
@@ -292,7 +295,16 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 		}
 	}
 	if options.Now == nil {
-		options.Now = func() int64 { return time.Now().UnixMilli() }
+		var last atomic.Int64
+		options.Now = func() int64 {
+			for {
+				previous := last.Load()
+				next := max(time.Now().UnixMilli(), previous+1)
+				if last.CompareAndSwap(previous, next) {
+					return next
+				}
+			}
+		}
 	}
 	if options.QueuedOutcome == "" {
 		options.QueuedOutcome = OutcomePending
@@ -1224,8 +1236,17 @@ func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values) 
 	return calmlens.JSON{"items": items[:end], "nextCursor": cursor, "pageSize": size, "ordering": ordering, "hasMore": end < len(items)}, nil
 }
 
-// search ranks assets whose name, ID, external ID, description or tags contain every
-// query word. Semantic search is not simulated, so semanticStatus is "disabled".
+// maxSearchTokens is how many distinct query words the API searches for.
+const maxSearchTokens = 8
+
+// searchFields are the keyword fields the API searches, in the order it reports matches.
+var searchFields = []string{"name", "id", "externalId", "description", "tags", "type", "content.format", "content.extension", "classification.moderation.status"}
+
+// search runs keyword search as the API does: the trimmed, lowercased query is split on
+// whitespace into at most 8 distinct words, and an asset matches when every word appears in
+// one of searchFields. Results are ranked by the API's score for the whole query (exact ID,
+// external ID or name first, then prefixes, then name and tag substrings), then newest first.
+// Semantic search is not simulated, so semanticStatus is "disabled".
 func (m *MockServerClient) search(q url.Values) (any, error) {
 	queryText := strings.TrimSpace(q.Get("query"))
 	if queryText == "" || len(queryText) > 200 {
@@ -1239,7 +1260,13 @@ func (m *MockServerClient) search(q url.Values) (any, error) {
 		}
 		limit = parsed
 	}
-	words := strings.Fields(strings.ToLower(queryText))
+	normalized := strings.ToLower(queryText)
+	tokens := []string{}
+	for _, word := range strings.Fields(normalized) {
+		if len(tokens) < maxSearchTokens && !contains(tokens, word) {
+			tokens = append(tokens, word)
+		}
+	}
 	type match struct {
 		asset  calmlens.JSON
 		score  float64
@@ -1250,36 +1277,53 @@ func (m *MockServerClient) search(q url.Values) (any, error) {
 		if a["projectId"] != m.options.ProjectID {
 			continue
 		}
-		values := map[string]string{"name": text(a["name"]), "id": text(a["id"]), "externalId": text(a["externalId"]), "description": text(a["description"])}
-		if tags, ok := a["tags"].([]any); ok {
-			values["tags"] = strings.ToLower(fmt.Sprint(tags...))
-		}
-		fields := []string{}
-		found := 0
-		for _, word := range words {
-			hit := false
-			for field, value := range values {
-				if strings.Contains(strings.ToLower(value), word) {
-					hit = true
-					if !contains(fields, field) {
-						fields = append(fields, field)
+		values := map[string]string{}
+		for _, field := range searchFields {
+			value := lookup(a, field)
+			if field == "tags" {
+				tags := []string{}
+				if list, ok := value.([]any); ok {
+					for _, tag := range list {
+						tags = append(tags, text(tag))
 					}
 				}
+				value = strings.Join(tags, " ")
 			}
-			if hit {
-				found++
+			values[field] = strings.ToLower(text(value))
+		}
+		fields := []string{}
+		for _, field := range searchFields {
+			for _, token := range tokens {
+				if strings.Contains(values[field], token) {
+					fields = append(fields, field)
+					break
+				}
 			}
 		}
-		if found == len(words) {
-			sort.Strings(fields)
-			matches = append(matches, match{a, float64(len(fields)) / float64(len(values)), fields})
+		matchesAll := true
+		for _, token := range tokens {
+			found := false
+			for _, field := range searchFields {
+				if strings.Contains(values[field], token) {
+					found = true
+					break
+				}
+			}
+			matchesAll = matchesAll && found
+		}
+		if matchesAll {
+			matches = append(matches, match{a, searchScore(values, normalized), fields})
 		}
 	}
 	sort.SliceStable(matches, func(i, j int) bool {
-		if matches[i].score == matches[j].score {
-			return text(matches[i].asset["id"]) < text(matches[j].asset["id"])
+		if matches[i].score != matches[j].score {
+			return matches[i].score > matches[j].score
 		}
-		return matches[i].score > matches[j].score
+		left, right := number(matches[i].asset["createdAt"]), number(matches[j].asset["createdAt"])
+		if left != right {
+			return left > right
+		}
+		return text(matches[i].asset["id"]) < text(matches[j].asset["id"])
 	})
 	items := []calmlens.JSON{}
 	for i, found := range matches {
@@ -1289,6 +1333,30 @@ func (m *MockServerClient) search(q url.Values) (any, error) {
 		items = append(items, calmlens.JSON{"asset": found.asset, "score": found.score, "matchedFields": found.fields})
 	}
 	return calmlens.JSON{"query": queryText, "items": items, "semanticStatus": "disabled"}, nil
+}
+
+// searchScore is the API's keyword score of lowercased field values for the whole lowercased query.
+func searchScore(values map[string]string, query string) float64 {
+	id, externalID, name := values["id"], values["externalId"], values["name"]
+	switch {
+	case id == query:
+		return 1000
+	case externalID == query:
+		return 950
+	case name == query:
+		return 900
+	case strings.HasPrefix(id, query):
+		return 800
+	case strings.HasPrefix(externalID, query):
+		return 750
+	case strings.HasPrefix(name, query):
+		return 700
+	case strings.Contains(name, query):
+		return 600
+	case strings.Contains(values["tags"], query):
+		return 500
+	}
+	return 100
 }
 
 func contains(values []string, value string) bool {

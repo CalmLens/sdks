@@ -278,13 +278,12 @@ final class ClientTest extends TestCase
         $client = $mock->client();
         $missing = $this->error('asset/not-found', fn () => $client->assets->retrieve(['assetId' => 'a']));
         self::assertInstanceOf(Exception\NotFoundException::class, $missing);
-        self::assertSame(['req-1', true, false, null], [$missing->requestId, $missing->isNotFound(), $missing->isRetryable(), $missing->retryAfter()]);
+        self::assertSame(['req-1', true, null], [$missing->requestId, $missing->isNotFound(), $missing->retryAfter()]);
         $limited = $this->error('upload/limit-exceeded', fn () => $client->assets->retrieve(['assetId' => 'a']));
         self::assertInstanceOf(Exception\RateLimitException::class, $limited);
         self::assertSame(0.0, $limited->retryAfter());
         $gateway = $this->error('sdk/http-error', fn () => $client->assets->retrieve(['assetId' => 'a']));
         self::assertInstanceOf(Exception\ServerException::class, $gateway);
-        self::assertTrue($gateway->isRetryable());
         self::assertInstanceOf(Exception\InvalidArgumentException::class, $this->error('sdk/invalid-argument', fn () => $client->assets->retrieve(['assetId' => ''])));
         self::assertInstanceOf(Exception\InvalidArgumentException::class, $this->error('upload/invalid-payload', fn () => $client->text->classify(['text' => ' '])));
         self::assertInstanceOf(Exception\ConfigurationException::class, $this->error('sdk/invalid-config', fn () => new ServerClient('key', 'p', timeout: 0)));

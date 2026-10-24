@@ -11,7 +11,7 @@ module CalmLens
   # error handling, then reach an in-memory stand-in for the API and CDN instead of the network.
   #
   # By default the stand-in is stateful: uploads create assets you can retrieve, list, filter,
-  # move and delete, folders behave like the API's, the CDN serves stored bytes, and errors use
+  # search, move and delete, folders behave like the API's, the CDN serves stored bytes, and errors use
   # the API's codes, HTTP statuses and body shape. It does not classify content: assets moderated
   # synchronously get `analyzed_outcome` and queued ones `queued_outcome`. Content is kept only with
   # `keepContentAfterProcessing: true`; otherwise it is removed once classification is `completed`, as in the API.
@@ -21,6 +21,10 @@ module CalmLens
   # `allow_age_restricted: true`, unless `api_key` comes from {.create_api_key} with an `assets:download`
   # grant. The default key has no grants. {#decide} applies a reviewer's decision, and
   # {Assets#wait_for_decision} takes no real time: a pending asset times out at once.
+  # Filters join comparisons with `;` (and), which binds tighter than `,` (or), and group them with
+  # `( … )`; list cursors resume after the last item returned. {Assets#search} is the API's keyword
+  # search: every query word (case-insensitive, up to 8) must appear in a searchable field, and
+  # results carry the API's `score` and `matchedFields`, ranked by score and then newest first.
   #
   # To script exact responses, enqueue them: queued responses and errors are used first, in order,
   # before the stand-in answers.
@@ -56,9 +60,19 @@ module CalmLens
       API_KEY_PREFIX + [JSON.generate(Internal.normalize(grants))].pack('m0').tr('+/', '-_').delete('=')
     end
 
+    # A clock in epoch milliseconds that follows the system time but never repeats or goes back.
+    # @api private
+    def self.monotonic_clock
+      last = 0
+      lock = Mutex.new
+      -> { lock.synchronize { last = [(Time.now.to_f * 1000).to_i, last + 1].max } }
+    end
+
     # @param project_id [String]
     # @param api_key [String] a key from {.create_api_key}; the default has no grants.
-    # @param now [#call] returns the current time in epoch milliseconds.
+    # @param now [#call] returns the current time in epoch milliseconds. The default clock reads the
+    #   system time but advances at least 1 ms per reading, so records made in a row have strictly
+    #   increasing `createdAt` and order predictably. A clock you pass is used as is.
     # @param create_id [#call] returns a new ID.
     # @param queued_outcome [String] the outcome of assets created with {Assets#create}: `pending`
     #   (processing, moderation pending), `allowed`, `age-restricted`, `blocked` or `purged` (processing
@@ -71,7 +85,7 @@ module CalmLens
     # @param options [Hash] other {ServerClient#initialize} settings, except `api_key` and `transport`.
     #   Retries wait no time unless a queued response sets `Retry-After`.
     def initialize(project_id: 'project-1', api_key: MockServerClient.create_api_key, base_url: 'https://api.calmlens.invalid/v1',
-                   cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: -> { (Time.now.to_f * 1000).to_i },
+                   cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: MockServerClient.monotonic_clock,
                    create_id: -> { SecureRandom.uuid }, queued_outcome: 'pending', analyzed_outcome: 'allowed',
                    **options)
       @mock_lock = Mutex.new

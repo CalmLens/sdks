@@ -248,8 +248,14 @@ an `asset.<outcome>` event with the event catalog's severity: `low` for `allowed
 otherwise.
 
 List filters support `==` (with `*` wildcards), `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`
-and `=le=` joined by `;` (and) and `,` (or), on nested names such as
-`classification.moderation.status`; other syntax throws instead of being ignored.
+and `=le=` joined by `;` (and), which binds tighter than `,` (or), and grouped with `( … )`, on
+nested names such as `classification.moderation.status`; other syntax throws instead of being
+ignored. List cursors resume after the last item returned, so assets created or deleted between
+pages are neither repeated nor skipped. `assets->search` runs the API's keyword search: every
+word of the query must appear, case-insensitively, in the name, ID, external ID, description,
+tags, type, content format or extension, or moderation status, and results carry the API's
+scores and `matchedFields`, best first, then newest. The default clock moves on by at least a
+millisecond per reading, so assets created in a row have increasing `createdAt`.
 
 ```php
 $mock->failNextRequest();          // the next call throws ConnectionException (sdk/transport-error)

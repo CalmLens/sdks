@@ -27,7 +27,6 @@ async fn api_errors_carry_status_request_id_and_details() {
     assert_eq!(error.status(), Some(404));
     assert_eq!(error.request_id(), Some("request-7"));
     assert!(error.is_not_found());
-    assert!(!error.is_retryable());
     assert_eq!(
         Value::Object(error.details().clone()),
         json!({"field":"id","traceId":"trace","network":true})

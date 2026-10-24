@@ -10,6 +10,4 @@ public class TransportException extends CalmLensException {
   private static final long serialVersionUID = 1L;
 
   TransportException(String code, String message, Throwable cause) { super(code, message, cause); }
-
-  @Override public boolean isRetryable() { return true; }
 }

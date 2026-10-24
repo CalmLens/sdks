@@ -353,6 +353,8 @@ class RobustnessTest {
         () -> transport.client().assets.waitForDecision(new Models.WaitForDecision("asset").timeout(Duration.ZERO)));
     assertEquals(ErrorCodes.SDK_TIMEOUT, error.getCode());
     assertEquals(Map.of("assetId", "asset", "classificationStatus", "processing", "moderationStatus", "pending"), error.getDetails());
+    // Waiting again later may still see a decision.
+    assertTrue(error.isRetryable());
     assertEquals(1, transport.requests.size());
 
     var unsent = new Scripted(reply(200, ALLOWED));

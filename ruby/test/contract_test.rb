@@ -351,6 +351,16 @@ class ContractTest < Minitest::Test
     end
   end
 
+  # Whether an error is retryable follows from its code and status alone, whichever class carries it.
+  def replay_retryable(entry)
+    label = "#{entry['code']} #{entry['status'].inspect}"
+    [CalmLens::Error.build(entry['code'], status: entry['status']),
+     CalmLens::Error.new(entry['code'], status: entry['status'])].each do |error|
+      assert_equal entry['retryable'], error.retryable?, "#{error.class} #{label}"
+    end
+  end
+  each_case('retryable', SURFACE['retryable']) { |entry| "#{entry['code']} #{entry['status']}" }
+
   def replay_surface(capability)
     assert present?(capability, SURFACE), "missing #{capability['id']} (#{capability['names']['ruby']})"
   end

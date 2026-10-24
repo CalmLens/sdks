@@ -608,6 +608,26 @@ fn at(value: &Value, path: &str) -> Value {
         })
 }
 
+/// `value` with whole floats as integers: typed `f64` fields serialize `950` as `950.0`, and JSON
+/// compares them as one number.
+fn whole_numbers(value: Value) -> Value {
+    match value {
+        Value::Number(number) => match number.as_f64() {
+            Some(float) if number.is_f64() && float.fract() == 0.0 && float.abs() < 1e15 => {
+                json!(float as i64)
+            }
+            _ => Value::Number(number),
+        },
+        Value::Array(items) => Value::Array(items.into_iter().map(whole_numbers).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(key, value)| (key, whole_numbers(value)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
 fn resolve(value: &Value, saved: &HashMap<String, Value>) -> Value {
     match value {
         Value::Object(map) if map.contains_key("$ref") => {
@@ -694,7 +714,7 @@ async fn check_step(
         );
         return;
     }
-    let result = outcome.unwrap_or_else(|error| panic!("{label}: {error:?}"));
+    let result = whole_numbers(outcome.unwrap_or_else(|error| panic!("{label}: {error:?}")));
     if let Some(Value::Object(cdn)) = expect.get("cdn") {
         for (key, wanted) in cdn {
             if key == "headers" {
@@ -975,6 +995,56 @@ async fn offers_every_capability() {
         stale.is_empty(),
         "references not in surface.json: {stale:?}"
     );
+}
+
+// surface.json `retryable`: whether an error is retryable follows from its code and status alone.
+
+#[tokio::test]
+async fn retryable_follows_code_and_status() {
+    let surface = fixture("surface");
+    each_case(
+        "retryable",
+        surface["retryable"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|case| (format!("{} {}", case["code"], case["status"]), case)),
+        |case| async move {
+            let code = case["code"].as_str().unwrap();
+            let status = case["status"].as_u64().map(|status| status as u16);
+            let expected = case["retryable"].as_bool().unwrap();
+            let mut built = calmlens::Error::new(ErrorCode::parse(code), "message");
+            if let Some(status) = status {
+                built = built.with_status(status);
+            }
+            assert_eq!(
+                built.is_retryable(),
+                expected,
+                "Error::new {code} {status:?}"
+            );
+            // The error a client raises for an API response with this code and status.
+            if let Some(status) = status {
+                let mock = MockServerClient::new().unwrap();
+                mock.enqueue_response(MockResponse::json(
+                    status,
+                    json!({"code": code, "message": "message"}),
+                ));
+                let raised = mock
+                    .client()
+                    .with_max_retries(0)
+                    .assets()
+                    .retrieve(AssetId::new("asset-1"))
+                    .await
+                    .unwrap_err();
+                assert_eq!(
+                    (raised.code().as_str(), raised.status()),
+                    (code, Some(status))
+                );
+                assert_eq!(raised.is_retryable(), expected, "raised {code} {status}");
+            }
+        },
+    )
+    .await;
 }
 
 // rejections.json: every request the API would reject is refused before anything is sent.

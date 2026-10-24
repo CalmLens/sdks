@@ -321,7 +321,7 @@ class MockFeedSearchAndListTests(unittest.TestCase):
                          ["a", "b"])
         self.assertEqual([a["name"] for a in c.assets.iter(page_size=1, filter="name!=b")], ["c", "a"])
         with self.assertRaises(NotImplementedError):
-            c.assets.list(filter="(name==a,name==b);classification.moderation.status==pending")
+            c.assets.list(filter="name=like=a")
 
 
 class MockConfigurationAndCaptureTests(unittest.TestCase):

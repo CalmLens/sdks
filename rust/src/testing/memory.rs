@@ -8,7 +8,7 @@ use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashMap, HashSet},
     fmt,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -112,14 +112,23 @@ impl Default for MockOptions {
             queued_outcome: MockOutcome::Pending,
             analyzed_outcome: MockOutcome::Allowed,
             create_id: Arc::new(crate::transport::uuid),
-            now: Arc::new(|| {
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map_or(0, |elapsed| elapsed.as_millis() as u64)
-            }),
+            now: monotonic_clock(),
             signed_url_base_url: "https://mock.calmlens.invalid".into(),
         }
     }
+}
+/// The system clock, moved on by at least a millisecond per reading, so assets created in a
+/// row get increasing `createdAt` values.
+fn monotonic_clock() -> Now {
+    let last = Mutex::new(0u64);
+    Arc::new(move || {
+        let system = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_millis() as u64);
+        let mut last = last.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        *last = system.max(*last + 1);
+        *last
+    })
 }
 impl fmt::Debug for MockOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1252,8 +1261,9 @@ impl Backend {
         }))
     }
 
-    /// Keyword search: assets whose name, ID, external ID, description or tags contain every
-    /// query word. Semantic search is not simulated.
+    /// Keyword search like the API: every whitespace-separated query token (case-insensitive, at
+    /// most 8 distinct) must appear in some searchable field. Results rank by the API's keyword
+    /// score, then newest first. Semantic search is not simulated.
     fn search(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let query = q.get("query").map_or("", |query| query.trim());
         if query.is_empty() || query.len() > 200 {
@@ -1264,36 +1274,63 @@ impl Backend {
             Some(Ok(limit)) if (1..=20).contains(&limit) => limit,
             Some(_) => return Err(invalid("limit must be from 1 to 20")),
         };
-        let words: Vec<String> = query.split_whitespace().map(str::to_lowercase).collect();
-        const FIELDS: [&str; 5] = ["name", "id", "externalId", "description", "tags"];
-        let mut matches: Vec<(f64, Vec<&str>, &Value)> = Vec::new();
+        let normalized = query.to_lowercase();
+        let mut tokens: Vec<&str> = Vec::new();
+        for token in normalized.split_whitespace() {
+            if tokens.len() < SEARCH_TOKENS && !tokens.contains(&token) {
+                tokens.push(token);
+            }
+        }
+        let mut matches: Vec<(u32, Vec<&str>, &Value)> = Vec::new();
         for asset in self.storage.assets.values() {
             if asset["projectId"] != self.options.project_id.as_str() {
                 continue;
             }
-            let values = FIELDS.map(|field| {
-                match &asset[field] {
+            let values = SEARCH_FIELDS.map(|field| {
+                match lookup(asset, field) {
                     Value::Array(tags) => tags.iter().map(display).collect::<Vec<_>>().join(" "),
                     value => display(value),
                 }
                 .to_lowercase()
             });
-            let fields: Vec<&str> = FIELDS
+            if !tokens
+                .iter()
+                .all(|token| values.iter().any(|value| value.contains(token)))
+            {
+                continue;
+            }
+            let fields: Vec<&str> = SEARCH_FIELDS
                 .iter()
                 .zip(&values)
-                .filter(|(_, value)| words.iter().any(|word| value.contains(word)))
+                .filter(|(_, value)| tokens.iter().any(|token| value.contains(token)))
                 .map(|(field, _)| *field)
                 .collect();
-            if words
-                .iter()
-                .all(|word| values.iter().any(|value| value.contains(word)))
-            {
-                matches.push((fields.len() as f64 / FIELDS.len() as f64, fields, asset));
-            }
+            let [name, id, external_id, _, tags, ..] = &values;
+            let score = if *id == normalized {
+                1000
+            } else if *external_id == normalized {
+                950
+            } else if *name == normalized {
+                900
+            } else if id.starts_with(&normalized) {
+                800
+            } else if external_id.starts_with(&normalized) {
+                750
+            } else if name.starts_with(&normalized) {
+                700
+            } else if name.contains(&normalized) {
+                600
+            } else if tags.contains(&normalized) {
+                500
+            } else {
+                100
+            };
+            matches.push((score, fields, asset));
         }
         matches.sort_by(|a, b| {
-            b.0.total_cmp(&a.0)
-                .then_with(|| compare(&a.2["id"], &b.2["id"]))
+            b.0.cmp(&a.0)
+                .then_with(|| compare(&b.2["createdAt"], &a.2["createdAt"]))
+                .then_with(|| compare(&b.2["id"], &a.2["id"]))
         });
         let items: Vec<Value> = matches
             .into_iter()
@@ -1437,6 +1474,21 @@ impl Backend {
     }
 }
 
+/// Keyword search fields, in the order matches are reported.
+const SEARCH_FIELDS: [&str; 9] = [
+    "name",
+    "id",
+    "externalId",
+    "description",
+    "tags",
+    "type",
+    "content.format",
+    "content.extension",
+    "classification.moderation.status",
+];
+/// The most distinct query tokens a keyword search uses.
+const SEARCH_TOKENS: usize = 8;
+
 /// Orders JSON values: null first, then numbers numerically, then everything else as text.
 fn compare(a: &Value, b: &Value) -> Ordering {
     match (a, b) {
@@ -1450,13 +1502,41 @@ fn compare(a: &Value, b: &Value) -> Ordering {
     }
 }
 
-/// An RSQL subset: `;` (and), `,` (or), `==` and `!=` (with `*` wildcards), `=in=`, `=out=`,
-/// `=gt=`, `=ge=`, `=lt=`, `=le=` and quoted values. Parentheses only enclose value lists.
-struct Filter(Vec<Vec<Comparison>>);
+/// An RSQL subset: `;` (and), which binds tighter than `,` (or), `( … )` groups, `==` and `!=`
+/// (with `*` wildcards), `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`, `=le=` and quoted values.
+/// Alternatives (`,`) of terms (`;`) that must all hold.
+struct Filter(Vec<Vec<Term>>);
+enum Term {
+    Comparison(Comparison),
+    Group(Filter),
+}
 struct Comparison {
     field: String,
     operator: &'static str,
     values: Vec<String>,
+}
+/// The expression inside `( … )` when the parentheses enclose all of `text`.
+fn unwrap_group(text: &str) -> Option<&str> {
+    if !text.starts_with('(') || !text.ends_with(')') {
+        return None;
+    }
+    let (mut depth, mut quote) = (0i32, None);
+    for (index, c) in text.char_indices() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, '"' | '\'') => quote = Some(c),
+            (None, '(') => depth += 1,
+            (None, ')') => {
+                depth -= 1;
+                if depth == 0 {
+                    return (index == text.len() - 1).then(|| &text[1..index]);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 fn split_top(expression: &str, separator: char) -> Vec<&str> {
     let (mut parts, mut start, mut depth, mut quote) = (Vec::new(), 0, 0i32, None);
@@ -1487,20 +1567,27 @@ fn unquote(value: &str) -> String {
     }
 }
 fn parse_filter(expression: &str) -> Outcome<Filter> {
+    parse_group(expression, expression)
+}
+fn parse_group(expression: &str, whole: &str) -> Outcome<Filter> {
     let unsupported = |reason: &str| {
         let mut failure = custom(
             "mock/invalid-filter",
             400,
             "The mock cannot evaluate this filter",
         );
-        failure.details = json!({ "filter": expression, "reason": reason });
+        failure.details = json!({ "filter": whole, "reason": reason });
         failure
     };
-    let mut groups = Vec::new();
-    for group in split_top(expression, ',') {
-        let mut comparisons = Vec::new();
-        for term in split_top(group, ';') {
+    let mut alternatives = Vec::new();
+    for alternative in split_top(expression, ',') {
+        let mut terms = Vec::new();
+        for term in split_top(alternative, ';') {
             let term = term.trim();
+            if let Some(group) = unwrap_group(term) {
+                terms.push(Term::Group(parse_group(group, whole)?));
+                continue;
+            }
             let field_end = term
                 .find(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '_'))
                 .unwrap_or(term.len());
@@ -1509,7 +1596,7 @@ fn parse_filter(expression: &str) -> Outcome<Filter> {
                 .into_iter()
                 .find(|operator| rest.starts_with(operator))
                 .filter(|_| !field.is_empty())
-                .ok_or_else(|| unsupported("expected `field<operator>value`"))?;
+                .ok_or_else(|| unsupported("expected `field<operator>value` or a ( … ) group"))?;
             let raw = rest[operator.len()..].trim();
             let values = if operator == "=in=" || operator == "=out=" {
                 let list = raw
@@ -1518,19 +1605,19 @@ fn parse_filter(expression: &str) -> Outcome<Filter> {
                     .ok_or_else(|| unsupported("=in= and =out= take a (list)"))?;
                 split_top(list, ',').into_iter().map(unquote).collect()
             } else if raw.starts_with('(') {
-                return Err(unsupported("parentheses only enclose =in= and =out= lists"));
+                return Err(unsupported("only =in= and =out= take a (list)"));
             } else {
                 vec![unquote(raw)]
             };
-            comparisons.push(Comparison {
+            terms.push(Term::Comparison(Comparison {
                 field: field.to_owned(),
                 operator,
                 values,
-            });
+            }));
         }
-        groups.push(comparisons);
+        alternatives.push(terms);
     }
-    Ok(Filter(groups))
+    Ok(Filter(alternatives))
 }
 fn wildcard(pattern: &str, value: &str) -> bool {
     match pattern.split_once('*') {
@@ -1547,8 +1634,12 @@ fn wildcard(pattern: &str, value: &str) -> bool {
 }
 impl Filter {
     fn matches(&self, asset: &Value) -> bool {
-        self.0.iter().any(|group| {
-            group.iter().all(|comparison| {
+        self.0.iter().any(|terms| {
+            terms.iter().all(|term| {
+                let comparison = match term {
+                    Term::Group(group) => return group.matches(asset),
+                    Term::Comparison(comparison) => comparison,
+                };
                 let actual = lookup(asset, &comparison.field);
                 let texts: Vec<String> = match actual {
                     Value::Array(items) => items.iter().map(display).collect(),

@@ -91,6 +91,9 @@ Every failure raises `CalmLensError` or a subclass, with a stable `code` (consta
 Each error also has `message`, `details` (the API's details, plus `traceId` when sent),
 `request_id` (the response's `X-Request-Id`, to quote to support), `headers` (lower-case
 names), `retry_after` (seconds from `Retry-After`), `is_not_found` and `is_retryable`.
+`is_retryable` depends only on `code` and `status`, so every error class agrees: it is True for
+`sdk/transport-error`, `sdk/timeout` (including `wait_for_decision`'s) and
+`idempotency/request-in-progress`, and for HTTP 429, 502, 503 and 504.
 Transport errors keep the native exception (`ConnectionResetError`, `ssl.SSLError`,
 `http.client.IncompleteRead`, `TimeoutError`, ...) as `__cause__`. `CalmLensValidationError`
 is also a `ValueError`.
@@ -502,13 +505,24 @@ and `signed_url_base_url`. Unknown mock options raise.
   `classification.moderation.status` or `classification.status` to simulate a decision or failure.
 - Idempotency keys are honoured: a repeated key replays the saved response, and a key reused
   for a different request raises `idempotency/key-reused`.
+- `assets.search` is keyword search like the API's: the query is split on whitespace (at most
+  8 distinct words, case-insensitive) and an asset matches when every word appears in its name,
+  ID, external ID, description, tags, type, content format or extension, or moderation status.
+  `matchedFields` lists the fields containing any word, `score` is the API's keyword score
+  (exact ID 1000, external ID 950, name 900; ID, external ID and name prefixes 800, 750 and 700;
+  name 600, tags 500, otherwise 100), results are ranked by score then newest first, and
+  `semanticStatus` is `disabled` whatever the `mode`.
+- List cursors resume after the last item returned, so assets created or deleted between pages
+  are neither skipped nor repeated.
+- The default `now` clock moves on by at least a millisecond per reading, so assets created in a
+  row have increasing `createdAt` values; a `now` you pass is used as is.
 
 The mock supports the same resource methods, folder constraints, lens version checks,
 multipart uploads (saved queue mode, declared sizes, part order), stored content, content
 and asset deletion, retries of failed assets, keyword search, list filters on top-level and nested
 fields such as `classification.moderation.status`, `classification.status` and `content.format` (a subset of RSQL: `==` with `*`, `!=`,
-`=in=`, `=out=`, `=gt=`/`=ge=`/`=lt=`/`=le=`, `;` and `,`; other syntax raises
-`NotImplementedError`) and ordering (newest first by default), and CDN download grants with
+`=in=`, `=out=`, `=gt=`/`=ge=`/`=lt=`/`=le=`, `;` (and), which binds tighter than `,` (or), and
+`( … )` groups; other syntax raises `NotImplementedError`) and ordering (newest first by default), and CDN download grants with
 realistic response headers. It does not classify content, transform media or fetch external
 URLs. Mock signatures and URLs are for tests only; inspect or seed the storage dictionaries
 between calls. Keep `calmlens.testing` out of production imports.

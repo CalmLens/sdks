@@ -102,7 +102,12 @@ final class MockServerClient
             self::checkOutcome($analyzedOutcome);
         }
         $this->analyzedOutcome = $analyzedOutcome;
-        $this->now = \Closure::fromCallable($now ?? fn (): int => (int) floor(microtime(true) * 1000));
+        $last = 0;
+        // The default clock moves on by at least a millisecond per reading, so assets created in a
+        // row have increasing createdAt and orderings never depend on random IDs.
+        $this->now = \Closure::fromCallable($now ?? function () use (&$last): int {
+            return $last = max((int) floor(microtime(true) * 1000), $last + 1);
+        });
         $this->createId = \Closure::fromCallable($createId ?? fn (): string => Values::uuid());
         $this->grants = $apiKey === null ? [] : self::grantsOf($apiKey);
         $stack = HandlerStack::create(fn (RequestInterface $request, array $options) => $this->handle($request));
@@ -538,8 +543,10 @@ final class MockServerClient
 
     /**
      * Filters with a subset of RSQL (`;` and, `,` or, `==` with `*` wildcards, `!=`, `=in=`,
-     * `=out=`, `=gt=`, `=ge=`, `=lt=`, `=le=`), orders by `createdAt` and `id`, and pages with an
-     * opaque cursor.
+     * `=out=`, `=gt=`, `=ge=`, `=lt=`, `=le=`, `( … )` groups), orders by `createdAt` and `id`
+     * with an `id` tie-breaker, and pages with keyset cursors like the API: a cursor resumes
+     * after the last returned item, so assets created or deleted between pages are neither
+     * repeated nor skipped.
      */
     private function page(array $items, array $query): array
     {
@@ -570,17 +577,29 @@ final class MockServerClient
         if ($size < 1 || $size > 100) {
             self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'pageSize must be from 1 to 100');
         }
-        $offset = 0;
         if (isset($query['cursor'])) {
             $decoded = base64_decode((string) $query['cursor'], true);
-            if ($decoded === false || !preg_match('/^offset:(\d+)$/D', $decoded, $match)) {
+            $after = $decoded === false ? null : json_decode($decoded, true);
+            if (!is_array($after) || !array_is_list($after) || count($after) !== count($ordering)) {
                 self::fail(ErrorCodes::INVALID_CURSOR, 400, 'Invalid cursor');
             }
-            $offset = (int) $match[1];
+            // Keyset: resume strictly after the last returned item's values.
+            $items = array_values(array_filter($items, function (array $item) use ($ordering, $after): bool {
+                foreach ($ordering as $i => $order) {
+                    $result = ($item[$order['field']] ?? null) <=> $after[$i];
+                    if ($result !== 0) {
+                        return (strtoupper($order['direction'] ?? 'ASC') === 'DESC' ? -$result : $result) > 0;
+                    }
+                }
+                return false;
+            }));
         }
-        $more = count($items) > $offset + $size;
-        return ['items' => array_slice($items, $offset, $size), 'nextCursor' => $more ? base64_encode('offset:' . ($offset + $size)) : null,
-            'pageSize' => $size, 'ordering' => $ordering, 'hasMore' => $more];
+        $more = count($items) > $size;
+        $taken = array_slice($items, 0, $size);
+        $last = $taken === [] ? null : $taken[array_key_last($taken)];
+        $cursor = $more && $last !== null
+            ? base64_encode(Values::json(array_map(fn (array $order) => $last[$order['field']] ?? null, $ordering))) : null;
+        return ['items' => $taken, 'nextCursor' => $cursor, 'pageSize' => $size, 'ordering' => $ordering, 'hasMore' => $more];
     }
 
     private static function filter(string $expression): \Closure
@@ -590,31 +609,32 @@ final class MockServerClient
         if (implode('', $tokens) !== $expression) {
             throw new \LogicException("MockServerClient cannot parse the filter $expression");
         }
-        // Group comparisons; a "(" after =in= or =out= opens a value list, not a group.
-        $groups = [[]];
-        $current = '';
-        $depth = 0;
-        foreach ($tokens as $token) {
-            if ($token === '(') {
-                if (!preg_match('/=(in|out)=\s*$/', $current)) {
-                    throw new \LogicException('MockServerClient filters do not support parentheses for grouping');
-                }
-                $depth++;
-            } elseif ($token === ')') {
-                $depth--;
-            }
-            if ($depth === 0 && ($token === ';' || $token === ',')) {
-                $groups[array_key_last($groups)][] = $current;
-                $current = '';
-                if ($token === ',') {
-                    $groups[] = [];
-                }
+        // Whitespace between parentheses and separators carries nothing.
+        $tokens = array_values(array_filter($tokens, fn (string $token) => trim($token) !== ''));
+        $position = 0;
+        $test = self::alternatives($tokens, $position);
+        if ($position !== count($tokens)) {
+            throw new \LogicException("MockServerClient cannot parse the filter $expression");
+        }
+        return $test;
+    }
+
+    /** `,` (or) of `;` (and) terms, read from `$tokens` until a closing `)` or the end. */
+    private static function alternatives(array $tokens, int &$position): \Closure
+    {
+        $alternatives = [[]];
+        while (true) {
+            $alternatives[array_key_last($alternatives)][] = self::term($tokens, $position);
+            $token = $tokens[$position] ?? null;
+            if ($token === ';') {
+                $position++;
+            } elseif ($token === ',') {
+                $position++;
+                $alternatives[] = [];
             } else {
-                $current .= $token;
+                break;
             }
         }
-        $groups[array_key_last($groups)][] = $current;
-        $alternatives = array_map(fn (array $group) => array_map(self::comparison(...), $group), $groups);
         return function (array $asset) use ($alternatives): bool {
             foreach ($alternatives as $tests) {
                 if (array_reduce($tests, fn (bool $all, \Closure $test) => $all && $test($asset), true)) {
@@ -623,6 +643,41 @@ final class MockServerClient
             }
             return false;
         };
+    }
+
+    /** A `( … )` group or a comparison, whose `=in=`/`=out=` value list keeps its parentheses. */
+    private static function term(array $tokens, int &$position): \Closure
+    {
+        if (($tokens[$position] ?? null) === '(') {
+            $position++;
+            $group = self::alternatives($tokens, $position);
+            if (($tokens[$position] ?? null) !== ')') {
+                throw new \LogicException('MockServerClient filters need a closing parenthesis');
+            }
+            $position++;
+            return $group;
+        }
+        $text = '';
+        $depth = 0;
+        while (isset($tokens[$position])) {
+            $token = $tokens[$position];
+            if ($token === '(') {
+                if (!preg_match('/=(in|out)=\s*$/', $text)) {
+                    throw new \LogicException("MockServerClient cannot parse the filter term $text(");
+                }
+                $depth++;
+            } elseif ($token === ')') {
+                if ($depth === 0) {
+                    break;
+                }
+                $depth--;
+            } elseif ($depth === 0 && ($token === ';' || $token === ',')) {
+                break;
+            }
+            $text .= $token;
+            $position++;
+        }
+        return self::comparison($text);
     }
 
     private static function comparison(string $text): \Closure
@@ -669,29 +724,63 @@ final class MockServerClient
         };
     }
 
-    /** Keyword matching on names, IDs, descriptions, types and tags; the mock has no semantic index. */
+    /** Keyword search fields, in the order matches are reported, and where each value sits in the asset. */
+    private const SEARCH_FIELDS = ['name' => ['name'], 'id' => ['id'], 'externalId' => ['externalId'],
+        'description' => ['description'], 'tags' => ['tags'], 'type' => ['type'], 'content.format' => ['content', 'format'],
+        'content.extension' => ['content', 'extension'], 'classification.moderation.status' => ['classification', 'moderation', 'status']];
+
+    /**
+     * Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8
+     * distinct) must appear in some field. Results rank by the API's score, then newest first;
+     * the mock has no semantic index.
+     */
     private function search(array $query): array
     {
-        $text = strtolower(trim((string) ($query['query'] ?? '')));
+        $text = trim((string) ($query['query'] ?? ''));
         if ($text === '') {
             self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'query is required');
         }
+        $normalized = strtolower($text);
+        $tokens = array_slice(array_values(array_unique(preg_split('/\s+/', $normalized))), 0, 8);
         $items = [];
         foreach ($this->assets as $asset) {
-            $matched = array_values(array_filter(['name', 'id', 'externalId', 'description', 'type'],
-                fn ($field) => str_contains(strtolower((string) ($asset[$field] ?? '')), $text)));
-            foreach ($asset['tags'] ?? [] as $tag) {
-                if (str_contains(strtolower((string) $tag), $text)) {
-                    $matched[] = 'tags';
-                    break;
+            $values = [];
+            foreach (self::SEARCH_FIELDS as $field => $path) {
+                $value = $asset;
+                foreach ($path as $key) {
+                    $value = is_array($value) ? ($value[$key] ?? null) : null;
+                }
+                $values[$field] = strtolower(implode(' ', array_map('strval', is_array($value) ? $value : ($value === null ? [] : [$value]))));
+            }
+            $contains = fn (string $value) => array_filter($tokens, fn ($token) => str_contains($value, $token)) !== [];
+            foreach ($tokens as $token) {
+                if (array_filter($values, fn ($value) => str_contains($value, $token)) === []) {
+                    continue 2;
                 }
             }
-            if ($matched !== []) {
-                $items[] = ['asset' => $asset, 'score' => count($matched) / 7, 'matchedFields' => $matched];
-            }
+            $items[] = ['asset' => $asset, 'score' => self::searchScore($values, $normalized),
+                'matchedFields' => array_keys(array_filter($values, $contains))];
         }
-        usort($items, fn ($a, $b) => $b['score'] <=> $a['score']);
-        return ['query' => $query['query'], 'items' => array_slice($items, 0, (int) ($query['limit'] ?? 10)), 'semanticStatus' => 'disabled'];
+        usort($items, fn ($a, $b) => [$b['score'], $b['asset']['createdAt']] <=> [$a['score'], $a['asset']['createdAt']]);
+        $limit = min(20, max(1, (int) ($query['limit'] ?? 10)));
+        return ['query' => $text, 'items' => array_slice($items, 0, $limit), 'semanticStatus' => 'disabled'];
+    }
+
+    /** The API's keyword score for the whole normalized query. */
+    private static function searchScore(array $values, string $query): int
+    {
+        ['id' => $id, 'externalId' => $externalId, 'name' => $name] = $values;
+        return match (true) {
+            $id === $query => 1000,
+            $externalId === $query => 950,
+            $name === $query => 900,
+            str_starts_with($id, $query) => 800,
+            str_starts_with($externalId, $query) => 750,
+            str_starts_with($name, $query) => 700,
+            str_contains($name, $query) => 600,
+            str_contains($values['tags'], $query) => 500,
+            default => 100,
+        };
     }
 
     private function folder(mixed $id): array

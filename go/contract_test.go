@@ -2,9 +2,9 @@ package calmlens
 
 // Replays the shared SDK contract fixtures that packages/sdk-contract/generate.ts writes to
 // testdata (format in packages/sdk-contract/README.md): requests captured from the JavaScript
-// SDK, path safety and CDN URLs, transform options, webhooks and rejections. Each fixture case
-// is its own subtest. The mock scenarios and the SDK surface need calmlenstest, so they are
-// replayed by calmlenstest/contract_test.go.
+// SDK, path safety and CDN URLs, transform options, webhooks, rejections and surface.json's
+// retryable errors. Each fixture case is its own subtest. The mock scenarios and the rest of the
+// SDK surface need calmlenstest, so they are replayed by calmlenstest/contract_test.go.
 
 import (
 	"bytes"
@@ -465,6 +465,36 @@ func TestRejections(t *testing.T) {
 			}
 			if got != rejection.Error || len(h.calls) != 0 {
 				t.Fatalf("got %q after %d requests; want %q before any request", got, len(h.calls), rejection.Error)
+			}
+		})
+	}
+}
+
+// TestRetryableContract replays surface.json's retryable cases: which error codes and HTTP
+// statuses every SDK treats as worth repeating.
+func TestRetryableContract(t *testing.T) {
+	fixture := readFixture[struct {
+		Retryable []struct {
+			Code      string
+			Status    *int
+			Retryable bool
+		}
+	}](t, "surface.json")
+	if len(fixture.Retryable) == 0 {
+		t.Fatal("surface.json has no retryable cases")
+	}
+	for _, c := range fixture.Retryable {
+		status := 0
+		if c.Status != nil {
+			status = *c.Status
+		}
+		t.Run(fmt.Sprintf("%s %d", c.Code, status), func(t *testing.T) {
+			e := &Error{Code: c.Code, Status: status}
+			if got := e.Retryable(); got != c.Retryable {
+				t.Fatalf("Retryable() = %v, want %v", got, c.Retryable)
+			}
+			if got := IsRetryable(fmt.Errorf("wrapped: %w", e)); got != c.Retryable {
+				t.Fatalf("IsRetryable = %v, want %v", got, c.Retryable)
 			}
 		})
 	}

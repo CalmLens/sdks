@@ -455,33 +455,57 @@ final class MockApi {
 
   // ------------------------------------------------------------------ Lists and search
 
-  /** A subset of RSQL: {@code ;} (and), {@code ,} (or), {@code ==} and {@code !=} (with {@code *} wildcards), {@code =in=}, {@code =out=}, {@code =gt=}, {@code =ge=}, {@code =lt=} and {@code =le=}. */
+  /**
+   * A subset of RSQL: {@code ==} and {@code !=} (with {@code *} wildcards), {@code =in=}, {@code =out=},
+   * {@code =gt=}, {@code =ge=}, {@code =lt=} and {@code =le=}, joined by {@code ;} (and), which binds
+   * tighter than {@code ,} (or), and grouped with {@code ( … )}.
+   */
   static Predicate<JsonObject> rsql(String expression) throws IOException {
-    List<List<String>> groups = new ArrayList<>(List.of(new ArrayList<>()));
-    StringBuilder current = new StringBuilder();
-    int depth = 0;
-    char quote = 0;
-    for (char c : expression.toCharArray()) {
-      if (quote != 0) { if (c == quote) quote = 0; current.append(c); continue; }
-      if (c == '"' || c == '\'') quote = c;
-      else if (c == '(') {
-        if (!current.toString().matches("(?s).*=(in|out)=\\s*")) throw new IOException("MockCalmLensServerClient filters do not support parentheses for grouping");
-        depth++;
-      } else if (c == ')') depth--;
-      if (depth == 0 && (c == ';' || c == ',')) {
-        groups.get(groups.size() - 1).add(current.toString());
-        current.setLength(0);
-        if (c == ',') groups.add(new ArrayList<>());
-      } else current.append(c);
-    }
-    groups.get(groups.size() - 1).add(current.toString());
     List<List<Predicate<JsonObject>>> alternatives = new ArrayList<>();
-    for (List<String> group : groups) {
+    for (String alternative : split(expression, ',')) {
       List<Predicate<JsonObject>> tests = new ArrayList<>();
-      for (String text : group) tests.add(comparison(text));
+      for (String term : split(alternative, ';')) {
+        String text = term.strip();
+        if (text.isEmpty()) throw new IOException("MockCalmLensServerClient cannot evaluate the filter " + expression);
+        String group = unwrap(text);
+        tests.add(group != null ? rsql(group) : comparison(text));
+      }
       alternatives.add(tests);
     }
     return asset -> alternatives.stream().anyMatch(group -> group.stream().allMatch(test -> test.test(asset)));
+  }
+
+  /** Splits on {@code separator} outside quotes and parentheses (groups and {@code =in=(...)} lists). */
+  private static List<String> split(String text, char separator) {
+    List<String> parts = new ArrayList<>();
+    StringBuilder current = new StringBuilder();
+    int depth = 0;
+    char quote = 0;
+    for (char c : text.toCharArray()) {
+      if (quote != 0) { if (c == quote) quote = 0; }
+      else if (c == '"' || c == '\'') quote = c;
+      else if (c == '(') depth++;
+      else if (c == ')') depth--;
+      else if (depth == 0 && c == separator) { parts.add(current.toString()); current.setLength(0); continue; }
+      current.append(c);
+    }
+    parts.add(current.toString());
+    return parts;
+  }
+
+  /** The expression inside {@code ( … )} when the parentheses enclose all of {@code text}, else null. */
+  private static String unwrap(String text) {
+    if (!text.startsWith("(") || !text.endsWith(")")) return null;
+    int depth = 0;
+    char quote = 0;
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (quote != 0) { if (c == quote) quote = 0; }
+      else if (c == '"' || c == '\'') quote = c;
+      else if (c == '(') depth++;
+      else if (c == ')' && --depth == 0) return i == text.length() - 1 ? text.substring(1, i) : null;
+    }
+    return null;
   }
 
   private static final Pattern COMPARISON = Pattern.compile("\\s*([\\w.]+)\\s*(==|!=|=in=|=out=|=gt=|=ge=|=lt=|=le=)(.*)", Pattern.DOTALL);
@@ -594,36 +618,64 @@ final class MockApi {
     return page;
   }
 
+  /** Keyword search fields, in the order matches are reported. */
+  private static final List<String> SEARCH_FIELDS = List.of("name", "id", "externalId", "description", "tags", "type",
+      "content.format", "content.extension", "classification.moderation.status");
+  private static final int MAX_SEARCH_TOKENS = 8, MAX_SEARCH_LIMIT = 20;
+
+  /**
+   * Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8
+   * distinct) must appear in some field. Results rank by the API's score, then newest first.
+   */
   private JsonObject search(JsonObject q) throws Failure {
-    String text = Objects.requireNonNullElse(str(q, "query"), "").strip().toLowerCase(Locale.ROOT);
+    String text = Objects.requireNonNullElse(str(q, "query"), "").strip();
     if (text.isEmpty()) throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "query is required");
-    long limit = number(q, "limit", 10, "limit", 1, 100);
-    List<String> fields = List.of("name", "id", "externalId", "description");
+    long limit = Math.min(number(q, "limit", 10, "limit", 1, 100), MAX_SEARCH_LIMIT);
+    String normalized = text.toLowerCase(Locale.ROOT);
+    List<String> tokens = java.util.Arrays.stream(normalized.split("\\s+")).distinct().limit(MAX_SEARCH_TOKENS).toList();
     List<JsonObject> items = new ArrayList<>();
     for (JsonObject asset : projectAssets()) {
-      JsonArray matched = new JsonArray();
-      for (String field : fields) if (Objects.requireNonNullElse(str(asset, field), "").toLowerCase(Locale.ROOT).contains(text)) matched.add(field);
-      JsonElement tags = asset.get("tags");
-      if (tags != null && tags.isJsonArray()) {
-        for (JsonElement tag : tags.getAsJsonArray())
-          if (tag.isJsonPrimitive() && tag.getAsString().toLowerCase(Locale.ROOT).contains(text)) { matched.add("tags"); break; }
+      Map<String, String> values = new LinkedHashMap<>();
+      for (String field : SEARCH_FIELDS) {
+        JsonElement value = path(asset, field);
+        List<String> texts = new ArrayList<>();
+        if (value != null && value.isJsonArray()) value.getAsJsonArray().forEach(item -> { if (item.isJsonPrimitive()) texts.add(item.getAsString()); });
+        else if (value != null && value.isJsonPrimitive()) texts.add(value.getAsString());
+        values.put(field, String.join(" ", texts).toLowerCase(Locale.ROOT));
       }
-      if (matched.isEmpty()) continue;
+      if (!tokens.stream().allMatch(token -> values.values().stream().anyMatch(value -> value.contains(token)))) continue;
+      JsonArray matched = new JsonArray();
+      values.forEach((field, value) -> { if (tokens.stream().anyMatch(value::contains)) matched.add(field); });
       JsonObject item = new JsonObject();
       item.add("asset", asset);
-      item.addProperty("score", matched.size() / (double) (fields.size() + 1));
+      item.addProperty("score", searchScore(values, normalized));
       item.add("matchedFields", matched);
       items.add(item);
     }
-    items.sort(Comparator.comparingDouble((JsonObject item) -> item.get("score").getAsDouble()).reversed());
+    items.sort(Comparator.comparingInt((JsonObject item) -> item.get("score").getAsInt())
+        .thenComparingLong(item -> item.getAsJsonObject("asset").get("createdAt").getAsLong()).reversed());
     JsonObject result = new JsonObject();
-    result.add("query", q.get("query"));
+    result.addProperty("query", text);
     JsonArray list = new JsonArray();
     items.stream().limit(limit).forEach(list::add);
     result.add("items", list);
     // The mock has no semantic index, so every search mode is keyword matching.
     result.addProperty("semanticStatus", "disabled");
     return result;
+  }
+
+  /** The API's keyword score for the whole normalized query. */
+  private static int searchScore(Map<String, String> values, String query) {
+    String id = values.get("id"), externalId = values.get("externalId"), name = values.get("name");
+    if (id.equals(query)) return 1000;
+    if (externalId.equals(query)) return 950;
+    if (name.equals(query)) return 900;
+    if (id.startsWith(query)) return 800;
+    if (externalId.startsWith(query)) return 750;
+    if (name.startsWith(query)) return 700;
+    if (name.contains(query)) return 600;
+    if (values.get("tags").contains(query)) return 500;
+    return 100;
   }
 
   // ------------------------------------------------------------------ Folders, lenses and events

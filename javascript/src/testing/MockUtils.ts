@@ -1,5 +1,10 @@
 import { invalidArgument } from "../client/CalmLensError";
-import type { AssetType, SubmitAssetOptions } from "../client/CalmLensTypes";
+import type {
+  Asset,
+  AssetSearchResponse,
+  AssetType,
+  SubmitAssetOptions,
+} from "../client/CalmLensTypes";
 import type { CursorPage, CursorPageQuery, Page } from "../contract/Page.js";
 
 export const toRawBase64 = (value: string): string => {
@@ -159,7 +164,7 @@ const readField = (item: Record<string, unknown>, path: string): unknown =>
 
 const unsupportedFilter = (expression: string) =>
   invalidArgument(
-    `MockCalmLensServerClient cannot evaluate the filter "${expression}". It supports ==, !=, <, <=, >, >=, =in= and =out=, joined by ; (and) or , (or), without grouping parentheses.`,
+    `MockCalmLensServerClient cannot evaluate the filter "${expression}". It supports ==, !=, <, <=, >, >=, =in= and =out=, joined by ; (and) or , (or) and grouped with parentheses.`,
   );
 
 const matchesComparison = (item: Record<string, unknown>, comparison: string): boolean => {
@@ -201,7 +206,7 @@ const matchesComparison = (item: Record<string, unknown>, comparison: string): b
   }
 };
 
-/** Splits on `separator` outside quotes and parentheses; grouping parentheses are refused. */
+/** Splits on `separator` outside quotes and parentheses. */
 const splitTopLevel = (text: string, separator: string): string[] => {
   const parts: string[] = [];
   let depth = 0;
@@ -227,21 +232,113 @@ const splitTopLevel = (text: string, separator: string): string[] => {
   return parts;
 };
 
+/** The expression inside `( … )` when the parentheses enclose all of `text`, else undefined. */
+const unwrapGroup = (text: string): string | undefined => {
+  if (!text.startsWith("(") || !text.endsWith(")")) return undefined;
+  let depth = 0;
+  let quote: string | null = null;
+  for (const [index, char] of [...text].entries()) {
+    if (quote) {
+      if (char === quote) quote = null;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      depth++;
+    } else if (char === ")" && --depth === 0) {
+      return index === text.length - 1 ? text.slice(1, -1) : undefined;
+    }
+  }
+  return undefined;
+};
+
+/** Evaluates `,` (or) of `;` (and) terms, where a term is a comparison or a `( … )` group. */
+const matchesExpression = (item: Record<string, unknown>, expression: string): boolean =>
+  splitTopLevel(expression, ",").some((alternative) =>
+    splitTopLevel(alternative, ";").every((term) => {
+      const trimmed = term.trim();
+      if (!trimmed) throw unsupportedFilter(expression);
+      const group = unwrapGroup(trimmed);
+      return group === undefined
+        ? matchesComparison(item, trimmed)
+        : matchesExpression(item, group);
+    }),
+  );
+
 /**
- * Applies an RSQL `filter` like the API for simple expressions: comparisons joined by `;`
- * (and) and `,` (or). Anything it can't evaluate throws instead of returning wrong results.
+ * Applies an RSQL `filter` like the API: comparisons joined by `;` (and), which binds tighter
+ * than `,` (or), and grouped with parentheses. Anything it can't evaluate throws instead of
+ * returning wrong results.
  */
 export const filterAssets = <T>(items: T[], filter: string | null | undefined): T[] => {
   if (!filter) return items;
-  const alternatives = splitTopLevel(filter, ",").map((group) => splitTopLevel(group, ";"));
-  for (const condition of alternatives.flat()) {
-    if (condition.trim().startsWith("(")) throw unsupportedFilter(condition);
-  }
-  return items.filter((item) =>
-    alternatives.some((conditions) =>
-      conditions.every((condition) =>
-        matchesComparison(item as Record<string, unknown>, condition),
-      ),
-    ),
-  );
+  // Evaluate once up front so an unsupported filter fails even when there are no items.
+  if (items.length === 0) matchesExpression({}, filter);
+  return items.filter((item) => matchesExpression(item as Record<string, unknown>, filter));
+};
+
+const MAX_SEARCH_TOKENS = 8;
+type AssetSearchResult = AssetSearchResponse["items"][number];
+type SearchField = AssetSearchResult["matchedFields"][number];
+
+/** The keyword fields the API searches, in the order it reports matches. */
+const searchFieldValues = (asset: Asset): Array<[SearchField, string]> => [
+  ["name", asset.name],
+  ["id", asset.id],
+  ["externalId", asset.externalId ?? ""],
+  ["description", asset.description ?? ""],
+  ["tags", asset.tags?.join(" ") ?? ""],
+  ["type", asset.type],
+  ["content.format", asset.content?.format ?? ""],
+  ["content.extension", asset.content?.extension ?? ""],
+  ["classification.moderation.status", asset.classification.moderation.status],
+];
+
+/** The API's keyword score for the whole lowercased query. */
+const keywordScore = (values: Map<SearchField, string>, query: string): number => {
+  const id = values.get("id")!;
+  const externalId = values.get("externalId")!;
+  const name = values.get("name")!;
+  if (id === query) return 1000;
+  if (externalId === query) return 950;
+  if (name === query) return 900;
+  if (id.startsWith(query)) return 800;
+  if (externalId.startsWith(query)) return 750;
+  if (name.startsWith(query)) return 700;
+  if (name.includes(query)) return 600;
+  if (values.get("tags")!.includes(query)) return 500;
+  return 100;
+};
+
+/**
+ * Keyword search as the API runs it: every whitespace-separated token (case-insensitive, at
+ * most 8) must appear in some searchable field. Results are ranked by the API's score, then
+ * newest first.
+ */
+export const searchAssets = (
+  assets: Asset[],
+  query: string,
+  limit: number,
+): AssetSearchResult[] => {
+  const normalized = query.trim().toLowerCase();
+  const tokens = [...new Set(normalized.split(/\s+/).filter(Boolean))].slice(0, MAX_SEARCH_TOKENS);
+  if (tokens.length === 0) return [];
+  return assets
+    .map((asset) => {
+      const fields = searchFieldValues(asset).map(
+        ([field, value]) => [field, value.toLowerCase()] as [SearchField, string],
+      );
+      const matches = tokens.every((token) => fields.some(([, value]) => value.includes(token)));
+      return {
+        asset,
+        matches,
+        score: keywordScore(new Map(fields), normalized),
+        matchedFields: fields
+          .filter(([, value]) => tokens.some((token) => value.includes(token)))
+          .map(([field]) => field),
+      };
+    })
+    .filter((result) => result.matches)
+    .sort((a, b) => b.score - a.score || b.asset.createdAt - a.asset.createdAt)
+    .slice(0, limit)
+    .map(({ asset, score, matchedFields }) => ({ asset, score, matchedFields }));
 };

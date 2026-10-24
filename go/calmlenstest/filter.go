@@ -174,7 +174,8 @@ type filterParser struct {
 }
 
 // parseFilter parses the RSQL subset the API documents: ==, !=, >, >=, <, <=, =in=, =out=,
-// =like= (and =gt=-style aliases), ";" for AND, "," for OR and parentheses.
+// =like= (and =gt=-style aliases), ";" for AND (binding tighter than ","), "," for OR and
+// nested parentheses.
 func parseFilter(input string) (filterNode, error) {
 	p := &filterParser{input: input}
 	node, err := p.or()

@@ -1111,46 +1111,520 @@
       ]
     },
     {
-      "name": "search matches an asset's externalId",
+      "name": "keyword search matches every token in any searchable field, case-insensitively, ranked like the API",
       "mock": {},
       "steps": [
         {
           "operation": "assets.create",
           "args": {
-            "name": "first.png",
+            "name": "Sunset Beach.png",
             "content": {
               "base64": "aGVsbG8=",
               "type": "image/png"
             },
-            "externalId": "order-17"
+            "externalId": "order-17",
+            "description": "Golden hour at the pier"
           },
-          "save": "first"
+          "save": "beach"
         },
         {
           "operation": "assets.create",
           "args": {
-            "name": "second.png",
+            "name": "invoice.png",
             "content": {
               "base64": "aGVsbG8=",
               "type": "image/png"
             },
-            "externalId": "invoice-42"
-          }
+            "externalId": "INV-42"
+          },
+          "save": "invoice"
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "Order Form.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "form"
         },
         {
           "operation": "assets.search",
           "args": {
-            "query": "order-17"
+            "query": "ORDER-17"
           },
           "expect": {
             "result": {
               "items.length": 1,
               "items.0.asset.id": {
-                "$ref": "first.id"
+                "$ref": "beach.id"
+              },
+              "items.0.score": 950,
+              "items.0.matchedFields": [
+                "externalId"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "order"
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.asset.id": {
+                "$ref": "beach.id"
+              },
+              "items.0.score": 750,
+              "items.0.matchedFields": [
+                "externalId"
+              ],
+              "items.1.asset.id": {
+                "$ref": "form.id"
+              },
+              "items.1.score": 700,
+              "items.1.matchedFields": [
+                "name"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "invoice.png"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "invoice.id"
+              },
+              "items.0.score": 900,
+              "items.0.matchedFields": [
+                "name"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "BEACH"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "beach.id"
+              },
+              "items.0.score": 600,
+              "items.0.matchedFields": [
+                "name"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": {
+              "$ref": "invoice.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "invoice.id"
+              },
+              "items.0.score": 1000,
+              "items.0.matchedFields": [
+                "id"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "  golden PIER  "
+          },
+          "expect": {
+            "result": {
+              "query": "golden PIER",
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "beach.id"
+              },
+              "items.0.score": 100,
+              "items.0.matchedFields": [
+                "description"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "sunset pier"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "beach.id"
+              },
+              "items.0.score": 100,
+              "items.0.matchedFields": [
+                "name",
+                "description"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "sunset invoice"
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "nothing-matches"
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "Pending"
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.asset.id": {
+                "$ref": "invoice.id"
+              },
+              "items.0.score": 100,
+              "items.0.matchedFields": [
+                "classification.moderation.status"
+              ],
+              "items.1.asset.id": {
+                "$ref": "beach.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "image"
+          },
+          "expect": {
+            "result": {
+              "items.length": 3,
+              "items.0.asset.id": {
+                "$ref": "form.id"
               },
               "items.0.matchedFields": {
-                "$contains": "externalId"
+                "$contains": "type"
               }
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": {
+              "$ref": "form.content.format"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 3,
+              "items.0.matchedFields": {
+                "$contains": "content.format"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "image",
+            "limit": 2
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.asset.id": {
+                "$ref": "form.id"
+              },
+              "items.1.asset.id": {
+                "$ref": "invoice.id"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "filters group with parentheses, and ; binds tighter than ,",
+      "mock": {
+        "queuedOutcome": "blocked"
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "a"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "b.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "b"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "c.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "c"
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "(name==a.png,name==c.png);classification.moderation.status==blocked"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "c.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "name==a.png,name==c.png;classification.moderation.status==blocked"
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.id": {
+                "$ref": "c.id"
+              },
+              "items.1.id": {
+                "$ref": "a.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "((name==a.png);(classification.moderation.status==allowed)),name==b.png"
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.id": {
+                "$ref": "b.id"
+              },
+              "items.1.id": {
+                "$ref": "a.id"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "list cursors resume after the last item when assets are created or deleted between pages",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "a"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "b.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "b"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "c.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "c"
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 2,
+            "ordering": [
+              {
+                "field": "createdAt",
+                "direction": "DESC"
+              }
+            ]
+          },
+          "save": "first",
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.id": {
+                "$ref": "c.id"
+              },
+              "items.1.id": {
+                "$ref": "b.id"
+              },
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "d.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "d"
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 2,
+            "ordering": [
+              {
+                "field": "createdAt",
+                "direction": "DESC"
+              }
+            ],
+            "cursor": {
+              "$ref": "first.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "a.id"
+              },
+              "hasMore": false,
+              "nextCursor": null
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 2,
+            "ordering": [
+              {
+                "field": "createdAt",
+                "direction": "DESC"
+              }
+            ]
+          },
+          "save": "again",
+          "expect": {
+            "result": {
+              "items.0.id": {
+                "$ref": "d.id"
+              },
+              "items.1.id": {
+                "$ref": "c.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.delete",
+          "args": {
+            "assetId": {
+              "$ref": "c.id"
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 2,
+            "ordering": [
+              {
+                "field": "createdAt",
+                "direction": "DESC"
+              }
+            ],
+            "cursor": {
+              "$ref": "again.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.id": {
+                "$ref": "b.id"
+              },
+              "items.1.id": {
+                "$ref": "a.id"
+              },
+              "hasMore": false
             }
           }
         }

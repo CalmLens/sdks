@@ -150,12 +150,53 @@ def _decode_query(pairs: Iterable[tuple[str, str]]) -> dict[str, Any]:
     return query
 
 
+def _split_top_level(text: str, separator: str) -> list[str]:
+    """Split on ``separator`` outside quotes and parentheses."""
+    parts: list[str] = []
+    depth, quote, current = 0, "", ""
+    for char in text:
+        if quote:
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        elif char == separator and depth == 0:
+            parts.append(current)
+            current = ""
+            continue
+        current += char
+    parts.append(current)
+    return parts
+
+
+def _unwrap_group(text: str) -> str | None:
+    """The expression inside ``( … )`` when the parentheses enclose all of ``text``."""
+    if not (text.startswith("(") and text.endswith(")")):
+        return None
+    depth, quote = 0, ""
+    for index, char in enumerate(text):
+        if quote:
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return text[1:-1] if index == len(text) - 1 else None
+    return None
+
+
 def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
-    """A subset of RSQL: ``;`` (and), ``,`` (or), ``==`` (``*`` wildcards), ``!=``,
-    ``=in=``, ``=out=``, ``=gt=``, ``=ge=``, ``=lt=``, ``=le=`` and quoted values."""
-    tokens = re.findall(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|[;,()]|[^;,()"\']+', expression)
-    if "".join(tokens) != expression:
-        raise NotImplementedError(f"MockCalmLensServerClient cannot parse the filter {expression!r}")
+    """RSQL like the API: ``;`` (and), which binds tighter than ``,`` (or), ``( … )`` groups,
+    ``==`` (``*`` wildcards), ``!=``, ``=in=``, ``=out=``, ``=gt=``, ``=ge=``, ``=lt=``, ``=le=``
+    and quoted values. Anything else raises ``NotImplementedError`` instead of matching wrongly."""
 
     def unquote_value(value: str) -> str:
         value = value.strip()
@@ -167,8 +208,12 @@ def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
             raise NotImplementedError(f"MockCalmLensServerClient cannot evaluate the filter {text!r}")
         name, operator, raw = found.groups()
         raw = raw.strip()
-        values = ([unquote_value(v) for v in re.findall(r'"(?:[^"\\]|\\.)*"|[^,()]+', raw[1:-1])]
-                  if raw.startswith("(") else [unquote_value(raw)])
+        if raw.startswith("("):
+            if not raw.endswith(")") or operator not in ("=in=", "=out="):
+                raise NotImplementedError(f"MockCalmLensServerClient cannot evaluate the filter {text!r}")
+            values = [unquote_value(v) for v in _split_top_level(raw[1:-1], ",")]
+        else:
+            values = [unquote_value(raw)]
 
         def matches(asset: Mapping[str, Any]) -> bool:
             actual: Any = asset
@@ -191,27 +236,58 @@ def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
             return {"=gt=": left > right, "=ge=": left >= right, "=lt=": left < right, "=le=": left <= right}[operator]
         return matches
 
-    # Group comparisons; a "(" that follows =in=/=out= belongs to the value list.
-    groups: list[list[str]] = [[]]
-    current = ""
-    depth = 0
-    for token in tokens:
-        if token == "(":
-            if not re.search(r"=(in|out)=\s*$", current):
-                raise NotImplementedError("MockCalmLensServerClient filters do not support parentheses for grouping")
-            depth += 1
-        elif token == ")":
-            depth -= 1
-        if depth == 0 and token in (";", ","):
-            groups[-1].append(current)
-            current = ""
-            if token == ",":
-                groups.append([])
-        else:
-            current += token
-    groups[-1].append(current)
-    alternatives = [[comparison(text) for text in group] for group in groups]
-    return lambda asset: any(all(test(asset) for test in group) for group in alternatives)
+    def parse(text: str) -> Callable[[Mapping[str, Any]], bool]:
+        alternatives: list[list[Callable[[Mapping[str, Any]], bool]]] = []
+        for alternative in _split_top_level(text, ","):
+            terms = []
+            for term in _split_top_level(alternative, ";"):
+                term = term.strip()
+                if not term:
+                    raise NotImplementedError(f"MockCalmLensServerClient cannot parse the filter {expression!r}")
+                group = _unwrap_group(term)
+                terms.append(comparison(term) if group is None else parse(group))
+            alternatives.append(terms)
+        return lambda asset: any(all(test(asset) for test in terms) for terms in alternatives)
+
+    return parse(expression)
+
+
+_MAX_SEARCH_TOKENS = 8
+
+
+def _keyword_score(values: Mapping[str, str], query: str) -> int:
+    """The API's keyword score for the whole lowercased query."""
+    identifier, external_id, name = values["id"], values["externalId"], values["name"]
+    if identifier == query:
+        return 1000
+    if external_id == query:
+        return 950
+    if name == query:
+        return 900
+    if identifier.startswith(query):
+        return 800
+    if external_id.startswith(query):
+        return 750
+    if name.startswith(query):
+        return 700
+    if query in name:
+        return 600
+    if query in values["tags"]:
+        return 500
+    return 100
+
+
+def _monotonic_clock() -> Callable[[], int]:
+    """The system clock in epoch milliseconds, moved on by at least 1 ms per reading."""
+    last = 0
+    lock = threading.Lock()
+
+    def now() -> int:
+        nonlocal last
+        with lock:
+            last = max(int(time.time() * 1000), last + 1)
+            return last
+    return now
 
 
 class MockOptions(TypedDict, total=False):
@@ -220,7 +296,10 @@ class MockOptions(TypedDict, total=False):
     image_storage: InMemoryMockImageStorage
     #: Returns new asset, folder, lens and event IDs.
     create_id: Callable[[], str]
-    #: Returns the current time in milliseconds since the Unix epoch.
+    #: Returns the current time in milliseconds since the Unix epoch. The default is the
+    #: system clock, moved on by at least a millisecond per reading, so assets created in a row
+    #: have increasing ``createdAt`` values and orderings by ``createdAt`` don't depend on IDs.
+    #: A clock you pass is used as is.
     now: Callable[[], int]
     #: Outcome of assets submitted with ``create`` (and queued multipart uploads). Defaults to
     #: ``pending``.
@@ -236,7 +315,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
     ``transport``). Retries are off by default (``max_retries=0``) so enqueued failures
     surface; pass ``max_retries`` to exercise retry handling. Waits take no real time:
     ``assets.wait_for_decision`` checks ``database_storage`` and returns a decided asset, or
-    raises ``sdk/timeout`` at once for one whose moderation stays ``pending``."""
+    raises ``sdk/timeout`` at once for one whose moderation stays ``pending``.
+
+    ``assets.search`` is the API's keyword search: every whitespace-separated word (at most 8,
+    case-insensitive) must appear in a searchable field, and results carry the API's keyword
+    ``score`` and ``matchedFields``, ranked by score and then newest first. List filters support
+    ``( … )`` groups, with ``;`` binding tighter than ``,``, and list cursors resume after the last
+    item returned."""
 
     def __init__(self, *, api_key: str | None = None, project_id: str = "mock-project",
                  base_url: str = "https://api.calmlens.invalid/v1",
@@ -261,7 +346,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self.database_storage.events = []
         self.image_storage = options.get("image_storage") or InMemoryMockImageStorage()
         self.create_id: Callable[[], str] = options.get("create_id", lambda: str(uuid.uuid4()))
-        self.now: Callable[[], int] = options.get("now", lambda: int(time.time() * 1000))
+        self.now: Callable[[], int] = options.get("now") or _monotonic_clock()
         self.queued_outcome: MockAssetOutcome = options.get("queued_outcome", "pending")
         self.analyzed_outcome: MockAssetOutcome = options.get("analyzed_outcome", "allowed")
         for outcome in (self.queued_outcome, self.analyzed_outcome):
@@ -716,21 +801,31 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return (int(stamp) if stamp.isdigit() else -1, identifier)
 
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
-        text = str(query.get("query", "")).strip().lower()
+        # Keyword search like the API's; the mock has no semantic index, so every mode is
+        # keyword matching.
+        text = str(query.get("query", "")).strip()
         if not text:
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "query is required")
+        normalized = text.lower()
+        tokens = list(dict.fromkeys(normalized.split()))[:_MAX_SEARCH_TOKENS]
         limit = query.get("limit", 10)
         items: list[dict[str, Any]] = []
         for asset in self._project_assets():
-            matched = [name for name in ("name", "id", "externalId", "description", "type")
-                       if text in str(asset.get(name) or "").lower()]
-            if any(text in str(tag).lower() for tag in asset.get("tags") or []):
-                matched.append("tags")
-            if matched:
-                items.append({"asset": asset, "score": len(matched) / 7, "matchedFields": matched})
-        items.sort(key=lambda item: -item["score"])
-        # The mock has no semantic index, so every mode is keyword matching.
-        return {"query": query.get("query"), "items": items[:limit], "semanticStatus": "disabled"}
+            content = asset.get("content") or {}
+            fields = {
+                "name": asset.get("name"), "id": asset.get("id"), "externalId": asset.get("externalId"),
+                "description": asset.get("description"), "tags": " ".join(asset.get("tags") or []),
+                "type": asset.get("type"), "content.format": content.get("format"),
+                "content.extension": content.get("extension"),
+                "classification.moderation.status": asset["classification"]["moderation"].get("status"),
+            }
+            values = {name: str(value or "").lower() for name, value in fields.items()}
+            if not all(any(token in value for value in values.values()) for token in tokens):
+                continue
+            matched = [name for name, value in values.items() if any(token in value for token in tokens)]
+            items.append({"asset": asset, "score": _keyword_score(values, normalized), "matchedFields": matched})
+        items.sort(key=lambda item: (-item["score"], -item["asset"]["createdAt"]))
+        return {"query": text, "items": items[:limit], "semanticStatus": "disabled"}
 
     @staticmethod
     def _page(items: list[dict[str, Any]], query: dict[str, Any]) -> dict[str, Any]:

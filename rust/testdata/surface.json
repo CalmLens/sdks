@@ -809,5 +809,422 @@
       "requestId": "req-surface",
       "retryAfterSeconds": 2
     }
-  }
+  },
+  "retryable": [
+    {
+      "code": "sdk/transport-error",
+      "status": null,
+      "retryable": true
+    },
+    {
+      "code": "sdk/timeout",
+      "status": null,
+      "retryable": true
+    },
+    {
+      "code": "sdk/cancelled",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/invalid-response",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/http-error",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/response-too-large",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/invalid-argument",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/invalid-config",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/no-fetch",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/invalid-webhook-signature",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/invalid-webhook-payload",
+      "status": null,
+      "retryable": false
+    },
+    {
+      "code": "sdk/http-error",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "sdk/http-error",
+      "status": 429,
+      "retryable": true
+    },
+    {
+      "code": "sdk/http-error",
+      "status": 500,
+      "retryable": false
+    },
+    {
+      "code": "sdk/http-error",
+      "status": 502,
+      "retryable": true
+    },
+    {
+      "code": "sdk/http-error",
+      "status": 503,
+      "retryable": true
+    },
+    {
+      "code": "sdk/http-error",
+      "status": 504,
+      "retryable": true
+    },
+    {
+      "code": "validation/invalid-ordering-field",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/invalid-cursor",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "auth/missing-token",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "auth/invalid-api-key",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "auth/project-mismatch",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "auth/api-key-not-accepted",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "upload/file-too-large",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload/image-requires-multipart-upload",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload/multipart-image-too-small",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload/multipart-image-too-large",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload/image-exceeded-max-dimensions",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload/limit-exceeded",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "upload/spend-limit-reached",
+      "status": 402,
+      "retryable": false
+    },
+    {
+      "code": "upload/invalid-mime-type",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "events/invalid-cursor",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload/invalid-payload",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload/use-upload-part",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "upload/not-open",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "upload/invalid-part-number",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "upload/missing",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "upload/size-mismatch",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "idempotency/invalid-key",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "idempotency/key-reused",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "idempotency/request-in-progress",
+      "status": 409,
+      "retryable": true
+    },
+    {
+      "code": "asset/not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "project/not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "asset/review-changed",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "asset/review-note-required",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "asset/update-failed",
+      "status": 500,
+      "retryable": false
+    },
+    {
+      "code": "asset/safety-held",
+      "status": 423,
+      "retryable": false
+    },
+    {
+      "code": "asset/not-retryable",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "asset/content-unavailable",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "asset/not-decided",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "asset/policy-changed",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "asset/reviewed",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "support/ticket-not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "asset/duplicate-external-id",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "folder/not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "folder/duplicate-name",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "folder/not-empty",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "folder/parent-cycle",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "lens/version-conflict",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "upload-preset/not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "upload-preset/disabled",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "upload-preset/token-required",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "upload/remote-url-not-allowed",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "upload/website-rate-limit-exceeded",
+      "status": 429,
+      "retryable": true
+    },
+    {
+      "code": "upload-preset/content-type-not-allowed",
+      "status": 415,
+      "retryable": false
+    },
+    {
+      "code": "upload-preset/too-large",
+      "status": 413,
+      "retryable": false
+    },
+    {
+      "code": "upload-preset/daily-limit-reached",
+      "status": 429,
+      "retryable": true
+    },
+    {
+      "code": "upload-preset/origin-not-allowed",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "upload-preset/field-not-allowed",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "upload-token/invalid",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "upload-token/expired",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "upload-token/used",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "asset/invalid-remote-url",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "asset/remote-url-unavailable",
+      "status": 422,
+      "retryable": false
+    },
+    {
+      "code": "appeal/not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "appeal/judgment-not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "appeal/asset-not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "appeal/permission-denied",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "appeal/already-reviewed",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "appeal/decision-changed",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "appeal/invalid-action",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "appeal/safety-held",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "appeal/content-unavailable",
+      "status": 409,
+      "retryable": false
+    }
+  ]
 }

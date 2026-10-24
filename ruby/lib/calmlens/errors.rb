@@ -63,11 +63,19 @@ module CalmLens
       status == 404 || code.end_with?('/not-found')
     end
 
-    # @return [Boolean] true when repeating the same request may succeed: connection failures,
-    #   timeouts, throttling (429), 502/503/504 and `idempotency/request-in-progress`.
-    #   Repeat a write only with the same idempotency key.
+    # Codes that may succeed when the same request is repeated, whatever the status.
+    RETRYABLE_CODES = [SdkErrorCodes::TRANSPORT_ERROR, SdkErrorCodes::TIMEOUT,
+                       ErrorCodes::IDEMPOTENT_REQUEST_IN_PROGRESS].freeze
+    # HTTP statuses that may succeed when the same request is repeated.
+    RETRYABLE_STATUSES = [429, 502, 503, 504].freeze
+    private_constant :RETRYABLE_CODES, :RETRYABLE_STATUSES
+
+    # @return [Boolean] true when repeating the same request may succeed: connection failures
+    #   (`sdk/transport-error`), timeouts (`sdk/timeout`, including {Assets#wait_for_decision}),
+    #   `idempotency/request-in-progress`, throttling (429) and 502/503/504. Everything else,
+    #   including other 5xx statuses, is false. Repeat a write only with the same idempotency key.
     def retryable?
-      [429, 502, 503, 504].include?(status) || code == ErrorCodes::IDEMPOTENT_REQUEST_IN_PROGRESS
+      RETRYABLE_CODES.include?(code) || RETRYABLE_STATUSES.include?(status)
     end
 
     # Builds the most specific error class for a code and HTTP status.
@@ -129,9 +137,7 @@ module CalmLens
   class ServerError < APIError; end
 
   # No complete response arrived (`sdk/transport-error`). The original exception is in `cause`.
-  class ConnectionError < Error
-    def retryable? = true
-  end
+  class ConnectionError < Error; end
 
   # Connecting, sending or receiving exceeded its timeout, or {Assets#wait_for_decision} had no
   # decision in time (`sdk/timeout`).

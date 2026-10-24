@@ -508,8 +508,14 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
   `folder/not-empty`, ...) and error body, with an `X-Request-Id` on every response.
 - `Assets.List` and `ListChildren` apply RSQL filters (`==`, `!=`, `=in=`, `=out=`,
-  comparisons, `;`, `,`, parentheses), ordering, `FolderID` and paging.
-- `Assets.Search` matches keywords in name, ID, external ID, description and tags.
+  comparisons, `;` binding tighter than `,`, parentheses), ordering, `FolderID` and paging.
+  Cursors resume after the last returned asset, so creates and deletes between pages don't
+  shift later pages.
+- `Assets.Search` runs the API's keyword search: every query word (case-insensitive, up to
+  8) must appear in the name, ID, external ID, description, tags, type, content format or
+  extension, or moderation status, and results are ranked by the API's score, then newest first.
+- The default clock advances at least 1 ms per reading, so assets created in a row have
+  increasing `createdAt` values; a `Now` you supply is used as is.
 - A decided upload finishes processing (`completed`); like the API, its content is then removed
   (`Content.Status` `removed`, `RemovalReason` `retention`) and no longer served unless the
   upload set `KeepContentAfterProcessing`. `OutcomePurged` always removes the content, with

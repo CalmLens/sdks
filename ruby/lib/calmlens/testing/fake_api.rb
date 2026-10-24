@@ -34,10 +34,12 @@ module CalmLens
     class FakeAPI
       JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize pageIndex searchAll resolveOnly limit
                       processingOptions metadata].freeze
-      # Search match fields and where each one's value sits in the asset.
+      # Keyword search fields, in the order matches are reported, and where each value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
+                        'content.format' => %w[content format], 'content.extension' => %w[content extension],
                         'classification.moderation.status' => %w[classification moderation status] }.freeze
+      MAX_SEARCH_TOKENS = 8
       REVIEW_DECISIONS = %w[allowed age-restricted blocked purged].freeze
       RESOURCES = %w[original rendered placeholder].freeze
       MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
@@ -251,17 +253,39 @@ module CalmLens
         { 'lenses' => saved }
       end
 
+      # Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8
+      # distinct) must appear in some field. Results rank by the API's score, then newest first.
       def search(query)
-        text = query['query'].to_s.strip.downcase
+        text = query['query'].to_s.strip
         fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'query is required') if text.empty?
 
+        normalized = text.downcase
+        tokens = normalized.split(/\s+/).uniq.first(MAX_SEARCH_TOKENS)
         items = project_assets.filter_map do |item|
-          fields = SEARCH_FIELDS.filter_map do |field, path|
-            field if Array(item.dig(*path)).any? { |value| value.to_s.downcase.include?(text) }
-          end
-          { 'asset' => item, 'score' => 1.0, 'matchedFields' => fields } unless fields.empty?
+          values = SEARCH_FIELDS.transform_values { |path| Array(item.dig(*path)).join(' ').downcase }
+          next unless tokens.all? { |token| values.each_value.any? { |value| value.include?(token) } }
+
+          fields = values.filter_map { |field, value| field if tokens.any? { |token| value.include?(token) } }
+          { 'asset' => item, 'score' => search_score(values, normalized), 'matchedFields' => fields }
         end
-        { 'query' => query['query'], 'items' => items.first(query.fetch('limit', 10)), 'semanticStatus' => 'disabled' }
+        items = items.each_with_index.sort_by { |result, index| [-result['score'], -result['asset']['createdAt'].to_i, index] }
+                     .map(&:first)
+        { 'query' => text, 'items' => items.first(query.fetch('limit', 10)), 'semanticStatus' => 'disabled' }
+      end
+
+      # The API's keyword score for the whole normalized query.
+      def search_score(values, query)
+        id, external_id, name = values.values_at('id', 'externalId', 'name')
+        if id == query then 1000
+        elsif external_id == query then 950
+        elsif name == query then 900
+        elsif id.start_with?(query) then 800
+        elsif external_id.start_with?(query) then 750
+        elsif name.start_with?(query) then 700
+        elsif name.include?(query) then 600
+        elsif values['tags'].include?(query) then 500
+        else 100
+        end
       end
 
       def kind(mime, url)
@@ -645,8 +669,8 @@ module CalmLens
 
     # The RSQL subset the fake API understands: `==` and `!=` (with `*` wildcards), `=in=` and
     # `=out=` with a `(value,value)` list, and `=gt=`, `=ge=`, `=lt=`, `=le=`, with quoted values,
-    # combined with `;` (and) and `,` (or). Anything else raises instead of being ignored, so a
-    # test never passes on an unfiltered list.
+    # combined with `;` (and), which binds tighter than `,` (or), and grouped with `( … )`.
+    # Anything else raises instead of being ignored, so a test never passes on an unfiltered list.
     # @api private
     module RSQL
       module_function
@@ -654,11 +678,52 @@ module CalmLens
       def filter(items, expression)
         return items if expression.nil? || expression.to_s.strip.empty?
 
-        groups = split(expression.to_s, ',').map { |group| split(group, ';').map { |term| comparison(term) } }
-        items.select { |item| groups.any? { |terms| terms.all? { |test| test.call(item) } } }
+        test = parse(expression.to_s)
+        items.select { |item| test.call(item) }
       end
 
-      # Splits on `separator` outside quotes and outside an `=in=(...)` value list.
+      # Compiles `,` (or) of `;` (and) terms, where a term is a comparison or a `( … )` group.
+      def parse(expression)
+        alternatives = split(expression, ',').map do |alternative|
+          split(alternative, ';').map do |term|
+            text = term.strip
+            raise unsupported(expression) if text.empty?
+
+            group = unwrap(text)
+            group ? parse(group) : comparison(text)
+          end
+        end
+        ->(item) { alternatives.any? { |terms| terms.all? { |test| test.call(item) } } }
+      end
+
+      # The expression inside `( … )` when the parentheses enclose all of `text`, else nil.
+      def unwrap(text)
+        return unless text.start_with?('(') && text.end_with?(')')
+
+        depth = 0
+        quote = nil
+        text.each_char.with_index do |char, index|
+          if quote
+            quote = nil if char == quote
+          elsif ['"', "'"].include?(char)
+            quote = char
+          elsif char == '('
+            depth += 1
+          elsif char == ')'
+            depth -= 1
+            return index == text.length - 1 ? text[1..-2] : nil if depth.zero?
+          end
+        end
+        nil
+      end
+
+      def unsupported(term)
+        InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
+                                 'MockServerClient filters support ==, !=, =in=, =out=, =gt=, =ge=, =lt= and ' \
+                                 "=le=, joined by ; and , and grouped with parentheses (got #{term.inspect})")
+      end
+
+      # Splits on `separator` outside quotes and parentheses (groups and `=in=(...)` lists).
       def split(text, separator)
         parts = ['']
         quote = nil
@@ -683,11 +748,7 @@ module CalmLens
 
       def comparison(term)
         match = term.strip.match(/\A([A-Za-z][\w.]*)(==|!=|=in=|=out=|=gt=|=ge=|=lt=|=le=)(.+)\z/m)
-        unless match
-          raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
-                                         'MockServerClient filters support ==, !=, =in=, =out=, =gt=, =ge=, =lt= and ' \
-                                         "=le= with ; and , (got #{term.inspect})")
-        end
+        raise unsupported(term) unless match
 
         field, operator, raw = match.captures
         values = list(operator, raw.strip)

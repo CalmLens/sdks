@@ -54,7 +54,7 @@ describe("MockCalmLensServerClient errors", () => {
 });
 
 describe("MockCalmLensServerClient listing", () => {
-  it("applies ordering and simple RSQL filters, and refuses filters it can't evaluate", async () => {
+  it("applies ordering and RSQL filters, and refuses filters it can't evaluate", async () => {
     const client = createClient();
     await client.assets.classify(text("b-allowed"));
     await client.assets.create(text("a-pending"));
@@ -81,14 +81,6 @@ describe("MockCalmLensServerClient listing", () => {
     });
     expect(both.items.map((asset) => asset.name)).toEqual(["c-allowed"]);
 
-    expect(
-      await caught(
-        client.assets.list({
-          filter:
-            "(classification.moderation.status==allowed,classification.moderation.status==pending);name==x",
-        }),
-      ),
-    ).toMatchObject({ code: "sdk/invalid-argument" });
     expect(await caught(client.assets.list({ filter: "name=like=a*" }))).toMatchObject({
       code: "sdk/invalid-argument",
     });

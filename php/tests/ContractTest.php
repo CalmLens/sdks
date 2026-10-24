@@ -199,6 +199,25 @@ final class ContractTest extends TestCase
         }
     }
 
+    // surface.json retryable: whether an error is retryable follows from its code and status alone.
+
+    public static function retryable(): iterable
+    {
+        foreach (self::fixtures('surface')['retryable'] as $entry) {
+            yield $entry['code'] . ' ' . json_encode($entry['status']) => [$entry];
+        }
+    }
+
+    #[DataProvider('retryable')]
+    public function testRetryableFollowsCodeAndStatus(array $entry): void
+    {
+        // The base class and the specific class the SDK raises for this code and status.
+        foreach ([new CalmLensException($entry['code'], status: $entry['status']),
+            CalmLensException::create($entry['code'], status: $entry['status'])] as $error) {
+            self::assertSame($entry['retryable'], $error->isRetryable(), $error::class);
+        }
+    }
+
     /** The mock answers each code with this status, so a stale ErrorCodes class would mislead callers and tests. */
     public function testErrorCodesMatchTheSharedErrorsFixture(): void
     {

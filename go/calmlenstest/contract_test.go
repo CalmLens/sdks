@@ -372,7 +372,12 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 	if err != nil {
 		return nil, err
 	}
-	return normalize(t, result), nil
+	out := normalize(t, result)
+	// AssetPage reports "no next page" as an empty NextCursor; the API sends null.
+	if page, ok := result.(*calmlens.AssetPage); ok && page.NextCursor == "" {
+		out.(map[string]any)["nextCursor"] = nil
+	}
+	return out, nil
 }
 
 func TestSharedMockScenarios(t *testing.T) {

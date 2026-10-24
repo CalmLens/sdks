@@ -56,6 +56,7 @@ const BRAND = Symbol.for("calmlens.sdk.CalmLensError");
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 const RETRYABLE_CODES = new Set<string>([
   SDK_ERROR_CODES.TRANSPORT_ERROR,
+  SDK_ERROR_CODES.TIMEOUT,
   API_ERROR_CODES.IDEMPOTENT_REQUEST_IN_PROGRESS,
 ]);
 
@@ -117,9 +118,10 @@ export class CalmLensError extends Error {
   }
 
   /**
-   * Whether repeating the same request may succeed: transport failures, throttling (429),
-   * gateway errors (502, 503, 504) and idempotent requests still in progress. Only repeat a
-   * create or upload with the same `idempotencyKey`.
+   * Whether repeating the same request may succeed: transport failures, timeouts (a request's
+   * `timeoutMs` or `waitForDecision`'s deadline), throttling (429), gateway errors (502, 503, 504)
+   * and idempotent requests still in progress. Only repeat a create or upload with the same
+   * `idempotencyKey`.
    */
   isRetryable(): boolean {
     return (

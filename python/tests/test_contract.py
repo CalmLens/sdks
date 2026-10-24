@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 import calmlens
-from calmlens import CalmLensError, CalmLensServerClient, parse_webhook_event, testing, to_webhook_event_payload, verify_webhook_signature
+from calmlens import CalmLensAPIError, CalmLensError, CalmLensServerClient, CalmLensTimeoutError, CalmLensTransportError, CalmLensValidationError, WebhookVerificationError, parse_webhook_event, testing, to_webhook_event_payload, verify_webhook_signature
 from calmlens.client import _serialize_transform
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key
 from calmlens.webhooks import create_webhook_signature_header
@@ -120,6 +120,18 @@ def _raised_error():
     except CalmLensError as error:
         return error
     raise AssertionError(f"{spec['operation']} did not fail")
+
+
+# The class the SDK raises for each SDK error code; errors carrying an HTTP status are
+# CalmLensAPIError. Python has no sdk/cancelled or sdk/no-fetch error, so those use the base class.
+_RAISED_CLASS = {
+    "sdk/timeout": CalmLensTimeoutError,
+    "sdk/transport-error": CalmLensTransportError,
+    "sdk/invalid-argument": CalmLensValidationError,
+    "sdk/invalid-config": CalmLensValidationError,
+    "sdk/invalid-webhook-signature": WebhookVerificationError,
+    "sdk/invalid-webhook-payload": WebhookVerificationError,
+}
 
 
 def _snake(path):
@@ -286,6 +298,14 @@ class SurfaceTests(unittest.TestCase):
         for capability in SURFACE["capabilities"]:
             with self.subTest(capability["id"], name=capability["names"]["python"]):
                 self.assertTrue(_present(capability))
+
+    def test_retryable_errors(self):
+        for case in SURFACE["retryable"]:
+            raised = CalmLensAPIError if case["status"] is not None else _RAISED_CLASS.get(case["code"], CalmLensError)
+            for error_class in dict.fromkeys((CalmLensError, raised)):
+                with self.subTest(case["code"], status=case["status"], error_class=error_class.__name__):
+                    error = error_class(case["code"], status=case["status"])
+                    self.assertIs(error.is_retryable, case["retryable"])
 
     def test_refuses_rejected_requests_before_sending(self):
         for case in _fixture("rejections.json"):
