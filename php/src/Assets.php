@@ -176,10 +176,10 @@ final class Assets extends Resource
             Values::invalid('timeout must be a non-negative number');
         }
         unset($options['timeout']);
-        $deadline = hrtime(true) / 1e9 + $timeout;
+        $deadline = ($this->session->clock)() + $timeout;
         $delay = 0.5;
         do {
-            $remaining = max(0.001, $deadline - hrtime(true) / 1e9);
+            $remaining = max(0.001, $deadline - ($this->session->clock)());
             $request = $options['requestOptions'] ?? [];
             $request['timeout'] = min($request['timeout'] ?? 120, $remaining);
             $request['maxRetries'] = 0;
@@ -190,11 +190,11 @@ final class Assets extends Resource
             if (($status !== null && $status !== 'pending') || ($classification['status'] ?? null) === 'failed') {
                 return $asset;
             }
-            $remaining = $deadline - hrtime(true) / 1e9;
+            $remaining = $deadline - ($this->session->clock)();
             if ($remaining <= 0) {
-                throw new CalmLensException('sdk/timeout', details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
+                throw CalmLensException::create('sdk/timeout', details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
             }
-            usleep((int) (min($delay, $remaining) * 1e6));
+            ($this->session->sleep)(min($delay, $remaining));
             $delay = min($delay * 1.5, 5);
         } while (true);
     }

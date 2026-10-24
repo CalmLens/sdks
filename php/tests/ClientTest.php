@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use CalmLens\CalmLensException;
+use CalmLens\Exception;
+use CalmLens\Testing\MockServerClient;
 use CalmLens\ServerClient;
 use CalmLens\Testing\MockTransport;
 use CalmLens\Webhooks;
@@ -267,4 +269,51 @@ final class ClientTest extends TestCase
         $client->assets->retrieve(['assetId' => 'a']);
     }
 
+    public function testErrorsUseTypedClassesWithRequestIdRetryAfterAndHelpers(): void
+    {
+        $mock = new MockTransport();
+        $mock->enqueueJson(['code' => 'asset/not-found', 'message' => 'Asset not found'], 404, ['X-Request-Id' => 'req-1'])
+            ->enqueueJson(['code' => 'upload/limit-exceeded'], 429, ['Retry-After' => 'Wed, 21 Oct 2015 07:28:00 GMT'])
+            ->enqueue(new Response(502, [], 'Bad gateway'));
+        $client = $mock->client();
+        $missing = $this->error('asset/not-found', fn () => $client->assets->retrieve(['assetId' => 'a']));
+        self::assertInstanceOf(Exception\NotFoundException::class, $missing);
+        self::assertSame(['req-1', true, false, null], [$missing->requestId, $missing->isNotFound(), $missing->isRetryable(), $missing->retryAfter()]);
+        $limited = $this->error('upload/limit-exceeded', fn () => $client->assets->retrieve(['assetId' => 'a']));
+        self::assertInstanceOf(Exception\RateLimitException::class, $limited);
+        self::assertSame(0.0, $limited->retryAfter());
+        $gateway = $this->error('sdk/http-error', fn () => $client->assets->retrieve(['assetId' => 'a']));
+        self::assertInstanceOf(Exception\ServerException::class, $gateway);
+        self::assertTrue($gateway->isRetryable());
+        self::assertInstanceOf(Exception\InvalidArgumentException::class, $this->error('sdk/invalid-argument', fn () => $client->assets->retrieve(['assetId' => ''])));
+        self::assertInstanceOf(Exception\InvalidArgumentException::class, $this->error('upload/invalid-payload', fn () => $client->text->classify(['text' => ' '])));
+        self::assertInstanceOf(Exception\ConfigurationException::class, $this->error('sdk/invalid-config', fn () => new ServerClient('key', 'p', timeout: 0)));
+    }
+
+    public function testOversizedResponsesUseResponseTooLarge(): void
+    {
+        $mock = new MockTransport();
+        $mock->enqueue(new Response(200, [], str_repeat(' ', 32 * 1024 * 1024 + 1)));
+        $error = $this->error('sdk/response-too-large', fn () => $mock->client()->assets->retrieve(['assetId' => 'a']));
+        self::assertInstanceOf(Exception\InvalidResponseException::class, $error);
+    }
+
+    public function testWebhookHelpersSignDeliveriesForStoredEventsAndReadHeaders(): void
+    {
+        $mock = new MockServerClient(now: fn () => 1760000000000, createId: fn () => 'id-1');
+        $event = $mock->enqueueEvent(['type' => 'asset.allowed', 'facts' => [['key' => 'test', 'value' => true]]]);
+        $body = json_encode(Webhooks::toPayload($event));
+        $headers = Webhooks::createHeaders($body, 'delivery-1', 'secret', 1760000000);
+        self::assertSame(['delivery-1', '1760000000'], [$headers[Webhooks::DELIVERY_HEADER], $headers[Webhooks::TIMESTAMP_HEADER]]);
+        $parsed = Webhooks::parseEvent($body, null, null, 'secret', now: 1760000000, headers: $headers);
+        self::assertSame(['id-1', 'asset.allowed', 'project-1', 'low', 'asset.allowed', null, true],
+            [$parsed['id'], $parsed['type'], $parsed['projectId'], $parsed['data']['severity'], $parsed['data']['title'], $parsed['data']['assetId'], Webhooks::isTest($parsed)]);
+        $server = ['HTTP_X_CALMLENS_SIGNATURE' => $headers[Webhooks::SIGNATURE_HEADER], 'HTTP_X_CALMLENS_TIMESTAMP' => '1760000000'];
+        self::assertTrue(Webhooks::verify($body, null, null, 'secret', now: 1760000000, headers: $server));
+        $psr = ['X-CalmLens-Signature' => [$headers[Webhooks::SIGNATURE_HEADER]], 'X-CalmLens-Timestamp' => ['1760000000']];
+        self::assertTrue(Webhooks::verify($body, null, null, 'secret', now: 1760000000, headers: $psr));
+        self::assertFalse(Webhooks::verify($body, null, null, 'secret', now: 1760000000 + Webhooks::SIGNATURE_TOLERANCE_SECONDS + 1, headers: $psr));
+        $rejected = $this->error('sdk/invalid-webhook-signature', fn () => Webhooks::parseEvent($body . ' ', null, null, 'secret', now: 1760000000, headers: $headers));
+        self::assertInstanceOf(Exception\WebhookVerificationException::class, $rejected);
+    }
 }

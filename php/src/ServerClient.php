@@ -75,11 +75,11 @@ final class ServerClient
             $response = $this->session->request('PUT', $this->session->project('lenses'), body: ['lenses' => $sent], options: $options['requestOptions'] ?? []);
             $returned = $response['lenses'] ?? $response;
             if (!is_array($returned) || count($returned) !== count($sent)) {
-                throw new CalmLensException('sdk/invalid-response', 'Unexpected lens response');
+                throw CalmLensException::create('sdk/invalid-response', 'Unexpected lens response');
             }
             foreach ($sent as $index => $definition) {
                 if (($returned[$index]['identifier'] ?? null) !== $definition['identifier']) {
-                    throw new CalmLensException('sdk/invalid-response', 'Unexpected lens identifier');
+                    throw CalmLensException::create('sdk/invalid-response', 'Unexpected lens identifier');
                 }
             }
             foreach (array_keys($chunk) as $index => $key) {

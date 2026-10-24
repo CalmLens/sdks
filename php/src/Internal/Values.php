@@ -11,7 +11,7 @@ final class Values
 {
     public static function invalid(string $message, string $code = 'sdk/invalid-argument'): never
     {
-        throw new CalmLensException($code, $message);
+        throw CalmLensException::create($code, $message);
     }
 
     public static function segment(mixed $value): string

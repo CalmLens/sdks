@@ -13,7 +13,7 @@ final class Folders extends Resource
         [$api, $request] = $this->split($options);
         $page = $this->session->request('GET', $this->session->project('folders'), query: $api, options: $request);
         if (!is_array($page) || !is_array($page['folders'] ?? null) || !is_array($page['ancestors'] ?? null) || !is_bool($page['hasMore'] ?? null)) {
-            throw new CalmLensException('sdk/invalid-response', 'Invalid folder page');
+            throw CalmLensException::create('sdk/invalid-response', 'Invalid folder page');
         }
         return $page;
     }

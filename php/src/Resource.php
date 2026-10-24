@@ -39,7 +39,7 @@ abstract class Resource
         do {
             $page = $fetch($options);
             if (!is_array($page) || !is_array($page[$items] ?? null) || !is_bool($page['hasMore'] ?? null)) {
-                throw new CalmLensException('sdk/invalid-response', 'Invalid page');
+                throw CalmLensException::create('sdk/invalid-response', 'Invalid page');
             }
             yield $page;
             if (!$page['hasMore']) {
@@ -47,7 +47,7 @@ abstract class Resource
             }
             $next = $page[$cursor] ?? null;
             if (!is_string($next) || $next === '' || isset($seen[$next])) {
-                throw new CalmLensException('sdk/invalid-response', 'Missing or repeated pagination cursor');
+                throw CalmLensException::create('sdk/invalid-response', 'Missing or repeated pagination cursor');
             }
             $seen[$next] = true;
             $options[$parameter] = $next;

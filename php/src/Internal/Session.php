@@ -17,6 +17,10 @@ use Psr\Http\Message\StreamInterface;
 final class Session
 {
     private ClientInterface $http;
+    /** Sleeps for a number of seconds; replaced by the mock so waits take no real time. */
+    public \Closure $sleep;
+    /** Monotonic seconds; replaced by the mock together with `sleep`. */
+    public \Closure $clock;
 
     public function __construct(
         #[\SensitiveParameter] private string $apiKey,
@@ -27,6 +31,8 @@ final class Session
         ?ClientInterface $http = null,
     ) {
         $this->http = $http ?? new Client();
+        $this->sleep = static function (float $seconds): void { usleep((int) ($seconds * 1_000_000)); };
+        $this->clock = static fn (): float => hrtime(true) / 1e9;
         self::validateOptions($defaults, 'sdk/invalid-config');
     }
 
@@ -84,7 +90,7 @@ final class Session
             }
             return $data;
         } catch (\JsonException) {
-            throw new CalmLensException('sdk/invalid-response', 'API response is not JSON', $status);
+            throw CalmLensException::create('sdk/invalid-response', 'API response is not JSON', $status);
         }
     }
 
@@ -122,25 +128,21 @@ final class Session
                 }
                 $error = $this->apiError($response);
             } catch (\InvalidArgumentException $error) {
-                throw new CalmLensException('sdk/invalid-argument', $error->getMessage());
+                throw CalmLensException::create('sdk/invalid-argument', $error->getMessage(), previous: $error);
             } catch (TransferException $error) {
                 $context = method_exists($error, 'getHandlerContext') ? $error->getHandlerContext() : [];
-                $error = new CalmLensException(($context['errno'] ?? null) === 28 ? 'sdk/timeout' : 'sdk/transport-error');
+                $timeout = ($context['errno'] ?? null) === 28;
+                $error = CalmLensException::create($timeout ? 'sdk/timeout' : 'sdk/transport-error',
+                    $timeout ? 'Request timed out' : 'Request failed', previous: $error);
             }
             if (!$safe || $attempt >= $options['maxRetries'] || !$error->isRetryable() || ($body !== null && !$body->isSeekable())) {
                 throw $error;
             }
-            $delay = min(0.5 * (2 ** min($attempt, 5)), 8) * random_int(0, 1000) / 1000;
-            foreach ($error->headers as $key => $values) {
-                if (strtolower($key) === 'retry-after') {
-                    $value = $values[0] ?? '';
-                    $delay = is_numeric($value) ? max(0, (float) $value) : max(0, (strtotime($value) ?: time()) - time());
-                }
-            }
+            $delay = $error->retryAfter() ?? min(0.5 * (2 ** min($attempt, 5)), 8) * random_int(0, 1000) / 1000;
             if ($delay > 60) {
                 throw $error;
             }
-            usleep((int) ($delay * 1_000_000));
+            ($this->sleep)($delay);
             $body?->rewind();
         }
     }
@@ -152,12 +154,12 @@ final class Session
         while (!$stream->eof() && strlen($bytes) <= $limit) {
             $chunk = $stream->read(min(8192, $limit + 1 - strlen($bytes)));
             if ($chunk === '' && !$stream->eof()) {
-                throw new CalmLensException('sdk/invalid-response', 'Response body stopped before EOF');
+                throw CalmLensException::create('sdk/invalid-response', 'Response body stopped before EOF');
             }
             $bytes .= $chunk;
         }
         if (strlen($bytes) > $limit) {
-            throw new CalmLensException('sdk/invalid-response', 'Response body exceeds the SDK limit');
+            throw CalmLensException::create('sdk/response-too-large', 'Response body exceeds the SDK limit');
         }
         return $bytes;
     }
@@ -174,7 +176,7 @@ final class Session
         if (isset($data['traceId'])) {
             $details['traceId'] = $data['traceId'];
         }
-        return new CalmLensException(
+        return CalmLensException::create(
             is_string($data['code'] ?? null) ? $data['code'] : 'sdk/http-error',
             is_string($data['message'] ?? null) ? $data['message'] : 'HTTP ' . $response->getStatusCode(),
             $response->getStatusCode(), $details, $response->getHeaders(),

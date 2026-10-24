@@ -11,7 +11,10 @@ final class Webhooks
     public const DELIVERY_HEADER = 'x-calmlens-delivery';
     public const TIMESTAMP_HEADER = 'x-calmlens-timestamp';
     public const SIGNATURE_HEADER = 'x-calmlens-signature';
+    /** Deliveries whose timestamp is further than this from the receiver's clock are rejected. */
+    public const SIGNATURE_TOLERANCE_SECONDS = 300;
 
+    /** `v1=<hex HMAC-SHA256 of "<timestamp>.<payload>">`, the `x-calmlens-signature` value. */
     public static function signatureHeader(string $payload, string|int $timestamp, #[\SensitiveParameter] string $secret): string
     {
         if ($secret === '') {
@@ -20,9 +23,46 @@ final class Webhooks
         return 'v1=' . hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
     }
 
-    public static function verify(string $payload, ?string $signature, string|int|null $timestamp,
-        #[\SensitiveParameter] string $secret, int $toleranceSeconds = 300, ?int $now = null): bool
+    /**
+     * Headers for one signed delivery of the raw body, as CalmLens sends them; for testing a
+     * webhook receiver. `timestamp` defaults to now (Unix seconds).
+     *
+     * @return array<string, string>
+     */
+    public static function createHeaders(string $payload, string $deliveryId, #[\SensitiveParameter] string $secret, ?int $timestamp = null): array
     {
+        $timestamp ??= time();
+        return [
+            'content-type' => 'application/json',
+            self::DELIVERY_HEADER => $deliveryId,
+            self::TIMESTAMP_HEADER => (string) $timestamp,
+            self::SIGNATURE_HEADER => self::signatureHeader($payload, $timestamp, $secret),
+        ];
+    }
+
+    /** The JSON body a webhook delivers for a stored event, such as one from `events->list`. */
+    public static function toPayload(array $event): array
+    {
+        return [
+            'id' => $event['id'], 'type' => $event['type'], 'createdAt' => $event['createdAt'], 'projectId' => $event['projectId'],
+            'data' => [
+                'severity' => $event['severity'], 'title' => $event['title'], 'description' => $event['description'] ?? null,
+                'assetId' => $event['assetId'] ?? null, 'asset' => $event['asset'] ?? null, 'facts' => $event['facts'],
+            ],
+        ];
+    }
+
+    /**
+     * Returns true when the exact raw `payload` is a delivery signed with `secret`. A null
+     * `signature` or `timestamp` is read from `headers`: request headers (names compared
+     * case-insensitively; values may be strings or PSR-7 style lists) or `$_SERVER`.
+     */
+    public static function verify(string $payload, ?string $signature, string|int|null $timestamp,
+        #[\SensitiveParameter] string $secret, int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null,
+        array $headers = []): bool
+    {
+        $signature ??= self::header($headers, self::SIGNATURE_HEADER);
+        $timestamp ??= self::header($headers, self::TIMESTAMP_HEADER);
         $stamp = trim((string) $timestamp);
         if ($secret === '' || !$signature || !preg_match('/^[0-9]+$/D', $stamp) || $toleranceSeconds < 0
             || abs(($now ?? time()) - (float) $stamp) > $toleranceSeconds) {
@@ -38,12 +78,16 @@ final class Webhooks
         return false;
     }
 
-    /** Verifies the exact raw bytes before parsing; preserves unknown event types and fields. */
+    /**
+     * Verifies the exact raw bytes before parsing; preserves unknown event types and fields.
+     * Throws `Exception\WebhookVerificationException`.
+     */
     public static function parseEvent(string $payload, ?string $signature, string|int|null $timestamp,
-        #[\SensitiveParameter] string $secret, int $toleranceSeconds = 300, ?int $now = null): array
+        #[\SensitiveParameter] string $secret, int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null,
+        array $headers = []): array
     {
-        if (!self::verify($payload, $signature, $timestamp, $secret, $toleranceSeconds, $now)) {
-            throw new CalmLensException('sdk/invalid-webhook-signature');
+        if (!self::verify($payload, $signature, $timestamp, $secret, $toleranceSeconds, $now, $headers)) {
+            throw CalmLensException::create('sdk/invalid-webhook-signature', 'Webhook signature or timestamp is invalid');
         }
         try {
             $object = json_decode($payload, false, 512, JSON_THROW_ON_ERROR);
@@ -52,8 +96,8 @@ final class Webhooks
                 throw new \JsonException('Not an event');
             }
             return json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            throw new CalmLensException('sdk/invalid-webhook-payload');
+        } catch (\JsonException $error) {
+            throw CalmLensException::create('sdk/invalid-webhook-payload', 'Webhook body is not an event', previous: $error);
         }
     }
 
@@ -65,5 +109,18 @@ final class Webhooks
             }
         }
         return false;
+    }
+
+    private static function header(array $headers, string $name): ?string
+    {
+        foreach ($headers as $key => $value) {
+            // Also accepts `$_SERVER` keys such as HTTP_X_CALMLENS_SIGNATURE.
+            $key = strtolower((string) $key);
+            if ($key === $name || str_replace('_', '-', preg_replace('/^http_/', '', $key)) === $name) {
+                $value = is_array($value) ? ($value[0] ?? null) : $value;
+                return is_scalar($value) ? (string) $value : null;
+            }
+        }
+        return null;
     }
 }

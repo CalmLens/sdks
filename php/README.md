@@ -53,7 +53,7 @@ caches its named lens definitions. Configure `baseUrl`, `cdnBaseUrl`, `timeout`
 | `cdn` | `getAssetUrl`, `serve` |
 | `uploadTokens` | `sign` |
 | Client | `ensureLens`, `ensureLenses` |
-| `Webhooks` | `signatureHeader`, `verify`, `parseEvent`, `isTest` |
+| `Webhooks` | `signatureHeader`, `verify`, `parseEvent`, `isTest`, `createHeaders`, `toPayload` |
 
 Methods take option arrays matching the API, e.g. `['assetId' => 'asset-1']`.
 Use `['folderId' => null]` or `['parentId' => null]` to move to the root.
@@ -113,11 +113,23 @@ Asset lists use `cursor`, `pageSize`, `ordering` and `filter`. Child lists work 
 same way. Folder lists retain `pageIndex`. An event list without `after` starts at
 the current feed position; save the returned cursor to consume subsequent events.
 
-Catch `CalmLens\CalmLensException` and inspect `errorCode`, `status`, `details` and
-`headers`. API error codes pass through unchanged. Local errors use stable codes
-such as `sdk/invalid-config`, `sdk/invalid-argument`, `sdk/invalid-response`,
-`sdk/transport-error`, `sdk/timeout`, `upload/invalid-payload` and
-`sdk/invalid-webhook-signature`.
+Every error the SDK throws is a `CalmLens\CalmLensException` with `errorCode`, `status`
+(null without a response), `details`, `headers`, `requestId` (the `X-Request-Id` header;
+include it when contacting support) and the underlying exception in `getPrevious()`.
+Helpers: `retryAfter()` (seconds from `Retry-After`, or null), `isNotFound()`,
+`isRetryable()` and `header($name)`. API error codes pass through unchanged; compare them
+with the constants in `CalmLens\ErrorCodes` (with each code's HTTP status in
+`ErrorCodes::STATUSES`) and the SDK's own codes in `CalmLens\SdkErrorCodes`, never with the
+message. Catch a subclass from `CalmLens\Exception` to handle one kind of failure:
+
+| Class | When |
+| --- | --- |
+| `ApiException` and its subclasses `BadRequestException` (400), `AuthenticationException` (401), `PermissionDeniedException` (403), `NotFoundException` (404), `ConflictException` (409), `RateLimitException` (429), `ServerException` (5xx) | The API answered with an error status. |
+| `ConnectionException` (`sdk/transport-error`) and its subclass `TimeoutException` (`sdk/timeout`) | No complete response arrived, or `waitForDecision` had no decision in time. |
+| `InvalidResponseException` (`sdk/invalid-response`, `sdk/response-too-large`) | A successful response could not be read, or was larger than 32 MiB. |
+| `InvalidArgumentException` (`sdk/invalid-argument`, or an `upload/*` code for payload checks the API also makes) | An argument was rejected before sending. |
+| `ConfigurationException` (`sdk/invalid-config`), a subclass of `InvalidArgumentException` | `ServerClient` received an invalid setting. |
+| `WebhookVerificationException` (`sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload`) | A webhook delivery failed verification; respond with 400. |
 
 GET requests and uploads with idempotency keys retry transient connection failures,
 429/502/503/504 and `idempotency/request-in-progress`. Upload keys are generated once
@@ -126,6 +138,8 @@ a key. Non-seekable streams are never replayed. Retry-After is respected up to 6
 seconds; larger delays return the error. Redirects are disabled to protect credentials.
 `requestOptions` supports `timeout`, `connectTimeout`, `maxRetries`, and
 `idempotencyKey` on each operation. Timeouts bound each request, not the whole retry loop.
+Calls are synchronous: `waitForDecision`'s `timeout` bounds the whole wait, and there is no
+separate cancellation handle.
 
 ### CDN, lenses and signed URLs
 
@@ -180,10 +194,17 @@ status: `asset.allowed`, `asset.age-restricted`, `asset.blocked` and `asset.purg
 for automated and reviewer decisions alike. `asset.failed` reports failed processing.
 Event asset snapshots carry `classification.moderation.status`.
 
-Verification uses the exact raw bytes, constant-time HMAC comparison and a default
-300-second timestamp tolerance. Future event types, extra fields and structured
+Pass `null` for the signature and timestamp and `headers: getallheaders()` (or `$_SERVER`,
+or a PSR-7 request's `getHeaders()`) to read them from the request headers. Verification uses
+the exact raw bytes, constant-time HMAC comparison and a default timestamp tolerance of
+`Webhooks::SIGNATURE_TOLERANCE_SECONDS` (300). Retries of one delivery repeat its
+`x-calmlens-delivery` ID (`Webhooks::DELIVERY_HEADER`), so use it to skip duplicates. Future event types, extra fields and structured
 fact values are preserved. Test deliveries use the registered `test: true` fact;
 `Webhooks::isTest($event)` recognizes it.
+
+To test your receiver, `Webhooks::toPayload($event)` builds the body CalmLens delivers for a
+stored event (such as one from `events->list` or the mock's `enqueueEvent`), and
+`Webhooks::createHeaders($body, $deliveryId, $secret)` the signed headers for it.
 
 `$client->uploadTokens->sign(['uploadPresetId' => $presetId, 'externalId' => $id])`
 returns `token` and `expiresAt` (Unix milliseconds). Signing is local; the default
@@ -192,9 +213,13 @@ fresh token per upload after authenticating and authorizing the browser user.
 
 ### Offline tests
 
-`CalmLens\Testing\MockServerClient` is an in-memory CalmLens behind the real client:
-uploads create assets you can retrieve, list (with `field==value` filters), update, move
-and delete, events can be added to the feed, and the CDN serves stored bytes.
+`CalmLens\Testing\MockServerClient` is an in-memory CalmLens behind the real client, which
+runs its usual validation, encoding, retries and error handling: uploads (including multipart
+uploads with `uploadPart`) create assets you can retrieve, list, search, update, move and
+delete; folders, lenses, idempotency keys and the events feed behave like the API's; errors
+carry the API's codes, statuses, `X-Request-Id` and body shape; and the CDN serves stored
+bytes. Arrange or inspect state through the public `assets`, `content`, `folders`, `events`
+and `lenses` arrays.
 
 ```php
 $mock = new CalmLens\Testing\MockServerClient(queuedOutcome: 'age-restricted');
@@ -211,8 +236,25 @@ and `classify` gives them `analyzedOutcome` (default `allowed`): `pending`, `all
 the asset and returns either. Content is kept only with `keepContentAfterProcessing`.
 Like the CDN, the mock refuses `blocked` assets and, with `downloadPermission: false`
 (a browser without your key), private assets and public age-restricted ones requested
-without `allowAgeRestricted`. Responses enqueued with `enqueueJson` or `enqueue` are used first;
-folders, search and multipart uploads need enqueued responses.
+without `allowAgeRestricted`. Pass `apiKey: MockServerClient::createApiKey([['actions' =>
+['assets:download'], 'folderId' => $folderId, 'includeSubfolders' => true]])` to grant
+downloads only for one folder (a `null` `folderId` covers the project).
+
+List filters support `==` (with `*` wildcards), `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`
+and `=le=` joined by `;` (and) and `,` (or), on nested names such as
+`classification.moderation.status`; other syntax throws instead of being ignored.
+
+```php
+$mock->failNextRequest();          // the next call throws ConnectionException (sdk/transport-error)
+$mock->failNextRequest('timeout'); // ... TimeoutException (sdk/timeout)
+$mock->failNextRequest(new CalmLens\CalmLensException('upload/limit-exceeded', 'Busy', 429, headers: ['Retry-After' => '5']));
+$request = $mock->requests()[0];   // every request received, as PSR-7 snapshots
+```
+
+Responses enqueued with `enqueueJson` or `enqueue` and `failNextRequest` failures are used
+first, in order, and leave the stored state unchanged. Retries are off unless you pass
+`maxRetries`. Waits take no real time: retry backoff and `waitForDecision` advance a virtual
+clock, so an asset whose decision never comes times out at once.
 
 For exact responses only, `MockTransport` replays a FIFO queue:
 
@@ -232,8 +274,8 @@ backend. For custom retry tests, inject Guzzle's MockHandler through `httpClient
 ## Development
 
 From `php/`, run `composer install`, `composer check`, and `composer test`.
-Tests read the existing generated `../ruby/testdata/{requests,paths,errors,webhooks}.json`
-files directly. The application repo's `bun packages/sdk-contract/generate.ts`
+Tests read the existing generated `../ruby/testdata/{requests,paths,errors,webhooks,transform-options}.json`
+files directly, and check `src/ErrorCodes.php` against `errors.json`. The application repo's `bun packages/sdk-contract/generate.ts`
 refreshes that shared source; PHP needs no independently maintained fixture copy.
 The HTTP tests also start a real loopback PHP server to verify streaming and redirects.
 CI runs PHP 8.2 and 8.5 and builds a Composer archive.
