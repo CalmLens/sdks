@@ -350,13 +350,13 @@ describe("MockCalmLensServerClient", () => {
 
     const signedUrl = await client.assets.createSignedUrl({
       assetId: asset.id,
-      resource: "preview",
+      resource: "rendered",
       expiresInSeconds: 60,
       lens: "thumbnail",
     });
 
     expect(signedUrl.url).toBe(
-      `https://mock.local/assets/${asset.id}/preview?expiresInSeconds=60&lens=thumbnail`,
+      `https://mock.local/assets/${asset.id}/rendered?expiresInSeconds=60&lens=thumbnail`,
     );
     expect(signedUrl.expiresAt).toBe(1_700_000_060_000);
   });
@@ -373,23 +373,23 @@ describe("MockCalmLensServerClient", () => {
     expect(
       client.cdn.getAssetUrl({
         assetIdentifier: "asset-id",
-        resource: "preview",
+        resource: "rendered",
         lens: "thumbnail",
       }),
-    ).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/preview/@thumbnail`);
+    ).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/rendered/@thumbnail`);
 
     expect(
       client.cdn.getAssetUrl({
         assetIdentifier: "asset-id",
-        resource: "preview",
+        resource: "rendered",
         lens: "thumbnail",
         allowAgeRestricted: true,
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/preview/@thumbnail?allowAgeRestricted=true`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/@thumbnail?allowAgeRestricted=true`,
     );
     expect(client.cdn.getAssetUrl({ assetIdentifier: "asset-id", allowAgeRestricted: false })).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/content`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered`,
     );
 
     expect(
@@ -398,7 +398,7 @@ describe("MockCalmLensServerClient", () => {
         transform: "imageTransform[format=png,width=1024]",
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/content/imageTransform[format=png,width=1024]`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/imageTransform[format=png,width=1024]`,
     );
 
     expect(
@@ -407,7 +407,7 @@ describe("MockCalmLensServerClient", () => {
         transform: { type: "imageTransform", options: { width: 1024, format: "png" } },
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/content/imageTransform[format=png,width=1024]`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/imageTransform[format=png,width=1024]`,
     );
 
     expect(
@@ -419,7 +419,7 @@ describe("MockCalmLensServerClient", () => {
         ],
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/content/imageTransform[border%5Bcolor%5D=%23fff,border%5Bwidth%5D=2],imageTransform[format=webp]`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/imageTransform[border%5Bcolor%5D=%23fff,border%5Bwidth%5D=2],imageTransform[format=webp]`,
     );
 
     expect(() =>
@@ -438,7 +438,7 @@ describe("MockCalmLensServerClient", () => {
     expect(await response.text()).toBe("asset-bytes");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/content`);
+    expect(url).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/rendered`);
     expect(new Headers(init.headers).get("accept")).toBe("image/png");
     expect(new Headers(init.headers).get("x-api-key")).toBe(apiKey);
     expect(init.redirect).toBe("manual");
@@ -533,7 +533,7 @@ describe("MockCalmLensServerClient", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
     expect(response.headers.get("X-Mock-CalmLens-CDN-URL")).toBe(
-      `https://mock-cdn.test/v1/assets/${projectId}/${asset.id}/content/@thumbnail`,
+      `https://mock-cdn.test/v1/assets/${projectId}/${asset.id}/rendered/@thumbnail`,
     );
     expect(new Uint8Array(await response.arrayBuffer()).length).toBeGreaterThan(0);
   });
@@ -628,7 +628,7 @@ describe("MockCalmLensServerClient", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
     expect(response.headers.get("X-Mock-CalmLens-CDN-URL")).toBe(
-      `https://mock-cdn.test/v1/assets/${projectId}/${externalId}/content/@thumbnail`,
+      `https://mock-cdn.test/v1/assets/${projectId}/${externalId}/rendered/@thumbnail`,
     );
     expect(new Uint8Array(await response.arrayBuffer()).length).toBeGreaterThan(0);
   });
@@ -1013,7 +1013,7 @@ describe("MockCalmLensServerClient", () => {
       timeoutMs: 5_000,
     });
     expect(client.cdn.getAssetUrl({ assetIdentifier: "a" })).toBe(
-      `https://cdn.test/v1/assets/${projectId}/a/content`,
+      `https://cdn.test/v1/assets/${projectId}/a/rendered`,
     );
     for (const invalid of [
       { apiKey: "" },
