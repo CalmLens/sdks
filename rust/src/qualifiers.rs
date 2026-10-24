@@ -58,8 +58,12 @@ string_enum! {
         SexualActivity = "sexual-activity",
         /// Sexual: Explicit sexual language.
         SexualExplicitLanguage = "sexual-explicit-language",
+        /// Sexual: Non-consensual sexual content.
+        SexualNonConsensual = "sexual-non-consensual",
         /// Sexual: Sexual solicitation.
         SexualSolicitation = "sexual-solicitation",
+        /// Sexual: Adult content promotion.
+        SexualAdultPromotion = "sexual-adult-promotion",
         /// Sexual: Revealing clothing.
         SexualRevealingClothing = "sexual-revealing-clothing",
         /// Sexual: Non-erotic nudity.
