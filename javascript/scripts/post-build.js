@@ -74,6 +74,7 @@ const FORBIDDEN_MODULES = {
     /CryptoUtils\.ts$/,
   ],
 };
+const PEER_ENTRIES = new Set(["react", "vue"]);
 // The UI entries run in browsers too, so they carry no more than the app entry.
 for (const entry of ["ui", "react", "vue", "elements"])
   FORBIDDEN_MODULES[entry] = FORBIDDEN_MODULES.app;
@@ -109,7 +110,8 @@ function checkProductionEntries(targetDir) {
         throw new Error(`${targetDir}/${entry}.js must not bundle ${name}`);
       }
     }
-    if (targetDir !== "cjs") continue;
+    // Entries for an optional peer dependency need the host app's copy of it to load.
+    if (targetDir !== "cjs" || PEER_ENTRIES.has(entry)) continue;
     const entryExports = require(path.join(buildDir, `${entry}.js`));
     for (const name of TESTING_EXPORTS) {
       if (name in entryExports) {

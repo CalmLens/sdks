@@ -79,7 +79,15 @@ export const useCalmLensUpload = (options: UploadControllerOptions): UseCalmLens
   const [controller] = useState(() => createUploadController(options));
   // The latest callbacks, without restarting uploads when a parent re-renders.
   controller.setOptions(options);
-  useEffect(() => () => controller.clear(), [controller]);
+  // Cancels uploads on unmount. The cancel waits a tick so StrictMode's simulated unmount, which
+  // mounts again straight away, keeps them.
+  const pendingClear = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    clearTimeout(pendingClear.current);
+    return () => {
+      pendingClear.current = setTimeout(() => controller.clear());
+    };
+  }, [controller]);
   const snapshot = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
