@@ -103,12 +103,12 @@ EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.allowed",
 EventSeverity = Union[Literal["low", "high"], str]
 #: Registered fact keys (kebab-case) across event types, plus ``test`` on test sends. Webhook,
 #: Slack and email deliveries and the public events feed leave out facts that hold personal or
-#: account data (names, email addresses, the project owner's ID).
+#: account data (names, email addresses, the organisation's ID).
 EventFactKey = Union[Literal[
     "asset-name", "asset-type", "file-format", "decided-by", "moderation-status", "flagged-categories",
-    "reviewer-user-id", "reviewer-name", "note", "previous-status", "limit", "used", "owner-user-id",
+    "reviewer-user-id", "reviewer-name", "note", "previous-status", "limit", "used", "organisation-id",
     "member-user-id", "member-name", "role", "invited-by-user-id", "connector-id", "connector-name",
-    "connector-type", "consecutive-failures", "last-error", "resumes-on", "preset-id", "preset-name",
+    "connector-type", "consecutive-failures", "last-error", "resumes-on", "reason", "preset-id", "preset-name",
     "daily-limit", "left", "removed-by-user-id", "previous-role", "changed-by-user-id", "key-id",
     "key-name", "action", "created-by-user-id", "revoked-by-user-id", "test",
 ], str]

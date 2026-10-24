@@ -49,7 +49,7 @@ const (
 	FactPreviousStatus      = "previous-status"
 	FactLimit               = "limit"
 	FactUsed                = "used"
-	FactOwnerUserID         = "owner-user-id"
+	FactOrganisationID      = "organisation-id"
 	FactMemberUserID        = "member-user-id"
 	FactMemberName          = "member-name"
 	FactRole                = "role"
@@ -60,6 +60,7 @@ const (
 	FactConsecutiveFailures = "consecutive-failures"
 	FactLastError           = "last-error"
 	FactResumesOn           = "resumes-on"
+	FactReason              = "reason"
 	FactPresetID            = "preset-id"
 	FactPresetName          = "preset-name"
 	FactDailyLimit          = "daily-limit"
@@ -255,12 +256,12 @@ type AssetFailedFacts struct {
 	PreviousStatus *string `json:"previous-status"`
 }
 
-// UsageLimitReachedFacts are the facts of EventUsageLimitReached. OwnerUserID stays in the portal
-// and is empty on webhook deliveries.
+// UsageLimitReachedFacts are the facts of EventUsageLimitReached. OrganisationID, the organisation
+// whose free uploads were used, stays in the portal and is empty on webhook deliveries.
 type UsageLimitReachedFacts struct {
-	Limit       int64  `json:"limit"`
-	Used        int64  `json:"used"`
-	OwnerUserID string `json:"owner-user-id"`
+	Limit          int64  `json:"limit"`
+	Used           int64  `json:"used"`
+	OrganisationID string `json:"organisation-id"`
 }
 
 // ProjectMemberJoinedFacts are the facts of EventProjectMemberJoined. Role is "admin",
@@ -290,9 +291,11 @@ type AssetRemovedFacts struct {
 	AssetType *string `json:"asset-type"`
 }
 
-// UsageSpendLimitReachedFacts are the facts of EventUsageSpendLimitReached. ResumesOn is a
-// YYYY-MM-DD date in UTC.
+// UsageSpendLimitReachedFacts are the facts of EventUsageSpendLimitReached. Reason is
+// "spend-limit", "usage-cap", "project-budget" or "payment-failed"; other values may be added.
+// ResumesOn is a YYYY-MM-DD date in UTC, or nil while an unpaid invoice pauses uploads.
 type UsageSpendLimitReachedFacts struct {
+	Reason    string  `json:"reason"`
 	ResumesOn *string `json:"resumes-on"`
 }
 

@@ -357,7 +357,7 @@ func TestEventFactsDecode(t *testing.T) {
           "value": 10
         },
         {
-          "key": "owner-user-id",
+          "key": "organisation-id",
           "value": "user-1"
         }
       ]
@@ -390,7 +390,7 @@ func TestEventFactsDecode(t *testing.T) {
 		t.Fatalf("%+v", flagged)
 	}
 	var usage UsageLimitReachedFacts
-	if err = page.Events[1].Facts.Decode(&usage); err != nil || usage.Limit != 9007199254740993 || usage.Used != 10 || usage.OwnerUserID != "user-1" {
+	if err = page.Events[1].Facts.Decode(&usage); err != nil || usage.Limit != 9007199254740993 || usage.Used != 10 || usage.OrganisationID != "user-1" {
 		t.Fatalf("%+v %v", usage, err)
 	}
 	if err = page.Events[1].Facts.Decode(&AssetClassifiedFacts{}); ErrorCode(err) != "" {
