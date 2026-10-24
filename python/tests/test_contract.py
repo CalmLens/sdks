@@ -7,6 +7,7 @@ import unittest
 from urllib.parse import parse_qsl, urlsplit
 
 from calmlens import CalmLensServerClient, CalmLensError
+from calmlens.client import _serialize_transform
 
 
 class ContractTests(unittest.TestCase):
@@ -53,3 +54,11 @@ class ContractTests(unittest.TestCase):
                     with self.assertRaises(CalmLensError) as raised:
                         c.cdn.get_asset_url(case["options"])
                     self.assertEqual(raised.exception.code, case["error"])
+
+    def test_transform_options(self):
+        """Every transform option serializes to the step the CDN writes for it."""
+        fixture = json.loads((Path(__file__).resolve().parents[2] / "go" / "testdata" / "transform-options.json").read_text())
+        for case in fixture["cases"]:
+            with self.subTest(options=case["options"]):
+                step = {"type": "imageTransform", "options": case["options"]}
+                self.assertEqual(_serialize_transform(step), case["selector"])

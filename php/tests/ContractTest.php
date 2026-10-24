@@ -121,4 +121,13 @@ final class ContractTest extends TestCase
             }
         }
     }
+
+    /** Every transform option serializes to the step the CDN writes for it. */
+    public function testTransformOptions(): void
+    {
+        foreach (self::fixtures('transform-options')['cases'] as $case) {
+            $step = ['type' => 'imageTransform', 'options' => $case['options']];
+            self::assertSame($case['selector'], \CalmLens\Internal\Transforms::selector($step), json_encode($case['options']));
+        }
+    }
 }

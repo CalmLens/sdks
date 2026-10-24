@@ -314,4 +314,19 @@ class ClientTest {
     assertEquals(expected, result.stream().map(Models.Lens::identifier).toList());
     assertEquals(expected.stream().map(identifier -> "id-" + identifier).toList(), result.stream().map(Models.Lens::id).toList());
   }
+
+  /** Every transform option, decoded into ImageTransformOptions and serialized, gives the step the CDN writes. */
+  @Test
+  void transformOptionsMatchTheContract() throws Exception {
+    JsonObject fixture = Fixtures.read("transform-options.json").getAsJsonObject();
+    for (JsonElement item : fixture.getAsJsonArray("cases")) {
+      JsonObject testCase = item.getAsJsonObject();
+      Models.ImageTransformOptions options =
+          Json.GSON.fromJson(testCase.get("options"), Models.ImageTransformOptions.class);
+      assertEquals(
+          testCase.get("selector").getAsString(),
+          CalmLensServerClient.serializeTransform(Models.Transform.image(options)),
+          testCase.get("options").toString());
+    }
+  }
 }

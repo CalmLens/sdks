@@ -127,4 +127,14 @@ class ContractTest < Minitest::Test
       end
     end
   end
+
+  # Every transform option serializes to the step the CDN writes for it.
+  def test_transform_options
+    client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1')
+    fixtures('transform-options')['cases'].each do |item|
+      step = { 'type' => 'imageTransform', 'options' => item['options'] }
+      url = client.cdn.get_asset_url(asset_identifier: 'asset-1', transform: step)
+      assert_equal item['selector'], url.split('/rendered/', 2).last, item['options'].inspect
+    end
+  end
 end

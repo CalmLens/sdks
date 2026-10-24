@@ -31,7 +31,7 @@ from . import error_codes
 from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError)
-from .types import (Asset, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
+from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
                     MetadataItem, ClassifyTextOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
@@ -112,8 +112,6 @@ def _id(value: object, name: str = "Identifier") -> str:
 
 
 _TRANSFORM_OPTION_NAME = re.compile(r"[a-z][a-zA-Z0-9]*")
-# Options that hold colours, written as hex without ``#`` in a selector.
-_TRANSFORM_COLOUR_KEYS = frozenset({"background", "border.color", "trim.border.color"})
 _HEX_COLOUR = re.compile(r"#((?:[0-9a-fA-F]{3}){1,2}|(?:[0-9a-fA-F]{4}){1,2})")
 
 
@@ -152,7 +150,7 @@ def _transform_options(pairs: list[str], key: str, value: Any) -> None:
             _transform_options(pairs, f"{key}.{child}", value[child])
         return
     if isinstance(value, str):
-        hex_colour = _HEX_COLOUR.fullmatch(value) if key in _TRANSFORM_COLOUR_KEYS else None
+        hex_colour = _HEX_COLOUR.fullmatch(value) if key in IMAGE_TRANSFORM_COLOUR_KEYS else None
         text = hex_colour.group(1).lower() if hex_colour else value
     elif isinstance(value, bool):
         text = "true" if value else "false"

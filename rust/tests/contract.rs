@@ -414,3 +414,30 @@ fn future_webhook_fields_and_types_are_accepted() {
         assert_eq!(event.data.facts[0].value, serde_json::json!({"count": 3}));
     }
 }
+
+/// Every transform option, decoded into `ImageTransformOptions` and serialized, gives the step the
+/// CDN writes for it: an option the type doesn't know lands in `extra` and fails here.
+#[test]
+fn transform_option_contracts() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../testdata/transform-options.json")).unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
+        let options: ImageTransformOptions =
+            serde_json::from_value(case["options"].clone()).unwrap();
+        assert!(
+            options.extra.is_empty(),
+            "{}: {:?}",
+            case["options"],
+            options.extra
+        );
+        let selector = CdnTransform::Steps(vec![Transform::image(options)])
+            .selector()
+            .unwrap();
+        assert_eq!(
+            selector,
+            case["selector"].as_str().unwrap(),
+            "{}",
+            case["options"]
+        );
+    }
+}

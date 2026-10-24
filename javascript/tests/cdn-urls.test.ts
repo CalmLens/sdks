@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { getAssetUrl } from "../src/app";
+import { serializeTransform } from "../src/client/CalmLensUtils";
 import type { CdnAssetUrlOptions } from "../src/index";
 import { CalmLensServerClient } from "../src/server";
 
@@ -78,5 +79,16 @@ describe("getAssetUrl", () => {
       "sdk/invalid-argument",
     );
     expect(codeOf(() => getAssetUrl({ ...base, projectId: ".." }))).toBe("sdk/invalid-argument");
+  });
+});
+
+describe("transform options contract", () => {
+  test("serializes every option to the step the CDN writes for it", async () => {
+    const fixture = (await Bun.file(
+      new URL("../../go/testdata/transform-options.json", import.meta.url),
+    ).json()) as { cases: { options: Record<string, unknown>; selector: string }[] };
+    for (const { options, selector } of fixture.cases) {
+      expect(serializeTransform({ type: "imageTransform", options })).toBe(selector);
+    }
   });
 });

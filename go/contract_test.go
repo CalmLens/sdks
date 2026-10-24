@@ -264,3 +264,31 @@ func TestJavaScriptPathSafety(t *testing.T) {
 		}
 	}
 }
+
+// Every transform option, decoded into ImageTransformOptions and serialized, gives the step the
+// CDN writes for it: an option missing from the type, or encoded differently, fails here.
+func TestTransformOptionsContract(t *testing.T) {
+	data, err := os.ReadFile("testdata/transform-options.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Cases []struct {
+			Options  json.RawMessage
+			Selector string
+		}
+	}
+	if err = json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range fixture.Cases {
+		options := decodeOptions[ImageTransformOptions](t, c.Options)
+		selector, err := serializeTransform([]LensTransform{ImageTransform(options)})
+		if err != nil {
+			t.Fatalf("%s: %v", c.Options, err)
+		}
+		if selector != c.Selector {
+			t.Errorf("%s: got %q, want %q", c.Options, selector, c.Selector)
+		}
+	}
+}

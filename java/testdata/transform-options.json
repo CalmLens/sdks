@@ -1,0 +1,231 @@
+{
+  "colourKeys": [
+    "background",
+    "border.color",
+    "trim.border.color"
+  ],
+  "options": [
+    "format",
+    "width",
+    "height",
+    "dpr",
+    "anim",
+    "background",
+    "blur",
+    "border",
+    "brightness",
+    "contrast",
+    "quality",
+    "fit",
+    "flip",
+    "gamma",
+    "segment",
+    "gravity",
+    "rotate",
+    "saturation",
+    "sharpen",
+    "trim"
+  ],
+  "cases": [
+    {
+      "options": {
+        "format": "jpg",
+        "width": 2,
+        "height": 2,
+        "dpr": 1.5,
+        "anim": false,
+        "background": "#FF0000",
+        "blur": 1.5,
+        "border": {
+          "color": "#FF0000",
+          "width": 1.5
+        },
+        "brightness": 1.5,
+        "contrast": 1.5,
+        "quality": 2,
+        "fit": "scale-down",
+        "flip": "h",
+        "gamma": 1.5,
+        "segment": "foreground",
+        "gravity": "face",
+        "rotate": 0,
+        "saturation": 1.5,
+        "sharpen": 1.5,
+        "trim": "border"
+      },
+      "selector": "anim=false,background=ff0000,blur=1.5,border.color=ff0000,border.width=1.5,brightness=1.5,contrast=1.5,dpr=1.5,fit=scale-down,flip=h,format=jpg,gamma=1.5,gravity=face,height=2,quality=2,rotate=0,saturation=1.5,segment=foreground,sharpen=1.5,trim=border,width=2"
+    },
+    {
+      "options": {
+        "format": "png"
+      },
+      "selector": "format=png"
+    },
+    {
+      "options": {
+        "format": "webp"
+      },
+      "selector": "format=webp"
+    },
+    {
+      "options": {
+        "format": "avif"
+      },
+      "selector": "format=avif"
+    },
+    {
+      "options": {
+        "format": "gif"
+      },
+      "selector": "format=gif"
+    },
+    {
+      "options": {
+        "quality": "low"
+      },
+      "selector": "quality=low"
+    },
+    {
+      "options": {
+        "quality": "medium"
+      },
+      "selector": "quality=medium"
+    },
+    {
+      "options": {
+        "quality": "high"
+      },
+      "selector": "quality=high"
+    },
+    {
+      "options": {
+        "fit": "contain"
+      },
+      "selector": "fit=contain"
+    },
+    {
+      "options": {
+        "fit": "pad"
+      },
+      "selector": "fit=pad"
+    },
+    {
+      "options": {
+        "fit": "squeeze"
+      },
+      "selector": "fit=squeeze"
+    },
+    {
+      "options": {
+        "fit": "cover"
+      },
+      "selector": "fit=cover"
+    },
+    {
+      "options": {
+        "fit": "crop"
+      },
+      "selector": "fit=crop"
+    },
+    {
+      "options": {
+        "flip": "v"
+      },
+      "selector": "flip=v"
+    },
+    {
+      "options": {
+        "flip": "hv"
+      },
+      "selector": "flip=hv"
+    },
+    {
+      "options": {
+        "gravity": {
+          "mode": "remainder",
+          "x": 1.5,
+          "y": 1.5
+        }
+      },
+      "selector": "gravity.mode=remainder,gravity.x=1.5,gravity.y=1.5"
+    },
+    {
+      "options": {
+        "gravity": "left"
+      },
+      "selector": "gravity=left"
+    },
+    {
+      "options": {
+        "gravity": "right"
+      },
+      "selector": "gravity=right"
+    },
+    {
+      "options": {
+        "gravity": "top"
+      },
+      "selector": "gravity=top"
+    },
+    {
+      "options": {
+        "gravity": "bottom"
+      },
+      "selector": "gravity=bottom"
+    },
+    {
+      "options": {
+        "gravity": "center"
+      },
+      "selector": "gravity=center"
+    },
+    {
+      "options": {
+        "gravity": "auto"
+      },
+      "selector": "gravity=auto"
+    },
+    {
+      "options": {
+        "gravity": "entropy"
+      },
+      "selector": "gravity=entropy"
+    },
+    {
+      "options": {
+        "rotate": 90
+      },
+      "selector": "rotate=90"
+    },
+    {
+      "options": {
+        "rotate": 180
+      },
+      "selector": "rotate=180"
+    },
+    {
+      "options": {
+        "rotate": 270
+      },
+      "selector": "rotate=270"
+    },
+    {
+      "options": {
+        "trim": {
+          "top": 1.5,
+          "bottom": 1.5,
+          "left": 1.5,
+          "right": 1.5,
+          "width": 1.5,
+          "height": 1.5,
+          "border": {
+            "color": "#FF0000",
+            "tolerance": 1.5,
+            "keep": 1.5
+          }
+        }
+      },
+      "selector": "trim.border.color=ff0000,trim.border.keep=1.5,trim.border.tolerance=1.5,trim.bottom=1.5,trim.height=1.5,trim.left=1.5,trim.right=1.5,trim.top=1.5,trim.width=1.5"
+    }
+  ]
+}
