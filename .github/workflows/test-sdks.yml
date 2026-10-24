@@ -80,6 +80,11 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run --cwd javascript check
       - run: bun run --cwd javascript test
+      # The React, Vue, Svelte and web component bindings, with the UI libraries installed apart.
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: javascript/ui-tests
+      - run: bun run check && bun run test
+        working-directory: javascript/ui-tests
       - run: bun run --cwd javascript build
       - run: >
           node -e "const { CalmLensServerClient } =

@@ -44,8 +44,8 @@ describe("getMediaState", () => {
     const base = `${CDN}/assets/${PROJECT_ID}/a1/rendered/@card`;
     expect(state).toEqual({
       kind: "image",
-      src: `${base},imageTransform[width=800]`,
-      srcSet: `${base},imageTransform[width=400] 400w, ${base},imageTransform[width=800] 800w`,
+      src: `${base}/width=800`,
+      srcSet: `${base}/width=400 400w, ${base}/width=800 800w`,
       placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     });
   });

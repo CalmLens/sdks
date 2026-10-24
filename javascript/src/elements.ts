@@ -108,6 +108,7 @@ export class CalmLensUploaderElement extends BaseElement {
   #token?: UploadControllerOptions["token"];
   #upload?: UploadControllerOptions["upload"];
   #checkStatus?: UploadControllerOptions["checkStatus"];
+  #createClient?: UploadControllerOptions["createClient"];
   #messages?: Partial<CalmLensMessages>;
   #controller?: UploadController;
   #unsubscribe?: () => void;
@@ -141,6 +142,15 @@ export class CalmLensUploaderElement extends BaseElement {
     this.#controller?.setOptions(this.#options());
   }
 
+  /** Creates the client for each upload, for example a `MockCalmLensAppClient` in tests. */
+  get createClient(): UploadControllerOptions["createClient"] {
+    return this.#createClient;
+  }
+  set createClient(value: UploadControllerOptions["createClient"]) {
+    this.#createClient = value;
+    this.#controller?.setOptions(this.#options());
+  }
+
   get messages(): Partial<CalmLensMessages> | undefined {
     return this.#messages;
   }
@@ -164,6 +174,7 @@ export class CalmLensUploaderElement extends BaseElement {
       uploadPresetId: this.getAttribute("upload-preset-id") ?? undefined,
       upload: this.upload,
       checkStatus: this.checkStatus,
+      createClient: this.createClient,
       token: this.token,
       tokenUrl: this.getAttribute("token-url") ?? undefined,
       accept: this.getAttribute("accept") ?? undefined,
@@ -179,7 +190,7 @@ export class CalmLensUploaderElement extends BaseElement {
   }
 
   connectedCallback() {
-    upgradeProperties(this, ["token", "upload", "checkStatus", "messages"]);
+    upgradeProperties(this, ["token", "upload", "checkStatus", "createClient", "messages"]);
     if (!this.hasAttribute("unstyled")) injectCalmLensStyles();
     this.classList.add("calmlens-uploader");
     this.#unsubscribe = this.controller.subscribe((snapshot) => {

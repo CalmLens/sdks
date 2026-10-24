@@ -45,6 +45,13 @@ bun run --cwd javascript test
 bun run --cwd javascript build
 ```
 
+The JavaScript SDK's React, Vue, Svelte and web component bindings are tested in
+[`javascript/ui-tests`](javascript/ui-tests), which installs the UI libraries apart from the SDK:
+
+```sh
+(cd javascript/ui-tests && bun install --frozen-lockfile && bun run check && bun run test)
+```
+
 Each native SDK includes its own tests and development instructions. JavaScript examples use
 the local JavaScript SDK; build it before installing an example's dependencies. Calmgram's fixed
 examples are illustrative snapshots; its live mode uses the API.
