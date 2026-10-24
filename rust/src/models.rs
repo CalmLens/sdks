@@ -465,8 +465,18 @@ string_enum! {
         /// The asset rendered through a lens or transform, or its default rendition (the default).
         Rendered = "rendered",
         /// A small blurred PNG, public for public assets whatever their moderation status. Only
-        /// for CDN URLs, without a lens, transform or `allow_age_restricted`; signed URLs don't take it.
+        /// for CDN URLs, without a lens, transform or `allow_age_restricted`.
         Placeholder = "placeholder",
+    }
+}
+
+string_enum! {
+    /// Which CDN resource of an asset a signed URL serves. Placeholders need no signature.
+    SignedUrlResource {
+        /// The asset's original file. It takes no lens or transform.
+        Original = "original",
+        /// The asset rendered through a lens or transform, or its default rendition (the default).
+        Rendered = "rendered",
     }
 }
 
@@ -1032,7 +1042,7 @@ pub struct SignedUrlOptions {
     pub asset_id: String,
     /// `rendered` (the API's default) or `original`, which takes no lens or transform.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resource: Option<CdnResource>,
+    pub resource: Option<SignedUrlResource>,
     /// A lens identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lens: Option<String>,
