@@ -38,7 +38,8 @@ port you use) as a site, then:
 CALMLENS_API_KEY=... CALMLENS_PROJECT_ID=... CALMLENS_UPLOAD_PRESET_ID=... bun run dev
 ```
 
-The dev server signs an upload token for each file at `POST /api/upload-token`. A real app checks
+Set `CALMLENS_API_URL` and `CALMLENS_CDN_URL` too to use a CalmLens instance other than the hosted
+one. The dev server signs an upload token for each file at `POST /api/upload-token`. A real app checks
 who is asking and passes the ID of the record being created as `externalId`; see
 [Build an upload component](https://calmlens.com/docs/guides/upload-component).
 

@@ -16,6 +16,9 @@ const env = {
   apiKey: process.env.CALMLENS_API_KEY,
   projectId: process.env.CALMLENS_PROJECT_ID,
   uploadPresetId: process.env.CALMLENS_UPLOAD_PRESET_ID,
+  /** A local CalmLens instance's API and CDN; the hosted ones by default. */
+  apiUrl: process.env.CALMLENS_API_URL || undefined,
+  cdnUrl: process.env.CALMLENS_CDN_URL || undefined,
 };
 const live = Boolean(env.apiKey && env.projectId && env.uploadPresetId);
 
@@ -152,6 +155,7 @@ const signToken = async (response: ServerResponse) => {
   const client = new CalmLensServerClient({
     apiKey: env.apiKey ?? "",
     projectId: env.projectId ?? "",
+    baseUrl: env.apiUrl,
   });
   // A real app checks the signed-in user here and passes the ID of the record being created as
   // `externalId`; see the upload component guide.
@@ -164,7 +168,7 @@ export const playgroundServer = (): Plugin => ({
   configureServer(server) {
     server.config.logger.info(
       live
-        ? `  CalmLens: live mode, project ${env.projectId}, preset ${env.uploadPresetId}`
+        ? `  CalmLens: live mode, project ${env.projectId}, preset ${env.uploadPresetId}${env.apiUrl ? ` on ${env.apiUrl}` : ""}`
         : "  CalmLens: mock mode (set CALMLENS_API_KEY, CALMLENS_PROJECT_ID and CALMLENS_UPLOAD_PRESET_ID for live mode)",
     );
     server.middlewares.use(async (request, response, next) => {
@@ -175,6 +179,7 @@ export const playgroundServer = (): Plugin => ({
             mode: live ? "live" : "mock",
             projectId: live ? env.projectId : MOCK_PROJECT_ID,
             uploadPresetId: live ? env.uploadPresetId : MOCK_PRESET_ID,
+            ...(live && { baseUrl: env.apiUrl, cdnBaseUrl: env.cdnUrl }),
           });
         }
         if (url.pathname === "/api/upload-token" && request.method === "POST") {
