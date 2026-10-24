@@ -521,7 +521,9 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
   `idempotency/key-reused`.
 - `EnqueueEvent` adds events to the feed, which `Events.List` and `ListAll` return after
   cursors taken earlier.
-- `CDN.Serve` answers with content type and length and supports single byte ranges. Like the
+- `CDN.Serve` answers with content type and length, and `Cache-Control` as the CDN sets it
+  (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable`
+  for images, `max-age=3600` otherwise), and supports single byte ranges. Like the
   CDN, blocked, purged and failed assets and removed content return 403 `asset/not-available`
   whatever the key. A private asset, or a public age-restricted one requested without
   `AllowAgeRestricted: true`, returns 403 `asset/api-key-missing-permission` unless the key has

@@ -61,8 +61,14 @@ type Scenario = {
     save?: string;
     expect?: {
       result?: Record<string, unknown>;
+      sameAs?: string;
       error?: { code: string; status: number | null };
-      cdn?: { status: number; code?: string; body?: string };
+      cdn?: {
+        status: number;
+        code?: string;
+        body?: string;
+        headers?: Record<string, string>;
+      };
     };
   }>;
 };
@@ -112,7 +118,7 @@ const run = async (
       const code = response.headers.get("content-type")?.startsWith("application/json")
         ? (JSON.parse(text) as { code?: string }).code
         : undefined;
-      return { status: response.status, code, body: text };
+      return { status: response.status, code, body: text, headers: response.headers };
     }
   }
   const [resource, method] = operation.split(".") as [string, string];
@@ -152,16 +158,35 @@ describe("shared mock scenarios", () => {
         }
         if (error) throw error;
         if (step.expect?.cdn) {
-          const { status, code, body } = result as { status: number; code?: string; body: string };
+          const { status, code, body, headers } = result as {
+            status: number;
+            code?: string;
+            body: string;
+            headers: Headers;
+          };
           const expected = step.expect.cdn;
           expect(
             {
               status,
               ...(expected.code !== undefined ? { code } : {}),
               ...(expected.body !== undefined ? { body } : {}),
+              // Header names are case-insensitive: Headers.get matches any case.
+              ...(expected.headers !== undefined
+                ? {
+                    headers: Object.fromEntries(
+                      Object.keys(expected.headers).map((name) => [name, headers.get(name)]),
+                    ),
+                  }
+                : {}),
             },
             label,
           ).toEqual(expected);
+        }
+        if (step.expect?.sameAs !== undefined) {
+          expect(step.expect.sameAs in saved, `${label}: saved ${step.expect.sameAs}`).toBe(true);
+          expect(result, `${label}: same as ${step.expect.sameAs}`).toEqual(
+            saved[step.expect.sameAs],
+          );
         }
         for (const [path, raw] of Object.entries(step.expect?.result ?? {})) {
           const actual = at(result, path);

@@ -34,44 +34,17 @@ fn cdn(asset_identifier: &str) -> CdnRequest {
     }
 }
 
-/// The shared scenarios cover the statuses, events and delivery a decision gives; these are the
-/// mock's own IDs, the recorded review, and an event feed that delivers each event once.
+/// The shared scenarios cover the statuses, recorded review, events and delivery a decision
+/// gives; these are the mock's own IDs and the refusal of an unknown asset.
 #[tokio::test]
-async fn decide_records_a_manual_review_once_on_a_deterministic_id() {
+async fn decide_uses_deterministic_ids_and_refuses_unknown_assets() {
     let mock = MockServerClient::in_memory(options()).unwrap();
-    let start = mock.events().list(ListEvents::default()).await.unwrap();
     let created = mock.assets().create(kept("a.png", b"png")).await.unwrap();
     assert_eq!(created.id, "id-1");
-
     let asset = mock
         .decide(&created.id, AssetModerationDecision::Blocked)
         .unwrap();
-    assert_eq!(
-        asset.classification.status,
-        AssetClassificationStatus::Completed
-    );
-    let reviews = &asset.classification.moderation.manual_reviews;
-    assert_eq!(reviews.len(), 1);
-    assert_eq!(reviews[0].decision, AssetModerationDecision::Blocked);
-
-    let page = mock
-        .events()
-        .list(ListEvents {
-            after: Some(start.cursor.clone()),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-    assert_eq!(page.events.len(), 1);
-    let later = mock
-        .events()
-        .list(ListEvents {
-            after: Some(page.cursor),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-    assert!(later.events.is_empty());
+    assert_eq!(asset.classification.moderation.manual_reviews[0].id, "id-2");
     assert_eq!(
         mock.decide("missing", AssetModerationDecision::Allowed)
             .unwrap_err()
@@ -114,9 +87,10 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
     assert!(!purging.with_storage(|storage| storage.content.contains_key(&purged.id)));
 }
 
-/// The shared scenarios cover which keys may read what; these are the served type and byte ranges.
+/// The shared scenarios cover which keys may read what and the served headers; these are byte
+/// ranges.
 #[tokio::test]
-async fn cdn_serves_the_stored_type_and_byte_ranges() {
+async fn cdn_serves_byte_ranges() {
     let allowed = MockServerClient::in_memory(
         options().api_key(create_mock_api_key(&[MockApiKeyGrant::download()])),
     )
@@ -126,9 +100,6 @@ async fn cdn_serves_the_stored_type_and_byte_ranges() {
         .classify(kept("d.png", b"0123456789"))
         .await
         .unwrap();
-    let response = allowed.cdn().serve(cdn(&private.id)).await.unwrap();
-    assert_eq!(response.status().as_u16(), 200);
-    assert_eq!(response.headers()["content-type"], "image/png");
     let range = allowed
         .cdn()
         .serve(CdnRequest {

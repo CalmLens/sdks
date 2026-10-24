@@ -184,7 +184,8 @@ final class MockServerClient
     /**
      * Gives an asset a new outcome, as a reviewer would, and adds the matching `asset.<status>`
      * (or `asset.failed`) event with the asset's snapshot, the event catalog's severity (`low` for
-     * `allowed`, `high` otherwise) and a `decided-by: reviewer` fact.
+     * `allowed`, `high` otherwise) and a `decided-by: reviewer` fact. A review decision (`allowed`,
+     * `age-restricted`, `blocked` or `purged`) also joins the asset's `manualReviews`.
      */
     public function decide(string $assetId, string $outcome): array
     {
@@ -193,6 +194,11 @@ final class MockServerClient
             throw new \InvalidArgumentException("No mock asset $assetId");
         }
         $asset = $this->applyOutcome($this->assets[$assetId], $outcome);
+        if (!in_array($outcome, ['pending', 'failed'], true)) {
+            $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)(), 'decision' => $outcome,
+                'note' => null, 'reviewerUserId' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
+            $this->assets[$assetId] = $asset;
+        }
         if ($outcome !== 'pending') {
             $this->enqueueEvent(['type' => 'asset.' . $outcome, 'assetId' => $assetId, 'severity' => $outcome === 'allowed' ? 'low' : 'high',
                 'facts' => [['key' => 'decided-by', 'value' => 'reviewer']]]);
@@ -867,8 +873,11 @@ final class MockServerClient
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
             return self::json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'The API key cannot download this asset']);
         }
+        // Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
+        // by shared caches only when delivery is public.
+        $lifetime = $asset['type'] === 'image' ? 'max-age=31536000, immutable' : 'max-age=3600';
         return new Response(200, ['Content-Type' => $stored['type'], 'Content-Length' => (string) strlen($stored['bytes']),
-            'Cache-Control' => $private || $ageRestricted ? 'private, no-store' : 'public, max-age=31536000',
+            'Cache-Control' => ($private ? 'private' : 'public') . ', ' . $lifetime,
             'ETag' => '"' . substr(hash('sha256', $stored['bytes']), 0, 32) . '"', 'X-Request-Id' => self::requestId()],
             $method === 'HEAD' ? '' : $stored['bytes']);
     }

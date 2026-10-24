@@ -67,7 +67,8 @@ def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any])
         with client.cdn.serve(args) as response:
             body = response.read()
             code = json.loads(body).get("code") if response.content_type == "application/json" else None
-            return {"status": response.status, "code": code, "body": body.decode("utf-8", "replace")}
+            return {"status": response.status, "code": code, "body": body.decode("utf-8", "replace"),
+                    "headers": response.headers}
     if operation == "assets.waitForDecision":
         options = {key: value for key, value in args.items() if key != "timeoutMs"}
         return client.assets.wait_for_decision({**options, "timeout": args["timeoutMs"] / 1000})
@@ -262,7 +263,13 @@ class MockScenarioTests(unittest.TestCase):
                         continue
                     result = _run(client, step["operation"], args)
                     if "cdn" in expect:
-                        self.assertEqual({key: result[key] for key in expect["cdn"]}, expect["cdn"], label)
+                        # Header names are case-insensitive; CDNResponse.headers has lower-case names.
+                        self.assertEqual({key: {name: result["headers"].get(name.lower()) for name in wanted}
+                                          if key == "headers" else result[key]
+                                          for key, wanted in expect["cdn"].items()}, expect["cdn"], label)
+                    if "sameAs" in expect:
+                        self.assertIn(expect["sameAs"], saved, label)
+                        self.assertEqual(result, saved[expect["sameAs"]], f"{label}: same as {expect['sameAs']}")
                     for path, wanted in expect.get("result", {}).items():
                         actual = _at(result, path)
                         if isinstance(wanted, dict) and "$contains" in wanted:

@@ -807,8 +807,12 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(_Failure("asset/api-key-missing-permission",
                                                        "This API key needs assets:download permission for this asset's folder.", 403))
             content = b"".join(v for _, v in sorted(stored["parts"].items()))
+            # Like the CDN: an image's bytes are immutable for a year, other content is kept for an
+            # hour, by shared caches only when delivery is public.
+            access = "private" if is_private and not public_url_allowed else "public"
+            lifetime = "max-age=31536000, immutable" if asset["type"] == "image" else "max-age=3600"
         headers = {"Content-Type": stored["type"], "Content-Length": str(len(content)),
-                   "Cache-Control": "private, no-store" if is_private else "public, max-age=31536000",
+                   "Cache-Control": f"{access}, {lifetime}",
                    "ETag": '"' + hashlib.sha256(content).hexdigest()[:32] + '"'}
         return self._respond(200, headers=headers, body=b"" if method == "HEAD" else content)
 

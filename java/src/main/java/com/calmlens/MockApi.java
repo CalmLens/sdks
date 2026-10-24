@@ -808,7 +808,14 @@ final class MockApi {
     if (missing) return error(new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE, 404, "Asset content is not available"));
     byte[] data = stored.bytes();
     int code = 200;
-    List<String> extra = new ArrayList<>(List.of("Accept-Ranges", "bytes", "Cache-Control", restricted ? "private, no-store" : "public, max-age=31536000"));
+    // Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
+    // by shared caches only when delivery is public (private assets and age-restricted ones
+    // requested without the opt-in are private).
+    boolean privateDelivery = !"public".equals(str(asset, "visibility"))
+        || ("age-restricted".equals(status) && !"true".equals(request.query().get("allowAgeRestricted")));
+    String cacheControl = (privateDelivery ? "private" : "public") + ", "
+        + ("image".equals(str(asset, "type")) ? "max-age=31536000, immutable" : "max-age=3600");
+    List<String> extra = new ArrayList<>(List.of("Accept-Ranges", "bytes", "Cache-Control", cacheControl));
     String range = request.header("Range");
     Matcher single = range == null ? null : Pattern.compile("bytes=(\\d+)-(\\d*)").matcher(range.strip());
     if (single != null && single.matches()) {

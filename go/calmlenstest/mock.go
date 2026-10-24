@@ -1337,6 +1337,16 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	if restricted && !m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission")
 	}
+	// Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
+	// by shared caches only when delivery is public.
+	access, lifetime := "public", "max-age=3600"
+	if restricted {
+		access = "private"
+	}
+	if asset["type"] == "image" {
+		lifetime = "max-age=31536000, immutable"
+	}
+	header.Set("Cache-Control", access+", "+lifetime)
 	indices := []int{}
 	for index := range stored.Parts {
 		indices = append(indices, index)

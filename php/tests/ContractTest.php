@@ -274,7 +274,8 @@ final class ContractTest extends TestCase
                 $response = $client->cdn->serve($args);
                 $body = (string) $response->getBody();
                 $json = $response->getHeaderLine('Content-Type') === 'application/json' ? json_decode($body, true) : null;
-                return ['status' => $response->getStatusCode(), 'code' => $json['code'] ?? null, 'body' => $body];
+                return ['status' => $response->getStatusCode(), 'code' => $json['code'] ?? null, 'body' => $body,
+                    'headers' => $response->getHeaders()];
             case 'assets.waitForDecision':
                 $args['timeout'] = $args['timeoutMs'] / 1000;
                 unset($args['timeoutMs']);
@@ -317,7 +318,19 @@ final class ContractTest extends TestCase
                 foreach (array_keys($expect['cdn']) as $key) {
                     $actual[$key] = $result[$key];
                 }
+                // Header names are case-insensitive.
+                if (isset($expect['cdn']['headers'])) {
+                    $served = array_change_key_case(array_map(fn ($values) => implode(', ', $values), $result['headers']));
+                    $actual['headers'] = [];
+                    foreach (array_keys($expect['cdn']['headers']) as $name) {
+                        $actual['headers'][$name] = $served[strtolower($name)] ?? null;
+                    }
+                }
                 self::assertSame($expect['cdn'], $actual, $label);
+            }
+            if (isset($expect['sameAs'])) {
+                self::assertArrayHasKey($expect['sameAs'], $saved, "$label: nothing saved as {$expect['sameAs']}");
+                self::assertSame($saved[$expect['sameAs']], $result, "$label: same as {$expect['sameAs']}");
             }
             foreach ($expect['result'] ?? [] as $path => $raw) {
                 if (is_array($raw) && array_key_exists('$contains', $raw)) {

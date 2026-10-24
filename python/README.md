@@ -493,7 +493,9 @@ and `signed_url_base_url`. Unknown mock options raise.
 - `cdn.serve` answers like the CDN: blocked, purged and failed assets and removed content get
   `403` `asset/not-available` whatever the key; private assets, and public age-restricted ones
   requested without `allowAgeRestricted`, get `403` `asset/api-key-missing-permission` unless the
-  key has `assets:download` (the default key has no grants).
+  key has `assets:download` (the default key has no grants). Served content has `Cache-Control`
+  as the CDN sets it: `public` only when anyone may see the asset, otherwise `private`, with
+  `max-age=31536000, immutable` for images and `max-age=3600` for other content.
 - `assets.wait_for_decision` reads the mock's `database_storage` and takes no real time: it
   returns an asset that is already decided (or whose processing failed) and raises
   `sdk/timeout` at once for one whose moderation stays `pending`. Set the stored asset's

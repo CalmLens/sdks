@@ -177,12 +177,18 @@
             },
             "outcome": "blocked"
           },
+          "save": "decision",
           "expect": {
             "result": {
               "id": {
                 "$ref": "blocked.id"
               },
+              "classification.status": "completed",
               "classification.moderation.status": "blocked",
+              "classification.moderation.manualReviews.length": 1,
+              "classification.moderation.manualReviews.0.decision": "blocked",
+              "classification.moderation.manualReviews.0.note": null,
+              "classification.moderation.manualReviews.0.appliedToAsset": true,
               "content.status": "stored"
             }
           }
@@ -196,7 +202,10 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "blocked"
+              "classification.moderation.status": "blocked",
+              "classification.moderation.manualReviews": {
+                "$ref": "decision.classification.moderation.manualReviews"
+              }
             }
           }
         },
@@ -274,6 +283,7 @@
               "$ref": "feed.cursor"
             }
           },
+          "save": "decisions",
           "expect": {
             "result": {
               "events.length": 1,
@@ -288,6 +298,24 @@
                   "key": "decided-by",
                   "value": "reviewer"
                 }
+              },
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "decisions.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 0,
+              "hasMore": false,
+              "cursor": {
+                "$ref": "decisions.cursor"
               }
             }
           }
@@ -602,7 +630,11 @@
           "expect": {
             "cdn": {
               "status": 200,
-              "body": "hello"
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=31536000, immutable"
+              }
             }
           }
         },
@@ -685,7 +717,11 @@
           "expect": {
             "cdn": {
               "status": 200,
-              "body": "hello"
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "private, max-age=31536000, immutable"
+              }
             }
           }
         },
@@ -715,7 +751,11 @@
           "expect": {
             "cdn": {
               "status": 200,
-              "body": "hello"
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "private, max-age=31536000, immutable"
+              }
             }
           }
         }
@@ -774,7 +814,11 @@
           "expect": {
             "cdn": {
               "status": 200,
-              "body": "hello"
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=31536000, immutable"
+              }
             }
           }
         },
@@ -837,11 +881,7 @@
             "idempotencyKey": "upload-1"
           },
           "expect": {
-            "result": {
-              "id": {
-                "$ref": "first.id"
-              }
-            }
+            "sameAs": "first"
           }
         },
         {

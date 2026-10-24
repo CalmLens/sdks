@@ -496,7 +496,13 @@ export class MockCalmLensServerClient {
           headers: {
             "Content-Type": storedContent.type ?? "application/octet-stream",
             "Content-Length": String(byteLength),
-            "Cache-Control": isPrivate ? "private, no-store" : "public, max-age=31536000",
+            // Like the CDN: an image's bytes are immutable for a year, other content and
+            // placeholders are kept for an hour, publicly only when delivery is public.
+            "Cache-Control": `${isPrivate ? "private" : "public"}, ${
+              asset.type === "image" && !isPlaceholder
+                ? "max-age=31536000, immutable"
+                : "max-age=3600"
+            }`,
             ETag: `"${asset.id}-${asset.updatedAt}"`,
             "X-Request-Id": requestId,
             "X-Mock-CalmLens-CDN-URL": url,

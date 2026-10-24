@@ -240,8 +240,12 @@ grants, like a real key without `assets:download`, so it also refuses private as
 public age-restricted ones requested without `allowAgeRestricted` (`403`
 `asset/api-key-missing-permission`). Pass `apiKey: MockServerClient::createApiKey([['actions' =>
 ['assets:download'], 'folderId' => null, 'includeSubfolders' => true]])` to read them; a
-`folderId` limits the grant to that folder. `decide` adds an `asset.<outcome>` event with the
-event catalog's severity: `low` for `allowed`, `high` otherwise.
+`folderId` limits the grant to that folder. Served content carries its stored
+`Content-Type` and `Cache-Control` as the CDN sets it: `public` only when anyone may see
+the asset, otherwise `private`, with `max-age=31536000, immutable` for images and
+`max-age=3600` for other content. `decide` records the review in `manualReviews` and adds
+an `asset.<outcome>` event with the event catalog's severity: `low` for `allowed`, `high`
+otherwise.
 
 List filters support `==` (with `*` wildcards), `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`
 and `=le=` joined by `;` (and) and `,` (or), on nested names such as

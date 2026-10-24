@@ -226,7 +226,8 @@ class ContractTest < Minitest::Test
       response = mock.cdn.serve(args)
       body = response.body.to_s
       code = response.content_type == 'application/json' ? JSON.parse(body)['code'] : nil
-      { 'status' => response.status, 'code' => code, 'body' => body.dup.force_encoding('UTF-8') }
+      { 'status' => response.status, 'code' => code, 'body' => body.dup.force_encoding('UTF-8'),
+        'headers' => response.headers }
     when 'assets.waitForDecision'
       mock.assets.wait_for_decision(args.except('timeoutMs').merge('timeout' => args['timeoutMs'] / 1000.0))
     else
@@ -235,6 +236,13 @@ class ContractTest < Minitest::Test
       resource, method = operation.split('.')
       mock.public_send(resource).public_send(method.gsub(/([a-z])([A-Z])/, '\1_\2').downcase, options)
     end
+  end
+
+  # Header names are case-insensitive; Response#headers has lowercase names.
+  def check_cdn(wanted, result, label)
+    served = result.slice(*wanted.keys)
+    served['headers'] = wanted['headers'].to_h { |name, _| [name, result['headers'][name.downcase]] } if wanted.key?('headers')
+    assert_equal wanted, served, label
   end
 
   def check_step(mock, step, saved)
@@ -248,7 +256,11 @@ class ContractTest < Minitest::Test
     end
 
     result = run_step(mock, step['operation'], args)
-    assert_equal expect['cdn'], result.slice(*expect['cdn'].keys), label if expect['cdn']
+    check_cdn(expect['cdn'], result, label) if expect['cdn']
+    if (name = expect['sameAs'])
+      assert saved.key?(name), "#{label}: nothing saved as #{name}"
+      assert_equal saved[name], result, "#{label}: same as #{name}"
+    end
     expect.fetch('result', {}).each do |path, raw|
       if raw.is_a?(Hash) && raw.key?('$contains')
         assert_includes at(result, path), resolve(raw['$contains'], saved), "#{label}: #{path}"

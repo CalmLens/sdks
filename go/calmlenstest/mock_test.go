@@ -395,7 +395,7 @@ func TestMockCDNResponseIsRealistic(t *testing.T) {
 	}
 	body, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	if res.StatusCode != 206 || string(body) != "ID3" || res.Header.Get("Content-Type") != "audio/mpeg" || res.Header.Get("Content-Range") != "bytes 0-2/8" || res.ContentLength != 3 || res.Header.Get("X-Request-Id") == "" {
+	if res.StatusCode != 206 || string(body) != "ID3" || res.Header.Get("Content-Range") != "bytes 0-2/8" || res.ContentLength != 3 || res.Header.Get("X-Request-Id") == "" {
 		t.Fatal(res.Status, res.Header, string(body))
 	}
 	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: "missing"}})

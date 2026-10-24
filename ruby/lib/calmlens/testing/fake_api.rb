@@ -556,7 +556,14 @@ module CalmLens
         bytes = stored['parts'].sort.map(&:last).join.b
         Response.new(status: 200, body: method == 'HEAD' ? '' : bytes,
                      headers: { 'content-type' => stored['type'], 'content-length' => bytes.bytesize.to_s,
-                                'x-request-id' => request_id })
+                                'cache-control' => cache_control(item, restricted), 'x-request-id' => request_id })
+      end
+
+      # Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
+      # by shared caches only when delivery is public.
+      def cache_control(item, restricted)
+        lifetime = item['type'] == 'image' ? 'max-age=31536000, immutable' : 'max-age=3600'
+        "#{restricted ? 'private' : 'public'}, #{lifetime}"
       end
 
       # Whether the request's mock API key grants `assets:download` for `folder_id`.

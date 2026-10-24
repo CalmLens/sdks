@@ -646,6 +646,12 @@ async fn run_step(
         "cdn.serve" => {
             let response = mock.cdn().serve(input(args)?).await?;
             let status = response.status().as_u16();
+            // HTTP header names are lowercase; expectations name them case-insensitively.
+            let headers: Map<String, Value> = response
+                .headers()
+                .iter()
+                .map(|(name, value)| (name.as_str().to_owned(), json!(value.to_str().unwrap())))
+                .collect();
             let json = response
                 .headers()
                 .get("content-type")
@@ -656,7 +662,7 @@ async fn run_step(
             } else {
                 Value::Null
             };
-            Ok(json!({"status": status, "code": code, "body": body}))
+            Ok(json!({"status": status, "code": code, "body": body, "headers": headers}))
         }
         "assets.waitForDecision" => {
             let timeout = Duration::from_millis(args["timeoutMs"].as_u64().unwrap());
@@ -691,8 +697,21 @@ async fn check_step(
     let result = outcome.unwrap_or_else(|error| panic!("{label}: {error:?}"));
     if let Some(Value::Object(cdn)) = expect.get("cdn") {
         for (key, wanted) in cdn {
-            assert_eq!(result[key], *wanted, "{label}: cdn {key}");
+            if key == "headers" {
+                for (name, value) in wanted.as_object().unwrap() {
+                    let served = &result["headers"][name.to_ascii_lowercase()];
+                    assert_eq!(served, value, "{label}: cdn header {name}");
+                }
+            } else {
+                assert_eq!(result[key], *wanted, "{label}: cdn {key}");
+            }
         }
+    }
+    if let Some(name) = expect["sameAs"].as_str() {
+        let first = saved
+            .get(name)
+            .unwrap_or_else(|| panic!("{label}: nothing saved as {name}"));
+        assert_eq!(result, *first, "{label}: same as {name}");
     }
     if let Some(Value::Object(paths)) = expect.get("result") {
         for (path, raw) in paths {

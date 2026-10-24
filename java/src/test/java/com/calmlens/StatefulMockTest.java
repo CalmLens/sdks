@@ -3,7 +3,6 @@ package com.calmlens;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.gson.JsonParser;
-import com.calmlens.MockCalmLensServerClient.Grant;
 import com.calmlens.MockCalmLensServerClient.Options;
 import com.calmlens.MockCalmLensServerClient.Outcome;
 import java.util.List;
@@ -24,27 +23,6 @@ class StatefulMockTest {
   private static Models.SubmitAsset kept(String name) {
     return new Models.SubmitAsset(name, Models.Content.bytes(PNG, "image/png"))
         .processingOptions(new Models.ProcessingOptions().keepContentAfterProcessing(true));
-  }
-
-  private static MockCalmLensServerClient withDownloadKey(Options options) {
-    return new MockCalmLensServerClient(CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(Grant.download()), "project-1")
-        .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"), options);
-  }
-
-  /** The shared scenarios cover a decision's statuses, filters and event; these are the review it records and a feed that delivers it once. */
-  @Test void decideRecordsAManualReviewAndItsEventArrivesOnce() {
-    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset created = mock.client.assets.create("photo.png", PNG, "image/png");
-    String cursor = mock.client.events.list(new Models.ListEvents()).cursor();
-
-    mock.decide(created.id(), Outcome.BLOCKED);
-
-    Models.Asset retrieved = mock.client.assets.retrieve(new Models.AssetId(created.id()));
-    assertSame(Models.AssetClassificationStatus.COMPLETED, retrieved.classification().status());
-    assertEquals(Models.AssetModerationDecision.BLOCKED, retrieved.classification().moderation().manualReviews().get(0).decision());
-    Models.EventsPage page = mock.client.events.list(new Models.ListEvents().after(cursor));
-    assertEquals(1, page.events().size());
-    assertEquals(List.of(), mock.client.events.list(new Models.ListEvents().after(page.cursor())).events());
   }
 
   @Test void explainCompletesTheEvidenceAndRerunModeratesAgain() {
@@ -70,17 +48,6 @@ class StatefulMockTest {
   @Test void textClassifyStoresAPlaintextDocument() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
     assertEquals("plaintext-document", mock.client.text.classify("hello").type());
-  }
-
-  /** The shared scenarios cover which keys may read what; this is the type the stored bytes are served with. */
-  @Test void cdnServesTheStoredContentType() {
-    MockCalmLensServerClient granted = withDownloadKey(deterministic());
-    Models.Asset stored = granted.client.assets.classify(kept("photo.png"));
-    try (CdnResponse served = granted.client.cdn.serve(new Models.CdnRequest(stored.id()))) {
-      assertEquals(200, served.status());
-      assertEquals("image/png", served.header("Content-Type"));
-      assertArrayEquals(PNG, served.readAllBytes(100));
-    }
   }
 
   /** The shared purge scenario covers the statuses and the CDN refusal; this is the stored bytes being dropped. */

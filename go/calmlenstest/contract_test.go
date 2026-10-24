@@ -216,6 +216,7 @@ type mockScenario struct {
 		Save      string
 		Expect    struct {
 			Result map[string]any
+			SameAs string
 			Error  *struct {
 				Code   string
 				Status *int
@@ -331,7 +332,7 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		}
 		defer response.Body.Close()
 		body, _ := io.ReadAll(response.Body)
-		served := map[string]any{"status": float64(response.StatusCode), "body": string(body)}
+		served := map[string]any{"status": float64(response.StatusCode), "body": string(body), "headers": response.Header}
 		if response.Header.Get("Content-Type") == "application/json" {
 			var errorBody struct{ Code string }
 			_ = json.Unmarshal(body, &errorBody)
@@ -416,8 +417,22 @@ func TestSharedMockScenarios(t *testing.T) {
 					t.Fatalf("%s: %v", label, err)
 				}
 				for key, want := range step.Expect.CDN {
-					if got := result.(map[string]any)[key]; !reflect.DeepEqual(got, want) {
+					got := result.(map[string]any)[key]
+					if key == "headers" {
+						// Header names are case-insensitive: http.Header.Get canonicalizes them.
+						headers := map[string]any{}
+						for name := range want.(map[string]any) {
+							headers[name] = got.(http.Header).Get(name)
+						}
+						got = headers
+					}
+					if !reflect.DeepEqual(got, want) {
 						t.Fatalf("%s: cdn %s is %#v, want %#v", label, key, got, want)
+					}
+				}
+				if name := step.Expect.SameAs; name != "" {
+					if want, ok := saved[name]; !ok || !reflect.DeepEqual(result, want) {
+						t.Fatalf("%s: result is %#v, want the same as %s: %#v", label, result, name, want)
 					}
 				}
 				for path, raw := range step.Expect.Result {

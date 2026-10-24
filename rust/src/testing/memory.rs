@@ -1355,15 +1355,19 @@ impl Backend {
             .response();
         }
         let data = stored.bytes();
-        let cache = if restricted || age_restricted {
-            "private, no-store"
+        // Like the CDN: an image's bytes are immutable for a year, other content is kept for an
+        // hour, by shared caches only when delivery is public.
+        let access = if restricted { "private" } else { "public" };
+        let lifetime = if asset["type"] == "image" {
+            "max-age=31536000, immutable"
         } else {
-            "public, max-age=31536000"
+            "max-age=3600"
         };
+        let cache = format!("{access}, {lifetime}");
         let response = MockResponse::new(200)
             .header("content-type", &stored.content_type)
             .header("accept-ranges", "bytes")
-            .header("cache-control", cache);
+            .header("cache-control", &cache);
         let range = header(headers, "range").strip_prefix("bytes=");
         let Some(spec) = range.filter(|spec| !spec.contains(',')) else {
             return response.body(data);

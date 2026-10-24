@@ -132,34 +132,16 @@ class MockTests(unittest.TestCase):
         with self.assertRaises(CalmLensError):
             c.folders.delete({"folderId": child["id"]})
 
-    def test_private_cdn_grants_and_response_headers(self):
-        c = self.client
+    def test_cdn_response_length_request_id_and_ok(self):
+        c = MockCalmLensServerClient(api_key=DOWNLOAD)
         a = c.assets.classify({'name': 'text', 'content': {'plainText': 'hello', 'type': 'text/plain'},
                                'processingOptions': {'keepContentAfterProcessing': True}})
-        with c.cdn.serve({"assetIdentifier": a["id"]}) as denied:
-            self.assertEqual(denied.status, 403)
-        c.api_key = DOWNLOAD
         with c.cdn.serve({"assetIdentifier": a["id"]}) as response:
-            self.assertEqual((response.status, response.content_type), (200, "text/plain"))
-            self.assertEqual(response.headers["content-length"], "5")
+            self.assertEqual((response.ok, response.headers["content-length"]), (True, "5"))
             self.assertTrue(response.request_id)
             self.assertEqual(response.read(), b"hello")
         with c.cdn.serve({"assetIdentifier": "missing"}) as missing:
             self.assertEqual((missing.status, missing.ok), (404, False))
-
-    def test_age_restricted_public_asset_needs_the_download_permission_or_opt_in(self):
-        c = MockCalmLensServerClient(mock_options={"analyzed_outcome": "age-restricted"})
-        a = c.assets.classify(name="a.txt", content={"plainText": "adult", "type": "text/plain"}, visibility="public",
-                              processing_options={"keepContentAfterProcessing": True})
-        with c.cdn.serve({"assetIdentifier": a["id"]}) as denied:
-            self.assertEqual(denied.status, 403)
-        with c.cdn.serve(asset_identifier=a["id"], allow_age_restricted=True) as opted_in:
-            self.assertEqual((opted_in.status, opted_in.headers["cache-control"], opted_in.read()),
-                             (200, "private, no-store", b"adult"))
-        c.api_key = DOWNLOAD
-        with c.cdn.serve({"assetIdentifier": a["id"]}) as response:
-            self.assertEqual((response.status, response.headers["cache-control"], response.read()),
-                             (200, "private, no-store", b"adult"))
 
     def test_purged_outcome_removes_kept_content_for_policy(self):
         c = MockCalmLensServerClient(api_key=DOWNLOAD, mock_options={"now": lambda: 9, "analyzed_outcome": "purged"})
@@ -304,7 +286,6 @@ class MockFeedSearchAndListTests(unittest.TestCase):
         last = c.events.list(after=page["cursor"])
         self.assertEqual(last["events"][0]["asset"]["uploadPresetId"], "preset-1")
         self.assertEqual(([e["type"] for e in last["events"]], last["hasMore"]), (["asset.allowed"], False))
-        self.assertEqual(c.events.list(after=last["cursor"]), {"events": [], "cursor": last["cursor"], "hasMore": False})
         with self.assertRaises(CalmLensAPIError) as raised:
             c.events.list(after="garbage")
         self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.INVALID_EVENT_CURSOR, 400))

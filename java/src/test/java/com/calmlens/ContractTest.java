@@ -287,6 +287,10 @@ class ContractTest {
           String type = response.header("content-type");
           result.add("code", type != null && type.startsWith("application/json") ? JsonParser.parseString(body).getAsJsonObject().get("code") : JsonNull.INSTANCE);
           result.addProperty("body", body);
+          // Header names are case-insensitive: keep them lowercase.
+          JsonObject headers = new JsonObject();
+          response.headers().forEach((key, values) -> headers.addProperty(key.toLowerCase(java.util.Locale.ROOT), String.join(", ", values)));
+          result.add("headers", headers);
           return result;
         }
       }
@@ -318,8 +322,20 @@ class ContractTest {
     }
     JsonElement result = run(mock, operation, args);
     if (expect.has("cdn"))
-      for (Map.Entry<String, JsonElement> entry : expect.getAsJsonObject("cdn").entrySet())
-        assertEquals(normalize(entry.getValue()), normalize(at(result, entry.getKey())), label + ": cdn " + entry.getKey());
+      for (Map.Entry<String, JsonElement> entry : expect.getAsJsonObject("cdn").entrySet()) {
+        if (entry.getKey().equals("headers")) {
+          JsonObject served = result.getAsJsonObject().getAsJsonObject("headers");
+          for (Map.Entry<String, JsonElement> header : entry.getValue().getAsJsonObject().entrySet())
+            assertEquals(header.getValue(), normalize(served.get(header.getKey().toLowerCase(java.util.Locale.ROOT))), label + ": cdn header " + header.getKey());
+        } else {
+          assertEquals(normalize(entry.getValue()), normalize(at(result, entry.getKey())), label + ": cdn " + entry.getKey());
+        }
+      }
+    if (expect.has("sameAs")) {
+      String name = expect.get("sameAs").getAsString();
+      assertTrue(saved.containsKey(name), label + ": nothing saved as " + name);
+      assertEquals(saved.get(name), result, label + ": same as " + name);
+    }
     if (expect.has("result"))
       for (Map.Entry<String, JsonElement> entry : expect.getAsJsonObject("result").entrySet()) {
         JsonElement raw = entry.getValue(), actual = at(result, entry.getKey());

@@ -536,22 +536,6 @@ describe("MockCalmLensServerClient", () => {
     expect(new Uint8Array(await response.arrayBuffer()).length).toBeGreaterThan(0);
   });
 
-  it("serves age-restricted content to a key with assets:download as private, no-store", async () => {
-    const withGrant = createClient(
-      { analyzedOutcome: "age-restricted" },
-      createMockApiKey([{ actions: ["assets:download"], folderId: null, includeSubfolders: true }]),
-    );
-    const granted = await withGrant.assets.classify({
-      name: "public-image.png",
-      content: { base64: pngBase64, type: "image/png" },
-      visibility: "public",
-      processingOptions: { keepContentAfterProcessing: true },
-    });
-    const served = await withGrant.cdn.serve({ assetIdentifier: granted.id });
-    expect(served.status).toBe(200);
-    expect(served.headers.get("Cache-Control")).toBe("private, no-store");
-  });
-
   it("serves in-memory asset content from the mock CDN by externalId", async () => {
     const client = createClient({}, apiKey, { cdnBaseUrl: "https://mock-cdn.test/v1" });
     const externalId = "UP-test-upload-id";

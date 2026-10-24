@@ -69,20 +69,6 @@ final class MockServerClientTest extends TestCase
     }
 
     /** The shared scenarios cover which keys may read what; these are the cache headers on each kind of response. */
-    public function testCdnCachesPublicResponsesButNotOptedInAgeRestrictedOnes(): void
-    {
-        $mock = new MockServerClient(queuedOutcome: 'age-restricted');
-        $asset = self::image($mock);
-        $optedIn = $mock->client()->cdn->serve(['assetIdentifier' => $asset['id'], 'allowAgeRestricted' => true]);
-        self::assertSame(200, $optedIn->getStatusCode());
-        self::assertSame('private, no-store', $optedIn->getHeaderLine('Cache-Control'));
-        $public = new MockServerClient(queuedOutcome: 'allowed');
-        self::image($public);
-        $response = $public->client()->cdn->serve(['assetIdentifier' => 'post-1']);
-        self::assertSame(200, $response->getStatusCode());
-        self::assertSame('public, max-age=31536000', $response->getHeaderLine('Cache-Control'));
-    }
-
     public function testEachPagesThroughEveryAsset(): void
     {
         $time = 1000;
@@ -214,16 +200,6 @@ final class MockServerClientTest extends TestCase
         self::assertSame('allowed', $override['classification']['moderation']['status']);
         $sized = $assets->create(['name' => 'c.txt', 'totalSizeInBytes' => strlen($first) + 2, 'part' => ['data' => $first, 'type' => 'text/plain']]);
         self::assertSame(ErrorCodes::UPLOAD_SIZE_MISMATCH, self::code(fn () => $assets->uploadPart(['assetId' => $sized['id'], 'part' => ['data' => 'x', 'partNumber' => 2, 'isFinal' => true]])));
-    }
-
-    /** The shared scenario checks the replayed ID and the refusal; the replay must also be the whole saved response. */
-    public function testIdempotencyKeysReplayTheWholeSavedResponse(): void
-    {
-        $mock = new MockServerClient();
-        $assets = $mock->client()->assets;
-        $options = ['name' => 'a.txt', 'content' => ['plainText' => 'one', 'type' => 'text/plain'], 'requestOptions' => ['idempotencyKey' => 'key-1']];
-        $first = $assets->create($options);
-        self::assertSame($first, $assets->create($options));
     }
 
     public function testFailNextRequestSimulatesConnectionFailuresAndApiErrors(): void
