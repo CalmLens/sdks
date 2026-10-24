@@ -99,6 +99,31 @@ for (const binding of BINDINGS) {
       expect(video.getAttribute("poster")).toBe(`${CDN}/assets/${PROJECT_ID}/a1/rendered`);
     });
 
+    it("shows an API asset with its own status and preview", async () => {
+      mounted = binding.mountMedia({
+        asset: {
+          id: "a1",
+          projectId: PROJECT_ID,
+          type: "image",
+          classification: { moderation: { status: "age-restricted" } },
+          content: {
+            previewImage: { thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI", width: 800, height: 600 },
+          },
+        },
+        canView: true,
+        alt: asset.alt,
+        messages,
+      });
+      const image = await view().findByRole("img", { name: asset.alt });
+
+      expect(image.getAttribute("src")).toBe(
+        `${CDN}/assets/${PROJECT_ID}/a1/rendered?allowAgeRestricted=true`,
+      );
+      expect(image.getAttribute("width")).toBe("800");
+      expect(decorative()).toHaveLength(1);
+      expect(decorative()[0]).toStartWith("data:image/png;base64,");
+    });
+
     it.skipIf(!binding.checksPreloadedImages)(
       "shows an image that finished loading before the component could listen for it",
       async () => {

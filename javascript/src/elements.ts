@@ -4,7 +4,7 @@
 
 import type { AssetModerationStatus } from "./client/CalmLensTypes";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import { getMediaState, type MediaOptions } from "./ui/Media";
+import { getMediaState, type MediaAsset, type MediaOptions, resolveMediaProps } from "./ui/Media";
 import {
   type CalmLensMessages,
   describeUploadItem,
@@ -369,7 +369,8 @@ export class CalmLensUploaderElement extends BaseElement {
  * Attributes: `project-id`, `asset-id`, `status`, `can-view`, `type`, `resource`, `lens`,
  * `transform`, `widths` (comma-separated), `url`, `no-placeholder`, `placeholder-hash`,
  * `placeholder-url`, `average-color`, `cdn-base-url`, `alt`, `aspect-ratio`, `width`, `height`,
- * `sizes`, `fit`, `position`, `eager`, `fetch-priority`, `no-controls` and `unstyled`.
+ * `sizes`, `fit`, `position`, `eager`, `fetch-priority`, `no-controls` and `unstyled`. Set the
+ * `asset` property to an API asset instead of `project-id` and `asset-id`.
  */
 export class CalmLensMediaElement extends BaseElement {
   static observedAttributes = [
@@ -401,6 +402,7 @@ export class CalmLensMediaElement extends BaseElement {
   ];
 
   #messages?: Partial<CalmLensMessages>;
+  #asset?: MediaAsset;
   #loadKey?: string;
 
   get messages(): Partial<CalmLensMessages> | undefined {
@@ -412,8 +414,20 @@ export class CalmLensMediaElement extends BaseElement {
     this.#render();
   }
 
+  /**
+   * An asset from the API, in place of `project-id` and `asset-id`. It supplies the status, type
+   * and preview too; attributes you set win over it.
+   */
+  get asset(): MediaAsset | undefined {
+    return this.#asset;
+  }
+  set asset(value: MediaAsset | undefined) {
+    this.#asset = value;
+    this.#render();
+  }
+
   connectedCallback() {
-    upgradeProperties(this, ["messages"]);
+    upgradeProperties(this, ["messages", "asset"]);
     if (!this.hasAttribute("unstyled")) injectCalmLensStyles();
     this.classList.add("calmlens-media");
     this.setAttribute("role", "figure");
@@ -424,15 +438,16 @@ export class CalmLensMediaElement extends BaseElement {
     this.#render();
   }
 
-  #mediaOptions(): MediaOptions {
+  #mediaOptions() {
     const list = (name: string) =>
       this.getAttribute(name)
         ?.split(",")
         .map((value) => value.trim())
         .filter(Boolean);
-    return {
-      projectId: this.getAttribute("project-id") ?? "",
-      assetId: this.getAttribute("asset-id") ?? "",
+    return resolveMediaProps({
+      asset: this.#asset,
+      projectId: this.getAttribute("project-id") ?? undefined,
+      assetId: this.getAttribute("asset-id") ?? undefined,
       status: (this.getAttribute("status") as AssetModerationStatus | null) ?? undefined,
       canView: this.hasAttribute("can-view"),
       type: (this.getAttribute("type") as MediaOptions["type"] | null) ?? undefined,
@@ -445,7 +460,10 @@ export class CalmLensMediaElement extends BaseElement {
       placeholderHash: this.getAttribute("placeholder-hash") ?? undefined,
       placeholderUrl: this.getAttribute("placeholder-url") ?? undefined,
       cdnBaseUrl: this.getAttribute("cdn-base-url") ?? undefined,
-    };
+      width: numberAttribute(this, "width"),
+      height: numberAttribute(this, "height"),
+      averageColor: this.getAttribute("average-color") ?? undefined,
+    } as MediaOptions & { width?: number; height?: number; averageColor?: string });
   }
 
   #render() {
@@ -456,12 +474,12 @@ export class CalmLensMediaElement extends BaseElement {
     const loadKey = `${getMediaLoadKey(state)} ${this.getAttribute("alt")} ${this.getAttribute("sizes")} ${options.canView}`;
     const ratio = getMediaAspectRatio({
       aspectRatio: numberAttribute(this, "aspect-ratio"),
-      width: numberAttribute(this, "width"),
-      height: numberAttribute(this, "height"),
+      width: options.width,
+      height: options.height,
     });
     this.style.aspectRatio = ratio ? String(ratio) : "";
     this.toggleAttribute("data-sized", Boolean(ratio));
-    this.style.backgroundColor = this.getAttribute("average-color") ?? "";
+    this.style.backgroundColor = options.averageColor ?? "";
     this.style.setProperty("--calmlens-fit", this.getAttribute("fit"));
     this.style.setProperty("--calmlens-position", this.getAttribute("position"));
     this.dataset.kind = state.kind;
@@ -517,8 +535,8 @@ export class CalmLensMediaElement extends BaseElement {
         srcset: state.srcSet,
         sizes,
         alt,
-        width: this.getAttribute("width") ?? undefined,
-        height: this.getAttribute("height") ?? undefined,
+        width: options.width,
+        height: options.height,
         loading: this.hasAttribute("eager") ? undefined : "lazy",
         decoding: "async",
         fetchpriority: this.getAttribute("fetch-priority") ?? undefined,

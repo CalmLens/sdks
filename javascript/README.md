@@ -599,6 +599,8 @@ import { CalmLensMedia } from "@calmlens/sdk/react";
 />;
 ```
 
+Instead of `projectId` and `assetId`, you can pass an asset from the API as `asset`, for example `<CalmLensMedia asset={asset} alt="…" />`: it supplies the project, ID, moderation status, media type and stored preview (ThumbHash, average colour and size), and props you set win over it. On the web component, set the `asset` property.
+
 It also takes `type` (`image`, `video` or `audio`), `resource`, `lens`, `transform`, `url` (a signed URL from your server), `placeholderHash` (the asset's `content.previewImage.thumbhash`, drawn in the browser so no placeholder request is needed, including for private assets), `placeholderUrl`, `averageColor`, `fit`, `position`, `lazy`, `fetchPriority` and `controls`.
 
 The components add their stylesheet to the page when they first render. Theme them with `--calmlens-accent`, `--calmlens-radius` and the other `--calmlens-*` properties, which take precedence on any element. Pass `unstyled` to style the `calmlens-*` classes yourself. When server rendering, or when your Content Security Policy refuses injected styles, include `CALMLENS_STYLES` in the page or link `@calmlens/sdk/styles.css`, and pass `unstyled`. All text can be replaced or translated with `messages`, keyed by message name or error code.

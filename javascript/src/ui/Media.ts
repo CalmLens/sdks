@@ -2,10 +2,45 @@ import type { AssetModerationStatus, CdnTransform, LensTransform } from "../clie
 import { getAssetUrl, serializeTransform, transformSelector } from "../client/CalmLensUtils";
 import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 
-export interface MediaOptions {
+/**
+ * The parts of an asset, as the API or a webhook returns it, that the media component reads.
+ * Assets from `CalmLensServerClient` fit as they are.
+ */
+export interface MediaAsset {
+  id: string;
   projectId: string;
-  /** The asset ID, or the `externalId` your app gave it. */
-  assetId: string;
+  type?: string | null;
+  classification?: { moderation?: { status?: AssetModerationStatus | null } | null } | null;
+  content?: {
+    previewImage?: {
+      thumbhash?: string | null;
+      averageColor?: string | null;
+      width?: number | null;
+      height?: number | null;
+    } | null;
+  } | null;
+}
+
+/** Which asset to show: an asset from the API, or its project and ID. */
+export type MediaSource =
+  | {
+      /**
+       * An asset from the API. It supplies the project, ID, moderation status, media type and
+       * stored preview (placeholder, average colour and size); props you pass win over it.
+       */
+      asset: MediaAsset;
+      projectId?: string;
+      assetId?: string;
+    }
+  | {
+      asset?: undefined;
+      projectId: string /** The asset ID, or its `externalId`. */;
+      assetId: string;
+    };
+
+export type MediaOptions = MediaSource & MediaSettings;
+
+export interface MediaSettings {
   /** The asset's stored moderation status. Defaults to `allowed`. */
   status?: AssetModerationStatus;
   /**
@@ -78,7 +113,38 @@ const joinTransforms = (base: CdnTransform | undefined, extra?: LensTransform) =
  * the video or audio, a gated placeholder for an age-restricted asset the viewer can't see, or
  * nothing for blocked and purged assets. Every framework's component renders this.
  */
-export const getMediaState = ({
+/** The display props an asset can supply, which media components read alongside the options. */
+type AssetDisplay = { width?: number; height?: number; averageColor?: string };
+
+/**
+ * Fills the props left unset from `asset`, if there is one: the project and ID, its moderation
+ * status, `video` or `audio` for those asset types, and its stored preview's ThumbHash, average
+ * colour and size. Every framework's media component calls this before rendering.
+ */
+export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
+  props: T,
+): T & { projectId: string; assetId: string } => {
+  const { asset } = props;
+  if (!asset) return props as T & { projectId: string; assetId: string };
+  const preview = asset.content?.previewImage;
+  const kind = asset.type === "video" || asset.type === "audio" ? asset.type : undefined;
+  return {
+    ...props,
+    projectId: props.projectId ?? asset.projectId,
+    assetId: props.assetId ?? asset.id,
+    status: props.status ?? asset.classification?.moderation?.status ?? undefined,
+    type: props.type ?? kind,
+    placeholderHash: props.placeholderHash ?? preview?.thumbhash ?? undefined,
+    averageColor: props.averageColor ?? preview?.averageColor ?? undefined,
+    width: props.width ?? preview?.width ?? undefined,
+    height: props.height ?? preview?.height ?? undefined,
+  } as T & { projectId: string; assetId: string };
+};
+
+export const getMediaState = (options: MediaOptions): MediaState =>
+  buildMediaState(resolveMediaProps(options));
+
+const buildMediaState = ({
   projectId,
   assetId,
   status = "allowed",
@@ -93,7 +159,7 @@ export const getMediaState = ({
   placeholderHash,
   placeholderUrl: customPlaceholderUrl,
   cdnBaseUrl,
-}: MediaOptions): MediaState => {
+}: MediaSettings & { projectId: string; assetId: string }): MediaState => {
   if (status === "blocked" || status === "purged") return { kind: "unavailable" };
   const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl };
   const placeholderUrl = placeholder

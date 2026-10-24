@@ -5,7 +5,9 @@
     getMediaLoadKey,
     getMediaState,
     injectCalmLensStyles,
+    type MediaOptions,
     type MediaProps,
+    resolveMediaProps,
     resolveMessages,
   } from "../ui.js";
   import Icon from "./Icon.svelte";
@@ -29,9 +31,15 @@
   }: MediaProps = $props();
 
   const messages = $derived(resolveMessages(overrides));
-  const state = $derived(getMediaState(options));
+  // An `asset` fills in what isn't passed: the source, status and type, and its preview's size.
+  const view = $derived(
+    resolveMediaProps({ ...(options as MediaOptions), width, height, averageColor }),
+  );
+  const state = $derived(getMediaState(view));
   const loadKey = $derived(getMediaLoadKey(state));
-  const ratio = $derived(getMediaAspectRatio({ aspectRatio, width, height }));
+  const ratio = $derived(
+    getMediaAspectRatio({ aspectRatio, width: view.width, height: view.height }),
+  );
   let load: "loading" | "loaded" | "error" = $state("loading");
   let image: HTMLImageElement | undefined = $state();
 
@@ -63,7 +71,7 @@
   data-state={load}
   data-sized={ratio ? "" : undefined}
   style:aspect-ratio={ratio}
-  style:background-color={averageColor}
+  style:background-color={view.averageColor}
   style:--calmlens-fit={fit}
   style:--calmlens-position={position}
 >
@@ -79,8 +87,8 @@
         srcset={state.srcSet}
         {sizes}
         {alt}
-        {width}
-        {height}
+        width={view.width}
+        height={view.height}
         loading={lazy ? "lazy" : undefined}
         decoding="async"
         fetchpriority={fetchPriority}

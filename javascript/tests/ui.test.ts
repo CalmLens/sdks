@@ -5,6 +5,7 @@ import {
   createUploadController,
   getMediaState,
   isFileAccepted,
+  resolveMediaProps,
   type UploadItem,
 } from "../src/ui";
 
@@ -74,6 +75,44 @@ describe("getMediaState", () => {
     expect(invalid.kind === "image" && invalid.placeholderUrl).toBe(
       `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     );
+  });
+
+  it("takes the source, status, type and preview from an API asset", () => {
+    const asset = {
+      id: "v1",
+      projectId: PROJECT_ID,
+      type: "video",
+      classification: { moderation: { status: "age-restricted" as const } },
+      content: {
+        previewImage: { thumbhash: null, averageColor: "#112233", width: 1280, height: 720 },
+      },
+    };
+    expect(getMediaState({ asset })).toEqual({
+      kind: "gated",
+      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
+    });
+    expect(resolveMediaProps({ asset, canView: true })).toMatchObject({
+      projectId: PROJECT_ID,
+      assetId: "v1",
+      status: "age-restricted",
+      type: "video",
+      averageColor: "#112233",
+      width: 1280,
+      height: 720,
+    });
+  });
+
+  it("lets props win over the asset they are passed with", () => {
+    const asset = {
+      id: "a1",
+      projectId: PROJECT_ID,
+      type: "image",
+      classification: { moderation: { status: "blocked" as const } },
+    };
+    expect(getMediaState({ asset, status: "allowed", assetId: "external-1" })).toMatchObject({
+      kind: "image",
+      src: `${CDN}/assets/${PROJECT_ID}/external-1/rendered`,
+    });
   });
 
   it("plays a video's original file, with the lens only on its rendered poster", () => {

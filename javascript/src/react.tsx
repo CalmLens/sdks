@@ -14,7 +14,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import { getMediaState } from "./ui/Media";
+import { getMediaState, resolveMediaProps } from "./ui/Media";
 import { describeUploadItem, getDropzoneHint, resolveMessages } from "./ui/Messages";
 import {
   getMediaAspectRatio,
@@ -283,8 +283,9 @@ type LoadState = "loading" | "loaded" | "error";
  * it loads. Age-restricted assets stay behind the placeholder and a reveal button until
  * `canView` is set; blocked and purged assets show an unavailable notice.
  */
-export function CalmLensMedia(props: CalmLensMediaProps) {
+export function CalmLensMedia(input: CalmLensMediaProps) {
   const {
+    asset: _asset,
     projectId,
     assetId,
     status,
@@ -316,7 +317,7 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
     className,
     style,
     ...attributes
-  } = props;
+  } = resolveMediaProps(input);
   useStyles(unstyled);
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
   const state = getMediaState({

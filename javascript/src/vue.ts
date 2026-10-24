@@ -20,7 +20,7 @@ import {
 } from "vue";
 import type { AssetModerationStatus, CdnTransform } from "./client/CalmLensTypes";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import { getMediaState } from "./ui/Media";
+import { getMediaState, type MediaAsset, type MediaOptions, resolveMediaProps } from "./ui/Media";
 import {
   type CalmLensMessages,
   describeUploadItem,
@@ -311,8 +311,12 @@ type LoadState = "loading" | "loaded" | "error";
 export const CalmLensMedia = defineComponent({
   name: "CalmLensMedia",
   props: {
-    projectId: { type: String, required: true },
-    assetId: { type: String, required: true },
+    /** An asset from the API, which supplies the project, ID, status, type and preview. */
+    asset: optional(Object as PropType<MediaAsset>),
+    /** Required without `asset`. */
+    projectId: optional(String),
+    /** Required without `asset`. */
+    assetId: optional(String),
     status: optional(String as PropType<AssetModerationStatus>),
     canView: { type: Boolean, default: false },
     type: optional(String as PropType<"image" | "video" | "audio">),
@@ -344,7 +348,8 @@ export const CalmLensMedia = defineComponent({
   setup(props) {
     useStyles(() => props.unstyled);
     const messages = computed(() => resolveMessages(props.messages));
-    const state = computed(() => getMediaState(props));
+    const resolved = computed(() => resolveMediaProps(props as MediaOptions & typeof props));
+    const state = computed(() => getMediaState(resolved.value));
     const loadKey = computed(() => getMediaLoadKey(state.value));
     const load = ref<LoadState>("loading");
     const image = ref<HTMLImageElement>();
@@ -362,7 +367,8 @@ export const CalmLensMedia = defineComponent({
     return () => {
       const current = state.value;
       const text = messages.value;
-      const ratio = getMediaAspectRatio(props);
+      const view = resolved.value;
+      const ratio = getMediaAspectRatio(view);
       const failed = load.value === "error";
       const placeholderUrl =
         current.kind === "audio" || current.kind === "unavailable"
@@ -382,7 +388,7 @@ export const CalmLensMedia = defineComponent({
           "data-sized": ratio ? "" : undefined,
           style: {
             aspectRatio: ratio,
-            backgroundColor: props.averageColor,
+            backgroundColor: view.averageColor,
             "--calmlens-fit": props.fit,
             "--calmlens-position": props.position,
           },
@@ -405,8 +411,8 @@ export const CalmLensMedia = defineComponent({
               srcset: current.srcSet,
               sizes: props.sizes,
               alt: props.alt,
-              width: props.width,
-              height: props.height,
+              width: view.width,
+              height: view.height,
               loading: props.lazy ? "lazy" : undefined,
               decoding: "async",
               fetchpriority: props.fetchPriority,
