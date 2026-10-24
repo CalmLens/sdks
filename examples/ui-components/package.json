@@ -1,0 +1,32 @@
+{
+  "name": "calmlens-ui-components",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Upload, comment, avatar and sensitive-media components for React, Vue, Svelte and plain JavaScript. The CalmLens docs show these files.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.html.json && vue-tsc --noEmit -p tsconfig.vue.json && svelte-check --tsconfig tsconfig.svelte.json --fail-on-warnings && biome check .",
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@calmlens/sdk": "file:../../javascript",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "svelte": "5.41.0",
+    "vue": "3.5.22"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@sveltejs/vite-plugin-svelte": "6.2.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.1.0",
+    "@vitejs/plugin-vue": "6.0.1",
+    "svelte-check": "4.3.3",
+    "typescript": "5.9.3",
+    "vite": "7.1.12",
+    "vue-tsc": "3.1.1"
+  }
+}

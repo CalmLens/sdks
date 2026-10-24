@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/svelte", "src/svelte-main.ts", "src/demo.ts", "src/vite-env.d.ts"]
+}

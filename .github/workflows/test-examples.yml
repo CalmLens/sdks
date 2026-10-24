@@ -97,6 +97,12 @@ jobs:
         working-directory: examples/mobile-uploads-expo
       - run: bun run check
         working-directory: examples/mobile-uploads-expo
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: examples/ui-components
+      - run: bun run check
+        working-directory: examples/ui-components
+      - run: bun run build
+        working-directory: examples/ui-components
 
   php-laravel:
     runs-on: ubuntu-latest

@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noImplicitAny": false },
+  "include": ["src/html", "src/html-main.js", "src/demo.ts", "src/vite-env.d.ts"]
+}
