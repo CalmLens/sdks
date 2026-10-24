@@ -305,6 +305,23 @@ const asset = await client.assets.retry({ assetId: "asset-uuid" });
 // asset.classification.status === "processing"
 ```
 
+##### assets.explain(options)
+
+Complete the policy evidence behind a decided asset's moderation decision. To decide quickly,
+moderation can skip questions whose answers could not change any action, so a report with
+`classification.moderation.policy.evidence` `decision` can credit a different rule, or show a
+different policy score, than a complete one. Explaining answers those questions and returns the asset
+with `policy.evidence` `full`; every action stays as decided. It throws `asset/not-decided` for an
+asset without a decision, and `asset/policy-changed` when the project's policy has changed since
+the decision: pass `rerun: true` to moderate the asset again with the current policy instead. A
+re-run returns the asset in `processing` and can reach a different decision; it throws
+`asset/reviewed` for an asset a reviewer has decided.
+
+```typescript
+const asset = await client.assets.explain({ assetId: "asset-uuid" });
+// asset.classification.moderation.policy?.evidence === "full"
+```
+
 ##### assets.waitForDecision(options)
 
 Wait for an asset's moderation decision and get the decided asset: it returns once `classification.moderation.status`

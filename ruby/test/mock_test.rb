@@ -105,6 +105,26 @@ class MockTest < Minitest::Test
                  assert_raises(CalmLens::APIError) { mock.assets.retry(asset_id: failed['id']) }.code
   end
 
+  def test_explain_completes_evidence_and_rerun_moderates_again
+    mock = CalmLens::MockServerClient.new(analyzed_outcome: 'blocked')
+    asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
+    moderation = mock.state.assets[asset['id']]['classification']['moderation']
+    moderation['policy'] = { 'score' => 0.9, 'categories' => {}, 'evidence' => 'decision' }
+    explained = mock.assets.explain(asset_id: asset['id'])
+    assert_equal %w[full blocked],
+                 [explained.dig('classification', 'moderation', 'policy', 'evidence'),
+                  explained.dig('classification', 'moderation', 'status')]
+
+    moderation['manualReviews'] = [{ 'decision' => 'blocked' }]
+    assert_equal CalmLens::ErrorCodes::ASSET_REVIEWED,
+                 assert_raises(CalmLens::APIError) { mock.assets.explain(asset_id: asset['id'], rerun: true) }.code
+    moderation['manualReviews'] = []
+    rerun = mock.assets.explain(asset_id: asset['id'], rerun: true)
+    assert_equal %w[processing pending], [rerun.dig('classification', 'status'), rerun.dig('classification', 'moderation', 'status')]
+    assert_equal CalmLens::ErrorCodes::ASSET_NOT_DECIDED,
+                 assert_raises(CalmLens::APIError) { mock.assets.explain(asset_id: asset['id']) }.code
+  end
+
   def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)

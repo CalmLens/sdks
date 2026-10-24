@@ -616,6 +616,22 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 raise _Failure(error_codes.ASSET_CONTENT_UNAVAILABLE)
             # Like the API: back to processing, to be moderated again.
             self._apply_outcome(asset, "pending", now)
+        elif suffix == "explain":
+            if asset["classification"]["status"] != "completed":
+                raise _Failure(error_codes.ASSET_NOT_DECIDED)
+            moderation = asset["classification"]["moderation"]
+            if not body.get("rerun"):
+                # Like the API: the evidence is completed and every action stays as decided.
+                policy = moderation.get("policy")
+                if policy and policy.get("evidence") == "decision":
+                    policy["evidence"] = "full"
+            elif moderation.get("manualReviews"):
+                raise _Failure(error_codes.ASSET_REVIEWED)
+            elif asset["content"]["status"] == "removed":
+                raise _Failure(error_codes.ASSET_CONTENT_UNAVAILABLE)
+            else:
+                # Like the API: back to processing, to be moderated again under the current policy.
+                self._apply_outcome(asset, "pending", now)
         elif suffix == "move":
             if body["folderId"]:
                 self._folder(body["folderId"])

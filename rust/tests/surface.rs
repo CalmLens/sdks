@@ -36,6 +36,7 @@ fn references() -> BTreeSet<&'static str> {
         "assets().delete" => ServerClient::assets, AssetsClient::delete;
         "assets().move_asset" => ServerClient::assets, AssetsClient::move_asset;
         "assets().retry" => ServerClient::assets, AssetsClient::retry;
+        "assets().explain" => ServerClient::assets, AssetsClient::explain;
         "assets().create_signed_url" => ServerClient::assets, AssetsClient::create_signed_url;
         "assets().classify" => ServerClient::assets, AssetsClient::classify;
         "assets().update" => ServerClient::assets, AssetsClient::update;

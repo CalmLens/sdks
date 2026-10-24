@@ -30,6 +30,7 @@ import type {
   DeleteAssetOptions,
   EnsureLensesOptions,
   EnsureLensOptions,
+  ExplainAssetOptions,
   FolderIdOptions,
   FolderPage,
   IterateAssetChildrenOptions,
@@ -381,6 +382,18 @@ export default class CalmLensServerClient {
        */
       retry: async ({ assetId }: RetryAssetOptions): Promise<Asset> =>
         this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/retry`),
+
+      /**
+       * Completes the policy evidence behind a decided asset's moderation decision: the report's
+       * `classification.moderation.policy.evidence` becomes `full` and every action stays as
+       * decided. With `rerun: true` the asset is moderated again with the project's current policy
+       * and returns in `processing`; use it when the policy has changed since the decision
+       * (`asset/policy-changed`).
+       */
+      explain: async ({ assetId, rerun }: ExplainAssetOptions): Promise<Asset> =>
+        this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/explain`, {
+          body: rerun ? { rerun } : {},
+        }),
 
       /**
        * Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,

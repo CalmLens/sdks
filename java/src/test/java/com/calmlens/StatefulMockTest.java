@@ -67,6 +67,26 @@ class StatefulMockTest {
     assertEquals(List.of(), mock.client.events.list(new Models.ListEvents().after(page.cursor())).events());
   }
 
+  @Test void explainCompletesTheEvidenceAndRerunModeratesAgain() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().analyzedOutcome(Outcome.BLOCKED));
+    Models.Asset asset = mock.client.assets.classify(kept("photo.png"));
+    mock.withStorage(storage -> storage.assets.get(asset.id()).getAsJsonObject("classification").getAsJsonObject("moderation")
+        .add("policy", JsonParser.parseString("{\"score\":0.9,\"categories\":{},\"evidence\":\"decision\"}")));
+    Models.Asset explained = mock.client.assets.explain(new Models.ExplainAsset(asset.id()));
+    assertEquals("full", explained.classification().moderation().policy().evidence());
+    assertEquals(Models.AssetModerationStatus.BLOCKED, explained.classification().moderation().status());
+
+    Models.Asset rerun = mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));
+    assertSame(Models.AssetClassificationStatus.PROCESSING, rerun.classification().status());
+    assertEquals(Models.AssetModerationStatus.PENDING, rerun.classification().moderation().status());
+    assertEquals(ErrorCodes.ASSET_NOT_DECIDED, assertThrows(ApiException.class,
+        () -> mock.client.assets.explain(new Models.ExplainAsset(asset.id()))).getCode());
+
+    mock.decide(asset.id(), Outcome.ALLOWED);
+    assertEquals(ErrorCodes.ASSET_REVIEWED, assertThrows(ApiException.class,
+        () -> mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true))).getCode());
+  }
+
   @Test void classifyEndsAtTheAnalyzedOutcome() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().analyzedOutcome(Outcome.AGE_RESTRICTED));
     Models.Asset image = mock.client.assets.classify(kept("photo.png"));

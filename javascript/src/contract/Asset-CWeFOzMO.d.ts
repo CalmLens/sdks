@@ -7839,6 +7839,10 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         }, zod.core.$strict>>;
       }, zod.core.$strict>>;
     }, zod.core.$strict>>;
+    evidence: zod.ZodOptional<zod.ZodEnum<{
+      decision: "decision";
+      full: "full";
+    }>>;
     decision: zod.ZodOptional<zod.ZodObject<{
       source: zod.ZodEnum<{
         "asset-override": "asset-override";
@@ -15586,6 +15590,10 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           }, zod.core.$strict>>;
         }, zod.core.$strict>>;
       }, zod.core.$strict>>;
+      evidence: zod.ZodOptional<zod.ZodEnum<{
+        decision: "decision";
+        full: "full";
+      }>>;
       decision: zod.ZodOptional<zod.ZodObject<{
         source: zod.ZodEnum<{
           "asset-override": "asset-override";
@@ -23512,6 +23520,10 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             }, zod.core.$strict>>;
           }, zod.core.$strict>>;
         }, zod.core.$strict>>;
+        evidence: zod.ZodOptional<zod.ZodEnum<{
+          decision: "decision";
+          full: "full";
+        }>>;
         decision: zod.ZodOptional<zod.ZodObject<{
           source: zod.ZodEnum<{
             "asset-override": "asset-override";

@@ -248,6 +248,20 @@
       }
     },
     {
+      "id": "assets.explain",
+      "kind": "method",
+      "description": "Complete the policy evidence behind an asset's moderation decision. To decide quickly, moderation skips questions whose answers could not change any action, so a report marked `policy.evidence: \"decision\"` can credit a different rule, or show a different policy score, than a complete report would. Explaining answers those questions for the same content and returns the asset with `policy.evidence: \"full\"`; every action stays as decided. A decision made under policy settings that have since changed can't be explained as made: re-run it with `rerun: true` instead.",
+      "names": {
+        "javascript": "assets.explain",
+        "python": "assets.explain",
+        "go": "Assets.Explain",
+        "rust": "assets().explain",
+        "java": "assets.explain",
+        "ruby": "assets.explain",
+        "php": "assets->explain"
+      }
+    },
+    {
       "id": "assets.createSignedUrl",
       "kind": "method",
       "description": "Create a short-lived signed CDN URL for an asset",

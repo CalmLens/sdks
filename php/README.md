@@ -46,7 +46,7 @@ caches its named lens definitions. Configure `baseUrl`, `cdnBaseUrl`, `timeout`
 
 | Resource | Methods |
 | --- | --- |
-| `assets` | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `deleteContent`, `delete`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
+| `assets` | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
 | `folders` | `list`, `create`, `retrieve`, `update`, `move`, `delete` |
 | `text` | `classify` |
 | `events` | `list`, `each`, `eachPage` |

@@ -848,6 +848,15 @@ impl AssetsClient<'_> {
         let path = format!("/assets/{}/retry", id(&options.asset_id)?);
         self.0.call(self.0.prepare(Method::POST, &path, &[])?).await
     }
+    /// Completes the policy evidence behind a decided asset's moderation decision: the report's
+    /// `policy.evidence` becomes `full` and every action stays as decided. With `rerun` the asset
+    /// is moderated again with the project's current policy and returns in `processing`; use it
+    /// when the policy changed since the decision (`asset/policy-changed`).
+    pub async fn explain(&self, options: ExplainAsset) -> Result<Asset> {
+        let path = format!("/assets/{}/explain", id(&options.asset_id)?);
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
     /// Removes the stored content (`DELETE /assets/:assetId/content`). The asset record,
     /// metadata and report remain; the returned asset has `storage_deleted_at` set.
     pub async fn delete_content(&self, options: AssetId) -> Result<Asset> {

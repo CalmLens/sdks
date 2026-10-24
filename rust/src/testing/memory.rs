@@ -1038,6 +1038,32 @@ impl Backend {
                     ));
                 }
             }
+            ("POST", "explain") => {
+                if asset["classification"]["status"] != "completed" {
+                    return Err(fail(
+                        ErrorCode::AssetNotDecided,
+                        "The asset has no moderation decision yet",
+                    ));
+                }
+                if body.get("rerun") == Some(&Value::Bool(true)) {
+                    let reviews = &asset["classification"]["moderation"]["manualReviews"];
+                    if reviews
+                        .as_array()
+                        .is_some_and(|reviews| !reviews.is_empty())
+                    {
+                        return Err(fail(
+                            ErrorCode::AssetReviewed,
+                            "A reviewer has decided the asset",
+                        ));
+                    }
+                    if asset["content"]["status"] == "removed" {
+                        return Err(fail(
+                            ErrorCode::AssetContentUnavailable,
+                            "The content is no longer stored",
+                        ));
+                    }
+                }
+            }
             ("POST", "move") => {
                 if let Some(folder) = body.get("folderId").and_then(Value::as_str) {
                     self.folder(folder)?;
@@ -1059,6 +1085,19 @@ impl Backend {
             ("DELETE", _) => remove_content(stored, &mut storage.content, "requested", now),
             // Back to processing, to be moderated again.
             (_, "retry") => apply_outcome(stored, &mut storage.content, "pending", now),
+            // Back to processing under the current policy, or the evidence completed with every
+            // action as decided.
+            (_, "explain") if body.get("rerun") == Some(&Value::Bool(true)) => {
+                apply_outcome(stored, &mut storage.content, "pending", now)
+            }
+            (_, "explain") => {
+                if let Some(evidence) = stored
+                    .pointer_mut("/classification/moderation/policy/evidence")
+                    .filter(|evidence| *evidence == "decision")
+                {
+                    *evidence = "full".into();
+                }
+            }
             (_, "move") => {
                 stored["folderId"] = body.get("folderId").cloned().unwrap_or(Value::Null)
             }

@@ -978,6 +978,27 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		}
 		// Like the API: back to processing, to be moderated again.
 		m.applyOutcome(a, OutcomePending, now)
+	case method == "POST" && suffix == "explain":
+		classification := section(a, "classification")
+		if classification["status"] != calmlens.ClassificationStatusCompleted {
+			return nil, fail(calmlens.CodeAssetNotDecided)
+		}
+		moderation := section(classification, "moderation")
+		if body["rerun"] != true {
+			// Like the API: the evidence is completed and every action stays as decided.
+			if policy, ok := moderation["policy"].(map[string]any); ok && policy["evidence"] == calmlens.PolicyEvidenceDecision {
+				policy["evidence"] = calmlens.PolicyEvidenceFull
+			}
+			break
+		}
+		if reviews, _ := moderation["manualReviews"].([]any); len(reviews) > 0 {
+			return nil, fail(calmlens.CodeAssetReviewed)
+		}
+		if section(a, "content")["status"] == calmlens.ContentStatusRemoved {
+			return nil, fail(calmlens.CodeAssetContentUnavailable)
+		}
+		// Like the API: back to processing, to be moderated again under the current policy.
+		m.applyOutcome(a, OutcomePending, now)
 	case method == "POST" && suffix == "move":
 		if folder := text(body["folderId"]); folder != "" {
 			if _, err = m.folder(folder); err != nil {

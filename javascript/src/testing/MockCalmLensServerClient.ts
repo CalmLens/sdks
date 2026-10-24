@@ -26,6 +26,7 @@ import type {
   DeleteAssetOptions,
   EnsureLensesOptions,
   EnsureLensOptions,
+  ExplainAssetOptions,
   FolderIdOptions,
   FolderPage,
   IterateAssetChildrenOptions,
@@ -143,6 +144,7 @@ export interface MockCalmLensOperationOptions {
   "assets.createSignedUrl": CreateAssetSignedUrlOptions;
   "assets.move": MoveAssetOptions;
   "assets.retry": RetryAssetOptions;
+  "assets.explain": ExplainAssetOptions;
   "assets.waitForDecision": WaitForAssetDecisionOptions;
   "assets.deleteContent": DeleteAssetContentOptions;
   "assets.delete": DeleteAssetOptions;
@@ -762,6 +764,38 @@ export class MockCalmLensServerClient {
           throw this.apiError(API_ERROR_CODES.ASSET_CONTENT_UNAVAILABLE);
         }
         // Like the API: back to processing, to be moderated again.
+        return this.databaseStorage.updateAsset(await this.applyOutcome(asset, "pending"));
+      },
+
+      explain: async (options: ExplainAssetOptions): Promise<Asset> => {
+        this.begin("assets.explain", options);
+        const asset = await this.findOwnAsset(options?.assetId);
+        if (asset.classification.status !== "completed") {
+          throw this.apiError(API_ERROR_CODES.ASSET_NOT_DECIDED);
+        }
+        if (!options.rerun) {
+          // Like the API: the evidence is completed and every action stays as decided.
+          const policy = asset.classification.moderation.policy;
+          if (policy?.evidence !== "decision") return asset;
+          return this.databaseStorage.updateAsset({
+            ...asset,
+            updatedAt: this.now(),
+            classification: {
+              ...asset.classification,
+              moderation: {
+                ...asset.classification.moderation,
+                policy: { ...policy, evidence: "full" },
+              },
+            },
+          });
+        }
+        if (asset.classification.moderation.manualReviews.length) {
+          throw this.apiError(API_ERROR_CODES.ASSET_REVIEWED);
+        }
+        if (asset.content.status === "removed") {
+          throw this.apiError(API_ERROR_CODES.ASSET_CONTENT_UNAVAILABLE);
+        }
+        // Like the API: back to processing, to be moderated again under the current policy.
         return this.databaseStorage.updateAsset(await this.applyOutcome(asset, "pending"));
       },
 

@@ -1006,6 +1006,19 @@ pub struct UpdateAsset {
     pub processing_options: Patch<ProcessingOptions>,
 }
 
+/// Options for [`AssetsClient::explain`](crate::AssetsClient::explain).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplainAsset {
+    /// The asset ID.
+    #[serde(skip_serializing)]
+    pub asset_id: String,
+    /// Moderates the asset again with the project's current policy instead of explaining the
+    /// decision as made.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rerun: bool,
+}
+
 /// Moves an asset to a folder, or to the project root with `folder_id: None`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1419,6 +1432,12 @@ pub struct ReportPolicy {
     /// Policy results by category.
     #[serde(default)]
     pub categories: HashMap<ClassificationCategory, CategoryPolicyScore>,
+    /// `decision` when questions that could not change any action were skipped (every action is
+    /// final, but a category's policy score and the rule credited with its action can differ from a
+    /// complete report); `full` when every question was answered. See
+    /// [`AssetsClient::explain`](crate::AssetsClient::explain).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<String>,
     /// The final automatic asset decision.
     #[serde(default)]
     pub decision: Option<ReportPolicyDecision>,

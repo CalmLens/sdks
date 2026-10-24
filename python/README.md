@@ -133,6 +133,7 @@ rewound for a retry when it is seekable; uploads from non-seekable streams are n
 | `assets.uploadPart(options)` | `assets.upload_part(...)` |
 | `assets.createSignedUrl(options)` | `assets.create_signed_url(...)` |
 | `assets.move/retry/delete(options)` | Same names; `delete` returns `None` |
+| `assets.explain({ assetId, rerun })` | `assets.explain(asset_id=, rerun=True)` |
 | `assets.deleteContent(options)` | `assets.delete_content(...)` |
 | `assets.waitForDecision({ assetId, timeoutMs })` | `assets.wait_for_decision(asset_id=, timeout=60)`; `timeout` in seconds, no `signal` |
 | `folders.list()` | `folders.list()` |

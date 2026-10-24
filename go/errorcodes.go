@@ -55,6 +55,10 @@ const (
 	CodeAssetNotFound = "asset/not-found"
 	// CodeProjectNotFound is returned with HTTP 404.
 	CodeProjectNotFound = "project/not-found"
+	// CodeAssetReviewChanged is returned with HTTP 409.
+	CodeAssetReviewChanged = "asset/review-changed"
+	// CodeAssetReviewNoteRequired is returned with HTTP 400.
+	CodeAssetReviewNoteRequired = "asset/review-note-required"
 	// CodeAssetUpdateFailed is returned with HTTP 500.
 	CodeAssetUpdateFailed = "asset/update-failed"
 	// CodeAssetSafetyHeld is returned with HTTP 423.
@@ -63,6 +67,12 @@ const (
 	CodeAssetNotRetryable = "asset/not-retryable"
 	// CodeAssetContentUnavailable is returned with HTTP 409.
 	CodeAssetContentUnavailable = "asset/content-unavailable"
+	// CodeAssetNotDecided is returned with HTTP 409.
+	CodeAssetNotDecided = "asset/not-decided"
+	// CodeAssetPolicyChanged is returned with HTTP 409.
+	CodeAssetPolicyChanged = "asset/policy-changed"
+	// CodeAssetReviewed is returned with HTTP 409.
+	CodeAssetReviewed = "asset/reviewed"
 	// CodeSupportTicketNotFound is returned with HTTP 404.
 	CodeSupportTicketNotFound = "support/ticket-not-found"
 	// CodeDuplicateExternalID is returned with HTTP 409.
@@ -153,10 +163,15 @@ var publicErrorStatuses = map[string]int{
 	CodeIdempotentRequestInProgress:       409,
 	CodeAssetNotFound:                     404,
 	CodeProjectNotFound:                   404,
+	CodeAssetReviewChanged:                409,
+	CodeAssetReviewNoteRequired:           400,
 	CodeAssetUpdateFailed:                 500,
 	CodeAssetSafetyHeld:                   423,
 	CodeAssetNotRetryable:                 409,
 	CodeAssetContentUnavailable:           409,
+	CodeAssetNotDecided:                   409,
+	CodeAssetPolicyChanged:                409,
+	CodeAssetReviewed:                     409,
 	CodeSupportTicketNotFound:             404,
 	CodeDuplicateExternalID:               409,
 	CodeFolderNotFound:                    404,

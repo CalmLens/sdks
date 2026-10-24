@@ -258,7 +258,7 @@ module CalmLens
     ?"source" => category_policy_source, ?"settings" => category_policy_settings_snapshot
   }
   type report_policy = {
-    "score" => number, "categories" => Hash[String, category_policy_score],
+    "score" => number, "categories" => Hash[String, category_policy_score], ?"evidence" => "decision" | "full",
     ?"decision" => { "source" => String, "action" => flagged_content_action?, "flaggedCategories" => Array[String] }
   }
 
@@ -526,6 +526,7 @@ module CalmLens
     ?request_options: request_options
   }
   type move_asset_options = { asset_id: String, folder_id: String?, ?request_options: request_options }
+  type explain_asset_options = { asset_id: String, ?rerun: bool, ?request_options: request_options }
   type create_signed_url_options = {
     asset_id: String,
     # Defaults to `rendered` on the server; `original` takes no lens or transform.

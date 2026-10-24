@@ -23,7 +23,7 @@ __all__ = [
     "EvaluatedCategoryResult", "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult",
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
-    "EventSeverity", "EventType", "EventsPage", "ExtractedText", "FaceDetectionFeatureOptions",
+    "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
     "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
@@ -413,6 +413,10 @@ class _ReportPolicyRequired(TypedDict):
 
 
 class ReportPolicy(_ReportPolicyRequired, total=False):
+    #: ``decision`` when questions that could not change any action were skipped (every action is
+    #: final, but a category's policy score and the rule credited with its action can differ from a
+    #: complete report); ``full`` when every question was answered. ``assets.explain`` completes it.
+    evidence: Literal["decision", "full"]
     decision: ReportPolicyDecision
 
 
@@ -868,6 +872,10 @@ class UploadPartOptions(_UploadPartRequired, total=False):
 
 class MoveAssetOptions(AssetIdOptions):
     folderId: Optional[str]
+
+
+class ExplainAssetOptions(AssetIdOptions, total=False):
+    rerun: bool
 
 
 class MoveFolderOptions(FolderIdOptions):

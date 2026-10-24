@@ -65,6 +65,19 @@ func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Ass
 	return s.assetRequest(ctx, "POST", options.AssetID, "/retry", nil)
 }
 
+// Explain completes the policy evidence behind a decided asset's moderation decision: the report's
+// Policy.Evidence becomes PolicyEvidenceFull and every action stays as decided. With Rerun the
+// asset is moderated again with the project's current policy and returns in
+// ClassificationStatusProcessing; use it when the policy changed since the decision
+// (CodeAssetPolicyChanged).
+func (s *AssetsService) Explain(ctx context.Context, options ExplainAssetOptions) (*Asset, error) {
+	body := JSON{}
+	if options.Rerun {
+		body["rerun"] = true
+	}
+	return s.assetRequest(ctx, "POST", options.AssetID, "/explain", body)
+}
+
 // DefaultDecisionTimeout is how long WaitForDecision waits when no Timeout is given.
 const DefaultDecisionTimeout = 60 * time.Second
 

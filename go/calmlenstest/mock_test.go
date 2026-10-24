@@ -541,6 +541,37 @@ func TestMockOutcomesFinishProcessingAndRemoveTemporaryContent(t *testing.T) {
 	}
 }
 
+func TestMockExplainCompletesEvidenceOrReruns(t *testing.T) {
+	c, err := NewServerClient(Options{Now: func() int64 { return 123 }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	moderation := c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)
+	moderation["policy"] = calmlens.JSON{"score": 0.1, "categories": calmlens.JSON{}, "evidence": calmlens.PolicyEvidenceDecision}
+	explained, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID})
+	if err != nil || explained.Classification.Moderation.Policy.Evidence != calmlens.PolicyEvidenceFull || explained.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
+		t.Fatal(explained, err)
+	}
+	moderation["manualReviews"] = []any{calmlens.JSON{"status": "allowed"}}
+	if _, err = c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true}); calmlens.ErrorCode(err) != calmlens.CodeAssetReviewed {
+		t.Fatal("reran a reviewed asset", err)
+	}
+	moderation["manualReviews"] = []any{}
+	rerun, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true})
+	if err != nil || rerun.Classification.Status != calmlens.ClassificationStatusProcessing || rerun.Classification.Moderation.Status != calmlens.ModerationStatusPending {
+		t.Fatal(rerun, err)
+	}
+	if _, err = c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotDecided {
+		t.Fatal("explained an undecided asset", err)
+	}
+}
+
 func TestMockPurgedOutcomeRemovesKeptContentForPolicy(t *testing.T) {
 	c, err := NewServerClient(Options{APIKey: CreateMockAPIKey([]Grant{{Actions: []string{"assets:download"}}}), AnalyzedOutcome: OutcomePurged})
 	if err != nil {

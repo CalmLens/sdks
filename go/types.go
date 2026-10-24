@@ -311,8 +311,21 @@ type MetadataItem struct {
 type ReportPolicy struct {
 	Score      float64                        `json:"score"`
 	Categories map[string]CategoryPolicyScore `json:"categories"`
-	Decision   *ReportPolicyDecision          `json:"decision,omitempty"`
+	// Evidence is PolicyEvidenceDecision when questions that could not change any action were
+	// skipped, and PolicyEvidenceFull (or empty) when every question was answered.
+	// AssetsService.Explain completes it.
+	Evidence string                `json:"evidence,omitempty"`
+	Decision *ReportPolicyDecision `json:"decision,omitempty"`
 }
+
+// Values of ReportPolicy.Evidence.
+const (
+	// PolicyEvidenceDecision means every action is final, but a category's policy score and the
+	// rule credited with its action can differ from a complete report.
+	PolicyEvidenceDecision = "decision"
+	// PolicyEvidenceFull means every question was answered.
+	PolicyEvidenceFull = "full"
+)
 
 // CategoryPolicyScore is how strongly a category meets the policy, from 0 to 1, and the action
 // the policy takes: allow, age-restrict, block or purge.
@@ -568,6 +581,13 @@ type AssetPage struct {
 
 // AssetIDOptions identifies an asset.
 type AssetIDOptions struct{ AssetID string }
+
+// ExplainAssetOptions selects the asset AssetsService.Explain explains. Rerun moderates it again
+// with the project's current policy instead of explaining the decision as made.
+type ExplainAssetOptions struct {
+	AssetID string
+	Rerun   bool
+}
 
 // WaitForDecisionOptions selects the asset AssetsService.WaitForDecision waits for.
 type WaitForDecisionOptions struct {

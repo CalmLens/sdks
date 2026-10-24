@@ -76,6 +76,7 @@ Every request sends `User-Agent: calmlens-go/<Version> (<Go version>; <OS>/<arch
 | --- | --- |
 | `assets.create/classify` | `Assets.Create/Classify(ctx, SubmitAssetOptions)` |
 | `assets.retrieve/retry` | `Assets.Retrieve/Retry(ctx, AssetIDOptions)` |
+| `assets.explain` | `Assets.Explain(ctx, ExplainAssetOptions)` |
 | `assets.waitForDecision` | `Assets.WaitForDecision(ctx, WaitForDecisionOptions)` |
 | `assets.update` | `Assets.Update(ctx, UpdateAssetOptions)` |
 | `assets.list` | `Assets.List(ctx, ListAssetsOptions)`; every page: `Assets.ListAll(ListAssetsOptions)` |

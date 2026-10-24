@@ -65,6 +65,20 @@ final class Assets extends Resource
         return $this->session->request('POST', $this->path($api, 'assets', 'assetId') . '/retry', options: $request);
     }
 
+    /**
+     * Completes the policy evidence behind a decided asset's moderation decision: the report's
+     * `classification.moderation.policy.evidence` becomes `full` and every action stays as decided.
+     * With `'rerun' => true` the asset is moderated again with the project's current policy and
+     * returns in `processing`; use it when the policy changed since the decision (`asset/policy-changed`).
+     */
+    public function explain(array $options): array
+    {
+        [$api, $request] = $this->split($options);
+        $path = $this->path($api, 'assets', 'assetId');
+        $body = !empty($api['rerun']) ? ['rerun' => true] : new \stdClass();
+        return $this->session->request('POST', $path . '/explain', body: $body, options: $request);
+    }
+
     public function deleteContent(array $options): array
     {
         [$api, $request] = $this->split($options);

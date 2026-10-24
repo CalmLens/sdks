@@ -9004,6 +9004,7 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 			restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
 		}).strict().optional().describe("The category threshold, default action and rules in force at decision time.")
 	}).strict()).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
+	evidence: zod.enum(["decision", "full"]).optional().describe("`decision` when questions that could not change any action were skipped: every action is final, but a category's policy score and the rule credited with its action can differ from a detailed report. `full` (or absent) when every question was answered. Request a detailed report to answer the rest."),
 	decision: zod.object({
 		source: zod.enum([
 			"policy",

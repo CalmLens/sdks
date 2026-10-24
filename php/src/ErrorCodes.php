@@ -43,6 +43,9 @@ final class ErrorCodes
     public const ASSET_SAFETY_HELD = 'asset/safety-held';
     public const ASSET_NOT_RETRYABLE = 'asset/not-retryable';
     public const ASSET_CONTENT_UNAVAILABLE = 'asset/content-unavailable';
+    public const ASSET_NOT_DECIDED = 'asset/not-decided';
+    public const ASSET_POLICY_CHANGED = 'asset/policy-changed';
+    public const ASSET_REVIEWED = 'asset/reviewed';
     public const SUPPORT_TICKET_NOT_FOUND = 'support/ticket-not-found';
     public const DUPLICATE_EXTERNAL_ID = 'asset/duplicate-external-id';
     public const FOLDER_NOT_FOUND = 'folder/not-found';
@@ -108,6 +111,9 @@ final class ErrorCodes
         'asset/safety-held' => 423,
         'asset/not-retryable' => 409,
         'asset/content-unavailable' => 409,
+        'asset/not-decided' => 409,
+        'asset/policy-changed' => 409,
+        'asset/reviewed' => 409,
         'support/ticket-not-found' => 404,
         'asset/duplicate-external-id' => 409,
         'folder/not-found' => 404,

@@ -124,6 +124,18 @@
     "status": 409
   },
   {
+    "code": "asset/not-decided",
+    "status": 409
+  },
+  {
+    "code": "asset/policy-changed",
+    "status": 409
+  },
+  {
+    "code": "asset/reviewed",
+    "status": 409
+  },
+  {
     "code": "support/ticket-not-found",
     "status": 404
   },

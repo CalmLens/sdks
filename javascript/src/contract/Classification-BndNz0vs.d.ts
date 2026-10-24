@@ -1,3 +1,4 @@
+import "./AssetModerationDecision-BzFBTVPm.js";
 import * as zod from "zod";
 //#region packages/shared/src/ModerationPolicyDimensions.d.ts
 declare const MODERATION_QUALIFIER_INFO: {
@@ -802,6 +803,17 @@ declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
   purge: "purge";
 }>;
 type FlaggedContentAction = zod.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
+//#endregion
+//#region packages/shared/src/Project.d.ts
+declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{
+  action: zod.ZodEnum<{
+    "age-restrict": "age-restrict";
+    allow: "allow";
+    block: "block";
+    purge: "purge";
+  }>;
+}, zod.core.$strip>;
+type FlaggedContentPolicy = zod.infer<typeof FLAGGED_CONTENT_POLICY_SCHEMA>;
 //#endregion
 //#region packages/shared/src/Classification.d.ts
 declare const CLASSIFICATION_CATEGORY_SCHEMA: zod.ZodEnum<{
@@ -5007,4 +5019,4 @@ declare const CLASSIFICATION_LABEL_SCHEMA: zod.ZodObject<{
 }, zod.core.$strip>;
 type ClassificationLabel = zod.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
 //#endregion
-export { ClassificationNotEvaluatedReason as a, FlaggedContentAction as c, ClassificationLabel as i, ModerationQualifier as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t };
+export { ClassificationNotEvaluatedReason as a, FlaggedContentPolicy as c, ClassificationLabel as i, FlaggedContentAction as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, ModerationQualifier as u };

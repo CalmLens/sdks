@@ -80,6 +80,27 @@ class MockTests(unittest.TestCase):
                 MockCalmLensServerClient(mock_options=options)
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_CONFIG)
 
+    def test_explaining_completes_evidence_and_rerun_moderates_again(self):
+        c = MockCalmLensServerClient(mock_options={"now": lambda: 7, "analyzed_outcome": "blocked"})
+        asset = c.assets.classify(name="a.txt", content={"plainText": "no", "type": "text/plain"},
+                                  processing_options={"keepContentAfterProcessing": True})
+        moderation = c.database_storage.assets[asset["id"]]["classification"]["moderation"]
+        moderation["policy"] = {"score": 0.9, "categories": {}, "evidence": "decision"}
+        explained = c.assets.explain(asset_id=asset["id"])
+        self.assertEqual((explained["classification"]["moderation"]["policy"]["evidence"],
+                          explained["classification"]["moderation"]["status"]), ("full", "blocked"))
+        moderation["manualReviews"] = [{"decision": "blocked"}]
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.assets.explain(asset_id=asset["id"], rerun=True)
+        self.assertEqual(raised.exception.code, error_codes.ASSET_REVIEWED)
+        moderation["manualReviews"] = []
+        rerun = c.assets.explain({"assetId": asset["id"], "rerun": True})
+        self.assertEqual((rerun["classification"]["status"], rerun["classification"]["moderation"]["status"]),
+                         ("processing", "pending"))
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.assets.explain(asset_id=asset["id"])
+        self.assertEqual(raised.exception.code, error_codes.ASSET_NOT_DECIDED)
+
     def test_errors_have_the_real_status_and_request_id(self):
         with self.assertRaises(CalmLensAPIError) as raised:
             self.client.assets.retrieve(asset_id="missing")

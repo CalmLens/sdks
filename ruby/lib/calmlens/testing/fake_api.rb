@@ -368,6 +368,7 @@ module CalmLens
           fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
           # Like the API: back to processing, to be moderated again.
           apply_outcome(item, 'pending')
+        in ['POST', 'explain'] then explain(item, json['rerun'])
         in ['POST', 'move']
           check_folder(json['folderId']) if json['folderId']
           touch(item.merge!('folderId' => json['folderId']))
@@ -380,6 +381,21 @@ module CalmLens
       def touch(item)
         item['updatedAt'] = @now.call
         item
+      end
+
+      def explain(item, rerun)
+        fail!(ErrorCodes::ASSET_NOT_DECIDED) unless item['classification']['status'] == 'completed'
+        moderation = item['classification']['moderation']
+        if rerun
+          fail!(ErrorCodes::ASSET_REVIEWED) unless moderation.fetch('manualReviews', []).empty?
+          fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
+          # Like the API: back to processing, to be moderated again under the current policy.
+          return apply_outcome(item, 'pending')
+        end
+        # Like the API: the evidence is completed and every action stays as decided.
+        policy = moderation['policy']
+        policy['evidence'] = 'full' if policy && policy['evidence'] == 'decision'
+        touch(item)
       end
 
       def signed_url(id, json)

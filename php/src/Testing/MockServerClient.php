@@ -345,6 +345,25 @@ final class MockServerClient
                     self::fail(ErrorCodes::ASSET_CONTENT_UNAVAILABLE);
                 }
                 return $this->applyOutcome($asset, 'pending');
+            case 'POST explain':
+                if ($asset['classification']['status'] !== 'completed') {
+                    self::fail(ErrorCodes::ASSET_NOT_DECIDED);
+                }
+                if (empty($json['rerun'])) {
+                    // Like the API: the evidence is completed and every action stays as decided.
+                    if (($asset['classification']['moderation']['policy']['evidence'] ?? null) === 'decision') {
+                        $asset['classification']['moderation']['policy']['evidence'] = 'full';
+                    }
+                    return $this->assets[$id] = $this->touch($asset);
+                }
+                if (($asset['classification']['moderation']['manualReviews'] ?? []) !== []) {
+                    self::fail(ErrorCodes::ASSET_REVIEWED);
+                }
+                if ($asset['content']['status'] === 'removed') {
+                    self::fail(ErrorCodes::ASSET_CONTENT_UNAVAILABLE);
+                }
+                // Like the API: back to processing, to be moderated again under the current policy.
+                return $this->applyOutcome($asset, 'pending');
             case 'POST move':
                 $folderId = $json['folderId'] ?? null;
                 if ($folderId !== null) {

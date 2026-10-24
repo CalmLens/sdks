@@ -239,6 +239,8 @@ blocking_methods!(AssetsClient => assets {
     fn update(options: UpdateAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::retry`].
     fn retry(options: AssetId) -> Result<Asset>;
+    /// See [`crate::AssetsClient::explain`].
+    fn explain(options: ExplainAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::delete_content`].
     fn delete_content(options: AssetId) -> Result<Asset>;
     /// See [`crate::AssetsClient::delete`].

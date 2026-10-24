@@ -140,6 +140,7 @@ module CalmLens
     def wait_for_decision: (wait_for_decision_options options) -> asset
     def update: (update_asset_options options) -> asset
     def retry: (asset_id_options options) -> asset
+    def explain: (explain_asset_options options) -> asset
     def delete_content: (asset_id_options options) -> asset
     def delete: (asset_id_options options) -> nil
     def move: (move_asset_options options) -> asset

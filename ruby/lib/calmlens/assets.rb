@@ -133,6 +133,20 @@ module CalmLens
       end
     end
 
+    # Completes the policy evidence behind a decided asset's moderation decision: the report's
+    # `classification.moderation.policy.evidence` becomes `full` and every action stays as decided.
+    # With `rerun: true` the asset is moderated again with the project's current policy and returns
+    # in `processing`; use it when the policy changed since the decision (`asset/policy-changed`).
+    # @option options [String] :asset_id
+    # @option options [Boolean] :rerun
+    # @return [Hash] the asset
+    def explain(options)
+      call(options) do |api, request|
+        request('POST', "/assets/#{Internal.segment(api['assetId'])}/explain",
+                body: api['rerun'] ? { 'rerun' => true } : {}, request_options: request)
+      end
+    end
+
     # Removes the stored content and returns the asset with `content.status` `removed` (reason
     # `requested`); the record and classification results are kept.
     # @option options [String] :asset_id

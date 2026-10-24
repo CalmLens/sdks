@@ -399,6 +399,21 @@ final class MockApi {
         if ("removed".equals(str(asset.getAsJsonObject("content"), "status"))) throw new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE);
         applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, now);
         break;
+      case "POST explain": {
+        if (!"completed".equals(str(asset.getAsJsonObject("classification"), "status"))) throw new Failure(ErrorCodes.ASSET_NOT_DECIDED);
+        JsonObject moderation = asset.getAsJsonObject("classification").getAsJsonObject("moderation");
+        if (body != null && body.has("rerun") && body.get("rerun").getAsBoolean()) {
+          JsonElement reviews = moderation.get("manualReviews");
+          if (reviews != null && reviews.isJsonArray() && !reviews.getAsJsonArray().isEmpty()) throw new Failure(ErrorCodes.ASSET_REVIEWED);
+          if ("removed".equals(str(asset.getAsJsonObject("content"), "status"))) throw new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE);
+          // Like the API: back to processing, to be moderated again under the current policy.
+          applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, now);
+        } else if (moderation.get("policy") instanceof JsonObject policy && "decision".equals(str(policy, "evidence"))) {
+          // Like the API: the evidence is completed and every action stays as decided.
+          policy.addProperty("evidence", "full");
+        }
+        break;
+      }
       case "POST move": {
         String folderId = str(body, "folderId");
         if (folderId != null) folder(folderId);

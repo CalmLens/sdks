@@ -33,6 +33,9 @@ export const API_ERROR_CODES = {
   ASSET_SAFETY_HELD: "asset/safety-held",
   ASSET_NOT_RETRYABLE: "asset/not-retryable",
   ASSET_CONTENT_UNAVAILABLE: "asset/content-unavailable",
+  ASSET_NOT_DECIDED: "asset/not-decided",
+  ASSET_POLICY_CHANGED: "asset/policy-changed",
+  ASSET_REVIEWED: "asset/reviewed",
   SUPPORT_TICKET_NOT_FOUND: "support/ticket-not-found",
   DUPLICATE_EXTERNAL_ID: "asset/duplicate-external-id",
   FOLDER_NOT_FOUND: "folder/not-found",
@@ -198,6 +201,18 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "asset/content-unavailable": {
     status: 409,
     message: "This asset's content is no longer stored, so it can't be processed again. Upload it again instead.",
+  },
+  "asset/not-decided": {
+    status: 409,
+    message: "This asset has no automatic moderation decision to explain yet.",
+  },
+  "asset/policy-changed": {
+    status: 409,
+    message: "The project's moderation policy has changed since this decision, so it can't be explained as made. Re-run moderation with the current policy instead.",
+  },
+  "asset/reviewed": {
+    status: 409,
+    message: "A reviewer has decided this asset, so its moderation can't be re-run.",
   },
   "support/ticket-not-found": {
     status: 404,

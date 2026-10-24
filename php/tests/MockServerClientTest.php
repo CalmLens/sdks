@@ -352,6 +352,23 @@ final class MockServerClientTest extends TestCase
         }
     }
 
+    public function testExplainCompletesTheEvidenceAndRerunModeratesAgain(): void
+    {
+        $mock = new MockServerClient(queuedOutcome: 'blocked');
+        $client = $mock->client();
+        $asset = self::image($mock);
+        $mock->assets[$asset['id']]['classification']['moderation']['policy'] = ['score' => 0.9, 'categories' => [], 'evidence' => 'decision'];
+        $explained = $client->assets->explain(['assetId' => $asset['id']]);
+        self::assertSame(['full', 'blocked'], [$explained['classification']['moderation']['policy']['evidence'],
+            $explained['classification']['moderation']['status']]);
+        $mock->assets[$asset['id']]['classification']['moderation']['manualReviews'] = [['decision' => 'blocked']];
+        self::assertSame(ErrorCodes::ASSET_REVIEWED, self::code(fn () => $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true])));
+        $mock->assets[$asset['id']]['classification']['moderation']['manualReviews'] = [];
+        $rerun = $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true]);
+        self::assertSame(['processing', 'pending'], [$rerun['classification']['status'], $rerun['classification']['moderation']['status']]);
+        self::assertSame(ErrorCodes::ASSET_NOT_DECIDED, self::code(fn () => $client->assets->explain(['assetId' => $asset['id']])));
+    }
+
     public function testRetryNeedsAFailedAssetWithContentAndLensesNeedAHigherVersionToChange(): void
     {
         $mock = new MockServerClient(queuedOutcome: 'failed');

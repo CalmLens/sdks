@@ -7807,6 +7807,10 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               }, zod.core.$strict>>;
             }, zod.core.$strict>>;
           }, zod.core.$strict>>;
+          evidence: zod.ZodOptional<zod.ZodEnum<{
+            decision: "decision";
+            full: "full";
+          }>>;
           decision: zod.ZodOptional<zod.ZodObject<{
             source: zod.ZodEnum<{
               "asset-override": "asset-override";

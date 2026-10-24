@@ -37,6 +37,13 @@
       "error": "sdk/invalid-argument"
     },
     {
+      "operation": "assets.explain",
+      "options": {
+        "assetId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
       "operation": "assets.move",
       "options": {
         "assetId": "..",

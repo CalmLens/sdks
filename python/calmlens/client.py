@@ -34,7 +34,7 @@ from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, Calm
 from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
-                    MetadataItem, ClassifyTextOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
+                    MetadataItem, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
                     SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, SubmitAssetOptions,
                     UpdateAssetOptions, UpdateFolderOptions, UploadPartOptions,
@@ -1166,6 +1166,18 @@ class Assets:
         still held (``content.status`` is not ``removed``)."""
         merged = _merge(options, asset_id=asset_id)
         return cast(Asset, self._c._request("POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/retry"))
+
+    def explain(self, options: ExplainAssetOptions | None = None, /, *, asset_id: str = _UNSET,
+                rerun: bool = _UNSET) -> Asset:
+        """Complete the policy evidence behind a decided asset's moderation decision: the report's
+        ``classification.moderation.policy.evidence`` becomes ``full`` and every action stays as
+        decided. With ``rerun=True`` the asset is moderated again with the project's current policy
+        and returns in ``processing``; use it when the policy changed since the decision
+        (``asset/policy-changed``)."""
+        merged = _merge(options, asset_id=asset_id, rerun=rerun)
+        body = {"rerun": True} if merged.get("rerun") else {}
+        return cast(Asset, self._c._request(
+            "POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/explain", body=body))
 
     def delete_content(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Remove stored content (source, preview and retained extracted text) but keep the

@@ -1246,6 +1246,24 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
+  /** Options for {@code assets.explain}. */
+  public static final class ExplainAsset {
+    private String assetId;
+    private Boolean rerun;
+    public ExplainAsset() {}
+    /** @param assetId the asset */
+    public ExplainAsset(String assetId) { this.assetId = assetId; }
+    public ExplainAsset assetId(String value) { assetId = value; return this; }
+    /**
+     * @param value whether to moderate the asset again with the project's current policy instead of
+     *     explaining the decision as made
+     * @return these options
+     */
+    public ExplainAsset rerun(boolean value) { rerun = value; return this; }
+    boolean rerunValue() { return Boolean.TRUE.equals(rerun); }
+    @Override public String toString() { return describe(this); }
+  }
+
   /** Options for {@code assets.move}; a null folder moves the asset to the project root. */
   public static final class MoveAsset {
     private String assetId;
@@ -1577,7 +1595,13 @@ public final class Models {
    * @param score the highest category policy score
    * @param categories policy results by category
    */
-  public record ReportPolicy(Double score, Map<String, CategoryPolicyScore> categories, ReportPolicyDecision decision) {
+  /**
+   * What the project's policy made of the report. {@code evidence} is {@code decision} when
+   * questions that could not change any action were skipped (every action is final, but a
+   * category's policy score and the rule credited with its action can differ from a complete
+   * report) and {@code full} when every question was answered; {@code assets.explain} completes it.
+   */
+  public record ReportPolicy(Double score, Map<String, CategoryPolicyScore> categories, String evidence, ReportPolicyDecision decision) {
     /** Copies collections so the record stays immutable. */
     public ReportPolicy { categories = map(categories); }
   }

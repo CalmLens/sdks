@@ -65,6 +65,8 @@ func TestJavaScriptContract(t *testing.T) {
 				_, err = c.Assets.ListChildren(ctx, decodeOptions[ListAssetChildrenOptions](t, fixture.Options))
 			case "assets.retry":
 				_, err = c.Assets.Retry(ctx, decodeOptions[AssetIDOptions](t, fixture.Options))
+			case "assets.explain":
+				_, err = c.Assets.Explain(ctx, decodeOptions[ExplainAssetOptions](t, fixture.Options))
 			case "assets.deleteContent":
 				_, err = c.Assets.DeleteContent(ctx, decodeOptions[AssetIDOptions](t, fixture.Options))
 			case "assets.delete":
@@ -220,6 +222,8 @@ func TestJavaScriptPathSafety(t *testing.T) {
 				_, err = c.Assets.ListChildren(ctx, decodeOptions[ListAssetChildrenOptions](t, rejection.Options))
 			case "assets.retry":
 				_, err = c.Assets.Retry(ctx, decodeOptions[AssetIDOptions](t, rejection.Options))
+			case "assets.explain":
+				_, err = c.Assets.Explain(ctx, decodeOptions[ExplainAssetOptions](t, rejection.Options))
 			case "assets.move":
 				_, err = c.Assets.Move(ctx, decodeOptions[MoveAssetOptions](t, rejection.Options))
 			case "assets.uploadPart":

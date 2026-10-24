@@ -40,6 +40,7 @@ matched = results['items'].map { |result| [result['asset']['id'], result['score'
 updated = client.assets.update(asset_id: uploaded['id'], tags: %w[a b], description: nil)
 client.assets.move(asset_id: updated['id'], folder_id: nil)
 client.assets.retry(asset_id: updated['id'])
+client.assets.explain(asset_id: updated['id'], rerun: true)
 client.assets.wait_for_decision(asset_id: uploaded['id'], timeout: 30)['classification']['moderation']['status']
 client.assets.delete_content(asset_id: updated['id'])['content']['updatedAt']
 signed = client.assets.create_signed_url(asset_id: updated['id'],

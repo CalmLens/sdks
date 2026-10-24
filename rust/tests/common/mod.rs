@@ -31,6 +31,7 @@ pub async fn invoke(
         "assets.retrieve" => output(client.assets().retrieve(input(options)?).await),
         "assets.update" => output(client.assets().update(input(options)?).await),
         "assets.retry" => output(client.assets().retry(input(options)?).await),
+        "assets.explain" => output(client.assets().explain(input(options)?).await),
         "assets.deleteContent" => output(client.assets().delete_content(input(options)?).await),
         "assets.delete" => output(client.assets().delete(input(options)?).await),
         "assets.move" => output(client.assets().move_asset(input(options)?).await),

@@ -712,6 +712,65 @@
     }
   },
   {
+    "operation": "assets.explain",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/explain",
+      "query": {},
+      "body": {}
+    },
+    "response": {
+      "id": "asset-1",
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "status": "allowed"
+        }
+      }
+    }
+  },
+  {
+    "operation": "assets.explain",
+    "options": {
+      "assetId": "asset-1",
+      "rerun": true
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/explain",
+      "query": {},
+      "body": {
+        "rerun": true
+      }
+    },
+    "response": {
+      "id": "asset-1",
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "status": "allowed"
+        }
+      }
+    }
+  },
+  {
     "operation": "assets.deleteContent",
     "options": {
       "assetId": "asset-1"

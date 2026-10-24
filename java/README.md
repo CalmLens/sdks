@@ -32,14 +32,14 @@ Create one client per API key, share it across threads and close it on shutdown.
 
 | Resource | Methods |
 | --- | --- |
-| `client.assets` | `create`, `classify`, `search`, `list`, `iterate`, `retrieve`, `waitForDecision`, `update`, `retry`, `deleteContent`, `delete`, `move`, `listChildren`, `iterateChildren`, `uploadPart`, `createSignedUrl` |
+| `client.assets` | `create`, `classify`, `search`, `list`, `iterate`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `move`, `listChildren`, `iterateChildren`, `uploadPart`, `createSignedUrl` |
 | `client.text` | `classify` |
 | `client.folders` | `list`, `create`, `retrieve`, `update`, `move`, `delete` |
 | `client.events` | `list`, `pages` |
 | `client.cdn` | `getAssetUrl`, `serve` |
 | `client` | `ensureLens`, `ensureLenses` |
 
-`assets.create` queues processing and returns the asset while its `classification().status()` is `processing`; `assets.classify` and `text.classify` wait for classification. `text.classify` supplies `text/plain` content and names the asset `text` unless you set a name. `assets.deleteContent` removes the stored bytes (the record and report stay, with `content().status()` `removed` and `content().removalReason()` `requested`); `assets.retry` processes an asset whose `classification().status()` is `failed` again; `assets.delete` removes everything.
+`assets.create` queues processing and returns the asset while its `classification().status()` is `processing`; `assets.classify` and `text.classify` wait for classification. `text.classify` supplies `text/plain` content and names the asset `text` unless you set a name. `assets.deleteContent` removes the stored bytes (the record and report stay, with `content().status()` `removed` and `content().removalReason()` `requested`); `assets.retry` processes an asset whose `classification().status()` is `failed` again; `assets.explain` completes the policy evidence behind a decision (`policy().evidence()` becomes `full`, every action stays as decided), or with `rerun(true)` moderates the asset again with the current policy; `assets.delete` removes everything.
 
 `assets.waitForDecision` retrieves an asset until its `classification().moderation().status()` is no longer `pending` (`allowed`, `age-restricted`, `blocked` or `purged`), or its `classification().status()` is `failed`, and returns it. It checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5 seconds. If there's no decision within the timeout (60 seconds by default), it throws `sdk/timeout` with `assetId` and the last `classificationStatus` and `moderationStatus` in `getDetails()`. Interrupting the thread stops it with `sdk/cancelled` and keeps the interrupt flag. Webhooks report decisions without polling.
 

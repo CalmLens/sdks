@@ -278,6 +278,46 @@ async fn purged_outcomes_and_decisions_remove_the_content() {
 }
 
 #[tokio::test]
+async fn explain_completes_evidence_and_rerun_moderates_again() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let asset = mock.assets().classify(kept("e.png", b"png")).await.unwrap();
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]["policy"] =
+            json!({"score": 0.1, "categories": {}, "evidence": "decision"});
+    });
+    let explain = |rerun| ExplainAsset {
+        asset_id: asset.id.clone(),
+        rerun,
+    };
+    let explained = mock.assets().explain(explain(false)).await.unwrap();
+    let policy = explained.classification.moderation.policy.unwrap();
+    assert_eq!(policy.evidence.as_deref(), Some("full"));
+    assert_eq!(
+        explained.classification.status,
+        AssetClassificationStatus::Completed
+    );
+
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]
+            ["manualReviews"] = json!([{"decision": "allowed"}]);
+    });
+    let error = mock.assets().explain(explain(true)).await.unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::AssetReviewed);
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]
+            ["manualReviews"] = json!([]);
+    });
+
+    let rerun = mock.assets().explain(explain(true)).await.unwrap();
+    assert_eq!(
+        rerun.classification.status,
+        AssetClassificationStatus::Processing
+    );
+    let error = mock.assets().explain(explain(false)).await.unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::AssetNotDecided);
+}
+
+#[tokio::test]
 async fn failed_processing_can_be_retried_and_deleted_content_cannot() {
     let mock = MockServerClient::in_memory(options().queued_outcome(MockOutcome::Failed)).unwrap();
     let asset = mock.assets().create(kept("g.png", b"png")).await.unwrap();

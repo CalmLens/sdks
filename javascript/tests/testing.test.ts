@@ -912,6 +912,47 @@ describe("MockCalmLensServerClient", () => {
     });
   });
 
+  it("explains a decided asset's evidence, or moderates it again with rerun", async () => {
+    const databaseStorage = new InMemoryMockDatabaseStorage();
+    const client = createClient({ databaseStorage, analyzedOutcome: "blocked" });
+    const asset = await client.assets.classify({
+      name: "image.png",
+      content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
+      processingOptions: { keepContentAfterProcessing: true },
+    });
+    const moderation = asset.classification.moderation;
+    await databaseStorage.updateAsset({
+      ...asset,
+      classification: {
+        ...asset.classification,
+        moderation: { ...moderation, policy: { score: 0.9, categories: {}, evidence: "decision" } },
+      },
+    });
+
+    const explained = await client.assets.explain({ assetId: asset.id });
+    expect(explained.classification.moderation.policy?.evidence).toBe("full");
+    expect(explained.classification.moderation.status).toBe("blocked");
+
+    await databaseStorage.updateAsset({
+      ...explained,
+      classification: {
+        ...explained.classification,
+        moderation: { ...explained.classification.moderation, manualReviews: [{} as never] },
+      },
+    });
+    await expect(client.assets.explain({ assetId: asset.id, rerun: true })).rejects.toMatchObject({
+      code: PUBLIC_ERROR_CODES.ASSET_REVIEWED.getId(),
+    });
+    await databaseStorage.updateAsset(explained);
+
+    const rerun = await client.assets.explain({ assetId: asset.id, rerun: true });
+    expect(rerun.classification.status).toBe("processing");
+    expect(rerun.classification.moderation.status).toBe("pending");
+    await expect(client.assets.explain({ assetId: asset.id })).rejects.toMatchObject({
+      code: PUBLIC_ERROR_CODES.ASSET_NOT_DECIDED.getId(),
+    });
+  });
+
   it("removes content but keeps the record, and deletes assets", async () => {
     const client = createClient({ analyzedOutcome: "allowed", now: () => 1_700_000_000_000 });
     const asset = await client.assets.classify({

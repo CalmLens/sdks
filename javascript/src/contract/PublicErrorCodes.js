@@ -445,6 +445,21 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This asset's content is no longer stored, so it can't be processed again. Upload it again instead.",
 		status: 409
 	}),
+	ASSET_NOT_DECIDED: new ErrorCode({
+		id: "asset/not-decided",
+		defaultMessage: "This asset has no automatic moderation decision to explain yet.",
+		status: 409
+	}),
+	ASSET_POLICY_CHANGED: new ErrorCode({
+		id: "asset/policy-changed",
+		defaultMessage: "The project's moderation policy has changed since this decision, so it can't be explained as made. Re-run moderation with the current policy instead.",
+		status: 409
+	}),
+	ASSET_REVIEWED: new ErrorCode({
+		id: "asset/reviewed",
+		defaultMessage: "A reviewer has decided this asset, so its moderation can't be re-run.",
+		status: 409
+	}),
 	SUPPORT_TICKET_NOT_FOUND: new ErrorCode({
 		id: "support/ticket-not-found",
 		defaultMessage: "Support ticket not found.",

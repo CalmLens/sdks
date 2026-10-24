@@ -412,6 +412,16 @@ export interface RetryAssetOptions {
   assetId: string;
 }
 
+export interface ExplainAssetOptions {
+  assetId: string;
+  /**
+   * Moderates the asset again with the project's current policy, answering every question,
+   * instead of explaining the decision as made. The asset returns to `processing` and gets a new
+   * decision, which can differ from the old one.
+   */
+  rerun?: boolean;
+}
+
 export interface WaitForAssetDecisionOptions {
   assetId: string;
   /** How long to wait for a decision, in milliseconds. Defaults to 60000. */

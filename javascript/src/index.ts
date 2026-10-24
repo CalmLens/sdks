@@ -46,6 +46,7 @@ export type {
   DeleteAssetOptions,
   EnsureLensesOptions,
   EnsureLensOptions,
+  ExplainAssetOptions,
   FolderIdOptions,
   GetAssetUrlOptions,
   IdempotencyOptions,
