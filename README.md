@@ -23,6 +23,7 @@ The six existing SDKs are published; PHP is available from this checkout pending
 | [Calmsnap: mobile photo uploads](examples/mobile-uploads-expo) | TypeScript / Expo |
 | [Link board](examples/link-board-python) | Python |
 | [Comment board](examples/comment-board-laravel) | PHP / Laravel |
+| [Chirp: short posts with images](examples/chirp-php) | PHP |
 | [Comment thread](examples/comment-thread-ruby) | Ruby |
 | [Media library](examples/media-library-rust) | Rust |
 | [Marketplace listings](examples/marketplace-listing-java) | Java |

@@ -114,3 +114,20 @@ jobs:
       - run: composer validate --strict
       - run: composer install --no-interaction --prefer-dist
       - run: composer test
+
+  php-chirp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/chirp-php
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer:v2
+          extensions: curl, mbstring, dom, xml, xmlwriter, fileinfo, gd
+          coverage: none
+      - run: composer validate --strict
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer test

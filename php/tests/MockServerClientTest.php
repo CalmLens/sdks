@@ -82,7 +82,9 @@ final class MockServerClientTest extends TestCase
         self::assertSame('age-restricted', $client->assets->waitForDecision(['assetId' => $asset['id']])['classification']['moderation']['status']);
         $events = $client->events->list(['after' => $cursor])['events'];
         self::assertSame(['asset.age-restricted'], array_column($events, 'type'));
-        self::assertSame([['key' => 'asset-id', 'value' => $asset['id']]], $events[0]['data']['facts']);
+        self::assertSame($asset['id'], $events[0]['assetId']);
+        self::assertSame('age-restricted', $events[0]['asset']['classification']['moderation']['status']);
+        self::assertSame([['key' => 'decided-by', 'value' => 'reviewer']], $events[0]['facts']);
     }
 
     public function testCdnRefusesBlockedAssets(): void

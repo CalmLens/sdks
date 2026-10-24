@@ -1,0 +1,16 @@
+{
+  "name": "calmlens/example-chirp",
+  "description": "Short posts with images, moderated with the CalmLens PHP SDK",
+  "type": "project",
+  "license": "MIT",
+  "require": {"php": "^8.2", "ext-fileinfo": "*", "ext-gd": "*", "calmlens/sdk": "dev-main"},
+  "require-dev": {"phpunit/phpunit": "^11.5"},
+  "repositories": [{"type": "path", "url": "../../php", "options": {"symlink": true, "versions": {"calmlens/sdk": "dev-main"}}}],
+  "autoload": {"classmap": ["src/"]},
+  "scripts": {
+    "test": "phpunit",
+    "start": ["Composer\\Config::disableProcessTimeout", "@php -S 127.0.0.1:6407 -t public public/index.php"],
+    "demo": ["Composer\\Config::disableProcessTimeout", "@putenv CHIRP_DEMO=1", "@php -S 127.0.0.1:6407 -t public public/index.php"]
+  },
+  "config": {"sort-packages": true, "platform": {"php": "8.2.0"}}
+}

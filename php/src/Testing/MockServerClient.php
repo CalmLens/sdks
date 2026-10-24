@@ -112,14 +112,15 @@ final class MockServerClient
     public function enqueueEvent(array $event): array
     {
         $now = ($this->now)();
-        $event += ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'createdAt' => $now, 'facts' => []];
+        $event += ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'severity' => 'low',
+            'title' => $event['type'] ?? '', 'assetId' => null, 'asset' => null, 'facts' => [], 'createdAt' => $now];
         $this->events[] = $event;
         return $event;
     }
 
     /**
-     * Gives an asset a new outcome, as a later classification or a reviewer would, and adds the
-     * matching `asset.<status>` (or `asset.failed`) event with its `asset-id` fact.
+     * Gives an asset a new outcome, as a reviewer would, and adds the matching `asset.<status>`
+     * (or `asset.failed`) event with the asset's snapshot and a `decided-by: reviewer` fact.
      */
     public function decide(string $assetId, string $outcome): array
     {
@@ -129,8 +130,11 @@ final class MockServerClient
         }
         $asset = $this->applyOutcome($this->assets[$assetId], $outcome);
         if ($outcome !== 'pending') {
-            $this->enqueueEvent(['type' => 'asset.' . $outcome, 'data' => ['assetId' => $assetId,
-                'facts' => [['key' => 'asset-id', 'value' => $assetId]]]]);
+            $this->enqueueEvent(['type' => 'asset.' . $outcome, 'assetId' => $assetId, 'asset' => [
+                'id' => $assetId, 'externalId' => $asset['externalId'], 'uploadPresetId' => $asset['uploadPresetId'],
+                'upload' => ['status' => $asset['upload']['status']], 'content' => ['status' => $asset['content']['status']],
+                'classification' => ['status' => $asset['classification']['status'], 'moderation' => ['status' => $asset['classification']['moderation']['status']]],
+            ], 'facts' => [['key' => 'decided-by', 'value' => 'reviewer']]]);
         }
         return $asset;
     }

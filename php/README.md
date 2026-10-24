@@ -18,7 +18,8 @@ This SDK is pre-release and has not been published to Packagist. In your applica
 ```
 
 Run `composer install`. The [Laravel comment board](../examples/comment-board-laravel)
-is runnable directly from this repository and includes route tests.
+and [Chirp](../examples/chirp-php), a short-post app with images, age-restricted media and
+webhooks, are runnable directly from this repository and include tests.
 
 ```php
 require 'vendor/autoload.php';
