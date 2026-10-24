@@ -1,5 +1,5 @@
 import "./AssetModerationDecision-eSI6kK4O.js";
-import { c as FlaggedContentAction } from "./Classification-rRE6ohWQ.js";
+import { c as FlaggedContentAction } from "./Classification-FuO3s-y2.js";
 import * as zod from "zod";
 //#region packages/shared/src/Project.d.ts
 declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{

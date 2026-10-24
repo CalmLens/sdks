@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-CnCxJ7QT.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-VY9G83NQ.js";
 import "./SharedConstants-DSItflG6.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -77,11 +77,16 @@ const FLAGGED_CONTENT_ACTION_RANK = {
 	block: 2,
 	purge: 3
 };
-/** Why a rule can't be used with its category's action, or undefined when it can. */
+/**
+* Why a rule can't be used with its category's action, or undefined when it can. An allowance must
+* be softer than the category action. A restriction may take any action but allow; one weaker than
+* the category action sets a floor where an allowance would otherwise soften the decision, such as
+* age-restricting graphic detail that a reporting allowance would allow.
+*/
 const getPolicyRuleConflict = (kind, rule, categoryAction) => {
 	const rank = FLAGGED_CONTENT_ACTION_RANK[rule.action];
 	if (kind === "allowance") return rank < FLAGGED_CONTENT_ACTION_RANK[categoryAction] ? void 0 : "allowance-not-softer";
-	return rule.action !== "allow" && rank >= FLAGGED_CONTENT_ACTION_RANK[categoryAction] ? void 0 : "restriction-weaker";
+	return rule.action !== "allow" ? void 0 : "restriction-allows";
 };
 const policyRuleKey = (rule) => policyConditionKey("some", ruleCondition(rule));
 const uniqueRules = (rules) => new Set(rules.map(policyRuleKey)).size === rules.length;
