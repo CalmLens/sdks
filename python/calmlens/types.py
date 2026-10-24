@@ -19,7 +19,7 @@ __all__ = [
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
     "ClassificationCategory", "ClassificationLabel", "Content", "CreateFolderOptions",
-    "CustomTransform", "DetectedFace", "DetectedPerson", "EnsureLensesOptions",
+    "DetectedFace", "DetectedPerson", "EnsureLensesOptions",
     "EvaluatedCategoryResult", "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult",
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
@@ -635,12 +635,17 @@ class ImageTransformOptions(TypedDict, total=False):
     format: Literal["jpg", "png", "webp", "avif", "gif"]
     width: int
     height: int
+    #: Pixel density, 1 to 3: multiplies ``width``, ``height`` and the border width.
+    dpr: float
+    #: ``False`` serves the first frame of an animated image.
+    anim: bool
     background: str
     blur: float
     border: ImageTransformBorder
     brightness: float
     contrast: float
-    quality: int
+    #: 1 to 100, or a level. Lossy output defaults to ``"high"``.
+    quality: Union[int, Literal["low", "medium", "high"]]
     fit: Literal["scale-down", "contain", "pad", "squeeze", "cover", "crop"]
     flip: Literal["h", "v", "hv"]
     gamma: float
@@ -659,20 +664,12 @@ class ImageTransform(TypedDict):
     options: ImageTransformOptions
 
 
-class _CustomTransformRequired(TypedDict):
-    type: str
-
-
-class CustomTransform(_CustomTransformRequired, total=False):
-    """A step of another transform type. Its options depend on that type, so they are untyped."""
-    options: Optional[Mapping[str, Any]]
-
-
 #: One transform step of a lens or a structured CDN transform.
-LensTransform = Union[ImageTransform, CustomTransform]
+LensTransform = ImageTransform
 
-#: A CDN transform: a selector string such as ``"imageTransform[format=png,width=1024]"``, or
-#: one or more structured steps (the shape of a lens's ``transforms``), which the SDK serializes.
+#: A CDN transform: a selector string with one step per path segment, such as
+#: ``"fit=cover,width=1024/blur=12"``, or one or more structured steps (the shape of a lens's
+#: ``transforms``), which the SDK serializes to the same selector.
 CdnTransform = Union[str, LensTransform, List[LensTransform]]
 
 

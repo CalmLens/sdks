@@ -83,17 +83,17 @@
     {
       "options": {
         "assetIdentifier": "a/b c",
-        "transform": "imageTransform[format=png,width=1024]"
+        "transform": "format=png,width=1024"
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/rendered/imageTransform[format=png,width=1024]"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/rendered/format=png,width=1024"
     },
     {
       "options": {
         "assetIdentifier": "ünï✓",
         "resource": "rendered",
-        "transform": "/imageTransform[width=10]"
+        "transform": "/width=10/blur=2"
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/%C3%BCn%C3%AF%E2%9C%93/rendered/imageTransform[width=10]"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/%C3%BCn%C3%AF%E2%9C%93/rendered/width=10/blur=2"
     },
     {
       "options": {
@@ -106,9 +106,9 @@
       "options": {
         "assetIdentifier": "asset-1",
         "lens": "thumbnail",
-        "transform": "imageTransform[format=avif]"
+        "transform": "format=avif"
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail,imageTransform[format=avif]"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail/format=avif"
     },
     {
       "options": {
@@ -122,7 +122,7 @@
           }
         }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail,imageTransform[format=webp]"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail/format=webp"
     },
     {
       "options": {
@@ -153,14 +153,14 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "transform": "imageTransform[width=10]?download=1"
+        "transform": "width=10?download=1"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "transform": "imageTransform[width=10]#x"
+        "transform": "width=10#x"
       },
       "error": "sdk/invalid-argument"
     },
@@ -175,7 +175,7 @@
           }
         }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/imageTransform[format=png,width=1024]"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/format=png,width=1024"
     },
     {
       "options": {
@@ -211,7 +211,7 @@
           }
         ]
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/imageTransform[background=rgb%280%2C%200%2C%200%29,border%5Bcolor%5D=%23ff0000,border%5Bwidth%5D=2,fit=cover,gravity%5Bmode%5D=box-center,gravity%5Bx%5D=0.5,gravity%5By%5D=0.25,sharpen=1.5,trim%5Bborder%5D=true],imageTransform[format=webp]"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/background=rgb%280%2C%200%2C%200%29,border.color=ff0000,border.width=2,fit=cover,gravity.mode=box-center,gravity.x=0.5,gravity.y=0.25,sharpen=1.5,trim.border=true/format=webp"
     },
     {
       "options": {
@@ -221,7 +221,33 @@
           "options": {}
         }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/imageTransform[]"
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": {
+          "type": "videoTransform",
+          "options": {
+            "width": 1
+          }
+        }
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "transform": {
+          "type": "imageTransform",
+          "options": {
+            "dpr": 2,
+            "quality": "high",
+            "anim": false
+          }
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/anim=false,dpr=2,quality=high"
     },
     {
       "options": {
@@ -250,7 +276,7 @@
         },
         "allowAgeRestricted": true
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail,imageTransform[width=320]?allowAgeRestricted=true"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail/width=320?allowAgeRestricted=true"
     },
     {
       "options": {
@@ -278,7 +304,7 @@
       "options": {
         "assetIdentifier": "asset-1",
         "resource": "placeholder",
-        "transform": "imageTransform[width=10]"
+        "transform": "width=10"
       },
       "error": "sdk/invalid-argument"
     },
@@ -322,7 +348,7 @@
       "options": {
         "assetIdentifier": "asset-1",
         "resource": "original",
-        "transform": "imageTransform[width=10]"
+        "transform": "width=10"
       },
       "error": "sdk/invalid-argument"
     },

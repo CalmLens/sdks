@@ -253,13 +253,17 @@ func TestImageTransformOptionsSerialize(t *testing.T) {
 		want    string
 	}{
 		{ImageTransformOptions{Format: ImageFormatPNG, Width: Ptr(1024), Fit: ImageFitScaleDown, Gravity: &ImageGravity{Side: "face"}, Trim: &ImageTrim{Border: &ImageTrimBorder{}}},
-			"imageTransform[fit=scale-down,format=png,gravity=face,trim=border,width=1024]"},
+			"fit=scale-down,format=png,gravity=face,trim=border,width=1024"},
 		{ImageTransformOptions{Rotate: Ptr(0), Gravity: &ImageGravity{Mode: "box-center", X: Ptr(0.25), Y: Ptr(0.5)}, Border: &ImageBorder{Color: "#fff", Width: Ptr(2.0)}},
-			"imageTransform[border%5Bcolor%5D=%23fff,border%5Bwidth%5D=2,gravity%5Bmode%5D=box-center,gravity%5Bx%5D=0.25,gravity%5By%5D=0.5,rotate=0]"},
+			"border.color=fff,border.width=2,gravity.mode=box-center,gravity.x=0.25,gravity.y=0.5,rotate=0"},
 		{ImageTransformOptions{Trim: &ImageTrim{Top: Ptr(10.0), Border: &ImageTrimBorder{}}},
-			"imageTransform[trim%5Bborder%5D=true,trim%5Btop%5D=10]"},
+			"trim.border=true,trim.top=10"},
 		{ImageTransformOptions{Trim: &ImageTrim{Border: &ImageTrimBorder{Color: "#000", Keep: Ptr(1.0)}}},
-			"imageTransform[trim%5Bborder%5D%5Bcolor%5D=%23000,trim%5Bborder%5D%5Bkeep%5D=1]"},
+			"trim.border.color=000,trim.border.keep=1"},
+		{ImageTransformOptions{Dpr: Ptr(1.5), Anim: Ptr(false), Quality: &ImageQuality{Level: ImageQualityLow}},
+			"anim=false,dpr=1.5,quality=low"},
+		{ImageTransformOptions{Quality: &ImageQuality{Value: 80}, Background: "#FFAA00"},
+			"background=ffaa00,quality=80"},
 	}
 	for _, c := range cases {
 		got, err := serializeTransform([]LensTransform{ImageTransform(c.options)})

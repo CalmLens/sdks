@@ -7,6 +7,17 @@ namespace CalmLens\Internal;
 /** @internal */
 final class Transforms
 {
+    private const OPTION_NAME = '/^[a-z][a-zA-Z0-9]*$/D';
+    // Options that hold colours, written as hex without `#` in a selector.
+    private const COLOUR_KEYS = ['background', 'border.color', 'trim.border.color'];
+    private const HEX_COLOUR = '/^#((?:[0-9a-f]{3}){1,2}|(?:[0-9a-f]{4}){1,2})$/iD';
+
+    /**
+     * Serializes structured transforms as a CDN selector, one path segment per step, such as
+     * `fit=cover,width=640/format=webp`. Option keys are sorted so equal transforms share a URL,
+     * nested keys are dotted (`border.color`), hex colours are written without `#` and values are
+     * percent-encoded. A selector string is returned unchanged.
+     */
     public static function selector(mixed $value): ?string
     {
         if ($value === null || is_string($value)) {
@@ -16,9 +27,9 @@ final class Transforms
             Values::invalid('Transform needs at least one step');
         }
         $steps = array_is_list($value) ? $value : [$value];
-        return implode(',', array_map(function ($step): string {
-            if (!is_array($step) || !is_string($step['type'] ?? null) || !preg_match('/^[A-Za-z0-9_]+$/D', $step['type'])) {
-                Values::invalid('Invalid transform type');
+        return implode('/', array_map(function ($step): string {
+            if (!is_array($step) || ($step['type'] ?? null) !== 'imageTransform') {
+                Values::invalid('Transform type must be "imageTransform"');
             }
             $options = $step['options'] ?? [];
             if ($options instanceof \stdClass) {
@@ -29,15 +40,23 @@ final class Transforms
             }
             $pairs = [];
             self::append($pairs, '', $options);
-            return $step['type'] . '[' . implode(',', $pairs) . ']';
+            if ($pairs === []) {
+                Values::invalid('Transform steps need at least one option');
+            }
+            return implode(',', $pairs);
         }, $steps));
     }
 
     private static function append(array &$pairs, string $prefix, array $options): void
     {
+        foreach (array_keys($options) as $key) {
+            if (!preg_match(self::OPTION_NAME, (string) $key)) {
+                Values::invalid('Transform option "' . $prefix . $key . '" is not a valid name');
+            }
+        }
         ksort($options, SORT_STRING);
         foreach ($options as $key => $value) {
-            $name = $prefix === '' ? (string) $key : $prefix . '[' . $key . ']';
+            $name = $prefix . $key;
             if ($value === null) {
                 continue;
             }
@@ -51,10 +70,14 @@ final class Transforms
                 if (array_is_list($value)) {
                     Values::invalid('Transform option arrays are not supported');
                 }
-                self::append($pairs, $name, $value);
-            } else {
-                $pairs[] = rawurlencode($name) . '=' . rawurlencode(Values::scalar($value));
+                self::append($pairs, $name . '.', $value);
+                continue;
             }
+            $text = Values::scalar($value);
+            if (is_string($value) && in_array($name, self::COLOUR_KEYS, true) && preg_match(self::HEX_COLOUR, $value, $match)) {
+                $text = strtolower($match[1]);
+            }
+            $pairs[] = $name . '=' . rawurlencode($text);
         }
     }
 
@@ -67,6 +90,7 @@ final class Transforms
         if (str_contains($value, '..') || strpbrk($value, '?#') !== false) {
             Values::invalid('Unsafe transform path');
         }
-        return preg_replace_callback("/[^A-Za-z0-9\-_.!~*'();\/:@&=+$,\[\]]/", fn ($m) => rawurlencode($m[0]), $value);
+        // Like JavaScript's encodeURI.
+        return preg_replace_callback("/[^A-Za-z0-9\-_.!~*'();\/:@&=+$,]/", fn ($m) => rawurlencode($m[0]), $value);
     }
 }

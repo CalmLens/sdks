@@ -59,14 +59,14 @@ describe("getAssetUrl", () => {
     const base = { projectId: "project-1", assetIdentifier: "asset-1" };
     for (const extra of [
       { lens: "thumb" },
-      { transform: "imageTransform[width=10]" },
+      { transform: "width=10" },
       { allowAgeRestricted: true },
     ]) {
       expect(codeOf(() => getAssetUrl({ ...base, resource: "placeholder", ...extra }))).toBe(
         "sdk/invalid-argument",
       );
     }
-    for (const extra of [{ lens: "thumb" }, { transform: "imageTransform[width=10]" }]) {
+    for (const extra of [{ lens: "thumb" }, { transform: "width=10" }]) {
       expect(codeOf(() => getAssetUrl({ ...base, resource: "original", ...extra }))).toBe(
         "sdk/invalid-argument",
       );

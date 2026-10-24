@@ -91,8 +91,8 @@ module CalmLens
       URI.encode_www_form_component(text).gsub('+', '%20')
     end
 
-    # Splits an absolute URL into its parsed origin and its raw request target. URI rejects the
-    # literal brackets CDN transform selectors keep, so only the origin is parsed.
+    # Splits an absolute URL into its parsed origin and its raw request target. Only the origin is
+    # parsed, so the request target is sent exactly as the SDK built it.
     # @return [Array(URI::Generic, String)]
     def split_url(url)
       match = %r{\A([A-Za-z][A-Za-z0-9+.-]*://[^/?#]*)([^#]*)}.match(url.to_s)

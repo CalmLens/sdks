@@ -334,12 +334,12 @@ async fn validation_and_urls() {
     let both = CdnRequest {
         asset_identifier: "x".into(),
         lens: Some("one".into()),
-        transform: Some("imageTransform[format=avif]".into()),
+        transform: Some("format=avif".into()),
         ..Default::default()
     };
     assert_eq!(
         client.cdn().get_asset_url(&both).unwrap(),
-        "https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one,imageTransform[format=avif]"
+        "https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one/format=avif"
     );
 }
 
@@ -355,12 +355,12 @@ fn structured_transform_numbers_format_like_javascript() {
         (json!(-3), "-3"),
     ] {
         let step = Transform::Unknown {
-            transform_type: "blur".into(),
-            options: json!({ "radius": number }),
+            transform_type: "imageTransform".into(),
+            options: json!({ "blur": number }),
         };
         assert_eq!(
             CdnTransform::from(step).selector().unwrap(),
-            format!("blur[radius={text}]"),
+            format!("blur={text}"),
             "{number}"
         );
     }

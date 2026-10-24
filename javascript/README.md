@@ -208,7 +208,7 @@ For several lenses, use `ensureLenses()` to ensure them together: new definition
 const [normal, uhd] = await client.ensureLenses({ lenses: [normalLens, uhdLens] });
 ```
 
-The CDN uses named lenses with an `@` prefix in URLs, such as `/content/@picmagic-normal`. The SDK adds it automatically when you supply `lens`. Use `transform` for one-off direct transforms, either as structured steps, for example `client.cdn.serve({ assetIdentifier: assetId, transform: { type: "imageTransform", options: { format: "png", width: 1024 } } })`, or as a selector string such as `"imageTransform[format=png,width=1024]"`. Pass an array of steps to chain transforms. `assets.createSignedUrl` accepts the same forms. Supply either `lens` or `transform`, not both. The resolved lens version is part of CalmLens's CDN cache and ETag identity, so changing a lens with the next version invalidates prior derived output.
+The CDN uses named lenses with an `@` prefix in URLs, such as `/rendered/@picmagic-normal`. The SDK adds it automatically when you supply `lens`. Use `transform` for one-off direct transforms, either as structured steps, for example `client.cdn.serve({ assetIdentifier: assetId, transform: { type: "imageTransform", options: { format: "png", width: 1024 } } })`, or as a selector string with one path segment per step, such as `"width=1024,fit=cover/blur=12"`. Pass an array of steps to chain transforms. `assets.createSignedUrl` accepts the same forms. Supply a `lens`, a `transform` or both; the transform runs after the lens. The resolved lens version is part of CalmLens's CDN cache and ETag identity, so changing a lens with the next version invalidates prior derived output.
 
 ##### assets.list(options)
 

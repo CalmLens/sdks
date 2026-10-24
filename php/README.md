@@ -139,6 +139,12 @@ $response = $client->cdn->serve(['assetIdentifier' => $asset['id']]);
 // Check $response->getStatusCode(); read $response->getBody() in chunks, then close it.
 ```
 
+A `transform` is a selector string or one or more structured steps. A selector has one path
+segment per step, such as `fit=cover,width=640/format=webp`, and a lens and a transform are
+joined with `/` (`/rendered/@thumbnail/width=320`). Structured options are sorted, nested
+options are dotted (`border.color`) and hex colours drop the `#`, so the example above builds
+`.../rendered/format=webp,width=640`.
+
 CDN `serve` returns a streaming PSR-7 response, including HTTP error responses. Its
 `init` option accepts `method` (`GET` or `HEAD`) and `headers` (e.g. `Range`). Signed
 URLs let browsers access private content without your API key; `createSignedUrl` takes

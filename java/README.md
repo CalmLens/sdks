@@ -177,7 +177,7 @@ A public asset whose moderation status is `age-restricted` is served from its pu
 To transform an asset without a saved lens, pass `transform` (here or on `SignedUrlOptions`) either a selector string or structured steps, which the SDK serializes with sorted, encoded options:
 
 ```java
-client.cdn.getAssetUrl(new CdnRequest(id).transform("imageTransform[format=png,width=1024]"));
+client.cdn.getAssetUrl(new CdnRequest(id).transform("format=png,width=1024"));
 client.cdn.getAssetUrl(new CdnRequest(id).transform(
     Transform.image(new ImageTransformOptions().format("png").width(1024))));
 client.cdn.getAssetUrl(new CdnRequest(id).transform(List.of(
@@ -186,7 +186,7 @@ client.cdn.getAssetUrl(new CdnRequest(id).transform(List.of(
     Transform.image(new ImageTransformOptions().format("webp")))));
 ```
 
-A lens runs before any additional transforms.
+A selector has one path segment per step, such as `fit=cover,width=640/format=webp`: options are sorted `key=value` pairs, nested options are dotted (`border.color=fff`) and hex colours drop the `#`. A lens runs before any additional transforms, and the two are joined with `/` (`/rendered/@thumbnail/width=320`). `quality` takes `Quality.of(80)` or `Quality.level("high")`.
 
 `readAllBytes(maxBytes)` buffers a body up to a limit. A stream read that receives nothing for the client's `timeout` fails with `HttpTimeoutException`; pass `new RequestOptions().timeout(...)` to change it per call. Use `assets.createSignedUrl` for private content in browsers.
 

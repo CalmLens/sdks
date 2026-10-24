@@ -395,10 +395,10 @@ describe("MockCalmLensServerClient", () => {
     expect(
       client.cdn.getAssetUrl({
         assetIdentifier: "asset-id",
-        transform: "imageTransform[format=png,width=1024]",
+        transform: "width=1024,format=png/blur=2",
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/imageTransform[format=png,width=1024]`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/width=1024,format=png/blur=2`,
     );
 
     expect(
@@ -406,9 +406,7 @@ describe("MockCalmLensServerClient", () => {
         assetIdentifier: "asset-id",
         transform: { type: "imageTransform", options: { width: 1024, format: "png" } },
       }),
-    ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/imageTransform[format=png,width=1024]`,
-    );
+    ).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/rendered/format=png,width=1024`);
 
     expect(
       client.cdn.getAssetUrl({
@@ -419,7 +417,7 @@ describe("MockCalmLensServerClient", () => {
         ],
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/imageTransform[border%5Bcolor%5D=%23fff,border%5Bwidth%5D=2],imageTransform[format=webp]`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/border.color=fff,border.width=2/format=webp`,
     );
 
     expect(() =>

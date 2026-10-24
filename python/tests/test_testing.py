@@ -43,7 +43,7 @@ class MockTests(unittest.TestCase):
         signed = c.assets.create_signed_url({"assetId": a["id"], "expiresInSeconds": 1})
         self.assertEqual(signed["expiresAt"], 1123)
         signed = c.assets.create_signed_url(asset_id=a["id"], transform={"type": "imageTransform", "options": {"width": 64}})
-        self.assertEqual(parse_qs(urlsplit(signed["url"]).query)["transform"], ["imageTransform[width=64]"])
+        self.assertEqual(parse_qs(urlsplit(signed["url"]).query)["transform"], ["width=64"])
 
     def test_content_kept_only_until_processing_finishes_is_removed(self):
         c = MockCalmLensServerClient(api_key=DOWNLOAD, mock_options={"now": lambda: 123})

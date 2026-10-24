@@ -31,7 +31,7 @@ final class Cdn extends Resource
             $url .= '/@' . Values::segment($options['lens']);
         }
         if (isset($options['transform']) && $options['transform'] !== '') {
-            $url .= (isset($options['lens']) ? ',' : '/') . Transforms::path($options['transform']);
+            $url .= '/' . Transforms::path($options['transform']);
         }
         // Opts a public age-restricted asset in to its public URL; only for viewers your app has
         // already decided may see age-restricted content. Without it, use a signed URL or the API key.

@@ -136,7 +136,7 @@ class ModelsTest {
     Models.Lens lens = Json.GSON.fromJson("""
         {"identifier": "card", "type": "image", "transforms": [
           {"type": "imageTransform", "options": {
-            "format": "webp", "width": 640,
+            "format": "webp", "width": 640, "quality": "medium", "dpr": 1.5, "anim": false,
             "border": {"color": "#000", "width": 2},
             "gravity": {"mode": "box-center", "x": 0.5},
             "trim": {"top": 4, "border": {"tolerance": 0.2}}}},
@@ -146,6 +146,9 @@ class ModelsTest {
     Models.ImageTransformOptions first = lens.transforms().get(0).options();
     assertEquals("webp", first.format());
     assertEquals(640, first.width());
+    assertEquals(Models.Quality.level("medium"), first.quality());
+    assertEquals(1.5, first.dpr());
+    assertEquals(false, first.anim());
     assertEquals(new Models.ImageBorder("#000", 2.0), first.border());
     assertEquals(Models.Gravity.point("box-center", 0.5, null), first.gravity());
     assertEquals(Models.Trim.edges(new Models.TrimEdges().top(4.0).border(Models.TrimBorder.options(null, 0.2, null))), first.trim());
@@ -170,10 +173,10 @@ class ModelsTest {
     assertEquals(transform, Json.GSON.fromJson(Json.GSON.toJson(transform), Models.Transform.class));
 
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").build();
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[format=avif,gravity=entropy,trim%5Bborder%5D=true,trim%5Bleft%5D=3]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/format=avif,gravity=entropy,trim.border=true,trim.left=3",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(transform)));
     Models.Transform point = Models.Transform.image(new Models.ImageTransformOptions().gravity(Models.Gravity.point("remainder", 0.25, 1.0)));
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[gravity%5Bmode%5D=remainder,gravity%5Bx%5D=0.25,gravity%5By%5D=1]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/gravity.mode=remainder,gravity.x=0.25,gravity.y=1",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(List.of(point))));
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {

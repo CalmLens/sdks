@@ -86,7 +86,7 @@ func TestMockLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	signedURL, err := url.Parse(signed.URL)
-	if err != nil || signedURL.Query().Get("transform") != "imageTransform[border%5Bcolor%5D=%23fff,width=64]" {
+	if err != nil || signedURL.Query().Get("transform") != "border.color=fff,width=64" {
 		t.Fatal(signed.URL, err)
 	}
 }

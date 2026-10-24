@@ -296,19 +296,15 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 		}
 		endpoint += "/@" + lens
 	}
-	separator := "/"
-	if options.Lens != "" {
-		separator = ","
-	}
 	if options.TransformSteps != nil {
-		// Serialized steps are already path-safe: unreserved characters, escapes, "[", "]", "=" and ",".
-		endpoint += separator + transform
+		// Serialized steps are already path-safe: unreserved characters, escapes, "=", "," and "/".
+		endpoint += "/" + transform
 	} else if transform != "" {
 		path, err := transformPath(transform)
 		if err != nil {
 			return "", err
 		}
-		endpoint += separator + path
+		endpoint += "/" + path
 	}
 	if options.AllowAgeRestricted {
 		endpoint += "?allowAgeRestricted=true"

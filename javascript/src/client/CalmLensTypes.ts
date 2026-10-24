@@ -113,15 +113,22 @@ export type SearchAssetsOptions = Partial<AssetSearchQuery> & { query: string };
 
 /** Options for the built-in `imageTransform` lens transform. */
 export interface ImageTransformOptions {
+  /** Leave it out to serve the best format the browser accepts. */
   format?: "jpg" | "png" | "webp" | "avif" | "gif";
+  /** 1 to 10,000 pixels, after `dpr`. With a size and no `fit`, the image scales down. */
   width?: number;
   height?: number;
+  /** Pixel density, 1 to 3: multiplies `width`, `height` and the border width. */
+  dpr?: number;
+  /** `false` serves the first frame of an animated GIF or WebP. */
+  anim?: boolean;
   background?: string;
   blur?: number;
   border?: { color?: string; width?: number };
   brightness?: number;
   contrast?: number;
-  quality?: number;
+  /** 1 to 100, or a level. Lossy output defaults to `high`. */
+  quality?: number | "low" | "medium" | "high";
   fit?: "scale-down" | "contain" | "pad" | "squeeze" | "cover" | "crop";
   flip?: "h" | "v" | "hv";
   gamma?: number;
@@ -162,8 +169,9 @@ export interface ImageTransform {
 export type LensTransform = ImageTransform;
 
 /**
- * A CDN transform: a selector string such as `imageTransform[format=png,width=1024]`, or one
- * or more structured steps such as `{ type: "imageTransform", options: { format: "png" } }`.
+ * A CDN transform: a selector string with one step per path segment, such as
+ * `width=1024,fit=cover/blur=12`, or one or more structured steps such as
+ * `{ type: "imageTransform", options: { width: 1024 } }`.
  */
 export type CdnTransform = string | LensTransform | LensTransform[];
 

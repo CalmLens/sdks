@@ -588,6 +588,52 @@ public final class Models {
     }
   }
 
+  /** An image transform's output quality: a number from 1 to 100, or a level. */
+  @JsonAdapter(Quality.Adapter.class)
+  public static final class Quality {
+    private final Integer value;
+    private final String level;
+
+    private Quality(Integer value, String level) { this.value = value; this.level = level; }
+
+    /**
+     * @param value a quality from 1 to 100
+     * @return a numeric quality
+     */
+    public static Quality of(int value) { return new Quality(value, null); }
+
+    /**
+     * @param level {@code low}, {@code medium} or {@code high}
+     * @return a quality level
+     */
+    public static Quality level(String level) { return new Quality(null, Objects.requireNonNull(level, "level")); }
+
+    /** @return the numeric quality, or null for a level */
+    public Integer value() { return value; }
+    /** @return the level, or null for a numeric quality */
+    public String level() { return level; }
+
+    @Override public boolean equals(Object other) {
+      return other instanceof Quality q && Objects.equals(q.value, value) && Objects.equals(q.level, level);
+    }
+    @Override public int hashCode() { return Objects.hash(value, level); }
+    @Override public String toString() { return level != null ? level : String.valueOf(value); }
+
+    static final class Adapter extends TypeAdapter<Quality> {
+      @Override public void write(JsonWriter out, Quality quality) throws IOException {
+        if (quality == null) out.nullValue();
+        else if (quality.level != null) out.value(quality.level);
+        else out.value(quality.value);
+      }
+
+      @Override public Quality read(JsonReader in) throws IOException {
+        if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
+        if (in.peek() == JsonToken.STRING) return level(in.nextString());
+        return of(in.nextInt());
+      }
+    }
+  }
+
   private static Double number(JsonObject object, String name) {
     JsonElement value = object.get(name);
     return value == null || value.isJsonNull() ? null : value.getAsDouble();
@@ -749,8 +795,10 @@ public final class Models {
    */
   public static final class ImageTransformOptions {
     private String format, background, fit, flip, segment;
-    private Integer width, height, quality, rotate;
-    private Double blur, brightness, contrast, gamma, saturation, sharpen;
+    private Integer width, height, rotate;
+    private Quality quality;
+    private Double dpr, blur, brightness, contrast, gamma, saturation, sharpen;
+    private Boolean anim;
     private ImageBorder border;
     private Gravity gravity;
     private Trim trim;
@@ -761,13 +809,17 @@ public final class Models {
     public ImageTransformOptions format(String value) { format = value; return this; }
     public ImageTransformOptions width(Integer value) { width = value; return this; }
     public ImageTransformOptions height(Integer value) { height = value; return this; }
+    /** @param value pixel density from 1 to 3, multiplying the width, height and border width @return these options */
+    public ImageTransformOptions dpr(Double value) { dpr = value; return this; }
+    /** @param value false to serve the first frame of an animated image @return these options */
+    public ImageTransformOptions anim(Boolean value) { anim = value; return this; }
     public ImageTransformOptions background(String value) { background = value; return this; }
     public ImageTransformOptions blur(Double value) { blur = value; return this; }
     public ImageTransformOptions border(ImageBorder value) { border = value; return this; }
     public ImageTransformOptions brightness(Double value) { brightness = value; return this; }
     public ImageTransformOptions contrast(Double value) { contrast = value; return this; }
-    /** @param value quality from 0 to 255 @return these options */
-    public ImageTransformOptions quality(Integer value) { quality = value; return this; }
+    /** @param value a quality from 1 to 100 or a level; lossy output defaults to {@code high} @return these options */
+    public ImageTransformOptions quality(Quality value) { quality = value; return this; }
     public ImageTransformOptions fit(String value) { fit = value; return this; }
     public ImageTransformOptions flip(String value) { flip = value; return this; }
     public ImageTransformOptions gamma(Double value) { gamma = value; return this; }
@@ -785,6 +837,10 @@ public final class Models {
     public Integer width() { return width; }
     /** @return the height in pixels */
     public Integer height() { return height; }
+    /** @return the pixel density */
+    public Double dpr() { return dpr; }
+    /** @return false to serve the first frame of an animated image */
+    public Boolean anim() { return anim; }
     /** @return the background colour */
     public String background() { return background; }
     /** @return the blur radius */
@@ -796,7 +852,7 @@ public final class Models {
     /** @return the contrast factor */
     public Double contrast() { return contrast; }
     /** @return the quality */
-    public Integer quality() { return quality; }
+    public Quality quality() { return quality; }
     /** @return how the image fits the box */
     public String fit() { return fit; }
     /** @return the flip direction */
@@ -1208,7 +1264,7 @@ public final class Models {
     public SignedUrlOptions resource(String value) { resource = value; return this; }
     public SignedUrlOptions lens(String value) { lens = value; return this; }
     /**
-     * @param value a CDN selector, such as {@code imageTransform[format=png,width=1024]}
+     * @param value a CDN selector with one step per path segment, such as {@code fit=cover,width=1024/blur=12}
      * @return these options
      */
     public SignedUrlOptions transform(String value) { transform = value; return this; }
@@ -1353,7 +1409,7 @@ public final class Models {
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
-     * @param value a CDN selector, such as {@code imageTransform[format=png,width=1024]}
+     * @param value a CDN selector with one step per path segment, such as {@code fit=cover,width=1024/blur=12}
      * @return these options
      */
     public CdnRequest transform(String value) { transform = value; return this; }

@@ -138,14 +138,14 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
 
 `cdn().get_asset_url(&CdnRequest)` builds an asset's CDN URL. `cdn().serve(CdnRequest)` fetches it with your API key and returns a streaming `CdnResponse` whatever its status, with `status()` and `headers()`. Read it with `chunk().await`, `into_stream()` or `bytes().await`; drop an unfinished response to close it. `HttpOptions` sets the method and headers, for `HEAD` or a `Range` request; the SDK always sends its own API key.
 
-`resource` is `CdnResource::Rendered` (the default), `CdnResource::Original` or `CdnResource::Placeholder`; only the rendered resource takes a lens or transform. Set `lens` to deliver through a named lens, or `transform` to a `CdnTransform`: a selector string, one `Transform` step or a `Vec<Transform>` of steps. Structured steps become a selector with sorted, percent-encoded options, so equal transforms share a URL. `assets().create_signed_url` takes the same `transform`. Set both `lens` and `transform` to apply the lens first, then the extra transforms.
+`resource` is `CdnResource::Rendered` (the default), `CdnResource::Original` or `CdnResource::Placeholder`; only the rendered resource takes a lens or transform. Set `lens` to deliver through a named lens, or `transform` to a `CdnTransform`: a selector string, one `Transform` step or a `Vec<Transform>` of steps. A selector has one path segment per step, such as `fit=cover,width=640/format=webp`, and a lens and a transform are joined with `/` (`/rendered/@thumbnail/width=320`). Structured steps become a selector with sorted, percent-encoded options, dotted nested keys (`border.color`) and hex colours without `#`, so equal transforms share a URL. `assets().create_signed_url` takes the same `transform`. Set both `lens` and `transform` to apply the lens first, then the extra transforms.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only with `allow_age_restricted: Some(true)`, which appends `?allowAgeRestricted=true`; otherwise it needs a signed URL or an API key. Set it only where your app has already decided the viewer may see age-restricted content.
 
 ```rust
 let url = client.cdn().get_asset_url(&CdnRequest {
     asset_identifier: "asset-1".into(),
-    transform: Some("imageTransform[format=png,width=1024]".into()),
+    transform: Some("format=png,width=1024".into()),
     ..Default::default()
 })?;
 let same = client.cdn().get_asset_url(&CdnRequest {

@@ -696,7 +696,8 @@ fn transform(value: &str) -> Result<String> {
             "Transform cannot contain \"..\", \"?\" or \"#\"",
         ));
     }
-    Ok(percent_encode(value, b"-_.!~*'();/:@&=+$,[]"))
+    // Like JavaScript's encodeURI.
+    Ok(percent_encode(value, b"-_.!~*'();/:@&=+$,"))
 }
 
 /// Asset operations. Get it from [`ServerClient::assets`].
@@ -1132,14 +1133,10 @@ impl CdnClient<'_> {
             url.push_str(&format!("/@{}", id(lens)?));
         }
         if let Some(value) = options.transform.as_ref().filter(|v| !v.is_empty()) {
-            url.push(if options.lens.as_deref().is_some_and(|v| !v.is_empty()) {
-                ','
-            } else {
-                '/'
-            });
+            url.push('/');
             match value {
                 CdnTransform::Selector(value) => url.push_str(&transform(value)?),
-                // Already path-safe: unreserved characters, percent escapes, brackets, `=` and `,`.
+                // Already path-safe: unreserved characters, percent escapes, `=`, `,` and `/`.
                 CdnTransform::Steps(_) => url.push_str(&value.selector()?),
             }
         }

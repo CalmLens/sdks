@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -319,10 +320,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
   }
 
-  /**
-   * Encodes a CDN transform selector string like JavaScript's encodeURI, keeping its separators
-   * and the literal {@code [} and {@code ]} the CDN matches.
-   */
+  /** Encodes a CDN transform selector string like JavaScript's encodeURI, keeping its separators. */
   private static String transformPath(String value) {
     String transform = value.replaceFirst("^/+", "");
     if (transform.contains("..") || transform.contains("?") || transform.contains("#"))
@@ -330,13 +328,16 @@ public final class CalmLensServerClient implements AutoCloseable {
     StringBuilder out = new StringBuilder();
     for (byte b : transform.getBytes(StandardCharsets.UTF_8)) {
       int c = b & 0xff;
-      if (c < 0x80 && (Character.isLetterOrDigit(c) || "-_.!~*'();/:@&=+$,[]".indexOf(c) >= 0)) out.append((char) c);
+      if (c < 0x80 && (Character.isLetterOrDigit(c) || "-_.!~*'();/:@&=+$,".indexOf(c) >= 0)) out.append((char) c);
       else out.append(String.format("%%%02X", c));
     }
     return out.toString();
   }
 
-  private static final Pattern TRANSFORM_TYPE = Pattern.compile("^[A-Za-z0-9_]+$");
+  private static final Pattern TRANSFORM_OPTION_NAME = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
+  /** Options that hold colours, written as hex without {@code #} in a selector. */
+  private static final Set<String> TRANSFORM_COLOUR_KEYS = Set.of("background", "border.color", "trim.border.color");
+  private static final Pattern HEX_COLOUR = Pattern.compile("^#((?:[0-9a-fA-F]{3}){1,2}|(?:[0-9a-fA-F]{4}){1,2})$");
 
   /** The selector the API accepts: a string as given, or structured steps serialized. */
   private static String transformSelector(Object transform) {
@@ -344,9 +345,10 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /**
-   * Serializes structured transforms as a CDN selector, such as
-   * {@code imageTransform[format=png,width=1024]}. Option keys are sorted so equal transforms share
-   * a URL; nested keys ({@code border[color]}) and values are percent-encoded.
+   * Serializes structured transforms as a CDN selector, one path segment per step, such as
+   * {@code fit=cover,width=640/format=webp}. Option keys are sorted so equal transforms share a URL,
+   * nested keys are dotted ({@code border.color}), hex colours are written without {@code #} and
+   * values are percent-encoded.
    */
   private static String serializeTransform(Object transform) {
     List<?> steps = transform instanceof List<?> list ? list : List.of(transform);
@@ -354,14 +356,14 @@ public final class CalmLensServerClient implements AutoCloseable {
     List<String> selectors = new ArrayList<>();
     for (Object item : steps) {
       if (!(item instanceof Models.Transform step)) throw argument("Transform steps must be transforms");
-      if (step.type() == null || !TRANSFORM_TYPE.matcher(step.type()).matches())
-        throw argument("Transform type must contain only letters, digits and underscores");
+      if (!Models.Transform.IMAGE.equals(step.type())) throw argument("Transform type must be \"imageTransform\"");
       Map<?, ?> options = transformOptions(step.options());
       List<String> pairs = new ArrayList<>();
-      for (String key : sortedKeys(options)) appendTransformOption(pairs, key, options.get(key));
-      selectors.add(step.type() + "[" + String.join(",", pairs) + "]");
+      for (String key : sortedKeys(options, "")) appendTransformOption(pairs, key, options.get(key));
+      if (pairs.isEmpty()) throw argument("Transform steps need at least one option");
+      selectors.add(String.join(",", pairs));
     }
-    return String.join(",", selectors);
+    return String.join("/", selectors);
   }
 
   /** Returns the options as nested maps of their wire values, or an empty map for none. */
@@ -374,10 +376,11 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
   }
 
-  private static List<String> sortedKeys(Map<?, ?> map) {
+  private static List<String> sortedKeys(Map<?, ?> map, String prefix) {
     List<String> keys = new ArrayList<>();
     for (Object key : map.keySet()) {
-      if (!(key instanceof String text)) throw argument("Transform option keys must be strings");
+      if (!(key instanceof String text) || !TRANSFORM_OPTION_NAME.matcher(text).matches())
+        throw argument("Transform option \"" + prefix + key + "\" is not a valid name");
       keys.add(text);
     }
     keys.sort(null);
@@ -387,15 +390,18 @@ public final class CalmLensServerClient implements AutoCloseable {
   private static void appendTransformOption(List<String> pairs, String key, Object value) {
     if (value == null) return;
     if (value instanceof Map<?, ?> map) {
-      for (String child : sortedKeys(map)) appendTransformOption(pairs, key + "[" + child + "]", map.get(child));
+      for (String child : sortedKeys(map, key + ".")) appendTransformOption(pairs, key + "." + child, map.get(child));
       return;
     }
     String text;
-    if (value instanceof String string) text = string;
+    if (value instanceof String string) {
+      Matcher hex = TRANSFORM_COLOUR_KEYS.contains(key) ? HEX_COLOUR.matcher(string) : null;
+      text = hex != null && hex.matches() ? hex.group(1).toLowerCase(Locale.ROOT) : string;
+    }
     else if (value instanceof Boolean bool) text = bool.toString();
     else if (value instanceof Number number && finite(number)) text = jsNumber(number);
     else throw argument("Transform option \"" + key + "\" must be a string, number, boolean or map");
-    pairs.add(encodeTransformComponent(key) + "=" + encodeTransformComponent(text));
+    pairs.add(key + "=" + encodeTransformComponent(text));
   }
 
   private static boolean finite(Number number) {
@@ -1168,10 +1174,9 @@ public final class CalmLensServerClient implements AutoCloseable {
       }
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
       if (o.has("lens") && !o.get("lens").isJsonNull()) url += "/@" + id(o.get("lens").getAsString());
-      String separator = o.has("lens") && !o.get("lens").isJsonNull() ? "," : "/";
-      if (transform instanceof String text) { if (!text.isEmpty()) url += separator + transformPath(text); }
-      // A serialized selector is already path-safe: unreserved characters, escapes, brackets, "=" and ",".
-      else if (transform != null) url += separator + serializeTransform(transform);
+      if (transform instanceof String text) { if (!text.isEmpty()) url += "/" + transformPath(text); }
+      // A serialized selector is already path-safe: unreserved characters, escapes, "=", "," and "/".
+      else if (transform != null) url += "/" + serializeTransform(transform);
       if (o.has("allowAgeRestricted") && !o.get("allowAgeRestricted").isJsonNull() && o.get("allowAgeRestricted").getAsBoolean()) url += "?allowAgeRestricted=true";
       return url;
     }

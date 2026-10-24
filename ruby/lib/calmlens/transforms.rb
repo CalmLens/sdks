@@ -6,7 +6,10 @@ module CalmLens
   module Transforms
     module_function
 
-    TYPE = /\A[A-Za-z0-9_]+\z/
+    OPTION_NAME = /\A[a-z][a-zA-Z0-9]*\z/
+    # Options that hold colours, written as hex without `#` in a selector.
+    COLOUR_KEYS = %w[background border.color trim.border.color].freeze
+    HEX_COLOUR = /\A#((?:\h{3}){1,2}|(?:\h{4}){1,2})\z/
 
     # Returns the selector the API and CDN accept for a transform: a selector String unchanged, or
     # structured steps (`{type:, options:}` or an Array of them) serialized by {serialize}.
@@ -14,21 +17,21 @@ module CalmLens
       value.nil? || value.is_a?(String) ? value : serialize(value)
     end
 
-    # Builds the CDN path of a transform. A selector String keeps its own separators and literal
-    # `[`/`]`, which the CDN matches; serialized steps are already path-safe.
+    # Builds the CDN path of a transform. A selector String keeps its own step separators and is
+    # encoded like JavaScript's encodeURI; serialized steps are already path-safe.
     def path(value)
       return serialize(value) unless value.is_a?(String)
 
       text = value.sub(%r{\A/+}, '')
       raise Internal.invalid('Transform cannot contain "..", "?" or "#"') if text.include?('..') || text.match?(/[?#]/)
 
-      # Like JavaScript's encodeURI, except that brackets stay literal.
-      text.b.gsub(%r{[^A-Za-z0-9\-_.!~*'();/:@&=+$,\[\]]}n) { |byte| format('%%%02X', byte.ord) }
+      # Like JavaScript's encodeURI.
+      text.b.gsub(%r{[^A-Za-z0-9\-_.!~*'();/:@&=+$,]}n) { |byte| format('%%%02X', byte.ord) }
     end
 
-    # Serializes structured transforms as a CDN selector such as `imageTransform[format=png,width=1024]`.
-    # Option keys are sorted so equal transforms share a URL; nested keys (`border[color]`) and values
-    # are percent-encoded.
+    # Serializes structured transforms as a CDN selector, one path segment per step, such as
+    # `fit=cover,width=640/format=webp`. Option keys are sorted so equal transforms share a URL, nested
+    # keys are dotted (`border.color`), hex colours are written without `#` and values are percent-encoded.
     def serialize(value)
       steps = value.is_a?(Array) ? value : [value]
       raise Internal.invalid('Transform needs at least one step') if steps.empty?
@@ -37,35 +40,48 @@ module CalmLens
         raise Internal.invalid('Transform steps must be Hashes') unless step.is_a?(Hash)
 
         step = step.transform_keys(&:to_s)
-        type = step['type']
-        unless type.is_a?(String) && type.match?(TYPE)
-          raise Internal.invalid('Transform type must contain only letters, digits and underscores')
-        end
+        raise Internal.invalid('Transform type must be "imageTransform"') unless step['type'] == 'imageTransform'
 
         options = step['options'] || {}
         raise Internal.invalid('Transform options must be a Hash') unless options.is_a?(Hash)
 
         pairs = []
         sorted_options(options).each { |key, item| append_pairs(pairs, key, item) }
-        "#{type}[#{pairs.join(',')}]"
-      end.join(',')
+        raise Internal.invalid('Transform steps need at least one option') if pairs.empty?
+
+        pairs.join(',')
+      end.join('/')
     end
 
-    def sorted_options(options) = options.map { |key, item| [key.to_s, item] }.sort_by(&:first)
+    def sorted_options(options, prefix = '')
+      options.map do |key, item|
+        name = key.to_s
+        raise Internal.invalid("Transform option \"#{prefix}#{name}\" is not a valid name") unless name.match?(OPTION_NAME)
+
+        [name, item]
+      end.sort_by(&:first)
+    end
 
     def append_pairs(pairs, key, value)
       return if value.nil?
-      return sorted_options(value).each { |child, item| append_pairs(pairs, "#{key}[#{child}]", item) } if value.is_a?(Hash)
+      return sorted_options(value, "#{key}.").each { |child, item| append_pairs(pairs, "#{key}.#{child}", item) } if value.is_a?(Hash)
 
       text = case value
-             when String, true, false, Integer then value.to_s
+             when String then colour(key, value)
+             when true, false, Integer then value.to_s
              when Float
                raise Internal.invalid("Transform option \"#{key}\" must be a finite number") unless value.finite?
 
                js_number(value)
              else raise Internal.invalid("Transform option \"#{key}\" must be a String, number, boolean or Hash")
              end
-      pairs << "#{component(key)}=#{component(text)}"
+      pairs << "#{key}=#{component(text)}"
+    end
+
+    # Writes a hex colour option without `#`, in lower case; other values are unchanged.
+    def colour(key, value)
+      match = COLOUR_KEYS.include?(key) && HEX_COLOUR.match(value)
+      match ? match[1].downcase : value
     end
 
     # Percent-encodes everything except RFC 3986 unreserved characters.

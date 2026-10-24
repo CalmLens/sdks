@@ -454,7 +454,7 @@ A transform is either a selector string or structured steps (`CDN.GetAssetURL`,
 // Selector string.
 url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{
     AssetIdentifier: "asset-id",
-    Transform:       "imageTransform[format=png,width=1024]",
+    Transform:       "format=png,width=1024",
 })
 
 // Structured steps, serialized to the same selector.
@@ -468,8 +468,11 @@ url, err = client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{
 
 `ImageTransformOptions` types every image option; `Gravity` and `Trim` accept both the
 named form (`&calmlens.ImageGravity{Side: "face"}`, `&calmlens.ImageTrim{Border: &calmlens.ImageTrimBorder{}}`)
-and the detailed form. Other transform types take any `Options` value that encodes as a JSON
-object.
+and the detailed form, and `Quality` takes a number (`&calmlens.ImageQuality{Value: 80}`) or a
+level (`&calmlens.ImageQuality{Level: calmlens.ImageQualityHigh}`). A selector has one path
+segment per step, such as `fit=cover,width=640/format=webp`: options are sorted `key=value`
+pairs, nested options are dotted (`border.color=ff0000`) and hex colours drop the `#`. A lens
+and a transform are joined with `/`, as in `/rendered/@thumbnail/width=320`.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
 when the URL carries `?allowAgeRestricted=true`; otherwise it needs a signed URL or an API key. Set

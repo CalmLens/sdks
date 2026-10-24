@@ -1133,7 +1133,7 @@ pub struct CdnRequest {
     /// A lens identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lens: Option<String>,
-    /// A transform: a selector such as `imageTransform[width=320]` or structured steps.
+    /// A transform: a selector such as `width=320` or structured steps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
     /// `Some(true)` appends `?allowAgeRestricted=true`, so the CDN serves a public asset whose
@@ -2401,13 +2401,14 @@ impl<'de> Deserialize<'de> for Transform {
 
 /// A direct CDN transform: a selector string or one or more structured [`Transform`] steps.
 ///
-/// `"imageTransform[width=320]".into()`, `Transform::image(..).into()` and a
-/// `Vec<Transform>` all convert into it. Structured steps serialize to a selector with
-/// option keys sorted, nested objects as `parent[child]` keys, and keys and values
-/// percent-encoded, so equal transforms share a URL.
+/// `"width=320".into()`, `Transform::image(..).into()` and a `Vec<Transform>` all convert into
+/// it. Structured steps serialize to a selector with one path segment per step, such as
+/// `fit=cover,width=640/format=webp`: option keys sorted, nested objects as dotted keys
+/// (`border.color`), hex colours without `#` and values percent-encoded, so equal transforms
+/// share a URL.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CdnTransform {
-    /// A selector string such as `imageTransform[format=png,width=1024]`.
+    /// A selector string with one step per path segment, such as `fit=cover,width=1024/blur=12`.
     Selector(String),
     /// Structured steps, applied in order. At least one is required.
     Steps(Vec<Transform>),
@@ -2418,8 +2419,9 @@ impl CdnTransform {
         matches!(self, Self::Selector(value) if value.is_empty())
     }
     /// The selector string the API and CDN accept. Fails with `sdk/invalid-argument` for
-    /// no steps, a type that isn't letters, digits and underscores, options that aren't an
-    /// object, or option values that are arrays.
+    /// no steps, a type other than `imageTransform`, options that aren't an object, a step
+    /// with no options, option names that aren't camelCase letters and digits, or option
+    /// values that are arrays.
     pub fn selector(&self) -> crate::Result<String> {
         let steps = match self {
             Self::Selector(value) => return Ok(value.clone()),
@@ -2430,11 +2432,8 @@ impl CdnTransform {
         }
         let mut selectors = Vec::with_capacity(steps.len());
         for step in steps {
-            let kind = step.transform_type();
-            if kind.is_empty() || !kind.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
-                return Err(transform_error(
-                    "Transform type must contain only letters, digits and underscores",
-                ));
+            if step.transform_type() != "imageTransform" {
+                return Err(transform_error("Transform type must be \"imageTransform\""));
             }
             let mut pairs = Vec::new();
             let options = step
@@ -2445,9 +2444,12 @@ impl CdnTransform {
                 Value::Object(options) => append_transform_options(&mut pairs, None, options)?,
                 _ => return Err(transform_error("Transform options must be an object")),
             }
-            selectors.push(format!("{kind}[{}]", pairs.join(",")));
+            if pairs.is_empty() {
+                return Err(transform_error("Transform steps need at least one option"));
+            }
+            selectors.push(pairs.join(","));
         }
-        Ok(selectors.join(","))
+        Ok(selectors.join("/"))
     }
 }
 impl From<&str> for CdnTransform {
@@ -2496,26 +2498,50 @@ impl<'de> Deserialize<'de> for CdnTransform {
 fn transform_error(message: &str) -> crate::Error {
     crate::Error::new(crate::ErrorCode::InvalidArgument, message)
 }
-/// Appends `key=value` pairs, keys sorted by code point at every level.
+/// Options that hold colours, written as hex without `#` in a selector.
+const TRANSFORM_COLOUR_KEYS: [&str; 3] = ["background", "border.color", "trim.border.color"];
+
+/// Whether `name` is a transform option name: a lower-case letter, then letters and digits.
+fn is_transform_option_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    bytes.next().is_some_and(|b| b.is_ascii_lowercase()) && bytes.all(|b| b.is_ascii_alphanumeric())
+}
+
+/// A colour option's hex value without `#`, in lower case, or `None` if it is not `#` and 3, 4,
+/// 6 or 8 hex digits.
+fn hex_colour(value: &str) -> Option<String> {
+    let digits = value.strip_prefix('#')?;
+    (matches!(digits.len(), 3 | 4 | 6 | 8) && digits.bytes().all(|b| b.is_ascii_hexdigit()))
+        .then(|| digits.to_ascii_lowercase())
+}
+
+/// Appends `key=value` pairs, keys sorted at every level.
 fn append_transform_options(
     pairs: &mut Vec<String>,
     parent: Option<&str>,
     options: &serde_json::Map<String, Value>,
 ) -> crate::Result<()> {
     let mut keys: Vec<&String> = options.keys().collect();
-    // JavaScript sorts by UTF-16 code unit; this matches it for every key without
-    // characters outside the Basic Multilingual Plane.
-    keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+    // Option names are ASCII, so byte order is JavaScript's UTF-16 order.
+    keys.sort();
     for key in keys {
         let full = match parent {
-            Some(parent) => format!("{parent}[{key}]"),
+            Some(parent) => format!("{parent}.{key}"),
             None => key.clone(),
         };
+        if !is_transform_option_name(key) {
+            return Err(transform_error(&format!(
+                "Transform option \"{full}\" is not a valid name"
+            )));
+        }
         let text = match &options[key] {
             Value::Null => continue,
             Value::Object(child) => {
                 append_transform_options(pairs, Some(&full), child)?;
                 continue;
+            }
+            Value::String(value) if TRANSFORM_COLOUR_KEYS.contains(&full.as_str()) => {
+                hex_colour(value).unwrap_or_else(|| value.clone())
             }
             Value::String(value) => value.clone(),
             Value::Bool(value) => value.to_string(),
@@ -2526,11 +2552,7 @@ fn append_transform_options(
                 )))
             }
         };
-        pairs.push(format!(
-            "{}={}",
-            encode_transform_component(&full),
-            encode_transform_component(&text)
-        ));
+        pairs.push(format!("{full}={}", encode_transform_component(&text)));
     }
     Ok(())
 }
@@ -2596,6 +2618,38 @@ string_enum! {
         Avif = "avif",
         /// GIF.
         Gif = "gif",
+    }
+}
+
+string_enum! {
+    /// A named image quality.
+    ImageQualityLevel {
+        /// Low quality, the smallest files.
+        Low = "low",
+        /// Medium quality.
+        Medium = "medium",
+        /// High quality.
+        High = "high",
+    }
+}
+
+/// An image quality: a number from 1 to 100 or a level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ImageQuality {
+    /// A number from 1 to 100.
+    Value(u32),
+    /// A level, such as `High`.
+    Level(ImageQualityLevel),
+}
+impl From<u32> for ImageQuality {
+    fn from(value: u32) -> Self {
+        Self::Value(value)
+    }
+}
+impl From<ImageQualityLevel> for ImageQuality {
+    fn from(value: ImageQualityLevel) -> Self {
+        Self::Level(value)
     }
 }
 
@@ -2803,6 +2857,12 @@ pub struct ImageTransformOptions {
     /// The height in pixels.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// The pixel density, 1 to 3: multiplies `width`, `height` and the border width.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpr: Option<f64>,
+    /// `false` serves the first frame of an animated image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anim: Option<bool>,
     /// The background colour, e.g. for `ImageFit::Pad`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
@@ -2818,9 +2878,9 @@ pub struct ImageTransformOptions {
     /// The contrast factor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contrast: Option<f64>,
-    /// The quality, 0 to 255.
+    /// The quality: 1 to 100, or a level. Lossy output defaults to `ImageQualityLevel::High`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quality: Option<u32>,
+    pub quality: Option<ImageQuality>,
     /// How the image fits the `width` and `height` box.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fit: Option<ImageFit>,

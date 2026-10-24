@@ -693,7 +693,7 @@ const (
 // SignedURLOptions requests a signed CDN URL. Resource is ResourceRendered (the server's
 // default when empty) or ResourceOriginal, which takes no lens or transform. ExpiresInSeconds
 // defaults to 900. Lens runs before Transform (a selector string such as
-// "imageTransform[format=png,width=1024]") or TransformSteps (structured steps, serialized
+// "format=png,width=1024") or TransformSteps (structured steps, serialized
 // to the same selector). Supply only one transform representation.
 type SignedURLOptions struct {
 	AssetID          string          `json:"-"`
@@ -819,7 +819,7 @@ type EventsPage struct {
 // CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
 // ID; Resource is "rendered" (default), "original" or "placeholder". Only "rendered" takes a
 // lens or transform; the Lens runs before extra transforms.
-// Supply Transform (a selector string such as "imageTransform[format=png,width=1024]")
+// Supply Transform (a selector string such as "format=png,width=1024")
 // or TransformSteps (structured steps; a non-nil empty slice is rejected), not both.
 type CDNAssetURLOptions struct {
 	AssetIdentifier string

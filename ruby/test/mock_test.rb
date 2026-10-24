@@ -108,9 +108,9 @@ class MockTest < Minitest::Test
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
     transform = { type: 'imageTransform', options: { width: 10, border: { color: '#fff' } } }
     assert_equal 'hello', mock.cdn.serve(asset_identifier: asset['id'], transform: transform).body
-    assert_equal "/assets/project-1/#{asset['id']}/rendered/imageTransform[border%5Bcolor%5D=%23fff,width=10]", mock.requests.last.path
+    assert_equal "/assets/project-1/#{asset['id']}/rendered/border.color=fff,width=10", mock.requests.last.path
     signed = URI(mock.assets.create_signed_url(asset_id: asset['id'], transform: transform)['url'])
-    assert_equal 'imageTransform[border%5Bcolor%5D=%23fff,width=10]', URI.decode_www_form(signed.query).to_h['transform']
+    assert_equal 'border.color=fff,width=10', URI.decode_www_form(signed.query).to_h['transform']
   end
 
   def test_cdn_serve_passes_the_age_restricted_parameter_and_rejects_non_booleans

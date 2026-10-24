@@ -279,12 +279,15 @@ transform. Use either `lens` or `transform`. A `transform` is a selector string 
 steps (the shape of a lens's `transforms`); both forms also work for `assets.create_signed_url`:
 
 ```python
-client.cdn.get_asset_url(asset_identifier=queued["id"], transform="imageTransform[format=png,width=1024]")
+client.cdn.get_asset_url(asset_identifier=queued["id"], transform="format=png,width=1024")
 client.cdn.get_asset_url(asset_identifier=queued["id"],
                          transform={"type": "imageTransform", "options": {"format": "png", "width": 1024}})
 ```
 
-Structured options are sorted and percent-encoded, so both calls return the same URL. `serve` returns a `CDNResponse` (`status`, `ok`, `headers`,
+A selector has one path segment per step, such as `fit=cover,width=640/format=webp`, and a lens
+and a transform are joined with `/` (`/rendered/@thumbnail/width=320`). Structured options are
+sorted, nested options are dotted (`border.color`), hex colours drop the `#` and values are
+percent-encoded, so both calls return the same URL. `serve` returns a `CDNResponse` (`status`, `ok`, `headers`,
 `content_type`, `request_id`, `read()`, `iter_bytes()`, `close()`) even for non-2xx responses;
 check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
 

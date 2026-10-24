@@ -225,8 +225,8 @@ class ClientTest {
     CalmLensServerClient client = client(request -> fail("Validation made an HTTP request"));
     assertEquals(ErrorCodes.INVALID_UPLOAD_PAYLOAD, assertThrows(CalmLensException.class,
         () -> client.assets.create(new Models.SubmitAsset("x", new Models.Content().base64("!").mimeType("text/plain")))).getCode());
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one,imageTransform[format=avif]",
-        client.cdn.getAssetUrl(new Models.CdnRequest("x").lens("one").transform("imageTransform[format=avif]")));
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one/format=avif/%5Bx%5D",
+        client.cdn.getAssetUrl(new Models.CdnRequest("x").lens("one").transform("format=avif/[x]")));
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> client.assets.retrieve(new Models.AssetId(""))).getCode());
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> client.assets.retrieve(null)).getCode());
     for (String value : List.of("a\r\nX-Injected: 1", "a\nb", "a\u0000b")) {
@@ -246,14 +246,20 @@ class ClientTest {
   @Test void typedImageTransformOptionsSerializeLikeJavaScriptNumbers() {
     CalmLensServerClient client = client(request -> fail("Building a URL made an HTTP request"));
     Models.Transform image = Models.Transform.image(new Models.ImageTransformOptions().width(640).blur(2.0).sharpen(0.25).format("webp"));
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[blur=2,format=webp,sharpen=0.25,width=640]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/blur=2,format=webp,sharpen=0.25,width=640",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(image)));
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[blur=1e%2B21,sharpen=1e-7]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/blur=1e%2B21,sharpen=1e-7",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(Models.Transform.image(new Models.ImageTransformOptions().blur(1e21).sharpen(1e-7)))));
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
         () -> client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(Models.Transform.image(new Models.ImageTransformOptions().blur(Double.NaN))))).getCode());
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/@thumb,imageTransform[blur=2,format=webp,sharpen=0.25,width=640]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/@thumb/blur=2,format=webp,sharpen=0.25,width=640",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").lens("thumb").transform(image)));
+    Models.Transform quality = Models.Transform.image(new Models.ImageTransformOptions()
+        .dpr(2.0).anim(false).quality(Models.Quality.level("high")).background("#FFAA00"));
+    Models.Transform numeric = Models.Transform.image(new Models.ImageTransformOptions()
+        .quality(Models.Quality.of(80)).border(new Models.ImageBorder("rgb(0, 0, 0)", null)));
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/anim=false,background=ffaa00,dpr=2,quality=high/border.color=rgb%280%2C%200%2C%200%29,quality=80",
+        client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(List.of(quality, numeric))));
   }
 
   @Test void malformedAndOversizedResponsesAreInvalidResponses() {

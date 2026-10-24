@@ -90,10 +90,12 @@ Use `create_signed_url` to deliver private content to browsers without your key.
 `cdn.get_asset_url` and `cdn.serve` take a `resource:` of `rendered` (the default), `original` or `placeholder`; only `rendered` takes a lens or transform. `cdn.get_asset_url`, `cdn.serve` and `create_signed_url` accept a `lens:`, a `transform:`, or both (the lens runs first). A transform is a selector string or structured steps (one Hash or an Array), serialized with sorted option keys:
 
 ```ruby
-client.cdn.get_asset_url(asset_identifier: asset_id, transform: 'imageTransform[format=png,width=1024]')
+client.cdn.get_asset_url(asset_identifier: asset_id, transform: 'format=png,width=1024')
 client.cdn.get_asset_url(asset_identifier: asset_id, transform: {type: 'imageTransform', options: {width: 1024, format: 'png'}})
-# => ".../rendered/imageTransform[format=png,width=1024]" in both cases
+# => ".../rendered/format=png,width=1024" in both cases
 ```
+
+A selector has one path segment per step, such as `fit=cover,width=640/format=webp`, and a lens and a transform are joined with `/` (`/rendered/@thumbnail/width=320`). Nested options are dotted (`border.color`) and hex colours drop the `#`.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only with `?allowAgeRestricted=true`; otherwise it needs a signed URL or the API key. Pass `allow_age_restricted: true` to `cdn.get_asset_url` (or `cdn.serve`) to add it after any lens or transform. Set it only where your app has already decided the viewer may see age-restricted content.
 

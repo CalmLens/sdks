@@ -18,10 +18,10 @@ const TransformTypeImage = "imageTransform"
 //
 //	calmlens.ImageTransform(calmlens.ImageTransformOptions{Width: calmlens.Ptr(1024), Format: calmlens.ImageFormatPNG})
 //
-// Options is any value that encodes as a JSON object, or nil, because each transform type
-// defines its own options; use ImageTransformOptions for TransformTypeImage. Nested objects
-// become bracketed keys such as border[color], and null values are skipped. Options decoded
-// from the API (Lens.Transforms) are map[string]any with json.Number numbers.
+// Type must be TransformTypeImage. Options is ImageTransformOptions, or any other value that
+// encodes as a JSON object with the same option names. Nested objects become dotted keys such
+// as border.color, and null values are skipped. Options decoded from the API
+// (Lens.Transforms) are map[string]any with json.Number numbers.
 type LensTransform struct {
 	Type    string `json:"type"`
 	Options any    `json:"options,omitempty"`
@@ -57,15 +57,19 @@ type ImageTransformOptions struct {
 	// Format is one of the ImageFormat constants.
 	Format string `json:"format,omitempty"`
 	// Width and Height are in pixels.
-	Width      *int         `json:"width,omitempty"`
-	Height     *int         `json:"height,omitempty"`
+	Width  *int `json:"width,omitempty"`
+	Height *int `json:"height,omitempty"`
+	// Dpr is the pixel density, from 1 to 3: it multiplies Width, Height and the border width.
+	Dpr *float64 `json:"dpr,omitempty"`
+	// Anim false serves the first frame of an animated image.
+	Anim       *bool        `json:"anim,omitempty"`
 	Background string       `json:"background,omitempty"`
 	Blur       *float64     `json:"blur,omitempty"`
 	Border     *ImageBorder `json:"border,omitempty"`
 	Brightness *float64     `json:"brightness,omitempty"`
 	Contrast   *float64     `json:"contrast,omitempty"`
-	// Quality is from 0 to 255.
-	Quality *int `json:"quality,omitempty"`
+	// Quality is a number from 1 to 100 or a level; lossy output defaults to ImageQualityHigh.
+	Quality *ImageQuality `json:"quality,omitempty"`
 	// Fit is one of the ImageFit constants.
 	Fit string `json:"fit,omitempty"`
 	// Flip is "h", "v" or "hv".
@@ -79,6 +83,37 @@ type ImageTransformOptions struct {
 	Saturation *float64   `json:"saturation,omitempty"`
 	Sharpen    *float64   `json:"sharpen,omitempty"`
 	Trim       *ImageTrim `json:"trim,omitempty"`
+}
+
+// Image quality levels for ImageQuality.Level.
+const (
+	ImageQualityLow    = "low"
+	ImageQualityMedium = "medium"
+	ImageQualityHigh   = "high"
+)
+
+// ImageQuality is an output quality. Set Level to one of the ImageQuality constants, or
+// Value to a number from 1 to 100.
+type ImageQuality struct {
+	Level string
+	Value int
+}
+
+// MarshalJSON encodes Level as a string, or Value as a number.
+func (q ImageQuality) MarshalJSON() ([]byte, error) {
+	if q.Level != "" {
+		return json.Marshal(q.Level)
+	}
+	return json.Marshal(q.Value)
+}
+
+// UnmarshalJSON decodes the level string or the number form.
+func (q *ImageQuality) UnmarshalJSON(data []byte) error {
+	*q = ImageQuality{}
+	if len(data) > 0 && data[0] == '"' {
+		return json.Unmarshal(data, &q.Level)
+	}
+	return json.Unmarshal(data, &q.Value)
 }
 
 // ImageBorder adds a border around an image.
@@ -201,7 +236,13 @@ func (t *ImageTrim) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var transformTypePattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+var (
+	transformOptionName = regexp.MustCompile(`^[a-z][a-zA-Z0-9]*$`)
+	hexColour           = regexp.MustCompile(`^#((?:[0-9a-fA-F]{3}){1,2}|(?:[0-9a-fA-F]{4}){1,2})$`)
+)
+
+// transformColourKeys are the options that hold colours, written as hex without "#".
+var transformColourKeys = map[string]bool{"background": true, "border.color": true, "trim.border.color": true}
 
 // transformSelector returns the selector string sent to the API for a string or structured
 // transform, and whether the transform is set at all. A non-nil TransformSteps, even an
@@ -217,17 +258,18 @@ func transformSelector(transform string, steps []LensTransform) (string, bool, e
 	return transform, transform != "", nil
 }
 
-// serializeTransform turns structured steps into a CDN selector such as
-// imageTransform[format=png,width=1024]. Option keys are sorted so equal transforms share a
-// URL; keys and values are percent-encoded, so the result is already path-safe.
+// serializeTransform turns structured steps into a CDN selector, one path segment per step,
+// such as fit=cover,width=640/format=webp. Option keys are sorted at every level so equal
+// transforms share a URL, nested keys are dotted (border.color), hex colours lose their "#",
+// and values are percent-encoded, so the result is already path-safe.
 func serializeTransform(steps []LensTransform) (string, error) {
 	if len(steps) == 0 {
 		return "", invalid(CodeSDKInvalidArgument, "transform needs at least one step")
 	}
 	parts := make([]string, 0, len(steps))
 	for _, step := range steps {
-		if !transformTypePattern.MatchString(step.Type) {
-			return "", invalid(CodeSDKInvalidArgument, "transform type must contain only letters, digits and underscores")
+		if step.Type != TransformTypeImage {
+			return "", invalid(CodeSDKInvalidArgument, `transform type must be "imageTransform"`)
 		}
 		options, err := transformOptions(step.Options)
 		if err != nil {
@@ -235,13 +277,19 @@ func serializeTransform(steps []LensTransform) (string, error) {
 		}
 		var pairs []string
 		for _, key := range sortedKeys(options) {
+			if !transformOptionName.MatchString(key) {
+				return "", invalid(CodeSDKInvalidArgument, fmt.Sprintf("transform option %q is not a valid name", key))
+			}
 			if pairs, err = appendTransformOption(pairs, key, options[key]); err != nil {
 				return "", err
 			}
 		}
-		parts = append(parts, step.Type+"["+strings.Join(pairs, ",")+"]")
+		if len(pairs) == 0 {
+			return "", invalid(CodeSDKInvalidArgument, "transform steps need at least one option")
+		}
+		parts = append(parts, strings.Join(pairs, ","))
 	}
-	return strings.Join(parts, ","), nil
+	return strings.Join(parts, "/"), nil
 }
 
 // transformOptions normalizes options (a map, struct or nil) to a decoded JSON object.
@@ -277,13 +325,21 @@ func appendTransformOption(pairs []string, key string, value any) ([]string, err
 	case map[string]any:
 		var err error
 		for _, child := range sortedKeys(v) {
-			if pairs, err = appendTransformOption(pairs, key+"["+child+"]", v[child]); err != nil {
+			if !transformOptionName.MatchString(child) {
+				return nil, invalid(CodeSDKInvalidArgument, fmt.Sprintf("transform option %q is not a valid name", key+"."+child))
+			}
+			if pairs, err = appendTransformOption(pairs, key+"."+child, v[child]); err != nil {
 				return nil, err
 			}
 		}
 		return pairs, nil
 	case string:
 		text = v
+		if transformColourKeys[key] {
+			if match := hexColour.FindStringSubmatch(v); match != nil {
+				text = strings.ToLower(match[1])
+			}
+		}
 	case bool:
 		text = strconv.FormatBool(v)
 	case json.Number:
@@ -295,7 +351,7 @@ func appendTransformOption(pairs []string, key string, value any) ([]string, err
 	default:
 		return nil, invalid(CodeSDKInvalidArgument, fmt.Sprintf("transform option %q must be a string, number, boolean or object", key))
 	}
-	return append(pairs, transformComponent(key)+"="+transformComponent(text)), nil
+	return append(pairs, key+"="+transformComponent(text)), nil
 }
 
 func sortedKeys(object map[string]any) []string {
@@ -334,8 +390,7 @@ func transformComponent(value string) string {
 	return out.String()
 }
 
-// transformPath encodes a string transform for the CDN path like JavaScript's encodeURI,
-// but keeps the literal "[" and "]" the CDN matches.
+// transformPath encodes a string transform for the CDN path like JavaScript's encodeURI.
 func transformPath(transform string) (string, error) {
 	transform = strings.TrimLeft(transform, "/")
 	// The transform keeps its separators, so it must not move up a path or add a query/fragment.
@@ -344,7 +399,7 @@ func transformPath(transform string) (string, error) {
 	}
 	var escaped strings.Builder
 	for _, b := range []byte(transform) {
-		if strings.ContainsRune(";/:@&=+$,[]", rune(b)) {
+		if strings.ContainsRune(";/:@&=+$,", rune(b)) {
 			escaped.WriteByte(b)
 		} else {
 			escaped.WriteString(component(string([]byte{b})))

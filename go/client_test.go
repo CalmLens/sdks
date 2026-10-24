@@ -503,15 +503,15 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 	if err != nil || endpoint != "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/rendered/@my%20lens" {
 		t.Fatal(endpoint, err)
 	}
-	endpoint, _ = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Transform: "/imageTransform[width=20]"})
-	if !strings.HasSuffix(endpoint, "/imageTransform[width=20]") {
+	endpoint, _ = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Transform: "/width=20/[x]"})
+	if !strings.HasSuffix(endpoint, "/rendered/width=20/%5Bx%5D") {
 		t.Fatal(endpoint)
 	}
-	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Lens: "x", Transform: "imageTransform[format=avif]"})
-	if err != nil || !strings.HasSuffix(endpoint, "/@x,imageTransform[format=avif]") {
+	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Lens: "x", Transform: "format=avif"})
+	if err != nil || !strings.HasSuffix(endpoint, "/@x/format=avif") {
 		t.Fatal(endpoint, err)
 	}
-	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Transform: "imageTransform[width=1]", TransformSteps: []LensTransform{{Type: "imageTransform"}}})
+	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Transform: "width=1", TransformSteps: []LensTransform{{Type: "imageTransform"}}})
 	if ErrorCode(err) != CodeSDKInvalidArgument {
 		t.Fatal("expected Transform and TransformSteps error", err)
 	}
@@ -522,13 +522,19 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 		Quality float64  `json:"quality"`
 		Tiny    float64  `json:"tiny"`
 	}
-	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformSteps: []LensTransform{{Type: "image_2", Options: resize{Width: 1e21, Quality: -0.0, Tiny: 1.5e-7}}}})
-	if err != nil || !strings.HasSuffix(endpoint, "/rendered/image_2[quality=0,tiny=1.5e-7,width=1e%2B21]") {
+	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformSteps: []LensTransform{{Type: TransformTypeImage, Options: resize{Width: 1e21, Quality: -0.0, Tiny: 1.5e-7}}}})
+	if err != nil || !strings.HasSuffix(endpoint, "/rendered/quality=0,tiny=1.5e-7,width=1e%2B21") {
 		t.Fatal(endpoint, err)
 	}
 	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformSteps: []LensTransform{{Type: "imageTransform", Options: JSON{"width": math.NaN()}}}})
 	if ErrorCode(err) != CodeSDKInvalidArgument {
 		t.Fatal("expected non-finite option error", err)
+	}
+	for _, options := range []JSON{{"Width": 1}, {"border": JSON{"bad-name": 1}}, {"quality": nil}} {
+		_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformSteps: []LensTransform{{Type: "imageTransform", Options: options}}})
+		if ErrorCode(err) != CodeSDKInvalidArgument {
+			t.Fatal("expected invalid option error", options, err)
+		}
 	}
 	res, err := c.CDN.Serve(context.Background(), CDNServeOptions{CDNAssetURLOptions: CDNAssetURLOptions{AssetIdentifier: "a"}, Headers: http.Header{"X-Api-Key": {"wrong"}, "Range": {"bytes=0-1"}}})
 	if err != nil {

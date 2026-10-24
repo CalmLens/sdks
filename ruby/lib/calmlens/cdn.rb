@@ -13,7 +13,7 @@ module CalmLens
     #   takes a lens or transform. A placeholder is a small blurred PNG that the CDN serves for public assets
     #   whatever their moderation status; it also takes no allow_age_restricted.
     # @option options [String] :lens a lens identifier
-    # @option options [String, Hash, Array<Hash>] :transform a selector such as `imageTransform[width=200]`,
+    # @option options [String, Hash, Array<Hash>] :transform a selector such as `width=200,fit=cover`,
     #   or structured steps: `{type: 'imageTransform', options: {width: 200}}` or an Array of them
     # @option options [Boolean] :allow_age_restricted true appends `?allowAgeRestricted=true`, so a public asset whose
     #   moderation status is `age-restricted` is served from this URL. Without it such an asset needs a signed
@@ -71,7 +71,7 @@ module CalmLens
             "#{Internal.segment(api['assetIdentifier'])}/#{resource}"
       url += "/@#{Internal.segment(api['lens'])}" if api['lens']
       transform = api['transform']
-      url += "#{api['lens'] ? ',' : '/'}#{Transforms.path(transform)}" unless transform.nil? || transform == ''
+      url += "/#{Transforms.path(transform)}" unless transform.nil? || transform == ''
       allow_age_restricted = api.fetch('allowAgeRestricted', false)
       raise Internal.invalid('allowAgeRestricted must be true or false') unless [true, false, nil].include?(allow_age_restricted)
 

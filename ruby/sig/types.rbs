@@ -293,6 +293,7 @@ module CalmLens
 
   type image_format = "jpg" | "png" | "webp" | "avif" | "gif"
   type image_fit = "scale-down" | "contain" | "pad" | "squeeze" | "cover" | "crop"
+  type image_quality = Integer | "low" | "medium" | "high"
   type image_gravity_side = "face" | "left" | "right" | "top" | "bottom" | "center" | "auto" | "entropy"
 
   # IMAGE_TRANSFORM_OPTIONS_SCHEMA, as options to send.
@@ -300,12 +301,17 @@ module CalmLens
     ?format: image_format,
     ?width: Integer,
     ?height: Integer,
+    # Pixel density, 1 to 3: multiplies width, height and the border width.
+    ?dpr: number,
+    # false serves the first frame of an animated image.
+    ?anim: bool,
     ?background: String,
     ?blur: number,
     ?border: { ?color: String, ?width: number },
     ?brightness: number,
     ?contrast: number,
-    ?quality: Integer,
+    # 1 to 100, or a level. Lossy output defaults to "high".
+    ?quality: image_quality,
     ?fit: image_fit,
     ?flip: "h" | "v" | "hv",
     ?gamma: number,
@@ -329,12 +335,14 @@ module CalmLens
     ?"format" => image_format,
     ?"width" => Integer,
     ?"height" => Integer,
+    ?"dpr" => number,
+    ?"anim" => bool,
     ?"background" => String,
     ?"blur" => number,
     ?"border" => { ?"color" => String, ?"width" => number },
     ?"brightness" => number,
     ?"contrast" => number,
-    ?"quality" => Integer,
+    ?"quality" => image_quality,
     ?"fit" => image_fit,
     ?"flip" => "h" | "v" | "hv",
     ?"gamma" => number,
@@ -357,8 +365,8 @@ module CalmLens
   # One structured transform step. `imageTransform` is the only transform type.
   type transform_step_input = { type: "imageTransform", ?options: image_transform_options_input }
   type transform_step = { "type" => "imageTransform", ?"options" => image_transform_options }
-  # A selector String such as `imageTransform[format=png,width=1024]`, or structured steps, which
-  # the SDK serializes into a selector.
+  # A selector String with one step per path segment, such as `fit=cover,width=1024/blur=12`, or
+  # structured steps, which the SDK serializes into a selector.
   type transform_input = String | transform_step_input | Array[transform_step_input]
 
   type lens_type = "image" | "video" | "audio" | "document" | "website"

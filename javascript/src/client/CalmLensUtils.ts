@@ -149,7 +149,10 @@ export const encodePathSegment = (value: unknown, name: string): string => {
   return encodeURIComponent(value);
 };
 
-const TRANSFORM_TYPE_PATTERN = /^[A-Za-z0-9_]+$/;
+const TRANSFORM_OPTION_NAME = /^[a-z][a-zA-Z0-9]*$/;
+// Options that hold colours, written as hex without `#` in a selector.
+const TRANSFORM_COLOUR_KEYS = new Set(["background", "border.color", "trim.border.color"]);
+const HEX_COLOUR = /^#((?:[0-9a-f]{3}){1,2}|(?:[0-9a-f]{4}){1,2})$/i;
 
 /** Percent-encodes everything except RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`). */
 const encodeTransformComponent = (value: string): string =>
@@ -165,23 +168,28 @@ const appendTransformOptions = (pairs: string[], key: string, value: unknown): v
   if (value === undefined || value === null) return;
   if (isPlainObject(value)) {
     for (const child of Object.keys(value).sort()) {
-      appendTransformOptions(pairs, `${key}[${child}]`, value[child]);
+      if (!TRANSFORM_OPTION_NAME.test(child)) {
+        throw invalidArgument(`Transform option "${key}.${child}" is not a valid name`);
+      }
+      appendTransformOptions(pairs, `${key}.${child}`, value[child]);
     }
     return;
   }
   let text: string;
-  if (typeof value === "string") text = value;
-  else if (typeof value === "boolean") text = String(value);
+  if (typeof value === "string") {
+    const hex = TRANSFORM_COLOUR_KEYS.has(key) ? HEX_COLOUR.exec(value) : null;
+    text = hex ? hex[1].toLowerCase() : value;
+  } else if (typeof value === "boolean") text = String(value);
   else if (typeof value === "number" && Number.isFinite(value)) text = String(value);
   else
     throw invalidArgument(`Transform option "${key}" must be a string, number, boolean or object`);
-  pairs.push(`${encodeTransformComponent(key)}=${encodeTransformComponent(text)}`);
+  pairs.push(`${key}=${encodeTransformComponent(text)}`);
 };
 
 /**
- * Serializes structured transforms as a CDN selector, such as
- * `imageTransform[format=png,width=1024]`. Option keys are sorted so equal transforms share a
- * URL; nested keys (`border[color]`) and values are percent-encoded.
+ * Serializes structured transforms as a CDN selector, one path segment per step, such as
+ * `fit=cover,width=640/blur=12`. Option keys are sorted so equal transforms share a URL, nested
+ * keys are dotted (`border.color`), colours are hex without `#`, and values are percent-encoded.
  */
 export const serializeTransform = (transform: LensTransform | LensTransform[]): string => {
   const steps = Array.isArray(transform) ? transform : [transform];
@@ -189,19 +197,23 @@ export const serializeTransform = (transform: LensTransform | LensTransform[]): 
   return steps
     .map((step) => {
       if (!isPlainObject(step)) throw invalidArgument("Transform steps must be objects");
-      if (typeof step.type !== "string" || !TRANSFORM_TYPE_PATTERN.test(step.type)) {
-        throw invalidArgument("Transform type must contain only letters, digits and underscores");
+      if (step.type !== "imageTransform") {
+        throw invalidArgument('Transform type must be "imageTransform"');
       }
       if (step.options !== undefined && step.options !== null && !isPlainObject(step.options)) {
         throw invalidArgument("Transform options must be an object");
       }
       const pairs: string[] = [];
       for (const key of Object.keys(step.options ?? {}).sort()) {
+        if (!TRANSFORM_OPTION_NAME.test(key)) {
+          throw invalidArgument(`Transform option "${key}" is not a valid name`);
+        }
         appendTransformOptions(pairs, key, (step.options as Record<string, unknown>)[key]);
       }
-      return `${step.type}[${pairs.join(",")}]`;
+      if (pairs.length === 0) throw invalidArgument("Transform steps need at least one option");
+      return pairs.join(",");
     })
-    .join(",");
+    .join("/");
 };
 
 /** Returns the selector string the API and CDN accept for a string or structured transform. */
@@ -276,16 +288,15 @@ const appendCdnPathSelector = (
     return url;
   }
   if (typeof options.transform !== "string") {
-    // Already path-safe: unreserved characters, percent escapes, brackets, `=` and `,`.
-    return `${url}${options.lens ? "," : "/"}${serializeTransform(options.transform)}`;
+    // Already path-safe: unreserved characters, percent escapes, `=`, `,`, `.` and `/`.
+    return `${url}/${serializeTransform(options.transform)}`;
   }
   const transform = options.transform.replace(/^\/+/, "");
-  // A transform keeps its own path separators, so it must not move up a path or add a query/fragment.
+  // A transform keeps its own step separators, so it must not move up a path or add a query/fragment.
   if (transform.includes("..") || transform.includes("?") || transform.includes("#")) {
     throw invalidArgument('Transform cannot contain "..", "?" or "#"');
   }
-  // The CDN matches literal `type[...]` brackets, which `encodeURI` would escape.
-  return `${url}${options.lens ? "," : "/"}${encodeURI(transform).replace(/%5B/g, "[").replace(/%5D/g, "]")}`;
+  return `${url}/${encodeURI(transform)}`;
 };
 
 const appendQueryValue = (parts: string[], key: string, value: unknown): void => {

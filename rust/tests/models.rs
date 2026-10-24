@@ -497,8 +497,35 @@ fn typed_image_transform_serializes_to_wire_options_and_selector() {
     );
     assert_eq!(
         CdnTransform::from(transform).selector().unwrap(),
-        "imageTransform[format=avif,gravity=entropy,trim%5Bborder%5D=true,trim%5Bleft%5D=3]"
+        "format=avif,gravity=entropy,trim.border=true,trim.left=3"
     );
+    let quality = Transform::image(ImageTransformOptions {
+        dpr: Some(2.0),
+        anim: Some(false),
+        quality: Some(ImageQualityLevel::High.into()),
+        background: Some("#FFAA00".into()),
+        ..Default::default()
+    });
+    assert_eq!(
+        CdnTransform::from(quality).selector().unwrap(),
+        "anim=false,background=ffaa00,dpr=2,quality=high"
+    );
+    let options: ImageTransformOptions =
+        serde_json::from_value(json!({ "quality": 80, "dpr": 1.5 })).unwrap();
+    assert_eq!(options.quality, Some(ImageQuality::Value(80)));
+    for options in [
+        json!({ "Width": 1 }),
+        json!({ "border": { "bad-name": 1 } }),
+    ] {
+        let step = Transform::Unknown {
+            transform_type: "imageTransform".into(),
+            options,
+        };
+        assert_eq!(
+            CdnTransform::from(step).selector().unwrap_err().code(),
+            &"sdk/invalid-argument"
+        );
+    }
 }
 
 #[test]

@@ -111,7 +111,10 @@ def _id(value: object, name: str = "Identifier") -> str:
     return quote(value, safe="~!*'()-._")
 
 
-_TRANSFORM_TYPE = re.compile(r"[A-Za-z0-9_]+")
+_TRANSFORM_OPTION_NAME = re.compile(r"[a-z][a-zA-Z0-9]*")
+# Options that hold colours, written as hex without ``#`` in a selector.
+_TRANSFORM_COLOUR_KEYS = frozenset({"background", "border.color", "trim.border.color"})
+_HEX_COLOUR = re.compile(r"#((?:[0-9a-fA-F]{3}){1,2}|(?:[0-9a-fA-F]{4}){1,2})")
 
 
 def _transform_component(value: str) -> str:
@@ -145,11 +148,12 @@ def _transform_options(pairs: list[str], key: str, value: Any) -> None:
     if value is None:
         return
     if isinstance(value, Mapping):
-        for child in _sorted_keys(value):
-            _transform_options(pairs, f"{key}[{child}]", value[child])
+        for child in _sorted_keys(value, f"{key}."):
+            _transform_options(pairs, f"{key}.{child}", value[child])
         return
     if isinstance(value, str):
-        text = value
+        hex_colour = _HEX_COLOUR.fullmatch(value) if key in _TRANSFORM_COLOUR_KEYS else None
+        text = hex_colour.group(1).lower() if hex_colour else value
     elif isinstance(value, bool):
         text = "true" if value else "false"
     elif isinstance(value, int) and abs(value) < 10 ** 21:
@@ -164,20 +168,23 @@ def _transform_options(pairs: list[str], key: str, value: Any) -> None:
         text = _js_number(number)
     else:
         raise _invalid(f'Transform option "{key}" must be a string, number, boolean or mapping')
-    pairs.append(_transform_component(key) + "=" + _transform_component(text))
+    pairs.append(key + "=" + _transform_component(text))
 
 
-def _sorted_keys(options: Mapping[Any, Any]) -> list[str]:
-    if not all(isinstance(key, str) for key in options):
-        raise _invalid("Transform option names must be strings")
+def _sorted_keys(options: Mapping[Any, Any], prefix: str = "") -> list[str]:
+    for key in options:
+        if not isinstance(key, str) or not _TRANSFORM_OPTION_NAME.fullmatch(key):
+            raise _invalid(f'Transform option "{prefix}{key}" is not a valid name')
     return sorted(options)
 
 
 def _serialize_transform(transform: Any) -> str:
-    """Serialize structured transforms as a CDN selector such as ``imageTransform[format=png,width=1024]``.
+    """Serialize structured transforms as a CDN selector, one path segment per step, such as
+    ``fit=cover,width=640/format=webp``.
 
-    Option keys are sorted so equal transforms share a URL; nested keys (``border[color]``) and
-    values are percent-encoded, so the result is already path-safe.
+    Option keys are sorted so equal transforms share a URL, nested keys are dotted
+    (``border.color``), hex colours are written without ``#`` and values are percent-encoded, so
+    the result is already path-safe.
     """
     steps = list(transform) if isinstance(transform, (list, tuple)) else [transform]
     if not steps:
@@ -186,9 +193,8 @@ def _serialize_transform(transform: Any) -> str:
     for step in steps:
         if not isinstance(step, Mapping):
             raise _invalid("Transform steps must be mappings")
-        kind = step.get("type")
-        if not isinstance(kind, str) or not _TRANSFORM_TYPE.fullmatch(kind):
-            raise _invalid("Transform type must contain only letters, digits and underscores")
+        if step.get("type") != "imageTransform":
+            raise _invalid('Transform type must be "imageTransform"')
         options = step.get("options")
         if options is None:
             options = {}
@@ -197,8 +203,10 @@ def _serialize_transform(transform: Any) -> str:
         pairs: list[str] = []
         for key in _sorted_keys(options):
             _transform_options(pairs, key, options[key])
-        selectors.append(f"{kind}[{','.join(pairs)}]")
-    return ",".join(selectors)
+        if not pairs:
+            raise _invalid("Transform steps need at least one option")
+        selectors.append(",".join(pairs))
+    return "/".join(selectors)
 
 
 def _transform_selector(transform: Any) -> Any:
@@ -212,14 +220,14 @@ def _has_transform(transform: Any) -> bool:
 
 def _transform_path(value: Any) -> str:
     """A transform as a URL path: structured steps serialized, strings encoded like JavaScript's
-    encodeURI with the literal ``[`` and ``]`` the CDN matches kept."""
+    encodeURI."""
     if not isinstance(value, str):
         return _serialize_transform(value)
     value = value.lstrip("/")
     if ".." in value or "?" in value or "#" in value:
         raise _invalid('Transform cannot contain "..", "?" or "#"')
     try:
-        return quote(value, safe=";/:@&=+$,~!*'()-._[]")
+        return quote(value, safe=";/:@&=+$,~!*'()-._")
     except UnicodeEncodeError as error:
         raise _invalid("Transform must be valid Unicode") from error
 
@@ -1279,7 +1287,7 @@ class CDN:
         if merged.get("lens"):
             url += "/@" + _id(merged["lens"], "lens")
         if _has_transform(merged.get("transform")):
-            url += ("," if merged.get("lens") else "/") + _transform_path(merged["transform"])
+            url += "/" + _transform_path(merged["transform"])
         return url + "?allowAgeRestricted=true" if age else url
 
     def serve(self, options: ServeOptions | None = None, /, *, asset_identifier: str = _UNSET,
