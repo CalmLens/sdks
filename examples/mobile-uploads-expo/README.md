@@ -48,6 +48,8 @@ When CalmLens marks a photo `age-restricted`, the app hides it and offers **Shar
 - **Android** uses Google Play Age Signals. `requestAgeSignalsAccessAsync` shows Play's consent
   screen first, and `requestAgeRangeAsync` returns a range only after the person agrees.
 
+[Check age natively](https://calmlens.com/docs/guides/native-age-checks) covers the same checks in Swift, Kotlin and on the web.
+
 The app never sees a birth date. If the person shares a range that starts at 18 or older, the
 photo is shown; if they decline, are under 18, or the device can't answer, it stays hidden. The
 answer is kept for the session, so the person is asked once.
