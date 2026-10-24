@@ -59,6 +59,13 @@ final class CommentTest extends TestCase
         $this->post('/comments', ['comment' => 'example'])->assertSessionHasErrors('comment')->assertSessionMissing('comments');
     }
 
+    public function testClientUsesTheConfiguredCdnUrl(): void
+    {
+        config(['calmlens.api_key' => 'key', 'calmlens.api_url' => 'http://localhost:6110/v1', 'calmlens.cdn_url' => 'http://localhost:6130/v1']);
+        $client = $this->app->make(ServerClient::class);
+        self::assertSame('http://localhost:6130/v1/assets/project-1/asset-1/content', $client->cdn->getAssetUrl(['assetIdentifier' => 'asset-1']));
+    }
+
     public function testValidationDoesNotCallApi(): void
     {
         $mock = new MockTransport();

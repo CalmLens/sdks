@@ -19,6 +19,9 @@ php artisan key:generate
 ```
 
 Set `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_WEBHOOK_SECRET` in `.env`.
+To use a local CalmLens instead of the hosted one, also set
+`CALMLENS_API_URL=http://localhost:6110/v1` and `CALMLENS_CDN_URL=http://localhost:6130/v1`;
+leave them empty for the hosted API and CDN.
 Then run `php artisan serve --host=127.0.0.1` and open http://127.0.0.1:8000.
 The SDK is installed from `../../php` through Composer's path repository, so the
 example works before the PHP package is published. Keep the repository layout intact.
