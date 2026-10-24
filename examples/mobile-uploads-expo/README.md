@@ -30,12 +30,44 @@ never holds an API key: a tiny token server signs a single-use upload token for 
 - [`App.tsx`](App.tsx) picks a photo with `expo-image-picker`, reads it with `expo-file-system`
   and uploads it with `assets.classify`. Photos are checked after they're stored, so the first
   answer is usually `pending`; the app shows **Still checking** and polls `assets.retrieve`
-  until CalmLens decides. After 60 seconds it stops and offers **Check again**. Only `allowed`
-  photos can be shown. The app has no age check, so it treats `age-restricted` like `blocked` and
-  `purged`: not shown.
+  until CalmLens decides. After 60 seconds it stops and offers **Check again**. `allowed` photos
+  are shown, and `age-restricted` photos are hidden until the person shares an age range of 18
+  or older (see [Age-restricted photos](#age-restricted-photos)).
 - Errors show a message for the person using the app and the error code for you. The app handles
   every `upload-preset/*` and `upload-token/*` code, timeouts, network errors and an unreachable
   token server.
+
+## Age-restricted photos
+
+When CalmLens marks a photo `age-restricted`, the app hides it and offers **Share my age range**.
+[`src/ageCheck.ts`](src/ageCheck.ts) asks the phone's OS with
+[`expo-age-range`](https://docs.expo.dev/versions/v57.0.0/sdk/age-range/):
+
+- **iOS 26+** uses Apple's Declared Age Range. The OS shows its own sheet, and the app learns
+  only whether the person is above or below the age gate it asks about (18).
+- **Android** uses Google Play Age Signals. `requestAgeSignalsAccessAsync` shows Play's consent
+  screen first, and `requestAgeRangeAsync` returns a range only after the person agrees.
+
+The app never sees a birth date. If the person shares a range that starts at 18 or older, the
+photo is shown; if they decline, are under 18, or the device can't answer, it stays hidden. The
+answer is kept for the session, so the person is asked once.
+
+Below iOS 26 and on the web, `expo-age-range` answers as if the person were an adult. The example
+treats those devices as unable to answer instead, so the photo stays hidden.
+
+An age range can be self-declared. `requestAgeCheck` reports `confirmed: true` when Apple
+confirmed it (`ageRangeDeclaration: "confirmed"`) or Google checked it with a card, ID, selfie or
+digital ID (`ageRangeSource` `TIER_C` or `TIER_D`). Require that where the law asks for a verified
+age.
+
+This app shows the photo from the phone itself. To show other people's age-restricted uploads
+from the CDN once the check passes, build the URL with `getAssetUrl({ ..., ageRestricted: true })`;
+without it, the CDN only serves age-restricted assets through signed URLs or an API key.
+
+The iOS age range needs the `com.apple.developer.declared-age-range` entitlement, which
+[`app.json`](app.json) sets, and a real device signed in to an Apple Account. Simulators may not
+answer. On Android, Play Age Signals needs Google Play on the device and only returns a range
+where Google provides age signals.
 
 The preset decides the folder, visibility and accepted file types, so the app can only name its
 upload. HEIC photos arrive as JPEG; JPEG and PNG files are uploaded unchanged.
@@ -127,7 +159,8 @@ changing `.env.local`.
 
 | File | What it does |
 | --- | --- |
-| [`App.tsx`](App.tsx) | Picker, upload, polling and the result card |
+| [`App.tsx`](App.tsx) | Picker, upload, polling, the result card and the age gate |
+| [`src/ageCheck.ts`](src/ageCheck.ts) | Asks iOS or Android for the person's age range, with their consent |
 | [`src/calmlens.ts`](src/calmlens.ts) | The upload preset client, token fetching and error messages |
 | [`server/index.ts`](server/index.ts) | Token server: signs one upload token per request |
 | [`metro.config.js`](metro.config.js) | Lets Metro bundle the SDK linked from `javascript` |

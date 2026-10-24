@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { type AgeCheck, requestAgeCheck } from "./src/ageCheck";
 import {
   checkUpload,
   describeError,
@@ -25,6 +26,9 @@ type UploadState =
 export default function App() {
   const [photo, setPhoto] = useState<PickedPhoto>();
   const [state, setState] = useState<UploadState>({ step: "idle" });
+  // Kept for the session, so the person is asked once rather than for every photo.
+  const [ageCheck, setAgeCheck] = useState<AgeCheck>();
+  const [checkingAge, setCheckingAge] = useState(false);
   const run = useRef(0);
 
   useEffect(() => () => void run.current++, []);
@@ -83,6 +87,20 @@ export default function App() {
     }
   };
 
+  const checkAge = async () => {
+    setCheckingAge(true);
+    try {
+      setAgeCheck(await requestAgeCheck());
+    } finally {
+      setCheckingAge(false);
+    }
+  };
+
+  // Age-restricted photos stay hidden until the person shares an age range of 18 or older.
+  const hidden =
+    state.step === "done" &&
+    state.asset.status === "age-restricted" &&
+    ageCheck?.result !== "adult";
   const busy = state.step === "uploading" || (state.step === "checking" && !state.gaveUp);
 
   return (
@@ -99,14 +117,22 @@ export default function App() {
           </Text>
 
           <View style={styles.preview}>
-            {photo ? (
+            {photo && !hidden ? (
               <Image source={{ uri: photo.uri }} style={styles.image} resizeMode="contain" />
             ) : (
-              <Text style={styles.placeholder}>No photo yet</Text>
+              <Text style={styles.placeholder}>
+                {photo ? "Hidden: age restricted" : "No photo yet"}
+              </Text>
             )}
           </View>
 
-          <Result state={state} onCheckAgain={checkAgain} />
+          <Result
+            state={state}
+            onCheckAgain={checkAgain}
+            ageCheck={ageCheck}
+            checkingAge={checkingAge}
+            onCheckAge={checkAge}
+          />
 
           {isConfigured ? (
             <Pressable
@@ -138,9 +164,15 @@ export default function App() {
 function Result({
   state,
   onCheckAgain,
+  ageCheck,
+  checkingAge,
+  onCheckAge,
 }: {
   state: UploadState;
   onCheckAgain: (asset: UploadedAsset) => void;
+  ageCheck: AgeCheck | undefined;
+  checkingAge: boolean;
+  onCheckAge: () => void;
 }) {
   switch (state.step) {
     case "idle":
@@ -168,13 +200,7 @@ function Result({
         case "allowed":
           return <Status tone="good" title="Allowed" detail="This photo can be shown." />;
         case "age-restricted":
-          return (
-            <Status
-              tone="bad"
-              title="Age restricted"
-              detail="This photo can only be shown behind an age check, which this app doesn't have."
-            />
-          );
+          return <AgeRestricted ageCheck={ageCheck} checking={checkingAge} onCheck={onCheckAge} />;
         case "blocked":
           return (
             <Status tone="bad" title="Blocked" detail="This photo breaks the project's policy." />
@@ -197,6 +223,80 @@ function Result({
       );
     case "failed":
       return <Status tone="bad" title="Upload failed" detail={state.message} code={state.code} />;
+  }
+}
+
+function AgeRestricted({
+  ageCheck,
+  checking,
+  onCheck,
+}: {
+  ageCheck: AgeCheck | undefined;
+  checking: boolean;
+  onCheck: () => void;
+}) {
+  const ask = { label: "Share my age range", onPress: onCheck };
+  if (checking) {
+    return (
+      <Status tone="neutral" title="Age restricted" detail="Asking for your age range…" busy />
+    );
+  }
+  switch (ageCheck?.result) {
+    case undefined:
+      return (
+        <Status
+          tone="neutral"
+          title="Age restricted"
+          detail="This photo is only shown to adults. Share your age range from your Apple or Google account to see it. The app only learns whether you're 18 or older."
+          action={ask}
+        />
+      );
+    case "adult":
+      return (
+        <Status
+          tone="good"
+          title="Age restricted"
+          detail={
+            ageCheck.confirmed
+              ? "Shown because your account confirms you're 18 or older."
+              : "Shown because you declared that you're 18 or older."
+          }
+        />
+      );
+    case "minor":
+      return (
+        <Status
+          tone="bad"
+          title="Age restricted"
+          detail="Your age range may be under 18, so this photo isn't shown."
+        />
+      );
+    case "declined":
+      return (
+        <Status
+          tone="bad"
+          title="Age restricted"
+          detail="You didn't share your age range, so this photo isn't shown."
+          action={ask}
+        />
+      );
+    case "verification-required":
+      return (
+        <Status
+          tone="bad"
+          title="Age restricted"
+          detail="Google Play needs you to verify your age in the Play Store first. Then try again."
+          action={ask}
+        />
+      );
+    case "unavailable":
+      return (
+        <Status
+          tone="bad"
+          title="Age restricted"
+          detail="This device can't share an age range. It needs iOS 26 or Android with Google Play, signed in to an account."
+        />
+      );
   }
 }
 
