@@ -1,7 +1,6 @@
 import { renderSensitiveImage } from "./sensitive-image.js";
 
-// revealedUrls holds signed URLs for the age-restricted images this viewer may see, by asset ID.
-export function renderFeed(list, { projectId, posts, revealedUrls, onReveal }) {
+export function renderFeed(list, { projectId, posts, viewer, onReveal }) {
   const items = posts
     .filter((post) => ["allowed", "age-restricted"].includes(post.status))
     .map((post) => {
@@ -10,7 +9,7 @@ export function renderFeed(list, { projectId, posts, revealedUrls, onReveal }) {
         projectId,
         assetId: post.assetId,
         status: post.status,
-        contentUrl: revealedUrls[post.assetId],
+        canView: viewer.canViewSensitiveMedia,
         alt: post.alt,
         aspectRatio: post.aspectRatio,
         onReveal,

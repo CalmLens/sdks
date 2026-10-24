@@ -16,12 +16,11 @@ const isShown = (post: Post): post is ShownPost =>
 type FeedProps = {
   projectId: string;
   posts: Post[];
-  /** Signed URLs for the age-restricted images this viewer may see, by asset ID. */
-  revealedUrls: Record<string, string>;
+  viewer: { canViewSensitiveMedia: boolean };
   onReveal: () => void;
 };
 
-export function Feed({ projectId, posts, revealedUrls, onReveal }: FeedProps) {
+export function Feed({ projectId, posts, viewer, onReveal }: FeedProps) {
   return (
     <ul className="feed">
       {posts.filter(isShown).map((post) => (
@@ -30,7 +29,7 @@ export function Feed({ projectId, posts, revealedUrls, onReveal }: FeedProps) {
             projectId={projectId}
             assetId={post.assetId}
             status={post.status}
-            contentUrl={revealedUrls[post.assetId]}
+            canView={viewer.canViewSensitiveMedia}
             onReveal={onReveal}
             alt={post.alt}
             aspectRatio={post.aspectRatio}

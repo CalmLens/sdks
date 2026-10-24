@@ -5,8 +5,7 @@ import SensitiveImage from "./SensitiveImage.vue";
 
 type Post = { id: string; assetId: string; status: AssetModerationStatus; alt: string; aspectRatio: number };
 type ShownPost = Post & { status: "allowed" | "age-restricted" };
-// revealedUrls: signed URLs for the age-restricted images this viewer may see, by asset ID.
-const props = defineProps<{ projectId: string; posts: Post[]; revealedUrls: Record<string, string> }>();
+const props = defineProps<{ projectId: string; posts: Post[]; canViewSensitiveMedia: boolean }>();
 const emit = defineEmits<{ reveal: [] }>();
 const shown = computed(() =>
   props.posts.filter((post): post is ShownPost => post.status === "allowed" || post.status === "age-restricted"),
@@ -20,7 +19,7 @@ const shown = computed(() =>
         :project-id="projectId"
         :asset-id="post.assetId"
         :status="post.status"
-        :content-url="revealedUrls[post.assetId]"
+        :can-view="canViewSensitiveMedia"
         :alt="post.alt"
         :aspect-ratio="post.aspectRatio"
         @reveal="emit('reveal')"

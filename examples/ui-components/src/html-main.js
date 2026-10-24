@@ -1,4 +1,4 @@
-import { posts, projectId, revealedUrls, show } from "./demo";
+import { posts, projectId, show } from "./demo";
 import { renderAvatar } from "./html/avatar.js";
 import { attachCommentForm } from "./html/comment-form.js";
 import { renderFeed } from "./html/media-feed.js";
@@ -17,11 +17,11 @@ renderAvatar(byId("avatar"), {
   status: "allowed",
   name: "Sam",
 });
-const showFeed = (urls) =>
+const showFeed = (canViewSensitiveMedia) =>
   renderFeed(byId("feed"), {
     projectId,
     posts,
-    revealedUrls: urls,
-    onReveal: () => showFeed(revealedUrls()),
+    viewer: { canViewSensitiveMedia },
+    onReveal: () => showFeed(true),
   });
-showFeed({});
+showFeed(false);

@@ -198,10 +198,10 @@ like any other text that isn't `allowed`.
   allowed or age-restricted it, and it uses CalmLens's random asset ID in URLs rather than its own
   (guessable) post IDs.
 - **Age-restricted photos opt in on the URL** (`cdn.getAssetUrl({ ..., allowAgeRestricted: true })`),
-  because Calmgram gates viewers itself: only viewers whose setting allows it get the URL
-  (`postMediaFor` in `src/content.ts`). CalmLens checks nothing on an opted-in URL and anyone who
-  has it can open it, so most apps issue short-lived signed URLs from their backend instead (see
-  [Show sensitive media](https://calmlens.com/docs/guides/sensitive-media)).
+  and only for viewers whose setting allows it (`postMediaFor` in `src/content.ts`). An opted-in
+  URL works for anyone who has it, so if you need CalmLens itself to refuse everyone else, issue
+  short-lived signed URLs from your backend instead (see
+  [Age-restricted assets](https://calmlens.com/docs/guides/delivering-assets#age-restricted-assets)).
 - **`not-evaluated` is not zero.** Only `evaluated` and `partial` category results have scores.
 - **Lenses** are named, versioned image presets. Calmgram defines `calmgram-feed` (1080px WebP)
   and `calmgram-thumb` (400px square) once with `ensureLenses`, so it needs no image-resizing code.
