@@ -11,8 +11,8 @@ held for a person to review before anyone sees it.
 - A reply with any field `blocked`, `age-restricted` or `purged` is **held**. The thread has no
   age check, so it holds age-restricted fields too. The thread shows a "held for review"
   placeholder, never its name or text, and the **Held for review** panel lists its asset IDs.
-- A moderator reviews held assets in the CalmLens portal. Allowing a held asset releases
-  the reply into the thread. Blocking, purging or age-restricting it keeps the reply out for
+- A moderator reviews held assets in the CalmLens portal. Allowing or limiting a held asset
+  releases the reply into the thread. Blocking, purging or age-restricting it keeps the reply out for
   good, and the app then deletes the reply's stored content from CalmLens. The asset record
   and its moderation report remain.
 - Pending, unknown and unreachable results, and fields whose `classification.status` is `failed`,

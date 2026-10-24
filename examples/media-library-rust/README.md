@@ -68,7 +68,7 @@ the app restarts. It holds up to 40 assets and 30 folders. Folder rules (empty d
 cycles, unique sibling names) and duplicate catalogue IDs return the same error codes as the
 API. Demo mode does not use the SDK's test mock.
 
-Each upload takes the moderation outcome you select: **Allow**, **Age-restrict**, **Block**,
+Each upload takes the moderation outcome you select: **Allow**, **Limit**, **Age-restrict**, **Block**,
 **Purge** or **Processing error**. Nothing is classified. A demo upload stays in review for two
 seconds, then takes the selected outcome when the page refreshes; **Purge** also deletes the
 kept file, with removal reason `policy`. Allowed and limited demo images are served from the bytes

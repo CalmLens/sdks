@@ -45,7 +45,7 @@ Open **http://127.0.0.1:6401**. Without credentials the app refuses to start, so
 quietly allow everything. `--demo` (or `CALMLENS_DEMO=1`) asks for a labelled demo mode
 instead. Demo mode lives in [demo.py](demo.py) and runs on the SDK's `MockCalmLensServerClient`,
 which live mode never imports; every call still goes through the real client's validation and
-encoding. Choose a demo outcome: **Allow the page**, **Age-restrict the page**, **Block the page**,
+encoding. Choose a demo outcome: **Allow the page**, **Limit the page**, **Age-restrict the page**, **Block the page**,
 **Purge the page**, **Processing error** or **Block the note**. The page stays pending for
 two seconds, then the app writes the selected status, a synthetic report and two synthetic
 parts (page text and an image) into the mock. These are explicitly selected fake statuses;

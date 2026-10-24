@@ -311,7 +311,6 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 const (
 	clipUploading = "uploading"
 	clipPending   = "pending"
-	clipAllowed   = calmlens.ModerationStatusAllowed
 	clipError     = "error"
 )
 

@@ -78,7 +78,7 @@ export const loadFeed = async (env: Env, sandbox: Sandbox | null) => {
   return { posts, comments, likesFor, bioFor };
 };
 
-/** Checks a caption before anything is saved; throws `ModerationRejection` unless it's allowed. */
+/** Checks a caption before anything is saved; throws `ModerationRejection` unless it's shown. */
 const checkCaption = async (env: Env, sandbox: Sandbox, postId: string, caption: string) => {
   if (!caption.trim()) return;
   const outcome = await getModeration(env).moderateText({
@@ -270,7 +270,7 @@ export const addComment = async (
     findings: outcome.findings,
     checkedAt: Date.now(),
   };
-  // Comments that aren't allowed are stored too (but never shown) so moderators can see them.
+  // Comments that aren't shown are stored too (but never shown) so moderators can see them.
   sandbox.comments.push(comment);
   await saveSandbox(env, sandbox);
   if (!isShownToEveryone(outcome.status)) {

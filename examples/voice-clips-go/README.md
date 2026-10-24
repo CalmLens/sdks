@@ -39,7 +39,7 @@ from the uploaded file with `io.NewSectionReader`). The page needs no JavaScript
 demo, and setting `CALMLENS_UPLOAD_PRESET_ID` together with `CALMLENS_DEMO=1` stops
 startup. All demo code
 lives in the separate [`demo`](demo/demo.go) package; live mode never calls it. The demo
-selector lets you choose the outcome explicitly: allow, age-restrict, block, purge, or a
+selector lets you choose the outcome explicitly: allow, limit, age-restrict, block, purge, or a
 processing error. The clip stays pending for two seconds, then the selected outcome is
 written with a **simulated** report: a fixed 48-second duration and two overlapping
 `clip` segments with synthetic category scores. Nothing is decoded and no moderation
