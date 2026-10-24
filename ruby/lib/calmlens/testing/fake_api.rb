@@ -643,9 +643,10 @@ module CalmLens
       end
     end
 
-    # The RSQL subset the fake API understands: `field==value` and `field!=value` (with `*`
-    # wildcards and quoted values), combined with `;` (and) and `,` (or). Anything else raises
-    # instead of being ignored, so a test never passes on an unfiltered list.
+    # The RSQL subset the fake API understands: `==` and `!=` (with `*` wildcards), `=in=` and
+    # `=out=` with a `(value,value)` list, and `=gt=`, `=ge=`, `=lt=`, `=le=`, with quoted values,
+    # combined with `;` (and) and `,` (or). Anything else raises instead of being ignored, so a
+    # test never passes on an unfiltered list.
     # @api private
     module RSQL
       module_function
@@ -657,15 +658,21 @@ module CalmLens
         items.select { |item| groups.any? { |terms| terms.all? { |test| test.call(item) } } }
       end
 
+      # Splits on `separator` outside quotes and outside an `=in=(...)` value list.
       def split(text, separator)
         parts = ['']
         quote = nil
+        depth = 0
         text.each_char do |char|
           if quote
             quote = nil if char == quote
           elsif ['"', "'"].include?(char)
             quote = char
-          elsif char == separator
+          elsif char == '('
+            depth += 1
+          elsif char == ')'
+            depth -= 1
+          elsif char == separator && depth.zero?
             parts << ''
             next
           end
@@ -675,20 +682,47 @@ module CalmLens
       end
 
       def comparison(term)
-        match = term.strip.match(/\A([A-Za-z][\w.]*)(==|!=)(.+)\z/m)
+        match = term.strip.match(/\A([A-Za-z][\w.]*)(==|!=|=in=|=out=|=gt=|=ge=|=lt=|=le=)(.+)\z/m)
         unless match
           raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
-                                         "MockServerClient filters support only ==, != with ; and , (got #{term.inspect})")
+                                         'MockServerClient filters support ==, !=, =in=, =out=, =gt=, =ge=, =lt= and ' \
+                                         "=le= with ; and , (got #{term.inspect})")
         end
 
         field, operator, raw = match.captures
-        value = raw.strip.match?(/\A(["']).*\1\z/m) ? raw.strip[1..-2] : raw.strip
-        pattern = Regexp.new("\\A#{Regexp.escape(value).gsub('\*', '.*')}\\z", Regexp::MULTILINE)
+        values = list(operator, raw.strip)
         lambda do |item|
           actual = field.split('.').reduce(item) { |object, key| object.is_a?(Hash) ? object[key] : nil }
-          equal = Array(actual.nil? ? 'null' : actual).any? { |entry| pattern.match?(entry.to_s) }
-          operator == '==' ? equal : !equal
+          entries = Array(actual.nil? ? 'null' : actual).map(&:to_s)
+          case operator
+          when '==', '=in=' then values.any? { |value| matches?(entries, value) }
+          when '!=', '=out=' then values.none? { |value| matches?(entries, value) }
+          else entries.any? { |entry| ordered?(entry, operator, values.first) }
+          end
         end
+      end
+
+      def list(operator, raw)
+        return [unquote(raw)] unless %w[=in= =out=].include?(operator)
+
+        unless raw.start_with?('(') && raw.end_with?(')')
+          raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT, "#{operator} takes a (value,value) list")
+        end
+
+        split(raw[1..-2], ',').map { |value| unquote(value.strip) }
+      end
+
+      def unquote(value) = value.match?(/\A(["']).*\1\z/m) ? value[1..-2] : value
+
+      def matches?(entries, value)
+        pattern = Regexp.new("\\A#{Regexp.escape(value).gsub('\*', '.*')}\\z", Regexp::MULTILINE)
+        entries.any? { |entry| pattern.match?(entry) }
+      end
+
+      # Numbers compare as numbers and everything else (such as ISO dates) as text.
+      def ordered?(entry, operator, value)
+        left, right = [entry, value].all? { |text| text.match?(/\A-?\d+(\.\d+)?\z/) } ? [entry.to_f, value.to_f] : [entry, value]
+        { '=gt=' => left > right, '=ge=' => left >= right, '=lt=' => left < right, '=le=' => left <= right }.fetch(operator)
       end
     end
   end

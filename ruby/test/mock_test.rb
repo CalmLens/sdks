@@ -178,7 +178,14 @@ class MockTest < Minitest::Test
     ascending = mock.assets.each(filter: 'name==good-*;classification.moderation.status!=blocked', page_size: 1,
                                  ordering: [{ field: 'createdAt', direction: 'ASC' }])
     assert_equal(%w[good-b good-a good-c], ascending.map { |asset| asset['name'] })
-    error = assert_raises(CalmLens::InvalidArgumentError) { mock.assets.list(filter: 'createdAt=gt=5') }
+    by_name = lambda do |filter|
+      mock.assets.each(filter: filter, ordering: [{ field: 'createdAt', direction: 'ASC' }]).map { |asset| asset['name'] }
+    end
+    created = mock.assets.each.to_h { |asset| [asset['name'], asset['createdAt']] }
+    assert_equal %w[bad-a good-c], by_name.call("name=in=(bad-a,\"good-c\");createdAt=gt=#{created['good-b']}")
+    assert_equal %w[good-b good-a], by_name.call('name=out=(bad-a,good-c)')
+    assert_equal %w[good-b bad-a], by_name.call("createdAt=le=#{created['bad-a']}")
+    error = assert_raises(CalmLens::InvalidArgumentError) { mock.assets.list(filter: 'name=like=good') }
     assert_equal 'sdk/invalid-argument', error.code
   end
 
