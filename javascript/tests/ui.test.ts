@@ -100,6 +100,17 @@ describe("getMediaState", () => {
     });
   });
 
+  it("requests nothing for an asset whose content was removed", () => {
+    const asset = {
+      id: "a2",
+      projectId: PROJECT_ID,
+      type: "image",
+      classification: { moderation: { status: "allowed" as const } },
+      content: { status: "removed", image: { thumbhash: null, width: 640, height: 480 } },
+    };
+    expect(getMediaState({ asset })).toEqual({ kind: "unavailable" });
+  });
+
   it("lets props win over the asset they are passed with", () => {
     const asset = {
       id: "a1",

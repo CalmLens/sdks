@@ -12,6 +12,7 @@ export interface MediaAsset {
   type?: string | null;
   classification?: { moderation?: { status?: AssetModerationStatus | null } | null } | null;
   content?: {
+    status?: string | null;
     image?: {
       thumbhash?: string | null;
       averageColor?: string | null;
@@ -43,6 +44,11 @@ export type MediaOptions = MediaSource & MediaSettings;
 export interface MediaSettings {
   /** The asset's stored moderation status. Defaults to `allowed`. */
   status?: AssetModerationStatus;
+  /**
+   * Whether CalmLens has removed the asset's content, from its `content.status`. Removed content
+   * shows the unavailable notice and requests nothing. Set from `asset` when you pass one.
+   */
+  contentRemoved?: boolean;
   /**
    * Whether your app lets this viewer see age-restricted media. Without it, age-restricted
    * assets show their blurred placeholder and a reveal button.
@@ -133,6 +139,7 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
     projectId: props.projectId ?? asset.projectId,
     assetId: props.assetId ?? asset.id,
     status: props.status ?? asset.classification?.moderation?.status ?? undefined,
+    contentRemoved: props.contentRemoved ?? asset.content?.status === "removed",
     type: props.type ?? kind,
     placeholderHash: props.placeholderHash ?? preview?.thumbhash ?? undefined,
     averageColor: props.averageColor ?? preview?.averageColor ?? undefined,
@@ -148,6 +155,7 @@ const buildMediaState = ({
   projectId,
   assetId,
   status = "allowed",
+  contentRemoved = false,
   canView = false,
   type = "image",
   resource = "rendered",
@@ -160,7 +168,7 @@ const buildMediaState = ({
   placeholderUrl: customPlaceholderUrl,
   cdnBaseUrl,
 }: MediaSettings & { projectId: string; assetId: string }): MediaState => {
-  if (status === "blocked" || status === "purged") return { kind: "unavailable" };
+  if (status === "blocked" || status === "purged" || contentRemoved) return { kind: "unavailable" };
   const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl };
   const placeholderUrl = placeholder
     ? (decodePlaceholderHash(placeholderHash) ??
