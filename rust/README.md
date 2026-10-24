@@ -276,6 +276,20 @@ assert_eq!(mock.last_request().unwrap().body, b"hello");
 
 `MockServerClient` answers from a FIFO queue and uses the real client's validation, encoding, retries and error mapping; it creates no HTTP client, so it works inside any runtime. Queue responses with `enqueue(status, model)`, `enqueue_api_error(code, message)` (the API's body shape and the HTTP status the API uses for that code), `enqueue_response(MockResponse::new(206).header(..).body(..))` (CDN responses, `Retry-After`), `enqueue_raw`, `enqueue_timeout()`, `enqueue_transport_error(message)` and `enqueue_error(error)`. Responses carry an `x-request-id` unless you set one. `requests()` and `last_request()` return captured requests (`method`, `url`, `path`, `query`/`query_param`, `headers`/`header` with the API key redacted, `body` including streamed uploads, `json()`). `client()` returns a `ServerClient` and `blocking()` a `blocking::ServerClient` sharing the queue. An empty queue fails with `sdk/transport-error` and never reaches the network. `MockServerClient::new()` disables retries; build one with `MockServerClient::from_builder(ServerClient::builder(key, project).max_retries(2))` to test them.
 
+`MockServerClient::in_memory(MockOptions::new())` adds an in-memory API behind the queue, so tests can simulate moderation outcomes. Queued replies are still used first. Uploads create stored assets: `assets().create` (and queued multipart uploads) get `queued_outcome` (default `MockOutcome::Pending`), and `assets().classify` and `text().classify` get `analyzed_outcome` (default `MockOutcome::Allowed`). The outcomes are `Pending`, `Allowed`, `AgeRestricted`, `Blocked`, `Purged` (removes the content with reason `policy`) and `Failed` (retryable). Finished processing removes the content unless the upload sets `keep_content_after_processing`. Retrieve, list (`field==value` RSQL filters with `;`, `,`, `!=`, `=in=`, `=out=` and comparisons, ordering, folder, cursors), children, update, move, delete, delete content, retry, keyword search (name, ID, external ID, description and tags), signed URLs, folders, lenses and `wait_for_decision` read and change that storage, with the API's error codes, statuses, `x-request-id` and idempotent replays.
+
+```rust
+use calmlens::{models::*, testing::*};
+
+let mock = MockServerClient::in_memory(MockOptions::new().analyzed_outcome(MockOutcome::AgeRestricted))?;
+let asset = mock.assets().create(SubmitAsset::text("hello")).await?; // pending
+let start = mock.events().list(ListEvents::default()).await?.cursor;
+mock.decide(&asset.id, AssetModerationDecision::Blocked)?; // adds an asset.blocked event
+let page = mock.events().list(ListEvents { after: Some(start), ..Default::default() }).await?;
+```
+
+`decide(asset_id, decision)` applies a reviewer decision and adds the matching `asset.<status>` event with a `decided-by: reviewer` fact; `enqueue_event(event)` adds any event to the feed. `cdn().serve` returns stored bytes (with single byte ranges), refuses blocked and purged assets, and serves private and age-restricted assets only when the API key has a download grant, such as `MockOptions::new().api_key(create_mock_api_key(&[MockApiKeyGrant::download()]))`, or a public age-restricted asset with `allow_age_restricted`. `with_storage(|storage| ..)` reads or seeds `assets`, `folders`, `content` and `events` in the API's JSON shape. `create_id`, `now` and `project_id` make results deterministic; `wait_for_decision` returns at once for a decided asset and otherwise waits for its timeout. The mock does not classify or transform content.
+
 ## Development
 
 ```sh

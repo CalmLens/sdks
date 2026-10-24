@@ -2,13 +2,23 @@
 //!
 //! [`MockServerClient`] answers requests from a FIFO queue and records them. It uses the real
 //! client's validation, request encoding, retries and error mapping; only the network is
-//! replaced, and no HTTP client is created. Enable the feature in `[dev-dependencies]`:
+//! replaced, and no HTTP client is created. [`MockServerClient::in_memory`] adds an in-memory
+//! API behind the queue: uploads create assets with a chosen [`MockOutcome`], and assets,
+//! folders, events and CDN downloads behave like the API's. Enable the feature in
+//! `[dev-dependencies]`:
 //!
 //! ```toml
 //! [dev-dependencies]
 //! calmlens = { version = "0.1", features = ["testing"] }
 //! ```
+mod memory;
+
+pub use memory::{
+    create_mock_api_key, MockApiKeyGrant, MockOptions, MockOutcome, MockStorage, StoredContent,
+};
+
 use crate::error::ErrorCode;
+use crate::models::{Asset, AssetModerationDecision, Event};
 use crate::transport::{Attempt, AttemptBody, Exchange, ResponseBody};
 use crate::{Error, Result, ServerClient, ServerClientBuilder};
 use bytes::Bytes;
@@ -113,6 +123,7 @@ enum Reply {
 struct State {
     replies: VecDeque<Reply>,
     requests: Vec<Request>,
+    backend: Option<memory::Backend>,
 }
 #[derive(Default)]
 pub(crate) struct MockTransport(Mutex<State>);
@@ -140,6 +151,12 @@ impl MockTransport {
         let url = &attempt.url;
         let mut state = self.state();
         let number = state.requests.len() + 1;
+        let reply = match state.replies.pop_front() {
+            Some(reply) => Some(reply),
+            None => state.backend.as_mut().map(|backend| {
+                Reply::Response(backend.handle(&attempt.method, url, &attempt.headers, &body))
+            }),
+        };
         state.requests.push(Request {
             method: attempt.method.to_string(),
             url: url.to_string(),
@@ -159,7 +176,7 @@ impl MockTransport {
                 .collect(),
             body,
         });
-        match state.replies.pop_front() {
+        match reply {
             Some(Reply::Response(mut response)) => {
                 if !response.headers.contains_key("x-request-id") {
                     response.headers.insert(
@@ -218,10 +235,116 @@ impl MockServerClient {
     pub fn new() -> Result<Self> {
         Self::from_builder(
             ServerClient::builder("mock-key", "project-1")
-                .base_url("https://api.calmlens.invalid/v1")
-                .cdn_base_url("https://cdn.calmlens.invalid/v1")
+                .base_url(memory::API_BASE_URL)
+                .cdn_base_url(memory::CDN_BASE_URL)
                 .max_retries(0),
         )
+    }
+    /// A mock backed by an in-memory API, configured by `options`. Queued replies are still
+    /// used first, in order; once the queue is empty, requests reach the in-memory API.
+    ///
+    /// Uploads create assets: `assets().create` (and queued multipart uploads) get
+    /// [`MockOptions::queued_outcome`], `assets().classify` and `text().classify`
+    /// [`MockOptions::analyzed_outcome`]. Finished processing removes the content unless the
+    /// upload set `keep_content_after_processing`; `purged` removes it with reason `policy`.
+    /// Retrieve, list (RSQL filter, ordering, folder, cursor), children, update, move, delete,
+    /// delete content, retry, keyword search, signed URLs, folders, lenses and the events feed
+    /// read and change that storage, with the API's error codes, statuses and idempotent
+    /// replays. `wait_for_decision` returns at once for a decided asset; a pending one waits
+    /// for [`decide`](Self::decide) or the timeout. The CDN serves stored bytes, refusing
+    /// blocked and purged assets, and private or age-restricted ones unless the API key has
+    /// an `assets:download` grant ([`create_mock_api_key`]) or a public age-restricted asset is
+    /// requested with `allow_age_restricted`. Content is never classified or transformed.
+    ///
+    /// ```
+    /// # async fn run() -> calmlens::Result<()> {
+    /// use calmlens::{models::*, testing::*};
+    /// let mock = MockServerClient::in_memory(MockOptions::new())?;
+    /// let asset = mock.assets().create(SubmitAsset::text("hello")).await?;
+    /// assert_eq!(asset.classification.moderation.status, AssetModerationStatus::Pending);
+    /// mock.decide(&asset.id, AssetModerationDecision::Blocked)?;
+    /// let asset = mock.assets().retrieve(AssetId::new(&asset.id)).await?;
+    /// assert_eq!(asset.classification.moderation.status, AssetModerationStatus::Blocked);
+    /// # Ok(()) }
+    /// ```
+    pub fn in_memory(options: MockOptions) -> Result<Self> {
+        let builder = ServerClient::builder(options.api_key.clone(), options.project_id.clone())
+            .base_url(memory::API_BASE_URL)
+            .cdn_base_url(memory::CDN_BASE_URL)
+            .max_retries(options.max_retries);
+        let transport = Arc::new(MockTransport(Mutex::new(State {
+            backend: Some(memory::Backend::new(options)),
+            ..State::default()
+        })));
+        let client = builder.clone().build_mock(transport.clone())?;
+        Ok(Self {
+            client,
+            builder,
+            transport,
+        })
+    }
+    fn backend<R>(&self, f: impl FnOnce(&mut memory::Backend) -> R) -> R {
+        let mut state = self.transport.state();
+        let backend = state
+            .backend
+            .as_mut()
+            .expect("this MockServerClient was not created with MockServerClient::in_memory");
+        f(backend)
+    }
+    /// Runs `f` on the in-memory storage, e.g. to seed assets or inspect stored content.
+    ///
+    /// # Panics
+    ///
+    /// When the mock was not created with [`MockServerClient::in_memory`].
+    pub fn with_storage<R>(&self, f: impl FnOnce(&mut MockStorage) -> R) -> R {
+        self.backend(|backend| f(&mut backend.storage))
+    }
+    /// Applies a reviewer decision to a stored asset, as the portal would: the moderation
+    /// status changes (`purged` removes the content), the review is added to `manual_reviews`,
+    /// and an `asset.<status>` event with a `decided-by: reviewer` fact joins the events feed.
+    /// Fails with `asset/not-found` for an unknown asset.
+    ///
+    /// # Panics
+    ///
+    /// When the mock was not created with [`MockServerClient::in_memory`].
+    pub fn decide(&self, asset_id: &str, decision: AssetModerationDecision) -> Result<Asset> {
+        let asset = self
+            .backend(|backend| backend.decide(asset_id, decision.as_str()))
+            .ok_or_else(|| Error::new(ErrorCode::AssetNotFound, "Asset not found"))?;
+        serde_json::from_value(asset)
+            .map_err(|cause| Error::new(ErrorCode::InvalidResponse, cause.to_string()))
+    }
+    /// Appends `event` to the in-memory events feed and returns it. A missing ID, project ID
+    /// or creation time is filled in; when `asset_id` names a stored asset and `asset` is
+    /// `None`, the event carries its snapshot. `events().list` returns it to cursors taken
+    /// before it was added.
+    ///
+    /// # Panics
+    ///
+    /// When the mock was not created with [`MockServerClient::in_memory`].
+    pub fn enqueue_event(&self, mut event: Event) -> Event {
+        self.backend(|backend| {
+            if event.id.is_empty() {
+                event.id = backend.create_id();
+            }
+            event
+                .project_id
+                .get_or_insert_with(|| backend.project_id().to_owned());
+            event.created_at.get_or_insert_with(|| backend.now());
+            let mut stored = serde_json::to_value(&event).expect("serializable event");
+            if event.asset.is_none() {
+                if let Some(asset) = event
+                    .asset_id
+                    .as_ref()
+                    .and_then(|id| backend.storage.assets.get(id))
+                {
+                    stored["asset"] = memory::snapshot(asset);
+                    event.asset = serde_json::from_value(stored["asset"].clone()).ok();
+                }
+            }
+            backend.storage.events.push(stored);
+            event
+        })
     }
     /// A mock configured exactly like a real client, e.g.
     /// `MockServerClient::from_builder(ServerClient::builder(key, project).base_url(url).max_retries(2))`.
