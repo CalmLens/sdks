@@ -7907,13 +7907,13 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 	harassment: {
 		summary: "Attacks on an identifiable person or a non-protected group: insults and humiliation, threats and intimidation, bullying and exclusion, sexual harassment and abuse, abuse within a relationship, and encouraging others to do these.",
 		definition: "covers content that attacks an identifiable person, or a group that is not a protected identity group, or asks others to. Attacks are insults and contemptuous name-calling, demeaning or humiliating treatment, threats and intimidation, bullying and exclusion, sexual harassment, sexual abuse or objectification, and abuse or coercive control by a partner, family member or someone else in an ongoing relationship. Mild mockery and teasing, including mild or jokey name-calling such as fool, dummy, silly or clowns, sarcasm and mocking nicknames, are a lighter form of their own rather than insults, so that a policy can allow or restrict them. The target can be named, addressed, implied or invented, and need not have a protected identity. Attacks that are quoted, reported, shown in fiction, taught or condemned still count; qualifiers record their framing, their severity and whether the target is a public figure or group.",
-		exclusions: "Not harassment on its own: dislike or anger without an attack, such as \"I hate you\"; disagreement or criticism of an idea, argument, decision, conduct or work, however blunt; untargeted profanity; affectionate teasing between people on good terms; telling someone not to call another person a name. An attack on a protected identity group is Hate, and a one-off physical attack is Violence; either is also Harassment when the content separately attacks a person in one of the ways above. Saying that a source contains an insult or abuse does not supply it: require the actual words, assertion or behaviour.",
+		exclusions: "Not harassment on its own: dislike or anger without an attack, such as \"I hate you\"; disagreement or criticism of an idea, argument, decision, conduct or work, however blunt; untargeted profanity; affectionate teasing between people on good terms; telling someone not to call another person a name. An attack on a protected identity group is Hate, and a one-off physical attack is Violence; either is also Harassment when the content separately attacks a person in one of the ways above.",
 		docsHref: "/docs/guides/moderation-categories#harassment-and-bullying"
 	},
 	hate: {
 		summary: "Identity-based abuse, dehumanization, discriminatory exclusion or threats against people because of protected characteristics.",
-		definition: "covers attacks on people because of race, ethnicity, nationality, religion, caste, sex, gender identity, sexual orientation or disability. It includes dehumanization, asserted inferiority, discriminatory exclusion, identity-based abuse and threats. Images that show a hate symbol or attack to counter or prevent hate, such as anti-hate education, also count, so that a policy can allow or restrict them.",
-		exclusions: "Descriptions of differences in income, opportunity, treatment, representation, dating preferences or social outcomes between protected groups do not alone establish identity-based contempt or inherent inferiority. Describing a group as disadvantaged or an outcome as humiliating does not itself assert that its members have less human worth or inherent ability. Require an actual attack, not merely an unfavourable comparison. Claims of inherent inferiority, dehumanization, contempt, discriminatory exclusion or threats still qualify even alongside statistics, dating preferences or discussion of disparities. Both the protected target and the identity-based attack must be supported. A source merely labelled as containing a conventional slur or identity-based insult supplies no actual slur or abusive assertion; do not invent the missing attack. Identity mentions, cultural clothing, religious imagery, criticism of beliefs or an unrelated threat do not establish hate. Reclaimed identity language without contempt and vocabulary discussion without an actual identity-based attack are excluded. Concrete attacks quoted or described in reporting, condemnation or education still count; framing qualifiers determine policy allowances. Conventional identity slurs used contemptuously about people can themselves establish an attack, including inside criticism of someone else. Grammatical gender, gendered profanity, an insult about personal conduct or a protected trait that merely identifies a victim does not alone establish identity-based hate. Everyday insults about sense or behaviour, such as dummy, silly, fool, goofball or dork, are not disability slurs, and telling someone not to use an insult attacks no one.",
+		definition: "covers attacks on people because of race, ethnicity, nationality, religion, caste, sex, gender identity, sexual orientation or disability. It includes dehumanization, claims that a group is inferior, harmful stereotypes and generalisations such as saying a group is criminal, violent, dangerous or immoral, discriminatory exclusion, identity-based slurs and abuse, and threats. Images that show a hate symbol or attack to counter or prevent hate, such as anti-hate education, also count, so that a policy can allow or restrict them.",
+		exclusions: "Not hate on its own: mentioning an identity, cultural clothing or religious imagery; describing differences in outcomes or treatment between groups without claiming that a group is inferior; criticism of beliefs, ideologies, political movements or conduct; reclaimed identity language used without contempt; discussing a slur as a word; an insult about someone’s conduct where a protected trait only identifies them; everyday insults such as dummy or fool. Attacks that are quoted, reported, condemned or taught still count, and qualifiers record that framing.",
 		docsHref: "/docs/guides/moderation-categories#hate-and-identity-abuse"
 	},
 	"personal-information": {
@@ -8408,15 +8408,15 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "harassment",
 		kind: "harm",
 		displayName: "Insults or humiliation",
-		description: "Personal degradation, humiliation or bullying that seeks to harm a recipient psychologically, imposes an abusive power dynamic or objectifies a person, including contemptuous name-calling such as idiot, moron, loser or pathetic aimed at a person or at a group that is not a protected identity group.",
-		exclusions: "Expressions of dislike or anger alone (including \"I hate you\" or \"i hate u\"), ordinary disagreement or criticism of conduct or competence, untargeted profanity or neutral reporting without personal degradation. Threats and intimidation are Threats or intimidation. Sarcasm, ironic praise or a mocking nickname for a person, including a public figure, that uses no contemptuous or degrading word, such as calling someone Mr Perfect, our genius or Captain Obvious, is Mild mockery or teasing and not an insult, however pointed the joke, unless it humiliates, excludes or repeatedly targets the person. Mild or jokey name-calling such as fool, dummy, silly or clowns, aimed at a person or a non-protected group, without degradation, exclusion or repeated targeting is Mild mockery or teasing; affectionate teasing between people on good terms is neither."
+		description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.",
+		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity. Sarcasm, mocking nicknames and mild name-calling such as fool or dummy are Mild mockery or teasing, and threats are Threats or intimidation."
 	},
 	"harassment-mild": {
 		category: "harassment",
 		kind: "harm",
 		displayName: "Mild mockery or teasing",
-		description: "Light ridicule, teasing, sarcasm or a mocking nickname aimed at an identifiable person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), that stops short of contempt or degradation, without threats or intimidation. Mild name-calling such as fool, dummy or silly, without degradation, exclusion or repeated targeting, is this form. It counts so that a policy can allow or restrict it. Actual quoted, reported or fictional instances also count.",
-		exclusions: "Contemptuous name-calling such as idiot, moron, loser or pathetic, insults that degrade or humiliate a person or group, attacks on a person's worth, slurs, threats, intimidation, sexual remarks, bullying campaigns or victim mockery: assess those as Insults or humiliation or the matching form. Name-calling of a protected identity group belongs under Hate. Criticism of an argument, decision, policy or conduct without mocking the people, self-deprecation and untargeted jokes. Affectionate or playful teasing between people on good terms, signalled by warmth such as \"love you\", laughter or a laughing emoji, a fond tone or a fondly described friend or family member, even with a mild word such as goofball, silly or dork. Telling someone not to call another person a name."
+		description: "Light ridicule, teasing, sarcasm, a mocking nickname or mild name-calling such as fool, dummy or silly, aimed at a person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), without contempt, degradation or threats. It counts so that a policy can allow or restrict it.",
+		exclusions: "Contemptuous name-calling such as idiot, moron, loser or pathetic, degrading insults, slurs, threats, sexual remarks, bullying or victim mockery, which are other forms; name-calling of a protected identity group, which is Hate; criticism of an argument, decision or conduct without mocking the people; self-deprecation and untargeted jokes; affectionate teasing between people on good terms; telling someone not to call another person a name."
 	},
 	"harassment-bullying": {
 		category: "harassment",
@@ -8436,8 +8436,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "harassment",
 		kind: "harm",
 		displayName: "Threats or intimidation",
-		description: "A direct, conditional or clearly implied personal threat, or serious abusive or coercive intimidation, against an identifiable person or group; broad intergroup violent rhetoric alone belongs under Hate or Violence.",
-		exclusions: "Figurative speech; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation. A concrete threat quoted or described in a report still has this form; whether that report covers it is decided by the framing criteria."
+		description: "A direct, conditional or clearly implied personal threat, or serious abusive or coercive intimidation, against an identifiable person or group. Violent rhetoric between groups belongs under Hate or Violence.",
+		exclusions: "Figures of speech; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation."
 	},
 	"harassment-sexual": {
 		category: "harassment",
@@ -8450,8 +8450,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "harassment",
 		kind: "harm",
 		displayName: "Encouraging harassment",
-		description: "The author (including the speaker of a supplied chat turn) urges, organises, praises or endorses targeted personal abuse. A narrator reporting third-party abuse is not encouraging it.",
-		exclusions: "Reporting, condemnation or lawful requests for accountability without endorsing abuse. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "The author urges, organises, praises or endorses targeted abuse of a person.",
+		exclusions: "Reporting or condemning abuse, or lawfully asking for accountability, without endorsing abuse."
 	},
 	"harassment-historical": {
 		category: "harassment",
@@ -8492,43 +8492,43 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "hate",
 		kind: "harm",
 		displayName: "Identity-based insults or slurs",
-		description: "An identity-based insult or slur against people represented in the content, including a concrete attack quoted or reported by a narrator.",
-		exclusions: "Identity mentions, untargeted profanity or quoted vocabulary without an identity-based attack on people. An actual identity-based attack quoted in reporting still has this form; framing is separate."
+		description: "Identity-based insults or slurs against people, including ones that are quoted or reported.",
+		exclusions: "Mentioning an identity, untargeted profanity, or discussing a word without attacking people."
 	},
 	"hate-slurs": {
 		category: "hate",
 		kind: "harm",
 		displayName: "Offensive slurs",
-		description: "Qualifying identity-based attacks that use actual conventional offensive identity epithets recognised as slurs in the supplied language, including clearly recognisable censored or obfuscated spellings. Require the offensive slur itself, rather than treating every group insult or historical outgroup name as a slur. Actual conventional slurs remain slurs when quoted, reported, historical, fictional or educational; the narrator need not endorse them.",
-		exclusions: "An omitted or unspecified slur; neutral identity vocabulary; generic derogatory descriptions such as calling another people barbarians or uncivilised; historical group-name etymology without a conventional offensive identity epithet; ambiguous spellings. These descriptions may qualify as identity abuse without this narrower slur form. Merely discussing vocabulary without a represented identity-based attack does not establish Hate; assess actual offensive words separately under Profanity."
+		description: "Identity-based attacks that use a recognised offensive identity slur, including censored or disguised spellings, whether used, quoted, reported, historical, fictional or taught.",
+		exclusions: "Neutral identity words, general insults about a people that are not slurs, and discussing a slur’s history or meaning without attacking anyone."
 	},
 	"hate-dehumanization": {
 		category: "hate",
 		kind: "harm",
 		displayName: "Dehumanization",
-		description: "The author (including the speaker of a supplied chat turn) personally claims or endorses that protected people are subhuman, animals, vermin or objects. An unendorsed third-party quotation inside a narrative report does not satisfy this active-stance qualifier.",
-		exclusions: "Literal descriptions, unrelated metaphors, neutral reporting or condemnation without endorsement. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "The author claims or endorses that people with a protected identity are subhuman, animals, vermin or objects.",
+		exclusions: "Literal descriptions, unrelated metaphors, and reporting or condemning someone else’s dehumanizing words."
 	},
 	"hate-inferiority": {
 		category: "hate",
 		kind: "harm",
-		displayName: "Claims of inferiority",
-		description: "An assertion represented in the content that people are inherently inferior because of a supported protected identity, including a concrete quoted or reported assertion.",
-		exclusions: "Differences in income, opportunity, treatment, representation, dating preferences or social outcomes without an assertion of inherent inferiority. Criticism of beliefs or conduct or identity mentions without a qualifying inferiority claim. Reporting a concrete inferiority claim retains the factual form; framing is separate."
+		displayName: "Inferiority or harmful stereotypes",
+		description: "A claim that people are inherently inferior, or a harmful stereotype or generalisation that they are criminal, violent, dangerous, dishonest or immoral, because of a protected identity, including quoted or reported claims.",
+		exclusions: "Describing differences in income, opportunity, treatment, representation or outcomes between groups without claiming a group is inferior; criticism of beliefs or conduct; a claim about particular people that does not extend to their group."
 	},
 	"hate-exclusion": {
 		category: "hate",
 		kind: "harm",
 		displayName: "Exclusion or discrimination",
-		description: "The author (including the speaker of a supplied chat turn) personally advocates or endorses denying rights to or excluding people because of protected identity. An unendorsed third-party quotation inside a narrative report does not satisfy this active-stance qualifier.",
-		exclusions: "Neutral reporting, criticism of policy or lawful distinctions without an identity-based attack. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "The author advocates or endorses denying rights to, or excluding, people because of a protected identity.",
+		exclusions: "Reporting, criticising a policy, or lawful distinctions that attack no identity."
 	},
 	"hate-threat": {
 		category: "hate",
 		kind: "harm",
 		displayName: "Threats or incitement",
-		description: "The author (including the speaker of a supplied chat turn) personally threatens or endorses serious harm because of protected identity. A narrator quoting another person's threat to report, document or condemn it does not satisfy this active-stance qualifier, even if the quotation contains an imperative call for harm.",
-		exclusions: "Unrelated threats, unsupported identity-based motive, neutral reporting, condemnation or lawful accountability. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "The author threatens or endorses serious harm against people because of a protected identity.",
+		exclusions: "Threats unrelated to identity, an unsupported identity motive, reporting or condemning someone else’s threat, and lawful accountability."
 	},
 	"hate-historical": {
 		category: "hate",

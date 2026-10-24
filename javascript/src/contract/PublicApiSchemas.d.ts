@@ -4,7 +4,7 @@ import "./Folder-DPmIHVJj.js";
 import "./EventCatalog-BN7QY46A.js";
 import "./Page-Bpd8G-D0.js";
 import { r as TypedEvent } from "./Event-BYnSpgfx.js";
-import "./Lens-yZlVGaQR.js";
+import "./Lens-C56zBnFc.js";
 import "./PublicErrorCodes-DXpimR79.js";
 import * as zod from "zod";
 //#region packages/shared/src/PublicApiSchemas.d.ts

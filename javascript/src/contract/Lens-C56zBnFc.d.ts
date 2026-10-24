@@ -21,11 +21,21 @@ declare const DEFAULT_ASSET_TRANSFORMS: {
         };
         width: {
           type: "integer";
-          minimum: 0;
+          minimum: 1;
+          maximum: 10000;
         };
         height: {
           type: "integer";
-          minimum: 0;
+          minimum: 1;
+          maximum: 10000;
+        };
+        dpr: {
+          type: "number";
+          minimum: 1;
+          maximum: 3;
+        };
+        anim: {
+          type: "boolean";
         };
         background: {
           type: "string";
@@ -53,9 +63,14 @@ declare const DEFAULT_ASSET_TRANSFORMS: {
           type: "number";
         };
         quality: {
-          type: "integer";
-          minimum: 0;
-          maximum: 255;
+          oneOf: [{
+            type: "integer";
+            minimum: 1;
+            maximum: 100;
+          }, {
+            type: "string";
+            enum: ["low", "medium", "high"];
+          }];
         };
         fit: {
           type: "string";
