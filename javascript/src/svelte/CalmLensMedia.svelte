@@ -33,13 +33,11 @@
   const loadKey = $derived(getMediaLoadKey(state));
   const ratio = $derived(getMediaAspectRatio({ aspectRatio, width, height }));
   let load: "loading" | "loaded" | "error" = $state("loading");
-  let useSources = $state(true);
   let image: HTMLImageElement | undefined = $state();
 
   $effect.pre(() => {
     void loadKey;
     load = "loading";
-    useSources = true;
   });
   onMount(() => {
     if (!unstyled) injectCalmLensStyles();
@@ -48,9 +46,7 @@
   });
 
   const onError = () => {
-    // A failed format source falls back to the original before giving up.
-    if (useSources && state.kind === "image" && state.sources.length) useSources = false;
-    else load = "error";
+    load = "error";
   };
   const placeholderUrl = $derived(
     state.kind === "audio" || state.kind === "unavailable" ? undefined : state.placeholderUrl,
@@ -75,30 +71,23 @@
     <img class="calmlens-media__placeholder" src={placeholderUrl} alt="" aria-hidden="true" />
   {/if}
   {#if state.kind === "image" && !failed}
-    <picture>
-      {#if useSources}
-        {#each state.sources as source (source.type)}
-          <source type={source.type} srcset={source.srcSet} {sizes} />
-        {/each}
-      {/if}
-      {#key `${loadKey} ${useSources}`}
-        <img
-          bind:this={image}
-          class="calmlens-media__content"
-          src={state.src}
-          srcset={state.srcSet}
-          {sizes}
-          {alt}
-          {width}
-          {height}
-          loading={lazy ? "lazy" : undefined}
-          decoding="async"
-          fetchpriority={fetchPriority}
-          onload={() => (load = "loaded")}
-          onerror={onError}
-        />
-      {/key}
-    </picture>
+    {#key loadKey}
+      <img
+        bind:this={image}
+        class="calmlens-media__content"
+        src={state.src}
+        srcset={state.srcSet}
+        {sizes}
+        {alt}
+        {width}
+        {height}
+        loading={lazy ? "lazy" : undefined}
+        decoding="async"
+        fetchpriority={fetchPriority}
+        onload={() => (load = "loaded")}
+        onerror={onError}
+      />
+    {/key}
   {:else if state.kind === "video" && !failed}
     <!-- svelte-ignore a11y_media_has_caption -->
     <!-- biome-ignore lint/a11y/useMediaCaption: captions are your app's to add -->

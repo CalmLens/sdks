@@ -101,7 +101,6 @@ export const CALMLENS_STYLES = `
   position: relative; display: block; overflow: hidden; margin: 0; border-radius: var(--calmlens-media-radius, 0);
   background: var(--calmlens-surface);
 }
-.calmlens-media picture { display: contents; }
 .calmlens-media__placeholder, .calmlens-media__content {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: var(--calmlens-fit, cover);
   object-position: var(--calmlens-position, center);

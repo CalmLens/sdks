@@ -4,7 +4,7 @@
 
 import type { AssetModerationStatus } from "./client/CalmLensTypes";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import { getMediaState, type MediaFormat, type MediaOptions } from "./ui/Media";
+import { getMediaState, type MediaOptions } from "./ui/Media";
 import {
   type CalmLensMessages,
   describeUploadItem,
@@ -356,9 +356,8 @@ export class CalmLensUploaderElement extends BaseElement {
  * CalmLens CDN with a blurred placeholder while it loads. Age-restricted assets show the
  * placeholder and a reveal button, which dispatches `calmlens-reveal`, until `can-view` is set.
  * Attributes: `project-id`, `asset-id`, `status`, `can-view`, `type`, `resource`, `lens`,
- * `transform`, `widths` (comma-separated), `formats` (comma-separated, `none` for only the
- * original), `url`, `no-placeholder`, `placeholder-hash`, `placeholder-url`, `average-color`,
- * `cdn-base-url`, `alt`, `aspect-ratio`, `width`, `height`,
+ * `transform`, `widths` (comma-separated), `url`, `no-placeholder`, `placeholder-hash`,
+ * `placeholder-url`, `average-color`, `cdn-base-url`, `alt`, `aspect-ratio`, `width`, `height`,
  * `sizes`, `fit`, `position`, `eager`, `fetch-priority`, `no-controls` and `unstyled`.
  */
 export class CalmLensMediaElement extends BaseElement {
@@ -372,7 +371,6 @@ export class CalmLensMediaElement extends BaseElement {
     "lens",
     "transform",
     "widths",
-    "formats",
     "url",
     "no-placeholder",
     "placeholder-hash",
@@ -421,7 +419,6 @@ export class CalmLensMediaElement extends BaseElement {
         ?.split(",")
         .map((value) => value.trim())
         .filter(Boolean);
-    const formats = list("formats");
     return {
       projectId: this.getAttribute("project-id") ?? "",
       assetId: this.getAttribute("asset-id") ?? "",
@@ -432,7 +429,6 @@ export class CalmLensMediaElement extends BaseElement {
       lens: this.getAttribute("lens") ?? undefined,
       transform: this.getAttribute("transform") ?? undefined,
       widths: list("widths")?.map(Number),
-      formats: formats?.includes("none") ? [] : (formats as MediaFormat[] | undefined),
       url: this.getAttribute("url") ?? undefined,
       placeholder: !this.hasAttribute("no-placeholder"),
       placeholderHash: this.getAttribute("placeholder-hash") ?? undefined,
@@ -498,9 +494,6 @@ export class CalmLensMediaElement extends BaseElement {
         ]),
       );
     } else if (state.kind === "image") {
-      const sources = state.sources.map((source) =>
-        el("source", { type: source.type, srcset: source.srcSet, sizes }),
-      );
       const image = el("img", {
         class: "calmlens-media__content",
         src: state.src,
@@ -513,19 +506,12 @@ export class CalmLensMediaElement extends BaseElement {
         decoding: "async",
         fetchpriority: this.getAttribute("fetch-priority") ?? undefined,
       });
-      const picture = el("picture", {}, [...sources, image]);
       image.addEventListener("load", () => {
         this.dataset.state = "loaded";
         placeholder?.remove();
       });
-      image.addEventListener("error", () => {
-        // A failed format source falls back to the original before giving up.
-        if (picture.querySelector("source")) {
-          for (const source of picture.querySelectorAll("source")) source.remove();
-          image.src = state.src;
-        } else fail();
-      });
-      this.replaceChildren(...[placeholder, picture].filter((node) => node !== undefined));
+      image.addEventListener("error", fail);
+      this.replaceChildren(...[placeholder, image].filter((node) => node !== undefined));
     } else {
       const media = el(state.kind, {
         class: "calmlens-media__content",

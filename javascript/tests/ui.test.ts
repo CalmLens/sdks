@@ -28,41 +28,33 @@ describe("getMediaState", () => {
       placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     });
 
-    const shown = getMediaState({ ...options, canView: true, formats: [] });
+    const shown = getMediaState({ ...options, canView: true });
     expect(shown.kind === "image" && shown.src).toBe(
-      `${CDN}/assets/${PROJECT_ID}/a1/content?allowAgeRestricted=true`,
+      `${CDN}/assets/${PROJECT_ID}/a1/rendered?allowAgeRestricted=true`,
     );
   });
 
-  it("offers each format at each width and falls back to the largest original width", () => {
+  it("offers each width from the rendered resource and falls back to the largest", () => {
     const state = getMediaState({
       projectId: PROJECT_ID,
       assetId: "a1",
       lens: "card",
       widths: [800, 400, 400],
-      formats: ["avif"],
     });
-    const base = `${CDN}/assets/${PROJECT_ID}/a1/content/@card`;
+    const base = `${CDN}/assets/${PROJECT_ID}/a1/rendered/@card`;
     expect(state).toEqual({
       kind: "image",
       src: `${base},imageTransform[width=800]`,
       srcSet: `${base},imageTransform[width=400] 400w, ${base},imageTransform[width=800] 800w`,
-      sources: [
-        {
-          type: "image/avif",
-          srcSet: `${base},imageTransform[format=avif,width=400] 400w, ${base},imageTransform[format=avif,width=800] 800w`,
-        },
-      ],
       placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     });
   });
 
   it("uses a signed URL as given, without a placeholder that would need the same access", () => {
-    const url = "https://cdn.calmlens.com/v1/assets/p/a1/content?exp=1&sig=abc";
+    const url = "https://cdn.calmlens.com/v1/assets/p/a1/rendered?exp=1&sig=abc";
     expect(getMediaState({ projectId: PROJECT_ID, assetId: "a1", url })).toEqual({
       kind: "image",
       src: url,
-      sources: [],
       placeholderUrl: undefined,
     });
   });
@@ -84,11 +76,13 @@ describe("getMediaState", () => {
     );
   });
 
-  it("serves a video's content with its preview as the poster", () => {
-    expect(getMediaState({ projectId: PROJECT_ID, assetId: "v1", type: "video" })).toMatchObject({
+  it("plays a video's original file, with the lens only on its rendered poster", () => {
+    expect(
+      getMediaState({ projectId: PROJECT_ID, assetId: "v1", type: "video", lens: "card" }),
+    ).toMatchObject({
       kind: "video",
-      src: `${CDN}/assets/${PROJECT_ID}/v1/content`,
-      poster: `${CDN}/assets/${PROJECT_ID}/v1/preview`,
+      src: `${CDN}/assets/${PROJECT_ID}/v1/original`,
+      poster: `${CDN}/assets/${PROJECT_ID}/v1/rendered/@card`,
     });
   });
 });

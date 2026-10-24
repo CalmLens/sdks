@@ -581,7 +581,7 @@ Options: `uploadPresetId`, `token` (a string, or a function of the file returnin
 
 To upload through your own API instead of a preset, pass `upload(file, { signal, onProgress })`, which returns `{ assetId, status? }`, and optionally `checkStatus(assetId)` for pending uploads. The uploader still shows progress, decisions and errors; throw a `CalmLensError` to show its code's message. `createProgressFetch(onProgress)` gives you a `fetch` that reports sent bytes, to pass as `uploadFetch` to your client.
 
-**The media component** shows an asset from the CDN. It offers AVIF before the original by default (`formats`), adds `srcset` widths when you pass `widths` and `sizes`, shows the blurred placeholder while the image loads, and fades the image in. Age-restricted assets stay behind the placeholder and a notice with a reveal button until you pass `canView`, and then use the `allowAgeRestricted` opt-in. Blocked and purged assets, and images that fail to load, show an unavailable notice.
+**The media component** shows an asset from the CDN's `rendered` resource in a single `<img>`, so the CDN picks the best format the browser accepts. It adds `srcset` widths when you pass `widths` and `sizes`, shows the blurred placeholder while the image loads, and fades the image in. Video and audio play the `original` file, with a rendered poster for video. Age-restricted assets stay behind the placeholder and a notice with a reveal button until you pass `canView`, and then use the `allowAgeRestricted` opt-in. Blocked and purged assets, and images that fail to load, show an unavailable notice.
 
 ```tsx
 import { CalmLensMedia } from "@calmlens/sdk/react";

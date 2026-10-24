@@ -20,7 +20,7 @@ import {
 } from "vue";
 import type { AssetModerationStatus, CdnTransform } from "./client/CalmLensTypes";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import { getMediaState, type MediaFormat } from "./ui/Media";
+import { getMediaState } from "./ui/Media";
 import {
   type CalmLensMessages,
   describeUploadItem,
@@ -302,7 +302,7 @@ export const CalmLensUploader = defineComponent({
 type LoadState = "loading" | "loaded" | "error";
 
 /**
- * Shows an asset from the CalmLens CDN with responsive sources and a blurred placeholder while
+ * Shows an asset from the CalmLens CDN with responsive widths and a blurred placeholder while
  * it loads. Age-restricted assets stay behind the placeholder and a reveal button until
  * `canView` is set; blocked and purged assets show an unavailable notice.
  */
@@ -314,11 +314,10 @@ export const CalmLensMedia = defineComponent({
     status: optional(String as PropType<AssetModerationStatus>),
     canView: { type: Boolean, default: false },
     type: optional(String as PropType<"image" | "video" | "audio">),
-    resource: optional(String as PropType<"content" | "preview">),
+    resource: optional(String as PropType<"original" | "rendered">),
     lens: optional(String),
     transform: optional([String, Object, Array] as PropType<CdnTransform>),
     widths: optional(Array as PropType<number[]>),
-    formats: optional(Array as PropType<MediaFormat[]>),
     url: optional(String),
     placeholder: { type: Boolean, default: true },
     placeholderHash: optional(String),
@@ -346,22 +345,16 @@ export const CalmLensMedia = defineComponent({
     const state = computed(() => getMediaState(props));
     const loadKey = computed(() => getMediaLoadKey(state.value));
     const load = ref<LoadState>("loading");
-    const useSources = ref(true);
     const image = ref<HTMLImageElement>();
     watch(loadKey, () => {
       load.value = "loading";
-      useSources.value = true;
     });
     // An image that loaded before hydration fires no load event.
     onMounted(() => {
       if (image.value?.complete && image.value.naturalWidth > 0) load.value = "loaded";
     });
     const onError = () => {
-      // A failed format source falls back to the original before giving up.
-      const current = state.value;
-      if (useSources.value && current.kind === "image" && current.sources.length) {
-        useSources.value = false;
-      } else load.value = "error";
+      load.value = "error";
     };
 
     return () => {
@@ -402,36 +395,24 @@ export const CalmLensMedia = defineComponent({
             }),
           current.kind === "image" &&
             !failed &&
-            h("picture", [
-              ...(useSources.value
-                ? current.sources.map((source) =>
-                    h("source", {
-                      key: source.type,
-                      type: source.type,
-                      srcset: source.srcSet,
-                      sizes: props.sizes,
-                    }),
-                  )
-                : []),
-              h("img", {
-                key: `${loadKey.value} ${useSources.value}`,
-                ref: image,
-                class: "calmlens-media__content",
-                src: current.src,
-                srcset: current.srcSet,
-                sizes: props.sizes,
-                alt: props.alt,
-                width: props.width,
-                height: props.height,
-                loading: props.lazy ? "lazy" : undefined,
-                decoding: "async",
-                fetchpriority: props.fetchPriority,
-                onLoad: () => {
-                  load.value = "loaded";
-                },
-                onError,
-              }),
-            ]),
+            h("img", {
+              key: loadKey.value,
+              ref: image,
+              class: "calmlens-media__content",
+              src: current.src,
+              srcset: current.srcSet,
+              sizes: props.sizes,
+              alt: props.alt,
+              width: props.width,
+              height: props.height,
+              loading: props.lazy ? "lazy" : undefined,
+              decoding: "async",
+              fetchpriority: props.fetchPriority,
+              onLoad: () => {
+                load.value = "loaded";
+              },
+              onError,
+            }),
           current.kind === "video" &&
             !failed &&
             h("video", {

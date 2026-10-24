@@ -4,7 +4,7 @@
 
 export type { IconName } from "./ui/Icons";
 export { ICON_ATTRIBUTES, ICONS } from "./ui/Icons";
-export type { MediaFormat, MediaOptions, MediaState } from "./ui/Media";
+export type { MediaOptions, MediaState } from "./ui/Media";
 export { getMediaState } from "./ui/Media";
 export type { CalmLensMessages, UploadItemView } from "./ui/Messages";
 export {

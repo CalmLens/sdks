@@ -130,14 +130,14 @@ const mockApi = async (request: IncomingMessage, response: ServerResponse, url: 
 
 const mockCdn = async (response: ServerResponse, url: URL) => {
   const route = url.pathname.match(
-    /^\/mock-cdn\/v1\/assets\/([^/]+)\/([^/]+)\/(content|preview|placeholder)/,
+    /^\/mock-cdn\/v1\/assets\/([^/]+)\/([^/]+)\/(original|rendered|placeholder)/,
   );
   if (!route || route[1] !== MOCK_PROJECT_ID)
     return json(response, 404, { code: "asset/not-found" });
   // The mock CDN applies the moderation gate; it ignores lenses and transforms.
   const served = await mockServer.cdn.serve({
     assetIdentifier: route[2] ?? "",
-    resource: route[3] as "content" | "preview" | "placeholder",
+    resource: route[3] as "original" | "rendered" | "placeholder",
     allowAgeRestricted: url.searchParams.get("allowAgeRestricted") === "true" || undefined,
   });
   response.writeHead(served.status, {

@@ -279,7 +279,7 @@ export type CalmLensMediaProps = MediaProps &
 type LoadState = "loading" | "loaded" | "error";
 
 /**
- * Shows an asset from the CalmLens CDN with responsive sources and a blurred placeholder while
+ * Shows an asset from the CalmLens CDN with responsive widths and a blurred placeholder while
  * it loads. Age-restricted assets stay behind the placeholder and a reveal button until
  * `canView` is set; blocked and purged assets show an unavailable notice.
  */
@@ -294,7 +294,6 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
     lens,
     transform,
     widths,
-    formats,
     url,
     placeholder,
     placeholderHash,
@@ -330,7 +329,6 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
     lens,
     transform,
     widths,
-    formats,
     url,
     placeholder,
     placeholderHash,
@@ -338,19 +336,17 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
     cdnBaseUrl,
   });
   const loadKey = getMediaLoadKey(state);
-  const [load, setLoad] = useState<{ key: string; state: LoadState; sources: boolean }>({
+  const [load, setLoad] = useState<{ key: string; state: LoadState }>({
     key: loadKey,
     state: "loading",
-    sources: true,
   });
-  const current =
-    load.key === loadKey ? load : { key: loadKey, state: "loading" as const, sources: true };
+  const current = load.key === loadKey ? load : { key: loadKey, state: "loading" as const };
   const image = useRef<HTMLImageElement>(null);
 
   // An image that loaded before hydration fires no load event.
   useEffect(() => {
     if (image.current?.complete && image.current.naturalWidth > 0) {
-      setLoad({ key: loadKey, state: "loaded", sources: true });
+      setLoad({ key: loadKey, state: "loaded" });
     }
   }, [loadKey]);
 
@@ -388,35 +384,22 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
         />
       )}
       {state.kind === "image" && current.state !== "error" && (
-        <picture>
-          {current.sources &&
-            state.sources.map((source) => (
-              <source key={source.type} type={source.type} srcSet={source.srcSet} sizes={sizes} />
-            ))}
-          <img
-            key={`${loadKey} ${current.sources}`}
-            ref={image}
-            className="calmlens-media__content"
-            src={state.src}
-            srcSet={state.srcSet}
-            sizes={sizes}
-            alt={alt}
-            width={width}
-            height={height}
-            loading={lazy ? "lazy" : undefined}
-            decoding="async"
-            fetchPriority={fetchPriority}
-            onLoad={() => setLoad({ key: loadKey, state: "loaded", sources: current.sources })}
-            onError={() =>
-              // A failed format source falls back to the original before giving up.
-              setLoad(
-                current.sources && state.sources.length
-                  ? { key: loadKey, state: "loading", sources: false }
-                  : { key: loadKey, state: "error", sources: false },
-              )
-            }
-          />
-        </picture>
+        <img
+          key={loadKey}
+          ref={image}
+          className="calmlens-media__content"
+          src={state.src}
+          srcSet={state.srcSet}
+          sizes={sizes}
+          alt={alt}
+          width={width}
+          height={height}
+          loading={lazy ? "lazy" : undefined}
+          decoding="async"
+          fetchPriority={fetchPriority}
+          onLoad={() => setLoad({ key: loadKey, state: "loaded" })}
+          onError={() => setLoad({ key: loadKey, state: "error" })}
+        />
       )}
       {state.kind === "video" && current.state !== "error" && (
         // biome-ignore lint/a11y/useMediaCaption: captions come from your app, as <track> children are not supported here
@@ -428,7 +411,7 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
           playsInline
           preload="metadata"
           aria-label={alt || undefined}
-          onError={() => setLoad({ key: loadKey, state: "error", sources: false })}
+          onError={() => setLoad({ key: loadKey, state: "error" })}
         />
       )}
       {state.kind === "audio" && current.state !== "error" && (
@@ -439,7 +422,7 @@ export function CalmLensMedia(props: CalmLensMediaProps) {
           controls={controls}
           preload="metadata"
           aria-label={alt || undefined}
-          onError={() => setLoad({ key: loadKey, state: "error", sources: false })}
+          onError={() => setLoad({ key: loadKey, state: "error" })}
         />
       )}
       {state.kind === "gated" && (

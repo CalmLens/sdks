@@ -2,9 +2,6 @@ import type { AssetModerationStatus, CdnTransform, LensTransform } from "../clie
 import { getAssetUrl, serializeTransform, transformSelector } from "../client/CalmLensUtils";
 import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 
-/** Image formats the media component offers before the original, best first. */
-export type MediaFormat = "avif" | "webp";
-
 export interface MediaOptions {
   projectId: string;
   /** The asset ID, or the `externalId` your app gave it. */
@@ -18,19 +15,18 @@ export interface MediaOptions {
   canView?: boolean;
   /** `image` (default), `video` or `audio`. */
   type?: "image" | "video" | "audio";
-  /** `content` (default) or `preview`, which also converts HEIC to a format browsers show. */
-  resource?: "content" | "preview";
+  /**
+   * `rendered` (default), which the CDN serves in the best format the browser accepts and where
+   * lenses and transforms apply, or `original`, the exact uploaded file. Video and audio always
+   * play the original.
+   */
+  resource?: "original" | "rendered";
   /** A named lens, such as `avatar`. */
   lens?: string;
   /** A transform applied after the lens, as a selector string or structured steps. */
   transform?: CdnTransform;
   /** Widths to offer in `srcset`, so browsers fetch the smallest that fits `sizes`. */
   widths?: number[];
-  /**
-   * Formats offered before the original. Defaults to `["avif"]`; pass `[]` to serve only the
-   * original. Each format and width is a separate image transform.
-   */
-  formats?: MediaFormat[];
   /**
    * A signed URL from your server, used as-is instead of a CDN URL built here, for private
    * assets or when CalmLens must refuse age-restricted content to everyone else.
@@ -53,13 +49,7 @@ export interface MediaOptions {
 export type MediaState =
   | { kind: "unavailable" }
   | { kind: "gated"; placeholderUrl?: string }
-  | {
-      kind: "image";
-      src: string;
-      srcSet?: string;
-      sources: { type: string; srcSet: string }[];
-      placeholderUrl?: string;
-    }
+  | { kind: "image"; src: string; srcSet?: string; placeholderUrl?: string }
   | { kind: "video"; src: string; poster?: string; placeholderUrl?: string }
   | { kind: "audio"; src: string };
 
@@ -84,7 +74,7 @@ const joinTransforms = (base: CdnTransform | undefined, extra?: LensTransform) =
   undefined;
 
 /**
- * What the media component should render for an asset: the image with its responsive sources,
+ * What the media component should render for an asset: the image with its responsive widths,
  * the video or audio, a gated placeholder for an age-restricted asset the viewer can't see, or
  * nothing for blocked and purged assets. Every framework's component renders this.
  */
@@ -94,11 +84,10 @@ export const getMediaState = ({
   status = "allowed",
   canView = false,
   type = "image",
-  resource = "content",
+  resource = "rendered",
   lens,
   transform,
   widths,
-  formats = ["avif"],
   url,
   placeholder = true,
   placeholderHash,
@@ -117,47 +106,43 @@ export const getMediaState = ({
   const restricted = status === "age-restricted";
   if (restricted && !canView) return { kind: "gated", placeholderUrl };
 
-  const build = (options: { resource?: "content" | "preview"; extra?: LensTransform } = {}) =>
-    getAssetUrl({
+  const build = (options: { resource?: "original" | "rendered"; extra?: LensTransform } = {}) => {
+    const chosen = options.resource ?? resource;
+    // Lenses and transforms apply only to the rendered resource.
+    const rendered = chosen === "rendered";
+    return getAssetUrl({
       ...asset,
-      resource: options.resource ?? resource,
-      lens,
-      transform: joinTransforms(transform, options.extra),
+      resource: chosen,
+      lens: rendered ? lens : undefined,
+      transform: rendered ? joinTransforms(transform, options.extra) : undefined,
       allowAgeRestricted: restricted || undefined,
     });
+  };
 
-  if (type === "audio") return { kind: "audio", src: url ?? build() };
+  if (type === "audio") return { kind: "audio", src: url ?? build({ resource: "original" }) };
   if (type === "video") {
     return {
       kind: "video",
-      src: url ?? build({ resource: "content" }),
-      poster: url ? undefined : build({ resource: "preview" }),
+      src: url ?? build({ resource: "original" }),
+      poster: url ? undefined : build({ resource: "rendered" }),
       placeholderUrl,
     };
   }
-  if (url) return { kind: "image", src: url, sources: [], placeholderUrl };
+  if (url) return { kind: "image", src: url, placeholderUrl };
 
-  const sorted = [...new Set(widths ?? [])]
+  // One URL per width; the CDN picks each one's format from the browser's Accept header.
+  const widthsInOrder = [...new Set(widths ?? [])]
     .filter((width) => Number.isSafeInteger(width) && width > 0)
     .sort((a, b) => a - b);
-  const step = (options: Record<string, string | number>): LensTransform => ({
-    type: "imageTransform",
-    options,
-  });
-  const srcSetFor = (format?: MediaFormat) =>
-    sorted.length
-      ? sorted
-          .map(
-            (width) => `${build({ extra: step({ width, ...(format && { format }) }) })} ${width}w`,
-          )
-          .join(", ")
-      : build({ extra: format ? step({ format }) : undefined });
-  const largest = sorted.at(-1);
+  const atWidth = (width: number) =>
+    build({ extra: { type: "imageTransform", options: { width } } });
+  const largest = widthsInOrder.at(-1);
   return {
     kind: "image",
-    src: largest ? build({ extra: step({ width: largest }) }) : build(),
-    srcSet: sorted.length ? srcSetFor() : undefined,
-    sources: formats.map((format) => ({ type: `image/${format}`, srcSet: srcSetFor(format) })),
+    src: largest ? atWidth(largest) : build(),
+    srcSet: widthsInOrder.length
+      ? widthsInOrder.map((width) => `${atWidth(width)} ${width}w`).join(", ")
+      : undefined,
     placeholderUrl,
   };
 };
