@@ -63,8 +63,9 @@ digital ID (`ageRangeSource` `TIER_C` or `TIER_D`). Require that where the law a
 age.
 
 This app shows the photo from the phone itself. To show other people's age-restricted uploads
-from the CDN once the check passes, build the URL with `getAssetUrl({ ..., ageRestricted: true })`;
-without it, the CDN only serves age-restricted assets through signed URLs or an API key.
+from the CDN, send the age result to your server, store it on the user's account, and have the
+server return a short-lived [signed URL](https://calmlens.com/docs/guides/delivering-assets#signed-urls)
+to users who passed. The CDN refuses age-restricted assets on plain public URLs.
 
 The iOS age range needs the `com.apple.developer.declared-age-range` entitlement, which
 [`app.json`](app.json) sets, and a real device signed in to an Apple Account. Simulators may not
