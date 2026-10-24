@@ -181,7 +181,7 @@ declare const RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   type: zod.ZodString;
   projectId: zod.ZodString;
-  createdAt: zod.ZodOptional<zod.ZodNumber>;
+  createdAt: zod.ZodNumber;
   data: zod.ZodObject<{
     severity: zod.ZodOptional<zod.ZodString>;
     title: zod.ZodOptional<zod.ZodString>;
@@ -207,7 +207,7 @@ interface ReceivedWebhookEventPayload {
   id: string;
   type: string;
   projectId: string;
-  createdAt?: number;
+  createdAt: number;
   data: {
     severity?: string;
     title?: string;

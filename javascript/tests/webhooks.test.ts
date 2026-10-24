@@ -197,7 +197,13 @@ describe("parseWebhookEvent", () => {
   });
 
   it("throws sdk/invalid-webhook-payload for a signed body that is not an event", async () => {
-    for (const payload of ["not json", "[]", JSON.stringify({ id: "e", type: "x" })]) {
+    for (const payload of [
+      "not json",
+      "[]",
+      JSON.stringify({ id: "e", type: "x" }),
+      // Every event CalmLens sends has its creation time.
+      JSON.stringify({ id: "e", type: "x", projectId: "p", data: {} }),
+    ]) {
       const signature = await builders.createWebhookSignatureHeader(
         secret,
         timestampSeconds,

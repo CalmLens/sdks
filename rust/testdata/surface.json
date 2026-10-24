@@ -178,6 +178,20 @@
       }
     },
     {
+      "id": "assets.update",
+      "kind": "method",
+      "description": "Update an existing asset",
+      "names": {
+        "javascript": "assets.update",
+        "python": "assets.update",
+        "go": "Assets.Update",
+        "rust": "assets().update",
+        "java": "assets.update",
+        "ruby": "assets.update",
+        "php": "assets->update"
+      }
+    },
+    {
       "id": "assets.deleteContent",
       "kind": "method",
       "description": "Remove stored content, including the content derived from it in child assets, while retaining the asset records",
@@ -315,20 +329,6 @@
         "java": "assets.classify",
         "ruby": "assets.classify",
         "php": "assets->classify"
-      }
-    },
-    {
-      "id": "assets.update",
-      "kind": "method",
-      "description": "A request fixture operation.",
-      "names": {
-        "javascript": "assets.update",
-        "python": "assets.update",
-        "go": "Assets.Update",
-        "rust": "assets().update",
-        "java": "assets.update",
-        "ruby": "assets.update",
-        "php": "assets->update"
       }
     },
     {

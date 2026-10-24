@@ -1434,7 +1434,7 @@ zod.looseObject({
 	id: zod.string(),
 	type: zod.string(),
 	projectId: zod.string(),
-	createdAt: zod.number().optional(),
+	createdAt: zod.number(),
 	data: zod.looseObject({
 		severity: zod.string().optional(),
 		title: zod.string().optional(),

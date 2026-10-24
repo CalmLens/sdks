@@ -114,6 +114,7 @@ export async function parseWebhookEvent(
     typeof candidate.id !== "string" ||
     typeof candidate.type !== "string" ||
     typeof candidate.projectId !== "string" ||
+    typeof candidate.createdAt !== "number" ||
     !candidate.data ||
     typeof candidate.data !== "object" ||
     Array.isArray(candidate.data)
