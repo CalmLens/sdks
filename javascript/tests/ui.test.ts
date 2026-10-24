@@ -87,10 +87,8 @@ describe("getMediaState", () => {
         image: { thumbhash: null, averageColor: "#112233", width: 1280, height: 720 },
       },
     };
-    expect(getMediaState({ asset })).toEqual({
-      kind: "gated",
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
-    });
+    // The CDN draws placeholders only for images, so a gated video has none.
+    expect(getMediaState({ asset })).toEqual({ kind: "gated" });
     expect(resolveMediaProps({ asset, canView: true })).toMatchObject({
       projectId: PROJECT_ID,
       assetId: "v1",
@@ -115,14 +113,10 @@ describe("getMediaState", () => {
     });
   });
 
-  it("plays a video's original file, with the lens only on its rendered poster", () => {
+  it("plays a video's original file, without a lens or a rendered poster", () => {
     expect(
       getMediaState({ projectId: PROJECT_ID, assetId: "v1", type: "video", lens: "card" }),
-    ).toMatchObject({
-      kind: "video",
-      src: `${CDN}/assets/${PROJECT_ID}/v1/original`,
-      poster: `${CDN}/assets/${PROJECT_ID}/v1/rendered/@card`,
-    });
+    ).toEqual({ kind: "video", src: `${CDN}/assets/${PROJECT_ID}/v1/original` });
   });
 });
 

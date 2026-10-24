@@ -85,7 +85,7 @@ export type MediaState =
   | { kind: "unavailable" }
   | { kind: "gated"; placeholderUrl?: string }
   | { kind: "image"; src: string; srcSet?: string; placeholderUrl?: string }
-  | { kind: "video"; src: string; poster?: string; placeholderUrl?: string }
+  | { kind: "video"; src: string; placeholderUrl?: string }
   | { kind: "audio"; src: string };
 
 const decodedPlaceholders = new Map<string, string | undefined>();
@@ -165,9 +165,9 @@ const buildMediaState = ({
   const placeholderUrl = placeholder
     ? (decodePlaceholderHash(placeholderHash) ??
       customPlaceholderUrl ??
-      // A private asset's placeholder needs the same access as its content, so a signed URL
-      // gets none from the CDN.
-      (url ? undefined : getAssetUrl({ ...asset, resource: "placeholder" })))
+      // The CDN draws placeholders only for images. A private asset's placeholder needs the same
+      // access as its content, so a signed URL gets none from the CDN.
+      (url || type !== "image" ? undefined : getAssetUrl({ ...asset, resource: "placeholder" })))
     : undefined;
   const restricted = status === "age-restricted";
   if (restricted && !canView) return { kind: "gated", placeholderUrl };
@@ -186,13 +186,9 @@ const buildMediaState = ({
   };
 
   if (type === "audio") return { kind: "audio", src: url ?? build({ resource: "original" }) };
+  // The CDN renders no still for video, so a video plays its original file with no poster.
   if (type === "video") {
-    return {
-      kind: "video",
-      src: url ?? build({ resource: "original" }),
-      poster: url ? undefined : build({ resource: "rendered" }),
-      placeholderUrl,
-    };
+    return { kind: "video", src: url ?? build({ resource: "original" }), placeholderUrl };
   }
   if (url) return { kind: "image", src: url, placeholderUrl };
 

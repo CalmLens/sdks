@@ -265,12 +265,12 @@ for await (const child of client.assets.iterateChildren({ assetId: parentAssetId
 
 ##### assets.createSignedUrl(options)
 
-Create a short-lived URL for private CDN content or previews.
+Create a short-lived URL for a private asset's `rendered` (default) or `original` resource.
 
 ```typescript
 const signed = await client.assets.createSignedUrl({
   assetId,
-  resource: "preview",
+  resource: "rendered",
   lens: "thumbnail",
   expiresInSeconds: 900,
 });
@@ -393,7 +393,7 @@ await client.folders.delete({ folderId: "folder-uuid" });
 ```typescript
 const url = client.cdn.getAssetUrl({
   assetIdentifier: assetId,
-  resource: "content",
+  resource: "rendered",
   lens: "thumbnail",
 });
 
@@ -402,19 +402,19 @@ const restrictedUrl = client.cdn.getAssetUrl({ assetIdentifier: assetId, allowAg
 
 const response = await client.cdn.serve({
   assetIdentifier: assetId,
-  resource: "content",
+  resource: "original",
 });
 ```
 
 `serve` returns the `Response` as soon as headers arrive, so you can stream the body (for example `return new Response(response.body, response)`); `timeoutMs` covers only the wait for headers. Non-2xx responses are returned rather than thrown. Pass `init` for extra `fetch` options such as `method: "HEAD"`.
 
-Private CDN content cannot be read directly with API keys. Use a short-lived signed URL for application clients.
+`serve` reads private assets with the client's API key when it has the **Download assets** (`assets:download`) permission. Give browsers and apps a short-lived signed URL instead.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only when the URL carries
 `allowAgeRestricted=true`, which `allowAgeRestricted: true` adds; otherwise it needs a signed URL or an API key. Set it only
 where your app has already decided the viewer may see age-restricted content.
 
-`resource` is `content` (default), `preview` or `placeholder`. The placeholder is a small blurred PNG made from the
+`resource` is `rendered` (default, for display; takes lenses and transforms), `original` (the exact uploaded file) or `placeholder`. The placeholder is a small blurred PNG made from the
 asset's ThumbHash, which the CDN serves for public assets whatever their moderation status, for example in place of an
 age-restricted image. It takes no `lens`, `transform` or `allowAgeRestricted`; passing one throws `sdk/invalid-argument`.
 

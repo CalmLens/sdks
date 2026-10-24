@@ -407,7 +407,6 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
         <video
           className="calmlens-media__content"
           src={state.src}
-          poster={state.poster}
           controls={controls}
           playsInline
           preload="metadata"

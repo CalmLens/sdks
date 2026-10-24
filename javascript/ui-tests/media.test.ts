@@ -91,12 +91,12 @@ for (const binding of BINDINGS) {
       expect(image.getAttribute("sizes")).toBe("(min-width: 768px) 50vw, 100vw");
     });
 
-    it("plays a video's original file with its rendered image as the poster", async () => {
+    it("plays a video's original file with no poster, as the CDN renders no still for video", async () => {
       mounted = binding.mountMedia({ ...asset, type: "video", messages });
       const video = await view().findByLabelText(asset.alt);
 
       expect(video.getAttribute("src")).toBe(`${CDN}/assets/${PROJECT_ID}/a1/original`);
-      expect(video.getAttribute("poster")).toBe(`${CDN}/assets/${PROJECT_ID}/a1/rendered`);
+      expect(video.getAttribute("poster")).toBeNull();
     });
 
     it("shows an API asset with its own status and preview", async () => {

@@ -426,7 +426,6 @@ export const CalmLensMedia = defineComponent({
             h("video", {
               class: "calmlens-media__content",
               src: current.src,
-              poster: current.poster,
               controls: props.controls,
               playsinline: true,
               preload: "metadata",

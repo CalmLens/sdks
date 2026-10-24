@@ -102,7 +102,6 @@
     <video
       class="calmlens-media__content"
       src={state.src}
-      poster={state.poster}
       {controls}
       playsinline
       preload="metadata"

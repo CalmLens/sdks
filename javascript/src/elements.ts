@@ -551,7 +551,6 @@ export class CalmLensMediaElement extends BaseElement {
       const media = el(state.kind, {
         class: "calmlens-media__content",
         src: state.src,
-        poster: state.kind === "video" ? state.poster : undefined,
         controls,
         playsinline: state.kind === "video",
         preload: "metadata",
