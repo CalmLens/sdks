@@ -817,7 +817,7 @@ func TestLocalCDNPlayback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cdnURL, err := a.client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "clip", Resource: calmlens.ResourceContent})
+	cdnURL, err := a.client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "clip", Resource: calmlens.ResourceOriginal})
 	if err != nil || !strings.HasPrefix(cdnURL, "http://localhost:6130/v1/assets/") {
 		t.Fatal(cdnURL, err)
 	}

@@ -702,7 +702,7 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 		a.streamDemo(w, r, id, contentType)
 		return
 	}
-	signed, err := a.client.Assets.CreateSignedURL(r.Context(), calmlens.SignedURLOptions{AssetID: id, Resource: calmlens.ResourceContent, ExpiresInSeconds: signedURLSeconds})
+	signed, err := a.client.Assets.CreateSignedURL(r.Context(), calmlens.SignedURLOptions{AssetID: id, Resource: calmlens.ResourceOriginal, ExpiresInSeconds: signedURLSeconds})
 	if err != nil {
 		log.Printf("Signed URL failed: %v", err)
 		http.Error(w, "Playback unavailable", 502)
