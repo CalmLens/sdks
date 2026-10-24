@@ -122,6 +122,21 @@ class ClientTest {
         () -> CalmLensServerClient.parseWebhookEvent(notAnEvent, CalmLensServerClient.createWebhookSignatureHeader("whsec", now, notAnEvent), now, "whsec")).getCode());
   }
 
+  @Test void webhookPayloadsAndDeliveryHeadersMatchTheContract() throws Exception {
+    JsonObject webhooks = Fixtures.read("webhooks.json").getAsJsonObject();
+    for (JsonElement item : webhooks.getAsJsonArray("payloads")) {
+      JsonObject entry = item.getAsJsonObject();
+      Models.Event event = Json.GSON.fromJson(entry.get("event"), Models.Event.class);
+      assertEquals(Json.GSON.fromJson(entry.get("payload"), Models.WebhookEventPayload.class),
+          CalmLensServerClient.toWebhookEventPayload(event), entry.toString());
+    }
+    JsonObject vector = webhooks.getAsJsonArray("signatures").get(0).getAsJsonObject();
+    String timestamp = vector.get("timestamp").getAsString();
+    assertEquals(Map.of("content-type", "application/json", CalmLensServerClient.WEBHOOK_DELIVERY_HEADER, "delivery-1",
+            CalmLensServerClient.WEBHOOK_TIMESTAMP_HEADER, timestamp, CalmLensServerClient.WEBHOOK_SIGNATURE_HEADER, vector.get("signature").getAsString()),
+        CalmLensServerClient.createWebhookHeaders(vector.get("secret").getAsString(), vector.get("body").getAsString(), "delivery-1", Long.parseLong(timestamp)));
+  }
+
   @Test void webhookVerificationUsesExactRawBytes() {
     // 0xff is not valid UTF-8: decoding it to a String replaces it, so only the byte overload matches.
     byte[] body = {'{', '"', 'a', '"', ':', '"', (byte) 0xff, '"', '}'};

@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/CalmLens/sdks/go/internal/clock"
 )
 
 // Default limits. Each one can be changed through Options.
@@ -188,6 +190,13 @@ func defaultTransport(options Options) *http.Transport {
 	transport.TLSHandshakeTimeout = connect
 	transport.ResponseHeaderTimeout = headers
 	return transport
+}
+
+func init() {
+	clock.Set = func(client any, now func() time.Time, sleep func(context.Context, time.Duration) error) {
+		c := client.(*ServerClient)
+		c.now, c.sleep = now, sleep
+	}
 }
 
 func sleep(ctx context.Context, d time.Duration) error {

@@ -233,7 +233,7 @@ func TestMockDeleteContentKeepsRecordThenDeleteRemovesIt(t *testing.T) {
 	if c.ImageStorage.Content[a.ID] != nil {
 		t.Fatal("stored bytes kept")
 	}
-	if status := serve(a.ID); status != 404 {
+	if status := serve(a.ID); status != 403 {
 		t.Fatal("content still served", status)
 	}
 	again, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
@@ -478,29 +478,24 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 		t.Fatal(queued, err)
 	}
 	c.ClearRequests()
-	type result struct {
-		asset *calmlens.Asset
-		err   error
+	// The hour passes at once: mock waits only advance the client's clock.
+	started := time.Now()
+	_, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: time.Hour})
+	var timeout *calmlens.Error
+	if !errors.As(err, &timeout) || timeout.Code != calmlens.CodeSDKTimeout || timeout.Details["moderationStatus"] != calmlens.ModerationStatusPending || time.Since(started) > 5*time.Second {
+		t.Fatal(err, time.Since(started))
 	}
-	done := make(chan result, 1)
-	go func() {
-		asset, err := c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID})
-		done <- result{asset, err}
-	}()
-	// Decide the asset in storage while the client waits between checks.
-	for len(c.Requests()) == 0 {
-		time.Sleep(time.Millisecond)
+	// Every check read the asset again.
+	requests := c.Requests()
+	if len(requests) < 2 || requests[1].Method != http.MethodGet || requests[1].Path != "/assets/"+queued.ID {
+		t.Fatal(requests)
 	}
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
 		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusBlocked
 	})
-	got := <-done
-	if got.err != nil || got.asset.ID != queued.ID || got.asset.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
-		t.Fatal(got.asset, got.err)
-	}
-	requests := c.Requests()
-	if len(requests) != 2 || requests[1].Method != http.MethodGet || requests[1].Path != "/assets/"+queued.ID {
-		t.Fatal(requests)
+	got, err := c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID})
+	if err != nil || got.ID != queued.ID || got.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+		t.Fatal(got, err)
 	}
 	if _, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: "missing"}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotFound {
 		t.Fatal(err)
@@ -525,7 +520,7 @@ func TestMockOutcomesFinishProcessingAndRemoveTemporaryContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	res.Body.Close()
-	if res.StatusCode != 404 {
+	if res.StatusCode != 403 {
 		t.Fatal("removed content served", res.StatusCode)
 	}
 	failed, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "failed", Content: text})

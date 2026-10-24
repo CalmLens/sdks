@@ -30,9 +30,11 @@ class MockTest < Minitest::Test
   end
 
   KEEP = { keep_content_after_processing: true }.freeze
+  # A key that may read private content from the CDN; the default key may not.
+  DOWNLOAD = CalmLens::MockServerClient.create_api_key([{ actions: ['assets:download'], folder_id: nil, include_subfolders: true }])
 
   def test_uploads_are_stored_retrieved_served_and_deleted
-    mock = CalmLens::MockServerClient.new(now: -> { 7 })
+    mock = CalmLens::MockServerClient.new(now: -> { 7 }, api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'note.txt', content: { data: StringIO.new('hello'), type: 'text/plain' },
                                  processing_options: KEEP)
     assert_equal ['completed', 'allowed', 7, 'stored', 'text/plain', 5],
@@ -51,7 +53,7 @@ class MockTest < Minitest::Test
 
     removed = mock.assets.delete_content(asset_id: asset['id'])
     assert_equal %w[removed requested], [removed.dig('content', 'status'), removed.dig('content', 'removalReason')]
-    assert_equal 404, mock.cdn.serve(asset_identifier: asset['id']).status
+    assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
     assert_nil mock.assets.delete(asset_id: asset['id'])
     error = assert_raises(CalmLens::NotFoundError) { mock.assets.retrieve(asset_id: asset['id']) }
     assert_equal [CalmLens::ErrorCodes::ASSET_NOT_FOUND, 404, true], [error.code, error.status, error.details['network']]
@@ -63,7 +65,7 @@ class MockTest < Minitest::Test
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' })
     assert_equal [{ 'status' => 'removed', 'removalReason' => 'retention', 'updatedAt' => 9 }, 'completed'],
                  [asset['content'].slice('status', 'removalReason', 'updatedAt'), asset.dig('classification', 'status')]
-    assert_equal 404, mock.cdn.serve(asset_identifier: asset['id']).status
+    assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
     refute mock.state.content.key?(asset['id'])
   end
 
@@ -83,7 +85,7 @@ class MockTest < Minitest::Test
     assert_equal [{ 'status' => 'removed', 'removalReason' => 'policy', 'updatedAt' => 4 }, 'purged'],
                  [asset['content'].slice('status', 'removalReason', 'updatedAt'), asset.dig('classification', 'moderation', 'status')]
     refute mock.state.content.key?(asset['id'])
-    assert_equal 404, mock.cdn.serve(asset_identifier: asset['id']).status
+    assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
   end
 
   def test_retry_reprocesses_failed_assets_with_content
@@ -104,7 +106,7 @@ class MockTest < Minitest::Test
   end
 
   def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector
-    mock = CalmLens::MockServerClient.new
+    mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
     transform = { type: 'imageTransform', options: { width: 10, border: { color: '#fff' } } }
     assert_equal 'hello', mock.cdn.serve(asset_identifier: asset['id'], transform: transform).body
@@ -114,7 +116,7 @@ class MockTest < Minitest::Test
   end
 
   def test_cdn_serve_passes_the_age_restricted_parameter_and_rejects_non_booleans
-    mock = CalmLens::MockServerClient.new
+    mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
     served = mock.cdn.serve(asset_identifier: asset['id'], lens: 'thumb', allow_age_restricted: true)
     request = mock.requests.last

@@ -398,7 +398,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /**
    * Gives an asset a new outcome, as a reviewer would: a decided status records a manual review,
    * and every outcome but {@code pending} adds the matching {@code asset.<status>} (or {@code
-   * asset.failed}) event with the asset's snapshot and a {@code decided-by: reviewer} fact.
+   * asset.failed}) event with the asset's snapshot, the event catalog's severity ({@code low} for
+   * {@code allowed}, {@code high} otherwise) and a {@code decided-by: reviewer} fact.
    * Finished processing removes temporary content, and {@code purged} removes it in any case.
    *
    * @param assetId a stored asset
@@ -421,7 +422,11 @@ public final class MockCalmLensServerClient implements AutoCloseable {
       review.addProperty("appliedToAsset", true);
       asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);
     }
-    if (outcome != Outcome.PENDING) enqueueEvent("asset." + outcome.value(), assetId, new Models.EventFact("decided-by", "reviewer", null));
+    if (outcome != Outcome.PENDING) {
+      enqueueEvent("asset." + outcome.value(), assetId, new Models.EventFact("decided-by", "reviewer", null));
+      // Like the event catalog: only allowing is low severity.
+      api.storage.events.get(api.storage.events.size() - 1).addProperty("severity", outcome == Outcome.ALLOWED ? "low" : "high");
+    }
     return Json.GSON.fromJson(asset, Models.Asset.class);
   }
 

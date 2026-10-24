@@ -1,0 +1,799 @@
+{
+  "languages": [
+    "javascript",
+    "python",
+    "go",
+    "rust",
+    "java",
+    "ruby",
+    "php"
+  ],
+  "capabilities": [
+    {
+      "id": "folders.list",
+      "kind": "method",
+      "description": "List a page of child folders, search folders, or resolve selected folder paths. The default is the first 100 folders at the project root.",
+      "names": {
+        "javascript": "folders.list",
+        "python": "folders.list",
+        "go": "Folders.List",
+        "rust": "folders().list",
+        "java": "folders.list",
+        "ruby": "folders.list",
+        "php": "folders->list"
+      }
+    },
+    {
+      "id": "folders.retrieve",
+      "kind": "method",
+      "description": "Get an asset folder by ID",
+      "names": {
+        "javascript": "folders.retrieve",
+        "python": "folders.retrieve",
+        "go": "Folders.Retrieve",
+        "rust": "folders().retrieve",
+        "java": "folders.retrieve",
+        "ruby": "folders.retrieve",
+        "php": "folders->retrieve"
+      }
+    },
+    {
+      "id": "folders.create",
+      "kind": "method",
+      "description": "Create an asset folder with an optional parent folder ID",
+      "names": {
+        "javascript": "folders.create",
+        "python": "folders.create",
+        "go": "Folders.Create",
+        "rust": "folders().create",
+        "java": "folders.create",
+        "ruby": "folders.create",
+        "php": "folders->create"
+      }
+    },
+    {
+      "id": "folders.update",
+      "kind": "method",
+      "description": "Rename an asset folder",
+      "names": {
+        "javascript": "folders.update",
+        "python": "folders.update",
+        "go": "Folders.Update",
+        "rust": "folders().update",
+        "java": "folders.update",
+        "ruby": "folders.update",
+        "php": "folders->update"
+      }
+    },
+    {
+      "id": "folders.delete",
+      "kind": "method",
+      "description": "Delete an empty asset folder by ID",
+      "names": {
+        "javascript": "folders.delete",
+        "python": "folders.delete",
+        "go": "Folders.Delete",
+        "rust": "folders().delete",
+        "java": "folders.delete",
+        "ruby": "folders.delete",
+        "php": "folders->delete"
+      }
+    },
+    {
+      "id": "folders.move",
+      "kind": "method",
+      "description": "Move a folder under another folder, or to the project root",
+      "names": {
+        "javascript": "folders.move",
+        "python": "folders.move",
+        "go": "Folders.Move",
+        "rust": "folders().move_folder",
+        "java": "folders.move",
+        "ruby": "folders.move",
+        "php": "folders->move"
+      }
+    },
+    {
+      "id": "assets.create",
+      "kind": "method",
+      "description": "Upload a new asset to a project. Direct image uploads must be smaller than 10MB. Images from 10MB through 20MB must use multipart upload; CalmLens accumulates parts and enforces the final total, and checks `totalSizeInBytes` up front when you send it. Retained multipart image originals are served through CalmLens CDN URLs. Send an `Idempotency-Key` header to retry safely without creating a second asset.",
+      "names": {
+        "javascript": "assets.create",
+        "python": "assets.create",
+        "go": "Assets.Create",
+        "rust": "assets().create",
+        "java": "assets.create",
+        "ruby": "assets.create",
+        "php": "assets->create"
+      }
+    },
+    {
+      "id": "assets.uploadPart",
+      "kind": "method",
+      "description": "Upload a sequential part for an in-progress asset upload. Image multipart uploads must total from 10MB through 20MB; each non-final part must be at least 5MiB. The final part is classified with the `queue` choice saved when the upload started unless you pass `queue` here. To stream raw bytes instead of JSON, send the `X-CalmLens-Upload: part` header and pass `partNumber`, `isFinal` and `sizeInBytes` as query parameters.",
+      "names": {
+        "javascript": "assets.uploadPart",
+        "python": "assets.upload_part",
+        "go": "Assets.UploadPart",
+        "rust": "assets().upload_part",
+        "java": "assets.uploadPart",
+        "ruby": "assets.upload_part",
+        "php": "assets->uploadPart"
+      }
+    },
+    {
+      "id": "assets.list",
+      "kind": "method",
+      "description": "Get a paginated list of assets for a project",
+      "names": {
+        "javascript": "assets.list",
+        "python": "assets.list",
+        "go": "Assets.List",
+        "rust": "assets().list",
+        "java": "assets.list",
+        "ruby": "assets.list",
+        "php": "assets->list"
+      }
+    },
+    {
+      "id": "assets.search",
+      "kind": "method",
+      "description": "Search accessible assets by keyword or natural language. Images are indexed automatically; enable audio and video search in project settings to include those media types. Results are ranked and limited to 20.",
+      "names": {
+        "javascript": "assets.search",
+        "python": "assets.search",
+        "go": "Assets.Search",
+        "rust": "assets().search",
+        "java": "assets.search",
+        "ruby": "assets.search",
+        "php": "assets->search"
+      }
+    },
+    {
+      "id": "assets.retrieve",
+      "kind": "method",
+      "description": "Get a single asset by ID",
+      "names": {
+        "javascript": "assets.retrieve",
+        "python": "assets.retrieve",
+        "go": "Assets.Retrieve",
+        "rust": "assets().retrieve",
+        "java": "assets.retrieve",
+        "ruby": "assets.retrieve",
+        "php": "assets->retrieve"
+      }
+    },
+    {
+      "id": "assets.listChildren",
+      "kind": "method",
+      "description": "Get child assets of a parent asset",
+      "names": {
+        "javascript": "assets.listChildren",
+        "python": "assets.list_children",
+        "go": "Assets.ListChildren",
+        "rust": "assets().list_children",
+        "java": "assets.listChildren",
+        "ruby": "assets.list_children",
+        "php": "assets->listChildren"
+      }
+    },
+    {
+      "id": "assets.deleteContent",
+      "kind": "method",
+      "description": "Remove stored content, including the content derived from it in child assets, while retaining the asset records",
+      "names": {
+        "javascript": "assets.deleteContent",
+        "python": "assets.delete_content",
+        "go": "Assets.DeleteContent",
+        "rust": "assets().delete_content",
+        "java": "assets.deleteContent",
+        "ruby": "assets.delete_content",
+        "php": "assets->deleteContent"
+      }
+    },
+    {
+      "id": "assets.delete",
+      "kind": "method",
+      "description": "Delete an asset, its child assets and their stored content from a project",
+      "names": {
+        "javascript": "assets.delete",
+        "python": "assets.delete",
+        "go": "Assets.Delete",
+        "rust": "assets().delete",
+        "java": "assets.delete",
+        "ruby": "assets.delete",
+        "php": "assets->delete"
+      }
+    },
+    {
+      "id": "assets.move",
+      "kind": "method",
+      "description": "Move an asset into a folder, or to the project root",
+      "names": {
+        "javascript": "assets.move",
+        "python": "assets.move",
+        "go": "Assets.Move",
+        "rust": "assets().move_asset",
+        "java": "assets.move",
+        "ruby": "assets.move",
+        "php": "assets->move"
+      }
+    },
+    {
+      "id": "assets.retry",
+      "kind": "method",
+      "description": "Process an asset whose `classification.status` is `failed` again. It returns to `processing` and is moderated like a new upload. The moderation decision must still be pending and the asset must not be under a safety hold. Processing needs available file content, inline text, or an eligible website URL to load again.",
+      "names": {
+        "javascript": "assets.retry",
+        "python": "assets.retry",
+        "go": "Assets.Retry",
+        "rust": "assets().retry",
+        "java": "assets.retry",
+        "ruby": "assets.retry",
+        "php": "assets->retry"
+      }
+    },
+    {
+      "id": "assets.createSignedUrl",
+      "kind": "method",
+      "description": "Create a short-lived signed CDN URL for an asset",
+      "names": {
+        "javascript": "assets.createSignedUrl",
+        "python": "assets.create_signed_url",
+        "go": "Assets.CreateSignedURL",
+        "rust": "assets().create_signed_url",
+        "java": "assets.createSignedUrl",
+        "ruby": "assets.create_signed_url",
+        "php": "assets->createSignedUrl"
+      }
+    },
+    {
+      "id": "ensureLens",
+      "kind": "method",
+      "description": "Create a lens or update it with a version greater than the current version",
+      "names": {
+        "javascript": "ensureLens",
+        "python": "ensure_lens",
+        "go": "EnsureLens",
+        "rust": "ensure_lens",
+        "java": "ensureLens",
+        "ruby": "ensure_lens",
+        "php": "ensureLens"
+      }
+    },
+    {
+      "id": "ensureLenses",
+      "kind": "method",
+      "description": "Create lenses or update them with their next versions",
+      "names": {
+        "javascript": "ensureLenses",
+        "python": "ensure_lenses",
+        "go": "EnsureLenses",
+        "rust": "ensure_lenses",
+        "java": "ensureLenses",
+        "ruby": "ensure_lenses",
+        "php": "ensureLenses"
+      }
+    },
+    {
+      "id": "events.list",
+      "kind": "method",
+      "description": "List project events, oldest first, after a cursor. A webhook connector delivers each event as `{ id, type, createdAt, projectId, data }`, where `data` holds the remaining event fields. Each event's `facts` are `{ key, value, url? }` entries registered for its `type` (see the event types in the webhooks guide). Omit `after` to get a cursor for the current time without any events, then pass each response's `cursor` as `after` until `hasMore` is false. Polling receives new events without a public webhook URL, for example during local development.",
+      "names": {
+        "javascript": "events.list",
+        "python": "events.list",
+        "go": "Events.List",
+        "rust": "events().list",
+        "java": "events.list",
+        "ruby": "events.list",
+        "php": "events->list"
+      }
+    },
+    {
+      "id": "text.classify",
+      "kind": "method",
+      "description": "Moderates text and waits for the decision.",
+      "names": {
+        "javascript": "text.classify",
+        "python": "text.classify",
+        "go": "Text.Classify",
+        "rust": "text().classify",
+        "java": "text.classify",
+        "ruby": "text.classify",
+        "php": "text->classify"
+      }
+    },
+    {
+      "id": "assets.classify",
+      "kind": "method",
+      "description": "Uploads an asset and waits for its moderation decision.",
+      "names": {
+        "javascript": "assets.classify",
+        "python": "assets.classify",
+        "go": "Assets.Classify",
+        "rust": "assets().classify",
+        "java": "assets.classify",
+        "ruby": "assets.classify",
+        "php": "assets->classify"
+      }
+    },
+    {
+      "id": "assets.update",
+      "kind": "method",
+      "description": "A request fixture operation.",
+      "names": {
+        "javascript": "assets.update",
+        "python": "assets.update",
+        "go": "Assets.Update",
+        "rust": "assets().update",
+        "java": "assets.update",
+        "ruby": "assets.update",
+        "php": "assets->update"
+      }
+    },
+    {
+      "id": "assets.waitForDecision",
+      "kind": "method",
+      "description": "Polls an asset until it has a moderation decision.",
+      "names": {
+        "javascript": "assets.waitForDecision",
+        "python": "assets.wait_for_decision",
+        "go": "Assets.WaitForDecision",
+        "rust": "assets().wait_for_decision",
+        "java": "assets.waitForDecision",
+        "ruby": "assets.wait_for_decision",
+        "php": "assets->waitForDecision"
+      }
+    },
+    {
+      "id": "assets.iterate",
+      "kind": "method",
+      "description": "Iterates every asset across pages.",
+      "names": {
+        "javascript": "assets.iterate",
+        "python": "assets.iter",
+        "go": "Assets.ListAll",
+        "rust": "assets().iterate",
+        "java": "assets.iterate",
+        "ruby": "assets.each",
+        "php": "assets->each"
+      }
+    },
+    {
+      "id": "assets.iterateChildren",
+      "kind": "method",
+      "description": "Iterates every child asset across pages.",
+      "names": {
+        "javascript": "assets.iterateChildren",
+        "python": "assets.iter_children",
+        "go": "Assets.ListChildrenAll",
+        "rust": "assets().iterate_children",
+        "java": "assets.iterateChildren",
+        "ruby": "assets.each_child",
+        "php": "assets->eachChild"
+      }
+    },
+    {
+      "id": "events.iterate",
+      "kind": "method",
+      "description": "Iterates events after a cursor across pages.",
+      "names": {
+        "javascript": "events.pages",
+        "python": "events.iter_pages",
+        "go": "Events.ListAll",
+        "rust": "events().pages",
+        "java": "events.pages",
+        "ruby": "events.each_page",
+        "php": "events->eachPage"
+      }
+    },
+    {
+      "id": "uploadTokens.sign",
+      "kind": "method",
+      "description": "Signs a browser upload token locally.",
+      "names": {
+        "javascript": "uploadTokens.sign",
+        "python": "upload_tokens.sign",
+        "go": "UploadTokens.Sign",
+        "rust": "upload_tokens().sign",
+        "java": "uploadTokens.sign",
+        "ruby": "upload_tokens.sign",
+        "php": "uploadTokens->sign"
+      }
+    },
+    {
+      "id": "cdn.getAssetUrl",
+      "kind": "method",
+      "description": "Builds a CDN URL without a request.",
+      "names": {
+        "javascript": "cdn.getAssetUrl",
+        "python": "cdn.get_asset_url",
+        "go": "CDN.GetAssetURL",
+        "rust": "cdn().get_asset_url",
+        "java": "cdn.getAssetUrl",
+        "ruby": "cdn.get_asset_url",
+        "php": "cdn->getAssetUrl"
+      }
+    },
+    {
+      "id": "cdn.serve",
+      "kind": "method",
+      "description": "Fetches CDN content with the API key.",
+      "names": {
+        "javascript": "cdn.serve",
+        "python": "cdn.serve",
+        "go": "CDN.Serve",
+        "rust": "cdn().serve",
+        "java": "cdn.serve",
+        "ruby": "cdn.serve",
+        "php": "cdn->serve"
+      }
+    },
+    {
+      "id": "webhooks.verify",
+      "kind": "function",
+      "description": "Checks a delivery's signature and timestamp.",
+      "names": {
+        "javascript": "verifyWebhookSignature",
+        "python": "verify_webhook_signature",
+        "go": "VerifyWebhookSignature",
+        "rust": "verify_webhook_signature",
+        "java": "CalmLensServerClient.verifyWebhookSignature",
+        "ruby": "CalmLens.verify_webhook_signature",
+        "php": "Webhooks::verify"
+      }
+    },
+    {
+      "id": "webhooks.parse",
+      "kind": "function",
+      "description": "Verifies a delivery and parses its payload.",
+      "names": {
+        "javascript": "parseWebhookEvent",
+        "python": "parse_webhook_event",
+        "go": "ParseWebhookEvent",
+        "rust": "construct_webhook_event",
+        "java": "CalmLensServerClient.parseWebhookEvent",
+        "ruby": "CalmLens.parse_webhook_event",
+        "php": "Webhooks::parseEvent"
+      }
+    },
+    {
+      "id": "webhooks.signatureHeader",
+      "kind": "function",
+      "description": "Signs a body: the x-calmlens-signature header value.",
+      "names": {
+        "javascript": "testing.createWebhookSignatureHeader",
+        "python": "create_webhook_signature_header",
+        "go": "SignWebhookPayload",
+        "rust": "create_webhook_signature_header",
+        "java": "CalmLensServerClient.createWebhookSignatureHeader",
+        "ruby": "CalmLens.create_webhook_signature_header",
+        "php": "Webhooks::signatureHeader"
+      }
+    },
+    {
+      "id": "webhooks.headers",
+      "kind": "function",
+      "description": "All headers of one signed delivery, for testing a webhook handler.",
+      "names": {
+        "javascript": "testing.createWebhookHeaders",
+        "python": "create_webhook_headers",
+        "go": "CreateWebhookHeaders",
+        "rust": "create_webhook_headers",
+        "java": "CalmLensServerClient.createWebhookHeaders",
+        "ruby": "CalmLens.create_webhook_headers",
+        "php": "Webhooks::createHeaders"
+      }
+    },
+    {
+      "id": "webhooks.toPayload",
+      "kind": "function",
+      "description": "Converts an event from events.list to the webhook delivery body.",
+      "names": {
+        "javascript": "testing.toWebhookEventPayload",
+        "python": "to_webhook_event_payload",
+        "go": "ToWebhookEventPayload",
+        "rust": "models::WebhookEventPayload::from_event",
+        "java": "CalmLensServerClient.toWebhookEventPayload",
+        "ruby": "CalmLens.to_webhook_event_payload",
+        "php": "Webhooks::toPayload"
+      }
+    },
+    {
+      "id": "webhooks.deliveryHeaderName",
+      "kind": "constant",
+      "description": "The x-calmlens-delivery header name.",
+      "value": "x-calmlens-delivery",
+      "names": {
+        "javascript": "WEBHOOK_DELIVERY_HEADER",
+        "python": "WEBHOOK_DELIVERY_HEADER",
+        "go": "WebhookDeliveryHeader",
+        "rust": "WEBHOOK_DELIVERY_HEADER",
+        "java": "CalmLensServerClient.WEBHOOK_DELIVERY_HEADER",
+        "ruby": "CalmLens::WEBHOOK_DELIVERY_HEADER",
+        "php": "Webhooks::DELIVERY_HEADER"
+      }
+    },
+    {
+      "id": "webhooks.timestampHeaderName",
+      "kind": "constant",
+      "description": "The x-calmlens-timestamp header name.",
+      "value": "x-calmlens-timestamp",
+      "names": {
+        "javascript": "WEBHOOK_TIMESTAMP_HEADER",
+        "python": "WEBHOOK_TIMESTAMP_HEADER",
+        "go": "WebhookTimestampHeader",
+        "rust": "WEBHOOK_TIMESTAMP_HEADER",
+        "java": "CalmLensServerClient.WEBHOOK_TIMESTAMP_HEADER",
+        "ruby": "CalmLens::WEBHOOK_TIMESTAMP_HEADER",
+        "php": "Webhooks::TIMESTAMP_HEADER"
+      }
+    },
+    {
+      "id": "webhooks.signatureHeaderName",
+      "kind": "constant",
+      "description": "The x-calmlens-signature header name.",
+      "value": "x-calmlens-signature",
+      "names": {
+        "javascript": "WEBHOOK_SIGNATURE_HEADER",
+        "python": "WEBHOOK_SIGNATURE_HEADER",
+        "go": "WebhookSignatureHeader",
+        "rust": "WEBHOOK_SIGNATURE_HEADER",
+        "java": "CalmLensServerClient.WEBHOOK_SIGNATURE_HEADER",
+        "ruby": "CalmLens::WEBHOOK_SIGNATURE_HEADER",
+        "php": "Webhooks::SIGNATURE_HEADER"
+      }
+    },
+    {
+      "id": "errors.apiCodeConstant",
+      "kind": "constant",
+      "description": "API error codes are constants (one representative code).",
+      "value": "asset/not-found",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.ASSET_NOT_FOUND",
+        "python": "error_codes.ASSET_NOT_FOUND",
+        "go": "CodeAssetNotFound",
+        "rust": "ErrorCode::AssetNotFound",
+        "java": "ErrorCodes.ASSET_NOT_FOUND",
+        "ruby": "CalmLens::ErrorCodes::ASSET_NOT_FOUND",
+        "php": "ErrorCodes::ASSET_NOT_FOUND"
+      }
+    },
+    {
+      "id": "errors.sdkCodeConstant",
+      "kind": "constant",
+      "description": "SDK error codes are constants (one representative code).",
+      "value": "sdk/invalid-argument",
+      "names": {
+        "javascript": "CALMLENS_ERROR_CODES.INVALID_ARGUMENT",
+        "python": "error_codes.SDK_INVALID_ARGUMENT",
+        "go": "CodeSDKInvalidArgument",
+        "rust": "ErrorCode::InvalidArgument",
+        "java": "ErrorCodes.SDK_INVALID_ARGUMENT",
+        "ruby": "CalmLens::SdkErrorCodes::INVALID_ARGUMENT",
+        "php": "SdkErrorCodes::INVALID_ARGUMENT"
+      }
+    },
+    {
+      "id": "errors.code",
+      "kind": "error-field",
+      "description": "The error code.",
+      "names": {
+        "javascript": "code",
+        "python": "code",
+        "go": "Code",
+        "rust": "code()",
+        "java": "getCode",
+        "ruby": "code",
+        "php": "errorCode"
+      }
+    },
+    {
+      "id": "errors.status",
+      "kind": "error-field",
+      "description": "The HTTP status.",
+      "names": {
+        "javascript": "status",
+        "python": "status",
+        "go": "Status",
+        "rust": "status()",
+        "java": "getStatus",
+        "ruby": "status",
+        "php": "status"
+      }
+    },
+    {
+      "id": "errors.requestId",
+      "kind": "error-field",
+      "description": "The X-Request-Id response header.",
+      "names": {
+        "javascript": "requestId",
+        "python": "request_id",
+        "go": "RequestID",
+        "rust": "request_id()",
+        "java": "getRequestId",
+        "ruby": "request_id",
+        "php": "requestId"
+      }
+    },
+    {
+      "id": "errors.retryAfter",
+      "kind": "error-field",
+      "description": "The Retry-After delay.",
+      "names": {
+        "javascript": "retryAfter",
+        "python": "retry_after",
+        "go": "RetryAfter",
+        "rust": "retry_after()",
+        "java": "getRetryAfter",
+        "ruby": "retry_after",
+        "php": "retryAfter()"
+      }
+    },
+    {
+      "id": "cdn.resource.original",
+      "kind": "cdn-resource",
+      "description": "The CDN's original resource.",
+      "value": "original",
+      "names": {
+        "javascript": "original",
+        "python": "original",
+        "go": "ResourceOriginal",
+        "rust": "CdnResource::Original",
+        "java": "original",
+        "ruby": "original",
+        "php": "original"
+      }
+    },
+    {
+      "id": "cdn.resource.rendered",
+      "kind": "cdn-resource",
+      "description": "The CDN's rendered resource.",
+      "value": "rendered",
+      "names": {
+        "javascript": "rendered",
+        "python": "rendered",
+        "go": "ResourceRendered",
+        "rust": "CdnResource::Rendered",
+        "java": "rendered",
+        "ruby": "rendered",
+        "php": "rendered"
+      }
+    },
+    {
+      "id": "cdn.resource.placeholder",
+      "kind": "cdn-resource",
+      "description": "The CDN's placeholder resource.",
+      "value": "placeholder",
+      "names": {
+        "javascript": "placeholder",
+        "python": "placeholder",
+        "go": "ResourcePlaceholder",
+        "rust": "CdnResource::Placeholder",
+        "java": "placeholder",
+        "ruby": "placeholder",
+        "php": "placeholder"
+      }
+    },
+    {
+      "id": "cdn.allowAgeRestricted",
+      "kind": "cdn-option",
+      "description": "Lets the CDN serve a public age-restricted asset from the URL.",
+      "names": {
+        "javascript": "allowAgeRestricted",
+        "python": "allow_age_restricted",
+        "go": "CDNAssetURLOptions.AllowAgeRestricted",
+        "rust": "CdnRequest::allow_age_restricted",
+        "java": "CdnRequest.allowAgeRestricted",
+        "ruby": "allow_age_restricted",
+        "php": "allowAgeRestricted"
+      }
+    },
+    {
+      "id": "mock.client",
+      "kind": "mock-client",
+      "description": "An offline, stateful in-memory server client.",
+      "names": {
+        "javascript": "testing.MockCalmLensServerClient",
+        "python": "testing.MockCalmLensServerClient",
+        "go": "calmlenstest.NewServerClient",
+        "rust": "testing::MockServerClient::in_memory",
+        "java": "MockCalmLensServerClient",
+        "ruby": "CalmLens::MockServerClient",
+        "php": "Testing\\MockServerClient"
+      }
+    },
+    {
+      "id": "mock.queuedOutcome",
+      "kind": "mock-option",
+      "description": "The outcome of queued uploads (assets.create).",
+      "names": {
+        "javascript": "mockOptions.queuedOutcome",
+        "python": "queued_outcome",
+        "go": "Options.QueuedOutcome",
+        "rust": "MockOptions::queued_outcome",
+        "java": "Options.queuedOutcome",
+        "ruby": "queued_outcome",
+        "php": "queuedOutcome"
+      }
+    },
+    {
+      "id": "mock.analyzedOutcome",
+      "kind": "mock-option",
+      "description": "The outcome of moderated uploads (assets.classify, text.classify).",
+      "names": {
+        "javascript": "mockOptions.analyzedOutcome",
+        "python": "analyzed_outcome",
+        "go": "Options.AnalyzedOutcome",
+        "rust": "MockOptions::analyzed_outcome",
+        "java": "Options.analyzedOutcome",
+        "ruby": "analyzed_outcome",
+        "php": "analyzedOutcome"
+      }
+    },
+    {
+      "id": "mock.decide",
+      "kind": "mock-method",
+      "description": "Decides a pending asset as a reviewer would.",
+      "names": {
+        "javascript": "decide",
+        "python": "decide",
+        "go": "Decide",
+        "rust": "decide",
+        "java": "decide",
+        "ruby": "decide",
+        "php": "decide"
+      }
+    },
+    {
+      "id": "mock.enqueueEvent",
+      "kind": "mock-method",
+      "description": "Adds an event to the mock's events feed.",
+      "names": {
+        "javascript": "enqueueEvent",
+        "python": "enqueue_event",
+        "go": "EnqueueEvent",
+        "rust": "enqueue_event",
+        "java": "enqueueEvent",
+        "ruby": "enqueue_event",
+        "php": "enqueueEvent"
+      }
+    },
+    {
+      "id": "mock.createApiKey",
+      "kind": "mock-function",
+      "description": "Creates a mock API key with grants, such as assets:download.",
+      "names": {
+        "javascript": "testing.createMockApiKey",
+        "python": "testing.create_mock_api_key",
+        "go": "calmlenstest.CreateMockAPIKey",
+        "rust": "testing::create_mock_api_key",
+        "java": "MockCalmLensServerClient.createMockApiKey",
+        "ruby": "CalmLens::MockServerClient.create_api_key",
+        "php": "Testing\\MockServerClient::createApiKey"
+      }
+    }
+  ],
+  "errorResponse": {
+    "operation": "assets.retrieve",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "status": 429,
+    "headers": {
+      "content-type": "application/json",
+      "x-request-id": "req-surface",
+      "retry-after": "2"
+    },
+    "body": {
+      "code": "upload/website-rate-limit-exceeded",
+      "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions."
+    },
+    "expected": {
+      "code": "upload/website-rate-limit-exceeded",
+      "status": 429,
+      "requestId": "req-surface",
+      "retryAfterSeconds": 2
+    }
+  }
+}

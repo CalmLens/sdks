@@ -14,7 +14,6 @@ use std::{
 
 pub(super) const API_BASE_URL: &str = "https://api.calmlens.invalid/v1";
 pub(super) const CDN_BASE_URL: &str = "https://cdn.calmlens.invalid/v1";
-const CDN_HOST: &str = "cdn.calmlens.invalid";
 
 /// The simulated result of an upload, for [`MockOptions::queued_outcome`] and
 /// [`MockOptions::analyzed_outcome`]. The mock does not classify content.
@@ -86,12 +85,16 @@ type Now = Arc<dyn Fn() -> u64 + Send + Sync>;
 /// Options for [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
 ///
 /// Defaults: project `mock-project`, `create_mock_api_key(&[])`, no retries, random IDs, the
-/// system clock, queued outcome [`MockOutcome::Pending`] and analyzed outcome [`MockOutcome::Allowed`].
+/// system clock, queued outcome [`MockOutcome::Pending`], analyzed outcome
+/// [`MockOutcome::Allowed`] and the base URLs `https://api.calmlens.invalid/v1` and
+/// `https://cdn.calmlens.invalid/v1`.
 #[derive(Clone)]
 pub struct MockOptions {
     pub(super) api_key: String,
     pub(super) project_id: String,
     pub(super) max_retries: u32,
+    pub(super) api_base_url: String,
+    pub(super) cdn_base_url: String,
     queued_outcome: MockOutcome,
     analyzed_outcome: MockOutcome,
     create_id: CreateId,
@@ -104,6 +107,8 @@ impl Default for MockOptions {
             api_key: create_mock_api_key(&[]),
             project_id: "mock-project".into(),
             max_retries: 0,
+            api_base_url: API_BASE_URL.into(),
+            cdn_base_url: CDN_BASE_URL.into(),
             queued_outcome: MockOutcome::Pending,
             analyzed_outcome: MockOutcome::Allowed,
             create_id: Arc::new(crate::transport::uuid),
@@ -121,6 +126,8 @@ impl fmt::Debug for MockOptions {
         f.debug_struct("MockOptions")
             .field("project_id", &self.project_id)
             .field("max_retries", &self.max_retries)
+            .field("api_base_url", &self.api_base_url)
+            .field("cdn_base_url", &self.cdn_base_url)
             .field("queued_outcome", &self.queued_outcome)
             .field("analyzed_outcome", &self.analyzed_outcome)
             .field("signed_url_base_url", &self.signed_url_base_url)
@@ -145,6 +152,17 @@ impl MockOptions {
     /// Retries of repeatable requests (0 by default, so a queued failure fails one call).
     pub fn max_retries(mut self, value: u32) -> Self {
         self.max_retries = value;
+        self
+    }
+    /// The API base URL the mock client uses and the in-memory API answers.
+    pub fn api_base_url(mut self, value: impl Into<String>) -> Self {
+        self.api_base_url = value.into();
+        self
+    }
+    /// The CDN base URL the mock client uses and the in-memory CDN answers. It must differ
+    /// from the API base URL.
+    pub fn cdn_base_url(mut self, value: impl Into<String>) -> Self {
+        self.cdn_base_url = value.into();
         self
     }
     /// The outcome of `assets().create` and queued multipart uploads.
@@ -287,6 +305,15 @@ fn header<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
         .and_then(|value| value.to_str().ok())
         .unwrap_or("")
 }
+/// The path of `url` below `base` (still percent-encoded), when `url` is under `base`.
+fn under<'a>(url: &'a reqwest::Url, base: &str) -> Option<&'a str> {
+    let base = reqwest::Url::parse(base).ok()?;
+    if url.origin() != base.origin() {
+        return None;
+    }
+    let rest = url.path().strip_prefix(base.path().trim_end_matches('/'))?;
+    (rest.is_empty() || rest.starts_with('/')).then_some(rest)
+}
 fn percent_decode(segment: &str) -> String {
     let bytes = segment.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -423,9 +450,11 @@ impl Backend {
             }));
         let asset = asset.clone();
         let event_type = format!("asset.{decision}");
+        // Like the event catalog: only allowing is low severity.
+        let severity = if decision == "allowed" { "low" } else { "high" };
         storage.events.push(json!({
             "id": event_id, "projectId": project_id, "userId": null, "type": event_type,
-            "severity": "low", "title": event_type, "description": null, "assetId": asset_id,
+            "severity": severity, "title": event_type, "description": null, "assetId": asset_id,
             "asset": snapshot(&asset), "facts": [{"key": "decided-by", "value": "reviewer"}],
             "notify": false, "createdAt": now, "updatedAt": now, "readAt": null,
         }));
@@ -439,11 +468,12 @@ impl Backend {
         headers: &HeaderMap,
         raw: &[u8],
     ) -> MockResponse {
-        let parts: Vec<String> = url
-            .path_segments()
-            .into_iter()
-            .flatten()
-            .skip(1) // the base URLs' `/v1`
+        let cdn = under(url, &self.options.cdn_base_url);
+        let Some(rest) = cdn.or_else(|| under(url, &self.options.api_base_url)) else {
+            return unknown_route().response();
+        };
+        let parts: Vec<String> = rest
+            .split('/')
             .filter(|part| !part.is_empty())
             .map(percent_decode)
             .collect();
@@ -451,7 +481,7 @@ impl Backend {
         for (key, value) in url.query_pairs().into_owned() {
             query.entry(key).or_insert(value);
         }
-        if url.host_str() == Some(CDN_HOST) {
+        if cdn.is_some() {
             let response = self.serve(&parts, &query, headers);
             return if method == Method::HEAD {
                 response.body(Vec::new())
@@ -1234,8 +1264,9 @@ impl Backend {
         Ok(json!({"query": query, "items": items, "semanticStatus": "disabled"}))
     }
 
-    /// A CDN request: stored bytes with their content type, refusing blocked and purged
-    /// assets, and private or age-restricted ones without the download permission.
+    /// A CDN request: stored bytes with their content type. Like the CDN, delivery checks come
+    /// first and refuse everyone (content uploading or removed, blocked, purged or failed
+    /// assets); then private or age-restricted assets need the download permission.
     fn serve(
         &self,
         parts: &[String],
@@ -1258,9 +1289,19 @@ impl Backend {
             return not_found();
         };
         let status = text(&asset["classification"]["moderation"]["status"]);
-        if status == "blocked" || status == "purged" {
+        let stored = self
+            .storage
+            .content
+            .get(text(&asset["id"]))
+            .filter(|_| asset["upload"]["status"] != "uploading");
+        let Some(stored) = stored.filter(|_| {
+            status != "blocked"
+                && status != "purged"
+                && asset["classification"]["status"] != "failed"
+                && asset["content"]["status"] != "removed"
+        }) else {
             return custom("asset/not-available", 403, "Asset is not available").response();
-        }
+        };
         let age_restricted = status == "age-restricted";
         let public = asset["visibility"] == "public";
         let restricted =
@@ -1274,15 +1315,6 @@ impl Backend {
             )
             .response();
         }
-        let stored = self.storage.content.get(text(&asset["id"]));
-        let Some(stored) = stored.filter(|_| asset["upload"]["status"] != "uploading") else {
-            return custom(
-                ErrorCode::AssetContentUnavailable.as_str(),
-                404,
-                "Asset content not found",
-            )
-            .response();
-        };
         let data = stored.bytes();
         let cache = if restricted || age_restricted {
             "private, no-store"

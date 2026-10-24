@@ -123,8 +123,8 @@ class StatefulMockTest {
     assertSame(Models.AssetContentStatus.REMOVED, mock.client.assets.retrieve(new Models.AssetId(asset.id())).content().status());
     mock.withStorage(storage -> assertFalse(storage.content.containsKey(asset.id())));
     try (CdnResponse after = mock.client.cdn.serve(new Models.CdnRequest(asset.id()))) {
-      assertEquals(404, after.status());
-      assertEquals(ErrorCodes.ASSET_CONTENT_UNAVAILABLE, errorCode(after));
+      assertEquals(403, after.status());
+      assertEquals("asset/not-available", errorCode(after));
     }
 
     MockCalmLensServerClient analyzed = withDownloadKey(deterministic().analyzedOutcome(Outcome.PURGED));

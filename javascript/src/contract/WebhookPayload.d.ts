@@ -1,5 +1,5 @@
 import { i as EventFacts, o as EventType } from "./EventCatalog-BN7QY46A.js";
-import { t as Event } from "./Event-BSwaATgV.js";
+import { n as EventAsset, t as Event } from "./Event-OKSu_WBu.js";
 import * as zod from "zod";
 //#region packages/shared/src/WebhookPayload.d.ts
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
@@ -197,6 +197,27 @@ declare const RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodObject<{
     }, zod.core.$loose>>>;
   }, zod.core.$loose>;
 }, zod.core.$loose>;
-type ReceivedWebhookEventPayload = zod.infer<typeof RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA>;
+type ReceivedFact = zod.infer<typeof RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA>["data"]["facts"];
+/**
+ * The schema only requires what parsing needs, so future fields still parse. The type describes
+ * the payload CalmLens sends today, including the asset snapshot; fields added later arrive too,
+ * untyped.
+ */
+interface ReceivedWebhookEventPayload {
+  id: string;
+  type: string;
+  projectId: string;
+  createdAt?: number;
+  data: {
+    severity?: string;
+    title?: string;
+    description?: string | null;
+    assetId?: string | null;
+    asset?: (EventAsset & Record<string, unknown>) | null;
+    facts?: ReceivedFact;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
 //#endregion
 export type { ReceivedWebhookEventPayload, WebhookEventPayload };

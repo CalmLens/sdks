@@ -31,10 +31,12 @@ use Psr\Http\Message\ResponseInterface;
  * removed once classification completes, as in the API. A `purged` outcome removes the content
  * with reason `policy`.
  *
- * Like the CDN, it does not serve `blocked` assets, and serves private and age-restricted assets
- * only with the download permission or, for a public age-restricted asset, the
- * `allowAgeRestricted` URL option. Set `downloadPermission: false` to act as a browser without a
- * key, or pass an `apiKey` from `createApiKey()` whose grants decide it.
+ * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
+ * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
+ * Then access: a private asset, or a public age-restricted one requested without the
+ * `allowAgeRestricted` URL option, needs an `assets:download` grant for its folder. The default
+ * key has no grants, like a real key without `assets:download`; pass an `apiKey` from
+ * `createApiKey()` to grant downloads.
  *
  * Waits (retry backoff and `assets->waitForDecision`) take no real time: they advance a virtual
  * clock, so a decision that never comes times out at once.
@@ -65,7 +67,7 @@ final class MockServerClient
     private array $idempotent = [];
     /** @var array<string, array{queue: bool, total: ?int, image: bool, parts: int}> Open multipart uploads. */
     private array $uploads = [];
-    private ?array $grants = null;
+    private array $grants;
     private float $elapsed = 0.0;
     private \Closure $now;
     private \Closure $createId;
@@ -80,9 +82,8 @@ final class MockServerClient
      * @param string|array|callable $analyzedOutcome outcome of `assets.classify` and `text.classify`:
      *   an outcome, fields to deep-merge into the asset (the outcome then follows their
      *   `classification.moderation.status`), or a callable that receives the asset and returns either.
-     * @param bool $downloadPermission whether CDN requests may read private and age-restricted content.
-     * @param ?string $apiKey the client's API key. A key from `createApiKey()` also limits CDN
-     *   downloads to its grants.
+     * @param ?string $apiKey the client's API key. Its grants, from `createApiKey()`, decide CDN
+     *   downloads of private and age-restricted content; the default key has none.
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
      */
     public function __construct(
@@ -91,7 +92,6 @@ final class MockServerClient
         string|array|callable $analyzedOutcome = 'allowed',
         ?callable $now = null,
         ?callable $createId = null,
-        public bool $downloadPermission = true,
         string $baseUrl = 'https://api.calmlens.invalid/v1',
         string $cdnBaseUrl = 'https://cdn.calmlens.invalid/v1',
         #[\SensitiveParameter] ?string $apiKey = null,
@@ -104,9 +104,7 @@ final class MockServerClient
         $this->analyzedOutcome = $analyzedOutcome;
         $this->now = \Closure::fromCallable($now ?? fn (): int => (int) floor(microtime(true) * 1000));
         $this->createId = \Closure::fromCallable($createId ?? fn (): string => Values::uuid());
-        if ($apiKey !== null) {
-            $this->grants = self::grantsOf($apiKey);
-        }
+        $this->grants = $apiKey === null ? [] : self::grantsOf($apiKey);
         $stack = HandlerStack::create(fn (RequestInterface $request, array $options) => $this->handle($request));
         $this->client = new ServerClient($apiKey ?? 'mock-key', $projectId, $baseUrl, $cdnBaseUrl, maxRetries: $maxRetries,
             httpClient: new Client(['handler' => $stack]));
@@ -185,7 +183,8 @@ final class MockServerClient
 
     /**
      * Gives an asset a new outcome, as a reviewer would, and adds the matching `asset.<status>`
-     * (or `asset.failed`) event with the asset's snapshot and a `decided-by: reviewer` fact.
+     * (or `asset.failed`) event with the asset's snapshot, the event catalog's severity (`low` for
+     * `allowed`, `high` otherwise) and a `decided-by: reviewer` fact.
      */
     public function decide(string $assetId, string $outcome): array
     {
@@ -195,7 +194,7 @@ final class MockServerClient
         }
         $asset = $this->applyOutcome($this->assets[$assetId], $outcome);
         if ($outcome !== 'pending') {
-            $this->enqueueEvent(['type' => 'asset.' . $outcome, 'assetId' => $assetId,
+            $this->enqueueEvent(['type' => 'asset.' . $outcome, 'assetId' => $assetId, 'severity' => $outcome === 'allowed' ? 'low' : 'high',
                 'facts' => [['key' => 'decided-by', 'value' => 'reviewer']]]);
         }
         return $asset;
@@ -802,12 +801,6 @@ final class MockServerClient
 
     private function canDownload(?string $folderId): bool
     {
-        if (!$this->downloadPermission) {
-            return false;
-        }
-        if ($this->grants === null) {
-            return true;
-        }
         foreach ($this->grants as $grant) {
             if (!is_array($grant) || !in_array('assets:download', (array) ($grant['actions'] ?? []), true)) {
                 continue;
@@ -841,8 +834,11 @@ final class MockServerClient
         if ($project !== $this->projectId || $asset === null || !in_array($resource, ['original', 'rendered'], true)) {
             return self::json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
         }
+        // Delivery checks come first and refuse everyone, like the CDN.
         $status = $asset['classification']['moderation']['status'];
-        if ($status === 'blocked') {
+        $stored = $this->content[$asset['id']] ?? null;
+        if ($stored === null || $asset['upload']['status'] !== 'completed' || in_array($status, ['blocked', 'purged'], true)
+            || $asset['classification']['status'] === 'failed' || $asset['content']['status'] === 'removed') {
             return self::json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
         }
         // Age-restricted assets are delivered like private ones, unless a public one is requested
@@ -851,10 +847,6 @@ final class MockServerClient
         $private = $asset['visibility'] !== 'public' || ($ageRestricted && ($query['allowAgeRestricted'] ?? null) !== 'true');
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
             return self::json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'The API key cannot download this asset']);
-        }
-        $stored = $this->content[$asset['id']] ?? null;
-        if ($stored === null || $asset['upload']['status'] !== 'completed') {
-            return self::json(404, ['code' => 'asset/not-found', 'message' => 'Asset content not found']);
         }
         return new Response(200, ['Content-Type' => $stored['type'], 'Content-Length' => (string) strlen($stored['bytes']),
             'Cache-Control' => $private || $ageRestricted ? 'private, no-store' : 'public, max-age=31536000',

@@ -159,3 +159,22 @@ func TestParseAndVerifyWebhookRequest(t *testing.T) {
 		t.Fatal("empty secret accepted", err)
 	}
 }
+
+func TestCreateWebhookHeadersSignADeliveryVerifyWebhookRequestAccepts(t *testing.T) {
+	now := time.Unix(1760000000, 0)
+	body := `{"id":"event-1","type":"asset.allowed","createdAt":1760000000000,"projectId":"p","data":{"severity":"low","title":"t","facts":[]}}`
+	header := CreateWebhookHeaders([]byte(body), "delivery-1", now.Unix(), "secret")
+	if header.Get(WebhookDeliveryHeader) != "delivery-1" || header.Get(WebhookTimestampHeader) != "1760000000" || header.Get("Content-Type") != "application/json" {
+		t.Fatal(header)
+	}
+	req := httptest.NewRequest("POST", "/webhooks", strings.NewReader(body))
+	req.Header = header
+	if event, err := VerifyWebhookRequest(req, "secret", WithNow(now)); err != nil || event.ID != "event-1" {
+		t.Fatal(event, err)
+	}
+	req = httptest.NewRequest("POST", "/webhooks", strings.NewReader(body))
+	req.Header = header
+	if _, err := VerifyWebhookRequest(req, "other", WithNow(now)); ErrorCode(err) != CodeSDKInvalidWebhookSignature {
+		t.Fatal("signed with the wrong secret", err)
+	}
+}

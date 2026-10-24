@@ -15,7 +15,12 @@ module CalmLens
   # the API's codes, HTTP statuses and body shape. It does not classify content: assets moderated
   # synchronously get `analyzed_outcome` and queued ones `queued_outcome`. Content is kept only with
   # `keepContentAfterProcessing: true`; otherwise it is removed once classification is `completed`, as in the API.
-  # A `purged` outcome removes the content with reason `policy`, and the CDN does not serve `blocked` assets.
+  # A `purged` outcome removes the content with reason `policy`. The CDN answers like the real one:
+  # `asset/not-available` (403) for blocked, purged, failed or removed content, and
+  # `asset/api-key-missing-permission` (403) for a private asset, or a public age-restricted one without
+  # `allow_age_restricted: true`, unless `api_key` comes from {.create_api_key} with an `assets:download`
+  # grant. The default key has no grants. {#decide} applies a reviewer's decision, and
+  # {Assets#wait_for_decision} takes no real time: a pending asset times out at once.
   #
   # To script exact responses, enqueue them: queued responses and errors are used first, in order,
   # before the stand-in answers.
@@ -39,7 +44,20 @@ module CalmLens
     # @return [Testing::State] the stored assets, folders, content and events.
     attr_reader :state
 
+    # The prefix of mock API keys made by {.create_api_key}.
+    API_KEY_PREFIX = 'sk_test_'
+
+    # A mock API key carrying permission grants, such as
+    # `[{ actions: ['assets:download'], folderId: nil, includeSubfolders: true }]` for CDN reads of
+    # private and age-restricted assets.
+    # @param grants [Array<Hash>] snake_case keys are converted.
+    # @return [String]
+    def self.create_api_key(grants = [])
+      API_KEY_PREFIX + [JSON.generate(Internal.normalize(grants))].pack('m0').tr('+/', '-_').delete('=')
+    end
+
     # @param project_id [String]
+    # @param api_key [String] a key from {.create_api_key}; the default has no grants.
     # @param now [#call] returns the current time in epoch milliseconds.
     # @param create_id [#call] returns a new ID.
     # @param queued_outcome [String] the outcome of assets created with {Assets#create}: `pending`
@@ -52,19 +70,37 @@ module CalmLens
     #   and is `allowed` otherwise), or a callable that receives a copy of the asset and returns either.
     # @param options [Hash] other {ServerClient#initialize} settings, except `api_key` and `transport`.
     #   Retries wait no time unless a queued response sets `Retry-After`.
-    def initialize(project_id: 'project-1', base_url: 'https://api.calmlens.invalid/v1',
+    def initialize(project_id: 'project-1', api_key: MockServerClient.create_api_key, base_url: 'https://api.calmlens.invalid/v1',
                    cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: -> { (Time.now.to_f * 1000).to_i },
                    create_id: -> { SecureRandom.uuid }, queued_outcome: 'pending', analyzed_outcome: 'allowed',
                    **options)
       @mock_lock = Mutex.new
       @queue = []
       @received = []
-      super(api_key: 'mock-key', project_id: project_id, base_url: base_url, cdn_base_url: cdn_base_url,
+      super(api_key: api_key, project_id: project_id, base_url: base_url, cdn_base_url: cdn_base_url,
             retry_base_delay: 0, **options, transport: method(:receive))
       @fake = Testing::FakeAPI.new(project_id: project_id, base_url: self.base_url, cdn_base_url: self.cdn_base_url,
                                    now: now, create_id: create_id, queued_outcome: queued_outcome,
                                    analyzed_outcome: analyzed_outcome)
       @state = @fake.state
+      # Decision checks advance this clock instead of sleeping.
+      @waited = 0.0
+      @session.use_clock(monotonic: -> { @mock_lock.synchronize { @waited } },
+                         pause: ->(seconds) { @mock_lock.synchronize { @waited += seconds } })
+    end
+
+    # Applies a reviewer's decision to a stored asset, as the portal or API would: the moderation
+    # status changes (`purged` also removes the content), the review joins `manualReviews`, and an
+    # `asset.<decision>` event with a `decided-by: reviewer` fact joins the events feed.
+    # @param asset_id [String]
+    # @param decision [String] `allowed`, `age-restricted`, `blocked` or `purged`
+    # @return [Hash] the asset
+    # @raise [APIError] `asset/not-found` for an unknown asset
+    def decide(asset_id, decision)
+      asset = @mock_lock.synchronize { @fake.decide(asset_id, decision) }
+      return asset if asset
+
+      raise APIError.class_for(404).new(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', status: 404)
     end
 
     # Queues a JSON response for the next request.

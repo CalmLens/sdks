@@ -38,6 +38,8 @@ module CalmLens
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
                         'classification.moderation.status' => %w[classification moderation status] }.freeze
+      REVIEW_DECISIONS = %w[allowed age-restricted blocked purged].freeze
+      RESOURCES = %w[original rendered placeholder].freeze
       MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
 
@@ -66,10 +68,32 @@ module CalmLens
         record
       end
 
+      # Applies a reviewer's decision, adds the matching `asset.<decision>` event and returns the
+      # asset, or nil when there is no such asset.
+      def decide(asset_id, decision)
+        unless REVIEW_DECISIONS.include?(decision)
+          raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
+                                         "Review decisions are #{REVIEW_DECISIONS.join(', ')} (got #{decision.inspect})")
+        end
+        item = @state.assets[asset_id]
+        return unless item && item['projectId'] == @project_id
+
+        apply_outcome(item, decision)
+        now = @now.call
+        (item['classification']['moderation']['manualReviews'] ||= []) <<
+          { 'id' => @create_id.call, 'decision' => decision, 'note' => nil, 'reviewerUserId' => nil,
+            'reviewedAt' => now, 'appliedToAsset' => true }
+        # Like the event catalog: only allowing is low severity.
+        add_event('type' => "asset.#{decision}", 'severity' => decision == 'allowed' ? 'low' : 'high',
+                  'assetId' => asset_id, 'asset' => snapshot(item),
+                  'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }])
+        deep_copy(item)
+      end
+
       # @return [Response]
       def handle(method, url, headers, body)
         if url.start_with?("#{@cdn_base_url}/")
-          serve(method, url.delete_prefix(@cdn_base_url))
+          serve(method, url.delete_prefix(@cdn_base_url), headers)
         else
           api(method, url.delete_prefix(@base_url), headers, body)
         end
@@ -86,8 +110,16 @@ module CalmLens
 
       def request_id = "mock-#{SecureRandom.hex(8)}"
 
-      def error(code, message)
-        respond(ErrorCodes::STATUSES.fetch(code, 400), { 'code' => code, 'message' => message })
+      def error(code, message, status = ErrorCodes::STATUSES.fetch(code, 400))
+        respond(status, { 'code' => code, 'message' => message })
+      end
+
+      # The asset summary events carry.
+      def snapshot(item)
+        { 'id' => item['id'], 'externalId' => item['externalId'], 'uploadPresetId' => item['uploadPresetId'],
+          'upload' => { 'status' => item['upload']['status'] }, 'content' => { 'status' => item['content']['status'] },
+          'classification' => { 'status' => item['classification']['status'],
+                                'moderation' => { 'status' => item['classification']['moderation']['status'] } } }
       end
 
       def fail!(code, message = nil) = raise(Failure.new(code, message))
@@ -479,17 +511,31 @@ module CalmLens
         left['id'].to_s <=> right['id'].to_s
       end
 
-      def serve(method, relative)
-        segments = relative.split(/[?#]/, 2).first.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
+      # Answers like the CDN: delivery checks first, which refuse everyone (content still uploading,
+      # blocked or purged, failed processing, removed content, or a placeholder, since the mock
+      # makes no previews); then a private asset, or a public age-restricted one requested without
+      # `allowAgeRestricted=true`, needs an API key with `assets:download` for its folder.
+      def serve(method, relative, headers)
+        path, query = relative.split('#', 2).first.split('?', 2)
+        segments = path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
         _, project, identifier, resource = segments
-        return text(404, 'Asset not found') unless project == @project_id
+        item = project == @project_id && project_assets.find { |asset| [asset['id'], asset['externalId']].include?(identifier) }
+        return error(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', 404) unless item && RESOURCES.include?(resource)
 
-        item = project_assets.find { |asset| asset['id'] == identifier || asset['externalId'] == identifier }
-        return text(404, 'Asset not found') unless item && %w[original rendered].include?(resource)
-        return text(403, 'Asset is held') if item['classification']['moderation']['status'] == 'blocked'
-
+        moderation = item['classification']['moderation']['status']
         stored = @state.content[item['id']]
-        return text(404, 'Asset content not found') unless stored
+        if resource == 'placeholder' || stored.nil? || item['upload']['status'] == 'uploading' ||
+           %w[blocked purged].include?(moderation) || item['classification']['status'] == 'failed' ||
+           item['content']['status'] == 'removed'
+          return error('asset/not-available', 'Asset is not available', 403)
+        end
+
+        opted_in = URI.decode_www_form(query.to_s).to_h['allowAgeRestricted'] == 'true'
+        restricted = item['visibility'] != 'public' || (moderation == 'age-restricted' && !opted_in)
+        if restricted && !can_download?(item['folderId'], headers)
+          return error('asset/api-key-missing-permission',
+                       'This API key needs assets:download permission for this asset’s folder.', 403)
+        end
 
         bytes = stored['parts'].sort.map(&:last).join.b
         Response.new(status: 200, body: method == 'HEAD' ? '' : bytes,
@@ -497,9 +543,34 @@ module CalmLens
                                 'x-request-id' => request_id })
       end
 
-      def text(status, message)
-        Response.new(status: status, body: message,
-                     headers: { 'content-type' => 'text/plain; charset=utf-8', 'x-request-id' => request_id })
+      # Whether the request's mock API key grants `assets:download` for `folder_id`.
+      def can_download?(folder_id, headers)
+        key = headers.find { |name, _| name.to_s.casecmp?('X-Api-Key') }&.last.to_s
+        return false unless key.start_with?(MockServerClient::API_KEY_PREFIX)
+
+        encoded = key.delete_prefix(MockServerClient::API_KEY_PREFIX).tr('-_', '+/')
+        grants = JSON.parse("#{encoded}#{'=' * (-encoded.size % 4)}".unpack1('m0'))
+        grants.any? do |grant|
+          next false unless Array(grant['actions']).include?('assets:download')
+          next true if grant['folderId'].nil?
+
+          covers?(grant, folder_id)
+        end
+      rescue ArgumentError, JSON::ParserError, TypeError, NoMethodError
+        false
+      end
+
+      def covers?(grant, folder_id)
+        current = folder_id
+        seen = []
+        while current && !seen.include?(current)
+          return true if current == grant['folderId']
+          return false unless grant['includeSubfolders']
+
+          seen << current
+          current = @state.folders.dig(current, 'parentId')
+        end
+        false
       end
     end
 

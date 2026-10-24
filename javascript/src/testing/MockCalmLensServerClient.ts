@@ -120,6 +120,16 @@ export type MockAssetOutcome =
   | "purged"
   | "failed";
 
+/** A reviewer's decision for `decide`: the moderation status it gives the asset. */
+export type MockReviewDecision = "allowed" | "age-restricted" | "blocked" | "purged";
+
+const REVIEW_DECISIONS: readonly MockReviewDecision[] = [
+  "allowed",
+  "age-restricted",
+  "blocked",
+  "purged",
+];
+
 /** The options each `MockCalmLensServerClient` method was given, by operation name. */
 export interface MockCalmLensOperationOptions {
   "assets.list": ListAssetsOptions;
@@ -212,6 +222,8 @@ export class MockCalmLensServerClient {
   private readonly uploadQueues = new Map<string, boolean>();
   private readonly idempotentResults = new Map<string, { fingerprint: string; asset: Asset }>();
   private requestCount = 0;
+  /** Time `waitForDecision` has spent waiting: mock waits advance it instead of sleeping. */
+  private waitedMs = 0;
   private readonly pendingFailures: Array<{
     failure: MockRequestFailure;
     operation?: MockCalmLensOperation;
@@ -279,6 +291,53 @@ export class MockCalmLensServerClient {
     } as TypedEvent;
     this.eventFeed.push(event);
     return event;
+  }
+
+  /**
+   * Applies a reviewer's decision to a stored asset, as the portal or API would: the moderation
+   * status changes (`purged` also removes the content), the review joins `manualReviews`, and an
+   * `asset.<decision>` event with a `decided-by: reviewer` fact joins the events feed. Rejects with
+   * `asset/not-found` for an unknown asset.
+   */
+  async decide(assetId: string, decision: MockReviewDecision): Promise<Asset> {
+    if (!REVIEW_DECISIONS.includes(decision)) {
+      throw invalidArgument(`decision must be one of ${REVIEW_DECISIONS.join(", ")}`);
+    }
+    const asset = await this.findOwnAsset(assetId);
+    const decided = await this.applyOutcome(asset, decision);
+    const now = this.now();
+    decided.classification.moderation.manualReviews = [
+      ...(decided.classification.moderation.manualReviews ?? []),
+      {
+        id: this.createId(),
+        decision,
+        note: null,
+        reviewerUserId: null,
+        reviewedAt: now,
+        appliedToAsset: true,
+      },
+    ];
+    const stored = await this.databaseStorage.updateAsset(decided);
+    this.enqueueEvent({
+      type: `asset.${decision}`,
+      // Like the event catalog: only allowing is low severity.
+      severity: decision === "allowed" ? "low" : "high",
+      title: `asset.${decision}`,
+      assetId: stored.id,
+      asset: {
+        id: stored.id,
+        externalId: stored.externalId ?? null,
+        uploadPresetId: stored.uploadPresetId ?? null,
+        upload: { status: stored.upload.status },
+        classification: {
+          status: stored.classification.status,
+          moderation: { status: stored.classification.moderation.status },
+        },
+        content: { status: stored.content.status },
+      },
+      facts: [{ key: "decided-by", value: "reviewer" }],
+    } as MockEventInput);
+    return stored;
   }
 
   /** An API error as the real client throws it: status, default message and request ID. */
@@ -372,9 +431,30 @@ export class MockCalmLensServerClient {
           this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
         if (!asset) return notFound();
 
-        // A placeholder is served whatever the moderation status; everything else follows it.
+        // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
+        // blocked or purged, failed processing or removed content. A placeholder is served whatever
+        // the moderation status, except for purged assets.
         const status = asset.classification.moderation.status;
         const isPlaceholder = options.resource === "placeholder";
+        const notAvailable = () =>
+          this.jsonResponse(
+            403,
+            { code: "asset/not-available", message: "Asset is not available" },
+            url,
+          );
+        const storedContent = await this.imageStorage.getContent(asset.id);
+        if (
+          asset.upload.status === "uploading" ||
+          status === "purged" ||
+          (!isPlaceholder && status === "blocked") ||
+          asset.classification.status === "failed" ||
+          asset.content.status === "removed" ||
+          !storedContent
+        ) {
+          return notAvailable();
+        }
+        // Then access: private assets, and public age-restricted ones requested without
+        // `allowAgeRestricted`, need an API key with `assets:download` for the asset's folder.
         const isPrivate =
           asset.visibility !== "public" ||
           (!isPlaceholder && status === "age-restricted" && !options.allowAgeRestricted);
@@ -393,16 +473,6 @@ export class MockCalmLensServerClient {
               code: "asset/api-key-missing-permission",
               message: "This API key needs assets:download permission for this asset’s folder.",
             },
-            url,
-          );
-        }
-
-        const storedContent = await this.imageStorage.getContent(asset.id);
-        if (!storedContent) return notFound();
-        if (!isPlaceholder && status === "blocked") {
-          return this.jsonResponse(
-            403,
-            { code: "asset/not-available", message: "This asset is not available" },
             url,
           );
         }
@@ -695,11 +765,23 @@ export class MockCalmLensServerClient {
         return this.databaseStorage.updateAsset(await this.applyOutcome(asset, "pending"));
       },
 
-      /** Waits like the real client, checking the mock's storage for a decision. */
+      /**
+       * Polls the mock's storage like the real client, without real waiting: each pause only
+       * advances the mock's clock (yielding to other tasks, which can `decide` meanwhile), so a
+       * pending asset fails with `sdk/timeout` at once.
+       */
       waitForDecision: async (options: WaitForAssetDecisionOptions): Promise<Asset> => {
         this.begin("assets.waitForDecision", options);
         const { assetId, ...waitOptions } = options;
-        return pollForDecision(() => this.findOwnAsset(assetId), waitOptions, sleep);
+        return pollForDecision(
+          () => this.findOwnAsset(assetId),
+          waitOptions,
+          async (ms, signal) => {
+            await sleep(0, signal);
+            this.waitedMs += ms;
+          },
+          () => this.waitedMs,
+        );
       },
 
       deleteContent: async (options: DeleteAssetContentOptions): Promise<Asset> => {

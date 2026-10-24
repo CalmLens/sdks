@@ -11,6 +11,11 @@ use PHPUnit\Framework\TestCase;
 
 final class MockServerClientTest extends TestCase
 {
+    private static function downloadKey(): string
+    {
+        return MockServerClient::createApiKey([['actions' => ['assets:download'], 'folderId' => null, 'includeSubfolders' => true]]);
+    }
+
     private static function image(MockServerClient $mock, string $visibility = 'public'): array
     {
         return $mock->client()->assets->create([
@@ -100,7 +105,7 @@ final class MockServerClientTest extends TestCase
 
     public function testCdnServesPublicAgeRestrictedAssetsOnlyWithTheOptInOrDownloadPermission(): void
     {
-        $mock = new MockServerClient(queuedOutcome: 'age-restricted', downloadPermission: false);
+        $mock = new MockServerClient(queuedOutcome: 'age-restricted');
         $asset = self::image($mock);
         $cdn = $mock->client()->cdn;
         $refused = $cdn->serve(['assetIdentifier' => $asset['id']]);
@@ -110,16 +115,17 @@ final class MockServerClientTest extends TestCase
         self::assertSame(200, $optedIn->getStatusCode());
         self::assertSame('png-bytes', (string) $optedIn->getBody());
         self::assertSame('private, no-store', $optedIn->getHeaderLine('Cache-Control'));
-        $mock->downloadPermission = true;
-        self::assertSame(200, $cdn->serve(['assetIdentifier' => $asset['id']])->getStatusCode());
+        $granted = new MockServerClient(queuedOutcome: 'age-restricted', apiKey: self::downloadKey());
+        $grantedAsset = self::image($granted);
+        self::assertSame(200, $granted->client()->cdn->serve(['assetIdentifier' => $grantedAsset['id']])->getStatusCode());
     }
 
     public function testCdnServesPrivateAssetsOnlyWithDownloadPermission(): void
     {
-        $mock = new MockServerClient(queuedOutcome: 'allowed', downloadPermission: false);
+        $mock = new MockServerClient(queuedOutcome: 'allowed');
         $asset = self::image($mock, 'private');
         self::assertSame(403, $mock->client()->cdn->serve(['assetIdentifier' => $asset['id'], 'allowAgeRestricted' => true])->getStatusCode());
-        $public = new MockServerClient(queuedOutcome: 'allowed', downloadPermission: false);
+        $public = new MockServerClient(queuedOutcome: 'allowed');
         $allowed = self::image($public);
         $response = $public->client()->cdn->serve(['assetIdentifier' => 'post-1']);
         self::assertSame(200, $response->getStatusCode());
@@ -249,7 +255,7 @@ final class MockServerClientTest extends TestCase
         $started = $assets->create(['name' => 'big.txt', 'processingOptions' => ['keepContentAfterProcessing' => true],
             'part' => ['data' => $first, 'type' => 'text/plain']]);
         self::assertSame(['uploading', 'pending'], [$started['upload']['status'], $started['classification']['status']]);
-        self::assertSame(404, $mock->client()->cdn->serve(['assetIdentifier' => $started['id']])->getStatusCode());
+        self::assertSame(403, $mock->client()->cdn->serve(['assetIdentifier' => $started['id']])->getStatusCode());
         self::assertSame(ErrorCodes::INVALID_UPLOAD_PART_NUMBER, self::code(fn () => $assets->uploadPart(['assetId' => $started['id'], 'part' => ['data' => 'z', 'partNumber' => 3, 'isFinal' => true]])));
         $done = $assets->uploadPart(['assetId' => $started['id'], 'part' => ['data' => 'end', 'partNumber' => 2, 'isFinal' => true]]);
         self::assertSame(['completed', 2, 'blocked'], [$done['upload']['status'], $done['upload']['partsReceived'], $done['classification']['moderation']['status']]);

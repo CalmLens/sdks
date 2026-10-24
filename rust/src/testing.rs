@@ -29,6 +29,7 @@ use std::{
     io,
     ops::Deref,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 /// A request captured by [`MockServerClient`], decoded so tests need not parse URLs by hand.
@@ -124,14 +125,36 @@ struct State {
     replies: VecDeque<Reply>,
     requests: Vec<Request>,
     backend: Option<memory::Backend>,
+    /// Virtual time the client's waits have advanced.
+    elapsed: Duration,
 }
-#[derive(Default)]
-pub(crate) struct MockTransport(Mutex<State>);
+pub(crate) struct MockTransport {
+    state: Mutex<State>,
+    started: tokio::time::Instant,
+}
 impl MockTransport {
+    fn new(state: State) -> Self {
+        Self {
+            state: Mutex::new(state),
+            started: tokio::time::Instant::now(),
+        }
+    }
     fn state(&self) -> std::sync::MutexGuard<'_, State> {
-        self.0
+        self.state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+    /// The virtual clock: the time the mock was created plus the waits since.
+    pub(crate) fn now(&self) -> tokio::time::Instant {
+        self.started + self.state().elapsed
+    }
+    /// Advances the virtual clock instead of waiting, then yields once to the runtime.
+    pub(crate) async fn sleep(&self, duration: Duration) {
+        {
+            let mut state = self.state();
+            state.elapsed = state.elapsed.saturating_add(duration);
+        }
+        tokio::task::yield_now().await;
     }
     pub(crate) async fn exchange(&self, attempt: Attempt) -> Result<Exchange> {
         let body = match attempt.body {
@@ -202,6 +225,9 @@ impl MockTransport {
 
 /// An offline client that answers requests from a FIFO queue. Dereferences to [`ServerClient`].
 ///
+/// Waits take no real time: retry backoff and `wait_for_decision` advance a virtual clock
+/// ([`elapsed`](Self::elapsed)), so a decision that never comes times out at once.
+///
 /// ```
 /// # async fn run() -> calmlens::Result<()> {
 /// use calmlens::{models::*, testing::MockServerClient};
@@ -269,13 +295,13 @@ impl MockServerClient {
     /// ```
     pub fn in_memory(options: MockOptions) -> Result<Self> {
         let builder = ServerClient::builder(options.api_key.clone(), options.project_id.clone())
-            .base_url(memory::API_BASE_URL)
-            .cdn_base_url(memory::CDN_BASE_URL)
+            .base_url(&options.api_base_url)
+            .cdn_base_url(&options.cdn_base_url)
             .max_retries(options.max_retries);
-        let transport = Arc::new(MockTransport(Mutex::new(State {
+        let transport = Arc::new(MockTransport::new(State {
             backend: Some(memory::Backend::new(options)),
             ..State::default()
-        })));
+        }));
         let client = builder.clone().build_mock(transport.clone())?;
         Ok(Self {
             client,
@@ -350,7 +376,7 @@ impl MockServerClient {
     /// `MockServerClient::from_builder(ServerClient::builder(key, project).base_url(url).max_retries(2))`.
     /// The configuration is validated the same way; no network requests are made.
     pub fn from_builder(builder: ServerClientBuilder) -> Result<Self> {
-        let transport = Arc::new(MockTransport::default());
+        let transport = Arc::new(MockTransport::new(State::default()));
         let client = builder.clone().build_mock(transport.clone())?;
         Ok(Self {
             client,
@@ -424,6 +450,11 @@ impl MockServerClient {
     /// The number of queued replies not yet used.
     pub fn remaining_responses(&self) -> usize {
         self.transport.state().replies.len()
+    }
+    /// The virtual time this mock's clients have waited: retry backoff and
+    /// `wait_for_decision` advance it instead of sleeping.
+    pub fn elapsed(&self) -> Duration {
+        self.transport.state().elapsed
     }
 }
 fn io_failure(code: ErrorCode, kind: io::ErrorKind, message: &str) -> Error {

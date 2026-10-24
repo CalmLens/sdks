@@ -47,6 +47,18 @@ module CalmLens
 
     def inspect = "#<#{self.class.name} project_id=#{@project_id.inspect} api_key=[REDACTED]>"
 
+    # Seconds on a monotonic clock, for decision deadlines. {MockServerClient} replaces it.
+    def monotonic = @monotonic ? @monotonic.call : Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+    # Waits between decision checks. {MockServerClient} replaces it.
+    def pause(seconds) = @pause ? @pause.call(seconds) : sleep(seconds)
+
+    # Replaces the clock and wait used for decision checks, so a mock's waits take no real time.
+    def use_clock(monotonic:, pause:)
+      @monotonic = monotonic
+      @pause = pause
+    end
+
     def close
       @transport.close if @transport.respond_to?(:close)
     end

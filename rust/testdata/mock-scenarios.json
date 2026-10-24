@@ -1,0 +1,1185 @@
+{
+  "scenarios": [
+    {
+      "name": "create leaves an asset processing and classify allows it by default",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "queued",
+          "expect": {
+            "result": {
+              "upload.status": "completed",
+              "classification.status": "processing",
+              "classification.moderation.status": "pending",
+              "content.status": "temporary"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "analyzed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "completed",
+              "classification.moderation.status": "allowed",
+              "content.status": "removed",
+              "content.removalReason": "retention"
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "queued.id"
+              },
+              "classification.moderation.status": "pending"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "classify uses analyzedOutcome and create uses queuedOutcome",
+      "mock": {
+        "queuedOutcome": "allowed",
+        "analyzedOutcome": "blocked"
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "analyzed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "completed",
+              "classification.moderation.status": "blocked"
+            }
+          }
+        },
+        {
+          "operation": "text.classify",
+          "args": {
+            "text": "hello"
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "blocked"
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "completed",
+              "classification.moderation.status": "allowed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a reviewer's block shows in retrieve, list, filters and events, and stops delivery",
+      "mock": {
+        "apiKeyGrants": [
+          {
+            "actions": [
+              "assets:download"
+            ],
+            "folderId": null,
+            "includeSubfolders": true
+          }
+        ]
+      },
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "result": {
+              "events.length": 0,
+              "hasMore": false
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "blocked.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "blocked",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "allowed"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "other.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "other"
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "blocked.id"
+            },
+            "outcome": "blocked"
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "blocked.id"
+              },
+              "classification.moderation.status": "blocked",
+              "content.status": "stored"
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "blocked.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "blocked"
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "classification.moderation.status==blocked"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "blocked.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "classification.moderation.status==allowed"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "other.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 2
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "blocked.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "other.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 1,
+              "events.0.type": "asset.blocked",
+              "events.0.severity": "high",
+              "events.0.assetId": {
+                "$ref": "blocked.id"
+              },
+              "events.0.asset.classification.moderation.status": "blocked",
+              "events.0.facts": {
+                "$contains": {
+                  "key": "decided-by",
+                  "value": "reviewer"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "purging removes the content and the CDN refuses it",
+      "mock": {
+        "apiKeyGrants": [
+          {
+            "actions": [
+              "assets:download"
+            ],
+            "folderId": null,
+            "includeSubfolders": true
+          }
+        ],
+        "queuedOutcome": "purged"
+      },
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "purged.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "purged",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "purged",
+              "content.status": "removed",
+              "content.removalReason": "policy"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "purged.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "decided.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "decided",
+          "expect": {
+            "result": {
+              "content.status": "stored"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "decided.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "decided.id"
+            },
+            "outcome": "purged"
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "purged",
+              "content.status": "removed",
+              "content.removalReason": "policy"
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "decided.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "removed"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "decided.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "keepContentAfterProcessing keeps content until it is deleted",
+      "mock": {
+        "apiKeyGrants": [
+          {
+            "actions": [
+              "assets:download"
+            ],
+            "folderId": null,
+            "includeSubfolders": true
+          }
+        ]
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "kept.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "kept",
+          "expect": {
+            "result": {
+              "content.status": "stored",
+              "content.removalReason": null
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "kept.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "temporary.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "temporary",
+          "expect": {
+            "result": {
+              "content.status": "removed",
+              "content.removalReason": "retention"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "temporary.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "assets.deleteContent",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "removed",
+              "content.removalReason": "requested",
+              "classification.moderation.status": "allowed"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "kept.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a key without assets:download cannot read private content",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "private",
+          "expect": {
+            "result": {
+              "visibility": "private"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "public"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "private.id"
+            },
+            "outcome": "blocked"
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": "missing-asset",
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a key with assets:download reads private and age-restricted content",
+      "mock": {
+        "apiKeyGrants": [
+          {
+            "actions": [
+              "assets:download"
+            ],
+            "folderId": null,
+            "includeSubfolders": true
+          }
+        ],
+        "analyzedOutcome": "age-restricted"
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "private"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "public"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a public age-restricted asset is served without a grant only with allowAgeRestricted",
+      "mock": {
+        "analyzedOutcome": "age-restricted"
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "public",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "age-restricted"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "original",
+            "allowAgeRestricted": true
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "private"
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "original",
+            "allowAgeRestricted": true
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an idempotency key replays the first result and refuses a different request",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "first.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "upload-1"
+          },
+          "save": "first"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "first.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "upload-1"
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "first.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "second.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "idempotencyKey": "upload-1"
+          },
+          "expect": {
+            "error": {
+              "code": "idempotency/key-reused",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an externalId is unique in the project",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "first.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "externalId": "order-17"
+          },
+          "expect": {
+            "result": {
+              "externalId": "order-17"
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "second.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "externalId": "order-17"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/duplicate-external-id",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "waitForDecision times out on a pending asset and returns a decided one",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "queued"
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "timeoutMs": 60000
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/timeout",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "outcome": "allowed"
+          }
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "timeoutMs": 60000
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "queued.id"
+              },
+              "classification.moderation.status": "allowed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a folder with assets cannot be deleted",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Uploads"
+          },
+          "save": "folder"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "filed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          },
+          "save": "filed",
+          "expect": {
+            "result": {
+              "folderId": {
+                "$ref": "folder.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "folders.delete",
+          "args": {
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-empty",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.delete",
+          "args": {
+            "assetId": {
+              "$ref": "filed.id"
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "filed.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "folders.delete",
+          "args": {
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          }
+        },
+        {
+          "operation": "folders.retrieve",
+          "args": {
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "folder/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "search matches an asset's externalId",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "first.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "externalId": "order-17"
+          },
+          "save": "first"
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "second.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "externalId": "invoice-42"
+          }
+        },
+        {
+          "operation": "assets.search",
+          "args": {
+            "query": "order-17"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.asset.id": {
+                "$ref": "first.id"
+              },
+              "items.0.matchedFields": {
+                "$contains": "externalId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "enqueued events reach cursors taken before them",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "queued"
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "result": {
+              "events.length": 0
+            }
+          }
+        },
+        {
+          "operation": "mock.enqueueEvent",
+          "args": {
+            "type": "asset.review-requested",
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "facts": [
+              {
+                "key": "automated-outcome",
+                "value": "allowed"
+              }
+            ]
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 1,
+              "events.0.type": "asset.review-requested",
+              "events.0.assetId": {
+                "$ref": "queued.id"
+              },
+              "events.0.facts": {
+                "$contains": {
+                  "key": "automated-outcome",
+                  "value": "allowed"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

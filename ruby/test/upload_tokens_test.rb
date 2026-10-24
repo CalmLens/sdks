@@ -50,9 +50,10 @@ class UploadTokensTest < Minitest::Test
   end
 
   def test_the_mock_signs_tokens_with_its_key_without_a_request
-    mock = CalmLens::MockServerClient.new
+    key = CalmLens::MockServerClient.create_api_key
+    mock = CalmLens::MockServerClient.new(api_key: key)
     _, body, sent = decode(mock.upload_tokens.sign(upload_preset_id: 'preset-1')['token'])
-    assert_equal signature(body, 'mock-key'), sent
+    assert_equal signature(body, key), sent
     assert_empty mock.requests
   end
 

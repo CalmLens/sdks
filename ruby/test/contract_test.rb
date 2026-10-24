@@ -107,6 +107,15 @@ class ContractTest < Minitest::Test
                                                 tolerance_seconds: vector.fetch('toleranceSeconds', 300))
       assert_equal vector['valid'], valid, vector['name']
     end
+    webhooks['payloads'].each do |entry|
+      assert_equal entry['payload'], CalmLens.to_webhook_event_payload(entry['event'])
+    end
+    vector = webhooks['signatures'].first
+    headers = CalmLens.create_webhook_headers(payload: vector['body'], delivery_id: 'delivery-1',
+                                              secret: vector['secret'], timestamp: vector['timestamp'].to_i)
+    assert_equal({ 'content-type' => 'application/json', CalmLens::WEBHOOK_DELIVERY_HEADER => 'delivery-1',
+                   CalmLens::WEBHOOK_TIMESTAMP_HEADER => vector['timestamp'],
+                   CalmLens::WEBHOOK_SIGNATURE_HEADER => vector['signature'] }, headers)
   end
 
   def test_parse_event_parses_every_payload_fixture

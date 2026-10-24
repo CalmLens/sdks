@@ -37,6 +37,35 @@ pub fn create_webhook_signature_header(
     format!("v1={hex}")
 }
 
+/// The headers of one signed delivery of the raw `body`, as CalmLens sends them: `content-type`,
+/// [`WEBHOOK_DELIVERY_HEADER`], [`WEBHOOK_TIMESTAMP_HEADER`] (`timestamp`, Unix seconds) and
+/// [`WEBHOOK_SIGNATURE_HEADER`]. Use it to test a webhook handler with the current time, since
+/// handlers reject deliveries more than five minutes old. Fails with `sdk/invalid-argument` when
+/// `delivery_id` is not a valid header value.
+pub fn create_webhook_headers(
+    body: impl AsRef<[u8]>,
+    delivery_id: &str,
+    timestamp: u64,
+    secret: &str,
+) -> Result<http::HeaderMap> {
+    let stamp = timestamp.to_string();
+    let value = |value: &str| {
+        http::HeaderValue::from_str(value).map_err(|cause| {
+            Error::new(ErrorCode::InvalidArgument, "Invalid webhook header value")
+                .with_source(cause)
+        })
+    };
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::CONTENT_TYPE, value("application/json")?);
+    headers.insert(WEBHOOK_DELIVERY_HEADER, value(delivery_id)?);
+    headers.insert(WEBHOOK_TIMESTAMP_HEADER, value(&stamp)?);
+    headers.insert(
+        WEBHOOK_SIGNATURE_HEADER,
+        value(&create_webhook_signature_header(body, &stamp, secret))?,
+    );
+    Ok(headers)
+}
+
 /// Verifies the exact raw `body` bytes against the [`WEBHOOK_SIGNATURE_HEADER`] and
 /// [`WEBHOOK_TIMESTAMP_HEADER`] values, rejecting timestamps more than `tolerance` seconds from
 /// `now` (Unix seconds; use [`WEBHOOK_SIGNATURE_TOLERANCE_SECONDS`]). Pass the request body as

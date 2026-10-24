@@ -69,6 +69,19 @@ func SignWebhookPayload(payload []byte, timestamp int64, secret string) string {
 	return "v1=" + webhookHMAC(secret, strconv.FormatInt(timestamp, 10), payload)
 }
 
+// CreateWebhookHeaders returns the headers of one signed delivery of payload, as CalmLens sends
+// them: content-type, x-calmlens-delivery (deliveryID), x-calmlens-timestamp and
+// x-calmlens-signature. Pass time.Now().Unix() as timestamp to test a webhook handler, which
+// rejects deliveries more than five minutes old.
+func CreateWebhookHeaders(payload []byte, deliveryID string, timestamp int64, secret string) http.Header {
+	header := http.Header{}
+	header.Set("Content-Type", "application/json")
+	header.Set(WebhookDeliveryHeader, deliveryID)
+	header.Set(WebhookTimestampHeader, strconv.FormatInt(timestamp, 10))
+	header.Set(WebhookSignatureHeader, SignWebhookPayload(payload, timestamp, secret))
+	return header
+}
+
 func webhookHMAC(secret, timestamp string, body []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(timestamp))

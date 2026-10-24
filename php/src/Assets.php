@@ -10,6 +10,9 @@ use CalmLens\Internal\Values;
 
 final class Assets extends Resource
 {
+    /** The longest signed URL lifetime the API accepts: 24 hours. */
+    public const MAX_SIGNED_URL_SECONDS = 86400;
+
     public function search(array $options): array
     {
         [$api, $request] = $this->split($options);
@@ -88,6 +91,19 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($options);
         $path = $this->path($api, 'assets', 'assetId');
+        // As the API checks: a placeholder needs no signature, and only the rendered resource
+        // takes a lens or transform.
+        $resource = $api['resource'] ?? 'rendered';
+        if (!in_array($resource, ['original', 'rendered'], true)) {
+            Values::invalid("A signed URL's resource must be original or rendered");
+        }
+        if ($resource === 'original' && (isset($api['lens']) || isset($api['transform']))) {
+            Values::invalid('Lenses and transforms apply only to the rendered resource');
+        }
+        $expires = $api['expiresInSeconds'] ?? 900;
+        if (!is_int($expires) || $expires < 1 || $expires > self::MAX_SIGNED_URL_SECONDS) {
+            Values::invalid('expiresInSeconds must be a whole number from 1 to 86400');
+        }
         if (isset($api['transform'])) {
             $api['transform'] = Transforms::selector($api['transform']);
         }

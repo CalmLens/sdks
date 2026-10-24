@@ -441,3 +441,17 @@ fn transform_option_contracts() {
         );
     }
 }
+
+#[test]
+fn create_webhook_headers_sign_a_delivery_construct_webhook_event_accepts() {
+    let body = r#"{"id":"event-1","type":"asset.allowed","data":{"facts":[]}}"#;
+    let headers = calmlens::create_webhook_headers(body, "delivery-1", now(), "secret").unwrap();
+    assert_eq!(headers[calmlens::WEBHOOK_DELIVERY_HEADER], "delivery-1");
+    assert_eq!(headers[http::header::CONTENT_TYPE], "application/json");
+    let event = calmlens::construct_webhook_event(body, &headers, "secret").unwrap();
+    assert_eq!(event.id, "event-1");
+    let error = calmlens::construct_webhook_event(body, &headers, "other").unwrap_err();
+    assert_eq!(error.code().as_str(), "sdk/invalid-webhook-signature");
+    let invalid = calmlens::create_webhook_headers(body, "bad\nid", now(), "secret").unwrap_err();
+    assert_eq!(invalid.code().as_str(), "sdk/invalid-argument");
+}

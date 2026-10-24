@@ -1137,12 +1137,20 @@ class Assets:
         900 seconds)."""
         merged = _merge(options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
                         lens=lens, transform=transform)
+        asset_path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/signed-url"
         body = {"expiresInSeconds": 900,
                 **{k: v for k, v in merged.items() if k != "assetId"}}
+        resource = body.get("resource", "rendered")
+        if resource not in ("original", "rendered"):
+            raise _invalid("A signed URL's resource must be original or rendered")
+        if resource == "original" and ("lens" in body or "transform" in body):
+            raise _invalid("Lenses and transforms apply only to the rendered resource")
+        expires = body["expiresInSeconds"]
+        if isinstance(expires, bool) or not isinstance(expires, int) or not 1 <= expires <= 86400:
+            raise _invalid("expires_in_seconds must be a whole number from 1 to 86400")
         if "transform" in body:
             body["transform"] = _transform_selector(body["transform"])
-        return cast(SignedUrl, self._c._request(
-            "POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/signed-url", body=body))
+        return cast(SignedUrl, self._c._request("POST", asset_path, body=body))
 
     def move(self, options: MoveAssetOptions | None = None, /, *, asset_id: str = _UNSET,
              folder_id: str | None = _UNSET) -> Asset:

@@ -234,11 +234,14 @@ and `classify` gives them `analyzedOutcome` (default `allowed`): `pending`, `all
 `age-restricted`, `blocked`, `purged` (which also removes the content) or `failed`.
 `analyzedOutcome` may also be fields to merge into the asset or a callable that receives
 the asset and returns either. Content is kept only with `keepContentAfterProcessing`.
-Like the CDN, the mock refuses `blocked` assets and, with `downloadPermission: false`
-(a browser without your key), private assets and public age-restricted ones requested
-without `allowAgeRestricted`. Pass `apiKey: MockServerClient::createApiKey([['actions' =>
-['assets:download'], 'folderId' => $folderId, 'includeSubfolders' => true]])` to grant
-downloads only for one folder (a `null` `folderId` covers the project).
+Like the CDN, the mock refuses blocked, purged and failed assets, and assets whose content
+was removed, with `403` `asset/not-available` whatever the key. The default key has no
+grants, like a real key without `assets:download`, so it also refuses private assets and
+public age-restricted ones requested without `allowAgeRestricted` (`403`
+`asset/api-key-missing-permission`). Pass `apiKey: MockServerClient::createApiKey([['actions' =>
+['assets:download'], 'folderId' => null, 'includeSubfolders' => true]])` to read them; a
+`folderId` limits the grant to that folder. `decide` adds an `asset.<outcome>` event with the
+event catalog's severity: `low` for `allowed`, `high` otherwise.
 
 List filters support `==` (with `*` wildcards), `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`
 and `=le=` joined by `;` (and) and `,` (or), on nested names such as

@@ -50,6 +50,32 @@ module CalmLens
       "v1=#{OpenSSL::HMAC.hexdigest('SHA256', secret, "#{timestamp.to_s.b}.".b + raw)}"
     end
 
+    # The headers of one signed delivery of a body, as CalmLens sends them, to test a receiver.
+    # @param payload [String] the raw body
+    # @param delivery_id [String] the `x-calmlens-delivery` value
+    # @param secret [String]
+    # @param timestamp [Integer] Unix seconds
+    # @return [Hash{String => String}]
+    def headers(payload:, delivery_id:, secret:, timestamp: Time.now.to_i)
+      {
+        'content-type' => 'application/json',
+        WEBHOOK_DELIVERY_HEADER => delivery_id.to_s,
+        WEBHOOK_TIMESTAMP_HEADER => timestamp.to_s,
+        WEBHOOK_SIGNATURE_HEADER => signature_header(payload: payload, timestamp: timestamp, secret: secret)
+      }
+    end
+
+    # Converts an event from {Events#list} to the JSON body of its webhook delivery.
+    # @param event [Hash] an event with string keys, as {Events#list} returns it
+    # @return [Hash] `{ 'id', 'type', 'createdAt', 'projectId', 'data' }`
+    def to_payload(event)
+      raise Internal.invalid('event must be a Hash') unless event.is_a?(Hash)
+
+      { 'id' => event['id'], 'type' => event['type'], 'createdAt' => event['createdAt'], 'projectId' => event['projectId'],
+        'data' => { 'severity' => event['severity'], 'title' => event['title'], 'description' => event['description'],
+                    'assetId' => event['assetId'], 'asset' => event['asset'], 'facts' => event['facts'] } }
+    end
+
     # Checks a delivery's signature and freshness in constant time.
     # @param payload [String] the raw request body, exactly as received
     # @param signature [String, nil] the `x-calmlens-signature` header
@@ -113,6 +139,12 @@ module CalmLens
 
   # @see Webhooks.signature_header
   def self.create_webhook_signature_header(...) = Webhooks.signature_header(...)
+
+  # @see Webhooks.headers
+  def self.create_webhook_headers(...) = Webhooks.headers(...)
+
+  # @see Webhooks.to_payload
+  def self.to_webhook_event_payload(...) = Webhooks.to_payload(...)
 
   # @see Webhooks.verify
   def self.verify_webhook_signature(...) = Webhooks.verify(...)

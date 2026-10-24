@@ -520,12 +520,17 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
   `idempotency/key-reused`.
 - `EnqueueEvent` adds events to the feed, which `Events.List` and `ListAll` return after
   cursors taken earlier.
-- `CDN.Serve` answers with content type and length and supports single byte ranges. Like a
-  private asset, an age-restricted asset needs the `assets:download` permission, unless it is
-  public and requested with `AllowAgeRestricted: true`.
-- `Assets.WaitForDecision` checks the mock's storage, so change an asset's
-  `["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"]` with `WithStorage` to decide it while the call
-  waits.
+- `CDN.Serve` answers with content type and length and supports single byte ranges. Like the
+  CDN, blocked, purged and failed assets and removed content return 403 `asset/not-available`
+  whatever the key. A private asset, or a public age-restricted one requested without
+  `AllowAgeRestricted: true`, returns 403 `asset/api-key-missing-permission` unless the key has
+  the `assets:download` permission; the default key has no grants.
+- `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeAgeRestricted`,
+  `OutcomePurged`) applies a reviewer's decision and adds the matching `asset.<decision>` event
+  with a `decided-by: reviewer` fact.
+- Waits take no real time: retry backoff and `Assets.WaitForDecision` only advance the mock
+  client's clock, so `WaitForDecision` returns `sdk/timeout` straight away for an asset whose
+  moderation stays pending.
 
 It does not classify content, transform media or fetch URLs, and its signed URLs are not
 production URLs. Inspect or seed `DatabaseStorage` and `ImageStorage` between calls, or

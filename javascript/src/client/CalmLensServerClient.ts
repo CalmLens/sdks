@@ -63,6 +63,7 @@ import {
   transformSelector,
   validateRequestOptions,
   validateServerClientOptions,
+  validateSignedUrlOptions,
 } from "./CalmLensUtils";
 import { isBrowserRuntime, isReactNativeRuntime } from "./CalmLensVersion";
 import { verifyWebhookSignature } from "./CalmLensWebhooks";
@@ -356,6 +357,7 @@ export default class CalmLensServerClient {
         ...options
       }: CreateAssetSignedUrlOptions): Promise<PostAssetSignedUrlResponse> => {
         const encodedAssetId = requireId(assetId, "Asset ID");
+        validateSignedUrlOptions(options);
         return this.request("POST", `/assets/${encodedAssetId}/signed-url`, {
           body: {
             resource: options.resource,

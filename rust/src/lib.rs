@@ -52,7 +52,7 @@ pub use webhooks::*;
 pub use client::{
     AssetsClient, CdnClient, CdnResponse, EventsClient, FoldersClient, ServerClient,
     ServerClientBuilder, TextClient, UploadTokensClient, DEFAULT_BASE_URL, DEFAULT_CDN_BASE_URL,
-    ENSURE_LENSES_MAX_PER_REQUEST,
+    ENSURE_LENSES_MAX_PER_REQUEST, MAX_SIGNED_URL_SECONDS,
 };
 #[cfg(feature = "async")]
 pub use transport::MAX_RESPONSE_BYTES;

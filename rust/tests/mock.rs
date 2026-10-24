@@ -964,7 +964,7 @@ fn enqueue_status(
     }
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
     let mock = MockServerClient::new().unwrap();
     enqueue_status(
@@ -979,13 +979,15 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
         AssetModerationStatus::Blocked,
         1,
     );
-    let started = tokio::time::Instant::now();
+    let started = std::time::Instant::now();
     let asset = mock
         .assets()
         .wait_for_decision(WaitForDecision::new("asset-1"))
         .await
         .unwrap();
-    let waited = started.elapsed();
+    // The waits advance the mock's virtual clock and take no real time.
+    assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    let waited = mock.elapsed();
     assert_eq!(asset.id, "asset-1");
     assert_eq!(
         asset.classification.moderation.status,
@@ -1001,14 +1003,10 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
         vec![("GET".to_string(), "/v1/assets/asset-1".to_string()); 8]
     );
     // 0.5s, then 1.5 times longer each time (0.75, 1.125, 1.6875, 2.53125, 3.796875), capped at 5s.
-    let expected = std::time::Duration::from_secs_f64(15.390625);
-    assert!(
-        waited >= expected && waited < expected + std::time::Duration::from_millis(10),
-        "{waited:?}"
-    );
+    assert_eq!(waited, std::time::Duration::from_secs_f64(15.390625));
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
     let mock = MockServerClient::new().unwrap();
     enqueue_status(
@@ -1017,7 +1015,6 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
         AssetModerationStatus::Pending,
         10,
     );
-    let started = tokio::time::Instant::now();
     let error = mock
         .assets()
         .wait_for_decision(
@@ -1025,7 +1022,6 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
         )
         .await
         .unwrap_err();
-    let waited = started.elapsed();
     assert_eq!(error.code(), &ErrorCode::Timeout);
     assert_eq!(
         Value::Object(error.details().clone()),
@@ -1033,14 +1029,10 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
     );
     // Checks at 0, 0.5, 1.25 and 2.375s, then a shortened wait so the last check is at 3s.
     assert_eq!(mock.requests().len(), 5);
-    assert!(
-        waited >= std::time::Duration::from_secs(3)
-            && waited < std::time::Duration::from_millis(3010),
-        "{waited:?}"
-    );
+    assert_eq!(mock.elapsed(), std::time::Duration::from_secs(3));
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn dropping_wait_for_decision_stops_retrieving() {
     let mock = MockServerClient::new().unwrap();
     enqueue_status(
@@ -1050,12 +1042,15 @@ async fn dropping_wait_for_decision_stops_retrieving() {
         10,
     );
     let assets = mock.assets();
-    let waiting = assets.wait_for_decision(WaitForDecision::new("asset-1"));
-    let outcome = tokio::time::timeout(std::time::Duration::from_secs(1), waiting).await;
-    assert!(outcome.is_err());
-    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-    // Checks at 0 and 0.5s only; nothing runs after the future is dropped.
-    assert_eq!(mock.requests().len(), 2);
+    use std::future::Future;
+    let mut waiting = Box::pin(assets.wait_for_decision(WaitForDecision::new("asset-1")));
+    let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+    // The first poll retrieves once, then yields while it waits for the next check.
+    assert!(waiting.as_mut().poll(&mut context).is_pending());
+    drop(waiting);
+    tokio::task::yield_now().await;
+    // Nothing runs after the future is dropped.
+    assert_eq!(mock.requests().len(), 1);
 }
 
 fn page_with_cursor(items: Vec<Asset>, more: bool) -> AssetPage {

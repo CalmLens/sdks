@@ -233,6 +233,37 @@ const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
   "placeholder",
 ]);
 
+/** The longest signed URL lifetime the API accepts: 24 hours. */
+const MAX_SIGNED_URL_SECONDS = 60 * 60 * 24;
+
+/**
+ * Checks signed URL options as the API does: only the `original` and `rendered` resources are
+ * signed (a placeholder needs no signature), lenses and transforms apply only to `rendered`, and
+ * the lifetime is a whole number of seconds from 1 to 24 hours.
+ */
+export const validateSignedUrlOptions = (options: {
+  resource?: unknown;
+  lens?: unknown;
+  transform?: unknown;
+  expiresInSeconds?: unknown;
+}): void => {
+  const { resource = "rendered", lens, transform, expiresInSeconds } = options;
+  if (resource !== "original" && resource !== "rendered") {
+    throw invalidArgument("A signed URL's resource must be original or rendered");
+  }
+  if (resource === "original" && (lens !== undefined || transform !== undefined)) {
+    throw invalidArgument("Lenses and transforms apply only to the rendered resource");
+  }
+  if (
+    expiresInSeconds !== undefined &&
+    (!Number.isInteger(expiresInSeconds) ||
+      (expiresInSeconds as number) < 1 ||
+      (expiresInSeconds as number) > MAX_SIGNED_URL_SECONDS)
+  ) {
+    throw invalidArgument("expiresInSeconds must be a whole number from 1 to 86400");
+  }
+};
+
 /**
  * Builds an asset's CDN URL without a client: no API key and no request, so it works in browsers.
  * `CalmLensServerClient`'s `cdn.getAssetUrl` uses it too.

@@ -325,6 +325,30 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self.database_storage.events.append(event)
             return copy.deepcopy(event)
 
+    def decide(self, asset_id: str, decision: Literal["allowed", "age-restricted", "blocked", "purged"]) -> Asset:
+        """Apply a reviewer's decision to a stored asset, as the portal or API would: the
+        moderation status changes (``purged`` also removes the content), the review joins
+        ``manualReviews``, and an ``asset.<decision>`` event with a ``decided-by: reviewer`` fact
+        joins the events feed. Raises ``asset/not-found`` for an unknown asset."""
+        if decision not in ("allowed", "age-restricted", "blocked", "purged"):
+            raise _invalid(f"Unknown review decision {decision!r}")
+        with self._state_lock:
+            asset = self.database_storage.assets.get(asset_id)
+            if not asset or asset["projectId"] != self.project_id:
+                raise CalmLensError(error_codes.ASSET_NOT_FOUND, "Asset not found",
+                                    status=error_codes.STATUS_BY_CODE[error_codes.ASSET_NOT_FOUND])
+            record = cast(dict[str, Any], asset)
+            now = self.now()
+            self._apply_outcome(record, decision, now)
+            record["classification"]["moderation"].setdefault("manualReviews", []).append(
+                {"id": self.create_id(), "decision": decision, "note": None, "reviewerUserId": None,
+                 "reviewedAt": now, "appliedToAsset": True})
+            # Like the event catalog: only allowing is low severity.
+            self.enqueue_event("asset." + decision, asset_id=asset_id,
+                               severity="low" if decision == "allowed" else "high",
+                               facts=[{"key": "decided-by", "value": "reviewer"}])
+            return copy.deepcopy(asset)
+
     # Transport -------------------------------------------------------------------------
 
     def _respond(self, status: int, payload: Any = None, headers: Mapping[str, str] | None = None,
@@ -749,18 +773,23 @@ class MockCalmLensServerClient(CalmLensServerClient):
                           and (a["id"] == identifier or a.get("externalId") == identifier)), None)
             if asset is None:
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
-            # Age-restricted assets are delivered like private ones (only with the download
-            # permission), unless a public one is requested with ``allowAgeRestricted=true``.
+            # Like the CDN, delivery checks come first and refuse everyone: content still uploading,
+            # blocked or purged, failed processing or removed content.
+            stored = self.image_storage.content.get(asset["id"])
+            if (asset["upload"]["status"] == "uploading"
+                    or asset["classification"]["moderation"].get("status") in ("blocked", "purged")
+                    or asset["classification"]["status"] == "failed"
+                    or asset["content"]["status"] == "removed" or stored is None):
+                return self._failure_response(_Failure("asset/not-available", "Asset is not available", 403))
+            # Then access: private assets, and public age-restricted ones requested without
+            # ``allowAgeRestricted=true``, need the download permission for the asset's folder.
             age_restricted = asset["classification"]["moderation"].get("status") == "age-restricted"
             is_private = asset["visibility"] != "public" or age_restricted
             public_url_allowed = (asset["visibility"] == "public" and age_restricted
                                   and query.get("allowAgeRestricted") in (True, "true"))
             if is_private and not public_url_allowed and not self._can_download(asset.get("folderId")):
                 return self._failure_response(_Failure("asset/api-key-missing-permission",
-                                                       "The API key cannot download this asset", 403))
-            stored = self.image_storage.content.get(asset["id"])
-            if stored is None:
-                return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset content not found", 404))
+                                                       "This API key needs assets:download permission for this asset's folder.", 403))
             content = b"".join(v for _, v in sorted(stored["parts"].items()))
         headers = {"Content-Type": stored["type"], "Content-Length": str(len(content)),
                    "Cache-Control": "private, no-store" if is_private else "public, max-age=31536000",

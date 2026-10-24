@@ -201,6 +201,8 @@ module CalmLens
 
   module Webhooks
     def self.signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
+    def self.headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
+    def self.to_payload: (event event) -> Hash[String, untyped]
     def self.verify: (payload: String, signature: String?, timestamp: String?, secret: String, ?tolerance_seconds: Integer,
                       ?now: number) -> bool
     def self.parse_event: (payload: String, signature: String?, timestamp: String?, secret: String,
@@ -208,6 +210,8 @@ module CalmLens
   end
 
   def self.create_webhook_signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
+  def self.create_webhook_headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
+  def self.to_webhook_event_payload: (event event) -> Hash[String, untyped]
   def self.verify_webhook_signature: (payload: String, signature: String?, timestamp: String?, secret: String,
                                       ?tolerance_seconds: Integer, ?now: number) -> bool
   def self.parse_webhook_event: (payload: String, signature: String?, timestamp: String?, secret: String,
@@ -259,7 +263,12 @@ module CalmLens
       def call: (asset asset) -> (String | Hash[String, json_input])
     end
 
-    def initialize: (?project_id: String, ?base_url: String, ?cdn_base_url: String, ?now: _Clock, ?create_id: _IdFactory,
+    API_KEY_PREFIX: String
+
+    # A mock API key carrying permission grants, such as `assets:download` for CDN reads.
+    def self.create_api_key: (?Array[Hash[Symbol | String, untyped]] grants) -> String
+
+    def initialize: (?project_id: String, ?api_key: String, ?base_url: String, ?cdn_base_url: String, ?now: _Clock, ?create_id: _IdFactory,
                      ?queued_outcome: outcome, ?analyzed_outcome: analyzed_outcome, ?timeout: number,
                      ?open_timeout: number, ?max_retries: Integer, ?retry_base_delay: number) -> void
     def state: () -> Testing::State
@@ -268,6 +277,8 @@ module CalmLens
     def enqueue_raw: (body: String, ?status: Integer, ?headers: Hash[String, String]) -> self
     def enqueue_error: (Exception error) -> self
     def enqueue_event: (mock_event_input event) -> event
+    # Applies a reviewer's decision and adds the matching `asset.<decision>` event.
+    def decide: (String asset_id, asset_moderation_decision decision) -> asset
     def requests: () -> Array[Request]
     def remaining_responses: () -> Integer
   end

@@ -6,6 +6,7 @@ package calmlenstest
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -15,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +24,7 @@ import (
 	"time"
 
 	calmlens "github.com/CalmLens/sdks/go"
+	"github.com/CalmLens/sdks/go/internal/clock"
 )
 
 // Grant is one permission grant encoded into a mock API key by CreateMockAPIKey.
@@ -87,7 +90,9 @@ type Options struct {
 	BaseURL string
 	Timeout time.Duration
 	// MaxRetries defaults to 0 in the mock, so FailNext fails exactly one call. Set it to
-	// test the client's retry behaviour; retries then wait the real backoff.
+	// test the client's retry behaviour. Waits take no real time: retry backoff and
+	// Assets.WaitForDecision only advance the mock client's clock, so WaitForDecision returns
+	// sdk/timeout at once for an asset whose moderation stays pending.
 	MaxRetries      *int
 	DatabaseStorage *InMemoryDatabaseStorage
 	ImageStorage    *InMemoryImageStorage
@@ -148,7 +153,9 @@ type MockServerClient struct {
 	requests        []CapturedRequest
 	failures        []error
 	requestCount    int
-	mu              sync.Mutex
+	// waited is the time the client has spent waiting; mock waits advance it instead of sleeping.
+	waited time.Duration
+	mu     sync.Mutex
 }
 
 // FailNext queues transport failures. Each following request is captured and then fails
@@ -206,6 +213,64 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) {
 		var stored calmlens.JSON
 		_ = json.Unmarshal(data, &stored)
 		m.events = append(m.events, stored)
+	}
+}
+
+// Decide applies a reviewer's decision (calmlens.ModerationStatusAllowed, ...AgeRestricted,
+// ...Blocked or ...Purged) to a stored asset, as the portal or API would: the moderation status
+// changes (purged also removes the content), the review joins manualReviews, and an
+// "asset.<decision>" event with a decided-by: reviewer fact joins the events feed. It returns a
+// *calmlens.Error with code asset/not-found for an unknown asset.
+func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, error) {
+	switch decision {
+	case OutcomeAllowed, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged:
+	default:
+		return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Unknown review decision " + strconv.Quote(decision)}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a, err := m.asset(assetID)
+	if err != nil {
+		return nil, &calmlens.Error{Code: calmlens.CodeAssetNotFound, Message: "Asset not found", Status: http.StatusNotFound}
+	}
+	now := m.options.Now()
+	m.applyOutcome(a, decision, now)
+	moderation := section(section(a, "classification"), "moderation")
+	reviews, _ := moderation["manualReviews"].([]any)
+	moderation["manualReviews"] = append(reviews, calmlens.JSON{
+		"id": m.options.CreateID(), "decision": decision, "note": nil, "reviewerUserId": nil,
+		"reviewedAt": now, "appliedToAsset": true,
+	})
+	// Like the event catalog: only allowing is low severity.
+	severity := "high"
+	if decision == OutcomeAllowed {
+		severity = "low"
+	}
+	m.events = append(m.events, calmlens.JSON{
+		"id": m.options.CreateID(), "projectId": m.options.ProjectID, "userId": nil,
+		"type": "asset." + decision, "severity": severity, "title": "asset." + decision,
+		"description": nil, "assetId": assetID, "asset": snapshot(a),
+		"facts":  []any{calmlens.JSON{"key": "decided-by", "value": "reviewer"}},
+		"notify": false, "createdAt": now, "updatedAt": now, "readAt": nil,
+	})
+	data, _ := json.Marshal(a)
+	var asset calmlens.Asset
+	if err := json.Unmarshal(data, &asset); err != nil {
+		return nil, err
+	}
+	return &asset, nil
+}
+
+// snapshot is the asset summary events carry.
+func snapshot(a calmlens.JSON) calmlens.JSON {
+	return calmlens.JSON{
+		"id": a["id"], "externalId": a["externalId"], "uploadPresetId": a["uploadPresetId"],
+		"upload":  calmlens.JSON{"status": section(a, "upload")["status"]},
+		"content": calmlens.JSON{"status": section(a, "content")["status"]},
+		"classification": calmlens.JSON{
+			"status":     section(a, "classification")["status"],
+			"moderation": calmlens.JSON{"status": section(section(a, "classification"), "moderation")["status"]},
+		},
 	}
 }
 
@@ -282,6 +347,21 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	mock.options.CDNBaseURL = strings.TrimRight(options.CDNBaseURL, "/")
 	cdn, _ := url.Parse(mock.options.CDNBaseURL)
 	mock.cdnPath = strings.TrimRight(cdn.EscapedPath(), "/")
+	start := time.Now()
+	clock.Set(client, func() time.Time {
+		mock.mu.Lock()
+		defer mock.mu.Unlock()
+		return start.Add(mock.waited)
+	}, func(ctx context.Context, d time.Duration) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		mock.mu.Lock()
+		mock.waited += d
+		mock.mu.Unlock()
+		runtime.Gosched()
+		return nil
+	})
 	mock.ServerClient = client
 	return mock, nil
 }
@@ -1220,16 +1300,21 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	if asset == nil {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound)
 	}
-	// A public age-restricted asset is served from its public URL only with the
-	// allowAgeRestricted=true opt-in; otherwise it needs the download permission, like a private one.
-	ageRestricted := section(section(asset, "classification"), "moderation")["status"] == calmlens.ModerationStatusAgeRestricted
-	restricted := asset["visibility"] != calmlens.VisibilityPublic || ageRestricted && req.URL.Query().Get("allowAgeRestricted") != "true"
+	// Like the CDN, delivery checks come first and refuse everyone: content still uploading,
+	// blocked or purged, failed processing or removed content.
+	moderation := section(section(asset, "classification"), "moderation")["status"]
+	stored := m.ImageStorage.Content[text(asset["id"])]
+	if stored == nil || section(asset, "upload")["status"] == "uploading" ||
+		moderation == calmlens.ModerationStatusBlocked || moderation == calmlens.ModerationStatusPurged ||
+		section(asset, "classification")["status"] == calmlens.ClassificationStatusFailed ||
+		section(asset, "content")["status"] == calmlens.ContentStatusRemoved {
+		return errorBody(http.StatusForbidden, "asset/not-available")
+	}
+	// Then access: a private asset, or a public age-restricted one requested without the
+	// allowAgeRestricted=true opt-in, needs the download permission for its folder.
+	restricted := asset["visibility"] != calmlens.VisibilityPublic || moderation == calmlens.ModerationStatusAgeRestricted && req.URL.Query().Get("allowAgeRestricted") != "true"
 	if restricted && !m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission")
-	}
-	stored := m.ImageStorage.Content[text(asset["id"])]
-	if stored == nil || section(asset, "upload")["status"] == "uploading" {
-		return errorBody(http.StatusNotFound, calmlens.CodeAssetContentUnavailable)
 	}
 	indices := []int{}
 	for index := range stored.Parts {

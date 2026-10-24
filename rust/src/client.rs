@@ -22,6 +22,8 @@ pub const DEFAULT_BASE_URL: &str = "https://api.calmlens.com/v1";
 pub const DEFAULT_CDN_BASE_URL: &str = "https://cdn.calmlens.com/v1";
 /// The most lens definitions [`ServerClient::ensure_lenses`] sends in one request.
 pub const ENSURE_LENSES_MAX_PER_REQUEST: usize = 100;
+/// The longest signed URL lifetime the API accepts, in seconds: 24 hours.
+pub const MAX_SIGNED_URL_SECONDS: u64 = 24 * 60 * 60;
 const MIN_PART: u64 = 5 * 1024 * 1024;
 const DECISION_POLL_FIRST_DELAY: Duration = Duration::from_millis(500);
 const DECISION_POLL_MAX_DELAY: Duration = Duration::from_secs(5);
@@ -803,15 +805,16 @@ impl AssetsClient<'_> {
         let timeout = options.timeout.unwrap_or(DEFAULT_DECISION_TIMEOUT);
         let asset_id = AssetId::new(options.asset_id);
         // A timeout too large to add to the clock never runs out.
-        let deadline = tokio::time::Instant::now().checked_add(timeout);
+        let transport = &self.0.inner.transport;
+        let deadline = transport.now().checked_add(timeout);
         let mut delay = DECISION_POLL_FIRST_DELAY;
         loop {
             let asset = self.retrieve(asset_id.clone()).await?;
             if asset.is_decided() {
                 return Ok(asset);
             }
-            let remaining = deadline
-                .map(|deadline| deadline.saturating_duration_since(tokio::time::Instant::now()));
+            let remaining =
+                deadline.map(|deadline| deadline.saturating_duration_since(transport.now()));
             if remaining == Some(Duration::ZERO) {
                 let processing = asset.classification.status.as_str();
                 let moderation = asset.classification.moderation.status.as_str();
@@ -828,7 +831,9 @@ impl AssetsClient<'_> {
                 )
                 .with_details(details));
             }
-            tokio::time::sleep(remaining.map_or(delay, |remaining| remaining.min(delay))).await;
+            transport
+                .sleep(remaining.map_or(delay, |remaining| remaining.min(delay)))
+                .await;
             delay = delay.mul_f64(1.5).min(DECISION_POLL_MAX_DELAY);
         }
     }
@@ -868,6 +873,29 @@ impl AssetsClient<'_> {
     /// (15 minutes by default).
     pub async fn create_signed_url(&self, options: SignedUrlOptions) -> Result<SignedUrl> {
         let path = format!("/assets/{}/signed-url", id(&options.asset_id)?);
+        match &options.resource {
+            None | Some(SignedUrlResource::Rendered) => {}
+            Some(SignedUrlResource::Original) => {
+                if options.lens.is_some() || options.transform.is_some() {
+                    return Err(invalid_argument(
+                        "Lenses and transforms apply only to the rendered resource",
+                    ));
+                }
+            }
+            Some(_) => {
+                return Err(invalid_argument(
+                    "A signed URL's resource must be original or rendered",
+                ))
+            }
+        }
+        if options
+            .expires_in_seconds
+            .is_some_and(|seconds| !(1..=MAX_SIGNED_URL_SECONDS).contains(&seconds))
+        {
+            return Err(invalid_argument(
+                "expires_in_seconds must be from 1 to 86400",
+            ));
+        }
         let transform = match options.transform {
             Some(transform) => Some(CdnTransform::Selector(transform.selector()?)),
             None => None,

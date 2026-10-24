@@ -22,6 +22,8 @@ module CalmLens
     DECISION_POLL_FIRST_DELAY = 0.5
     DECISION_POLL_MAX_DELAY = 5.0
     DEFAULT_DECISION_TIMEOUT = 60
+    # The longest signed URL lifetime the API accepts: 24 hours.
+    MAX_SIGNED_URL_SECONDS = 24 * 60 * 60
 
     # Searches assets by meaning or keyword.
     # @option options [String] :query
@@ -172,10 +174,12 @@ module CalmLens
     # @return [Hash] `{'url', 'expiresAt'}`
     def create_signed_url(options)
       call(options) do |api, request|
-        body = without(api, 'assetId')
+        path = "/assets/#{Internal.segment(api['assetId'])}/signed-url"
+        body = { 'expiresInSeconds' => 900 }.merge(without(api, 'assetId'))
+        check_signed_url(body)
         body['transform'] = Transforms.selector(body['transform']) if body.key?('transform')
-        request('POST', "/assets/#{Internal.segment(api['assetId'])}/signed-url",
-                body: { 'expiresInSeconds' => 900 }.merge(body),
+        request('POST', path,
+                body: body,
                 request_options: request)
       end
     end
@@ -244,8 +248,11 @@ module CalmLens
 
     private
 
+    # Waits between decision checks; a mock client's waits take no real time.
+    def sleep(seconds) = @session.pause(seconds)
+
     def poll_for_decision(asset_id, request_options, timeout)
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+      deadline = @session.monotonic + timeout
       delay = DECISION_POLL_FIRST_DELAY
       loop do
         asset = retrieve('assetId' => asset_id, 'request_options' => request_options)
@@ -253,7 +260,7 @@ module CalmLens
         moderation = asset.dig('classification', 'moderation', 'status')
         return asset if moderation != PENDING_MODERATION_STATUS || FINISHED_PROCESSING_STATUSES.include?(processing)
 
-        remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        remaining = deadline - @session.monotonic
         unless remaining.positive?
           raise TimeoutError.new(SdkErrorCodes::TIMEOUT,
                                  "Asset #{asset['id']} had no moderation decision after #{timeout}s " \
@@ -302,6 +309,19 @@ module CalmLens
       request('POST', project('assets'),
               query: query, raw: body, idempotent: true, request_options: request_options,
               headers: { 'Content-Type' => content['type'], 'X-CalmLens-Upload' => multipart ? 'part' : 'content' })
+    end
+
+    def check_signed_url(body)
+      resource = body.fetch('resource', 'rendered')
+      raise Internal.invalid("A signed URL's resource must be original or rendered") unless %w[original rendered].include?(resource)
+      if resource == 'original' && (body.key?('lens') || body.key?('transform'))
+        raise Internal.invalid('Lenses and transforms apply only to the rendered resource')
+      end
+
+      expires = body['expiresInSeconds']
+      return if expires.is_a?(Integer) && expires.between?(1, MAX_SIGNED_URL_SECONDS)
+
+      raise Internal.invalid('expires_in_seconds must be a whole number from 1 to 86400')
     end
 
     def check_mime(type)

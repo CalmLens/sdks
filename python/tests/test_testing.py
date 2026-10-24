@@ -51,7 +51,7 @@ class MockTests(unittest.TestCase):
         self.assertEqual((temporary["content"]["status"], temporary["content"]["removalReason"],
                           temporary["content"]["updatedAt"]), ("removed", "retention", 123))
         self.assertNotIn(temporary["id"], c.image_storage.content)
-        self.assertEqual(c.cdn.serve({"assetIdentifier": temporary["id"]}).status, 404)
+        self.assertEqual(c.cdn.serve({"assetIdentifier": temporary["id"]}).status, 403)
         kept = c.assets.classify(name="b.txt", content={"plainText": "keep", "type": "text/plain"},
                                  processing_options={"keepContentAfterProcessing": True})
         self.assertEqual((kept["content"]["status"], kept["content"]["removalReason"]), ("stored", None))
@@ -148,7 +148,7 @@ class MockTests(unittest.TestCase):
                           a["content"]["status"], a["content"]["removalReason"], a["content"]["updatedAt"]),
                          ("completed", "purged", "removed", "policy", 9))
         self.assertNotIn(a["id"], c.image_storage.content)
-        self.assertEqual(c.cdn.serve({"assetIdentifier": a["id"]}).status, 404)
+        self.assertEqual(c.cdn.serve({"assetIdentifier": a["id"]}).status, 403)
 
     def test_delete_content_keeps_record_and_stops_cdn_bytes(self):
         c = MockCalmLensServerClient(api_key=DOWNLOAD, mock_options={"now": lambda: 456})
@@ -164,7 +164,7 @@ class MockTests(unittest.TestCase):
         self.assertEqual(c.assets.retrieve({"assetId": a["id"]})["classification"]["moderation"],
                          {"processedAt": 1, "categories": {}, "score": 0.0})
         self.assertNotIn(a["id"], c.image_storage.content)
-        self.assertEqual(c.cdn.serve({"assetIdentifier": a["id"]}).status, 404)
+        self.assertEqual(c.cdn.serve({"assetIdentifier": a["id"]}).status, 403)
         self.assertEqual((c.requests[-3].method, c.requests[-3].path), ("DELETE", f"/assets/{a['id']}/content"))
 
     def test_wait_for_decision_reads_storage_without_real_waiting(self):

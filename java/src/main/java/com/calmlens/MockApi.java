@@ -780,13 +780,17 @@ final class MockApi {
     boolean placeholder = resource.equals("placeholder");
     boolean ageRestricted = !placeholder && "age-restricted".equals(status) && !"true".equals(request.query().get("allowAgeRestricted"));
     boolean restricted = !"public".equals(str(asset, "visibility")) || ageRestricted;
+    MockCalmLensServerClient.StoredContent stored = storage.content.get(str(asset, "id"));
+    boolean missing = stored == null || "uploading".equals(str(asset.getAsJsonObject("upload"), "status"));
+    // Like the CDN, delivery checks come first and refuse everyone: content still uploading or
+    // removed, blocked or purged assets, and failed processing.
+    if (!placeholder && (missing || "blocked".equals(status) || "purged".equals(status)
+        || "failed".equals(str(asset.getAsJsonObject("classification"), "status"))
+        || "removed".equals(str(asset.getAsJsonObject("content"), "status"))))
+      return error(new Failure("asset/not-available", 403, "This asset is not available"));
     if (restricted && !canDownload(str(asset, "folderId"), request.header("X-Api-Key")))
       return error(new Failure("asset/api-key-missing-permission", 403, "The API key cannot download this asset"));
-    MockCalmLensServerClient.StoredContent stored = storage.content.get(str(asset, "id"));
-    if (stored == null || "uploading".equals(str(asset.getAsJsonObject("upload"), "status")))
-      return error(new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE, 404, "Asset content is not available"));
-    if (!placeholder && ("blocked".equals(status) || "purged".equals(status)))
-      return error(new Failure("asset/not-available", 403, "This asset is not available"));
+    if (missing) return error(new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE, 404, "Asset content is not available"));
     byte[] data = stored.bytes();
     int code = 200;
     List<String> extra = new ArrayList<>(List.of("Accept-Ranges", "bytes", "Cache-Control", restricted ? "private, no-store" : "public, max-age=31536000"));

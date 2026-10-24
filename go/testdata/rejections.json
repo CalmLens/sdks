@@ -1,0 +1,188 @@
+[
+  {
+    "name": "signed URL for the placeholder",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "placeholder"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL for an unknown resource",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "content"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL for the original through a lens",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "original",
+      "lens": "thumbnail"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL for the original with a transform",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "original",
+      "transform": "width=10"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL for the original with transform steps",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "original",
+      "transform": {
+        "type": "imageTransform",
+        "options": {
+          "width": 10
+        }
+      }
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL lifetime below 1 second",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "expiresInSeconds": -1
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL lifetime above 24 hours",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "expiresInSeconds": 86401
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL lifetime of a fraction of a second",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "expiresInSeconds": 1.5
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL without an asset ID",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "empty text",
+    "operation": "text.classify",
+    "options": {
+      "text": ""
+    },
+    "error": "upload/invalid-payload"
+  },
+  {
+    "name": "retrieve without an asset ID",
+    "operation": "assets.retrieve",
+    "options": {
+      "assetId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "wait for a decision without an asset ID",
+    "operation": "assets.waitForDecision",
+    "options": {
+      "assetId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "delete without an asset ID",
+    "operation": "assets.delete",
+    "options": {
+      "assetId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "retrieve without a folder ID",
+    "operation": "folders.retrieve",
+    "options": {
+      "folderId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the placeholder through a lens",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "resource": "placeholder",
+      "lens": "thumbnail"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the placeholder with a transform",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "resource": "placeholder",
+      "transform": "width=10"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the placeholder age-restricted",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "resource": "placeholder",
+      "allowAgeRestricted": true
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the original through a lens",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "resource": "original",
+      "lens": "thumbnail"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the original with a transform",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "resource": "original",
+      "transform": "width=10"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve without an asset identifier",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": ""
+    },
+    "error": "sdk/invalid-argument"
+  }
+]

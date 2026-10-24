@@ -485,8 +485,14 @@ and `signed_url_base_url`. Unknown mock options raise.
   `sdk/timeout`, other `OSError`s and `http.client` errors → `sdk/transport-error`, with the
   exception as `__cause__`).
 - `client.enqueue_event(type, facts=..., asset_id=..., severity=..., title=...)` adds an event
-  to the feed; `events.list`, `events.iter` and cursors behave like the API's. The mock does
-  not create events by itself.
+  to the feed; `events.list`, `events.iter` and cursors behave like the API's.
+- `client.decide(asset_id, decision)` applies a reviewer's decision (`allowed`,
+  `age-restricted`, `blocked` or `purged`, which also removes the content) and adds the matching
+  `asset.<decision>` event with a `decided-by: reviewer` fact.
+- `cdn.serve` answers like the CDN: blocked, purged and failed assets and removed content get
+  `403` `asset/not-available` whatever the key; private assets, and public age-restricted ones
+  requested without `allowAgeRestricted`, get `403` `asset/api-key-missing-permission` unless the
+  key has `assets:download` (the default key has no grants).
 - `assets.wait_for_decision` reads the mock's `database_storage` and takes no real time: it
   returns an asset that is already decided (or whose processing failed) and raises
   `sdk/timeout` at once for one whose moderation stays `pending`. Set the stored asset's

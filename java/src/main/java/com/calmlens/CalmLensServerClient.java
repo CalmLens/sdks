@@ -74,6 +74,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final String WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
   /** Deliveries whose timestamp is further than this from the receiver's clock are rejected. */
   public static final long WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300;
+  /** The longest signed URL lifetime the API accepts, in seconds: 24 hours. */
+  public static final long MAX_SIGNED_URL_SECONDS = 24 * 60 * 60;
 
   private static final long MULTIPART_MIN_PART_BYTES = 5L * 1024 * 1024;
   private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(60);
@@ -1002,12 +1004,23 @@ public final class CalmLensServerClient implements AutoCloseable {
      */
     public Models.SignedUrl createSignedUrl(Models.SignedUrlOptions options) {
       JsonObject o = Models.encode(options);
+      String path = "/assets/" + id(str(o, "assetId", null)) + "/signed-url";
+      // As the API checks: a placeholder needs no signature, and only the rendered resource takes
+      // a lens or transform.
+      String resource = str(o, "resource", "rendered");
+      if (!resource.equals("original") && !resource.equals("rendered")) throw argument("A signed URL's resource must be original or rendered");
+      if (resource.equals("original") && (o.has("lens") || options.transformValue() != null))
+        throw argument("Lenses and transforms apply only to the rendered resource");
+      if (o.has("expiresInSeconds")) {
+        long seconds = o.get("expiresInSeconds").getAsLong();
+        if (seconds < 1 || seconds > MAX_SIGNED_URL_SECONDS) throw argument("expiresInSeconds must be from 1 to 86400");
+      }
       JsonObject body = new JsonObject();
       body.addProperty("expiresInSeconds", 900);
       without(o, "assetId").entrySet().forEach(entry -> body.add(entry.getKey(), entry.getValue()));
       String transform = transformSelector(options.transformValue());
       if (transform != null) body.addProperty("transform", transform);
-      return decode(json("POST", "/assets/" + id(str(o, "assetId", null)) + "/signed-url", null, body), Models.SignedUrl.class);
+      return decode(json("POST", path, null, body), Models.SignedUrl.class);
     }
   }
 
@@ -1333,6 +1346,37 @@ public final class CalmLensServerClient implements AutoCloseable {
    */
   public static String createWebhookSignatureHeader(String secret, String timestamp, String body) {
     return createWebhookSignatureHeader(secret, timestamp, body.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * The headers of one signed delivery of a body, as CalmLens sends them, for testing a webhook
+   * handler. Pass the current time: handlers reject deliveries more than five minutes old.
+   *
+   * @param secret the webhook signing secret
+   * @param body the exact raw body
+   * @param deliveryId the {@link #WEBHOOK_DELIVERY_HEADER} value
+   * @param timestampSeconds Unix seconds, such as {@code Instant.now().getEpochSecond()}
+   * @return {@code content-type} and the delivery, timestamp and signature headers
+   */
+  public static Map<String, String> createWebhookHeaders(String secret, String body, String deliveryId, long timestampSeconds) {
+    String timestamp = Long.toString(timestampSeconds);
+    Map<String, String> headers = new LinkedHashMap<>();
+    headers.put("content-type", "application/json");
+    headers.put(WEBHOOK_DELIVERY_HEADER, deliveryId);
+    headers.put(WEBHOOK_TIMESTAMP_HEADER, timestamp);
+    headers.put(WEBHOOK_SIGNATURE_HEADER, createWebhookSignatureHeader(secret, timestamp, body));
+    return java.util.Collections.unmodifiableMap(headers);
+  }
+
+  /**
+   * The JSON body of the webhook delivery for an event from {@code events.list}.
+   *
+   * @param event the event
+   * @return its delivery payload
+   */
+  public static Models.WebhookEventPayload toWebhookEventPayload(Models.Event event) {
+    return new Models.WebhookEventPayload(event.id(), event.type(), event.createdAt(), event.projectId(),
+        new Models.WebhookEventData(event.severity(), event.title(), event.description(), event.assetId(), event.asset(), event.facts()));
   }
 
   private static byte[] webhookMac(String secret, String timestamp, byte[] body) {

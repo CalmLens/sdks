@@ -170,6 +170,9 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 	return &result, nil
 }
 
+// MaxSignedURLSeconds is the longest signed URL lifetime the API accepts: 24 hours.
+const MaxSignedURLSeconds = 24 * 60 * 60
+
 // CreateSignedURL returns a short-lived URL for private CDN content.
 func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOptions) (*SignedURL, error) {
 	path, err := resourcePath("assets", options.AssetID, "/signed-url")
@@ -179,6 +182,15 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	transform, _, err := transformSelector(options.Transform, options.TransformSteps)
 	if err != nil {
 		return nil, err
+	}
+	if options.Resource != "" && options.Resource != ResourceOriginal && options.Resource != ResourceRendered {
+		return nil, invalid(CodeSDKInvalidArgument, "a signed URL's resource must be original or rendered")
+	}
+	if options.Resource == ResourceOriginal && (options.Lens != "" || transform != "") {
+		return nil, invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
+	}
+	if options.ExpiresInSeconds < 0 || options.ExpiresInSeconds > MaxSignedURLSeconds {
+		return nil, invalid(CodeSDKInvalidArgument, "ExpiresInSeconds must be from 1 to 86400 (0 for the default)")
 	}
 	options.Transform, options.TransformSteps = transform, nil
 	if options.ExpiresInSeconds == 0 {

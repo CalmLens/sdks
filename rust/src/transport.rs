@@ -157,6 +157,22 @@ pub(crate) enum Transport {
 }
 
 impl Transport {
+    /// The clock waits are measured with: the mock's virtual clock, or Tokio's.
+    pub(crate) fn now(&self) -> tokio::time::Instant {
+        match self {
+            #[cfg(feature = "testing")]
+            Transport::Mock(mock) => mock.now(),
+            Transport::Http(_) => tokio::time::Instant::now(),
+        }
+    }
+    /// Waits for `duration`; the mock only advances its virtual clock.
+    pub(crate) async fn sleep(&self, duration: Duration) {
+        match self {
+            #[cfg(feature = "testing")]
+            Transport::Mock(mock) => mock.sleep(duration).await,
+            Transport::Http(_) => tokio::time::sleep(duration).await,
+        }
+    }
     async fn exchange(&self, attempt: Attempt, timeout: Option<Duration>) -> Result<Exchange> {
         match self {
             #[cfg(feature = "testing")]
@@ -237,7 +253,7 @@ pub(crate) async fn execute(
             Some(delay) => delay,
             None => backoff(retry),
         };
-        tokio::time::sleep(delay).await;
+        transport.sleep(delay).await;
         retry += 1;
     }
 }

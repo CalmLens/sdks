@@ -882,7 +882,7 @@ describe("MockCalmLensServerClient", () => {
     expect(asset.classification.status).toBe("completed");
     expect(asset.classification.moderation.status).toBe("blocked");
     expect(asset.content).toMatchObject({ status: "removed", removalReason: "retention" });
-    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(404);
+    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(403);
   });
 
   it("deletes kept content of a purged asset for policy", async () => {
@@ -897,7 +897,7 @@ describe("MockCalmLensServerClient", () => {
       moderation: { status: "purged" },
     });
     expect(asset.content).toMatchObject({ status: "removed", removalReason: "policy" });
-    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(404);
+    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(403);
   });
 
   it("refuses to retry a failed asset whose content was removed", async () => {
@@ -930,7 +930,7 @@ describe("MockCalmLensServerClient", () => {
       removalReason: "requested",
       updatedAt: 1_700_000_000_000,
     });
-    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(404);
+    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(403);
     expect((await client.assets.retrieve({ assetId: asset.id })).content.removalReason).toBe(
       "requested",
     );
