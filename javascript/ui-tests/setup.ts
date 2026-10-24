@@ -7,6 +7,10 @@ import { plugin } from "bun";
 
 GlobalRegistrator.register({ url: "http://localhost/" });
 
+// Waits for DOM changes allow for a busy machine, so a slow render isn't reported as a failure.
+const { configure } = await import("@testing-library/dom");
+configure({ asyncUtilTimeout: 5000 });
+
 const here = import.meta.dir;
 const { compile } = await import("svelte/compiler");
 

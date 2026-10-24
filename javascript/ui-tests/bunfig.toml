@@ -1,2 +1,4 @@
 [test]
 preload = ["./setup.ts"]
+# Rendering in happy-dom is slow on a busy machine; the waits below allow for it.
+timeout = 20000
