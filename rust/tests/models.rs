@@ -24,16 +24,11 @@ fn asset_nested_fields_decode_into_typed_models() {
           "md5": null
         },
         "image": {
-          "perceptualHash": "ph",
           "width": 10,
-          "height": 20
-        },
-        "previewImage": {
-          "fileFormat": "webp",
+          "height": 20,
           "thumbhash": "th",
           "averageColor": "#000",
-          "width": 4,
-          "height": 8
+          "perceptualHash": "ph"
         },
         "safetyHold": {
           "placedAt": 1,
@@ -166,19 +161,14 @@ fn asset_nested_fields_decode_into_typed_models() {
     );
     let image = content.image.as_ref().unwrap();
     assert_eq!(
-        (image.perceptual_hash.as_deref(), image.width, image.height),
-        (Some("ph"), Some(10), Some(20))
-    );
-    let preview = content.preview_image.as_ref().unwrap();
-    assert_eq!(
         (
-            preview.file_format.as_deref(),
-            preview.thumbhash.as_deref(),
-            preview.average_color.as_deref(),
-            preview.width,
-            preview.height
+            image.width,
+            image.height,
+            image.thumbhash.as_deref(),
+            image.average_color.as_deref(),
+            image.perceptual_hash.as_deref()
         ),
-        (Some("webp"), Some("th"), Some("#000"), Some(4), Some(8))
+        (Some(10), Some(20), Some("th"), Some("#000"), Some("ph"))
     );
     assert_eq!(
         content.safety_hold.as_ref().unwrap().reason,

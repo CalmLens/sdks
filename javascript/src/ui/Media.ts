@@ -12,7 +12,7 @@ export interface MediaAsset {
   type?: string | null;
   classification?: { moderation?: { status?: AssetModerationStatus | null } | null } | null;
   content?: {
-    previewImage?: {
+    image?: {
       thumbhash?: string | null;
       averageColor?: string | null;
       width?: number | null;
@@ -70,7 +70,7 @@ export interface MediaSettings {
   /** Show the blurred placeholder while the media loads. Defaults to `true`. */
   placeholder?: boolean;
   /**
-   * The asset's `content.previewImage.thumbhash`, if your app stores it. The placeholder is then
+   * The asset's `content.image.thumbhash`, if your app stores it. The placeholder is then
    * drawn in the browser instead of requested from the CDN, which also works for private assets
    * and signed URLs.
    */
@@ -126,7 +126,7 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
 ): T & { projectId: string; assetId: string } => {
   const { asset } = props;
   if (!asset) return props as T & { projectId: string; assetId: string };
-  const preview = asset.content?.previewImage;
+  const preview = asset.content?.image;
   const kind = asset.type === "video" || asset.type === "audio" ? asset.type : undefined;
   return {
     ...props,

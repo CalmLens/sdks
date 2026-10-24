@@ -201,8 +201,9 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
 - `content`: `status` (`temporary` while CalmLens holds the content only until processing
   finishes, `stored` when `keepContentAfterProcessing` is on, or `removed`), `removalReason`
   (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updatedAt`,
-  `safetyHold`, `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image`,
-  `previewImage` and `extractedText`. Fields that don't apply are `None`.
+  `safetyHold`, `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image` (the
+  picture served at the rendered resource, with its size, ThumbHash and average colour) and
+  `extractedText`. Fields that don't apply are `None`.
 
 `description`, `externalId`, `externalUrl`, `folderId`, `parentId`, `metadata` and `tags`
 may be missing or `None`, so use `.get()` for them.

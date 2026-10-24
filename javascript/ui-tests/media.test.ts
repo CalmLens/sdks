@@ -107,7 +107,7 @@ for (const binding of BINDINGS) {
           type: "image",
           classification: { moderation: { status: "age-restricted" } },
           content: {
-            previewImage: { thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI", width: 800, height: 600 },
+            image: { thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI", width: 800, height: 600 },
           },
         },
         canView: true,

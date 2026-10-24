@@ -171,7 +171,7 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 - `Content` (`AssetContent`): `Status` is whether CalmLens holds the content
   (`ContentStatusTemporary` until processing finishes, `ContentStatusStored` or
   `ContentStatusRemoved`, with `RemovalReason`), plus `Format` (MIME type), `Extension`,
-  `SizeInBytes`, `Checksums`, `Image`, `PreviewImage`, `SafetyHold` and `ExtractedText`.
+  `SizeInBytes`, `Checksums`, `Image`, `SafetyHold` and `ExtractedText`.
 
 Fields that may be missing are pointers, maps, or slices and are `nil` when absent:
 `Classification.Moderation.Categories` is `nil` until classification produces findings, and optional fields such as `Content.SizeInBytes`,
@@ -193,7 +193,7 @@ default:
 ```
 
 Every field of an asset and its report is typed: `Content.Checksums`, `Content.Image`,
-`Content.PreviewImage`, `Content.SafetyHold`, `Content.ExtractedText`, `ProcessingOptions`,
+`Content.SafetyHold`, `Content.ExtractedText`, `ProcessingOptions`,
 report `Labels` (`[]ClassificationLabel`) and category `Qualifiers`
 (`map[string]QualifierResult`, keyed by the `Qualifier...` constants). Enumerations such as
 the processing, moderation and content statuses, `Type`, `Visibility`,

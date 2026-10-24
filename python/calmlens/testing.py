@@ -508,7 +508,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             content={"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                      "safetyHold": None, "format": mime or None,
                      "extension": None, "sizeInBytes": len(raw) if raw_upload and raw is not None else None,
-                     "checksums": None, "image": None, "previewImage": None, "extractedText": None})
+                     "checksums": None, "image": None, "extractedText": None})
         if "url" in options:
             asset["externalUrl"] = options["url"]
         if multipart and not final:

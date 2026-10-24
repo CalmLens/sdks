@@ -7888,20 +7888,20 @@ const backfill = noop;
 const MODERATION_CATEGORY_DEFINITIONS = {
 	sexual: {
 		summary: "Sexual acts, explicit sexual anatomy, sexual services, sexual assault depictions and clearly erotic material.",
-		definition: "covers sexual acts, explicit sexual anatomy, sexual services and clearly erotic material. Actual exposed adult breasts or nipples, genitals or buttocks, and descriptions of masturbation, oral sex, ejaculation or orgasm count in clinical, educational and non-erotic material too. An actual reported sexual offer or assault counts without a verbatim quotation. Descriptions of sexual assault can qualify without erotic intent. Fictional, illustrated and generated depictions can also qualify. In images, people shown in swimwear or other revealing clothing also count, so that a policy can allow or restrict them.",
-		exclusions: "Ordinary affection, diagrams without exposed sexual anatomy or acts, and general sexual-health education without a qualifying sexual description do not qualify on their own. Clinical, medical or educational framing does not erase actual sexual anatomy or activity; educational qualifiers control allowances. A person accepting money does not establish sexual content without a qualifying act, display or offer.",
+		definition: "covers sexual acts, explicit sexual anatomy, sexual services and clearly erotic material. Actual exposed adult breasts or nipples, genitals or buttocks, and descriptions of masturbation, oral sex, ejaculation or orgasm count in clinical, educational and non-erotic material too. Descriptions of sexual assault can qualify without erotic intent. Fictional, illustrated and generated depictions can also qualify. In images, people shown in swimwear or other revealing clothing also count, so that a policy can allow or restrict them.",
+		exclusions: "Ordinary affection, diagrams without exposed sexual anatomy or acts, and general sexual-health education without a qualifying sexual description do not qualify on their own. Clinical, medical or educational framing does not erase actual sexual anatomy or activity; educational qualifiers control allowances.",
 		docsHref: "/docs/guides/moderation-categories#sexual-content"
 	},
 	violence: {
 		summary: "Physical attacks, graphic bodily harm, death, threats against others, and planning or encouraging physical violence.",
 		definition: "covers physical attacks, sexual assault, graphic bodily harm, death and threats against others. Non-consensual sexual touching and coerced sexual acts count even without a separately described injury. Graphic bodily detail and natural death also count without an attacker; a non-graphic injury or medical condition alone does not. It also includes planning, requesting, encouraging or praising physical violence. A depicted or described act can qualify in fiction or news reporting even when the author condemns it. In images, a weapon shown without an attack and consensual combat sport or training also count, so that a policy can allow or restrict them.",
-		exclusions: "Solely intentional self-injury or suicide belongs under self-harm. Property damage alone, figurative language and abstract discussion of violence, injury or death do not establish violence. Non-graphic injuries and medical states alone do not qualify, regardless of severity: fractures, wounds, bruises, scars, coma, treatment and recovery do not establish an attack. Do not infer a cause from an injury. Explicit disturbing bodily detail such as exposed bone, organs or mutilation can qualify even after an accident or during medical treatment.",
+		exclusions: "Solely intentional self-injury or suicide belongs under self-harm. Property damage alone, figurative language and abstract discussion of violence, injury or death do not establish violence. Non-graphic injuries and medical states alone do not qualify, regardless of severity: fractures, wounds, bruises, scars, coma, treatment and recovery do not establish an attack. Explicit disturbing bodily detail such as exposed bone, organs or mutilation can qualify even after an accident or during medical treatment.",
 		docsHref: "/docs/guides/moderation-categories#violence"
 	},
 	"self-harm": {
 		summary: "Intentional self-injury, suicide, preparation, methods or encouragement; text also includes current or recurring self-harm thoughts.",
 		definition: "covers intentional self-injury, suicide, current self-harm risk, preparation, methods and encouragement. For text, it also includes current or recurring self-harm thoughts and an explicitly expressed desire to die. Asking for support does not cancel a separate disclosure of current risk or behavior.",
-		exclusions: "For images, require evidence of a self-directed act, preparation, harmful methods or encouragement. An injury or covered body does not establish that harm was self-inflicted. General sadness, neutral statistics and healed scars alone are excluded. Prevention or recovery without a concrete described act, current risk or harmful methods is insufficient; reported or historical acts still count.",
+		exclusions: "An injury or covered body does not establish that harm was self-inflicted. General sadness, neutral statistics and healed scars alone are excluded. Prevention or recovery without a concrete described act, current risk or harmful methods is insufficient; reported or historical acts still count.",
 		docsHref: "/docs/guides/moderation-categories#self-harm"
 	},
 	harassment: {
@@ -7918,13 +7918,13 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 	},
 	"personal-information": {
 		summary: "Private contact details, precise personal location, sensitive identifiers or credentials, and requests to disclose them.",
-		definition: "covers supplied private personal contact details such as personal email addresses and phone numbers, precise home or current location, government or financial identifiers, account credentials and authentication secrets. Explicit requests to disclose those details also count even when no value is supplied. Own details and other people's details both count; qualifiers distinguish them. Classify plausible supplied details without verifying a person's identity. Concrete quoted, reported or educational instances remain present; framing does not erase them. Readable details in images count, but do not infer identity or unseen details from a face or setting.",
-		exclusions: "Ordinary names alone, ages alone, broad locations such as a city, public business or official contact details, clearly fictional examples or placeholders such as example.com addresses, redacted values, generic privacy advice and descriptions of omitted details do not qualify. A number without evidence that it is a personal identifier is insufficient.",
+		definition: "covers supplied private personal contact details such as personal email addresses and phone numbers, precise home or current location, government or financial identifiers, account credentials and authentication secrets. Explicit requests to disclose those details also count even when no value is supplied. Own details and other people's details both count; qualifiers distinguish them. Concrete quoted, reported or educational instances remain present; framing does not erase them. Readable details in images count, but do not infer identity or unseen details from a face or setting.",
+		exclusions: "Ordinary names alone, ages alone, broad locations such as a city, public business or official contact details, clearly fictional examples or placeholders such as example.com addresses, redacted values, generic privacy advice and descriptions of omitted details do not qualify.",
 		docsHref: "/docs/guides/moderation-categories#personal-information"
 	},
 	profanity: {
 		summary: "Actual swear words, vulgar language or offensive slurs, including clearly recognisable obfuscations.",
-		definition: "covers actual swear words, vulgar expletives and offensive slurs in the supplied language, including mild and strong forms and clearly recognisable censored or obfuscated spellings. It does not require a target, abusive intent or an attack. Quoted, reclaimed, historical, fictional, educational and supportive uses still contain the language; qualifiers distinguish its form and framing. Readable words in images count. Consider the actual meaning in its language and context rather than an English substring match.",
+		definition: "covers actual swear words, vulgar expletives and offensive slurs in the supplied language, including mild and strong forms and clearly recognisable censored or obfuscated spellings. It does not require a target, abusive intent or an attack. Quoted, reclaimed, historical, fictional, educational and supportive uses still contain the language; qualifiers distinguish its form and framing. Readable words in images count.",
 		exclusions: "Descriptions such as the character swears or the passage contains a slur without the actual wording, ordinary anatomical or medical terminology, insults or dehumanising words that are neither swear words nor conventional slurs (such as vermin, pests, idiot or clown), words with innocent literal meanings, names containing a swear-word substring, and ambiguous abbreviations or symbols without supported profane meaning do not qualify.",
 		docsHref: "/docs/guides/moderation-categories#profanity"
 	},
@@ -8006,14 +8006,14 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "target",
 		displayName: "Own details",
 		description: "The speaker supplies their own private personal details.",
-		exclusions: "Unknown ownership, third-party details, and requests without supplied values. Do not invent ownership."
+		exclusions: "Unknown ownership, third-party details, and requests without supplied values."
 	},
 	"personal-information-third-party": {
 		category: "personal-information",
 		kind: "target",
 		displayName: "Other people’s details",
 		description: "The supplied private details are explicitly attributed to someone other than the speaker.",
-		exclusions: "Unknown ownership, the speaker's own details and requests without supplied values. Do not invent ownership."
+		exclusions: "Unknown ownership, the speaker's own details and requests without supplied values."
 	},
 	"personal-information-historical": {
 		category: "personal-information",
@@ -8026,8 +8026,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "personal-information",
 		kind: "context",
 		displayName: "Reporting or documentary",
-		description: "Private details explicitly framed as factual reporting or documentation of an actual real-world event, such as a news report, court record or public notice that contains them. Require evidence of the reporting purpose in the supplied material.",
-		exclusions: "Stating, passing on or sharing someone's details, however accurate or matter-of-fact; telling people to contact, visit or find someone; third-person narration or quotation marks alone; fictional or invented examples. Do not infer a factual reporting purpose from neutral tone."
+		description: "Private details explicitly framed as factual reporting or documentation of an actual real-world event, such as a news report, court record or public notice that contains them.",
+		exclusions: "Stating, passing on or sharing someone's details, however accurate or matter-of-fact; telling people to contact, visit or find someone; third-person narration or quotation marks alone; fictional or invented examples."
 	},
 	"personal-information-educational": {
 		category: "personal-information",
@@ -8145,15 +8145,15 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "sexual",
 		kind: "harm",
 		displayName: "Sexual solicitation",
-		description: "A request, offer or advertisement for sexual services, escorting or a sexual encounter, performed by the message itself or a supplied chat turn. A narrator describing someone else's sexual offer is not making that offer.",
-		exclusions: "Promotion of adult content, such as a subscription page or explicit media for sale, which is adult content promotion; dating, ordinary romance, accepting money or vague offers without sexual content. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "A request, offer or advertisement for sexual services, escorting or a sexual encounter, performed by the message itself or a supplied chat turn.",
+		exclusions: "Promotion of adult content, such as a subscription page or explicit media for sale, which is adult content promotion; dating, ordinary romance, accepting money or vague offers without sexual content."
 	},
 	"sexual-adult-promotion": {
 		category: "sexual",
 		kind: "harm",
 		displayName: "Adult content promotion",
 		description: "Promotion of legal adult sexual content performed by the message itself: links to, subscriptions for, or sales of pornography, explicit photos or videos, or an adult creator's paid page.",
-		exclusions: "Offers or requests for sexual services, escorting or a sexual encounter, which are sexual solicitation; dating, ordinary romance and non-sexual paid content. A narrator describing someone else's promotion is not promoting it."
+		exclusions: "Offers or requests for sexual services, escorting or a sexual encounter, which are sexual solicitation; dating, ordinary romance and non-sexual paid content."
 	},
 	"sexual-revealing-clothing": {
 		category: "sexual",
@@ -8181,8 +8181,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "sexual",
 		kind: "context",
 		displayName: "Reporting or documentary",
-		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.",
-		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance."
+		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.",
+		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance."
 	},
 	"sexual-educational": {
 		category: "sexual",
@@ -8195,8 +8195,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "sexual",
 		kind: "context",
 		displayName: "Non-graphic discussion",
-		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.",
-		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose."
+		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.",
+		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation."
 	},
 	"sexual-fictional": {
 		category: "sexual",
@@ -8209,8 +8209,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "sexual",
 		kind: "context",
 		displayName: "Sexual harm support or prevention",
-		description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.",
-		exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive."
+		description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help.",
+		exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement."
 	},
 	"violence-attack": {
 		category: "violence",
@@ -8230,15 +8230,15 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		kind: "harm",
 		displayName: "Preparation or instructions",
-		description: "A concrete plan or request to physically harm another person made by the author (including the speaker of a supplied chat turn), or actionable harmful instructions actually supplied in the material. A narrator merely documenting someone else's plan or request is not making it.",
-		exclusions: "A depiction, threat or praise alone; neutral reporting, prevention or lawful safety advice. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "A concrete plan or request to physically harm another person made by the author, or actionable harmful instructions actually supplied in the material.",
+		exclusions: "A depiction, threat or praise alone; neutral reporting, prevention or lawful safety advice."
 	},
 	"violence-encouragement": {
 		category: "violence",
 		kind: "harm",
 		displayName: "Encouragement of violence",
-		description: "The author (including the speaker of a supplied chat turn) urges, endorses, praises or promotes physical violence. A narrator quoting someone else's words to report or condemn them is not encouraging violence.",
-		exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "The author urges, endorses, praises or promotes physical violence.",
+		exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention."
 	},
 	"violence-injury": {
 		category: "violence",
@@ -8296,8 +8296,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		kind: "context",
 		displayName: "Reporting or documentary",
-		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.",
-		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance."
+		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.",
+		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance."
 	},
 	"violence-educational": {
 		category: "violence",
@@ -8310,8 +8310,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		kind: "context",
 		displayName: "Non-graphic discussion",
-		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.",
-		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose."
+		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.",
+		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation."
 	},
 	"violence-fictional": {
 		category: "violence",
@@ -8331,8 +8331,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		kind: "context",
 		displayName: "Support or prevention",
-		description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.",
-		exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive."
+		description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help.",
+		exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement."
 	},
 	"self-harm-thoughts": {
 		category: "self-harm",
@@ -8366,8 +8366,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "self-harm",
 		kind: "harm",
 		displayName: "Encouragement",
-		description: "The author (including the speaker of a supplied chat turn) urges, endorses, praises or promotes intentional self-injury or suicide. A narrator reporting or condemning another person's encouragement is not endorsing it.",
-		exclusions: "Support, prevention, condemnation or reporting without endorsement. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "The author urges, endorses, praises or promotes intentional self-injury or suicide.",
+		exclusions: "Support, prevention, condemnation or reporting without endorsement."
 	},
 	"self-harm-historical": {
 		category: "self-harm",
@@ -8380,8 +8380,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "self-harm",
 		kind: "context",
 		displayName: "Reporting or documentary",
-		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.",
-		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance."
+		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.",
+		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance."
 	},
 	"self-harm-educational": {
 		category: "self-harm",
@@ -8401,8 +8401,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "self-harm",
 		kind: "context",
 		displayName: "Support or prevention",
-		description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.",
-		exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive."
+		description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help.",
+		exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement."
 	},
 	"harassment-abuse": {
 		category: "harassment",
@@ -8464,8 +8464,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "harassment",
 		kind: "context",
 		displayName: "Reporting or documentary",
-		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.",
-		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance."
+		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.",
+		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance."
 	},
 	"harassment-educational": {
 		category: "harassment",
@@ -8541,8 +8541,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "hate",
 		kind: "context",
 		displayName: "Reporting or documentary",
-		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.",
-		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance."
+		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.",
+		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance."
 	},
 	"hate-educational": {
 		category: "hate",
@@ -8562,8 +8562,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "hate",
 		kind: "context",
 		displayName: "Counterspeech",
-		description: "Concrete identity-based attacks quoted, paraphrased or described to reject, challenge or oppose their prejudice, including defending the people targeted and explaining why discriminatory claims are wrong. Judge the supported stance and attribution in context; a classroom format or explicit anti-hate label is not required.",
-		exclusions: "Mere quotation, neutral documentation or victim support without challenging the represented prejudice; an unrelated statement opposing hate that leaves a separate identity-based attack endorsed or directly expressed. For All, every qualifying attack must be countered, not every sentence: ordinary political criticism, criticism of discriminatory conduct and benign surrounding discussion do not break coverage. Do not invent an attack from a generic reference to hateful content that is not supplied."
+		description: "Concrete identity-based attacks quoted, paraphrased or described to reject, challenge or oppose their prejudice, including defending the people targeted and explaining why discriminatory claims are wrong.",
+		exclusions: "Mere quotation, neutral documentation or victim support without challenging the represented prejudice; an unrelated statement opposing hate that leaves a separate identity-based attack endorsed or directly expressed."
 	},
 	"hate-support-prevention": {
 		category: "hate",
@@ -8583,29 +8583,29 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "criminal-activity",
 		kind: "harm",
 		displayName: "Intent or preparation",
-		description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. A concrete intent, preparation or plan for a criminal or seriously dangerous act expressed by the author (including the speaker of a supplied chat turn). A narrator documenting another person's past or third-party plan is not expressing that intent.",
-		exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "A concrete intent, preparation or plan for a criminal or seriously dangerous act expressed by the author.",
+		exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
 	},
 	"criminal-activity-request": {
 		category: "criminal-activity",
 		kind: "harm",
 		displayName: "Requests for assistance",
-		description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. A request by the author (including the speaker of a supplied chat turn) for help carrying out a concrete criminal or seriously dangerous act. A later refusal does not erase that request. A narrator merely reporting a third-party request is not making it.",
-		exclusions: "Lawful assistance, neutral reporting, prevention or requests without a concrete criminal or seriously dangerous act. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "A request by the author for help carrying out a concrete criminal or seriously dangerous act. A later refusal does not erase that request.",
+		exclusions: "Lawful assistance, neutral reporting, prevention or requests without a concrete criminal or seriously dangerous act. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
 	},
 	"criminal-activity-instructions": {
 		category: "criminal-activity",
 		kind: "harm",
 		displayName: "Instructions or facilitation",
-		description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act.",
+		description: "Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act.",
 		exclusions: "Prevention, lawful safety advice, ordinary tools or non-actionable reporting alone. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
 	},
 	"criminal-activity-promotion": {
 		category: "criminal-activity",
 		kind: "harm",
 		displayName: "Recruitment or promotion",
-		description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. The author (including the speaker of a supplied chat turn) recruits for, endorses or promotes a concrete criminal or seriously dangerous act. A narrator's unendorsed account of another person's promotion is not itself promotion.",
-		exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement."
+		description: "The author recruits for, endorses or promotes a concrete criminal or seriously dangerous act.",
+		exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
 	},
 	"criminal-activity-substances": {
 		category: "criminal-activity",
@@ -8619,7 +8619,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Grooming and exploitation",
 		description: "Concrete manipulation to prepare a child or vulnerable person for sexual exploitation or abuse, including sexual demands, rewards conditional on sexual compliance, or secrecy, isolation or private-contact tactics with a supported exploitative purpose. Explicit sexual words are not required when that purpose is evidenced. Actual reported or fictional grooming also counts.",
-		exclusions: "Ordinary friendly contact, consensual adult relationships, gifts, mentoring, private messaging or secrecy alone; infer neither age nor exploitative intent from appearance. Generic grooming warnings or references to an omitted case without concrete exploitative conduct. Hair care and animal grooming."
+		exclusions: "Ordinary friendly contact, consensual adult relationships, gifts, mentoring, private messaging or secrecy alone. Generic grooming warnings or references to an omitted case without concrete exploitative conduct. Hair care and animal grooming."
 	},
 	"criminal-activity-csam": {
 		category: "criminal-activity",
@@ -8627,7 +8627,7 @@ const MODERATION_QUALIFIER_INFO = {
 		harmOption: false,
 		displayName: "Child sexual abuse material",
 		description: "Child sexual abuse material or child sexual exploitation material, whether merely named or referred to or present as an actual instance of it being created, possessed, viewed, sought, bought, sold, shared, distributed or profited from, including requests and plans. A bare mention counts so that a policy can restrict it; conduct qualifiers such as Demonstration or Request record an actual instance. Reported, historical, fictional, educational and preventive instances also count.",
-		exclusions: "Adult sexual material; do not infer a child's age from appearance, clothing or body. Lawful non-sexual images of children. Child abuse that is not sexual material, and grooming conduct without material, are separate forms. The words must refer to sexual material involving children; do not infer it from unrelated words.",
+		exclusions: "Adult sexual material. Lawful non-sexual images of children. Child abuse that is not sexual material, and grooming conduct without material, are separate forms. The words must refer to sexual material involving children.",
 		inputs: ["text"]
 	},
 	"criminal-activity-alcohol": {
@@ -8635,7 +8635,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Alcohol",
 		description: "Depicted or concretely described drinking, serving, purchasing, selling, making or advertising alcoholic drinks, including lawful adult activity and actual reported, historical or fictional instances.",
-		exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. The word alcohol alone, generic health or prevention discussion without an actual qualifying instance, non-alcoholic drinks, hand sanitiser, disinfectants, laboratory alcohol and ordinary medicine. Do not infer alcohol from an ambiguous cup or bottle."
+		exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. The word alcohol alone, generic health or prevention discussion without an actual qualifying instance, non-alcoholic drinks, hand sanitiser, disinfectants, laboratory alcohol and ordinary medicine."
 	},
 	"criminal-activity-tobacco": {
 		category: "criminal-activity",
@@ -8649,7 +8649,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Gambling",
 		description: "Depicted or concretely described betting or wagering money or something of real value on an uncertain outcome, casino gambling, paid lotteries, or selling or advertising those services, including lawful adult activity and actual reported, historical or fictional instances.",
-		exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. Ordinary games, sports, playing cards or dice without stakes, free competitions without a wager, investing without gambling conduct, figurative bets and generic risk or prevention discussion without an actual gambling instance. Do not infer gambling from a casino-like setting alone."
+		exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. Ordinary games, sports, playing cards or dice without stakes, free competitions without a wager, investing without gambling conduct, figurative bets and generic risk or prevention discussion without an actual gambling instance."
 	},
 	"criminal-activity-fraud": {
 		category: "criminal-activity",
@@ -8684,22 +8684,22 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "criminal-activity",
 		kind: "context",
 		displayName: "Reporting or documentary",
-		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.",
-		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance."
+		description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.",
+		exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance."
 	},
 	"criminal-activity-educational": {
 		category: "criminal-activity",
 		kind: "context",
 		displayName: "Educational",
 		description: "Qualifying content used in a lesson, safety explanation, clinical explanation or academic study.",
-		exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose; do not infer education from neutral wording or an explanation of what someone is doing. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material."
+		exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material."
 	},
 	"criminal-activity-discussion": {
 		category: "criminal-activity",
 		kind: "context",
 		displayName: "Non-graphic discussion",
-		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.",
-		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose."
+		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.",
+		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation."
 	},
 	"criminal-activity-fictional": {
 		category: "criminal-activity",

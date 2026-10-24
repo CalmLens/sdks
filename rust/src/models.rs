@@ -1387,12 +1387,9 @@ pub struct AssetContent {
     /// Digests of the uploaded content.
     #[serde(default)]
     pub checksums: Option<Checksums>,
-    /// Image details, for image assets.
+    /// The picture served at the rendered resource, `None` when the asset has none.
     #[serde(default)]
-    pub image: Option<ImageData>,
-    /// The browser-friendly preview generated for images, documents and websites.
-    #[serde(default)]
-    pub preview_image: Option<PreviewImage>,
+    pub image: Option<AssetImage>,
     /// Text extracted from the content.
     #[serde(default)]
     pub extracted_text: Option<ExtractedText>,
@@ -2222,20 +2219,29 @@ pub struct SignedUrl {
     pub extra: HashMap<String, Value>,
 }
 
-/// Image details.
+/// The picture CalmLens can show for an asset: the original for image assets, or a generated
+/// image for documents and websites. It remains after the content is removed, so check the content
+/// `status` before loading it.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct ImageData {
-    /// The perceptual hash.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub perceptual_hash: Option<String>,
-    /// The width in pixels.
+pub struct AssetImage {
+    /// The width in pixels: the original's for image assets (a converted HEIC is served smaller at
+    /// the same aspect ratio), and the generated image's for documents and websites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
-    /// The height in pixels.
+    /// The height in pixels, like `width`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// A ThumbHash placeholder to render while the image loads; `None` once it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbhash: Option<String>,
+    /// The average colour; `None` once the image is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub average_color: Option<String>,
+    /// The perceptual hash, for matching similar image assets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub perceptual_hash: Option<String>,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -2261,31 +2267,6 @@ pub struct Checksums {
     /// The SHA-512 digest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha512: Option<String>,
-    /// Fields this SDK version does not know.
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-/// A preview image.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct PreviewImage {
-    /// The file format.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub file_format: Option<String>,
-    /// A ThumbHash placeholder.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thumbhash: Option<String>,
-    /// The average colour.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub average_color: Option<String>,
-    /// The width in pixels.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub width: Option<u32>,
-    /// The height in pixels.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub height: Option<u32>,
     /// Fields this SDK version does not know.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,

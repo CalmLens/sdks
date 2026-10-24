@@ -27,16 +27,11 @@ class ModelsTest {
       "md5": null
     },
     "image": {
-      "perceptualHash": "p",
       "width": 4,
-      "height": 3
-    },
-    "previewImage": {
-      "fileFormat": "webp",
+      "height": 3,
       "thumbhash": "t",
       "averageColor": "#fff",
-      "width": 2,
-      "height": 1
+      "perceptualHash": "p"
     },
     "extractedText": null
   },
@@ -90,8 +85,7 @@ class ModelsTest {
     assertEquals("png", content.extension());
     assertEquals(9007199254740993L, content.sizeInBytes());
     assertEquals(new Models.Checksums(null, null, "abc", null, null), content.checksums());
-    assertEquals(new Models.ImageData("p", 4, 3), content.image());
-    assertEquals(new Models.PreviewImage("webp", "t", "#fff", 2, 1), content.previewImage());
+    assertEquals(new Models.AssetImage(4, 3, "t", "#fff", "p"), content.image());
     assertNull(content.extractedText());
     assertEquals(new Models.FlaggedContentPolicy("purge"), asset.processingOptions().flaggedContentPolicy());
     assertEquals(Boolean.TRUE, asset.processingOptions().keepContentAfterProcessing());

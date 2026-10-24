@@ -7881,16 +7881,11 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         sha512: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       }, zod.core.$strip>>;
       image: zod.ZodNullable<zod.ZodObject<{
-        perceptualHash: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        width: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-        height: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-      }, zod.core.$strip>>;
-      previewImage: zod.ZodNullable<zod.ZodObject<{
-        fileFormat: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-        thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-        averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
         width: zod.ZodNullable<zod.ZodNumber>;
         height: zod.ZodNullable<zod.ZodNumber>;
+        thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+        averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+        perceptualHash: zod.ZodNullable<zod.ZodString>;
       }, zod.core.$strip>>;
       extractedText: zod.ZodNullable<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         type: zod.ZodLiteral<"string">;

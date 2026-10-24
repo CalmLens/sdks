@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-COtpPy3f.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-B-VFkMT1.js";
 import "./SharedConstants-DSItflG6.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -276,6 +276,17 @@ const PREVIEW_IMAGE_SCHEMA = zod.object({
 	width: zod.number().int().positive().nullable().describe("Preview width in pixels"),
 	height: zod.number().int().positive().nullable().describe("Preview height in pixels")
 });
+/**
+* The picture CalmLens can show for an asset, as the API returns it. For image assets it is the
+* original upload; for documents and websites it is the page image CalmLens generates.
+*/
+const ASSET_IMAGE_SCHEMA = zod.object({
+	width: zod.number().int().positive().nullable().describe("Width in pixels: the original's for image assets (a converted HEIC is served smaller at the same aspect ratio), and the generated image's for documents and websites"),
+	height: zod.number().int().positive().nullable().describe("Height in pixels, like `width`"),
+	thumbhash: saneStringField().nullable().describe("ThumbHash placeholder you can render while the image loads; `null` once the image is removed"),
+	averageColor: saneStringField().nullable().describe("Average color of the image; `null` once the image is removed"),
+	perceptualHash: zod.string().nullable().describe("Perceptual hash used to match visually similar images, for image assets")
+});
 const METADATA_ITEM_SCHEMA = zod.object({
 	id: saneStringField().meta(metaStore([docPropertyInfo({
 		description: "Identifier for the metadata item",
@@ -370,7 +381,6 @@ const STORED_ASSET_SCHEMA = zod.object({
 	description: "An asset as stored",
 	namedType: "StoredAsset"
 })]));
-const PUBLIC_PREVIEW_IMAGE_SCHEMA = PREVIEW_IMAGE_SCHEMA.omit({ id: true });
 const epoch = (description) => zod.number().nullable().describe(`${description}, in milliseconds since the Unix epoch`);
 const ASSET_UPLOAD_STATUS_SCHEMA = zod.enum(["uploading", "completed"]);
 const ASSET_UPLOAD_SCHEMA = zod.object({
@@ -414,8 +424,7 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	extension: zod.string().nullable().describe("File extension of the content"),
 	sizeInBytes: zod.number().nullable().describe("Size of the uploaded content in bytes"),
 	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the uploaded content"),
-	image: IMAGE_DATA_SCHEMA.nullable().describe("Image properties, for image assets"),
-	previewImage: PUBLIC_PREVIEW_IMAGE_SCHEMA.nullable().describe("Browser-friendly preview generated for images, documents and websites"),
+	image: ASSET_IMAGE_SCHEMA.nullable().describe("The picture CalmLens serves at the rendered resource: the original image for image assets, or a generated image for documents and websites. It remains after the content is removed, so check `status` before loading it; `null` when the asset has no image."),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
@@ -478,7 +487,6 @@ STORED_ASSET_SCHEMA.pick({
 			sizeInBytes: 245760,
 			checksums: null,
 			image: null,
-			previewImage: null,
 			extractedText: null
 		}
 	}

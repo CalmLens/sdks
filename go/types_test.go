@@ -24,16 +24,11 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
       "md5": null
     },
     "image": {
-      "perceptualHash": "ph",
       "width": 640,
-      "height": 480
-    },
-    "previewImage": {
-      "fileFormat": "webp",
+      "height": 480,
       "thumbhash": "th",
       "averageColor": "#fff",
-      "width": 128,
-      "height": 96
+      "perceptualHash": "ph"
     },
     "safetyHold": {
       "placedAt": 1760000000000,
@@ -131,11 +126,8 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if *a.UploadPresetID != "preset-1" || *content.Checksums.SHA256 != "abc" || content.Checksums.MD5 != nil {
 		t.Fatalf("checksums: %+v", content.Checksums)
 	}
-	if *content.Image.PerceptualHash != "ph" || *content.Image.Width != 640 || *content.Image.Height != 480 {
-		t.Fatalf("image data: %+v", content.Image)
-	}
-	if p := content.PreviewImage; *p.FileFormat != "webp" || *p.Thumbhash != "th" || *p.AverageColor != "#fff" || *p.Width != 128 || *p.Height != 96 {
-		t.Fatalf("preview: %+v", p)
+	if i := content.Image; *i.PerceptualHash != "ph" || *i.Width != 640 || *i.Height != 480 || *i.Thumbhash != "th" || *i.AverageColor != "#fff" {
+		t.Fatalf("image: %+v", i)
 	}
 	if h := content.SafetyHold; h.PlacedAt != 1760000000000 || h.Reason != SafetyHoldReasonSuspectedIllegalContent || h.DisposedAt != nil {
 		t.Fatalf("safety hold: %+v", h)

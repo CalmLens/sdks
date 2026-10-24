@@ -207,7 +207,7 @@ Rust fields are snake_case; the wire JSON is camelCase. Response models are `#[n
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
 - `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and reviewer decisions (`manual_reviews`, each with a `decision` of `allowed`, `age-restricted`, `blocked` or `purged`). A reviewer decision does not change `completedAt`.
-- `content`: `status` (`temporary` until processing finishes, `stored` or `removed`), `removal_reason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updated_at`, `safety_hold`, `format` (the MIME type), `extension`, `size_in_bytes`, `checksums`, `image`, `preview_image` and `extracted_text`.
+- `content`: `status` (`temporary` until processing finishes, `stored` or `removed`), `removal_reason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updated_at`, `safety_hold`, `format` (the MIME type), `extension`, `size_in_bytes`, `checksums`, `image` (the picture served at the rendered resource) and `extracted_text`.
 
 The moderation status also decides delivery:
 

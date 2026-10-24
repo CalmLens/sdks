@@ -26,7 +26,7 @@ export interface MediaDisplayOptions {
   height?: number;
   /** The `sizes` attribute for `widths`, such as `(min-width: 768px) 50vw, 100vw`. */
   sizes?: string;
-  /** The asset's `content.previewImage.averageColor`, shown behind the media while it loads. */
+  /** The asset's `content.image.averageColor`, shown behind the media while it loads. */
   averageColor?: string;
   /** How the media fills its box: `cover` (default) or `contain`. */
   fit?: "cover" | "contain";

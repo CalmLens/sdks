@@ -75,21 +75,18 @@ declare const EXTRACTED_TEXT_SCHEMA: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
   id: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
 }, zod.core.$strip>], "type">;
 type ExtractedText = zod.infer<typeof EXTRACTED_TEXT_SCHEMA>;
-declare const IMAGE_DATA_SCHEMA: zod.ZodObject<{
-  perceptualHash: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-  width: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-  height: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-}, zod.core.$strip>;
-type ImageData = zod.infer<typeof IMAGE_DATA_SCHEMA>;
-declare const PREVIEW_IMAGE_SCHEMA: zod.ZodObject<{
-  id: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-  fileFormat: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-  thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-  averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+/**
+ * The picture CalmLens can show for an asset, as the API returns it. For image assets it is the
+ * original upload; for documents and websites it is the page image CalmLens generates.
+ */
+declare const ASSET_IMAGE_SCHEMA: zod.ZodObject<{
   width: zod.ZodNullable<zod.ZodNumber>;
   height: zod.ZodNullable<zod.ZodNumber>;
+  thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+  averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+  perceptualHash: zod.ZodNullable<zod.ZodString>;
 }, zod.core.$strip>;
-type PreviewImage = zod.infer<typeof PREVIEW_IMAGE_SCHEMA>;
+type AssetImage = zod.infer<typeof ASSET_IMAGE_SCHEMA>;
 declare const METADATA_ITEM_SCHEMA: zod.ZodObject<{
   id: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
   value: zod.ZodJSONSchema;
@@ -15612,16 +15609,11 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     sha512: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   }, zod.core.$strip>>;
   image: zod.ZodNullable<zod.ZodObject<{
-    perceptualHash: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-    width: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-    height: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-  }, zod.core.$strip>>;
-  previewImage: zod.ZodNullable<zod.ZodObject<{
-    fileFormat: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-    thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-    averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
     width: zod.ZodNullable<zod.ZodNumber>;
     height: zod.ZodNullable<zod.ZodNumber>;
+    thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+    averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+    perceptualHash: zod.ZodNullable<zod.ZodString>;
   }, zod.core.$strip>>;
   extractedText: zod.ZodNullable<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     type: zod.ZodLiteral<"string">;
@@ -23490,16 +23482,11 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       sha512: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>>;
     image: zod.ZodNullable<zod.ZodObject<{
-      perceptualHash: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-      width: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-      height: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-    }, zod.core.$strip>>;
-    previewImage: zod.ZodNullable<zod.ZodObject<{
-      fileFormat: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-      thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
-      averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
       width: zod.ZodNullable<zod.ZodNumber>;
       height: zod.ZodNullable<zod.ZodNumber>;
+      thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+      averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+      perceptualHash: zod.ZodNullable<zod.ZodString>;
     }, zod.core.$strip>>;
     extractedText: zod.ZodNullable<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       type: zod.ZodLiteral<"string">;
@@ -23512,4 +23499,4 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
 }, zod.core.$strip>;
 type Asset = zod.infer<typeof ASSET_SCHEMA>;
 //#endregion
-export { PreviewImage as _, AssetContentRemovalReason as a, AssetModerationStatus as c, AssetType as d, AssetUpload as f, MetadataItem as g, ImageData as h, AssetContent as i, AssetSafetyHold as l, ExtractedText as m, AssetClassification as n, AssetContentStatus as o, AssetVisibility as p, AssetClassificationStatus as r, AssetModeration as s, Asset as t, AssetSafetyHoldReason as u, ProcessingOptions as v };
+export { ProcessingOptions as _, AssetContentRemovalReason as a, AssetModeration as c, AssetSafetyHoldReason as d, AssetType as f, MetadataItem as g, ExtractedText as h, AssetContent as i, AssetModerationStatus as l, AssetVisibility as m, AssetClassification as n, AssetContentStatus as o, AssetUpload as p, AssetClassificationStatus as r, AssetImage as s, Asset as t, AssetSafetyHold as u };

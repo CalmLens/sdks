@@ -69,14 +69,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "target";
     readonly displayName: "Own details";
     readonly description: "The speaker supplies their own private personal details.";
-    readonly exclusions: "Unknown ownership, third-party details, and requests without supplied values. Do not invent ownership.";
+    readonly exclusions: "Unknown ownership, third-party details, and requests without supplied values.";
   };
   readonly "personal-information-third-party": {
     readonly category: "personal-information";
     readonly kind: "target";
     readonly displayName: "Other people’s details";
     readonly description: "The supplied private details are explicitly attributed to someone other than the speaker.";
-    readonly exclusions: "Unknown ownership, the speaker's own details and requests without supplied values. Do not invent ownership.";
+    readonly exclusions: "Unknown ownership, the speaker's own details and requests without supplied values.";
   };
   readonly "personal-information-historical": {
     readonly category: "personal-information";
@@ -89,8 +89,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "personal-information";
     readonly kind: "context";
     readonly displayName: "Reporting or documentary";
-    readonly description: "Private details explicitly framed as factual reporting or documentation of an actual real-world event, such as a news report, court record or public notice that contains them. Require evidence of the reporting purpose in the supplied material.";
-    readonly exclusions: "Stating, passing on or sharing someone's details, however accurate or matter-of-fact; telling people to contact, visit or find someone; third-person narration or quotation marks alone; fictional or invented examples. Do not infer a factual reporting purpose from neutral tone.";
+    readonly description: "Private details explicitly framed as factual reporting or documentation of an actual real-world event, such as a news report, court record or public notice that contains them.";
+    readonly exclusions: "Stating, passing on or sharing someone's details, however accurate or matter-of-fact; telling people to contact, visit or find someone; third-person narration or quotation marks alone; fictional or invented examples.";
   };
   readonly "personal-information-educational": {
     readonly category: "personal-information";
@@ -208,15 +208,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "sexual";
     readonly kind: "harm";
     readonly displayName: "Sexual solicitation";
-    readonly description: "A request, offer or advertisement for sexual services, escorting or a sexual encounter, performed by the message itself or a supplied chat turn. A narrator describing someone else's sexual offer is not making that offer.";
-    readonly exclusions: "Promotion of adult content, such as a subscription page or explicit media for sale, which is adult content promotion; dating, ordinary romance, accepting money or vague offers without sexual content. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+    readonly description: "A request, offer or advertisement for sexual services, escorting or a sexual encounter, performed by the message itself or a supplied chat turn.";
+    readonly exclusions: "Promotion of adult content, such as a subscription page or explicit media for sale, which is adult content promotion; dating, ordinary romance, accepting money or vague offers without sexual content.";
   };
   readonly "sexual-adult-promotion": {
     readonly category: "sexual";
     readonly kind: "harm";
     readonly displayName: "Adult content promotion";
     readonly description: "Promotion of legal adult sexual content performed by the message itself: links to, subscriptions for, or sales of pornography, explicit photos or videos, or an adult creator's paid page.";
-    readonly exclusions: "Offers or requests for sexual services, escorting or a sexual encounter, which are sexual solicitation; dating, ordinary romance and non-sexual paid content. A narrator describing someone else's promotion is not promoting it.";
+    readonly exclusions: "Offers or requests for sexual services, escorting or a sexual encounter, which are sexual solicitation; dating, ordinary romance and non-sexual paid content.";
   };
   readonly "sexual-revealing-clothing": {
     readonly category: "sexual";
@@ -244,8 +244,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "sexual";
     readonly kind: "context";
     readonly displayName: "Reporting or documentary";
-    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
-    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
   };
   readonly "sexual-educational": {
     readonly category: "sexual";
@@ -258,8 +258,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "sexual";
     readonly kind: "context";
     readonly displayName: "Non-graphic discussion";
-    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.";
-    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose.";
+    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation.";
   };
   readonly "sexual-fictional": {
     readonly category: "sexual";
@@ -272,8 +272,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "sexual";
     readonly kind: "context";
     readonly displayName: "Sexual harm support or prevention";
-    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.";
-    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive.";
+    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help.";
+    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement.";
   };
   readonly "violence-attack": {
     readonly category: "violence";
@@ -293,15 +293,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "violence";
     readonly kind: "harm";
     readonly displayName: "Preparation or instructions";
-    readonly description: "A concrete plan or request to physically harm another person made by the author (including the speaker of a supplied chat turn), or actionable harmful instructions actually supplied in the material. A narrator merely documenting someone else's plan or request is not making it.";
-    readonly exclusions: "A depiction, threat or praise alone; neutral reporting, prevention or lawful safety advice. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+    readonly description: "A concrete plan or request to physically harm another person made by the author, or actionable harmful instructions actually supplied in the material.";
+    readonly exclusions: "A depiction, threat or praise alone; neutral reporting, prevention or lawful safety advice.";
   };
   readonly "violence-encouragement": {
     readonly category: "violence";
     readonly kind: "harm";
     readonly displayName: "Encouragement of violence";
-    readonly description: "The author (including the speaker of a supplied chat turn) urges, endorses, praises or promotes physical violence. A narrator quoting someone else's words to report or condemn them is not encouraging violence.";
-    readonly exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+    readonly description: "The author urges, endorses, praises or promotes physical violence.";
+    readonly exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention.";
   };
   readonly "violence-injury": {
     readonly category: "violence";
@@ -359,8 +359,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "violence";
     readonly kind: "context";
     readonly displayName: "Reporting or documentary";
-    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
-    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
   };
   readonly "violence-educational": {
     readonly category: "violence";
@@ -373,8 +373,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "violence";
     readonly kind: "context";
     readonly displayName: "Non-graphic discussion";
-    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.";
-    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose.";
+    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation.";
   };
   readonly "violence-fictional": {
     readonly category: "violence";
@@ -394,8 +394,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "violence";
     readonly kind: "context";
     readonly displayName: "Support or prevention";
-    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.";
-    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive.";
+    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help.";
+    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement.";
   };
   readonly "self-harm-thoughts": {
     readonly category: "self-harm";
@@ -429,8 +429,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "self-harm";
     readonly kind: "harm";
     readonly displayName: "Encouragement";
-    readonly description: "The author (including the speaker of a supplied chat turn) urges, endorses, praises or promotes intentional self-injury or suicide. A narrator reporting or condemning another person's encouragement is not endorsing it.";
-    readonly exclusions: "Support, prevention, condemnation or reporting without endorsement. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+    readonly description: "The author urges, endorses, praises or promotes intentional self-injury or suicide.";
+    readonly exclusions: "Support, prevention, condemnation or reporting without endorsement.";
   };
   readonly "self-harm-historical": {
     readonly category: "self-harm";
@@ -443,8 +443,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "self-harm";
     readonly kind: "context";
     readonly displayName: "Reporting or documentary";
-    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
-    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
   };
   readonly "self-harm-educational": {
     readonly category: "self-harm";
@@ -464,8 +464,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "self-harm";
     readonly kind: "context";
     readonly displayName: "Support or prevention";
-    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help. Neutral academic analysis alone is educational, not support or prevention.";
-    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement. Adding a supportive reply does not make a separate harmful request, attack or endorsement supportive.";
+    readonly description: "Qualifying content presented solely to seek or provide non-harmful support, prevention or recovery, including a survivor describing abuse to obtain help and counterspeech that explicitly rejects a represented attack or threat. A disclosure of current harm or risk can count when it is presented to seek help.";
+    readonly exclusions: "Harmful instructions, assistance, concealment advice, targeting or encouragement.";
   };
   readonly "harassment-abuse": {
     readonly category: "harassment";
@@ -527,8 +527,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "harassment";
     readonly kind: "context";
     readonly displayName: "Reporting or documentary";
-    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
-    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
   };
   readonly "harassment-educational": {
     readonly category: "harassment";
@@ -604,8 +604,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "hate";
     readonly kind: "context";
     readonly displayName: "Reporting or documentary";
-    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
-    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
   };
   readonly "hate-educational": {
     readonly category: "hate";
@@ -625,8 +625,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "hate";
     readonly kind: "context";
     readonly displayName: "Counterspeech";
-    readonly description: "Concrete identity-based attacks quoted, paraphrased or described to reject, challenge or oppose their prejudice, including defending the people targeted and explaining why discriminatory claims are wrong. Judge the supported stance and attribution in context; a classroom format or explicit anti-hate label is not required.";
-    readonly exclusions: "Mere quotation, neutral documentation or victim support without challenging the represented prejudice; an unrelated statement opposing hate that leaves a separate identity-based attack endorsed or directly expressed. For All, every qualifying attack must be countered, not every sentence: ordinary political criticism, criticism of discriminatory conduct and benign surrounding discussion do not break coverage. Do not invent an attack from a generic reference to hateful content that is not supplied.";
+    readonly description: "Concrete identity-based attacks quoted, paraphrased or described to reject, challenge or oppose their prejudice, including defending the people targeted and explaining why discriminatory claims are wrong.";
+    readonly exclusions: "Mere quotation, neutral documentation or victim support without challenging the represented prejudice; an unrelated statement opposing hate that leaves a separate identity-based attack endorsed or directly expressed.";
   };
   readonly "hate-support-prevention": {
     readonly category: "hate";
@@ -646,29 +646,29 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "criminal-activity";
     readonly kind: "harm";
     readonly displayName: "Intent or preparation";
-    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. A concrete intent, preparation or plan for a criminal or seriously dangerous act expressed by the author (including the speaker of a supplied chat turn). A narrator documenting another person's past or third-party plan is not expressing that intent.";
-    readonly exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+    readonly description: "A concrete intent, preparation or plan for a criminal or seriously dangerous act expressed by the author.";
+    readonly exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
   };
   readonly "criminal-activity-request": {
     readonly category: "criminal-activity";
     readonly kind: "harm";
     readonly displayName: "Requests for assistance";
-    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. A request by the author (including the speaker of a supplied chat turn) for help carrying out a concrete criminal or seriously dangerous act. A later refusal does not erase that request. A narrator merely reporting a third-party request is not making it.";
-    readonly exclusions: "Lawful assistance, neutral reporting, prevention or requests without a concrete criminal or seriously dangerous act. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+    readonly description: "A request by the author for help carrying out a concrete criminal or seriously dangerous act. A later refusal does not erase that request.";
+    readonly exclusions: "Lawful assistance, neutral reporting, prevention or requests without a concrete criminal or seriously dangerous act. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
   };
   readonly "criminal-activity-instructions": {
     readonly category: "criminal-activity";
     readonly kind: "harm";
     readonly displayName: "Instructions or facilitation";
-    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act.";
+    readonly description: "Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act.";
     readonly exclusions: "Prevention, lawful safety advice, ordinary tools or non-actionable reporting alone. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
   };
   readonly "criminal-activity-promotion": {
     readonly category: "criminal-activity";
     readonly kind: "harm";
     readonly displayName: "Recruitment or promotion";
-    readonly description: "Require a concrete criminal or seriously dangerous act independently of the policy-controlled alcohol, tobacco/vaping or gambling form. A lawful adult advert, sale, plan or request for those activities alone does not have this property. The author (including the speaker of a supplied chat turn) recruits for, endorses or promotes a concrete criminal or seriously dangerous act. A narrator's unendorsed account of another person's promotion is not itself promotion.";
-    readonly exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. A narrator's unendorsed report of another person's words or intent is not the narrator's own request, plan or endorsement.";
+    readonly description: "The author recruits for, endorses or promotes a concrete criminal or seriously dangerous act.";
+    readonly exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
   };
   readonly "criminal-activity-substances": {
     readonly category: "criminal-activity";
@@ -682,7 +682,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Grooming and exploitation";
     readonly description: "Concrete manipulation to prepare a child or vulnerable person for sexual exploitation or abuse, including sexual demands, rewards conditional on sexual compliance, or secrecy, isolation or private-contact tactics with a supported exploitative purpose. Explicit sexual words are not required when that purpose is evidenced. Actual reported or fictional grooming also counts.";
-    readonly exclusions: "Ordinary friendly contact, consensual adult relationships, gifts, mentoring, private messaging or secrecy alone; infer neither age nor exploitative intent from appearance. Generic grooming warnings or references to an omitted case without concrete exploitative conduct. Hair care and animal grooming.";
+    readonly exclusions: "Ordinary friendly contact, consensual adult relationships, gifts, mentoring, private messaging or secrecy alone. Generic grooming warnings or references to an omitted case without concrete exploitative conduct. Hair care and animal grooming.";
   };
   readonly "criminal-activity-csam": {
     readonly category: "criminal-activity";
@@ -690,7 +690,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly harmOption: false;
     readonly displayName: "Child sexual abuse material";
     readonly description: "Child sexual abuse material or child sexual exploitation material, whether merely named or referred to or present as an actual instance of it being created, possessed, viewed, sought, bought, sold, shared, distributed or profited from, including requests and plans. A bare mention counts so that a policy can restrict it; conduct qualifiers such as Demonstration or Request record an actual instance. Reported, historical, fictional, educational and preventive instances also count.";
-    readonly exclusions: "Adult sexual material; do not infer a child's age from appearance, clothing or body. Lawful non-sexual images of children. Child abuse that is not sexual material, and grooming conduct without material, are separate forms. The words must refer to sexual material involving children; do not infer it from unrelated words.";
+    readonly exclusions: "Adult sexual material. Lawful non-sexual images of children. Child abuse that is not sexual material, and grooming conduct without material, are separate forms. The words must refer to sexual material involving children.";
     readonly inputs: readonly ["text"];
   };
   readonly "criminal-activity-alcohol": {
@@ -698,7 +698,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Alcohol";
     readonly description: "Depicted or concretely described drinking, serving, purchasing, selling, making or advertising alcoholic drinks, including lawful adult activity and actual reported, historical or fictional instances.";
-    readonly exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. The word alcohol alone, generic health or prevention discussion without an actual qualifying instance, non-alcoholic drinks, hand sanitiser, disinfectants, laboratory alcohol and ordinary medicine. Do not infer alcohol from an ambiguous cup or bottle.";
+    readonly exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. The word alcohol alone, generic health or prevention discussion without an actual qualifying instance, non-alcoholic drinks, hand sanitiser, disinfectants, laboratory alcohol and ordinary medicine.";
   };
   readonly "criminal-activity-tobacco": {
     readonly category: "criminal-activity";
@@ -712,7 +712,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Gambling";
     readonly description: "Depicted or concretely described betting or wagering money or something of real value on an uncertain outcome, casino gambling, paid lotteries, or selling or advertising those services, including lawful adult activity and actual reported, historical or fictional instances.";
-    readonly exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. Ordinary games, sports, playing cards or dice without stakes, free competitions without a wager, investing without gambling conduct, figurative bets and generic risk or prevention discussion without an actual gambling instance. Do not infer gambling from a casino-like setting alone.";
+    readonly exclusions: "A separate crime or seriously dangerous act, even if it involves these products or activities, does not meet this form: e.g. impaired driving, supplying minors illegally, fraud, coercion or exploitation. Ordinary games, sports, playing cards or dice without stakes, free competitions without a wager, investing without gambling conduct, figurative bets and generic risk or prevention discussion without an actual gambling instance.";
   };
   readonly "criminal-activity-fraud": {
     readonly category: "criminal-activity";
@@ -747,22 +747,22 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "criminal-activity";
     readonly kind: "context";
     readonly displayName: "Reporting or documentary";
-    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority. Require evidence of the reporting purpose in the supplied material.";
-    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. Do not infer a factual reporting purpose from neutral tone. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
+    readonly description: "Qualifying content explicitly framed as factual reporting, testimony or documentation of actual real-world events or utterances, including a person's own incident report or a report to an authority.";
+    readonly exclusions: "Unframed descriptions, third-person narration or quotation marks alone; fictional stories, invented classroom examples, erotic display or advertisements. A separate direct harmful request, attack or endorsement cannot receive this allowance.";
   };
   readonly "criminal-activity-educational": {
     readonly category: "criminal-activity";
     readonly kind: "context";
     readonly displayName: "Educational";
     readonly description: "Qualifying content used in a lesson, safety explanation, clinical explanation or academic study.";
-    readonly exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose; do not infer education from neutral wording or an explanation of what someone is doing. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material.";
+    readonly exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material.";
   };
   readonly "criminal-activity-discussion": {
     readonly category: "criminal-activity";
     readonly kind: "context";
     readonly displayName: "Non-graphic discussion";
-    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act. The supported discussion purpose must apply to the qualifying instance. A formal lesson or factual incident report is not required. Context does not create a parent category where no qualifying content is supplied.";
-    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. An argumentative label does not excuse these. For All, every qualifying instance must be covered; a separate active harmful passage remains uncovered. Mere quotation, neutral tone or third-person narration alone does not establish a discussion purpose.";
+    readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation.";
   };
   readonly "criminal-activity-fictional": {
     readonly category: "criminal-activity";

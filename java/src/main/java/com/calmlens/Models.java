@@ -1562,14 +1562,13 @@ public final class Models {
    * @param extension file extension of the content
    * @param sizeInBytes size of the uploaded content
    * @param checksums digests of the uploaded content
-   * @param image image dimensions and hash, for image assets
-   * @param previewImage generated preview
+   * @param image the picture served at the rendered resource; null when the asset has none
    * @param extractedText text extracted from the content
    */
   public record AssetContent(AssetContentStatus status, String removalReason,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
-      ImageData image, PreviewImage previewImage, ExtractedText extractedText) {}
+      AssetImage image, ExtractedText extractedText) {}
 
 
   /**
@@ -1755,13 +1754,19 @@ public final class Models {
   }
 
   /**
-   * Image details.
+   * The picture CalmLens can show for an asset: the original for image assets, or a generated
+   * image for documents and websites. It remains after the content is removed, so check the
+   * content status before loading it.
    *
-   * @param perceptualHash perceptual hash
-   * @param width width in pixels
-   * @param height height in pixels
+   * @param width width in pixels: the original's for image assets (a converted HEIC is served
+   *     smaller at the same aspect ratio), and the generated image's otherwise
+   * @param height height in pixels, like {@code width}
+   * @param thumbhash ThumbHash placeholder to render while the image loads; null once removed
+   * @param averageColor average colour of the image; null once removed
+   * @param perceptualHash perceptual hash for matching similar images, for image assets
    */
-  public record ImageData(String perceptualHash, Integer width, Integer height) {}
+  public record AssetImage(
+      Integer width, Integer height, String thumbhash, String averageColor, String perceptualHash) {}
 
   /**
    * Digests of an asset's uploaded content. Each is null when not computed.
@@ -1773,17 +1778,6 @@ public final class Models {
    * @param sha512 SHA-512 digest
    */
   public record Checksums(String md5, String sha1, String sha256, String sha384, String sha512) {}
-
-  /**
-   * A generated preview image.
-   *
-   * @param fileFormat format
-   * @param thumbhash thumbhash placeholder
-   * @param averageColor average color
-   * @param width width
-   * @param height height
-   */
-  public record PreviewImage(String fileFormat, String thumbhash, String averageColor, Integer width, Integer height) {}
 
   /**
    * A safety hold that restricts access to an asset.

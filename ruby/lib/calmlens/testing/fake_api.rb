@@ -532,7 +532,7 @@ module CalmLens
                                 'moderation' => { 'status' => 'pending', 'manualReviews' => [] } },
           'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
                          'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
-                         'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'previewImage' => nil,
+                         'sizeInBytes' => size, 'checksums' => nil, 'image' => nil,
                          'extractedText' => nil }
         }
       end

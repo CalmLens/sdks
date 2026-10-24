@@ -79,13 +79,13 @@ module CalmLens
     ?"sha384" => String?,
     ?"sha512" => String?
   }
-  type image_data = { ?"perceptualHash" => String?, ?"width" => Integer?, ?"height" => Integer? }
-  type preview_image = {
-    "fileFormat" => String?,
+  # The picture served at the rendered resource; it remains after the content is removed.
+  type asset_image = {
+    "width" => Integer?,
+    "height" => Integer?,
     "thumbhash" => String?,
     "averageColor" => String?,
-    "width" => Integer?,
-    "height" => Integer?
+    "perceptualHash" => String?
   }
   type safety_hold = { "placedAt" => Integer, "reason" => "suspected-illegal-content", ?"disposedAt" => Integer? }
   # `type: "string"` carries the text in `content`; `type: "document"` stores it under `id`.
@@ -129,8 +129,7 @@ module CalmLens
     "extension" => String?,
     "sizeInBytes" => Integer?,
     "checksums" => checksums?,
-    "image" => image_data?,
-    "previewImage" => preview_image?,
+    "image" => asset_image?,
     "extractedText" => extracted_text?
   }
 

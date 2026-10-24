@@ -1039,7 +1039,6 @@ export class MockCalmLensServerClient {
         sizeInBytes: this.getSizeInBytes(options) ?? null,
         checksums: null,
         image: null,
-        previewImage: null,
         extractedText: null,
       },
       upload: {

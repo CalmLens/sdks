@@ -24,7 +24,7 @@ __all__ = [
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "ImageData", "ImageTransform",
+    "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
@@ -32,7 +32,7 @@ __all__ = [
     "ModerationQualifier", "MoveAssetOptions", "MoveFolderOptions", "NotEvaluatedCategoryResult",
     "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",
     "Ordering", "PartContent", "PartialCategoryResult", "PersonDetectionFeatureOptions", "PersonDetectionResult",
-    "PreviewImage", "ProcessingFeatureResults", "ProcessingFeatureStage", "ProcessingFeatures", "ProcessingOptions",
+    "ProcessingFeatureResults", "ProcessingFeatureStage", "ProcessingFeatures", "ProcessingOptions",
     "QualifierResult", "QualifierResults", "SafetyHold", "SafetyHoldReason", "SearchAssetsOptions", "SearchMode",
     "SemanticStatus", "ServeInit", "ServeOptions", "SignedUrl", "SignedUrlOptions", "StoredExtractedText",
     "SignedUploadToken", "SignUploadTokenOptions", "SubmitAssetOptions", "UpdateAssetOptions",
@@ -426,19 +426,17 @@ class Checksums(TypedDict, total=False):
     sha512: Optional[str]
 
 
-class ImageData(TypedDict, total=False):
-    perceptualHash: Optional[str]
+class AssetImage(TypedDict):
+    """The picture CalmLens serves at the rendered resource: the original for image assets, or a
+    generated image for documents and websites. It remains after the content is removed, so check
+    the content ``status`` before loading it; ``thumbhash`` and ``averageColor`` are ``None`` then.
+    Width and height are the original's for image assets (a converted HEIC is served smaller at the
+    same aspect ratio)."""
     width: Optional[int]
     height: Optional[int]
-
-
-class PreviewImage(TypedDict):
-    """Browser-friendly preview generated for images, documents and websites."""
-    fileFormat: Optional[str]
     thumbhash: Optional[str]
     averageColor: Optional[str]
-    width: Optional[int]
-    height: Optional[int]
+    perceptualHash: Optional[str]
 
 
 class _SafetyHoldRequired(TypedDict):
@@ -524,8 +522,7 @@ class AssetContent(TypedDict):
     extension: Optional[str]
     sizeInBytes: Optional[int]
     checksums: Optional[Checksums]
-    image: Optional[ImageData]
-    previewImage: Optional[PreviewImage]
+    image: Optional[AssetImage]
     extractedText: Optional[ExtractedText]
 
 

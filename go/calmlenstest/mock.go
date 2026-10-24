@@ -748,7 +748,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	content := calmlens.JSON{
 		"status": contentStatus, "removalReason": nil, "updatedAt": now, "safetyHold": nil,
 		"format": nil, "extension": nil, "sizeInBytes": nil, "checksums": nil, "image": nil,
-		"previewImage": nil, "extractedText": nil,
+		"extractedText": nil,
 	}
 	a["upload"] = uploadState
 	a["classification"] = processing

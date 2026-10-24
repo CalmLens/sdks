@@ -84,7 +84,7 @@ describe("getMediaState", () => {
       type: "video",
       classification: { moderation: { status: "age-restricted" as const } },
       content: {
-        previewImage: { thumbhash: null, averageColor: "#112233", width: 1280, height: 720 },
+        image: { thumbhash: null, averageColor: "#112233", width: 1280, height: 720 },
       },
     };
     expect(getMediaState({ asset })).toEqual({

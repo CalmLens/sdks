@@ -190,11 +190,11 @@ type AssetContent struct {
 	// Format is the MIME type of the content.
 	Format *string `json:"format"`
 	// Extension is the file extension of the content.
-	Extension     *string        `json:"extension"`
-	SizeInBytes   *int64         `json:"sizeInBytes"`
-	Checksums     *Checksums     `json:"checksums"`
-	Image         *ImageData     `json:"image"`
-	PreviewImage  *PreviewImage  `json:"previewImage"`
+	Extension   *string    `json:"extension"`
+	SizeInBytes *int64     `json:"sizeInBytes"`
+	Checksums   *Checksums `json:"checksums"`
+	// Image is the picture CalmLens serves at the rendered resource, nil when the asset has none.
+	Image         *AssetImage    `json:"image"`
 	ExtractedText *ExtractedText `json:"extractedText"`
 }
 
@@ -207,25 +207,20 @@ type Checksums struct {
 	SHA512 *string `json:"sha512,omitempty"`
 }
 
-// ImageData holds image properties, for image assets.
-type ImageData struct {
-	// PerceptualHash matches visually similar images.
-	PerceptualHash *string `json:"perceptualHash,omitempty"`
-	// Width and Height are in pixels.
-	Width  *int `json:"width,omitempty"`
-	Height *int `json:"height,omitempty"`
-}
-
-// PreviewImage is the browser-friendly preview generated for images, documents and websites.
-type PreviewImage struct {
-	// FileFormat is the preview's file format, such as "webp".
-	FileFormat *string `json:"fileFormat"`
-	// Thumbhash is a ThumbHash placeholder to render while the preview loads.
-	Thumbhash    *string `json:"thumbhash"`
-	AverageColor *string `json:"averageColor"`
-	// Width and Height are in pixels.
+// AssetImage is the picture CalmLens can show for an asset: the original for image assets, or a
+// generated image for documents and websites. It remains after the content is removed, so check
+// Content.Status before loading it.
+type AssetImage struct {
+	// Width and Height are in pixels: the original's for image assets (a converted HEIC is served
+	// smaller at the same aspect ratio), and the generated image's for documents and websites.
 	Width  *int `json:"width"`
 	Height *int `json:"height"`
+	// Thumbhash is a ThumbHash placeholder to render while the image loads; nil once it is removed.
+	Thumbhash *string `json:"thumbhash"`
+	// AverageColor is the image's average colour; nil once it is removed.
+	AverageColor *string `json:"averageColor"`
+	// PerceptualHash matches visually similar images, for image assets.
+	PerceptualHash *string `json:"perceptualHash"`
 }
 
 // SafetyHoldReasonSuspectedIllegalContent is the SafetyHold.Reason for suspected illegal
