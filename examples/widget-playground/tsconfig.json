@@ -18,6 +18,8 @@
     "src/vite-env.d.ts",
     "src/shims.d.ts",
     "server",
-    "vite.config.ts"
+    "vite.config.ts",
+    "e2e",
+    "playwright.config.ts"
   ]
 }

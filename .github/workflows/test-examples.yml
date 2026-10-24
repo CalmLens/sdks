@@ -104,6 +104,36 @@ jobs:
       - run: bun run build
         working-directory: examples/ui-components
 
+  widget-playground:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/widget-playground
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: .
+      - run: bun run --cwd javascript build
+        working-directory: .
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run check
+      - run: bunx playwright install --with-deps chromium firefox webkit
+      # Every library tab against the mock API and CDN, in Chromium, Firefox and WebKit.
+      - run: bun run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: widget-playground-playwright
+          path: examples/widget-playground/test-results
+
   php-laravel:
     runs-on: ubuntu-latest
     defaults:
