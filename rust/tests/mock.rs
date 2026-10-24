@@ -848,7 +848,7 @@ async fn cdn_responses_keep_status_and_headers() {
     assert_eq!(request.header("range"), Some("bytes=0-3"));
     assert_eq!(
         request.url,
-        "https://cdn.calmlens.invalid/v1/assets/project-1/asset/content"
+        "https://cdn.calmlens.invalid/v1/assets/project-1/asset/rendered"
     );
 }
 

@@ -225,7 +225,7 @@ class ClientTest {
     CalmLensServerClient client = client(request -> fail("Validation made an HTTP request"));
     assertEquals(ErrorCodes.INVALID_UPLOAD_PAYLOAD, assertThrows(CalmLensException.class,
         () -> client.assets.create(new Models.SubmitAsset("x", new Models.Content().base64("!").mimeType("text/plain")))).getCode());
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/x/content/@one,imageTransform[format=avif]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one,imageTransform[format=avif]",
         client.cdn.getAssetUrl(new Models.CdnRequest("x").lens("one").transform("imageTransform[format=avif]")));
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> client.assets.retrieve(new Models.AssetId(""))).getCode());
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> client.assets.retrieve(null)).getCode());
@@ -240,19 +240,19 @@ class ClientTest {
         () -> client.assets.create(Models.SubmitAsset.text("hi"), new RequestOptions().idempotencyKey("bad\nkey"))).getCode());
     assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder("", "project").build()).getCode());
     assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder("key", "project").maxRetries(-1).build()).getCode());
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a%2Fb/content", client.cdn.getAssetUrl(new Models.CdnRequest("a/b")));
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a%2Fb/rendered", client.cdn.getAssetUrl(new Models.CdnRequest("a/b")));
   }
 
   @Test void typedImageTransformOptionsSerializeLikeJavaScriptNumbers() {
     CalmLensServerClient client = client(request -> fail("Building a URL made an HTTP request"));
     Models.Transform image = Models.Transform.image(new Models.ImageTransformOptions().width(640).blur(2.0).sharpen(0.25).format("webp"));
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/content/imageTransform[blur=2,format=webp,sharpen=0.25,width=640]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[blur=2,format=webp,sharpen=0.25,width=640]",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(image)));
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/content/imageTransform[blur=1e%2B21,sharpen=1e-7]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[blur=1e%2B21,sharpen=1e-7]",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(Models.Transform.image(new Models.ImageTransformOptions().blur(1e21).sharpen(1e-7)))));
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
         () -> client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(Models.Transform.image(new Models.ImageTransformOptions().blur(Double.NaN))))).getCode());
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/content/@thumb,imageTransform[blur=2,format=webp,sharpen=0.25,width=640]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/@thumb,imageTransform[blur=2,format=webp,sharpen=0.25,width=640]",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").lens("thumb").transform(image)));
   }
 

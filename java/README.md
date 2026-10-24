@@ -163,7 +163,7 @@ The payload has `id()`, `type()`, `createdAt()`, `projectId()` and `data()` (`se
 
 ## CDN
 
-`cdn.getAssetUrl(new CdnRequest(id).lens("thumb"))` builds a CDN URL. `cdn.serve` streams content with the API key and returns a `CdnResponse` for any status; close it when done:
+`cdn.getAssetUrl(new CdnRequest(id).lens("thumb"))` builds a CDN URL. `CdnRequest.resource` is `rendered` (the default), `original` or `placeholder`; only `rendered` takes a lens or transform. `cdn.serve` streams content with the API key and returns a `CdnResponse` for any status; close it when done:
 
 ```java
 try (CdnResponse response = client.cdn.serve(new CdnRequest(asset.id())

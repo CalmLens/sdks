@@ -47,7 +47,7 @@ class MockTest < Minitest::Test
     served = mock.cdn.serve(asset_identifier: asset['id'])
     assert_equal [200, 'hello', 'text/plain', '5'], [served.status, served.body, served.content_type, served.headers['content-length']]
     refute_nil served.request_id
-    assert_equal "/assets/project-1/#{asset['id']}/content", mock.requests.last.path
+    assert_equal "/assets/project-1/#{asset['id']}/rendered", mock.requests.last.path
 
     removed = mock.assets.delete_content(asset_id: asset['id'])
     assert_equal %w[removed requested], [removed.dig('content', 'status'), removed.dig('content', 'removalReason')]
@@ -108,7 +108,7 @@ class MockTest < Minitest::Test
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
     transform = { type: 'imageTransform', options: { width: 10, border: { color: '#fff' } } }
     assert_equal 'hello', mock.cdn.serve(asset_identifier: asset['id'], transform: transform).body
-    assert_equal "/assets/project-1/#{asset['id']}/content/imageTransform[border%5Bcolor%5D=%23fff,width=10]", mock.requests.last.path
+    assert_equal "/assets/project-1/#{asset['id']}/rendered/imageTransform[border%5Bcolor%5D=%23fff,width=10]", mock.requests.last.path
     signed = URI(mock.assets.create_signed_url(asset_id: asset['id'], transform: transform)['url'])
     assert_equal 'imageTransform[border%5Bcolor%5D=%23fff,width=10]', URI.decode_www_form(signed.query).to_h['transform']
   end
@@ -118,7 +118,7 @@ class MockTest < Minitest::Test
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
     served = mock.cdn.serve(asset_identifier: asset['id'], lens: 'thumb', allow_age_restricted: true)
     request = mock.requests.last
-    assert_equal ["/assets/project-1/#{asset['id']}/content/@thumb", { 'allowAgeRestricted' => 'true' }], [request.path, request.query]
+    assert_equal ["/assets/project-1/#{asset['id']}/rendered/@thumb", { 'allowAgeRestricted' => 'true' }], [request.path, request.query]
     assert_equal 200, served.status
     error = assert_raises(CalmLens::InvalidArgumentError) { mock.cdn.get_asset_url(asset_identifier: asset['id'], allow_age_restricted: 'yes') }
     assert_equal 'sdk/invalid-argument', error.code

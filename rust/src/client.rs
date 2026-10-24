@@ -863,7 +863,8 @@ impl AssetsClient<'_> {
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Creates a signed URL for an asset's content or preview (15 minutes by default).
+    /// Creates a signed URL for an asset's rendered (the API's default) or original resource
+    /// (15 minutes by default).
     pub async fn create_signed_url(&self, options: SignedUrlOptions) -> Result<SignedUrl> {
         let path = format!("/assets/{}/signed-url", id(&options.asset_id)?);
         let transform = match options.transform {
@@ -872,7 +873,6 @@ impl AssetsClient<'_> {
         };
         let options = SignedUrlOptions {
             transform,
-            resource: Some(options.resource.unwrap_or_else(|| "content".into())),
             expires_in_seconds: Some(options.expires_in_seconds.unwrap_or(900)),
             ..options
         };
@@ -1096,23 +1096,26 @@ impl TextClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
-    /// The CDN URL of an asset's content, preview or placeholder, optionally through a lens or
-    /// transform, with `?allowAgeRestricted=true` when [`CdnRequest::allow_age_restricted`] is `Some(true)`.
-    /// A placeholder takes no lens, transform or `allow_age_restricted`.
+    /// The CDN URL of an asset's rendered (default), original or placeholder resource, with
+    /// `?allowAgeRestricted=true` when [`CdnRequest::allow_age_restricted`] is `Some(true)`. Only the
+    /// rendered resource takes a lens or transform; a placeholder also takes no `allow_age_restricted`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource
             .as_ref()
-            .map_or("content", |value| value.as_str());
-        if !["content", "preview", "placeholder"].contains(&resource) {
+            .map_or("rendered", |value| value.as_str());
+        if !["original", "rendered", "placeholder"].contains(&resource) {
             return Err(invalid_argument(
-                "Resource must be content, preview or placeholder",
+                "Resource must be original, rendered or placeholder",
             ));
         }
-        if resource == "placeholder"
-            && (options.lens.is_some()
-                || options.transform.is_some()
-                || options.allow_age_restricted == Some(true))
+        let transformed = options.lens.is_some() || options.transform.is_some();
+        if resource == "original" && transformed {
+            return Err(invalid_argument(
+                "Lenses and transforms apply only to the rendered resource",
+            ));
+        }
+        if resource == "placeholder" && (transformed || options.allow_age_restricted == Some(true))
         {
             return Err(invalid_argument(
                 "A placeholder takes no lens, transform or allowAgeRestricted",

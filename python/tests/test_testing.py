@@ -327,7 +327,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c = MockCalmLensServerClient(project_id="p1", base_url="https://api.example.test/v2/", cdn_base_url="https://cdn.example.test/v2",
                                timeout=5, mock_options={"create_id": lambda: "a1"})
         self.assertEqual((c.project_id, c.base_url, c.cdn_base_url, c.timeout), ("p1", "https://api.example.test/v2", "https://cdn.example.test/v2", 5))
-        self.assertEqual(c.cdn.get_asset_url({"assetIdentifier": "a1"}), "https://cdn.example.test/v2/assets/p1/a1/content")
+        self.assertEqual(c.cdn.get_asset_url({"assetIdentifier": "a1"}), "https://cdn.example.test/v2/assets/p1/a1/rendered")
         with self.assertRaises(CalmLensError):
             MockCalmLensServerClient(timeout=0)
         with self.assertRaises(CalmLensError):
@@ -351,7 +351,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertTrue(upload.url.startswith(c.base_url + "/projects/p1/assets?"))
         self.assertEqual((update.method, update.path, update.body), ("PATCH", "/assets/a1", {"tags": ["x"]}))
         self.assertEqual(events.query, {"after": "1_cursor", "limit": 5})
-        self.assertEqual((serve.method, serve.path), ("GET", "/assets/p1/a1/content/@thumb"))
+        self.assertEqual((serve.method, serve.path), ("GET", "/assets/p1/a1/rendered/@thumb"))
         c.requests[0].query["externalId"] = "changed"
         self.assertEqual(c.requests[0].query["externalId"], "e1")
 

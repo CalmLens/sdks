@@ -181,9 +181,6 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 		return nil, err
 	}
 	options.Transform, options.TransformSteps = transform, nil
-	if options.Resource == "" {
-		options.Resource = "content"
-	}
 	if options.ExpiresInSeconds == 0 {
 		options.ExpiresInSeconds = 900
 	}
@@ -274,11 +271,15 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	transformed := options.Lens != "" || options.Transform != "" || options.TransformSteps != nil
 	if options.Resource == "" {
-		options.Resource = "content"
+		options.Resource = ResourceRendered
 	}
-	if options.Resource != ResourceContent && options.Resource != ResourcePreview && options.Resource != ResourcePlaceholder {
-		return "", invalid(CodeSDKInvalidArgument, "resource must be content, preview or placeholder")
+	if options.Resource != ResourceOriginal && options.Resource != ResourceRendered && options.Resource != ResourcePlaceholder {
+		return "", invalid(CodeSDKInvalidArgument, "resource must be original, rendered or placeholder")
+	}
+	if options.Resource == ResourceOriginal && transformed {
+		return "", invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
 	}
 	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil || options.AllowAgeRestricted) {
 		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or allowAgeRestricted")

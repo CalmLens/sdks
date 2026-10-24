@@ -164,7 +164,7 @@ module CalmLens
 
     # Creates a time-limited URL that delivers private content without an API key.
     # @option options [String] :asset_id
-    # @option options [String] :resource `content` (default) or `preview`
+    # @option options [String] :resource `rendered` (the API's default) or `original`, which takes no lens or transform
     # @option options [Integer] :expires_in_seconds default 900
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash, Array<Hash>] :transform a selector String or structured steps,
@@ -175,7 +175,7 @@ module CalmLens
         body = without(api, 'assetId')
         body['transform'] = Transforms.selector(body['transform']) if body.key?('transform')
         request('POST', "/assets/#{Internal.segment(api['assetId'])}/signed-url",
-                body: { 'resource' => 'content', 'expiresInSeconds' => 900 }.merge(body),
+                body: { 'expiresInSeconds' => 900 }.merge(body),
                 request_options: request)
       end
     end

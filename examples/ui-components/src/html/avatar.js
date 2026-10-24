@@ -16,7 +16,7 @@ export function renderAvatar(container, { projectId, assetId, status, name }) {
   img.src = getAssetUrl({
     projectId,
     assetIdentifier: assetId,
-    resource: "preview",
+    resource: "rendered",
     lens: "avatar",
   });
   img.alt = name;

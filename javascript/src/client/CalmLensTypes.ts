@@ -292,11 +292,13 @@ export interface IdempotencyOptions {
 }
 
 /**
- * What a CDN URL serves: the asset's `content` (default), its `preview`, or its `placeholder`, a
- * small blurred PNG that is public for public assets whatever their moderation status. A
+ * What a CDN URL serves: the asset's `original` file, exactly as uploaded; its `rendered` form for
+ * display, in the best format the client accepts, which takes lenses and transforms; or its
+ * `placeholder`, a small blurred PNG that is public for public assets whatever their moderation
+ * status. Defaults to `rendered`; ask for `original` to download the exact file. A
  * placeholder takes no lens, transform or `allowAgeRestricted`.
  */
-export type CdnResource = "content" | "preview" | "placeholder";
+export type CdnResource = "original" | "rendered" | "placeholder";
 
 export interface CdnAssetUrlOptions {
   assetIdentifier: string;
@@ -327,7 +329,7 @@ export interface CdnServeOptions extends CdnAssetUrlOptions {
 
 export interface CreateAssetSignedUrlOptions {
   assetId: string;
-  resource?: "content" | "preview";
+  resource?: "original" | "rendered";
   lens?: string;
   transform?: CdnTransform;
   expiresInSeconds?: number;

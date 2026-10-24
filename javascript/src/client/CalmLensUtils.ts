@@ -213,8 +213,8 @@ export const transformSelector = (transform: CdnTransform | undefined): string |
 export const DEFAULT_CDN_BASE_URL = `https://cdn.${DOMAIN}/v1`;
 
 const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
-  "content",
-  "preview",
+  "original",
+  "rendered",
   "placeholder",
 ]);
 
@@ -222,19 +222,23 @@ const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
  * Builds an asset's CDN URL without a client: no API key and no request, so it works in browsers.
  * `CalmLensServerClient`'s `cdn.getAssetUrl` uses it too.
  *
- * `resource` is `content` (default), `preview` or `placeholder`. A placeholder is a small blurred
- * PNG that the CDN serves for public assets whatever their moderation status, so it takes no
- * lens, transform or `allowAgeRestricted`.
+ * `resource` is `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or
+ * transform, and it serves images in the best format the browser accepts. A
+ * placeholder is a small blurred PNG that the CDN serves for public assets whatever their
+ * moderation status, so it also takes no `allowAgeRestricted`.
  */
 export const getAssetUrl = ({
   projectId,
   assetIdentifier,
   cdnBaseUrl = DEFAULT_CDN_BASE_URL,
-  resource = "content",
+  resource = "rendered",
   ...options
 }: GetAssetUrlOptions): string => {
   if (!CDN_RESOURCES.has(resource)) {
-    throw invalidArgument("resource must be content, preview or placeholder");
+    throw invalidArgument("resource must be original, rendered or placeholder");
+  }
+  if (resource === "original" && (options.lens !== undefined || options.transform !== undefined)) {
+    throw invalidArgument("Lenses and transforms apply only to the rendered resource");
   }
   if (
     resource === "placeholder" &&

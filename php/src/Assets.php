@@ -91,7 +91,7 @@ final class Assets extends Resource
         if (isset($api['transform'])) {
             $api['transform'] = Transforms::selector($api['transform']);
         }
-        return $this->session->request('POST', $path . '/signed-url', body: $api + ['resource' => 'content', 'expiresInSeconds' => 900], options: $request);
+        return $this->session->request('POST', $path . '/signed-url', body: $api + ['expiresInSeconds' => 900], options: $request);
     }
 
     public function create(array $options): array { return $this->submit($options, true); }

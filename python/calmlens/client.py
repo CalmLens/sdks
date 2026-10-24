@@ -1125,12 +1125,13 @@ class Assets:
             idempotency_key=idempotency_key if idempotency_key is not None else str(uuid.uuid4())))
 
     def create_signed_url(self, options: SignedUrlOptions | None = None, /, *, asset_id: str = _UNSET,
-                          resource: Literal["content", "preview"] = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,
+                          resource: Literal["original", "rendered"] = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,
                           transform: CdnTransform = _UNSET) -> SignedUrl:
-        """Sign a temporary CDN URL for private content (defaults: ``content``, 900 seconds)."""
+        """Sign a temporary CDN URL for private content (defaults: ``rendered``, applied by the API, and
+        900 seconds)."""
         merged = _merge(options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
                         lens=lens, transform=transform)
-        body = {"resource": "content", "expiresInSeconds": 900,
+        body = {"expiresInSeconds": 900,
                 **{k: v for k, v in merged.items() if k != "assetId"}}
         if "transform" in body:
             body["transform"] = _transform_selector(body["transform"])
@@ -1250,8 +1251,9 @@ class CDN:
     def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, asset_identifier: str = _UNSET,
                       resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
                       allow_age_restricted: bool = _UNSET) -> str:
-        """The CDN URL of an asset's ``content``, ``preview`` or ``placeholder``, optionally through a named
-        ``lens``, a ``transform``, or both (the lens runs first). Private assets need an API key or a signed URL.
+        """The CDN URL of an asset's ``rendered`` (default), ``original`` or ``placeholder`` resource. The
+        rendered resource optionally goes through a named ``lens``, a ``transform``, or both (the lens runs
+        first); ``original`` takes neither. Private assets need an API key or a signed URL.
 
         ``placeholder`` is a small blurred PNG that the CDN serves for public assets whatever their
         moderation status. It takes no ``lens``, ``transform`` or ``allow_age_restricted``.
@@ -1264,10 +1266,13 @@ class CDN:
         age = merged.get("allowAgeRestricted", False)
         if not isinstance(age, bool):
             raise _invalid("allowAgeRestricted must be a boolean")
-        selected = merged.get("resource", "content")
-        if selected not in ("content", "preview", "placeholder"):
-            raise _invalid("Resource must be content, preview or placeholder")
-        if selected == "placeholder" and (merged.get("lens") is not None or merged.get("transform") is not None or age):
+        selected = merged.get("resource", "rendered")
+        if selected not in ("original", "rendered", "placeholder"):
+            raise _invalid("Resource must be original, rendered or placeholder")
+        transformed = merged.get("lens") is not None or merged.get("transform") is not None
+        if selected == "original" and transformed:
+            raise _invalid("Lenses and transforms apply only to the rendered resource")
+        if selected == "placeholder" and (transformed or age):
             raise _invalid("A placeholder takes no lens, transform or allowAgeRestricted")
         url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
                f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{selected}")

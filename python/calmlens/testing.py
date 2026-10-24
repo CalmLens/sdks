@@ -583,7 +583,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return self._page([a for a in self._project_assets() if a.get("parentId") == identifier], query)
         if suffix == "signed-url":
             selector: dict[str, Any] = {k: body[k] for k in ("expiresInSeconds", "lens", "transform") if k in body}
-            return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body['resource']}?{urlencode(selector)}",
+            return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body.get('resource', 'rendered')}?{urlencode(selector)}",
                     "expiresAt": now + body["expiresInSeconds"] * 1000}
         if suffix == "retry":
             if asset["classification"]["status"] != "failed":

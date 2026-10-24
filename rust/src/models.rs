@@ -460,10 +460,10 @@ string_enum! {
 string_enum! {
     /// Which CDN resource of an asset to serve or sign.
     CdnResource {
-        /// The asset's content (the default).
-        Content = "content",
-        /// The generated preview image.
-        Preview = "preview",
+        /// The asset's original file. It takes no lens or transform.
+        Original = "original",
+        /// The asset rendered through a lens or transform, or its default rendition (the default).
+        Rendered = "rendered",
         /// A small blurred PNG, public for public assets whatever their moderation status. Only
         /// for CDN URLs, without a lens, transform or `allow_age_restricted`; signed URLs don't take it.
         Placeholder = "placeholder",
@@ -1030,7 +1030,7 @@ pub struct SignedUrlOptions {
     /// The asset ID.
     #[serde(skip_serializing)]
     pub asset_id: String,
-    /// `content` (default) or `preview`.
+    /// `rendered` (the API's default) or `original`, which takes no lens or transform.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<CdnResource>,
     /// A lens identifier.
@@ -1121,13 +1121,13 @@ pub struct EnsureLenses {
     pub lenses: Vec<LensDefinition>,
 }
 
-/// A CDN request for an asset's content or preview.
+/// A CDN request for an asset's rendered, original or placeholder resource.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CdnRequest {
     /// The asset ID or external ID.
     pub asset_identifier: String,
-    /// `content` (default) or `preview`.
+    /// `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or transform.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<CdnResource>,
     /// A lens identifier.

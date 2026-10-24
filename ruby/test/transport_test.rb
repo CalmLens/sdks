@@ -128,7 +128,7 @@ class TransportTest < Minitest::Test
   def test_cdn_transform_selectors_reach_the_server_with_literal_brackets
     with_server(->(*) { [200, {}, 'png'] }) do |client, server|
       assert_equal 200, client.cdn.serve(asset_identifier: 'asset', transform: 'imageTransform[width=10]').status
-      assert_equal 'GET /assets/project/asset/content/imageTransform[width=10] HTTP/1.1', server.requests.pop[:line]
+      assert_equal 'GET /assets/project/asset/rendered/imageTransform[width=10] HTTP/1.1', server.requests.pop[:line]
     end
   end
 

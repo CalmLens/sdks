@@ -496,7 +496,8 @@ module CalmLens
   type move_asset_options = { asset_id: String, folder_id: String?, ?request_options: request_options }
   type create_signed_url_options = {
     asset_id: String,
-    ?resource: "content" | "preview",
+    # Defaults to `rendered` on the server; `original` takes no lens or transform.
+    ?resource: "original" | "rendered",
     ?expires_in_seconds: Integer,
     # A lens runs before any additional transforms.
     ?lens: String,
@@ -611,8 +612,9 @@ module CalmLens
   type asset_url_options = {
     # The asset ID or external ID.
     asset_identifier: String,
-    # `placeholder` is a small blurred PNG and takes no lens, transform or allow_age_restricted.
-    ?resource: "content" | "preview" | "placeholder",
+    # `rendered` is the default. `original` takes no lens or transform; `placeholder` is a small blurred PNG
+    # and takes no lens, transform or allow_age_restricted.
+    ?resource: "original" | "rendered" | "placeholder",
     # A lens runs before any additional transforms.
     ?lens: String,
     ?transform: transform_input,
@@ -622,7 +624,7 @@ module CalmLens
   }
   type serve_options = {
     asset_identifier: String,
-    ?resource: "content" | "preview",
+    ?resource: "original" | "rendered" | "placeholder",
     ?lens: String,
     ?transform: transform_input,
     ?allow_age_restricted: bool?,

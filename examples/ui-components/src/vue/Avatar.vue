@@ -6,7 +6,7 @@ const props = defineProps<{ projectId: string; assetId?: string; status?: string
 const failed = ref(false);
 const src = computed(() =>
   props.assetId
-    ? getAssetUrl({ projectId: props.projectId, assetIdentifier: props.assetId, resource: "preview", lens: "avatar" })
+    ? getAssetUrl({ projectId: props.projectId, assetIdentifier: props.assetId, resource: "rendered", lens: "avatar" })
     : undefined,
 );
 </script>

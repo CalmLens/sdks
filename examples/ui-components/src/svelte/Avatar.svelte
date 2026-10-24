@@ -4,7 +4,7 @@
   let { projectId, assetId, status, name }: { projectId: string; assetId?: string; status?: string; name: string } = $props();
   let failed = $state(false);
   const src = $derived(
-    assetId ? getAssetUrl({ projectId, assetIdentifier: assetId, resource: "preview", lens: "avatar" }) : undefined,
+    assetId ? getAssetUrl({ projectId, assetIdentifier: assetId, resource: "rendered", lens: "avatar" }) : undefined,
   );
 </script>
 

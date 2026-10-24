@@ -109,7 +109,7 @@ asset, err := client.Assets.Update(ctx, calmlens.UpdateAssetOptions{
     Tags:        calmlens.Set([]string{"reviewed"}),
 })
 signed, err := client.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{
-    AssetID: assetID, Resource: calmlens.ResourcePreview, Lens: "thumbnail",
+    AssetID: assetID, Resource: calmlens.ResourceRendered, Lens: "thumbnail",
 })
 ```
 
@@ -133,7 +133,7 @@ if err == nil && decided.Classification.Moderation.Status != calmlens.Moderation
 and moderation to `pending`). `DeleteContent` removes stored content but keeps the record and
 report (the result's `Content.Status` is `removed` with `RemovalReason` `requested`, and the CDN
 stops serving it); `Delete` removes the record and its content. Lists default to page index 0;
-signed URLs default to content and 900 seconds. Lens ensures cache full definitions,
+signed URLs default to the rendered resource and 900 seconds. Lens ensures cache full definitions,
 deduplicate batches/concurrent calls, and invalidate prior definitions by identifier.
 
 ### Pagination
@@ -443,7 +443,9 @@ deliveries.
 
 `CDN.Serve` returns the response, including non-2xx statuses, with the body streamed:
 `defer response.Body.Close()` is required. It is not bounded by `Options.Timeout`, so
-large downloads finish; pass a context deadline to bound them. Supply a lens, a direct transform, or both. When combined, the lens runs first. Private content should be delivered through a signed URL.
+large downloads finish; pass a context deadline to bound them. `Resource` is `calmlens.ResourceRendered`
+(the default), `calmlens.ResourceOriginal` or `calmlens.ResourcePlaceholder`; only the rendered resource
+takes a lens or transform. Supply a lens, a direct transform, or both. When combined, the lens runs first. Private content should be delivered through a signed URL.
 
 A transform is either a selector string or structured steps (`CDN.GetAssetURL`,
 `CDN.Serve` and `Assets.CreateSignedURL` accept both, but not together):

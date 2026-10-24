@@ -883,7 +883,12 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 				params.Set(key, value)
 			}
 		}
-		return calmlens.JSON{"url": m.options.SignedURLBaseURL + "/assets/" + id + "/" + text(body["resource"]) + "?" + params.Encode(), "expiresAt": now + int64(number(body["expiresInSeconds"])*1000)}, nil
+		// Like the API, the resource defaults to rendered.
+		resource := text(body["resource"])
+		if resource == "" {
+			resource = calmlens.ResourceRendered
+		}
+		return calmlens.JSON{"url": m.options.SignedURLBaseURL + "/assets/" + id + "/" + resource + "?" + params.Encode(), "expiresAt": now + int64(number(body["expiresInSeconds"])*1000)}, nil
 	case method == "POST" && suffix == "retry":
 		if section(a, "classification")["status"] != calmlens.ClassificationStatusFailed {
 			return nil, fail(calmlens.CodeAssetNotRetryable)

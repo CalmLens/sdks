@@ -141,9 +141,10 @@ $response = $client->cdn->serve(['assetIdentifier' => $asset['id']]);
 
 CDN `serve` returns a streaming PSR-7 response, including HTTP error responses. Its
 `init` option accepts `method` (`GET` or `HEAD`) and `headers` (e.g. `Range`). Signed
-URLs let browsers access private content without your API key. URL builders accept
-`resource` (`content`, `preview` or `placeholder`), `lens`, a string or structured
-`transform` and `allowAgeRestricted`. `placeholder` is a small blurred PNG that the CDN serves for
+URLs let browsers access private content without your API key; `createSignedUrl` takes
+`resource` (`rendered`, the default, or `original`). URL builders accept `resource`
+(`rendered`, the default, `original` or `placeholder`), `lens`, a string or structured
+`transform` and `allowAgeRestricted`. Only `rendered` takes a lens or transform. `placeholder` is a small blurred PNG that the CDN serves for
 public assets whatever their moderation status; it takes no lens, transform or `allowAgeRestricted`.
 
 The CDN treats an `age-restricted` asset like a private one: its plain public URL is

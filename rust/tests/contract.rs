@@ -339,7 +339,7 @@ async fn validation_and_urls() {
     };
     assert_eq!(
         client.cdn().get_asset_url(&both).unwrap(),
-        "https://cdn.calmlens.com/v1/assets/project-1/x/content/@one,imageTransform[format=avif]"
+        "https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one,imageTransform[format=avif]"
     );
 }
 

@@ -500,7 +500,7 @@ func TestEnsureLensesSplitsLargeBatches(t *testing.T) {
 func TestCDNURLsAndServeHeaders(t *testing.T) {
 	c, h := setup(t)
 	endpoint, err := c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a/b?", Lens: "my lens"})
-	if err != nil || endpoint != "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/content/@my%20lens" {
+	if err != nil || endpoint != "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/rendered/@my%20lens" {
 		t.Fatal(endpoint, err)
 	}
 	endpoint, _ = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Transform: "/imageTransform[width=20]"})
@@ -523,7 +523,7 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 		Tiny    float64  `json:"tiny"`
 	}
 	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformSteps: []LensTransform{{Type: "image_2", Options: resize{Width: 1e21, Quality: -0.0, Tiny: 1.5e-7}}}})
-	if err != nil || !strings.HasSuffix(endpoint, "/content/image_2[quality=0,tiny=1.5e-7,width=1e%2B21]") {
+	if err != nil || !strings.HasSuffix(endpoint, "/rendered/image_2[quality=0,tiny=1.5e-7,width=1e%2B21]") {
 		t.Fatal(endpoint, err)
 	}
 	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformSteps: []LensTransform{{Type: "imageTransform", Options: JSON{"width": math.NaN()}}}})

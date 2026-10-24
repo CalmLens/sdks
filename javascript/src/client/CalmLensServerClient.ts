@@ -358,7 +358,7 @@ export default class CalmLensServerClient {
         const encodedAssetId = requireId(assetId, "Asset ID");
         return this.request("POST", `/assets/${encodedAssetId}/signed-url`, {
           body: {
-            resource: options.resource ?? "content",
+            resource: options.resource,
             expiresInSeconds: options.expiresInSeconds ?? 60 * 15,
             lens: options.lens,
             transform: transformSelector(options.transform),

@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
 import java.io.InputStream;
@@ -980,14 +979,16 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Creates a short-lived signed CDN URL for a private asset.
+     * Creates a short-lived signed CDN URL for a private asset. The API signs the {@code rendered}
+     * resource unless the options ask for {@code original}; the expiry defaults to 900 seconds.
      *
      * @param options the asset, resource, lens or transform and expiry
      * @return the URL
      */
     public Models.SignedUrl createSignedUrl(Models.SignedUrlOptions options) {
       JsonObject o = Models.encode(options);
-      JsonObject body = JsonParser.parseString("{\"resource\":\"content\",\"expiresInSeconds\":900}").getAsJsonObject();
+      JsonObject body = new JsonObject();
+      body.addProperty("expiresInSeconds", 900);
       without(o, "assetId").entrySet().forEach(entry -> body.add(entry.getKey(), entry.getValue()));
       String transform = transformSelector(options.transformValue());
       if (transform != null) body.addProperty("transform", transform);
@@ -1146,10 +1147,10 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Cdn() {}
 
     /**
-     * Builds the CDN URL of an asset's content, preview or placeholder, optionally through a lens or
-     * transform, with {@code ?allowAgeRestricted=true} when {@link Models.CdnRequest#allowAgeRestricted(Boolean)}
-     * is true. A placeholder is a small blurred PNG, public for public assets whatever their moderation
-     * status; it takes no lens, transform or {@code allowAgeRestricted}.
+     * Builds the CDN URL of an asset's {@code rendered} (default), {@code original} or {@code placeholder}
+     * resource, with {@code ?allowAgeRestricted=true} when {@link Models.CdnRequest#allowAgeRestricted(Boolean)}
+     * is true. Only the rendered resource takes a lens or transform. A placeholder is a small blurred PNG,
+     * public for public assets whatever their moderation status; it takes no {@code allowAgeRestricted} either.
      *
      * @param options the asset and selector
      * @return the URL
@@ -1157,9 +1158,11 @@ public final class CalmLensServerClient implements AutoCloseable {
     public String getAssetUrl(Models.CdnRequest options) {
       JsonObject o = Models.encode(options);
       Object transform = options.transformValue();
-      String resource = str(o, "resource", "content");
-      if (!List.of("content", "preview", "placeholder").contains(resource)) throw argument("Resource must be content, preview or placeholder");
-      if (resource.equals("placeholder") && (o.has("lens") && !o.get("lens").isJsonNull() || transform != null
+      String resource = str(o, "resource", "rendered");
+      if (!List.of("original", "rendered", "placeholder").contains(resource)) throw argument("Resource must be original, rendered or placeholder");
+      boolean transformed = o.has("lens") && !o.get("lens").isJsonNull() || transform != null;
+      if (resource.equals("original") && transformed) throw argument("Lenses and transforms apply only to the rendered resource");
+      if (resource.equals("placeholder") && (transformed
           || o.has("allowAgeRestricted") && !o.get("allowAgeRestricted").isJsonNull() && o.get("allowAgeRestricted").getAsBoolean())) {
         throw argument("A placeholder takes no lens, transform or allowAgeRestricted");
       }

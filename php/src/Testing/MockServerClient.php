@@ -233,7 +233,7 @@ final class MockServerClient
             case 'POST signed-url':
                 $expires = $json['expiresInSeconds'] ?? 900;
                 $params = http_build_query(array_intersect_key($json, array_flip(['lens', 'transform'])) + ['expires' => $expires]);
-                return ['url' => $this->cdnBaseUrl . '/signed/' . rawurlencode($id) . '/' . ($json['resource'] ?? 'content') . '?' . $params,
+                return ['url' => $this->cdnBaseUrl . '/signed/' . rawurlencode($id) . '/' . ($json['resource'] ?? 'rendered') . '?' . $params,
                     'expiresAt' => ($this->now)() + $expires * 1000];
         }
         throw new \LogicException("MockServerClient does not emulate $route for an asset; enqueue a response for it");
@@ -386,7 +386,7 @@ final class MockServerClient
                 $asset = $candidate;
             }
         }
-        if ($project !== $this->projectId || $asset === null || !in_array($resource, ['content', 'preview'], true)) {
+        if ($project !== $this->projectId || $asset === null || !in_array($resource, ['original', 'rendered'], true)) {
             return self::json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
         }
         $status = $asset['classification']['moderation']['status'];

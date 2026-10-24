@@ -87,12 +87,12 @@ end
 
 Use `create_signed_url` to deliver private content to browsers without your key.
 
-`cdn.get_asset_url`, `cdn.serve` and `create_signed_url` accept a `lens:`, a `transform:`, or both (the lens runs first). A transform is a selector string or structured steps (one Hash or an Array), serialized with sorted option keys:
+`cdn.get_asset_url` and `cdn.serve` take a `resource:` of `rendered` (the default), `original` or `placeholder`; only `rendered` takes a lens or transform. `cdn.get_asset_url`, `cdn.serve` and `create_signed_url` accept a `lens:`, a `transform:`, or both (the lens runs first). A transform is a selector string or structured steps (one Hash or an Array), serialized with sorted option keys:
 
 ```ruby
 client.cdn.get_asset_url(asset_identifier: asset_id, transform: 'imageTransform[format=png,width=1024]')
 client.cdn.get_asset_url(asset_identifier: asset_id, transform: {type: 'imageTransform', options: {width: 1024, format: 'png'}})
-# => ".../content/imageTransform[format=png,width=1024]" in both cases
+# => ".../rendered/imageTransform[format=png,width=1024]" in both cases
 ```
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only with `?allowAgeRestricted=true`; otherwise it needs a signed URL or the API key. Pass `allow_age_restricted: true` to `cdn.get_asset_url` (or `cdn.serve`) to add it after any lens or transform. Set it only where your app has already decided the viewer may see age-restricted content.
@@ -215,7 +215,7 @@ mock.enqueue_event(type: 'asset.allowed', asset_id: asset['id'])  # joins the ev
 
 request = mock.requests.last
 request.method # => "GET"
-request.path   # => "/assets/project-1/<id>/content" (relative to base_url or cdn_base_url)
+request.path   # => "/assets/project-1/<id>/rendered" (relative to base_url or cdn_base_url)
 ```
 
 `MockServerClient` runs the real client's validation, encoding, retries and error handling, then answers from an in-memory stand-in for the API and CDN. Uploads create assets you can retrieve, list, search, move and delete, and `assets.wait_for_decision` checks the stored asset's processing and moderation status; folders, multipart uploads, idempotency keys, lenses and the events feed behave like the API's; errors carry the API's codes, HTTP statuses and body shape; and `cdn.serve` returns stored bytes with real headers. Like the API, content is removed (`removalReason` `retention`) once classification is `completed` unless the upload sets `keep_content_after_processing: true`; a `purged` outcome removes it with `removalReason` `policy`, and `cdn.serve` does not serve `blocked` assets. List filters support `==` and `!=` (with `*` wildcards) joined by `;` and `,`, on top-level and nested names such as `classification.moderation.status`, `classification.status`, `content.status` and `content.format`; other RSQL operators raise rather than being ignored. It does not classify content: `classify` gives `analyzed_outcome:` and `create` gives `queued_outcome:`. An outcome is `pending` (still processing), `allowed`, `age-restricted`, `blocked` or `purged` (processing done with that moderation status; the default for `classify` is `allowed`) or `failed` (processing failed, retryable). `analyzed_outcome:` can also be fields to deep-merge into the asset, such as `{'classification' => {'moderation' => {'status' => 'blocked'}}}` (the outcome follows `classification.moderation.status`), or a callable that receives the asset and returns either. Change records through `mock.state` to arrange a test. Queued responses and errors are used first, in order.

@@ -170,10 +170,10 @@ class ModelsTest {
     assertEquals(transform, Json.GSON.fromJson(Json.GSON.toJson(transform), Models.Transform.class));
 
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").build();
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/content/imageTransform[format=avif,gravity=entropy,trim%5Bborder%5D=true,trim%5Bleft%5D=3]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[format=avif,gravity=entropy,trim%5Bborder%5D=true,trim%5Bleft%5D=3]",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(transform)));
     Models.Transform point = Models.Transform.image(new Models.ImageTransformOptions().gravity(Models.Gravity.point("remainder", 0.25, 1.0)));
-    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/content/imageTransform[gravity%5Bmode%5D=remainder,gravity%5Bx%5D=0.25,gravity%5By%5D=1]",
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/imageTransform[gravity%5Bmode%5D=remainder,gravity%5Bx%5D=0.25,gravity%5By%5D=1]",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(List.of(point))));
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {

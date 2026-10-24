@@ -680,20 +680,24 @@ type MoveAssetOptions struct {
 
 // CDN resources.
 const (
-	ResourceContent = "content"
-	ResourcePreview = "preview"
+	// ResourceOriginal is the asset's original file. It takes no Lens, Transform or TransformSteps.
+	ResourceOriginal = "original"
+	// ResourceRendered is the default: the asset rendered through a Lens, Transform or
+	// TransformSteps, or its default rendition when none is given.
+	ResourceRendered = "rendered"
 	// ResourcePlaceholder is a small blurred PNG, public for public assets whatever their
 	// moderation status. It takes no Lens, Transform, TransformSteps or AllowAgeRestricted.
 	ResourcePlaceholder = "placeholder"
 )
 
-// SignedURLOptions requests a signed CDN URL. Resource defaults to ResourceContent and
-// ExpiresInSeconds to 900. Lens runs before Transform (a selector string such as
+// SignedURLOptions requests a signed CDN URL. Resource is ResourceRendered (the server's
+// default when empty) or ResourceOriginal, which takes no lens or transform. ExpiresInSeconds
+// defaults to 900. Lens runs before Transform (a selector string such as
 // "imageTransform[format=png,width=1024]") or TransformSteps (structured steps, serialized
 // to the same selector). Supply only one transform representation.
 type SignedURLOptions struct {
 	AssetID          string          `json:"-"`
-	Resource         string          `json:"resource"`
+	Resource         string          `json:"resource,omitempty"`
 	Lens             string          `json:"lens,omitempty"`
 	Transform        string          `json:"transform,omitempty"`
 	TransformSteps   []LensTransform `json:"-"`
@@ -813,7 +817,8 @@ type EventsPage struct {
 }
 
 // CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
-// ID; Resource is "content" (default), "preview" or "placeholder". Lens runs before extra transforms.
+// ID; Resource is "rendered" (default), "original" or "placeholder". Only "rendered" takes a
+// lens or transform; the Lens runs before extra transforms.
 // Supply Transform (a selector string such as "imageTransform[format=png,width=1024]")
 // or TransformSteps (structured steps; a non-nil empty slice is rejected), not both.
 type CDNAssetURLOptions struct {

@@ -795,7 +795,6 @@
       "path": "/v1/assets/asset-1/signed-url",
       "query": {},
       "body": {
-        "resource": "content",
         "expiresInSeconds": 900,
         "lens": "thumb",
         "transform": "imageTransform[format=avif]"
@@ -825,7 +824,6 @@
       "path": "/v1/assets/asset-1/signed-url",
       "query": {},
       "body": {
-        "resource": "content",
         "expiresInSeconds": 900,
         "transform": "imageTransform[border%5Bcolor%5D=%23fff,width=640]"
       }

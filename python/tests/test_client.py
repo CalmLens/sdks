@@ -290,10 +290,10 @@ class ClientTests(ClientTestCase):
         options = {"a": 2.0, "b": 0.00001, "c": 1e-7, "d": 1e21, "e": -0.0, "f": 123456789012, "g": -2.5}
         url = self.client.cdn.get_asset_url(asset_identifier="a",
                                             transform=({"type": "t", "options": options}, {"type": "u"}))
-        self.assertTrue(url.endswith("/content/t[a=2,b=0.00001,c=1e-7,d=1e%2B21,e=0,f=123456789012,g=-2.5],u[]"))
+        self.assertTrue(url.endswith("/rendered/t[a=2,b=0.00001,c=1e-7,d=1e%2B21,e=0,f=123456789012,g=-2.5],u[]"))
         # Keyword arguments are converted to camelCase, but transform option names are CDN names.
         url = self.client.cdn.get_asset_url(asset_identifier="a", transform={"type": "t", "options": {"keep_me": 1}})
-        self.assertTrue(url.endswith("/content/t[keep_me=1]"))
+        self.assertTrue(url.endswith("/rendered/t[keep_me=1]"))
         for bad in (float("nan"), float("inf"), {1: "x"}, object()):
             with self.subTest(bad=bad), self.assertRaises(CalmLensError) as raised:
                 self.client.cdn.get_asset_url(asset_identifier="a", transform={"type": "t", "options": {"v": bad}})
@@ -304,9 +304,9 @@ class ClientTests(ClientTestCase):
 
     def test_cdn_urls_and_serve_headers(self):
         url = self.client.cdn.get_asset_url({"assetIdentifier": "a/b?", "lens": "my lens"})
-        self.assertEqual(url, "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/content/@my%20lens")
+        self.assertEqual(url, "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/rendered/@my%20lens")
         self.assertTrue(self.client.cdn.get_asset_url({"assetIdentifier": "a", "transform": "/imageTransform[width=20]"}).endswith("/imageTransform[width=20]"))
-        self.assertEqual(self.client.cdn.get_asset_url({"assetIdentifier": "a", "lens": "x", "transform": "imageTransform[format=avif]"}), "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a/content/@x,imageTransform[format=avif]")
+        self.assertEqual(self.client.cdn.get_asset_url({"assetIdentifier": "a", "lens": "x", "transform": "imageTransform[format=avif]"}), "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a/rendered/@x,imageTransform[format=avif]")
         self.result, self.headers = b"0123456789", {"Content-Type": "image/png", "X-Request-Id": "req_cdn"}
         with self.client.cdn.serve({"assetIdentifier": "a", "init": {"headers": {"x-api-key": "wrong", "Range": "bytes=0-1"}}}) as response:
             self.assertEqual(self.calls[-1].headers["X-api-key"], "key")

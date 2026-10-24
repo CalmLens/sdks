@@ -112,7 +112,7 @@ class MockClientTest {
       assertEquals("3", response.header("content-length"));
       assertArrayEquals(new byte[] {1, 2, 3}, response.readAllBytes(10));
     }
-    assertEquals("/v1/assets/project-1/asset-1/content/@card", mock.requests().get(1).path());
+    assertEquals("/v1/assets/project-1/asset-1/rendered/@card", mock.requests().get(1).path());
   }
 
   @Test void processingFeaturesAreSentAndFeatureResultsAreTyped() {
@@ -175,7 +175,7 @@ class MockClientTest {
         .baseUrl("http://localhost:6110/v1").cdnBaseUrl("http://localhost:6130/v1").timeout(Duration.ofSeconds(5)).maxRetries(0));
     assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class,
         () -> new MockCalmLensServerClient(CalmLensServerClient.builder("key", "project").timeout(Duration.ZERO))).getCode());
-    assertEquals("http://localhost:6130/v1/assets/project-9/one/content", mock.client.cdn.getAssetUrl(new Models.CdnRequest("one")));
+    assertEquals("http://localhost:6130/v1/assets/project-9/one/rendered", mock.client.cdn.getAssetUrl(new Models.CdnRequest("one")));
 
     var refused = new java.net.ConnectException("Connection refused");
     mock.enqueueFailure(refused).enqueueTimeout();

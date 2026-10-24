@@ -132,14 +132,14 @@ class ServerClientTest < Minitest::Test
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: ->(_) { flunk 'sent a request' })
     url = client.cdn.get_asset_url(asset_identifier: 'a',
                                    transform: { type: 'imageTransform', options: { scale: 2.0, blur: 1.0e-7, rotate: -90, dpr: 1e21 } })
-    assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/content/imageTransform[blur=1e-7,dpr=1e%2B21,rotate=-90,scale=2]', url
+    assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/rendered/imageTransform[blur=1e-7,dpr=1e%2B21,rotate=-90,scale=2]', url
     [Float::INFINITY, Float::NAN, :png, 1r].each do |value|
       error = assert_raises(CalmLens::InvalidArgumentError, value.inspect) do
         client.cdn.get_asset_url(asset_identifier: 'a', transform: { type: 'imageTransform', options: { width: value } })
       end
       assert_equal 'sdk/invalid-argument', error.code
     end
-    assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/content/@thumb,imageTransform[]',
+    assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/rendered/@thumb,imageTransform[]',
                  client.cdn.get_asset_url(asset_identifier: 'a', lens: 'thumb', transform: { type: 'imageTransform' })
   end
 

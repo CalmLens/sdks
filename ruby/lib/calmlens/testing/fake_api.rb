@@ -353,7 +353,7 @@ module CalmLens
       def signed_url(id, json)
         expires = json.fetch('expiresInSeconds', 900)
         params = URI.encode_www_form(json.slice('lens', 'transform').merge('expires' => expires))
-        { 'url' => "#{@cdn_base_url}/signed/#{URI.encode_www_form_component(id)}/#{json.fetch('resource', 'content')}?#{params}",
+        { 'url' => "#{@cdn_base_url}/signed/#{URI.encode_www_form_component(id)}/#{json.fetch('resource', 'rendered')}?#{params}",
           'expiresAt' => @now.call + (expires * 1000) }
       end
 
@@ -485,7 +485,7 @@ module CalmLens
         return text(404, 'Asset not found') unless project == @project_id
 
         item = project_assets.find { |asset| asset['id'] == identifier || asset['externalId'] == identifier }
-        return text(404, 'Asset not found') unless item && %w[content preview].include?(resource)
+        return text(404, 'Asset not found') unless item && %w[original rendered].include?(resource)
         return text(403, 'Asset is held') if item['classification']['moderation']['status'] == 'blocked'
 
         stored = @state.content[item['id']]

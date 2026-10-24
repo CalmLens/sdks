@@ -165,13 +165,13 @@ client.assets.delete(asset_id=queued["id"])
 
 client.ensure_lens(identifier="thumbnail", name="Thumbnail", type="image", active=True, version=1,
                    transforms=[{"type": "imageTransform", "options": {"width": 128}}])
-signed = client.assets.create_signed_url(asset_id=asset_id, resource="preview", lens="thumbnail")
+signed = client.assets.create_signed_url(asset_id=asset_id, resource="rendered", lens="thumbnail")
 ```
 
 `create` queues processing; `classify` waits for classification. Text uses UTF-8 `text/plain`
 content with an explicit asset name. List pagination starts at 0. `None` clears nullable
 update fields and moves assets/folders to the root; omitted fields remain unchanged.
-Signed URLs default to `content` and 900 seconds.
+Signed URLs default to the `rendered` resource and 900 seconds.
 
 `wait_for_decision` checks again after 0.5 seconds, then waits 1.5 times longer each time, up
 to 5 seconds between checks and never past `timeout`. Without a decision in time it raises
@@ -274,7 +274,8 @@ with client.cdn.serve(asset_identifier=queued["id"]) as response:
                 out.write(chunk)
 ```
 
-Use either `lens` or `transform`. A `transform` is a selector string or one or more structured
+`resource` is `rendered` (the default), `original` or `placeholder`; only `rendered` takes a lens or
+transform. Use either `lens` or `transform`. A `transform` is a selector string or one or more structured
 steps (the shape of a lens's `transforms`); both forms also work for `assets.create_signed_url`:
 
 ```python

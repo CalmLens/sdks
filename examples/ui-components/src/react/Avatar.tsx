@@ -15,7 +15,7 @@ export function Avatar({ projectId, assetId, status, name }: AvatarProps) {
   const src = getAssetUrl({
     projectId,
     assetIdentifier: assetId,
-    resource: "preview",
+    resource: "rendered",
     lens: "avatar",
   });
   return <img className="avatar" src={src} alt={name} onError={() => setFailed(true)} />;

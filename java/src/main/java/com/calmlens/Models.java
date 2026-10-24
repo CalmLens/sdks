@@ -1204,6 +1204,7 @@ public final class Models {
     /** @param assetId the asset */
     public SignedUrlOptions(String assetId) { this.assetId = assetId; }
     public SignedUrlOptions assetId(String value) { assetId = value; return this; }
+    /** @param value {@code rendered} (the API's default) or {@code original} (no lens or transform) @return these options */
     public SignedUrlOptions resource(String value) { resource = value; return this; }
     public SignedUrlOptions lens(String value) { lens = value; return this; }
     /**
@@ -1348,7 +1349,7 @@ public final class Models {
     /** @param assetIdentifier an asset ID or external ID */
     public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
     public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code content} (default), {@code preview} or {@code placeholder} (no lens, transform or allowAgeRestricted) @return these options */
+    /** @param value {@code rendered} (default), {@code original} (no lens or transform) or {@code placeholder} (no lens, transform or allowAgeRestricted) @return these options */
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**

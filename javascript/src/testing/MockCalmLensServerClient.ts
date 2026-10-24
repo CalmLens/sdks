@@ -656,7 +656,7 @@ export class MockCalmLensServerClient {
         const { assetId, ...options } = signedUrlOptions;
         const asset = await this.findOwnAsset(assetId);
         const expiresInSeconds = options.expiresInSeconds ?? 60 * 15;
-        const resource = options.resource ?? "content";
+        const resource = options.resource ?? "rendered";
         const transform = transformSelector(options.transform);
         const selector =
           (options.lens ? `&lens=${encodeURIComponent(options.lens)}` : "") +
