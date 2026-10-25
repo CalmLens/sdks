@@ -224,7 +224,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Revealing clothing";
     readonly description: "People shown in swimwear, underwear or lingerie-style clothing, or other clothing that exposes much of the body, with no exposed sexual anatomy, sexual act or explicit erotic display. Fitness clothing counts only when it exposes much of the body.";
-    readonly exclusions: "Exposed sexual anatomy, a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.";
+    readonly exclusions: "Exposed sexual anatomy, including a pubic area, buttocks or genitals exposed by clothing pulled down, open or pushed aside, which is nudity; a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.";
     readonly inputs: readonly ["image"];
   };
   readonly "sexual-suggestive": {
@@ -549,8 +549,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "harassment";
     readonly kind: "context";
     readonly displayName: "Fictional";
-    readonly description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.";
-    readonly exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request.";
+    readonly description: "Qualifying harassment between invented characters in a clearly fictional story, comic, cartoon, game or roleplay, such as one character insulting, threatening, bullying or scheming against another, with no real or addressed person as its target.";
+    readonly exclusions: "Missing or ambiguous fictional context: quotation marks, verse, an unattributed fragment or third-person narration alone do not make content fiction. Harassment aimed at a real person, the reader or an addressed participant rather than their character; sexual harassment of a real or addressed participant; a thin fictional cover for attacking someone real, such as a story mocking a named classmate. Memes, satire, caricatures and generated images about a real person, public figure or group, and photographs of real people, including staged or stock photos, are not fiction.";
   };
   readonly "harassment-support-prevention": {
     readonly category: "harassment";

@@ -1,4 +1,4 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-ASf7ZITR.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-xiCMFQF5.js";
 import "./SharedConstants-KcY2LQbA.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
@@ -377,6 +377,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	copyrightHolds: zod.array(zod.string().uuid()).nullish(),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullish().meta(metaStore([docPropertyInfo({ description: "Extracted text stored inline for small content or in R2 for larger content" })])),
 	processingOptions: PROCESSING_OPTIONS_SCHEMA.describe("Processing options supplied when the asset was uploaded"),
+	freeUpload: zod.boolean().nullish().describe("Uploaded with the organisation's free uploads, before billing was set up; its text is moderated only up to the free upload limit while billing is still not set up"),
 	visibility: ASSET_VISIBILITY_SCHEMA.nullish().meta(metaStore([docPropertyInfo({
 		description: "Visibility level of the asset",
 		defaultValue: "private"

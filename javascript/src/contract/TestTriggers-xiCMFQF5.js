@@ -1,3 +1,4 @@
+import "./SharedConstants-KcY2LQbA.js";
 import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
 import * as zod from "zod";
 var __defProp = Object.defineProperty;
@@ -344,6 +345,17 @@ function prefixIssues(path, issues) {
 }
 function unwrapMessage(message) {
 	return typeof message === "string" ? message : message?.message;
+}
+/** The leading size checks of `defChecks` that set an upper bound, each paired with it. */
+function sizeCaps(defChecks) {
+	const caps = [];
+	for (const ch of defChecks ?? []) {
+		const d = ch._zod.def;
+		if (!/_(length|size)$|_equals$/.test(d.check)) break;
+		const max = d.maximum ?? d.length ?? d.size;
+		if (max >= 0) caps.push([max, ch]);
+	}
+	return caps;
 }
 function attachSchema(issues, start, inst) {
 	var _a;
@@ -1669,7 +1681,7 @@ var Doc = class {
 const version = {
 	major: 4,
 	minor: 6,
-	patch: 5
+	patch: 7
 };
 //#endregion
 //#region node_modules/zod/v4/core/schemas.js
@@ -2363,6 +2375,28 @@ const $ZodDate = /*@__PURE__*/ $constructor("$ZodDate", (inst, def) => {
 		return payload;
 	};
 });
+function capSize(inst, size) {
+	const caps = sizeCaps(inst._zod.def.checks);
+	if (!caps.length) return;
+	const cap = Math.min(...caps.map((c) => c[0]));
+	const parse = inst._zod.parse;
+	inst._zod.parse = (payload, ctx) => {
+		const n = size(payload.value);
+		if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
+			for (const [max, ch] of sizeCaps(inst._zod.def.checks)) if (n > max && ch._zod.def.when(payload)) {
+				const start = payload.issues.length;
+				ch._zod.check(payload);
+				payload.issues[start].continue = false;
+				attachSchema(payload.issues, start, inst);
+				return payload;
+			}
+		}
+		return parse(payload, ctx);
+	};
+}
+const arraySize = (input) => Array.isArray(input) ? input.length : -1;
+const mapSize = (input) => input instanceof Map ? input.size : -1;
+const setSize = (input) => input instanceof Set ? input.size : -1;
 function handleArrayResult(result, final, index) {
 	if (result.issues.length) final.issues.push(...prefixIssues(index, result.issues));
 	final.value[index] = result.value;
@@ -2400,6 +2434,7 @@ const $ZodArray = /*@__PURE__*/ $constructor("$ZodArray", (inst, def) => {
 		if (proms.length) return Promise.all(proms).then(() => payload);
 		return payload;
 	};
+	capSize(inst, arraySize);
 });
 function handlePropertyResult(result, final, key, input, optin, optout) {
 	const isPresent = key in input;
@@ -2508,7 +2543,7 @@ const $ZodObject = /*@__PURE__*/ $constructor("$ZodObject", (inst, def) => {
 		}
 		return propValues;
 	});
-	const isObject$2 = isObject;
+	const isObject$1 = isObject;
 	const catchall = def.catchall;
 	let value;
 	const memo = globalConfig.memoizer;
@@ -2516,7 +2551,7 @@ const $ZodObject = /*@__PURE__*/ $constructor("$ZodObject", (inst, def) => {
 	inst._zod.parse = (payload, ctx) => {
 		value ?? (value = _normalized.value);
 		const input = payload.value;
-		if (!isObject$2(input)) {
+		if (!isObject$1(input)) {
 			payload.issues.push({
 				expected: "object",
 				code: "invalid_type",
@@ -2646,7 +2681,7 @@ const $ZodObjectJIT = /*@__PURE__*/ $constructor("$ZodObjectJIT", (inst, def) =>
 		return doc.compile();
 	};
 	let fastpass;
-	const isObject$1 = isObject;
+	const isObject$2 = isObject;
 	const jit = !globalConfig.jitless;
 	const fastEnabled = jit && allowsEval.value;
 	const catchall = def.catchall;
@@ -2654,7 +2689,7 @@ const $ZodObjectJIT = /*@__PURE__*/ $constructor("$ZodObjectJIT", (inst, def) =>
 	inst._zod.parse = (payload, ctx) => {
 		value ?? (value = _normalized.value);
 		const input = payload.value;
-		if (!isObject$1(input)) {
+		if (!isObject$2(input)) {
 			payload.issues.push({
 				expected: "object",
 				code: "invalid_type",
@@ -3232,6 +3267,7 @@ const $ZodMap = /*@__PURE__*/ $constructor("$ZodMap", (inst, def) => {
 		if (proms.length) return Promise.all(proms).then(() => payload);
 		return payload;
 	};
+	capSize(inst, mapSize);
 });
 function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
 	if (keyResult.issues.length) {
@@ -3291,6 +3327,7 @@ const $ZodSet = /*@__PURE__*/ $constructor("$ZodSet", (inst, def) => {
 		if (proms.length) return Promise.all(proms).then(() => payload);
 		return payload;
 	};
+	capSize(inst, setSize);
 });
 function handleSetResult(result, final) {
 	if (result.issues.length) final.issues.push(...result.issues);
@@ -8160,7 +8197,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Revealing clothing",
 		description: "People shown in swimwear, underwear or lingerie-style clothing, or other clothing that exposes much of the body, with no exposed sexual anatomy, sexual act or explicit erotic display. Fitness clothing counts only when it exposes much of the body.",
-		exclusions: "Exposed sexual anatomy, a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.",
+		exclusions: "Exposed sexual anatomy, including a pubic area, buttocks or genitals exposed by clothing pulled down, open or pushed aside, which is nudity; a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.",
 		inputs: ["image"]
 	},
 	"sexual-suggestive": {
@@ -8485,8 +8522,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "harassment",
 		kind: "context",
 		displayName: "Fictional",
-		description: "Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene.",
-		exclusions: "Missing or ambiguous fictional context; claiming fiction for a real-world threat or actionable harmful request."
+		description: "Qualifying harassment between invented characters in a clearly fictional story, comic, cartoon, game or roleplay, such as one character insulting, threatening, bullying or scheming against another, with no real or addressed person as its target.",
+		exclusions: "Missing or ambiguous fictional context: quotation marks, verse, an unattributed fragment or third-person narration alone do not make content fiction. Harassment aimed at a real person, the reader or an addressed participant rather than their character; sexual harassment of a real or addressed participant; a thin fictional cover for attacking someone real, such as a story mocking a named classmate. Memes, satire, caricatures and generated images about a real person, public figure or group, and photographs of real people, including staged or stock photos, are not fiction."
 	},
 	"harassment-support-prevention": {
 		category: "harassment",
@@ -8801,7 +8838,10 @@ const createProcessingFeaturesSchema = (booleanSchema) => {
 		ocr: options.ocr.nullish(),
 		personDetection: options.personDetection.nullish(),
 		faceDetection: options.faceDetection.nullish()
-	}).strict().meta(metaStore([docPropertyInfo({
+	}).strict().omit({
+		personDetection: true,
+		faceDetection: true
+	}).meta(metaStore([docPropertyInfo({
 		description: "Optional analyses to run on this asset, keyed by feature. Unknown features are rejected.",
 		namedType: "ProcessingFeatures"
 	})]));
