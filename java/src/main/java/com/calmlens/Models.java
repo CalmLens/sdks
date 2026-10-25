@@ -1299,6 +1299,41 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
+  /**
+   * What {@code assets.batch} does to every asset: {@link #DELETE} deletes it with its child assets
+   * and stored content; {@link #REMOVE_CONTENT} removes its stored content and keeps the record.
+   */
+  public enum AssetBatchOperation {
+    @SerializedName("delete") DELETE("delete"),
+    @SerializedName("remove-content") REMOVE_CONTENT("remove-content");
+    private final String value;
+    AssetBatchOperation(String value) { this.value = value; }
+    /** @return the API value, such as {@code remove-content} */
+    public String value() { return value; }
+    @Override public String toString() { return value; }
+  }
+
+  /** Options for {@code assets.batch}: 1 to 500 asset IDs and the operation to run on them. */
+  public static final class BatchAssets {
+    private List<String> assetIds;
+    private AssetBatchOperation operation;
+    public BatchAssets() {}
+    /** @param assetIds 1 to 500 asset IDs in the project @param operation what to do with them */
+    public BatchAssets(List<String> assetIds, AssetBatchOperation operation) { this.assetIds = assetIds; this.operation = operation; }
+    public BatchAssets assetIds(List<String> value) { assetIds = value; return this; }
+    public BatchAssets operation(AssetBatchOperation value) { operation = value; return this; }
+    List<String> assetIdsValue() { return assetIds; }
+    AssetBatchOperation operationValue() { return operation; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * What {@code assets.batch} returns once the operation is queued.
+   *
+   * @param queued always true
+   */
+  public record BatchAssetsResponse(boolean queued) {}
+
   /** Options for {@code assets.uploadPart}: a later part of a multipart upload. */
   public static final class UploadPart {
     private String assetId;

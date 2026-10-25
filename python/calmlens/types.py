@@ -881,6 +881,22 @@ class ExplainAssetOptions(AssetIdOptions, total=False):
     rerun: bool
 
 
+#: What ``assets.batch`` does to every asset: ``delete`` deletes it with its child assets and stored
+#: content; ``remove-content`` removes its stored content and keeps the record.
+AssetBatchOperation = Literal["delete", "remove-content"]
+
+
+class BatchAssetsOptions(TypedDict):
+    #: IDs of 1 to 500 assets in the project.
+    assetIds: List[str]
+    operation: AssetBatchOperation
+
+
+class BatchAssetsResponse(TypedDict):
+    """``assets.batch`` returns once the operation is queued: ``{"queued": True}``."""
+    queued: bool
+
+
 class MoveFolderOptions(FolderIdOptions):
     parentId: Optional[str]
 

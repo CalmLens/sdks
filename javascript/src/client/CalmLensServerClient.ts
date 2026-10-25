@@ -20,6 +20,8 @@ import type {
   AssetPage,
   AssetSearchQuery,
   AssetSearchResponse,
+  BatchAssetsOptions,
+  BatchAssetsResponse,
   CalmLensServerClientOptions,
   CdnAssetUrlOptions,
   CdnServeOptions,
@@ -63,6 +65,7 @@ import {
   pollForDecision,
   toTextAssetOptions,
   transformSelector,
+  validateBatchAssetsOptions,
   validateRequestOptions,
   validateServerClientOptions,
   validateSignedUrlOptions,
@@ -435,6 +438,21 @@ export default class CalmLensServerClient {
       /** Deletes an asset record together with its stored content. */
       delete: async ({ assetId }: DeleteAssetOptions): Promise<void> => {
         await this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}`);
+      },
+
+      /**
+       * Deletes up to 500 assets (`operation: "delete"`) or removes their stored content
+       * (`"remove-content"`) in one request. Every asset must exist in the project and the key
+       * needs `assets:delete` for its folder, or nothing is queued. Resolves with
+       * `{ queued: true }` once queued; the work runs in the background and records
+       * `asset.deleted` or `asset.content-removed` for each asset. Assets under a safety hold
+       * are skipped. Not retried: it carries no `Idempotency-Key`.
+       */
+      batch: async ({ assetIds, operation }: BatchAssetsOptions): Promise<BatchAssetsResponse> => {
+        validateBatchAssetsOptions({ assetIds, operation });
+        return this.request("POST", `${this.projectPath}/assets/batch`, {
+          body: { assetIds, operation },
+        });
       },
     };
   }

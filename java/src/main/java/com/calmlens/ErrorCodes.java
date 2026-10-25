@@ -22,6 +22,8 @@ public final class ErrorCodes {
   public static final String API_KEY_PROJECT_MISMATCH = "auth/project-mismatch";
   /** {@code auth/api-key-not-accepted} (HTTP 403). */
   public static final String API_KEY_NOT_ACCEPTED = "auth/api-key-not-accepted";
+  /** {@code auth/permission-denied} (HTTP 403). */
+  public static final String PERMISSION_DENIED = "auth/permission-denied";
   /** {@code upload/file-too-large} (HTTP 400). */
   public static final String FILE_TOO_LARGE = "upload/file-too-large";
   /** {@code upload/image-requires-multipart-upload} (HTTP 400). */
@@ -172,6 +174,7 @@ public final class ErrorCodes {
       Map.entry(INVALID_API_KEY, 401),
       Map.entry(API_KEY_PROJECT_MISMATCH, 403),
       Map.entry(API_KEY_NOT_ACCEPTED, 403),
+      Map.entry(PERMISSION_DENIED, 403),
       Map.entry(FILE_TOO_LARGE, 400),
       Map.entry(IMAGE_REQUIRES_MULTIPART_UPLOAD, 400),
       Map.entry(MULTIPART_IMAGE_TOO_SMALL, 400),

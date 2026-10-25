@@ -129,6 +129,7 @@ final class MockApi {
         case "POST folders" -> Set.of("folders.create");
         case "GET assets/search" -> Set.of("assets.search");
         case "GET assets/page" -> Set.of("assets.list", "assets.iterate");
+        case "POST assets/batch" -> Set.of("assets.batch");
         case "POST assets" -> "false".equals(request.query().get("queue")) ? Set.of("assets.classify", "text.classify") : Set.of("assets.create");
         default -> Set.of();
       };
@@ -320,6 +321,7 @@ final class MockApi {
           return page(items, q, Json.write(scope));
         }
         case "POST assets": return createAsset(upload, q, body, raw, now);
+        case "POST assets/batch": return batch(body, now);
         default: break;
       }
     } else if (parts.size() == 2 || parts.size() == 3) {
@@ -601,6 +603,84 @@ final class MockApi {
     return event;
   }
 
+  /** The UUID form the API's schema accepts (zod's {@code uuid()}). */
+  private static final java.util.regex.Pattern UUID_PATTERN = java.util.regex.Pattern.compile(
+      "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$");
+
+  /**
+   * POST /projects/:id/assets/batch: validated like the API's schema, then every asset must exist
+   * before anything changes. The operation is applied at once, in request order, instead of in the
+   * background. Mock assets carry no safety holds, so none is skipped.
+   */
+  private JsonElement batch(JsonObject body, long now) throws Failure {
+    JsonElement idsElement = body == null ? null : body.get("assetIds");
+    if (idsElement == null || !idsElement.isJsonArray()) throw Failure.validation("validation/invalid-type", "assetIds");
+    JsonArray ids = idsElement.getAsJsonArray();
+    if (ids.size() < 1) throw Failure.validation("validation/too-small", "assetIds");
+    if (ids.size() > CalmLensServerClient.ASSET_BATCH_MAX_ASSETS) throw Failure.validation("validation/too-big", "assetIds");
+    java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+    for (int index = 0; index < ids.size(); index++) {
+      JsonElement id = ids.get(index);
+      if (!id.isJsonPrimitive() || !id.getAsJsonPrimitive().isString()) throw Failure.validation("validation/invalid-type", "assetIds." + index);
+      if (!UUID_PATTERN.matcher(id.getAsString()).matches()) throw Failure.validation("validation/invalid-format", "assetIds." + index);
+      unique.add(id.getAsString());
+    }
+    String operation = str(body, "operation");
+    if (!"delete".equals(operation) && !"remove-content".equals(operation)) throw Failure.validation("validation/invalid-value", "operation");
+    List<JsonObject> assets = new ArrayList<>();
+    for (String id : unique) assets.add(asset(id));
+    for (JsonObject asset : assets) {
+      if (operation.equals("delete")) {
+        deleteAssetTree(str(asset, "id"));
+        lifecycle("asset.deleted", asset);
+      } else {
+        removeContent(asset, now);
+      }
+    }
+    JsonObject queued = new JsonObject();
+    queued.addProperty("queued", true);
+    return queued;
+  }
+
+  /** Deletes an asset, its stored child assets and their content. */
+  private void deleteAssetTree(String id) {
+    Set<String> deleting = new java.util.LinkedHashSet<>(List.of(id));
+    for (boolean added = true; added; ) {
+      added = false;
+      for (JsonObject other : projectAssets()) {
+        String parentId = str(other, "parentId");
+        if (parentId != null && deleting.contains(parentId) && deleting.add(str(other, "id"))) added = true;
+      }
+    }
+    for (String each : deleting) {
+      storage.assets.remove(each);
+      storage.content.remove(each);
+      uploads.remove(each);
+    }
+  }
+
+  /**
+   * Removes an asset's content like the API: the record and report stay; stored content, extracted
+   * text and the placeholder go. Content already removed keeps its reason, and an
+   * asset.content-removed event is recorded either way.
+   */
+  private JsonObject removeContent(JsonObject asset, long now) {
+    storage.content.remove(str(asset, "id"));
+    JsonObject content = asset.getAsJsonObject("content");
+    if (!"removed".equals(str(content, "status"))) {
+      content.addProperty("status", "removed");
+      content.addProperty("removalReason", "requested");
+      content.addProperty("updatedAt", now);
+      content.add("extractedText", JsonNull.INSTANCE);
+      content.add("image", Objects.requireNonNullElse(withoutPlaceholder(content.get("image")), JsonNull.INSTANCE));
+      asset.addProperty("updatedAt", now);
+    } else if (content.get("image") instanceof JsonObject image && str(image, "thumbhash") != null) {
+      content.add("image", withoutPlaceholder(image));
+    }
+    lifecycle("asset.content-removed", asset);
+    return asset;
+  }
+
   private JsonElement assetRoute(String method, String id, String suffix, JsonObject q, JsonObject body, byte[] raw, long now)
       throws Failure, IOException {
     JsonObject asset = asset(id);
@@ -613,25 +693,7 @@ final class MockApi {
         uploads.remove(id);
         lifecycle("asset.deleted", asset);
         return null;
-      case "DELETE content": {
-        // Like the API: the record and report stay; stored content, extracted text and the
-        // placeholder go. Content already removed keeps its reason, and an asset.content-removed
-        // event is recorded either way.
-        storage.content.remove(id);
-        JsonObject content = asset.getAsJsonObject("content");
-        if (!"removed".equals(str(content, "status"))) {
-          content.addProperty("status", "removed");
-          content.addProperty("removalReason", "requested");
-          content.addProperty("updatedAt", now);
-          content.add("extractedText", JsonNull.INSTANCE);
-          content.add("image", Objects.requireNonNullElse(withoutPlaceholder(content.get("image")), JsonNull.INSTANCE));
-          asset.addProperty("updatedAt", now);
-        } else if (content.get("image") instanceof JsonObject image && str(image, "thumbhash") != null) {
-          content.add("image", withoutPlaceholder(image));
-        }
-        lifecycle("asset.content-removed", asset);
-        return asset;
-      }
+      case "DELETE content": return removeContent(asset, now);
       case "POST retry":
         if (!"failed".equals(str(asset.getAsJsonObject("classification"), "status"))
             || !"pending".equals(str(asset.getAsJsonObject("classification").getAsJsonObject("moderation"), "status")))

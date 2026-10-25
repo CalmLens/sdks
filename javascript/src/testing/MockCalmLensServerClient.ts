@@ -16,6 +16,8 @@ import type {
   AssetChildrenPage,
   AssetPage,
   AssetSearchResponse,
+  BatchAssetsOptions,
+  BatchAssetsResponse,
   CalmLensServerClientOptions,
   CdnAssetUrlOptions,
   CdnServeOptions,
@@ -56,6 +58,7 @@ import {
   pollForDecision,
   toTextAssetOptions,
   transformSelector,
+  validateBatchAssetsOptions,
   validateServerClientOptions,
 } from "../client/CalmLensUtils";
 import { getAssetPayloadByteLength, validateAssetPayload } from "../contract/AssetPayload.js";
@@ -195,6 +198,7 @@ export interface MockCalmLensOperationOptions {
   "assets.waitForDecision": WaitForAssetDecisionOptions;
   "assets.deleteContent": DeleteAssetContentOptions;
   "assets.delete": DeleteAssetOptions;
+  "assets.batch": BatchAssetsOptions;
   "text.classify": ClassifyTextOptions;
   "cdn.serve": CdnServeOptions;
   "events.list": ListEventsOptions;
@@ -248,6 +252,10 @@ const toFailureError = (failure: Exclude<MockRequestFailure, ApiErrorCode>): Err
   }
   return failure;
 };
+
+/** The UUID form the API's schema accepts (zod's `uuid()`). */
+const UUID_PATTERN =
+  /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
 
 /** The asset snapshot events carry (getEventAsset in the API). */
 const toEventAsset = (asset: Asset) => ({
@@ -985,36 +993,7 @@ export class MockCalmLensServerClient {
 
       deleteContent: async (options: DeleteAssetContentOptions): Promise<Asset> => {
         this.begin("assets.deleteContent", options);
-        const asset = await this.findOwnAsset(options?.assetId);
-        await this.imageStorage.deleteContent(asset.id);
-        // Like the API: the record and report stay; stored content, extracted text and the
-        // placeholder go. Content already removed keeps its reason, and an `asset.content-removed`
-        // event is recorded either way.
-        const removed =
-          asset.content.status === "removed"
-            ? asset.content.image?.thumbhash
-              ? await this.databaseStorage.updateAsset({
-                  ...asset,
-                  content: { ...asset.content, image: withoutPlaceholder(asset.content.image) },
-                })
-              : asset
-            : await (async () => {
-                const now = this.now();
-                return this.databaseStorage.updateAsset({
-                  ...asset,
-                  content: {
-                    ...asset.content,
-                    status: "removed",
-                    removalReason: "requested",
-                    updatedAt: now,
-                    extractedText: null,
-                    image: withoutPlaceholder(asset.content.image),
-                  },
-                  updatedAt: now,
-                });
-              })();
-        this.recordLifecycleEvent("asset.content-removed", removed);
-        return removed;
+        return this.removeContent(await this.findOwnAsset(options?.assetId));
       },
 
       delete: async (options: DeleteAssetOptions): Promise<void> => {
@@ -1024,7 +1003,89 @@ export class MockCalmLensServerClient {
         await this.databaseStorage.deleteAsset(asset.id);
         this.recordLifecycleEvent("asset.deleted", asset);
       },
+
+      /**
+       * Checks every asset like the API (a non-UUID ID is `validation/invalid-format`, an unknown
+       * one `asset/not-found`, and either refuses the whole batch), then applies the operation at
+       * once instead of in the background: `delete` deletes each asset with its stored child
+       * assets and records `asset.deleted` with the asset as it was; `remove-content` removes
+       * the content like `deleteContent`. Mock assets carry no safety holds, so none is skipped.
+       */
+      batch: async (options: BatchAssetsOptions): Promise<BatchAssetsResponse> => {
+        this.begin("assets.batch", options);
+        validateBatchAssetsOptions(options);
+        const { assetIds, operation } = options;
+        assetIds.forEach((assetId, index) => {
+          if (!UUID_PATTERN.test(assetId)) {
+            throw this.validationError("validation/invalid-format", `assetIds.${index}`);
+          }
+        });
+        const assets: Asset[] = [];
+        for (const assetId of new Set(assetIds)) assets.push(await this.findOwnAsset(assetId));
+        for (const asset of assets) {
+          if (operation === "delete") {
+            await this.deleteAssetTree(asset);
+            this.recordLifecycleEvent("asset.deleted", asset);
+          } else {
+            await this.removeContent(asset);
+          }
+        }
+        return { queued: true };
+      },
     };
+  }
+
+  /**
+   * Removes an asset's content like the API: the record and report stay; stored content,
+   * extracted text and the placeholder go. Content already removed keeps its reason, and an
+   * `asset.content-removed` event is recorded either way.
+   */
+  private async removeContent(asset: Asset): Promise<Asset> {
+    await this.imageStorage.deleteContent(asset.id);
+    const removed =
+      asset.content.status === "removed"
+        ? asset.content.image?.thumbhash
+          ? await this.databaseStorage.updateAsset({
+              ...asset,
+              content: { ...asset.content, image: withoutPlaceholder(asset.content.image) },
+            })
+          : asset
+        : await (async () => {
+            const now = this.now();
+            return this.databaseStorage.updateAsset({
+              ...asset,
+              content: {
+                ...asset.content,
+                status: "removed",
+                removalReason: "requested",
+                updatedAt: now,
+                extractedText: null,
+                image: withoutPlaceholder(asset.content.image),
+              },
+              updatedAt: now,
+            });
+          })();
+    this.recordLifecycleEvent("asset.content-removed", removed);
+    return removed;
+  }
+
+  /** Deletes an asset, its stored child assets and their content. */
+  private async deleteAssetTree(asset: Asset): Promise<void> {
+    const assets = await this.databaseStorage.listAssets(this.projectId);
+    const deleting = new Set([asset.id]);
+    for (let added = true; added; ) {
+      added = false;
+      for (const other of assets) {
+        if (other.parentId && deleting.has(other.parentId) && !deleting.has(other.id)) {
+          deleting.add(other.id);
+          added = true;
+        }
+      }
+    }
+    for (const id of deleting) {
+      await this.imageStorage.deleteContent(id);
+      await this.databaseStorage.deleteAsset(id);
+    }
   }
 
   /** Signs real upload tokens with the mock's API key, like the real client, without a request. */

@@ -694,6 +694,30 @@ type UploadAssetPartOptions struct {
 	IdempotencyKey string
 }
 
+// AssetBatchOperation is what Assets.Batch does to every asset.
+type AssetBatchOperation string
+
+const (
+	// AssetBatchOperationDelete deletes each asset with its child assets and stored content.
+	AssetBatchOperationDelete AssetBatchOperation = "delete"
+	// AssetBatchOperationRemoveContent removes each asset's stored content and keeps the record.
+	AssetBatchOperationRemoveContent AssetBatchOperation = "remove-content"
+)
+
+// AssetBatchMaxAssets is the most assets one Assets.Batch request takes.
+const AssetBatchMaxAssets = 500
+
+// BatchAssetsOptions selects 1 to 500 assets and the operation to run on them.
+type BatchAssetsOptions struct {
+	AssetIDs  []string
+	Operation AssetBatchOperation
+}
+
+// BatchAssetsResponse confirms that a batch operation is queued.
+type BatchAssetsResponse struct {
+	Queued bool `json:"queued"`
+}
+
 // MoveAssetOptions moves an asset; a nil FolderID moves it to the root.
 type MoveAssetOptions struct {
 	AssetID  string

@@ -92,6 +92,7 @@ send `Accept: application/json`. `calmlens.Version` is the SDK version.
 | `assets.deleteContent` | `Assets.DeleteContent(ctx, AssetIDOptions)` |
 | `assets.delete` | `Assets.Delete(ctx, AssetIDOptions)` (returns only `error`) |
 | `assets.move` | `Assets.Move(ctx, MoveAssetOptions)` |
+| `assets.batch` | `Assets.Batch(ctx, BatchAssetsOptions)`: 1 to 500 `AssetIDs` with `AssetBatchOperationDelete` or `AssetBatchOperationRemoveContent`; returns `*BatchAssetsResponse` once queued, and is not retried |
 | `assets.createSignedUrl` | `Assets.CreateSignedURL(ctx, SignedURLOptions)` |
 | `folders.list` | `Folders.List(ctx, ListFoldersOptions{})` |
 | `folders.retrieve/delete` | `Folders.Retrieve/Delete(ctx, FolderIDOptions)` |

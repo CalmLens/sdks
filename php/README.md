@@ -50,7 +50,7 @@ configuration. The defaults are constants on `ServerClient`. Requests send a
 
 | Resource | Methods |
 | --- | --- |
-| `assets` | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
+| `assets` | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
 | `folders` | `list`, `create`, `retrieve`, `update`, `move`, `delete` |
 | `text` | `classify` |
 | `events` | `list`, `each`, `eachPage` |

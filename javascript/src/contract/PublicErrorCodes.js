@@ -315,6 +315,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "API keys are only accepted by the public API at /v1.",
 		status: 403
 	}),
+	PERMISSION_DENIED: new ErrorCode({
+		id: "auth/permission-denied",
+		defaultMessage: "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
+		status: 403
+	}),
 	FILE_TOO_LARGE: new ErrorCode({
 		id: "upload/file-too-large",
 		defaultMessage: "File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.",

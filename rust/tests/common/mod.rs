@@ -42,6 +42,7 @@ pub async fn invoke(
         "assets.deleteContent" => output(client.assets().delete_content(input(options)?).await),
         "assets.delete" => output(client.assets().delete(input(options)?).await),
         "assets.move" => output(client.assets().move_asset(input(options)?).await),
+        "assets.batch" => output(client.assets().batch(input(options)?).await),
         "assets.listChildren" => output(client.assets().list_children(input(options)?).await),
         "assets.uploadPart" => output(client.assets().upload_part(input(options)?).await),
         "assets.createSignedUrl" => {

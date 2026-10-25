@@ -843,6 +843,54 @@
     }
   },
   {
+    "operation": "assets.batch",
+    "options": {
+      "assetIds": [
+        "asset-1",
+        "a/b?c#d"
+      ],
+      "operation": "remove-content"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/assets/batch",
+      "query": {},
+      "body": {
+        "assetIds": [
+          "asset-1",
+          "a/b?c#d"
+        ],
+        "operation": "remove-content"
+      }
+    },
+    "response": {
+      "queued": true
+    }
+  },
+  {
+    "operation": "assets.batch",
+    "options": {
+      "assetIds": [
+        "asset-1"
+      ],
+      "operation": "delete"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/assets/batch",
+      "query": {},
+      "body": {
+        "assetIds": [
+          "asset-1"
+        ],
+        "operation": "delete"
+      }
+    },
+    "response": {
+      "queued": true
+    }
+  },
+  {
     "operation": "assets.createSignedUrl",
     "options": {
       "assetId": "asset-1",

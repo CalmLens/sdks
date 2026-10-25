@@ -255,6 +255,8 @@ blocking_methods!(AssetsClient => assets {
     fn delete_content(options: AssetId) -> Result<Asset>;
     /// See [`crate::AssetsClient::delete`].
     fn delete(options: AssetId) -> Result<()>;
+    /// See [`crate::AssetsClient::batch`].
+    fn batch(options: BatchAssets) -> Result<BatchAssetsResponse>;
     /// See [`crate::AssetsClient::move_asset`].
     fn move_asset(options: MoveAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::create_signed_url`].

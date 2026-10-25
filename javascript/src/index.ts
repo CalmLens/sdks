@@ -12,6 +12,7 @@ export { CALMLENS_ERROR_CODES, CalmLensError } from "./client/CalmLensError";
 export type { ApiErrorCode } from "./client/CalmLensErrorCodes";
 export type {
   Asset,
+  AssetBatchOperation,
   AssetChecksums,
   AssetChildrenPage,
   AssetClassification,
@@ -31,6 +32,8 @@ export type {
   AssetUpload,
   AssetUploadStatus,
   AssetVisibility,
+  BatchAssetsOptions,
+  BatchAssetsResponse,
   CalmLensAppClientOptions,
   CalmLensServerClientOptions,
   CdnAssetUrlOptions,

@@ -792,7 +792,11 @@ class ContractTest {
 
   /** Fixture options a Java type cannot hold, so the type already refuses the request. */
   private static final Map<String, String> REJECTED_BY_TYPE = Map.of(
-      "signed URL lifetime of a fraction of a second", "SignedUrlOptions.expiresInSeconds is a Long");
+      "signed URL lifetime of a fraction of a second", "SignedUrlOptions.expiresInSeconds is a Long",
+      "batch with an unknown operation", "BatchAssets.operation is an AssetBatchOperation enum");
+  private static final Map<String, Class<?>> REJECTED_TYPES = Map.of(
+      "signed URL lifetime of a fraction of a second", Models.SignedUrlOptions.class,
+      "batch with an unknown operation", Models.BatchAssets.class);
 
   @TestFactory Stream<DynamicTest> refusesRejectedRequestsBeforeSending() throws Exception {
     CalmLensServerClient client = refusing();
@@ -801,7 +805,7 @@ class ContractTest {
       JsonObject options = rejection.getAsJsonObject("options");
       if (REJECTED_BY_TYPE.containsKey(name)) {
         // The typed options cannot hold the fixture's value: it does not survive decoding.
-        JsonObject typed = Models.encode(Fixtures.decode(options, Models.SignedUrlOptions.class));
+        JsonObject typed = Models.encode(Fixtures.decode(options, REJECTED_TYPES.get(name)));
         assertNotEquals(options, typed, REJECTED_BY_TYPE.get(name));
         return;
       }

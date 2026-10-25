@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-//go:generate go run ./internal/errorcodesgen ../shared/src/PublicErrorCodes.ts errorcodes.go
+//go:generate go run ./internal/errorcodesgen ../../packages/shared/src/PublicErrorCodes.ts errorcodes.go
 
 // Error codes the SDK itself produces, in addition to the API codes in errorcodes.go.
 const (

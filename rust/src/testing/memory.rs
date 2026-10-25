@@ -323,6 +323,23 @@ fn custom(code: &str, status: u16, message: &str) -> Failure {
 fn invalid(message: &str) -> Failure {
     fail(ErrorCode::InvalidUploadPayload, message)
 }
+/// Whether `value` is a UUID as the API's schema accepts it (zod's `uuid()`): version 1 to 8
+/// with the RFC variant, or the nil or max UUID.
+fn is_uuid(value: &str) -> bool {
+    if value == "00000000-0000-0000-0000-000000000000"
+        || value == "ffffffff-ffff-ffff-ffff-ffffffffffff"
+    {
+        return true;
+    }
+    let bytes = value.as_bytes();
+    bytes.len() == 36
+        && bytes.iter().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => *byte == b'-',
+            14 => (b'1'..=b'8').contains(byte),
+            19 => matches!(byte.to_ascii_lowercase(), b'8' | b'9' | b'a' | b'b'),
+            _ => byte.is_ascii_hexdigit(),
+        })
+}
 /// A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
 fn validation(issue: &str, path: &str) -> Failure {
     let mut failure = custom(
@@ -696,6 +713,96 @@ impl Backend {
         self.storage.events.push(event);
     }
 
+    /// Removes an asset's content like the API: the record and report stay; stored content,
+    /// extracted text and the placeholder go. Content already removed keeps its reason, and an
+    /// `asset.content-removed` event is recorded either way.
+    fn remove_content(&mut self, mut asset: Value, now: u64) -> Value {
+        let id = text(&asset["id"]).to_owned();
+        self.storage.content.remove(&id);
+        let image = without_placeholder(&asset["content"]["image"]);
+        if asset["content"]["status"] != "removed" {
+            let content = section(&mut asset, "content");
+            content.insert("status".into(), "removed".into());
+            content.insert("removalReason".into(), "requested".into());
+            content.insert("updatedAt".into(), now.into());
+            content.insert("extractedText".into(), Value::Null);
+            asset["updatedAt"] = now.into();
+        }
+        asset["content"]["image"] = image;
+        self.storage.assets.insert(id, asset.clone());
+        self.record_lifecycle_event("asset.content-removed", &asset);
+        asset
+    }
+
+    /// Deletes an asset, its stored child assets and their content.
+    fn delete_asset_tree(&mut self, id: &str) {
+        let mut deleting = vec![id.to_owned()];
+        let mut index = 0;
+        while index < deleting.len() {
+            let parent = deleting[index].clone();
+            for (child, asset) in &self.storage.assets {
+                if asset["parentId"] == parent.as_str() && !deleting.contains(child) {
+                    deleting.push(child.clone());
+                }
+            }
+            index += 1;
+        }
+        for id in deleting {
+            self.storage.assets.remove(&id);
+            self.storage.content.remove(&id);
+            self.uploads.remove(&id);
+        }
+    }
+
+    /// `POST /projects/:id/assets/batch`: the schema (1 to 500 UUIDs and a known operation) and
+    /// every asset are checked before anything changes, then the operation is applied at once,
+    /// in request order, instead of in the background. Mock assets carry no safety holds.
+    fn batch(&mut self, body: Map<String, Value>, now: u64) -> Outcome<Value> {
+        let ids = match body.get("assetIds") {
+            Some(Value::Array(ids)) => ids,
+            _ => return Err(validation("invalid-type", "assetIds")),
+        };
+        if ids.is_empty() {
+            return Err(validation("too-small", "assetIds"));
+        }
+        if ids.len() > crate::ASSET_BATCH_MAX_ASSETS {
+            return Err(validation("too-big", "assetIds"));
+        }
+        let mut unique: Vec<String> = Vec::new();
+        for (index, id) in ids.iter().enumerate() {
+            let Some(id) = id.as_str() else {
+                return Err(validation("invalid-type", &format!("assetIds.{index}")));
+            };
+            if !is_uuid(id) {
+                return Err(validation("invalid-format", &format!("assetIds.{index}")));
+            }
+            if !unique.iter().any(|seen| seen == id) {
+                unique.push(id.to_owned());
+            }
+        }
+        let operation = body.get("operation").and_then(Value::as_str);
+        if !matches!(operation, Some("delete" | "remove-content")) {
+            return Err(validation("invalid-value", "operation"));
+        }
+        let mut assets = Vec::with_capacity(unique.len());
+        for id in &unique {
+            let asset = self
+                .owned(&self.storage.assets, id)
+                .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?;
+            assets.push(asset.clone());
+        }
+        for asset in assets {
+            if operation == Some("delete") {
+                self.delete_asset_tree(text(&asset["id"]));
+                // One event per requested asset, with the asset as it was before the deletion.
+                self.record_lifecycle_event("asset.deleted", &asset);
+            } else {
+                self.remove_content(asset, now);
+            }
+        }
+        Ok(json!({ "queued": true }))
+    }
+
     /// Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API.
     fn record_lifecycle_event(&mut self, event_type: &str, asset: &Value) {
         let mut name = json!({"key": "asset-name", "value": asset["name"]});
@@ -833,6 +940,7 @@ impl Backend {
                         })
                     }
                     ("GET", "assets/search") => self.search(q),
+                    ("POST", "assets/batch") => self.batch(body, now),
                     ("POST", "assets") => {
                         self.create_asset(header(headers, "x-calmlens-upload"), body, q, raw, now)
                     }
@@ -1411,25 +1519,7 @@ impl Backend {
                 }
                 asset["updatedAt"] = now.into();
             }
-            ("DELETE", "content") => {
-                // The record and report stay; stored content, extracted text and the
-                // placeholder go. Content already removed keeps its reason, and an
-                // `asset.content-removed` event is recorded either way.
-                storage.content.remove(id);
-                let image = without_placeholder(&asset["content"]["image"]);
-                if asset["content"]["status"] != "removed" {
-                    let content = section(&mut asset, "content");
-                    content.insert("status".into(), "removed".into());
-                    content.insert("removalReason".into(), "requested".into());
-                    content.insert("updatedAt".into(), now.into());
-                    content.insert("extractedText".into(), Value::Null);
-                    asset["updatedAt"] = now.into();
-                }
-                asset["content"]["image"] = image;
-                storage.assets.insert(id.to_owned(), asset.clone());
-                self.record_lifecycle_event("asset.content-removed", &asset);
-                return Ok(asset);
-            }
+            ("DELETE", "content") => return Ok(self.remove_content(asset, now)),
             ("POST", "part") => {
                 let (received, is_final) = self.check_part(&asset, q, raw)?;
                 let part: u64 = q["partNumber"].parse().unwrap_or(0);
@@ -1880,6 +1970,7 @@ impl Backend {
             ("POST", ["projects", _, "folders"]) => "folders.create",
             ("GET", ["projects", _, "assets", "page"]) => "assets.list",
             ("GET", ["projects", _, "assets", "search"]) => "assets.search",
+            ("POST", ["projects", _, "assets", "batch"]) => "assets.batch",
             ("POST", ["projects", _, "assets"]) if queue => "assets.create",
             ("POST", ["projects", _, "assets"]) => "assets.classify",
             ("GET", ["assets", _]) => "assets.retrieve",

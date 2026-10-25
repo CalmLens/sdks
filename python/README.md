@@ -148,6 +148,7 @@ retried.
 | `assets.move/retry/delete(options)` | Same names; `delete` returns `None` |
 | `assets.explain({ assetId, rerun })` | `assets.explain(asset_id=, rerun=True)` |
 | `assets.deleteContent(options)` | `assets.delete_content(...)` |
+| `assets.batch({ assetIds, operation })` | `assets.batch(asset_ids=[...], operation="delete")`; returns `{"queued": True}` |
 | `assets.waitForDecision({ assetId, timeoutMs })` | `assets.wait_for_decision(asset_id=, timeout=60)`; `timeout` in seconds, no `signal` |
 | `folders.list()` | `folders.list()` |
 | `folders.create/retrieve/update/move/delete(options)` | Same names |
@@ -176,6 +177,8 @@ decided = client.assets.wait_for_decision(asset_id=queued["id"], timeout=30)
 client.assets.delete_content(asset_id=queued["id"])
 # Delete the record and its content:
 client.assets.delete(asset_id=queued["id"])
+# Up to 500 assets at once, "delete" or "remove-content"; runs in the background once queued:
+client.assets.batch(asset_ids=[first_id, second_id], operation="remove-content")
 
 client.ensure_lens(identifier="thumbnail", name="Thumbnail", type="image", active=True, version=1,
                    transforms=[{"type": "imageTransform", "options": {"width": 128}}])

@@ -2739,6 +2739,269 @@
       ]
     },
     {
+      "name": "batch removes content and deletes assets, and an unknown or malformed ID refuses the whole batch",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "a"
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "b.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "b"
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "c.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "c"
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed"
+        },
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              {
+                "$ref": "a.id"
+              },
+              "00000000-0000-4000-8000-000000000000"
+            ],
+            "operation": "delete"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              {
+                "$ref": "a.id"
+              },
+              "not-a-uuid"
+            ],
+            "operation": "remove-content"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-format",
+              "status": 400,
+              "details": {
+                "path": "assetIds.1"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "stored"
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 0
+            }
+          }
+        },
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              {
+                "$ref": "a.id"
+              }
+            ],
+            "operation": "remove-content"
+          },
+          "expect": {
+            "result": {
+              "queued": true
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "removed",
+              "content.removalReason": "requested",
+              "classification.moderation.status": "allowed"
+            }
+          }
+        },
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              {
+                "$ref": "a.id"
+              },
+              {
+                "$ref": "b.id"
+              }
+            ],
+            "operation": "delete"
+          },
+          "expect": {
+            "result": {
+              "queued": true
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "b.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "c.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "after": {
+              "$ref": "feed.cursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "events.length": 3,
+              "events.0.type": "asset.content-removed",
+              "events.0.assetId": {
+                "$ref": "a.id"
+              },
+              "events.0.asset.content.status": "removed",
+              "events.0.facts": {
+                "$contains": {
+                  "key": "asset-name",
+                  "value": "a.png",
+                  "url": {
+                    "$concat": [
+                      "/portal/assets/",
+                      {
+                        "$ref": "a.id"
+                      }
+                    ]
+                  }
+                }
+              },
+              "events.1.type": "asset.deleted",
+              "events.1.severity": "low",
+              "events.1.assetId": {
+                "$ref": "a.id"
+              },
+              "events.1.asset.content.status": "removed",
+              "events.1.facts": {
+                "$contains": {
+                  "key": "asset-name",
+                  "value": "a.png"
+                }
+              },
+              "events.2.type": "asset.deleted",
+              "events.2.assetId": {
+                "$ref": "b.id"
+              },
+              "events.2.asset.content.status": "stored",
+              "events.2.facts": {
+                "$contains": {
+                  "key": "asset-name",
+                  "value": "b.png"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "a reviewer's purge records content-removed before asset.purged",
       "mock": {},
       "steps": [

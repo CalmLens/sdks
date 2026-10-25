@@ -213,6 +213,19 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   private static CalmLensException config(String message) { return new CalmLensException(ErrorCodes.SDK_INVALID_CONFIG, message); }
 
+  /** The most assets one {@code assets.batch} request takes. */
+  public static final int ASSET_BATCH_MAX_ASSETS = 500;
+
+  /** Refuses a batch the API would reject for its size, an ID or the operation. */
+  static void validateBatch(Models.BatchAssets options) {
+    if (options == null) throw argument("Batch options are required");
+    java.util.List<String> ids = options.assetIdsValue();
+    if (ids == null || ids.isEmpty() || ids.size() > ASSET_BATCH_MAX_ASSETS)
+      throw argument("assetIds must list 1 to " + ASSET_BATCH_MAX_ASSETS + " asset IDs");
+    for (String id : ids) if (id == null || id.isEmpty()) throw argument("Every asset ID must be a non-empty string");
+    if (options.operationValue() == null) throw argument("operation must be one of delete, remove-content");
+  }
+
   private static CalmLensException argument(String message) { return new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, message); }
 
   private static CalmLensException payloadError(String message) { return new CalmLensException(ErrorCodes.INVALID_UPLOAD_PAYLOAD, message); }
@@ -1143,6 +1156,27 @@ public final class CalmLensServerClient implements AutoCloseable {
     /** Permanently deletes the asset record, its report and its stored content. @param options the asset */
     public void delete(Models.AssetId options) {
       success(json("DELETE", "/assets/" + id(str(Models.encode(options), "assetId", null)), null, null));
+    }
+
+    /**
+     * Deletes up to 500 assets ({@link Models.AssetBatchOperation#DELETE}) or removes their stored
+     * content ({@link Models.AssetBatchOperation#REMOVE_CONTENT}) in one request. Every asset must
+     * exist in the project and the key needs {@code assets:delete} for its folder, or nothing is
+     * queued. The work runs in the background and records {@code asset.deleted} or
+     * {@code asset.content-removed} for each asset; assets under a safety hold are skipped. Not
+     * retried: it carries no {@code Idempotency-Key}.
+     *
+     * @param options the asset IDs and the operation
+     * @return the queued response
+     */
+    public Models.BatchAssetsResponse batch(Models.BatchAssets options) {
+      validateBatch(options);
+      JsonObject body = new JsonObject();
+      com.google.gson.JsonArray ids = new com.google.gson.JsonArray();
+      options.assetIdsValue().forEach(ids::add);
+      body.add("assetIds", ids);
+      body.addProperty("operation", options.operationValue().value());
+      return decode(json("POST", project("assets/batch"), null, body), Models.BatchAssetsResponse.class);
     }
 
     /** @param options the asset and target folder (null for the root) @return the moved asset */

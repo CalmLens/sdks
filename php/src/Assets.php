@@ -20,6 +20,14 @@ final class Assets extends Resource
     public const DECISION_FIRST_INTERVAL = 0.5;
     public const DECISION_INTERVAL_FACTOR = 1.5;
     public const DECISION_MAX_INTERVAL = 5;
+    /** `batch` operation: deletes each asset with its child assets and stored content. */
+    public const BATCH_DELETE = 'delete';
+    /** `batch` operation: removes each asset's stored content and keeps the record. */
+    public const BATCH_REMOVE_CONTENT = 'remove-content';
+    /** The operations `batch` runs. */
+    public const BATCH_OPERATIONS = [self::BATCH_DELETE, self::BATCH_REMOVE_CONTENT];
+    /** The most assets one `batch` request takes. */
+    public const MAX_BATCH_ASSETS = 500;
 
     public function search(array $options): array
     {
@@ -97,6 +105,42 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($options);
         $this->session->request('DELETE', $this->path($api, 'assets', 'assetId'), options: $request);
+    }
+
+    /**
+     * Deletes up to 500 assets (`'operation' => 'delete'`) or removes their stored content
+     * (`'remove-content'`) in one request. Every asset must exist in the project and the key needs
+     * `assets:delete` for its folder, or nothing is queued. Returns `['queued' => true]` once
+     * queued; the work runs in the background and records `asset.deleted` or
+     * `asset.content-removed` for each asset. Assets under a safety hold are skipped. Not retried:
+     * it carries no `Idempotency-Key`.
+     *
+     * @param array{assetIds: list<string>, operation: string} $options
+     * @return array{queued: bool}
+     */
+    public function batch(array $options): array
+    {
+        [$api, $request] = $this->split($options);
+        self::validateBatch($api);
+        $body = ['assetIds' => $api['assetIds'], 'operation' => $api['operation']];
+        return $this->session->request('POST', $this->session->project('assets/batch'), body: $body, options: $request);
+    }
+
+    /** Refuses a batch the API would reject for its size, an ID or the operation (`sdk/invalid-argument`). */
+    public static function validateBatch(array $options): void
+    {
+        $ids = $options['assetIds'] ?? null;
+        if (!is_array($ids) || !array_is_list($ids) || count($ids) < 1 || count($ids) > self::MAX_BATCH_ASSETS) {
+            Values::invalid('assetIds must list 1 to ' . self::MAX_BATCH_ASSETS . ' asset IDs');
+        }
+        foreach ($ids as $id) {
+            if (!is_string($id) || $id === '') {
+                Values::invalid('Every asset ID must be a non-empty string');
+            }
+        }
+        if (!in_array($options['operation'] ?? null, self::BATCH_OPERATIONS, true)) {
+            Values::invalid('operation must be one of ' . implode(', ', self::BATCH_OPERATIONS));
+        }
     }
 
     public function move(array $options): array

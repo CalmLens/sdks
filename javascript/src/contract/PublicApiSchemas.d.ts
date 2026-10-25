@@ -5,7 +5,7 @@ import "./EventCatalog-BEqpjGaY.js";
 import "./Page-Bpd8G-D0.js";
 import { r as TypedEvent } from "./Event-xe8EF3CI.js";
 import "./Lens-C4Nob-W6.js";
-import "./PublicErrorCodes-4wHBtE9j.js";
+import "./PublicErrorCodes-DMKnKcr3.js";
 import * as zod from "zod";
 //#region packages/shared/src/PublicApiSchemas.d.ts
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
@@ -108,6 +108,12 @@ declare const PATCH_ASSET_BODY_SCHEMA: zod.ZodObject<{
   }>>>>;
 }, zod.core.$strip>;
 type PatchAssetBody = zod.infer<typeof PATCH_ASSET_BODY_SCHEMA>;
+declare const ASSET_BATCH_OPERATIONS: readonly ["delete", "remove-content"];
+type AssetBatchOperation = (typeof ASSET_BATCH_OPERATIONS)[number];
+declare const POST_ASSET_BATCH_OPERATION_RESPONSE_SCHEMA: zod.ZodObject<{
+  queued: zod.ZodLiteral<true>;
+}, zod.core.$strip>;
+type PostAssetBatchOperationResponse = zod.infer<typeof POST_ASSET_BATCH_OPERATION_RESPONSE_SCHEMA>;
 declare const GET_EVENTS_QUERY_SCHEMA: zod.ZodObject<{
   after: zod.ZodOptional<zod.ZodString>;
   limit: zod.ZodDefault<zod.ZodNumber>;
@@ -119,4 +125,4 @@ type GetEventsResponse = {
   hasMore: boolean;
 };
 //#endregion
-export type { GetAssetChildrenQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, PatchAssetBody, PatchFolderBody, PostAssetSignedUrlResponse, PostFolderBody };
+export type { AssetBatchOperation, GetAssetChildrenQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, PatchAssetBody, PatchFolderBody, PostAssetBatchOperationResponse, PostAssetSignedUrlResponse, PostFolderBody };

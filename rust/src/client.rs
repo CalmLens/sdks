@@ -794,6 +794,24 @@ fn percent_encode(value: &str, keep: &[u8]) -> String {
 }
 /// Encodes an identifier as one path segment. "." and ".." are rejected because URL
 /// resolution treats them as relative segments, which would reach another route.
+/// The most assets one [`AssetsClient::batch`] request takes.
+pub const ASSET_BATCH_MAX_ASSETS: usize = 500;
+
+/// Refuses a batch the API would reject for its size or an empty ID.
+pub(crate) fn validate_batch(options: &BatchAssets) -> Result<()> {
+    if options.asset_ids.is_empty() || options.asset_ids.len() > ASSET_BATCH_MAX_ASSETS {
+        return Err(invalid_argument(format!(
+            "asset_ids must list 1 to {ASSET_BATCH_MAX_ASSETS} asset IDs"
+        )));
+    }
+    if options.asset_ids.iter().any(String::is_empty) {
+        return Err(invalid_argument(
+            "Every asset ID must be a non-empty string",
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn id(value: &str) -> Result<String> {
     if value.is_empty() {
         return Err(invalid_argument("Identifier is required"));
@@ -993,6 +1011,19 @@ impl AssetsClient<'_> {
         self.0
             .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
             .await
+    }
+    /// Deletes up to 500 assets ([`AssetBatchOperation::Delete`]) or removes their stored content
+    /// ([`AssetBatchOperation::RemoveContent`]) in one request
+    /// (`POST /projects/:projectId/assets/batch`). Every asset must exist in the project and the
+    /// key needs `assets:delete` for its folder, or nothing is queued. Returns once queued; the
+    /// work runs in the background and records `asset.deleted` or `asset.content-removed` for
+    /// each asset. Assets under a safety hold are skipped. Not retried: it carries no
+    /// `Idempotency-Key`.
+    pub async fn batch(&self, options: BatchAssets) -> Result<BatchAssetsResponse> {
+        validate_batch(&options)?;
+        let path = self.0.project_path("assets/batch")?;
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        self.0.call(request).await
     }
     /// Moves an asset to a folder, or to the project root.
     pub async fn move_asset(&self, options: MoveAsset) -> Result<Asset> {

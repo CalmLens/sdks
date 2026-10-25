@@ -436,6 +436,12 @@ def _grants_of(api_key: str) -> list[dict[str, Any]]:
         return []
 
 
+#: The UUID form the API's schema accepts (zod's ``uuid()``).
+_UUID_PATTERN = re.compile(
+    r"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"
+    r"|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)\Z")
+
+
 def _invalid_field(code: str, path: str) -> _Failure:
     """A request the API's schema refuses: ``validation/<issue>`` with HTTP 400 and the field."""
     return _Failure(code, f"Invalid {path}", 400, {"path": path})
@@ -730,7 +736,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
             except _Failure as failure_response:
                 # A failed request frees its idempotency key.
                 return self._failure_response(failure_response)
-            response = self._respond(200, result) if result is not None else self._respond(204)
+            # Like the API, a queued batch is 202 Accepted.
+            status = 202 if parts[-2:] == ["assets", "batch"] and request.get_method() == "POST" else 200
+            response = self._respond(status, result) if result is not None else self._respond(204)
             if key is not None:
                 self._idempotent[key] = (fingerprint, response.status, response.getvalue())
             return response
@@ -796,6 +804,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self.database_storage.folders[folder["id"]] = cast(Folder, folder)
             return folder
         suffix = parts[1] if len(parts) > 1 else ""
+        if suffix == "batch":
+            return self._batch(body, now)
         if suffix == "search":
             return self._search(query)
         if suffix == "page":
@@ -1029,6 +1039,45 @@ class MockCalmLensServerClient(CalmLensServerClient):
             asset.update(body)
         asset["updatedAt"] = now
         return asset
+
+    def _batch(self, body: dict[str, Any], now: int) -> dict[str, Any]:
+        """``POST /projects/:id/assets/batch``: the schema needs 1 to 500 UUIDs and a known operation, and
+        every asset must exist before anything changes. The mock then applies the operation at once, in
+        request order, instead of in the background: ``delete`` deletes each asset with its stored child
+        assets and records ``asset.deleted`` with the asset as it was; ``remove-content`` removes the
+        content like ``delete_content``. Mock assets carry no safety holds, so none is skipped."""
+        asset_ids = body.get("assetIds")
+        if not isinstance(asset_ids, list):
+            raise _invalid_field("validation/invalid-type", "assetIds")
+        if not asset_ids:
+            raise _invalid_field("validation/too-small", "assetIds")
+        if len(asset_ids) > 500:
+            raise _invalid_field("validation/too-big", "assetIds")
+        for index, asset_id in enumerate(asset_ids):
+            if not isinstance(asset_id, str) or not _UUID_PATTERN.match(asset_id):
+                raise _invalid_field("validation/invalid-format", f"assetIds.{index}")
+        operation = body.get("operation")
+        if operation not in ("delete", "remove-content"):
+            raise _invalid_field("validation/invalid-value", "operation")
+        assets = [self._asset(asset_id) for asset_id in dict.fromkeys(asset_ids)]
+        for asset in assets:
+            if operation == "remove-content":
+                self._delete_content(asset, now)
+                continue
+            deleting = {asset["id"]}
+            added = True
+            while added:
+                added = False
+                for other in self._project_assets():
+                    if other.get("parentId") in deleting and other["id"] not in deleting:
+                        deleting.add(other["id"])
+                        added = True
+            for asset_id in deleting:
+                self.image_storage.content.pop(asset_id, None)
+                self.database_storage.assets.pop(asset_id, None)
+                self._uploads.pop(asset_id, None)
+            self._lifecycle_event("asset.deleted", asset)
+        return {"queued": True}
 
     def _delete_content(self, asset: dict[str, Any], now: int) -> dict[str, Any]:
         # Like the API: the record and report stay; stored content, extracted text and the

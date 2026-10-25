@@ -1139,6 +1139,7 @@ fn references() -> BTreeSet<&'static str> {
         "assets().delete_content" => ServerClient::assets, AssetsClient::delete_content;
         "assets().delete" => ServerClient::assets, AssetsClient::delete;
         "assets().move_asset" => ServerClient::assets, AssetsClient::move_asset;
+        "assets().batch" => ServerClient::assets, AssetsClient::batch;
         "assets().retry" => ServerClient::assets, AssetsClient::retry;
         "assets().explain" => ServerClient::assets, AssetsClient::explain;
         "assets().create_signed_url" => ServerClient::assets, AssetsClient::create_signed_url;
@@ -1391,7 +1392,7 @@ async fn retryable_follows_code_and_status() {
 // rejections.json: every request the API would reject is refused before anything is sent.
 
 /// Fixture options a Rust type cannot hold, so the type already refuses the request.
-const REJECTED_BY_TYPE: [(&str, &str); 2] = [
+const REJECTED_BY_TYPE: [(&str, &str); 3] = [
     (
         "signed URL lifetime below 1 second",
         "SignedUrlOptions::expires_in_seconds is a u64",
@@ -1399,6 +1400,10 @@ const REJECTED_BY_TYPE: [(&str, &str); 2] = [
     (
         "signed URL lifetime of a fraction of a second",
         "SignedUrlOptions::expires_in_seconds is a u64",
+    ),
+    (
+        "batch with an unknown operation",
+        "BatchAssets::operation is an AssetBatchOperation, which has no unknown values",
     ),
 ];
 
@@ -1424,6 +1429,7 @@ async fn reject(
             .await
             .map(drop),
         "assets.delete" => client.assets().delete(decode(options)?).await,
+        "assets.batch" => client.assets().batch(decode(options)?).await.map(drop),
         "folders.retrieve" => client.folders().retrieve(decode(options)?).await.map(drop),
         "cdn.serve" => client.cdn().serve(decode(options)?).await.map(drop),
         other => panic!("unhandled operation {other}"),

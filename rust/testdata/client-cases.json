@@ -3332,6 +3332,122 @@
       ]
     },
     {
+      "name": "assets.batch sends the asset IDs and the delete operation, and returns the queued response",
+      "area": "options",
+      "responses": [
+        {
+          "status": 202,
+          "body": {
+            "queued": true
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
+            "operation": "delete"
+          },
+          "expect": {
+            "result": {
+              "queued": true
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets/batch",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
+            "operation": "delete"
+          }
+        }
+      ]
+    },
+    {
+      "name": "assets.batch sends the remove-content operation",
+      "area": "options",
+      "responses": [
+        {
+          "status": 202,
+          "body": {
+            "queued": true
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              "asset-1"
+            ],
+            "operation": "remove-content"
+          },
+          "expect": {
+            "result": {
+              "queued": true
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets/batch",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "assetIds": [
+              "asset-1"
+            ],
+            "operation": "remove-content"
+          }
+        }
+      ]
+    },
+    {
       "name": "ensureLens sends one definition",
       "area": "options",
       "responses": [
@@ -5606,6 +5722,69 @@
       ]
     },
     {
+      "name": "assets.batch is not retried: it carries no Idempotency-Key",
+      "area": "retries",
+      "client": {
+        "maxRetries": 2
+      },
+      "responses": [
+        {
+          "status": 503,
+          "bodyText": "<html><body>503</body></html>",
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "text/html",
+            "retry-after": "0"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              "asset-1"
+            ],
+            "operation": "delete"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/http-error",
+              "status": 503,
+              "requestId": "req-1",
+              "retryAfter": 0,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets/batch",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "assetIds": [
+              "asset-1"
+            ],
+            "operation": "delete"
+          }
+        }
+      ]
+    },
+    {
       "name": "assets.createSignedUrl is not retried: it carries no Idempotency-Key",
       "area": "retries",
       "client": {
@@ -6957,6 +7136,146 @@
             }
           },
           "body": null
+        }
+      ]
+    },
+    {
+      "name": "assets.batch raises asset/not-found for an unknown asset",
+      "area": "errors",
+      "client": {
+        "maxRetries": 0
+      },
+      "responses": [
+        {
+          "status": 404,
+          "body": {
+            "code": "asset/not-found",
+            "message": "Asset not found",
+            "traceId": "trace-1"
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
+            "operation": "delete"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404,
+              "requestId": "req-1",
+              "retryAfter": null,
+              "details": {
+                "traceId": "trace-1"
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets/batch",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
+            "operation": "delete"
+          }
+        }
+      ]
+    },
+    {
+      "name": "assets.batch raises auth/permission-denied for an asset the key cannot delete",
+      "area": "errors",
+      "client": {
+        "maxRetries": 0
+      },
+      "responses": [
+        {
+          "status": 403,
+          "body": {
+            "code": "auth/permission-denied",
+            "message": "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
+            "traceId": "trace-1"
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.batch",
+          "args": {
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
+            "operation": "delete"
+          },
+          "expect": {
+            "error": {
+              "code": "auth/permission-denied",
+              "status": 403,
+              "requestId": "req-1",
+              "retryAfter": null,
+              "details": {
+                "traceId": "trace-1"
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets/batch",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
+            "operation": "delete"
+          }
         }
       ]
     },

@@ -3,6 +3,7 @@ import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "
 import { API_ERROR_CODES } from "./CalmLensErrorCodes";
 import type {
   Asset,
+  BatchAssetsOptions,
   CalmLensAppClientOptions,
   CalmLensServerClientOptions,
   CdnResource,
@@ -244,6 +245,24 @@ const MAX_SIGNED_URL_SECONDS = 60 * 60 * 24;
  * signed (a placeholder needs no signature), lenses and transforms apply only to `rendered`, and
  * the lifetime is a whole number of seconds from 1 to 24 hours.
  */
+/** The most assets one `assets.batch` request takes. */
+export const ASSET_BATCH_MAX_ASSETS = 500;
+/** The operations `assets.batch` runs. */
+export const ASSET_BATCH_OPERATIONS = ["delete", "remove-content"] as const;
+
+/** Refuses a batch the API would reject for its size, an ID or the operation. */
+export const validateBatchAssetsOptions = ({ assetIds, operation }: BatchAssetsOptions) => {
+  if (!Array.isArray(assetIds) || assetIds.length < 1 || assetIds.length > ASSET_BATCH_MAX_ASSETS) {
+    throw invalidArgument(`assetIds must list 1 to ${ASSET_BATCH_MAX_ASSETS} asset IDs`);
+  }
+  if (assetIds.some((assetId) => typeof assetId !== "string" || !assetId)) {
+    throw invalidArgument("Every asset ID must be a non-empty string");
+  }
+  if (!(ASSET_BATCH_OPERATIONS as readonly unknown[]).includes(operation)) {
+    throw invalidArgument(`operation must be one of ${ASSET_BATCH_OPERATIONS.join(", ")}`);
+  }
+};
+
 export const validateSignedUrlOptions = (options: {
   resource?: unknown;
   lens?: unknown;

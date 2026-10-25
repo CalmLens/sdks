@@ -21,6 +21,7 @@ import type {
 import type { LENS_SCHEMA } from "../contract/Lens.js";
 import type { CursorPage } from "../contract/Page.js";
 import type {
+  AssetBatchOperation,
   GetAssetChildrenQuery,
   GetAssetsPageQuery,
   GetEventsQuery,
@@ -28,6 +29,7 @@ import type {
   GetFoldersResponse,
   PatchAssetBody,
   PatchFolderBody,
+  PostAssetBatchOperationResponse,
   PostAssetSignedUrlResponse,
   PostFolderBody,
 } from "../contract/PublicApiSchemas.js";
@@ -439,6 +441,21 @@ export interface DeleteAssetOptions {
 export interface DeleteAssetContentOptions {
   assetId: string;
 }
+
+/**
+ * What `assets.batch` does to every asset: `delete` deletes it with its child assets and stored
+ * content; `remove-content` removes its stored content and keeps the record.
+ */
+export type { AssetBatchOperation };
+
+export interface BatchAssetsOptions {
+  /** IDs of 1 to 500 assets in the project. */
+  assetIds: string[];
+  operation: AssetBatchOperation;
+}
+
+/** `assets.batch` resolves once the operation is queued: `{ queued: true }`. */
+export type BatchAssetsResponse = PostAssetBatchOperationResponse;
 
 export type UpdateAssetOptions = PatchAssetBody & { assetId: string };
 

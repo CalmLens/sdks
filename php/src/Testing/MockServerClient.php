@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CalmLens\Testing;
 
+use CalmLens\Assets;
 use CalmLens\CalmLensException;
 use CalmLens\ErrorCodes;
 use CalmLens\Internal\Session;
@@ -56,6 +57,8 @@ final class MockServerClient
     /** The ThumbHash the mock gives every classified image, standing in for one computed from its pixels. */
     public const THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI';
     private const MIB = 1024 * 1024;
+    /** The UUID form the API's schema accepts (zod's `uuid()`). */
+    private const UUID_PATTERN = '/^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/D';
     private const ACTIVE_CONTENT_TYPES = ['image/svg+xml', 'application/xhtml+xml', 'text/html', 'application/xml', 'text/xml'];
 
     /** @var array<string, array> Assets by ID, with the API's field names. Change them to arrange a test. */
@@ -81,6 +84,8 @@ final class MockServerClient
     private array $grants;
     private float $elapsed = 0.0;
     private int $requestCount = 0;
+    /** The status of the response being answered: 200, or 202 for a queued batch. */
+    private int $status = 200;
     private \Closure $now;
     private \Closure $createId;
     private mixed $analyzedOutcome;
@@ -308,6 +313,7 @@ final class MockServerClient
                 'POST folders' => ['folders.create'],
                 'GET assets/page' => ['assets.list'],
                 'GET assets/search' => ['assets.search'],
+                'POST assets/batch' => ['assets.batch'],
                 'POST assets' => self::flag($query['queue'] ?? null) ? ['assets.create'] : ['assets.classify', 'text.classify'],
                 default => [],
             };
@@ -365,8 +371,9 @@ final class MockServerClient
         }
         try {
             $json = $request->getHeaderLine('Content-Type') === 'application/json' ? json_decode($body, true) : [];
+            $this->status = 200;
             $data = $this->api($request, $parts, $query, is_array($json) ? $json : [], $body);
-            $response = $data === null ? new Response(204, ['X-Request-Id' => $this->requestId()]) : $this->json(200, $data);
+            $response = $data === null ? new Response(204, ['X-Request-Id' => $this->requestId()]) : $this->json($this->status, $data);
         } catch (CalmLensException $failure) {
             // Raised by fail(): answer like the API does, and leave the key unsaved.
             return Create::promiseFor($this->error($failure->errorCode, $failure->getMessage(), $failure->status, $failure->details));
@@ -436,6 +443,7 @@ final class MockServerClient
                 $route === 'POST folders' => $this->createFolder($json),
                 $route === 'GET assets/page' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
+                $route === 'POST assets/batch' => $this->batch($json),
                 $route === 'POST assets' && $upload === '' => $this->createAsset($json, self::flag($query['queue'] ?? null), null, false),
                 $route === 'POST assets' && in_array($upload, ['content', 'part'], true) => $this->createAsset($query, self::flag($query['queue'] ?? null), $body, $upload === 'part'),
                 default => throw new \LogicException("MockServerClient does not emulate $route; enqueue a response for it"),
@@ -471,17 +479,7 @@ final class MockServerClient
                 $this->lifecycleEvent('asset.deleted', $asset);
                 return null;
             case 'DELETE content':
-                // Like the API: the record and report stay; stored content, extracted text and the
-                // placeholder go. Content already removed keeps its reason.
-                unset($this->content[$id]);
-                if ($asset['content']['status'] !== 'removed') {
-                    $asset = $this->touch($this->removeContent($asset, 'requested'));
-                } elseif (isset($asset['content']['image']['thumbhash'])) {
-                    $asset['content']['image'] = self::withoutPlaceholder($asset['content']['image']);
-                }
-                $this->assets[$id] = $asset;
-                $this->lifecycleEvent('asset.content-removed', $asset);
-                return $asset;
+                return $this->requestedRemoval($asset);
             case 'POST retry':
                 if ($asset['classification']['status'] !== 'failed' || $asset['classification']['moderation']['status'] !== 'pending') {
                     self::fail(ErrorCodes::ASSET_NOT_RETRYABLE);
@@ -700,6 +698,80 @@ final class MockServerClient
         $asset['classification']['moderation']['status'] = $decided ? $outcome : 'pending';
         $asset['updatedAt'] = $now;
         return $this->assets[$asset['id']] = $asset;
+    }
+
+    /**
+     * DELETE /assets/:id/content, like the API: the record and report stay; stored content,
+     * extracted text and the placeholder go. Content already removed keeps its reason, and an
+     * `asset.content-removed` event is recorded either way.
+     */
+    private function requestedRemoval(array $asset): array
+    {
+        unset($this->content[$asset['id']]);
+        if ($asset['content']['status'] !== 'removed') {
+            $asset = $this->touch($this->removeContent($asset, 'requested'));
+        } elseif (isset($asset['content']['image']['thumbhash'])) {
+            $asset['content']['image'] = self::withoutPlaceholder($asset['content']['image']);
+        }
+        $this->assets[$asset['id']] = $asset;
+        $this->lifecycleEvent('asset.content-removed', $asset);
+        return $asset;
+    }
+
+    /**
+     * POST /projects/:id/assets/batch. Checks every asset like the API (a non-UUID ID is
+     * `validation/invalid-format`, an unknown one `asset/not-found`, and either refuses the whole
+     * batch), then answers 202 and applies the operation at once, in request order, instead of in
+     * the background: `delete` deletes each asset with its stored child assets and records
+     * `asset.deleted` with the asset as it was; `remove-content` removes the content like
+     * DELETE /assets/:id/content. Mock assets carry no safety holds, so none is skipped.
+     */
+    private function batch(array $json): array
+    {
+        $ids = $json['assetIds'] ?? null;
+        if (!is_array($ids) || !array_is_list($ids)) {
+            self::invalid('validation/invalid-type', 'assetIds');
+        }
+        if (count($ids) < 1) {
+            self::invalid('validation/too-small', 'assetIds');
+        }
+        if (count($ids) > Assets::MAX_BATCH_ASSETS) {
+            self::invalid('validation/too-big', 'assetIds');
+        }
+        foreach ($ids as $index => $id) {
+            if (!is_string($id) || !preg_match(self::UUID_PATTERN, $id)) {
+                self::invalid('validation/invalid-format', "assetIds.$index");
+            }
+        }
+        $operation = $json['operation'] ?? null;
+        if (!in_array($operation, Assets::BATCH_OPERATIONS, true)) {
+            self::invalid('validation/invalid-value', 'operation');
+        }
+        $assets = [];
+        foreach (array_unique($ids) as $id) {
+            $assets[] = $this->assets[$id] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
+        }
+        foreach ($assets as $asset) {
+            if ($operation === Assets::BATCH_DELETE) {
+                $this->deleteTree($asset['id']);
+                $this->lifecycleEvent('asset.deleted', $asset);
+            } else {
+                $this->requestedRemoval($this->assets[$asset['id']] ?? $asset);
+            }
+        }
+        $this->status = 202;
+        return ['queued' => true];
+    }
+
+    /** Deletes an asset, its stored child assets and their content. */
+    private function deleteTree(string $id): void
+    {
+        foreach ($this->assets as $childId => $child) {
+            if (($child['parentId'] ?? null) === $id) {
+                $this->deleteTree((string) $childId);
+            }
+        }
+        unset($this->assets[$id], $this->content[$id], $this->uploads[$id]);
     }
 
     private function removeContent(array $asset, string $reason): array

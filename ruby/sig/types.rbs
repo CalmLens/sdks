@@ -289,6 +289,8 @@ module CalmLens
     "semanticStatus" => "disabled" | "ready" | "indexing" | "unavailable"
   }
 
+  type asset_batch_operation = "delete" | "remove-content"
+  type batch_assets_response = { "queued" => bool }
   type signed_url = { "url" => String, "expiresAt" => Integer }
 
   # ---- Transforms and lenses (AssetTransform.ts, Lens.ts) -------------------------------------
@@ -528,6 +530,7 @@ module CalmLens
     ?visibility: asset_visibility?,
     ?request_options: request_options
   }
+  type batch_assets_options = { asset_ids: Array[String], operation: asset_batch_operation, ?request_options: request_options }
   type move_asset_options = { asset_id: String, folder_id: String?, ?request_options: request_options }
   type explain_asset_options = { asset_id: String, ?rerun: bool, ?request_options: request_options }
   type create_signed_url_options = {

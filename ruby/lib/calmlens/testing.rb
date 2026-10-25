@@ -54,7 +54,7 @@ module CalmLens
     REQUEST_FAILURES = %w[transport-error timeout].freeze
     # The methods {#fail_next_request} can target, by resource. Iterators are their list calls.
     OPERATIONS = { assets: %i[search list retrieve list_children update create classify upload_part create_signed_url move
-                              retry explain wait_for_decision delete_content delete],
+                              retry explain wait_for_decision delete_content delete batch],
                    folders: %i[list retrieve create update delete move], text: %i[classify], events: %i[list],
                    cdn: %i[serve] }.freeze
     private_constant :OPERATIONS

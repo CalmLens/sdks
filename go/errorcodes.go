@@ -15,6 +15,8 @@ const (
 	CodeAPIKeyProjectMismatch = "auth/project-mismatch"
 	// CodeAPIKeyNotAccepted is returned with HTTP 403.
 	CodeAPIKeyNotAccepted = "auth/api-key-not-accepted"
+	// CodePermissionDenied is returned with HTTP 403.
+	CodePermissionDenied = "auth/permission-denied"
 	// CodeFileTooLarge is returned with HTTP 400.
 	CodeFileTooLarge = "upload/file-too-large"
 	// CodeImageRequiresMultipartUpload is returned with HTTP 400.
@@ -143,6 +145,7 @@ var publicErrorStatuses = map[string]int{
 	CodeInvalidAPIKey:                     401,
 	CodeAPIKeyProjectMismatch:             403,
 	CodeAPIKeyNotAccepted:                 403,
+	CodePermissionDenied:                  403,
 	CodeFileTooLarge:                      400,
 	CodeImageRequiresMultipartUpload:      400,
 	CodeMultipartImageTooSmall:            400,

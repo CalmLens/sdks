@@ -12,7 +12,7 @@ client.close
 
 Install from RubyGems: `gem install calmlens`, or add `gem "calmlens"` to your Gemfile. The gem has no runtime dependencies and ships YARD documentation and RBS signatures in `sig/` (see [Types](#types)).
 
-Resources cover every API operation: assets create/classify/search/list/each/retrieve/wait_for_decision/update/retry/explain/delete_content/delete/move/list_children/each_child/upload_part/create_signed_url; folders list/create/retrieve/update/move/delete; text moderation; events list/each/each_page; CDN URL building and serving; and `ensure_lens`/`ensure_lenses`. `CalmLens::VERSION` holds the gem version.
+Resources cover every API operation: assets create/classify/search/list/each/retrieve/wait_for_decision/update/retry/explain/delete_content/delete/batch/move/list_children/each_child/upload_part/create_signed_url; folders list/create/retrieve/update/move/delete; text moderation; events list/each/each_page; CDN URL building and serving; and `ensure_lens`/`ensure_lenses`. `CalmLens::VERSION` holds the gem version.
 
 ## Options
 

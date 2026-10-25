@@ -546,6 +546,8 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		result, err = m.Assets.DeleteContent(ctx, decode[calmlens.AssetIDOptions](t, args))
 	case "assets.delete":
 		err = m.Assets.Delete(ctx, decode[calmlens.AssetIDOptions](t, args))
+	case "assets.batch":
+		result, err = m.Assets.Batch(ctx, decode[calmlens.BatchAssetsOptions](t, args))
 	case "assets.waitForDecision":
 		options := calmlens.WaitForDecisionOptions{AssetID: args["assetId"].(string)}
 		if ms, ok := args["timeoutMs"].(float64); ok {

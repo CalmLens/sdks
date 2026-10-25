@@ -30,9 +30,10 @@ from . import error_codes
 from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError, _parse_retry_after)
-from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
+from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
+                    BatchAssetsOptions, BatchAssetsResponse,
                     MetadataItem, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
                     SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, SubmitAssetOptions,
@@ -636,6 +637,23 @@ def _convert(value: Any) -> Any:
     if isinstance(value, list):
         return [_convert(item) for item in value]
     return value
+
+
+#: The most assets one ``assets.batch`` request takes.
+ASSET_BATCH_MAX_ASSETS = 500
+#: The operations ``assets.batch`` runs.
+ASSET_BATCH_OPERATIONS: tuple[str, ...] = ("delete", "remove-content")
+
+
+def _validate_batch(options: Mapping[str, Any]) -> None:
+    """Refuse a batch the API would reject for its size, an ID or the operation."""
+    asset_ids = options.get("assetIds")
+    if not isinstance(asset_ids, list) or not 1 <= len(asset_ids) <= ASSET_BATCH_MAX_ASSETS:
+        raise _invalid(f"assetIds must list 1 to {ASSET_BATCH_MAX_ASSETS} asset IDs")
+    if any(not isinstance(asset_id, str) or not asset_id for asset_id in asset_ids):
+        raise _invalid("Every asset ID must be a non-empty string")
+    if options.get("operation") not in ASSET_BATCH_OPERATIONS:
+        raise _invalid("operation must be one of " + ", ".join(ASSET_BATCH_OPERATIONS))
 
 
 def _merge(options: Mapping[str, Any] | None, **keywords: Any) -> dict[str, Any]:
@@ -1300,6 +1318,20 @@ class Assets:
         """Delete the asset record together with its stored content."""
         merged = _merge(options, asset_id=asset_id)
         self._c._request("DELETE", "/assets/" + _id(merged.get("assetId"), "assetId"))
+
+    def batch(self, options: BatchAssetsOptions | None = None, /, *, asset_ids: List[str] = _UNSET,
+              operation: AssetBatchOperation = _UNSET) -> BatchAssetsResponse:
+        """Delete up to 500 assets (``operation="delete"``) or remove their stored content
+        (``"remove-content"``) in one request. Every asset must exist in the project and the key needs
+        ``assets:delete`` for its folder, or nothing is queued. Returns ``{"queued": True}`` once
+        queued; the work runs in the background and records ``asset.deleted`` or
+        ``asset.content-removed`` for each asset. Assets under a safety hold are skipped. Not
+        retried: it carries no ``Idempotency-Key``."""
+        merged = _merge(options, asset_ids=asset_ids, operation=operation)
+        _validate_batch(merged)
+        return cast(BatchAssetsResponse, self._c._request(
+            "POST", self._c._project("assets/batch"),
+            body={"assetIds": merged["assetIds"], "operation": merged["operation"]}))
 
 
 class Folders:

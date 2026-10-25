@@ -28,6 +28,11 @@ module CalmLens
     DEFAULT_SIGNED_URL_SECONDS = 15 * 60
     # The longest signed URL lifetime the API accepts: 24 hours.
     MAX_SIGNED_URL_SECONDS = 24 * 60 * 60
+    # The operations {#batch} runs: `delete` deletes each asset with its child assets and stored
+    # content; `remove-content` removes its stored content and keeps the record.
+    BATCH_OPERATIONS = %w[delete remove-content].freeze
+    # The most assets one {#batch} request takes.
+    MAX_BATCH_ASSETS = 500
 
     # Searches assets by meaning or keyword.
     # @option options [String] :query
@@ -168,6 +173,28 @@ module CalmLens
       call(options) do |api, request|
         request('DELETE', "/assets/#{Internal.segment(api['assetId'])}", request_options: request)
         nil
+      end
+    end
+
+    # Deletes up to 500 assets (`operation: 'delete'`) or removes their stored content
+    # (`'remove-content'`) in one request. Every asset must exist in the project and the key needs
+    # `assets:delete` for its folder, or nothing is queued. Returns once the operation is queued; the
+    # work runs in the background and records `asset.deleted` or `asset.content-removed` for each
+    # asset. Assets under a safety hold are skipped. Not retried: it carries no `Idempotency-Key`.
+    # @option options [Array<String>] :asset_ids 1 to 500 asset IDs
+    # @option options [String] :operation one of {BATCH_OPERATIONS}
+    # @return [Hash] `{'queued' => true}`
+    def batch(options)
+      call(options) do |api, request|
+        ids = api['assetIds']
+        unless ids.is_a?(Array) && ids.size.between?(1, MAX_BATCH_ASSETS)
+          raise Internal.invalid("asset_ids must list 1 to #{MAX_BATCH_ASSETS} asset IDs")
+        end
+        raise Internal.invalid('Every asset ID must be a non-empty string') unless ids.all? { |id| id.is_a?(String) && !id.empty? }
+        raise Internal.invalid("operation must be one of #{BATCH_OPERATIONS.join(', ')}") unless BATCH_OPERATIONS.include?(api['operation'])
+
+        request('POST', project('assets/batch'), body: { 'assetIds' => ids, 'operation' => api['operation'] },
+                                                 request_options: request)
       end
     end
 

@@ -7,6 +7,7 @@ export const API_ERROR_CODES = {
   INVALID_API_KEY: "auth/invalid-api-key",
   API_KEY_PROJECT_MISMATCH: "auth/project-mismatch",
   API_KEY_NOT_ACCEPTED: "auth/api-key-not-accepted",
+  PERMISSION_DENIED: "auth/permission-denied",
   FILE_TOO_LARGE: "upload/file-too-large",
   IMAGE_REQUIRES_MULTIPART_UPLOAD: "upload/image-requires-multipart-upload",
   MULTIPART_IMAGE_TOO_SMALL: "upload/multipart-image-too-small",
@@ -98,6 +99,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 403,
     message: "API keys are only accepted by the public API at /v1.",
   },
+  "auth/permission-denied": {
+    status: 403,
+    message: "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
+  },
   "upload/file-too-large": {
     status: 400,
     message: "File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.",
@@ -124,7 +129,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "upload/spend-limit-reached": {
     status: 402,
-    message: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner or billing admin can review them in Billing.",
+    message: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
   },
   "upload/invalid-mime-type": {
     status: 400,

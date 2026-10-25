@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"runtime"
 	"slices"
 	"sort"
@@ -102,7 +103,8 @@ type Options struct {
 	MaxRetries      *int
 	DatabaseStorage *InMemoryDatabaseStorage
 	ImageStorage    *InMemoryImageStorage
-	CreateID        func() string
+	// CreateID returns new IDs; the default is a random UUID, like the API's.
+	CreateID func() string
 	// Now returns the current time in unix milliseconds. The default clock is the wall clock,
 	// advanced by at least 1 ms per reading so assets created in a row have strictly increasing
 	// createdAt values; a Now you supply is used as is.
@@ -379,11 +381,15 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	}
 	if options.CreateID == nil {
 		options.CreateID = func() string {
+			// A random (version 4) UUID, like the API's IDs.
 			b := make([]byte, 16)
 			if _, err := rand.Read(b); err != nil {
 				panic(err)
 			}
-			return hex.EncodeToString(b)
+			b[6] = b[6]&0x0f | 0x40
+			b[8] = b[8]&0x3f | 0x80
+			h := hex.EncodeToString(b)
+			return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
 		}
 	}
 	if options.Now == nil {
@@ -635,6 +641,8 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 			return []string{"assets.list", "assets.iterate"}
 		case route == "assets/search":
 			return []string{"assets.search"}
+		case route == "assets/batch":
+			return []string{"assets.batch"}
 		case route == "assets" && q.Get("queue") == "false":
 			return []string{"assets.classify", "text.classify"}
 		case route == "assets":
@@ -824,6 +832,8 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.page(func(a calmlens.JSON) bool { return !hasFolder || a["folderId"] == folder[0] }, q, "assets:"+q.Get("filter")+":"+strings.Join(folder, ""))
 		case route == "assets/search" && method == "GET":
 			return m.search(q)
+		case route == "assets/batch" && method == "POST":
+			return m.batchAssets(body, now)
 		case route == "assets" && method == "POST":
 			return m.createAsset(headers.Get("X-CalmLens-Upload"), body, q, raw, now)
 		}
@@ -1204,6 +1214,98 @@ func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int
 	content["image"] = withoutPlaceholder(content["image"])
 }
 
+// requestContentRemoval removes an asset's content on request, like the API: the record and
+// report stay; stored content, extracted text and the placeholder go. Content already removed
+// keeps its reason, and an asset.content-removed event is recorded either way.
+func (m *MockServerClient) requestContentRemoval(a calmlens.JSON, now int64) {
+	content := section(a, "content")
+	if content["status"] == calmlens.ContentStatusRemoved {
+		delete(m.ImageStorage.Content, text(a["id"]))
+		if asJSON(content["image"])["thumbhash"] != nil {
+			content["image"] = withoutPlaceholder(content["image"])
+		}
+	} else {
+		m.removeContent(a, calmlens.ContentRemovalReasonRequested, now)
+		a["updatedAt"] = now
+	}
+	m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a)
+}
+
+// uuidPattern is the UUID form the API's schema accepts (zod's uuid()).
+var uuidPattern = regexp.MustCompile(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$`)
+
+// batchAssets checks the batch like the API (1 to 500 UUIDs, a known operation, and every asset
+// in the project, refusing the whole batch otherwise), then applies it at once, in request order,
+// instead of in the background: delete deletes each asset with its stored child assets and
+// records asset.deleted with the asset as it was; remove-content removes the content like
+// DELETE /assets/:id/content. Mock assets carry no safety holds, so none is skipped.
+func (m *MockServerClient) batchAssets(body calmlens.JSON, now int64) (any, error) {
+	ids, ok := body["assetIds"].([]any)
+	if !ok {
+		return nil, validation("validation/invalid-type", "assetIds")
+	}
+	if len(ids) < 1 {
+		return nil, validation("validation/too-small", "assetIds")
+	}
+	if len(ids) > calmlens.AssetBatchMaxAssets {
+		return nil, validation("validation/too-big", "assetIds")
+	}
+	for index, id := range ids {
+		value, isString := id.(string)
+		if !isString {
+			return nil, validation("validation/invalid-type", fmt.Sprintf("assetIds.%d", index))
+		}
+		if !uuidPattern.MatchString(value) {
+			return nil, validation("validation/invalid-format", fmt.Sprintf("assetIds.%d", index))
+		}
+	}
+	operation := calmlens.AssetBatchOperation(text(body["operation"]))
+	if operation != calmlens.AssetBatchOperationDelete && operation != calmlens.AssetBatchOperationRemoveContent {
+		return nil, validation("validation/invalid-value", "operation")
+	}
+	var assets []calmlens.JSON
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if seen[id.(string)] {
+			continue
+		}
+		seen[id.(string)] = true
+		a, err := m.asset(id.(string))
+		if err != nil {
+			return nil, err
+		}
+		assets = append(assets, a)
+	}
+	for _, a := range assets {
+		if operation == calmlens.AssetBatchOperationDelete {
+			m.recordLifecycleEvent(calmlens.EventAssetDeleted, a)
+			m.deleteAssetTree(text(a["id"]))
+		} else {
+			m.requestContentRemoval(a, now)
+		}
+	}
+	return calmlens.JSON{"queued": true}, nil
+}
+
+// deleteAssetTree deletes an asset, its stored child assets and their content.
+func (m *MockServerClient) deleteAssetTree(id string) {
+	deleting := map[string]bool{id: true}
+	for added := true; added; {
+		added = false
+		for otherID, other := range m.DatabaseStorage.Assets {
+			if parent := text(other["parentId"]); parent != "" && deleting[parent] && !deleting[otherID] {
+				deleting[otherID] = true
+				added = true
+			}
+		}
+	}
+	for deleted := range deleting {
+		delete(m.ImageStorage.Content, deleted)
+		delete(m.DatabaseStorage.Assets, deleted)
+		delete(m.uploads, deleted)
+	}
+}
+
 func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.JSON, q url.Values, raw []byte, now int64) (any, error) {
 	a, err := m.asset(id)
 	if err != nil {
@@ -1231,20 +1333,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		}
 		a["updatedAt"] = now
 	case method == "DELETE" && suffix == "content":
-		// Like the API: the record and report stay; stored content, extracted text and the
-		// placeholder go. Content already removed keeps its reason, and an
-		// asset.content-removed event is recorded either way.
-		content := section(a, "content")
-		if content["status"] == calmlens.ContentStatusRemoved {
-			delete(m.ImageStorage.Content, id)
-			if asJSON(content["image"])["thumbhash"] != nil {
-				content["image"] = withoutPlaceholder(content["image"])
-			}
-		} else {
-			m.removeContent(a, calmlens.ContentRemovalReasonRequested, now)
-			a["updatedAt"] = now
-		}
-		m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a)
+		m.requestContentRemoval(a, now)
 	case method == "GET" && suffix == "children":
 		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q, "children:"+id)
 	case method == "POST" && suffix == "signed-url":

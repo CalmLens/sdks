@@ -236,6 +236,7 @@ module CalmLens
         in ['POST', ['folders'], _] then create_folder(json)
         in ['GET', ['assets', 'page'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
+        in ['POST', ['assets', 'batch'], _] then batch(json)
         in ['POST', ['assets'], nil] then create_asset(json, query['queue'] == true, url: json['url'])
         in ['POST', ['assets'], 'content'] then create_asset(query, query['queue'] == true, data: body)
         in ['POST', ['assets'], 'part'] then start_multipart(query, body)
@@ -244,6 +245,56 @@ module CalmLens
       end
 
       def project_assets = @state.assets.values.select { |item| item['projectId'] == @project_id }
+
+      # The UUID form the API's schema accepts (zod's `uuid()`).
+      UUID_PATTERN = /\A(?:\h{8}-\h{4}-[1-8]\h{3}-[89abAB]\h{3}-\h{12}|0{8}-0{4}-0{4}-0{4}-0{12}|f{8}-f{4}-f{4}-f{4}-f{12})\z/
+      private_constant :UUID_PATTERN
+
+      # POST /projects/:id/assets/batch: like the API, every ID must be a UUID
+      # (`validation/invalid-format` at `assetIds.<index>`) and every asset must exist
+      # (`asset/not-found`) before anything happens. The operation then runs at once, in request
+      # order, rather than in the background: `delete` deletes each asset with its stored child
+      # assets and records `asset.deleted` with the asset as it was; `remove-content` removes the
+      # content like DELETE /assets/:id/content. Mock assets carry no safety holds.
+      def batch(json)
+        ids = json['assetIds']
+        invalid!('validation/invalid-type', 'assetIds') unless ids.is_a?(Array)
+        invalid!('validation/too-small', 'assetIds') if ids.empty?
+        invalid!('validation/too-big', 'assetIds') if ids.size > 500
+        ids.each_with_index do |id, index|
+          invalid!('validation/invalid-format', "assetIds.#{index}") unless id.is_a?(String) && id.match?(UUID_PATTERN)
+        end
+        invalid!('validation/invalid-value', 'operation') unless %w[delete remove-content].include?(json['operation'])
+        items = ids.uniq.map do |id|
+          item = @state.assets[id]
+          fail!(ErrorCodes::ASSET_NOT_FOUND) unless item && item['projectId'] == @project_id
+          item
+        end
+        items.each do |item|
+          if json['operation'] == 'delete'
+            delete_tree(item)
+            lifecycle_event('asset.deleted', item)
+          else
+            delete_content(item)
+          end
+        end
+        respond(202, { 'queued' => true })
+      end
+
+      # Deletes an asset, its stored child assets and their content.
+      def delete_tree(item)
+        deleting = [item['id']]
+        loop do
+          added = project_assets.select { |other| deleting.include?(other['parentId']) && !deleting.include?(other['id']) }
+          break if added.empty?
+
+          deleting.concat(added.map { |other| other['id'] })
+        end
+        deleting.each do |id|
+          @state.assets.delete(id)
+          @state.content.delete(id)
+        end
+      end
 
       def list(query)
         items = project_assets.reject { |item| item['parentId'] }

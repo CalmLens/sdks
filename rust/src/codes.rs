@@ -10,6 +10,8 @@ error_codes! {
     ApiKeyProjectMismatch = "auth/project-mismatch", 403;
     /// `auth/api-key-not-accepted` (HTTP 403): API keys are only accepted by the public API at /v1.
     ApiKeyNotAccepted = "auth/api-key-not-accepted", 403;
+    /// `auth/permission-denied` (HTTP 403): This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.
+    PermissionDenied = "auth/permission-denied", 403;
     /// `upload/file-too-large` (HTTP 400): File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.
     FileTooLarge = "upload/file-too-large", 400;
     /// `upload/image-requires-multipart-upload` (HTTP 400): Images of 10MB or more must use a multipart upload.

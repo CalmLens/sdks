@@ -262,6 +262,20 @@
       }
     },
     {
+      "id": "assets.batch",
+      "kind": "method",
+      "description": "Delete up to 500 assets, or remove their stored content, in one request. Every asset must exist in the project and the API key needs `assets:delete` for its folder; otherwise nothing is queued. The response confirms that the operation is queued. It then runs in the background: `delete` deletes each asset with its child assets and stored content and records `asset.deleted`, and `remove-content` removes the content as a removal would (reason `requested`) and records `asset.content-removed`. Assets under a safety hold, or in a folder the key can no longer delete from when the operation runs, are skipped.",
+      "names": {
+        "javascript": "assets.batch",
+        "python": "assets.batch",
+        "go": "Assets.Batch",
+        "rust": "assets().batch",
+        "java": "assets.batch",
+        "ruby": "assets.batch",
+        "php": "assets->batch"
+      }
+    },
+    {
       "id": "assets.createSignedUrl",
       "kind": "method",
       "description": "Create a short-lived signed CDN URL for an asset",
@@ -1144,6 +1158,11 @@
     },
     {
       "code": "auth/api-key-not-accepted",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "auth/permission-denied",
       "status": 403,
       "retryable": false
     },

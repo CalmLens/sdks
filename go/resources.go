@@ -151,6 +151,41 @@ func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) erro
 	return s.c.request(ctx, "DELETE", path, nil, nil, nil)
 }
 
+// Batch deletes up to 500 assets (AssetBatchOperationDelete) or removes their stored content
+// (AssetBatchOperationRemoveContent) in one request. Every asset must exist in the project and
+// the key needs assets:delete for its folder, or nothing is queued. It returns once the
+// operation is queued; the work runs in the background and records asset.deleted or
+// asset.content-removed for each asset. Assets under a safety hold are skipped. It is not
+// retried: it carries no Idempotency-Key.
+func (s *AssetsService) Batch(ctx context.Context, options BatchAssetsOptions) (*BatchAssetsResponse, error) {
+	if err := validateBatchAssetsOptions(options); err != nil {
+		return nil, err
+	}
+	var result BatchAssetsResponse
+	body := JSON{"assetIds": options.AssetIDs, "operation": options.Operation}
+	if err := s.c.request(ctx, "POST", s.c.project("assets/batch"), nil, body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// validateBatchAssetsOptions refuses a batch the API would reject for its size, an ID or the
+// operation, with sdk/invalid-argument.
+func validateBatchAssetsOptions(options BatchAssetsOptions) error {
+	if len(options.AssetIDs) < 1 || len(options.AssetIDs) > AssetBatchMaxAssets {
+		return invalid(CodeSDKInvalidArgument, "AssetIDs must list 1 to 500 asset IDs")
+	}
+	for _, id := range options.AssetIDs {
+		if id == "" {
+			return invalid(CodeSDKInvalidArgument, "Every asset ID must be a non-empty string")
+		}
+	}
+	if options.Operation != AssetBatchOperationDelete && options.Operation != AssetBatchOperationRemoveContent {
+		return invalid(CodeSDKInvalidArgument, "Operation must be one of delete, remove-content")
+	}
+	return nil
+}
+
 // Move moves an asset into a folder, or to the root when FolderID is nil.
 func (s *AssetsService) Move(ctx context.Context, options MoveAssetOptions) (*Asset, error) {
 	return s.assetRequest(ctx, "POST", options.AssetID, "/move", JSON{"folderId": options.FolderID})

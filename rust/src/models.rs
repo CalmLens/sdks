@@ -1060,6 +1060,52 @@ pub struct MoveAsset {
     pub folder_id: Option<String>,
 }
 
+/// What [`crate::AssetsClient::batch`] does to every asset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AssetBatchOperation {
+    /// Deletes each asset with its child assets and stored content.
+    Delete,
+    /// Removes each asset's stored content and keeps the record, metadata and report.
+    RemoveContent,
+}
+impl AssetBatchOperation {
+    /// The wire value.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Delete => "delete",
+            Self::RemoveContent => "remove-content",
+        }
+    }
+}
+impl fmt::Display for AssetBatchOperation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Deletes up to 500 assets, or removes their stored content, in one request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAssets {
+    /// IDs of 1 to 500 assets in the project.
+    pub asset_ids: Vec<String>,
+    /// What to do to every asset.
+    pub operation: AssetBatchOperation,
+}
+
+/// The response of [`crate::AssetsClient::batch`]: the operation is queued.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct BatchAssetsResponse {
+    /// Always `true`: the operation is queued.
+    pub queued: bool,
+    /// Fields this SDK version does not know.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
 /// A later part of a multipart upload.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]

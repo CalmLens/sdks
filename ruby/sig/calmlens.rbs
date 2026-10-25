@@ -143,6 +143,8 @@ module CalmLens
     DEFAULT_DECISION_TIMEOUT: Integer
     DEFAULT_SIGNED_URL_SECONDS: Integer
     MAX_SIGNED_URL_SECONDS: Integer
+    BATCH_OPERATIONS: Array[asset_batch_operation]
+    MAX_BATCH_ASSETS: Integer
 
     def search: (asset_search_options options) -> asset_search_response
     def list: (?list_assets_options options) -> asset_page
@@ -158,6 +160,7 @@ module CalmLens
     def explain: (explain_asset_options options) -> asset
     def delete_content: (asset_id_options options) -> asset
     def delete: (asset_id_options options) -> nil
+    def batch: (batch_assets_options options) -> batch_assets_response
     def move: (move_asset_options options) -> asset
     def create_signed_url: (create_signed_url_options options) -> signed_url
     def create: (upload_options options) -> asset
