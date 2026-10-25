@@ -12,9 +12,11 @@
   ],
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
-    "@changesets/cli": "^3.0.3"
+    "@changesets/cli": "^3.0.3",
+    "dev-pad": "^0.5.0"
   },
   "scripts": {
+    "dev": "dev-pad",
     "changeset": "changeset",
     "release:version": "node scripts/version-sdks.mjs",
     "release:check": "node scripts/version-sdks.mjs --check",

@@ -12,3 +12,4 @@ javascript/esm/
 javascript/cjs/
 java/target/
 *.gem
+.local/

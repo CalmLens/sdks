@@ -56,6 +56,11 @@ Each native SDK includes its own tests and development instructions. JavaScript 
 the local JavaScript SDK; build it before installing an example's dependencies. Calmgram's fixed
 examples are illustrative snapshots; its live mode uses the API.
 
+`bun install && bun run dev` opens a dashboard that starts each example in its offline demo.
+Its `m` key switches to local mode, which provisions the examples on a CalmLens development
+instance at `localhost:6110` that only the CalmLens team runs. To use your own project, follow
+an example's README instead.
+
 The `javascript/src/contract` bindings and native `testdata` fixtures are generated from the
 CalmLens API contract. Update SDK implementations here; regenerate bindings when the API
 contract changes. Generated bindings contain only public schemas, constants and SDK helpers.
