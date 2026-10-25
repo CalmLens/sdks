@@ -38,6 +38,7 @@ ModerationQualifier = Union[Literal[
     "sexual-revealing-clothing",
     "sexual-suggestive",
     "sexual-non-erotic-nudity",
+    "sexual-text",
     "sexual-historical",
     "sexual-documentary",
     "sexual-educational",

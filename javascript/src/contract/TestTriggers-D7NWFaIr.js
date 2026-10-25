@@ -8191,6 +8191,15 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "Exposed anatomy in a non-erotic setting: breastfeeding, childbirth, medical or health care such as post-surgery images or self-examination, protest, or fine art such as a painting or sculpture.",
 		exclusions: "Erotic posing, sexual focus or arousal; a sexual act; photographs or generated images presented as art to show nudity; pornographic drawings; any person who appears to be a minor. An educational or artistic label alone does not make erotic nudity non-erotic."
 	},
+	"sexual-text": {
+		category: "sexual",
+		kind: "context",
+		displayName: "Text",
+		description: "The content is text, not an image or video. It is set from the input type and never judged from the content.",
+		exclusions: "Images and video, including readable text shown in them.",
+		inputs: ["text"],
+		fromInput: true
+	},
 	"sexual-historical": {
 		category: "sexual",
 		kind: "context",

@@ -39,6 +39,7 @@ const (
 	QualifierSexualRevealingClothing              = "sexual-revealing-clothing"
 	QualifierSexualSuggestive                     = "sexual-suggestive"
 	QualifierSexualNonEroticNudity                = "sexual-non-erotic-nudity"
+	QualifierSexualText                           = "sexual-text"
 	QualifierSexualHistorical                     = "sexual-historical"
 	QualifierSexualDocumentary                    = "sexual-documentary"
 	QualifierSexualEducational                    = "sexual-educational"

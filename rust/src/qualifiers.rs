@@ -70,6 +70,8 @@ string_enum! {
         SexualSuggestive = "sexual-suggestive",
         /// Sexual: Non-erotic nudity.
         SexualNonEroticNudity = "sexual-non-erotic-nudity",
+        /// Sexual: Text.
+        SexualText = "sexual-text",
         /// Sexual: Historical.
         SexualHistorical = "sexual-historical",
         /// Sexual: Reporting or documentary.
