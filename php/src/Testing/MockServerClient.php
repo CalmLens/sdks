@@ -84,8 +84,10 @@ final class MockServerClient
     private array $grants;
     private float $elapsed = 0.0;
     private int $requestCount = 0;
-    /** The status of the response being answered: 200, or 202 for a queued batch. */
+    /** The status of the response being answered: 200, 201 for a new folder or 202 for a queued batch. */
     private int $status = 200;
+    /** The status of the last response, null when the last request failed without one; the contract tests check it. */
+    private ?int $lastStatus = null;
     private \Closure $now;
     private \Closure $createId;
     private mixed $analyzedOutcome;
@@ -332,6 +334,15 @@ final class MockServerClient
 
     private function handle(RequestInterface $request): PromiseInterface
     {
+        $this->lastStatus = null;
+        return $this->answer($request)->then(function (ResponseInterface $response): ResponseInterface {
+            $this->lastStatus = $response->getStatusCode();
+            return $response;
+        });
+    }
+
+    private function answer(RequestInterface $request): PromiseInterface
+    {
         $body = (string) $request->getBody();
         $request = $request->withBody(\GuzzleHttp\Psr7\Utils::streamFor($body));
         $this->history[] = $request;
@@ -373,7 +384,8 @@ final class MockServerClient
             $json = $request->getHeaderLine('Content-Type') === 'application/json' ? json_decode($body, true) : [];
             $this->status = 200;
             $data = $this->api($request, $parts, $query, is_array($json) ? $json : [], $body);
-            $response = $data === null ? new Response(204, ['X-Request-Id' => $this->requestId()]) : $this->json($this->status, $data);
+            // Like the API, deletes answer 200 with an empty object.
+            $response = $this->json($this->status, $data ?? new \stdClass());
         } catch (CalmLensException $failure) {
             // Raised by fail(): answer like the API does, and leave the key unsaved.
             return Create::promiseFor($this->error($failure->errorCode, $failure->getMessage(), $failure->status, $failure->details));
@@ -1099,6 +1111,8 @@ final class MockServerClient
         $now = ($this->now)();
         $folder = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'parentId' => $parentId, 'name' => $json['name'],
             'createdAt' => $now, 'updatedAt' => $now];
+        // Like the API, a new folder is 201 Created.
+        $this->status = 201;
         return $this->folders[$folder['id']] = $folder;
     }
 

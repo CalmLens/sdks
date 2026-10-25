@@ -20,7 +20,8 @@
               "classification.status": "processing",
               "classification.moderation.status": "pending",
               "content.status": "temporary"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -38,7 +39,8 @@
               "classification.moderation.status": "allowed",
               "content.status": "removed",
               "content.removalReason": "retention"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -54,7 +56,8 @@
                 "$ref": "queued.id"
               },
               "classification.moderation.status": "pending"
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -79,7 +82,8 @@
             "result": {
               "classification.status": "completed",
               "classification.moderation.status": "blocked"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -90,7 +94,8 @@
           "expect": {
             "result": {
               "classification.moderation.status": "blocked"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -106,7 +111,8 @@
             "result": {
               "classification.status": "completed",
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -133,7 +139,8 @@
             "result": {
               "events.length": 0,
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -152,7 +159,8 @@
           "expect": {
             "result": {
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -167,7 +175,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "other"
+          "save": "other",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "mock.decide",
@@ -206,7 +217,8 @@
               "classification.moderation.manualReviews": {
                 "$ref": "decision.classification.moderation.manualReviews"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -220,7 +232,8 @@
               "items.0.id": {
                 "$ref": "blocked.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -234,7 +247,8 @@
               "items.0.id": {
                 "$ref": "other.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -243,7 +257,8 @@
           "expect": {
             "result": {
               "items.length": 2
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -300,7 +315,8 @@
                 }
               },
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -317,7 +333,8 @@
               "cursor": {
                 "$ref": "decisions.cursor"
               }
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -355,7 +372,8 @@
               "classification.moderation.status": "purged",
               "content.status": "removed",
               "content.removalReason": "policy"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -389,7 +407,8 @@
           "expect": {
             "result": {
               "content.status": "stored"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -433,7 +452,8 @@
           "expect": {
             "result": {
               "content.status": "removed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -484,7 +504,8 @@
             "result": {
               "content.status": "stored",
               "content.removalReason": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -516,7 +537,8 @@
             "result": {
               "content.status": "removed",
               "content.removalReason": "retention"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -546,7 +568,8 @@
               "content.status": "removed",
               "content.removalReason": "requested",
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -586,7 +609,8 @@
           "expect": {
             "result": {
               "visibility": "private"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -617,7 +641,10 @@
             },
             "visibility": "public"
           },
-          "save": "public"
+          "save": "public",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -704,7 +731,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "private"
+          "save": "private",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -738,7 +768,10 @@
             },
             "visibility": "public"
           },
-          "save": "public"
+          "save": "public",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -784,7 +817,8 @@
           "expect": {
             "result": {
               "classification.moderation.status": "age-restricted"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -834,7 +868,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "private"
+          "save": "private",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -877,7 +914,8 @@
           "expect": {
             "result": {
               "classification.moderation.status": "limited"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -910,13 +948,17 @@
               "items.0.id": {
                 "$ref": "public.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
           "operation": "events.list",
           "args": {},
-          "save": "feed"
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "mock.decide",
@@ -992,7 +1034,8 @@
                   "value": "reviewer"
                 }
               }
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1011,7 +1054,10 @@
             },
             "idempotencyKey": "upload-1"
           },
-          "save": "first"
+          "save": "first",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -1024,7 +1070,8 @@
             "idempotencyKey": "upload-1"
           },
           "expect": {
-            "sameAs": "first"
+            "sameAs": "first",
+            "httpStatus": 200
           }
         },
         {
@@ -1050,7 +1097,8 @@
           "expect": {
             "result": {
               "items.length": 1
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1072,7 +1120,8 @@
           "expect": {
             "result": {
               "externalId": "order-17"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1098,7 +1147,8 @@
           "expect": {
             "result": {
               "items.length": 1
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1116,7 +1166,10 @@
               "type": "image/png"
             }
           },
-          "save": "queued"
+          "save": "queued",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.waitForDecision",
@@ -1156,7 +1209,8 @@
                 "$ref": "queued.id"
               },
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1170,7 +1224,10 @@
           "args": {
             "name": "Uploads"
           },
-          "save": "folder"
+          "save": "folder",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "assets.create",
@@ -1190,7 +1247,8 @@
               "folderId": {
                 "$ref": "folder.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1217,6 +1275,9 @@
             "assetId": {
               "$ref": "filed.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -1239,6 +1300,9 @@
             "folderId": {
               "$ref": "folder.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -1272,7 +1336,10 @@
             "externalId": "order-17",
             "description": "Golden hour at the pier"
           },
-          "save": "beach"
+          "save": "beach",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -1284,7 +1351,10 @@
             },
             "externalId": "INV-42"
           },
-          "save": "invoice"
+          "save": "invoice",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.classify",
@@ -1295,7 +1365,10 @@
               "type": "image/png"
             }
           },
-          "save": "form"
+          "save": "form",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.search",
@@ -1312,7 +1385,8 @@
               "items.0.matchedFields": [
                 "externalId"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1337,7 +1411,8 @@
               "items.1.matchedFields": [
                 "name"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1355,7 +1430,8 @@
               "items.0.matchedFields": [
                 "name"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1373,7 +1449,8 @@
               "items.0.matchedFields": [
                 "name"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1393,7 +1470,8 @@
               "items.0.matchedFields": [
                 "id"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1412,7 +1490,8 @@
               "items.0.matchedFields": [
                 "description"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1431,7 +1510,8 @@
                 "name",
                 "description"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1442,7 +1522,8 @@
           "expect": {
             "result": {
               "items.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1453,7 +1534,8 @@
           "expect": {
             "result": {
               "items.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1474,7 +1556,8 @@
               "items.1.asset.id": {
                 "$ref": "beach.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1491,7 +1574,8 @@
               "items.0.matchedFields": {
                 "$contains": "type"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1507,7 +1591,8 @@
               "items.0.matchedFields": {
                 "$contains": "content.format"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1525,7 +1610,8 @@
               "items.1.asset.id": {
                 "$ref": "invoice.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1545,7 +1631,10 @@
               "type": "image/png"
             }
           },
-          "save": "a"
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -1556,7 +1645,10 @@
               "type": "image/png"
             }
           },
-          "save": "b"
+          "save": "b",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -1567,7 +1659,10 @@
               "type": "image/png"
             }
           },
-          "save": "c"
+          "save": "c",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.list",
@@ -1580,7 +1675,8 @@
               "items.0.id": {
                 "$ref": "c.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1597,7 +1693,8 @@
               "items.1.id": {
                 "$ref": "a.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1614,7 +1711,8 @@
               "items.1.id": {
                 "$ref": "a.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1632,7 +1730,10 @@
               "type": "image/png"
             }
           },
-          "save": "a"
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -1643,7 +1744,10 @@
               "type": "image/png"
             }
           },
-          "save": "b"
+          "save": "b",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -1654,7 +1758,10 @@
               "type": "image/png"
             }
           },
-          "save": "c"
+          "save": "c",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.list",
@@ -1678,7 +1785,8 @@
                 "$ref": "b.id"
               },
               "hasMore": true
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1690,7 +1798,10 @@
               "type": "image/png"
             }
           },
-          "save": "d"
+          "save": "d",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.list",
@@ -1714,7 +1825,8 @@
               },
               "hasMore": false,
               "nextCursor": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1737,7 +1849,8 @@
               "items.1.id": {
                 "$ref": "c.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1746,6 +1859,9 @@
             "assetId": {
               "$ref": "c.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -1772,7 +1888,8 @@
                 "$ref": "a.id"
               },
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1790,7 +1907,10 @@
               "type": "image/png"
             }
           },
-          "save": "queued"
+          "save": "queued",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "events.list",
@@ -1799,7 +1919,8 @@
           "expect": {
             "result": {
               "events.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1837,7 +1958,8 @@
                   "value": "allowed"
                 }
               }
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -1864,7 +1986,8 @@
               "tags": null,
               "metadata": null,
               "folderId": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1881,7 +2004,8 @@
             "result": {
               "externalId": null,
               "description": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1905,7 +2029,8 @@
                 "beach",
                 "sunset"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1923,7 +2048,8 @@
               "items.0.matchedFields": [
                 "tags"
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1940,7 +2066,8 @@
               "name": "renamed.png",
               "description": null,
               "tags": []
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1969,7 +2096,8 @@
           "expect": {
             "result": {
               "externalId": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -1985,7 +2113,8 @@
             "result": {
               "externalId": "order-1",
               "visibility": "public"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2001,7 +2130,8 @@
               "description": null,
               "tags": [],
               "externalId": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2028,7 +2158,10 @@
           "args": {
             "name": "Inbox"
           },
-          "save": "folder"
+          "save": "folder",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "assets.create",
@@ -2039,7 +2172,10 @@
               "type": "image/png"
             }
           },
-          "save": "a"
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -2050,7 +2186,10 @@
               "type": "image/png"
             }
           },
-          "save": "b"
+          "save": "b",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.move",
@@ -2070,7 +2209,8 @@
               "folderId": {
                 "$ref": "folder.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2086,7 +2226,8 @@
               "items.0.id": {
                 "$ref": "a.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2100,7 +2241,8 @@
           "expect": {
             "result": {
               "folderId": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2113,7 +2255,8 @@
           "expect": {
             "result": {
               "items.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2141,7 +2284,8 @@
           "expect": {
             "result": {
               "folderId": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2201,7 +2345,10 @@
               "type": "image/png"
             }
           },
-          "save": "a"
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.listChildren",
@@ -2216,7 +2363,8 @@
               "hasMore": false,
               "nextCursor": null,
               "pageSize": 10
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2229,7 +2377,8 @@
           "expect": {
             "result": {
               "length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2255,7 +2404,10 @@
         {
           "operation": "events.list",
           "args": {},
-          "save": "feed"
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -2272,7 +2424,8 @@
               "classification.status": "failed",
               "classification.moderation.status": "pending",
               "content.status": "temporary"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2289,7 +2442,8 @@
                 "$ref": "failed.id"
               },
               "classification.status": "failed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2304,7 +2458,8 @@
               "classification.status": "processing",
               "classification.completedAt": null,
               "classification.moderation.status": "pending"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2330,7 +2485,10 @@
               "type": "image/png"
             }
           },
-          "save": "allowed"
+          "save": "allowed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.retry",
@@ -2355,7 +2513,10 @@
               "type": "image/png"
             }
           },
-          "save": "emptied"
+          "save": "emptied",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.deleteContent",
@@ -2363,6 +2524,9 @@
             "assetId": {
               "$ref": "emptied.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -2418,7 +2582,8 @@
                 "$ref": "emptied.id"
               },
               "events.1.asset.content.status": "removed"
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -2436,7 +2601,10 @@
               "type": "image/png"
             }
           },
-          "save": "queued"
+          "save": "queued",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.explain",
@@ -2479,7 +2647,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "kept"
+          "save": "kept",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.explain",
@@ -2489,7 +2660,8 @@
             }
           },
           "expect": {
-            "sameAs": "kept"
+            "sameAs": "kept",
+            "httpStatus": 200
           }
         },
         {
@@ -2508,7 +2680,8 @@
               "classification.status": "processing",
               "classification.completedAt": null,
               "classification.moderation.status": "pending"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2523,7 +2696,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "reviewed"
+          "save": "reviewed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "mock.decide",
@@ -2558,7 +2734,10 @@
               "type": "image/png"
             }
           },
-          "save": "temporary"
+          "save": "temporary",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.explain",
@@ -2583,7 +2762,8 @@
             }
           },
           "expect": {
-            "sameAs": "temporary"
+            "sameAs": "temporary",
+            "httpStatus": 200
           }
         },
         {
@@ -2607,7 +2787,10 @@
         {
           "operation": "events.list",
           "args": {},
-          "save": "feed"
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.classify",
@@ -2621,7 +2804,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "kept"
+          "save": "kept",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.deleteContent",
@@ -2636,7 +2822,8 @@
               "content.status": "removed",
               "content.removalReason": "requested",
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2647,7 +2834,8 @@
             }
           },
           "expect": {
-            "sameAs": "removed"
+            "sameAs": "removed",
+            "httpStatus": 200
           }
         },
         {
@@ -2656,6 +2844,9 @@
             "assetId": {
               "$ref": "kept.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -2692,7 +2883,8 @@
           "expect": {
             "result": {
               "items.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2733,7 +2925,8 @@
                   "value": "kept.png"
                 }
               }
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -2754,7 +2947,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "a"
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.classify",
@@ -2768,7 +2964,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "b"
+          "save": "b",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.classify",
@@ -2782,12 +2981,18 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "c"
+          "save": "c",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "events.list",
           "args": {},
-          "save": "feed"
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.batch",
@@ -2838,7 +3043,8 @@
           "expect": {
             "result": {
               "content.status": "stored"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2851,7 +3057,8 @@
           "expect": {
             "result": {
               "events.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2867,7 +3074,8 @@
           "expect": {
             "result": {
               "queued": true
-            }
+            },
+            "httpStatus": 202
           }
         },
         {
@@ -2882,7 +3090,8 @@
               "content.status": "removed",
               "content.removalReason": "requested",
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2901,7 +3110,8 @@
           "expect": {
             "result": {
               "queued": true
-            }
+            },
+            "httpStatus": 202
           }
         },
         {
@@ -2941,7 +3151,8 @@
               "items.0.id": {
                 "$ref": "c.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -2996,7 +3207,8 @@
                   "value": "b.png"
                 }
               }
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -3017,12 +3229,18 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "purged"
+          "save": "purged",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "events.list",
           "args": {},
-          "save": "feed"
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "mock.decide",
@@ -3056,7 +3274,8 @@
                   "value": "reviewer"
                 }
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3085,7 +3304,8 @@
           "expect": {
             "result": {
               "events.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3114,7 +3334,8 @@
             "result": {
               "events.length": 2,
               "hasMore": true
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3130,7 +3351,8 @@
             "result": {
               "events.length": 1,
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3148,7 +3370,8 @@
               "cursor": {
                 "$ref": "second.cursor"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3169,7 +3392,8 @@
               "1.cursor": {
                 "$ref": "second.cursor"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3197,7 +3421,8 @@
             "result": {
               "events.length": 50,
               "hasMore": true
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3212,7 +3437,8 @@
             "result": {
               "events.length": 100,
               "hasMore": true
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3227,7 +3453,8 @@
             "result": {
               "events.length": 51,
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3296,7 +3523,10 @@
               "type": "image/png"
             }
           },
-          "repeat": 11
+          "repeat": 11,
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.list",
@@ -3317,7 +3547,8 @@
                   "direction": "DESC"
                 }
               ]
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3332,7 +3563,8 @@
               "items.length": 1,
               "hasMore": false,
               "nextCursor": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3346,7 +3578,8 @@
               "0.id": {
                 "$ref": "first.items.0.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3358,7 +3591,8 @@
           "expect": {
             "result": {
               "length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3418,7 +3652,8 @@
               "items.length": 11,
               "pageSize": 100,
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3466,7 +3701,10 @@
               "type": "image/png"
             }
           },
-          "save": "letters"
+          "save": "letters",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -3477,7 +3715,10 @@
               "type": "image/png"
             }
           },
-          "repeat": 11
+          "repeat": 11,
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.search",
@@ -3490,7 +3731,8 @@
               "items.0.asset.id": {
                 "$ref": "letters.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3501,7 +3743,8 @@
           "expect": {
             "result": {
               "items.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3512,7 +3755,8 @@
           "expect": {
             "result": {
               "items.length": 1
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3523,7 +3767,8 @@
           "expect": {
             "result": {
               "items.length": 10
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3535,7 +3780,8 @@
           "expect": {
             "result": {
               "items.length": 11
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3615,7 +3861,10 @@
               "type": "image/png"
             }
           },
-          "save": "queued"
+          "save": "queued",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.waitForDecision",
@@ -3700,7 +3949,8 @@
               "classification.status": "pending",
               "classification.moderation.status": "pending",
               "content.sizeInBytes": 5242880
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3764,7 +4014,8 @@
               "classification.status": "completed",
               "classification.moderation.status": "blocked",
               "content.sizeInBytes": 5242885
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3802,7 +4053,10 @@
               "isFinal": false
             }
           },
-          "save": "analyzed"
+          "save": "analyzed",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.uploadPart",
@@ -3819,7 +4073,8 @@
           "expect": {
             "result": {
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3838,7 +4093,10 @@
               "isFinal": false
             }
           },
-          "save": "override"
+          "save": "override",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.uploadPart",
@@ -3856,7 +4114,8 @@
           "expect": {
             "result": {
               "classification.moderation.status": "allowed"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3959,7 +4218,8 @@
             "result": {
               "type": "image",
               "upload.status": "uploading"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -3993,7 +4253,8 @@
               "upload.status": "uploading",
               "upload.partsReceived": 1,
               "content.sizeInBytes": 5242880
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4013,7 +4274,10 @@
             },
             "totalSizeInBytes": 5242881
           },
-          "save": "declared"
+          "save": "declared",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.uploadPart",
@@ -4050,7 +4314,8 @@
             "result": {
               "upload.status": "completed",
               "content.sizeInBytes": 5242881
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -4087,7 +4352,10 @@
             },
             "idempotencyKey": "retry-1"
           },
-          "save": "first"
+          "save": "first",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -4100,7 +4368,8 @@
             "idempotencyKey": "retry-1"
           },
           "expect": {
-            "sameAs": "first"
+            "sameAs": "first",
+            "httpStatus": 200
           }
         },
         {
@@ -4129,6 +4398,9 @@
               "type": "image/png"
             },
             "idempotencyKey": "order 17 upload"
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -4141,7 +4413,10 @@
             },
             "idempotencyKey": " order-17"
           },
-          "save": "padded"
+          "save": "padded",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.create",
@@ -4154,7 +4429,8 @@
             "idempotencyKey": "order-17 "
           },
           "expect": {
-            "sameAs": "padded"
+            "sameAs": "padded",
+            "httpStatus": 200
           }
         },
         {
@@ -4166,6 +4442,9 @@
               "type": "image/png"
             },
             "idempotencyKey": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -4234,6 +4513,9 @@
               "type": "image/png"
             },
             "idempotencyKey": "network-1"
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -4242,7 +4524,8 @@
           "expect": {
             "result": {
               "items.length": 5
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
@@ -4280,7 +4563,8 @@
           "expect": {
             "result": {
               "items.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4305,7 +4589,8 @@
           "expect": {
             "result": {
               "items.length": 0
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4321,7 +4606,10 @@
             },
             "visibility": "public"
           },
-          "save": "accepted"
+          "save": "accepted",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "mock.failNext",
@@ -4353,7 +4641,8 @@
             }
           },
           "expect": {
-            "sameAs": "accepted"
+            "sameAs": "accepted",
+            "httpStatus": 200
           }
         },
         {
@@ -4430,7 +4719,8 @@
               "0.identifier": "thumb",
               "0.version": 1,
               "1.identifier": "card"
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4496,7 +4786,8 @@
               },
               "name": "Small thumbnail",
               "version": 2
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4585,7 +4876,10 @@
           "args": {
             "name": "Photos"
           },
-          "save": "photos"
+          "save": "photos",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.create",
@@ -4597,7 +4891,8 @@
             "result": {
               "name": "photos",
               "parentId": null
-            }
+            },
+            "httpStatus": 201
           }
         },
         {
@@ -4626,7 +4921,8 @@
               "parentId": {
                 "$ref": "photos.id"
               }
-            }
+            },
+            "httpStatus": 201
           }
         },
         {
@@ -4634,7 +4930,10 @@
           "args": {
             "name": "Trips"
           },
-          "save": "rootTrips"
+          "save": "rootTrips",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.create",
@@ -4644,7 +4943,10 @@
               "$ref": "trips.id"
             }
           },
-          "save": "year"
+          "save": "year",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.create",
@@ -4690,7 +4992,8 @@
               },
               "name": "archive",
               "parentId": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4710,7 +5013,8 @@
               },
               "ancestors.length": 0,
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4732,7 +5036,8 @@
                   "$ref": "photos"
                 }
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4750,7 +5055,8 @@
               "folders.length": 0,
               "ancestors.length": 3,
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4762,7 +5068,8 @@
           "expect": {
             "result": {
               "folders.length": 2
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4776,7 +5083,8 @@
               "folders.0.id": {
                 "$ref": "rootTrips.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4788,7 +5096,8 @@
             "result": {
               "folders.length": 2,
               "hasMore": true
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4804,7 +5113,8 @@
                 "$ref": "lower.id"
               },
               "hasMore": false
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4821,7 +5131,8 @@
               "folders.2.id": {
                 "$ref": "photos.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4847,7 +5158,8 @@
             }
           },
           "expect": {
-            "sameAs": "archive"
+            "sameAs": "archive",
+            "httpStatus": 200
           }
         },
         {
@@ -4873,7 +5185,10 @@
           "args": {
             "name": "A"
           },
-          "save": "a"
+          "save": "a",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.create",
@@ -4883,7 +5198,10 @@
               "$ref": "a.id"
             }
           },
-          "save": "b"
+          "save": "b",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.create",
@@ -4893,14 +5211,20 @@
               "$ref": "b.id"
             }
           },
-          "save": "c"
+          "save": "c",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.create",
           "args": {
             "name": "B"
           },
-          "save": "rootB"
+          "save": "rootB",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.move",
@@ -4965,7 +5289,8 @@
                 "$ref": "c.id"
               },
               "parentId": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -4983,7 +5308,8 @@
               "parentId": {
                 "$ref": "a.id"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -5038,6 +5364,9 @@
             "folderId": {
               "$ref": "c.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -5046,6 +5375,9 @@
             "folderId": {
               "$ref": "b.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -5054,6 +5386,9 @@
             "folderId": {
               "$ref": "a.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -5095,7 +5430,10 @@
           "args": {
             "name": "Parent"
           },
-          "save": "parent"
+          "save": "parent",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "folders.create",
@@ -5105,7 +5443,10 @@
               "$ref": "parent.id"
             }
           },
-          "save": "child"
+          "save": "child",
+          "expect": {
+            "httpStatus": 201
+          }
         },
         {
           "operation": "assets.classify",
@@ -5119,7 +5460,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "root"
+          "save": "root",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.classify",
@@ -5136,7 +5480,10 @@
               "$ref": "parent.id"
             }
           },
-          "save": "inParent"
+          "save": "inParent",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "assets.classify",
@@ -5153,7 +5500,10 @@
               "$ref": "child.id"
             }
           },
-          "save": "inChild"
+          "save": "inChild",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "mock.grant",
@@ -5393,7 +5743,10 @@
             },
             "visibility": "public"
           },
-          "save": "public"
+          "save": "public",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -5545,7 +5898,10 @@
               "keepContentAfterProcessing": true
             }
           },
-          "save": "private"
+          "save": "private",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -5619,7 +5975,10 @@
             },
             "visibility": "public"
           },
-          "save": "queued"
+          "save": "queued",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -5649,7 +6008,10 @@
             },
             "visibility": "public"
           },
-          "save": "note"
+          "save": "note",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -5672,6 +6034,9 @@
             "assetId": {
               "$ref": "private.id"
             }
+          },
+          "expect": {
+            "httpStatus": 200
           }
         },
         {
@@ -5706,7 +6071,8 @@
               "content.removalReason": "retention",
               "content.image.thumbhash": null,
               "content.image.averageColor": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -5737,7 +6103,10 @@
             },
             "visibility": "public"
           },
-          "save": "purged"
+          "save": "purged",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "mock.decide",
@@ -5795,7 +6164,10 @@
             },
             "visibility": "public"
           },
-          "save": "image"
+          "save": "image",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",
@@ -5844,7 +6216,10 @@
             },
             "visibility": "public"
           },
-          "save": "note"
+          "save": "note",
+          "expect": {
+            "httpStatus": 200
+          }
         },
         {
           "operation": "cdn.serve",

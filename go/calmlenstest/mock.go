@@ -164,6 +164,9 @@ type MockServerClient struct {
 	failures        []failure
 	grants          []Grant
 	requestCount    int
+	// lastStatus is the HTTP status of the last response, 0 when the last request failed
+	// without one; the contract tests check it.
+	lastStatus int
 	// waited is the time the client has spent waiting; mock waits advance it instead of sleeping.
 	waited time.Duration
 	mu     sync.Mutex
@@ -539,6 +542,16 @@ func fail(code string) error {
 func (m *MockServerClient) roundTrip(req *http.Request, raw []byte) (*http.Response, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	res, err := m.answer(req, raw)
+	m.lastStatus = 0
+	if res != nil {
+		m.lastStatus = res.StatusCode
+	}
+	return res, err
+}
+
+// answer captures the request and answers it from memory; the caller holds m.mu.
+func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response, error) {
 	if err := req.Context().Err(); err != nil {
 		return nil, err
 	}
@@ -599,6 +612,9 @@ func (m *MockServerClient) roundTrip(req *http.Request, raw []byte) (*http.Respo
 	}
 	result, err := m.dispatch(req.Method, parts, req.URL.Query(), raw, req.Header)
 	res := m.jsonResponse(req, header, result, err)
+	if err == nil {
+		setStatus(res, successStatus(operations))
+	}
 	// A failed request frees its key, like the API.
 	if key != "" && err == nil {
 		data, _ := json.Marshal(result)
@@ -703,6 +719,23 @@ func (m *MockServerClient) jsonResponse(req *http.Request, header http.Header, r
 	}
 	data, _ := json.Marshal(result)
 	return response(req, status, header, "application/json", data)
+}
+
+// successStatus is the status the API answers a successful request with: 201 Created for a new
+// folder, 202 Accepted for a queued batch, otherwise 200 OK.
+func successStatus(operations []string) int {
+	switch {
+	case contains(operations, "folders.create"):
+		return http.StatusCreated
+	case contains(operations, "assets.batch"):
+		return http.StatusAccepted
+	}
+	return http.StatusOK
+}
+
+func setStatus(res *http.Response, status int) {
+	res.StatusCode = status
+	res.Status = fmt.Sprintf("%d %s", status, http.StatusText(status))
 }
 
 func response(req *http.Request, status int, header http.Header, contentType string, data []byte) *http.Response {

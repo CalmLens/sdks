@@ -50,6 +50,9 @@ pub struct Request {
     pub headers: HashMap<String, String>,
     /// The request body, including streamed uploads.
     pub body: Vec<u8>,
+    /// The HTTP status the mock answered with, or `None` when the request failed without a
+    /// response (a transport error or timeout).
+    pub response_status: Option<u16>,
 }
 impl Request {
     /// The first value of query parameter `name`.
@@ -227,6 +230,10 @@ impl MockTransport {
                 .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_string()))
                 .collect(),
             body,
+            response_status: match &reply {
+                Some(Reply::Response(response)) => Some(response.status),
+                _ => None,
+            },
         });
         match reply {
             Some(Reply::Response(mut response)) => {

@@ -736,9 +736,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
             except _Failure as failure_response:
                 # A failed request frees its idempotency key.
                 return self._failure_response(failure_response)
-            # Like the API, a queued batch is 202 Accepted.
-            status = 202 if parts[-2:] == ["assets", "batch"] and request.get_method() == "POST" else 200
-            response = self._respond(status, result) if result is not None else self._respond(204)
+            # Like the API: a new folder is 201 Created, a queued batch 202 Accepted, and deletes
+            # answer 200 with an empty object.
+            status = {"folders.create": 201, "assets.batch": 202}.get(operation, 200)
+            response = self._respond(status, {} if result is None else result)
             if key is not None:
                 self._idempotent[key] = (fingerprint, response.status, response.getvalue())
             return response

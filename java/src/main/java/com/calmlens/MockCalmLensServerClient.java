@@ -584,7 +584,21 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /** Closes {@link #client}. */
   @Override public void close() { client.close(); }
 
+  /** The status of the last response, null when the last request failed without one; the contract tests check it. */
+  Integer lastStatus;
+
   private Transport.Response send(Transport.Request request) throws IOException, InterruptedException {
+    synchronized (this) {
+      lastStatus = null;
+    }
+    Transport.Response response = answer(request);
+    synchronized (this) {
+      lastStatus = response.status();
+    }
+    return response;
+  }
+
+  private Transport.Response answer(Transport.Request request) throws IOException, InterruptedException {
     Request captured = capture(request);
     Queued next;
     synchronized (this) {

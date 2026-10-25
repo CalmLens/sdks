@@ -828,7 +828,12 @@ final class ContractTest extends TestCase
                     }
                     continue;
                 }
+                // The mock keeps the status of its last response, to check the step's final one.
+                (fn () => $this->lastStatus = null)->call($mock);
                 $result = self::runStep($mock, $step['operation'], $args);
+                if (isset($expect['httpStatus'])) {
+                    self::assertSame($expect['httpStatus'], (fn (): ?int => $this->lastStatus)->call($mock), "$label: final response status");
+                }
                 if (isset($expect['cdn'])) {
                     self::checkCdn(self::resolve($expect['cdn'], $saved), $result, $label);
                 }

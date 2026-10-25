@@ -892,9 +892,15 @@ impl Backend {
         } else {
             Map::new()
         };
+        // Like the API: a new folder is 201 Created, a queued batch 202 Accepted.
+        let status = match self.operation(method, url, headers) {
+            Some("folders.create") => 201,
+            Some("assets.batch") => 202,
+            _ => 200,
+        };
         match self.dispatch(method, &parts, &query, body, raw, headers) {
             Ok(value) => {
-                let response = MockResponse::json(200, value);
+                let response = MockResponse::json(status, value);
                 if !key.is_empty() {
                     self.replays
                         .insert(key.to_owned(), (fingerprint, response.clone()));

@@ -60,6 +60,7 @@ type ScenarioStep = {
   expect?: {
     result?: Record<string, unknown>;
     sameAs?: string;
+    httpStatus?: number;
     error?: { code: string; status: number | null; details?: Record<string, unknown> };
     cdn?: {
       status: number;
@@ -210,6 +211,8 @@ const checkCdnExpectation = (
 };
 
 describe("shared mock scenarios", () => {
+  // Like the other not-applicable cases, the reason is the skipped test's name.
+  test.skip("expect.httpStatus (not applicable: MockCalmLensServerClient answers API methods in memory and sends no HTTP response; cdn.serve steps check expect.cdn.status)", () => {});
   for (const scenario of scenarios) {
     it(scenario.name, async () => {
       const client = new MockCalmLensServerClient({

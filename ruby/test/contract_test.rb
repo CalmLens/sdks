@@ -136,7 +136,16 @@ class ContractTest < Minitest::Test
     end
   end
 
-  def check_step(mock, step, saved, label)
+  # Records the status of each response the mock's in-memory API answers, to check a step's final one.
+  def record_statuses(mock)
+    statuses = []
+    mock.instance_variable_get(:@fake).singleton_class.prepend(Module.new do
+      define_method(:handle) { |*args| super(*args).tap { |response| statuses << response.status } }
+    end)
+    statuses
+  end
+
+  def check_step(mock, step, saved, label, statuses)
     args = resolve(step.fetch('args', {}), saved)
     expect = step.fetch('expect', {})
     if (wanted = expect['error'])
@@ -144,7 +153,9 @@ class ContractTest < Minitest::Test
       return check_error(wanted, error, saved, label)
     end
 
+    statuses.clear
     result = run_step(mock, step['operation'], args)
+    assert_equal [expect['httpStatus']], statuses.last(1), "#{label}: final response status" if expect['httpStatus']
     check_cdn(resolve(expect['cdn'], saved), result, label) if expect['cdn']
     if (name = expect['sameAs'])
       assert saved.key?(name), "#{label}: nothing saved as #{name}"
@@ -169,10 +180,11 @@ class ContractTest < Minitest::Test
       analyzed_outcome: options.fetch('analyzedOutcome', 'allowed')
     )
     saved = {}
+    statuses = record_statuses(mock)
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     scenario['steps'].each_with_index do |step, index|
       step.fetch('repeat', 1).times do |run|
-        check_step(mock, step, saved, "step #{index + 1}#{" run #{run + 1}" if step['repeat']} (#{step['operation']})")
+        check_step(mock, step, saved, "step #{index + 1}#{" run #{run + 1}" if step['repeat']} (#{step['operation']})", statuses)
       end
     end
     # Mock waits take no real time.

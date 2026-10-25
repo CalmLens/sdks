@@ -752,6 +752,16 @@ class MockScenarioTests(unittest.TestCase):
                                                        ("analyzedOutcome", "analyzed_outcome")) if name in mock}
         client = MockCalmLensServerClient(api_key=create_mock_api_key(mock.get("apiKeyGrants")),
                                           project_id="project-1", mock_options=options)
+        # The status of each response the mock answers, to check a step's final one.
+        statuses: list[int] = []
+        serve = client.transport
+
+        def recording(request: Any, timeout: float) -> Any:
+            response = serve(request, timeout)
+            statuses.append(response.status)
+            return response
+
+        client.transport = recording
         saved: dict[str, Any] = {}
         for index, step in enumerate(scenario["steps"], 1):
             for run in range(step.get("repeat", 1)):
@@ -769,7 +779,10 @@ class MockScenarioTests(unittest.TestCase):
                         self.assertEqual(_json(error.details.get(key)), _resolve(value, saved),
                                          f"{label}: details.{key}")
                     continue
+                statuses.clear()
                 result = _run(client, step["operation"], args)
+                if "httpStatus" in expect:
+                    self.assertEqual(statuses[-1:], [expect["httpStatus"]], f"{label}: final response status")
                 if "cdn" in expect:
                     self._check_cdn(result, _resolve(expect["cdn"], saved), label)
                 if "sameAs" in expect:

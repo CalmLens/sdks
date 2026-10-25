@@ -981,6 +981,7 @@ async fn check_step(
     }
     let empty = Value::Object(Map::new());
     let expect = resolve(step.get("expect").unwrap_or(&empty), saved);
+    let sent = mock.requests().len();
     let outcome = run_step(mock, operation, args).await;
     if let Some(wanted) = expect.get("error") {
         let error = outcome.expect_err(&label);
@@ -999,6 +1000,16 @@ async fn check_step(
         return;
     }
     let result = whole_numbers(outcome.unwrap_or_else(|error| panic!("{label}: {error:?}")));
+    if let Some(wanted) = expect.get("httpStatus") {
+        let last = mock.requests()[sent..]
+            .last()
+            .and_then(|request| request.response_status);
+        assert_eq!(
+            last.map(Value::from).as_ref(),
+            Some(wanted),
+            "{label}: final response status"
+        );
+    }
     if let Some(Value::Object(cdn)) = expect.get("cdn") {
         for (key, wanted) in cdn {
             match key.as_str() {

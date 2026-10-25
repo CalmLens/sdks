@@ -289,9 +289,10 @@ type mockScenario struct {
 		Save      string
 		Repeat    int
 		Expect    struct {
-			Result map[string]any
-			SameAs string
-			Error  *struct {
+			Result     map[string]any
+			SameAs     string
+			HTTPStatus *int `json:"httpStatus"`
+			Error      *struct {
 				Code    string
 				Status  *int
 				Details map[string]any
@@ -685,6 +686,9 @@ func TestSharedMockScenarios(t *testing.T) {
 						t.Logf("%s: skipped, %s", label, reason)
 						continue
 					}
+					m.mu.Lock()
+					m.lastStatus = 0
+					m.mu.Unlock()
 					var result any
 					var servedResponse served
 					if step.Operation == "cdn.serve" {
@@ -720,6 +724,14 @@ func TestSharedMockScenarios(t *testing.T) {
 					}
 					if err != nil {
 						t.Fatalf("%s: %v", label, err)
+					}
+					if want := step.Expect.HTTPStatus; want != nil {
+						m.mu.Lock()
+						got := m.lastStatus
+						m.mu.Unlock()
+						if got != *want {
+							t.Fatalf("%s: final response status is %d, want %d", label, got, *want)
+						}
 					}
 					if want := step.Expect.CDN; want != nil {
 						checkCDN(t, label, servedResponse, want, saved)

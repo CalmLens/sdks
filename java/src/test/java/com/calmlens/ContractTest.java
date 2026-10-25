@@ -585,7 +585,17 @@ class ContractTest {
       }
       return;
     }
+    synchronized (mock) {
+      mock.lastStatus = null;
+    }
     JsonElement result = run(mock, operation, args);
+    if (expect.has("httpStatus")) {
+      Integer status;
+      synchronized (mock) {
+        status = mock.lastStatus;
+      }
+      assertEquals(Integer.valueOf(expect.get("httpStatus").getAsInt()), status, label + ": final response status");
+    }
     if (expect.has("cdn")) {
       JsonObject cdn = resolve(expect.get("cdn"), saved).getAsJsonObject();
       JsonObject served = result.getAsJsonObject().getAsJsonObject("headers");

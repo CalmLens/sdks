@@ -187,10 +187,13 @@ final class MockApi {
       // A failed request frees its key, as the API does.
       return error(failure);
     }
-    byte[] bytes = result == null ? new byte[0] : Json.write(result).getBytes(StandardCharsets.UTF_8);
-    int status = result == null ? 204 : 200;
+    // Like the API: deletes answer 200 with an empty object, a new folder is 201 Created and a
+    // queued batch 202 Accepted.
+    byte[] bytes = Json.write(result == null ? new JsonObject() : result).getBytes(StandardCharsets.UTF_8);
+    Set<String> operations = operations(request);
+    int status = operations.contains("folders.create") ? 201 : operations.contains("assets.batch") ? 202 : 200;
     if (key != null) idempotent.put(key, new Saved(fingerprint, status, bytes));
-    return respond(status, result == null ? null : "application/json", bytes);
+    return respond(status, "application/json", bytes);
   }
 
   private static IOException unsupported(String method, String path) {

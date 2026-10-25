@@ -709,6 +709,8 @@ module CalmLens
         item = { 'id' => @create_id.call, 'projectId' => @project_id, 'parentId' => json['parentId'], 'name' => json['name'],
                  'createdAt' => now, 'updatedAt' => now }
         @state.folders[item['id']] = item
+        # Like the API, a new folder is 201 Created.
+        respond(201, deep_copy(item))
       end
 
       def move_folder(item, parent_id)
