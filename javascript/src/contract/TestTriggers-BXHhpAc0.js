@@ -8132,7 +8132,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "sexual",
 		kind: "harm",
 		displayName: "Nudity",
-		description: "Explicitly exposed intimate sexual anatomy.",
+		description: "Explicitly exposed intimate sexual anatomy, including partially exposed breasts, genitals or buttocks and a pubic area or pubic hair exposed by clothing pulled down or open.",
 		exclusions: "Swimwear, revealing clothing and diagrams without exposed sexual anatomy. Actual exposed sexual anatomy in a clinical or medical diagram still qualifies; educational framing is separate."
 	},
 	"sexual-activity": {
@@ -8332,7 +8332,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		kind: "context",
 		displayName: "Non-graphic discussion",
-		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.",
+		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, or mentioned in passing, such as recalling that someone was shot, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.",
 		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation."
 	},
 	"violence-fictional": {
@@ -8431,13 +8431,13 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Insults or humiliation",
 		description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.",
-		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation."
+		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; describing a view or insult someone else holds, such as “you think they are traitors”, which is not the speaker insulting anyone; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation."
 	},
 	"harassment-mild": {
 		category: "harassment",
 		kind: "harm",
 		displayName: "Mild mockery or teasing",
-		description: "Light ridicule, teasing, sarcasm, a mocking nickname or mild name-calling such as fool, dummy or silly, aimed at a person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), without contempt, degradation or threats. Hyperbole or satire about a public figure’s character, conduct or followers is included. It counts so that a policy can allow or restrict it.",
+		description: "Light ridicule, teasing, sarcasm, a mocking nickname or mild name-calling such as fool, dummy or silly, aimed at a person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), without contempt, degradation or threats. Hyperbole or satire about a public figure’s character, conduct or followers is included, and so is a meme whose comparison comes from its picture or a pictured character’s line, such as an animal guarding its “garbage”, when no one is directly called an insulting name. It counts so that a policy can allow or restrict it.",
 		exclusions: "Contemptuous name-calling such as idiot, moron, loser or pathetic, degrading insults, slurs, threats, sexual remarks, bullying or victim mockery, which are other forms; name-calling of a protected identity group, which is Hate; criticism of an argument, decision or conduct without mocking the people; self-deprecation and untargeted jokes; affectionate teasing between people on good terms; telling someone not to call another person a name."
 	},
 	"harassment-bullying": {
