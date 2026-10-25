@@ -343,8 +343,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "violence";
     readonly kind: "harm";
     readonly displayName: "Weapon without an attack";
-    readonly description: "A firearm, knife or other weapon shown or described only as an object. Nobody is attacked, injured, killed or threatened with it, and it is not aimed, pointed or brandished at anyone.";
-    readonly exclusions: "Any supported attack, graphic bodily harm, death or threat, including an armed standoff, a weapon aimed or swung at someone, or a person posed to use it; ordinary tools, toys or props with no violent association.";
+    readonly description: "A firearm, knife or other weapon shown or described only as an object. Nobody is attacked, injured, killed or threatened with it, and it is not aimed, pointed or brandished at a visible or identified person or animal. A weapon held or aimed in posed art, an illustration or a photo with no visible target counts here.";
+    readonly exclusions: "Any supported attack, graphic bodily harm, death or threat, including an armed standoff or a weapon aimed or swung at a visible or identified person or animal; ordinary tools, toys or props with no violent association.";
     readonly inputs: readonly ["image"];
   };
   readonly "violence-sport": {
@@ -374,14 +374,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "context";
     readonly displayName: "Educational";
     readonly description: "Qualifying content presented to teach or inform: a lesson, course or textbook material, a health, safety or clinical explanation, or academic study of the subject.";
-    readonly exclusions: "An educational label on a harmful request, working instructions or an endorsement; erotic, gratuitous or graphic detail beyond what the teaching needs; an academic tone alone.";
+    readonly exclusions: "An educational label on a harmful request, working instructions or an endorsement; erotic, gratuitous or graphic detail beyond what the teaching needs; an academic tone alone. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively.";
   };
   readonly "violence-discussion": {
     readonly category: "violence";
     readonly kind: "context";
     readonly displayName: "Non-graphic discussion";
     readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, or mentioned in passing, such as recalling that someone was shot, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.";
-    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively.";
   };
   readonly "violence-fictional": {
     readonly category: "violence";
@@ -479,7 +479,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Insults or humiliation";
     readonly description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.";
-    readonly exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; describing a view or insult someone else holds, such as “you think they are traitors”, which is not the speaker insulting anyone; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation.";
+    readonly exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; a made-up or hypothetical quote illustrating a joke or observation, aimed at no real person; describing a view or insult someone else holds, such as “you think they are traitors”, which is not the speaker insulting anyone; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation.";
   };
   readonly "harassment-mild": {
     readonly category: "harassment";
@@ -646,7 +646,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "criminal-activity";
     readonly kind: "harm";
     readonly displayName: "Depicted or reported activity";
-    readonly description: "A depiction or account of a concrete criminal or seriously dangerous act, including a factual report of an actual act.";
+    readonly description: "A depiction or account of a concrete violent or seriously dangerous criminal act, including a factual report of an actual act. A non-violent offence that endangers no one, such as theft or burglary, does not qualify on its own.";
     readonly exclusions: "A topic mention, ordinary objects, abstract policy debate or unsupported inference without a concrete criminal or seriously dangerous act.";
   };
   readonly "criminal-activity-preparation": {
@@ -660,14 +660,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "criminal-activity";
     readonly kind: "harm";
     readonly displayName: "Requests for assistance";
-    readonly description: "A request by the author for help carrying out a concrete criminal or seriously dangerous act. A later refusal does not erase that request.";
+    readonly description: "A request by the author for help carrying out a concrete criminal or seriously dangerous act, or for help evading detection, consequences or accountability for one, such as how to get away with it. A later refusal does not erase that request.";
     readonly exclusions: "Lawful assistance, neutral reporting, prevention or requests without a concrete criminal or seriously dangerous act. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
   };
   readonly "criminal-activity-instructions": {
     readonly category: "criminal-activity";
     readonly kind: "harm";
     readonly displayName: "Instructions or facilitation";
-    readonly description: "Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act.";
+    readonly description: "Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act, including how to evade detection, consequences or accountability for one.";
     readonly exclusions: "Prevention, lawful safety advice, ordinary tools or non-actionable reporting alone. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
   };
   readonly "criminal-activity-promotion": {
@@ -762,14 +762,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "context";
     readonly displayName: "Educational";
     readonly description: "Qualifying content used in a lesson, safety explanation, clinical explanation or academic study.";
-    readonly exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material.";
+    readonly exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively.";
   };
   readonly "criminal-activity-discussion": {
     readonly category: "criminal-activity";
     readonly kind: "context";
     readonly displayName: "Non-graphic discussion";
     readonly description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.";
-    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation.";
+    readonly exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively.";
   };
   readonly "criminal-activity-fictional": {
     readonly category: "criminal-activity";

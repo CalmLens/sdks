@@ -7900,7 +7900,6 @@ const noop = () => {};
 const primaryKey = noop;
 const updatedAt = noop;
 const backfill = noop;
-// packages/shared/src/ModerationCategoryDefinitions.ts
 const MODERATION_CATEGORY_DEFINITIONS = {
 	sexual: {
 		summary: "Sexual acts, explicit sexual anatomy, sexual services, sexual assault depictions and clearly erotic material.",
@@ -7946,8 +7945,8 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 	},
 	"criminal-activity": {
 		summary: "Concrete criminal or seriously dangerous acts, plans, assistance or instructions; fraud, scams, grooming, illegal drugs and contraband, plus policy-controlled alcohol, tobacco/vaping and gambling.",
-		definition: "covers concrete criminal or seriously dangerous acts and their planning, requests for assistance, instructions, encouragement or facilitation, including concrete acts depicted or described in reporting, fiction, education or prevention. A request can qualify even when no act occurs and a later reply refuses it. Dangerous activity requires a concrete serious risk of physical harm. It also covers fraud, scams and phishing aimed at the reader, illegal drug use, dealing, production or trafficking, and contraband such as stolen goods, counterfeit money or documents and smuggled or illegally traded weapons. Consensual adult sexual solicitation, including paid services, also counts so that a policy can allow or restrict it; this does not establish illegality. Concrete grooming for sexual exploitation or abuse also counts, including evidenced manipulation before explicit sexual content. Child sexual abuse material counts whenever it is supplied, sought, traded or merely named or referred to, so that a policy can restrict even a bare mention; conduct qualifiers distinguish an actual instance from a mention. Depicted or concretely described alcohol drinking or trade, tobacco or vaping use or trade, and gambling with real-value stakes count for policy control even when lawful; this does not assert illegality. In images, graffiti on property counts. Harm-reduction, recovery or prevention material about illegal drug use counts in text and images. A policy can allow or restrict each.",
-		exclusions: "Solely self-directed harm, suicidal thoughts, self-harm risk or help-seeking belongs under self-harm, not criminal activity; require separate criminal conduct or serious endangerment of others. A topic mention, lawful safety advice without a concrete criminal act, or vague dangerous reference does not qualify. Lawful medical, pharmaceutical, clinical and research activity is not criminal, including prescriptions, dosages, side effects, controlled medicines used as prescribed, pharmacies, hospitals and lawful pharmaceutical manufacturing. Framing something as reporting, education or prevention does not erase an actual qualifying criminal act or harmful instructions. Generic alcohol, tobacco, gambling or drug-policy discussion without a concrete qualifying instance does not qualify. Non-alcoholic drinks, disinfectant, prescribed cessation treatment and games without real-value stakes do not qualify. Masks, computers, payment cards, detention or ordinary tools do not establish criminal facilitation by themselves. A clear visual demonstration of how to carry out a crime can qualify.",
+		definition: "covers concrete criminal or seriously dangerous acts and their planning, requests for assistance, instructions, encouragement or facilitation, including help evading detection, consequences or accountability for them, and concrete acts depicted or described in reporting, fiction, education or prevention. A request can qualify even when no act occurs and a later reply refuses it. Dangerous activity requires a concrete serious risk of physical harm. It also covers fraud, scams and phishing aimed at the reader, illegal drug use, dealing, production or trafficking, and contraband such as stolen goods, counterfeit money or documents and smuggled or illegally traded weapons. Consensual adult sexual solicitation, including paid services, also counts so that a policy can allow or restrict it; this does not establish illegality. Concrete grooming for sexual exploitation or abuse also counts, including evidenced manipulation before explicit sexual content. Child sexual abuse material counts whenever it is supplied, sought, traded or merely named or referred to, so that a policy can restrict even a bare mention; conduct qualifiers distinguish an actual instance from a mention. Depicted or concretely described alcohol drinking or trade, tobacco or vaping use or trade, and gambling with real-value stakes count for policy control even when lawful; this does not assert illegality. In images, graffiti on property counts. Harm-reduction, recovery or prevention material about illegal drug use counts in text and images. A policy can allow or restrict each.",
+		exclusions: `Solely self-directed harm, suicidal thoughts, self-harm risk or help-seeking belongs under self-harm, not criminal activity; require separate criminal conduct or serious endangerment of others. A depiction or report of a non-violent offence that endangers no one, such as theft, burglary, shoplifting, trespass, vandalism or a past fraud, does not qualify on its own, even when it shows the act in progress; it qualifies only with an actual plan, request, instructions, facilitation, promotion or encouragement, or as an offer to sell stolen or counterfeit goods. Violent acts, threats, coercion such as blackmail, and acts that seriously endanger people still qualify when depicted or reported. A topic mention, lawful safety advice without a concrete criminal act, or vague dangerous reference does not qualify. Lawful medical, pharmaceutical, clinical and research activity is not criminal, including prescriptions, dosages, side effects, controlled medicines used as prescribed, pharmacies, hospitals and lawful pharmaceutical manufacturing. Framing something as reporting, education or prevention does not erase an actual qualifying criminal act or harmful instructions. Generic alcohol, tobacco, gambling or drug-policy discussion without a concrete qualifying instance does not qualify. Non-alcoholic drinks, disinfectant, prescribed cessation treatment and games without real-value stakes do not qualify. Masks, computers, payment cards, detention or ordinary tools do not establish criminal facilitation by themselves. A clear visual demonstration of how to carry out a crime can qualify.`,
 		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
 	}
 };
@@ -8295,8 +8294,8 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		kind: "harm",
 		displayName: "Weapon without an attack",
-		description: "A firearm, knife or other weapon shown or described only as an object. Nobody is attacked, injured, killed or threatened with it, and it is not aimed, pointed or brandished at anyone.",
-		exclusions: "Any supported attack, graphic bodily harm, death or threat, including an armed standoff, a weapon aimed or swung at someone, or a person posed to use it; ordinary tools, toys or props with no violent association.",
+		description: "A firearm, knife or other weapon shown or described only as an object. Nobody is attacked, injured, killed or threatened with it, and it is not aimed, pointed or brandished at a visible or identified person or animal. A weapon held or aimed in posed art, an illustration or a photo with no visible target counts here.",
+		exclusions: "Any supported attack, graphic bodily harm, death or threat, including an armed standoff or a weapon aimed or swung at a visible or identified person or animal; ordinary tools, toys or props with no violent association.",
 		inputs: ["image"]
 	},
 	"violence-sport": {
@@ -8326,14 +8325,14 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "context",
 		displayName: "Educational",
 		description: "Qualifying content presented to teach or inform: a lesson, course or textbook material, a health, safety or clinical explanation, or academic study of the subject.",
-		exclusions: "An educational label on a harmful request, working instructions or an endorsement; erotic, gratuitous or graphic detail beyond what the teaching needs; an academic tone alone."
+		exclusions: "An educational label on a harmful request, working instructions or an endorsement; erotic, gratuitous or graphic detail beyond what the teaching needs; an academic tone alone. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively."
 	},
 	"violence-discussion": {
 		category: "violence",
 		kind: "context",
 		displayName: "Non-graphic discussion",
 		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, or mentioned in passing, such as recalling that someone was shot, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.",
-		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation."
+		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively."
 	},
 	"violence-fictional": {
 		category: "violence",
@@ -8431,7 +8430,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Insults or humiliation",
 		description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.",
-		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; describing a view or insult someone else holds, such as “you think they are traitors”, which is not the speaker insulting anyone; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation."
+		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; a made-up or hypothetical quote illustrating a joke or observation, aimed at no real person; describing a view or insult someone else holds, such as “you think they are traitors”, which is not the speaker insulting anyone; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation."
 	},
 	"harassment-mild": {
 		category: "harassment",
@@ -8598,7 +8597,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "criminal-activity",
 		kind: "harm",
 		displayName: "Depicted or reported activity",
-		description: "A depiction or account of a concrete criminal or seriously dangerous act, including a factual report of an actual act.",
+		description: "A depiction or account of a concrete violent or seriously dangerous criminal act, including a factual report of an actual act. A non-violent offence that endangers no one, such as theft or burglary, does not qualify on its own.",
 		exclusions: "A topic mention, ordinary objects, abstract policy debate or unsupported inference without a concrete criminal or seriously dangerous act."
 	},
 	"criminal-activity-preparation": {
@@ -8612,14 +8611,14 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "criminal-activity",
 		kind: "harm",
 		displayName: "Requests for assistance",
-		description: "A request by the author for help carrying out a concrete criminal or seriously dangerous act. A later refusal does not erase that request.",
+		description: "A request by the author for help carrying out a concrete criminal or seriously dangerous act, or for help evading detection, consequences or accountability for one, such as how to get away with it. A later refusal does not erase that request.",
 		exclusions: "Lawful assistance, neutral reporting, prevention or requests without a concrete criminal or seriously dangerous act. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
 	},
 	"criminal-activity-instructions": {
 		category: "criminal-activity",
 		kind: "harm",
 		displayName: "Instructions or facilitation",
-		description: "Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act.",
+		description: "Actionable instructions, practical assistance or facilitation for a concrete criminal or seriously dangerous act, including how to evade detection, consequences or accountability for one.",
 		exclusions: "Prevention, lawful safety advice, ordinary tools or non-actionable reporting alone. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
 	},
 	"criminal-activity-promotion": {
@@ -8714,14 +8713,14 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "context",
 		displayName: "Educational",
 		description: "Qualifying content used in a lesson, safety explanation, clinical explanation or academic study.",
-		exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material."
+		exclusions: "A plain factual description or text card without a supported teaching, clinical or academic purpose. An educational label on a direct harmful request or endorsement; actual actionable harmful instructions remain instructions even inside teaching material. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively."
 	},
 	"criminal-activity-discussion": {
 		category: "criminal-activity",
 		kind: "context",
 		displayName: "Non-graphic discussion",
 		description: "Qualifying content referenced non-graphically to make or examine an argument, comparison, ethical question or analysis, rather than to perform, endorse, threaten, eroticise or facilitate the harmful act.",
-		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation."
+		exclusions: "Graphic bodily or explicit sexual detail; erotic presentation; actual threats, victim mockery, endorsement, promotion, practical harmful assistance or instructions, direct harmful requests or sexual solicitation. A direct request, plan or question seeking to harm someone or commit a crime stays outside this kind even when a reply in the same conversation answers it informatively."
 	},
 	"criminal-activity-fictional": {
 		category: "criminal-activity",
