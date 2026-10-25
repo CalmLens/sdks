@@ -1,13 +1,11 @@
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Consts.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Consts.js
 const SENDABLE_ERROR_INSTANCE_SYMBOL = "__isSendableError";
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Utils.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Utils.js
 const isSendableError = (error) => {
 	if (!error || typeof error !== "object") return false;
 	return Boolean(error[SENDABLE_ERROR_INSTANCE_SYMBOL]);
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/ErrorCode.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/ErrorCode.js
 var ErrorCode = class ErrorCode {
 	properties;
 	static DEFAULT_CODE = new ErrorCode({
@@ -54,8 +52,7 @@ var ErrorCode = class ErrorCode {
 		return this.getId();
 	}
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Logging.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Logging.js
 const defaultErrorLogger = (options) => {
 	const { message, error, info } = options;
 	const stackLines = error.stack?.split("\n").slice(1).join("\n");
@@ -72,8 +69,7 @@ let currentLogger = defaultErrorLogger;
 const getErrorLogger = () => {
 	return currentLogger;
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/SendableError.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/SendableError.js
 const DEFAULT_STATUS = 500;
 function hashString(str) {
 	let h = 2166136261;
@@ -287,8 +283,7 @@ Object.defineProperty(class SendableError extends Error {
 	}
 }, "name", { value: "SendableError" });
 ErrorCode.DEFAULT_CODE;
-//#endregion
-//#region packages/shared/src/PublicErrorCodes.ts
+// packages/shared/src/PublicErrorCodes.ts
 const PUBLIC_ERROR_CODES = {
 	INVALID_CURSOR: new ErrorCode({
 		id: "validation/invalid-cursor",
@@ -622,5 +617,4 @@ const PUBLIC_ERROR_CODES = {
 	})
 };
 PUBLIC_ERROR_CODES.MISSING_TOKEN, PUBLIC_ERROR_CODES.INVALID_API_KEY, PUBLIC_ERROR_CODES.API_KEY_PROJECT_MISMATCH;
-//#endregion
 export { PUBLIC_ERROR_CODES };

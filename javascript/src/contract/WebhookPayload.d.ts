@@ -1,7 +1,6 @@
-import { i as EventFacts, o as EventType } from "./EventCatalog-BEqpjGaY.js";
-import { n as EventAsset, t as Event } from "./Event-xe8EF3CI.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-DK8SUPrz.js";
+import { n as EventAsset, t as Event } from "./Event-CBOyUme0.js";
 import * as zod from "zod";
-//#region packages/shared/src/WebhookPayload.d.ts
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 export declare const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";
 export declare const WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
@@ -222,5 +221,4 @@ interface ReceivedWebhookEventPayload {
   };
   [key: string]: unknown;
 }
-//#endregion
 export type { ReceivedWebhookEventPayload, WebhookEventPayload };

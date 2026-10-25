@@ -1,4 +1,3 @@
-//#region packages/shared/src/UploadToken.d.ts
 export declare const UPLOAD_TOKEN_DEFAULT_TTL_SECONDS = 600;
 export declare const UPLOAD_TOKEN_MAX_TTL_SECONDS = 3600;
 /** What a token grants: one upload through one preset, until it expires. */
@@ -34,5 +33,4 @@ export declare const decodeUploadToken: (token: string) => {
 } | undefined;
 /** Whether `signature` signs `body` with the API key whose SHA-256 is `keyHash`. */
 export declare const verifyUploadTokenSignature: (body: string, signature: string, keyHash: string) => Promise<boolean>;
-//#endregion
 export {};

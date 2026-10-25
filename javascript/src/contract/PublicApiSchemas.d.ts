@@ -1,13 +1,12 @@
-import "./Asset-Bnm6sUw0.js";
-import "./AssetPayload-CqMF2R4w.js";
-import "./Folder-DPmIHVJj.js";
-import "./EventCatalog-BEqpjGaY.js";
-import "./Page-Bpd8G-D0.js";
-import { r as TypedEvent } from "./Event-xe8EF3CI.js";
-import "./Lens-C4Nob-W6.js";
-import "./PublicErrorCodes-DMKnKcr3.js";
+import "./Asset-D2UZSw40.js";
+import "./AssetPayload-BpPkhqVM.js";
+import "./Folder-D1CVstEY.js";
+import "./EventCatalog-DK8SUPrz.js";
+import "./Page-CHCx12S3.js";
+import { r as TypedEvent } from "./Event-CBOyUme0.js";
+import "./Lens-CH-hrR_K.js";
+import "./PublicErrorCodes-BPH1sv1T.js";
 import * as zod from "zod";
-//#region packages/shared/src/PublicApiSchemas.d.ts
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
   pageSize: zod.ZodDefault<zod.ZodCoercedNumber<unknown>>;
@@ -124,5 +123,4 @@ type GetEventsResponse = {
   cursor: string;
   hasMore: boolean;
 };
-//#endregion
 export type { AssetBatchOperation, GetAssetChildrenQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, PatchAssetBody, PatchFolderBody, PostAssetBatchOperationResponse, PostAssetSignedUrlResponse, PostFolderBody };

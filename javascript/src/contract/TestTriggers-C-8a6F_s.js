@@ -1,8 +1,8 @@
-import "./SharedConstants-KcY2LQbA.js";
-import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
+import "./SharedConstants-CyiUWW66.js";
+import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import * as zod from "zod";
 var __defProp = Object.defineProperty;
-var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
+var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod, mod.exports), cb = null), mod.exports);
 var __exportAll = (all, no_symbols) => {
 	let target = {};
 	for (var name in all) __defProp(target, name, {
@@ -12,8 +12,7 @@ var __exportAll = (all, no_symbols) => {
 	if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
 	return target;
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/util.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
 	const numericValues = Object.values(entries).filter((v) => typeof v === "number");
 	return Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -455,6 +454,7 @@ function hide(inst, key, value) {
 	return own(inst, key, value, false);
 }
 /** Adds members a table derives from the instance: each builds on first read and shadows as own data, and assignment shadows the same way, as when these were own properties. */
+/* @__NO_SIDE_EFFECTS__ */
 function derived(computes, table) {
 	for (const key in computes) {
 		const compute = computes[key];
@@ -578,8 +578,7 @@ function constantCatch(value) {
 	fn[CONSTANT_CATCH] = true;
 	return fn;
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/core.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/core.js
 var _a$1;
 const _zodDesc = {
 	value: void 0,
@@ -606,6 +605,7 @@ function newError(Definition) {
 	}
 	return new Definition();
 }
+/* @__NO_SIDE_EFFECTS__ */
 function $constructor(name, initializer, proto, params) {
 	const zodProto = {};
 	function Internals(def) {
@@ -684,8 +684,7 @@ function config(newConfig) {
 	if (newConfig) Object.assign(globalConfig, newConfig);
 	return globalConfig;
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/errors.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/errors.js
 function _getMessage() {
 	const internals = this._zod;
 	internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -736,8 +735,8 @@ const initializer$1 = (inst, def) => {
 		});
 	}
 };
-const $ZodError = $constructor("$ZodError", initializer$1);
-const $ZodRealError = $constructor("$ZodError", initializer$1, void 0, { Parent: Error });
+const $ZodError = /* @__PURE__ */ $constructor("$ZodError", initializer$1);
+const $ZodRealError = /* @__PURE__ */ $constructor("$ZodError", initializer$1, void 0, { Parent: Error });
 /** Get-or-create `obj[key]` as an own data property. A path segment naming an inherited member
 * ("toString", "constructor") would otherwise read through to the prototype, and assigning
 * "__proto__" would hit the setter instead of creating a key. */
@@ -800,8 +799,7 @@ function formatError(error, mapper = (issue) => issue.message) {
 	processError(error);
 	return fieldErrors;
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/parse.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
 	return {
 		callee: params?.callee ?? callee,
@@ -1005,8 +1003,7 @@ const _safeEncodeAsync = (_Err) => async (schema, value, _ctx) => {
 const _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 	return _safeParseAsync(_Err)(schema, value, _ctx);
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/regexes.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/regexes.js
 var regexes_exports = /* @__PURE__ */ __exportAll({
 	anyString: () => anyString,
 	base64: () => base64$1,
@@ -1194,8 +1191,7 @@ const sha384_base64url = /*@__PURE__*/ fixedBase64url(64);
 const sha512_hex = /^[0-9a-fA-F]{128}$/;
 const sha512_base64 = /*@__PURE__*/ fixedBase64(86, "==");
 const sha512_base64url = /*@__PURE__*/ fixedBase64url(86);
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/checks.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/checks.js
 const $ZodCheck = /*@__PURE__*/ $constructor("$ZodCheck", (inst, def) => {
 	var _a;
 	inst._zod ?? (inst._zod = {});
@@ -1642,8 +1638,7 @@ const $ZodCheckOverwrite = /*@__PURE__*/ $constructor("$ZodCheckOverwrite", (ins
 		payload.value = def.tx(payload.value);
 	};
 });
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/doc.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/doc.js
 var Doc = class {
 	constructor(args = [], closed = {}) {
 		this.content = [];
@@ -1676,15 +1671,13 @@ var Doc = class {
 		return new F(...Object.keys(this.closed), `return function (${this.args.join(", ")}) {\n${content.join("\n")}\n};`)(...Object.values(this.closed));
 	}
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/versions.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/versions.js
 const version = {
 	major: 4,
 	minor: 6,
 	patch: 7
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/schemas.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/schemas.js
 const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
 	var _a;
 	inst ?? (inst = {});
@@ -3850,8 +3843,7 @@ function handleRefineResult(result, payload, input, inst) {
 		payload.issues.push(issue(_iss));
 	}
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/memoizer.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
 	constructor() {
 		super(`Cannot parse a reference cycle that closes through a transform`);
@@ -4103,8 +4095,7 @@ function isBackEdge(ctx, value) {
 	const backEdges = ctx[STATE]?.backEdges;
 	return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/locales/en.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/locales/en.js
 const error = () => {
 	const Sizable = {
 		string: {
@@ -4211,8 +4202,7 @@ const error = () => {
 function en_default() {
 	return { localeError: error() };
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/registries.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/registries.js
 var _a;
 var $ZodRegistry = class {
 	constructor() {
@@ -4258,8 +4248,7 @@ function registry() {
 }
 (_a = globalThis).__zod_globalRegistry ?? (_a.__zod_globalRegistry = registry());
 const globalRegistry = globalThis.__zod_globalRegistry;
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/api.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
 	if (def.checks) def.checks = [...def.checks];
 	return def;
@@ -5097,8 +5086,7 @@ function _stringFormat(Class, format, fnOrRegex, _params = {}) {
 	if (fnOrRegex instanceof RegExp) def.pattern = fnOrRegex;
 	return new Class(def);
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/to-json-schema.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
 	for (const source of sources) for (const key of Reflect.ownKeys(source)) if (Object.prototype.propertyIsEnumerable.call(source, key)) assignProp(target, key, source[key]);
 	return target;
@@ -5541,8 +5529,7 @@ const createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params)
 	extractDefs(ctx, schema);
 	return finalize(ctx, schema);
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/json-schema-processors.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/json-schema-processors.js
 const narrowMin = (agg, key, value) => {
 	if (agg[key] === void 0 || value > agg[key]) agg[key] = value;
 };
@@ -6110,8 +6097,7 @@ const lazyProcessor = (schema, ctx, _json, params) => {
 	const seen = ctx.seen.get(schema);
 	seen.ref = innerType;
 };
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/checks.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/checks.js
 var checks_exports = /* @__PURE__ */ __exportAll({
 	endsWith: () => _endsWith,
 	gt: () => _gt,
@@ -6144,8 +6130,7 @@ var checks_exports = /* @__PURE__ */ __exportAll({
 	trim: () => _trim,
 	uppercase: () => _uppercase
 });
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/errors.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/errors.js
 const _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
 	Object.defineProperty(proto, key, {
@@ -6194,8 +6179,7 @@ const initializer = (inst, issues) => {
 	});
 };
 const ZodRealError = /*@__PURE__*/ $constructor("ZodError", initializer, void 0, { Parent: Error });
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/parse.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/parse.js
 const parse = /* @__PURE__ */ _parse(ZodRealError);
 const parseAsync = /* @__PURE__ */ _parseAsync(ZodRealError);
 const safeParse = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -6208,8 +6192,7 @@ const safeEncode = /* @__PURE__ */ _safeEncode(ZodRealError);
 const safeDecode = /* @__PURE__ */ _safeDecode(ZodRealError);
 const safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 const safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/schemas.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/schemas.js
 var schemas_exports = /* @__PURE__ */ __exportAll({
 	ZodAny: () => ZodAny,
 	ZodArray: () => ZodArray,
@@ -7826,8 +7809,7 @@ function preprocess(fn, schema) {
 		out: schema
 	});
 }
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/compat.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/compat.js
 /** @deprecated Do not use. Stub definition, only included for zod-to-json-schema compatibility. */
 var ZodFirstPartyTypeKind;
 ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {});
@@ -7835,8 +7817,7 @@ ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {});
 	...schemas_exports,
 	...checks_exports
 });
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod-meta/esm/index.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod-meta/esm/index.js
 const ZOD_META_KEY = "__zod_meta__";
 const createMetaType = (type) => {
 	return Object.assign((value) => {
@@ -7914,14 +7895,12 @@ const metaStore = (meta) => {
 	}
 	module.exports = escapeString;
 })))();
-//#endregion
-//#region ../../../../../../../Users/09jwater/Documents/safemind/packages/zodbase/src/index.browser.ts
+// ../../../../../../../Users/09jwater/Documents/safemind/packages/zodbase/src/index.browser.ts
 const noop = () => {};
 const primaryKey = noop;
 const updatedAt = noop;
 const backfill = noop;
-//#endregion
-//#region packages/shared/src/ModerationCategoryDefinitions.ts
+// packages/shared/src/ModerationCategoryDefinitions.ts
 const MODERATION_CATEGORY_DEFINITIONS = {
 	sexual: {
 		summary: "Sexual acts, explicit sexual anatomy, sexual services, sexual assault depictions and clearly erotic material.",
@@ -7972,8 +7951,7 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
 	}
 };
-//#endregion
-//#region packages/shared/src/ModerationPolicyDimensions.ts
+// packages/shared/src/ModerationPolicyDimensions.ts
 const MODERATION_QUALIFIER_INFO = {
 	"personal-information-contact": {
 		category: "personal-information",
@@ -8453,13 +8431,13 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Insults or humiliation",
 		description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.",
-		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation."
+		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation."
 	},
 	"harassment-mild": {
 		category: "harassment",
 		kind: "harm",
 		displayName: "Mild mockery or teasing",
-		description: "Light ridicule, teasing, sarcasm, a mocking nickname or mild name-calling such as fool, dummy or silly, aimed at a person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), without contempt, degradation or threats. It counts so that a policy can allow or restrict it.",
+		description: "Light ridicule, teasing, sarcasm, a mocking nickname or mild name-calling such as fool, dummy or silly, aimed at a person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), without contempt, degradation or threats. Hyperbole or satire about a public figure’s character, conduct or followers is included. It counts so that a policy can allow or restrict it.",
 		exclusions: "Contemptuous name-calling such as idiot, moron, loser or pathetic, degrading insults, slurs, threats, sexual remarks, bullying or victim mockery, which are other forms; name-calling of a protected identity group, which is Hate; criticism of an argument, decision or conduct without mocking the people; self-deprecation and untargeted jokes; affectionate teasing between people on good terms; telling someone not to call another person a name."
 	},
 	"harassment-bullying": {
@@ -8766,8 +8744,7 @@ const MODERATION_QUALIFIERS_BY_CATEGORY = MODERATION_QUALIFIERS.reduce((groups, 
 	return groups;
 }, {});
 const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
-//#endregion
-//#region packages/shared/src/PolicyRule.ts
+// packages/shared/src/PolicyRule.ts
 /**
 * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
 * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
@@ -8797,11 +8774,9 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "At least as strong as the category action, and never `allow`.");
-//#endregion
-//#region packages/shared/src/DocMetaTypes.ts
+// packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
-//#endregion
-//#region packages/shared/src/ProcessingFeatures.ts
+// packages/shared/src/ProcessingFeatures.ts
 /**
 * Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
 * the single source for the request and result schemas, cache keys and metering. Features are
@@ -8899,8 +8874,7 @@ const PROCESSING_FEATURE_RESULTS_SCHEMA = zod.object({
 	description: "Results of the optional features requested in `processingOptions.features`, keyed by feature",
 	namedType: "ProcessingFeatureResults"
 })]));
-//#endregion
-//#region packages/shared/src/ZodUtils.ts
+// packages/shared/src/ZodUtils.ts
 const primaryUuidField = () => zod.string().uuid({ version: "v4" }).meta({
 	...metaStore([primaryKey()]),
 	examples: ["123e4567-e89b-42d3-a456-426614174000"]
@@ -9088,8 +9062,7 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	features: PROCESSING_FEATURE_RESULTS_SCHEMA.optional(),
 	policy: CLASSIFICATION_REPORT_POLICY_SCHEMA.optional().describe("What the project's moderation policy made of this report when the asset was decided. Absent until then.")
 }).strict();
-//#endregion
-//#region packages/shared/src/TestTriggers.ts
+// packages/shared/src/TestTriggers.ts
 const TEST_IMAGE_PALETTES = {
 	"personal-information": [
 		[
@@ -9398,5 +9371,4 @@ const detectTestImage = async (image, testInputKey) => {
 		if (timingSafeEqual(tag, await getTestInputTag("image", category, testInputKey))) return category;
 	}
 };
-//#endregion
 export { POLICY_ALLOWANCE_SCHEMA as C, metaStore as D, backfill as E, FLAGGED_CONTENT_ACTION_SCHEMA as S, getModerationQualifiers as T, saneStringField as _, generateTestTextCode as a, PROCESSING_FEATURES_SCHEMA as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, primaryUuidField as g, createdAtField as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORY_SCHEMA as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORIES as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, updatedAtField as v, POLICY_RESTRICTION_SCHEMA as w, docPropertyInfo as x, uuidField as y };

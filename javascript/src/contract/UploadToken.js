@@ -1,5 +1,5 @@
-import { n as sha256Hex, r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
-//#region packages/shared/src/UploadToken.ts
+import { n as sha256Hex, r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
+// packages/shared/src/UploadToken.ts
 const UPLOAD_TOKEN_PREFIX = "clut_";
 const UPLOAD_TOKEN_DEFAULT_TTL_SECONDS = 600;
 const UPLOAD_TOKEN_MAX_TTL_SECONDS = 3600;
@@ -44,5 +44,4 @@ const decodeUploadToken = (token) => {
 };
 /** Whether `signature` signs `body` with the API key whose SHA-256 is `keyHash`. */
 const verifyUploadTokenSignature = async (body, signature, keyHash) => timingSafeEqual(await hmacSha256Hex(keyHash, SIGNING_CONTEXT + body), signature);
-//#endregion
 export { UPLOAD_TOKEN_DEFAULT_TTL_SECONDS, UPLOAD_TOKEN_MAX_TTL_SECONDS, decodeUploadToken, signUploadToken, uploadTokenKeyPrefix, verifyUploadTokenSignature };

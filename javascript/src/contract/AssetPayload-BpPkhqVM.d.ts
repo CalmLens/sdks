@@ -1,4 +1,3 @@
-//#region packages/shared/src/AssetPayload.d.ts
 type AssetDataInput = Blob | Response | ReadableStream<Uint8Array>;
 type AssetBufferInput = ArrayBuffer | (Uint8Array & {
   write(string: string, offset?: number, length?: number, encoding?: string): number;
@@ -48,5 +47,4 @@ declare const validateAssetPayload: (payload: AssetBinaryPayloadInput, options?:
   ok: false;
   error: string;
 };
-//#endregion
 export { validateAssetPayload as a, getAssetPayloadByteLength as i, assetDataToUint8Array as n, assetToData as r, AssetBinaryPayloadInput as t };

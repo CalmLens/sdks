@@ -1,5 +1,4 @@
 import * as zod from "zod";
-//#region packages/shared/src/AssetSearch.d.ts
 declare const ASSET_SEARCH_MATCH_FIELD_SCHEMA: zod.ZodEnum<{
   "classification.moderation.status": "classification.moderation.status";
   "content.extension": "content.extension";
@@ -7978,5 +7977,4 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
 type AssetSearchMatchField = zod.infer<typeof ASSET_SEARCH_MATCH_FIELD_SCHEMA>;
 type AssetSearchQuery = zod.infer<typeof ASSET_SEARCH_QUERY_SCHEMA>;
 type AssetSearchResult = zod.infer<typeof ASSET_SEARCH_RESULT_SCHEMA>;
-//#endregion
 export type { AssetSearchMatchField, AssetSearchQuery, AssetSearchResult };

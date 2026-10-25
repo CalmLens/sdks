@@ -1,5 +1,4 @@
 import * as zod from "zod";
-//#region packages/shared/src/ProcessingFeatures.d.ts
 /**
  * Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
  * the single source for the request and result schemas, cache keys and metering. Features are
@@ -119,5 +118,4 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>], "status">>;
 }, zod.core.$strict>;
 type ProcessingFeatureResults = zod.infer<typeof PROCESSING_FEATURE_RESULTS_SCHEMA>;
-//#endregion
 export type { AgeRange, BoundingBox, DetectedFace, DetectedPerson, ProcessingFeatureId, ProcessingFeatureResults, ProcessingFeatureStage, ProcessingFeatures };

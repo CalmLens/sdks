@@ -1,8 +1,7 @@
-import "./Asset-Bnm6sUw0.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-BEqpjGaY.js";
-import "./Page-Bpd8G-D0.js";
+import "./Asset-D2UZSw40.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-DK8SUPrz.js";
+import "./Page-CHCx12S3.js";
 import * as zod from "zod";
-//#region packages/shared/src/Event.d.ts
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -129,5 +128,4 @@ type TypedEvent = { [TType in EventType]: Omit<Event, "type" | "facts"> & {
   type: TType;
   facts: EventFacts<TType>;
 }; }[EventType];
-//#endregion
 export { EventAsset as n, TypedEvent as r, Event as t };

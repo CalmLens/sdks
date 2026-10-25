@@ -1,9 +1,9 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-DEUVyuwf.js";
-import "./SharedConstants-KcY2LQbA.js";
-import { t as hmacSha256Hex } from "./CryptoUtils-Cb7_Afa0.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Blo3Tgky.js";
+import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-C-8a6F_s.js";
+import "./SharedConstants-CyiUWW66.js";
+import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-C6e7hBbd.js";
 import * as zod from "zod";
-//#region packages/shared/src/AssetModerationDecision.ts
+// packages/shared/src/AssetModerationDecision.ts
 /**
 * What moderation decided for an asset, which also decides how it is delivered: served to anyone
 * with access (`allowed`), served the same way but marked for reduced reach (`limited`), only
@@ -17,8 +17,7 @@ const ASSET_MODERATION_DECISION_SCHEMA = zod.enum([
 	"blocked",
 	"purged"
 ]);
-//#endregion
-//#region packages/shared/src/HumanReview.ts
+// packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
 const HUMAN_REVIEW_SETTINGS_SCHEMA = zod.object({
 	allowedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
@@ -52,8 +51,7 @@ zod.object({
 		message: "Confirm permanent deletion"
 	});
 });
-//#endregion
-//#region packages/shared/src/PolicyCondition.ts
+// packages/shared/src/PolicyCondition.ts
 const ruleCondition = (rule) => {
 	return [{
 		all: [...rule.when].sort(),
@@ -68,8 +66,7 @@ const normalizePolicyCondition = (condition) => [...new Map(condition.map((claus
 	return [JSON.stringify(normalized), normalized];
 })).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, clause]) => clause);
 const policyConditionKey = (scope, condition) => `${scope}:${JSON.stringify(normalizePolicyCondition(condition))}`;
-//#endregion
-//#region packages/shared/src/Project.ts
+// packages/shared/src/Project.ts
 const MINIMUM_MODERATION_THRESHOLD = .1;
 const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTION_SCHEMA });
 /** Ranks actions by strength: allowances must be softer than the category action, restrictions not. */
@@ -195,8 +192,7 @@ zod.object({
 	testInputKey: zod.string().regex(TEST_INPUT_KEY_PATTERN).nullish()
 });
 Object.fromEntries(MODERATION_POLICY_CATEGORIES.map((category) => [category, MINIMUM_MODERATION_THRESHOLD]));
-//#endregion
-//#region packages/shared/src/Asset.ts
+// packages/shared/src/Asset.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
 const ASSET_CLASSIFICATION_STATUS_SCHEMA = zod.enum([
 	"pending",
@@ -509,8 +505,7 @@ zod.object({
 	childProcessing: CHILD_PROCESSING_SCHEMA.nullish(),
 	manualDecision: MANUAL_DECISION_SCHEMA.nullish()
 });
-//#endregion
-//#region packages/shared/src/ProjectAccess.ts
+// packages/shared/src/ProjectAccess.ts
 const PROJECT_MEMBER_ROLE_SCHEMA = zod.enum([...ACCESS_ROLE_SCHEMA.options, "reviewer"]);
 zod.object({
 	id: primaryUuidField(),
@@ -536,8 +531,7 @@ zod.object({
 		"revoked"
 	])
 });
-//#endregion
-//#region packages/shared/src/EventCatalog.ts
+// packages/shared/src/EventCatalog.ts
 const EVENT_SEVERITY_SCHEMA = zod.enum(["low", "high"]);
 zod.enum([
 	"assets",
@@ -1319,8 +1313,7 @@ const EVENT_FACT_SCHEMA = zod.strictObject({
 	url: factUrl
 });
 const EVENT_FACTS_SCHEMA = zod.array(EVENT_FACT_SCHEMA);
-//#endregion
-//#region packages/shared/src/Event.ts
+// packages/shared/src/Event.ts
 const EVENT_ASSET_SCHEMA = zod.object({
 	id: zod.string().describe("Asset ID"),
 	externalId: zod.string().nullish().describe("The asset's `externalId`, if you set one"),
@@ -1408,8 +1401,7 @@ zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type)
 	},
 	docsSchema: EVENT_SCHEMA
 })]));
-//#endregion
-//#region packages/shared/src/WebhookPayload.ts
+// packages/shared/src/WebhookPayload.ts
 const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";
 const WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
@@ -1476,5 +1468,4 @@ zod.looseObject({
 		})).optional()
 	})
 });
-//#endregion
 export { WEBHOOK_DELIVERY_HEADER, WEBHOOK_EVENT_PAYLOAD_SCHEMA, WEBHOOK_SIGNATURE_HEADER, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS, WEBHOOK_TIMESTAMP_HEADER, createWebhookHeaders, toWebhookEventPayload };

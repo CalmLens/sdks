@@ -1,5 +1,4 @@
 import * as zod from "zod";
-//#region packages/shared/src/AssetModerationDecision.d.ts
 /**
  * What moderation decided for an asset, which also decides how it is delivered: served to anyone
  * with access (`allowed`), served the same way but marked for reduced reach (`limited`), only
@@ -14,5 +13,4 @@ declare const ASSET_MODERATION_DECISION_SCHEMA: zod.ZodEnum<{
   purged: "purged";
 }>;
 type AssetModerationDecision = zod.infer<typeof ASSET_MODERATION_DECISION_SCHEMA>;
-//#endregion
 export { AssetModerationDecision as t };

@@ -1,4 +1,4 @@
-//#region packages/shared/src/AssetPayload.ts
+// packages/shared/src/AssetPayload.ts
 const uint8ArrayInputToNumbers = (value) => {
 	if (Array.isArray(value)) return value;
 	return Array.from(value);
@@ -79,5 +79,4 @@ const validateAssetPayload = (payload, options) => {
 	};
 	return { ok: true };
 };
-//#endregion
 export { assetDataToUint8Array, assetToData, getAssetPayloadByteLength, validateAssetPayload };

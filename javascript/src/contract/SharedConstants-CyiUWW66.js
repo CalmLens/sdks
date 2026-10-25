@@ -1,4 +1,4 @@
-//#region packages/shared/src/SharedConstants.ts
+// packages/shared/src/SharedConstants.ts
 const IMPERSONATION_COOKIE_NAME = "CL_impersonation";
 const DAY_MS = 864e5;
 const YEAR_MS = 365 * DAY_MS;
@@ -211,5 +211,4 @@ const normalizeUploadMimeType = (mimeType) => mimeType.toLowerCase().split(";")[
 const isRejectedUploadMimeType = (mimeType) => REJECTED_UPLOAD_MIME_TYPE_SET.has(normalizeUploadMimeType(mimeType));
 const getRejectedUploadMimeTypeError = (mimeType) => `${normalizeUploadMimeType(mimeType)} is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.`;
 const DOMAIN = "calmlens.com";
-//#endregion
 export { getRejectedUploadMimeTypeError as a, MIN_MULTIPART_UPLOAD_PART_BYTES as i, MAX_IMAGE_UPLOAD_BYTES as n, isRejectedUploadMimeType as o, MIN_MULTIPART_IMAGE_UPLOAD_BYTES as r, DOMAIN as t };

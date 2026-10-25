@@ -1,5 +1,5 @@
 import * as zod from "zod";
-//#region packages/shared/src/Permissions.ts
+// packages/shared/src/Permissions.ts
 const ACTION_SCHEMA = zod.enum([
 	"assets:read",
 	"assets:download",
@@ -68,5 +68,4 @@ const permits = (grants, action, folderId, folders) => grants.some((grant) => {
 	return false;
 });
 zod.enum(["active", "banned"]);
-//#endregion
 export { GRANTS_SCHEMA as n, permits as r, ACCESS_ROLE_SCHEMA as t };

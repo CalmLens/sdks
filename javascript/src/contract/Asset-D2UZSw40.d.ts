@@ -1,6 +1,5 @@
-import "./AssetModerationDecision-BZ_vVYoX.js";
+import "./AssetModerationDecision-T9b0RF7k.js";
 import * as zod from "zod";
-//#region packages/shared/src/Asset.d.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
 declare const ASSET_CLASSIFICATION_STATUS_SCHEMA: zod.ZodEnum<{
   completed: "completed";
@@ -23690,5 +23689,4 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>;
 }, zod.core.$strip>;
 type Asset = zod.infer<typeof ASSET_SCHEMA>;
-//#endregion
 export { ProcessingOptions as _, AssetContentRemovalReason as a, AssetModeration as c, AssetSafetyHoldReason as d, AssetType as f, MetadataItem as g, ExtractedText as h, AssetContent as i, AssetModerationStatus as l, AssetVisibility as m, AssetClassification as n, AssetContentStatus as o, AssetUpload as p, AssetClassificationStatus as r, AssetImage as s, Asset as t, AssetSafetyHold as u };

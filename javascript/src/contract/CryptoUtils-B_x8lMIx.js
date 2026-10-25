@@ -1,4 +1,4 @@
-//#region packages/shared/src/CryptoUtils.ts
+// packages/shared/src/CryptoUtils.ts
 const encoder = new TextEncoder();
 /** Lowercase hex of `bytes`, two characters per byte. */
 const bytesToHex = (bytes) => Array.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -22,5 +22,4 @@ const timingSafeEqual = (a, b) => {
 	for (let index = 0; index < a.length; index++) difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
 	return difference === 0;
 };
-//#endregion
 export { sha256Hex as n, timingSafeEqual as r, hmacSha256Hex as t };

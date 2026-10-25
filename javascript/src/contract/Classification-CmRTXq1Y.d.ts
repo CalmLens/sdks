@@ -1,6 +1,5 @@
-import "./AssetModerationDecision-BZ_vVYoX.js";
+import "./AssetModerationDecision-T9b0RF7k.js";
 import * as zod from "zod";
-//#region packages/shared/src/ModerationPolicyDimensions.d.ts
 declare const MODERATION_QUALIFIER_INFO: {
   readonly "personal-information-contact": {
     readonly category: "personal-information";
@@ -480,13 +479,13 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Insults or humiliation";
     readonly description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.";
-    readonly exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation.";
+    readonly exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity; a remark with no identifiable or addressed target, such as an unnamed “someone”; an insult or generalisation about a protected identity group as a whole, such as women, Muslims or Africans, which is Hate unless a specific person is also attacked. Hyperbole or satire about a public figure’s character, conduct or followers, such as saying they would sell their own mother, without contemptuous name-calling, is Mild mockery or teasing. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation.";
   };
   readonly "harassment-mild": {
     readonly category: "harassment";
     readonly kind: "harm";
     readonly displayName: "Mild mockery or teasing";
-    readonly description: "Light ridicule, teasing, sarcasm, a mocking nickname or mild name-calling such as fool, dummy or silly, aimed at a person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), without contempt, degradation or threats. It counts so that a policy can allow or restrict it.";
+    readonly description: "Light ridicule, teasing, sarcasm, a mocking nickname or mild name-calling such as fool, dummy or silly, aimed at a person, including a public figure, or at a group that is not a protected identity group (a club, a team’s fans, a political party or its members), without contempt, degradation or threats. Hyperbole or satire about a public figure’s character, conduct or followers is included. It counts so that a policy can allow or restrict it.";
     readonly exclusions: "Contemptuous name-calling such as idiot, moron, loser or pathetic, degrading insults, slurs, threats, sexual remarks, bullying or victim mockery, which are other forms; name-calling of a protected identity group, which is Hate; criticism of an argument, decision or conduct without mocking the people; self-deprecation and untargeted jokes; affectionate teasing between people on good terms; telling someone not to call another person a name.";
   };
   readonly "harassment-bullying": {
@@ -788,8 +787,6 @@ declare const MODERATION_QUALIFIER_INFO: {
   };
 };
 type ModerationQualifier = keyof typeof MODERATION_QUALIFIER_INFO;
-//#endregion
-//#region packages/shared/src/PolicyRule.d.ts
 /**
  * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
  * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
@@ -804,8 +801,6 @@ declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
   purge: "purge";
 }>;
 type FlaggedContentAction = zod.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
-//#endregion
-//#region packages/shared/src/Project.d.ts
 declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{
   action: zod.ZodEnum<{
     "age-restrict": "age-restrict";
@@ -816,8 +811,6 @@ declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{
   }>;
 }, zod.core.$strip>;
 type FlaggedContentPolicy = zod.infer<typeof FLAGGED_CONTENT_POLICY_SCHEMA>;
-//#endregion
-//#region packages/shared/src/Classification.d.ts
 declare const CLASSIFICATION_CATEGORY_SCHEMA: zod.ZodEnum<{
   "criminal-activity": "criminal-activity";
   harassment: "harassment";
@@ -5020,5 +5013,4 @@ declare const CLASSIFICATION_LABEL_SCHEMA: zod.ZodObject<{
   knowledgeBaseId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
 }, zod.core.$strip>;
 type ClassificationLabel = zod.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
-//#endregion
 export { ClassificationNotEvaluatedReason as a, FlaggedContentPolicy as c, ClassificationLabel as i, FlaggedContentAction as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, ModerationQualifier as u };

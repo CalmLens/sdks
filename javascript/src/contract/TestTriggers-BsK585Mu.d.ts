@@ -1,5 +1,4 @@
-import { n as ClassificationCategory } from "./Classification-CEw5e1vN.js";
-//#region packages/shared/src/TestTriggers.d.ts
+import { n as ClassificationCategory } from "./Classification-CmRTXq1Y.js";
 type ClassificationTestSignal = ClassificationCategory | "sexual.involving-minors" | "violence.graphic";
 declare const TEST_IMAGE_PALETTES: Partial<Record<ClassificationTestSignal, [[number, number, number, number], [number, number, number, number], [number, number, number, number], [number, number, number, number]]>>;
 /** A project's test input key: 32 hexadecimal characters only its members can see. */
@@ -33,5 +32,4 @@ declare const detectTestImage: (image: {
   height: number;
   rgba: Uint8Array;
 }, testInputKey: string) => Promise<ClassificationTestSignal | undefined>;
-//#endregion
 export { detectTestImage as a, getImageTestCategories as c, paintTestImage as d, TestImageKeyCell as i, getTestImageKeyCells as l, TEST_IMAGE_PALETTES as n, detectTestTrigger as o, TEST_INPUT_KEY_PATTERN as r, generateTestTextCode as s, ClassificationTestSignal as t, getTestImageKeyColors as u };

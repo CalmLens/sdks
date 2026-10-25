@@ -1,6 +1,5 @@
 import * as zod from "zod";
 import { FromSchema, JSONSchema } from "json-schema-to-ts";
-//#region packages/shared/src/AssetTransform.d.ts
 interface AssetTransform<T extends string = string, O = unknown> {
   type: T;
   options: O;
@@ -232,8 +231,6 @@ declare const DEFAULT_ASSET_TRANSFORMS: {
 type AssetTransformForType<TType extends AssetTransformType> = TType extends AssetTransformType<infer T, infer O> ? AssetTransform<T, FromSchema<O>> : never;
 type DefaultAssetTransformType = keyof typeof DEFAULT_ASSET_TRANSFORMS;
 type DefaultAssetTransform = AssetTransformForType<(typeof DEFAULT_ASSET_TRANSFORMS)[DefaultAssetTransformType]>;
-//#endregion
-//#region packages/shared/src/Lens.d.ts
 declare const LENS_TYPE_SCHEMA: zod.ZodEnum<{
   audio: "audio";
   document: "document";
@@ -268,5 +265,4 @@ declare const LENS_SCHEMA: zod.ZodObject<{
 type Lens = Omit<zod.infer<typeof LENS_SCHEMA>, "transforms"> & {
   transforms?: Array<DefaultAssetTransform | AssetTransform> | null;
 };
-//#endregion
 export { Lens as n, LensType as r, LENS_SCHEMA as t };

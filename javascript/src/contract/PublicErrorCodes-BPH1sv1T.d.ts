@@ -1,13 +1,10 @@
 import "zod";
-//#region packages/shared/src/RequestInfo.d.ts
 interface RequestErrorCode {
   getId(): string;
   getDefaultMessage(): string | undefined;
   is(error: any): error is any;
   getStatus(): number | undefined;
 }
-//#endregion
-//#region packages/shared/src/PublicErrorCodes.d.ts
 declare const PUBLIC_ERROR_CODES: {
   readonly INVALID_CURSOR: RequestErrorCode;
   readonly MISSING_TOKEN: RequestErrorCode;
@@ -76,5 +73,4 @@ declare const PUBLIC_ERROR_CODES: {
   readonly APPEAL_SAFETY_HELD: RequestErrorCode;
   readonly APPEAL_CONTENT_UNAVAILABLE: RequestErrorCode;
 };
-//#endregion
 export { PUBLIC_ERROR_CODES as t };

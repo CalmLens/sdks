@@ -1,6 +1,5 @@
-import { t as Folder } from "./Folder-DPmIHVJj.js";
+import { t as Folder } from "./Folder-D1CVstEY.js";
 import * as zod from "zod";
-//#region packages/shared/src/Permissions.d.ts
 declare const ACTION_SCHEMA: zod.ZodEnum<{
   "api-keys:read": "api-keys:read";
   "api-keys:write": "api-keys:write";
@@ -99,5 +98,4 @@ declare const GRANTS_SCHEMA: zod.ZodArray<zod.ZodObject<{
 }, zod.core.$strict>>;
 type PermissionGrant = zod.infer<typeof GRANT_SCHEMA>;
 declare const permits: (grants: PermissionGrant[], action: PermissionAction, folderId: string | null, folders: Pick<Folder, "id" | "parentId">[]) => boolean;
-//#endregion
 export { permits as i, PermissionAction as n, PermissionGrant as r, GRANTS_SCHEMA as t };

@@ -1,6 +1,6 @@
-import { d as CLASSIFICATION_CATEGORIES, l as getTestInputTag } from "./TestTriggers-DEUVyuwf.js";
-import "./CryptoUtils-Cb7_Afa0.js";
-//#region packages/shared/src/MediaTestTriggers.ts
+import { d as CLASSIFICATION_CATEGORIES, l as getTestInputTag } from "./TestTriggers-C-8a6F_s.js";
+import "./CryptoUtils-B_x8lMIx.js";
+// packages/shared/src/MediaTestTriggers.ts
 const MEDIA_TEST_SIGNALS = [...CLASSIFICATION_CATEGORIES, "violence.graphic"];
 const HEX_WORDS = [
 	"zero",
@@ -25,5 +25,4 @@ async function generateMediaTestCode(signal, testInputKey) {
 	if (!MEDIA_TEST_SIGNALS.includes(signal)) throw new RangeError("Unsupported media test signal");
 	return `Calm Lens test ${[...await getTestInputTag("media", signal, testInputKey)].map((character) => HEX_WORDS[Number.parseInt(character, 16)]).join(" ")} ${signal.replace(/[.-]/g, " ")} end test`;
 }
-//#endregion
 export { MEDIA_TEST_SIGNALS, generateMediaTestCode };

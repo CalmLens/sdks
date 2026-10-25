@@ -505,7 +505,7 @@ impl ServerClient {
     async fn call_upload(&self, request: Prepared) -> Result<Asset> {
         let (status, headers, body) = self.send(request).await?;
         let value: serde_json::Value = decode(status, &headers, &body)?;
-        if !value["id"].as_str().is_some_and(|id| !id.is_empty()) {
+        if value["id"].as_str().is_none_or(|id| id.is_empty()) {
             return Err(Error::new(
                 ErrorCode::InvalidResponse,
                 "Expected an uploaded asset response",

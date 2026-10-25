@@ -1,5 +1,4 @@
 import * as zod from "zod";
-//#region packages/shared/src/Page.d.ts
 declare const ORDER_SCHEMA: zod.ZodObject<{
   field: zod.ZodString;
   direction: zod.ZodEnum<{
@@ -48,5 +47,4 @@ interface CursorPage<T> {
   hasMore: boolean;
   ordering: Order[];
 }
-//#endregion
 export { Page as i, CursorPageQuery as n, Order as r, CursorPage as t };

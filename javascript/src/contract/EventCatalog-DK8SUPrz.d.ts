@@ -1,6 +1,5 @@
-import { n as PermissionAction } from "./Permissions-CH9267Iv.js";
+import { n as PermissionAction } from "./Permissions-DdLV25aB.js";
 import * as zod from "zod";
-//#region packages/shared/src/EventCatalog.d.ts
 declare const EVENT_SEVERITY_SCHEMA: zod.ZodEnum<{
   high: "high";
   low: "low";
@@ -1674,5 +1673,4 @@ type EventFact<TType extends EventType = EventType> = TType extends EventType ? 
   url?: string;
 } : never;
 type EventFacts<TType extends EventType = EventType> = EventFact<TType>[];
-//#endregion
 export { EventSeverity as a, EventFacts as i, EventFact as n, EventType as o, EventFactValues as r, EventCategory as t };

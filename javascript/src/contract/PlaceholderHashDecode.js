@@ -1,4 +1,4 @@
-//#region packages/shared/src/PlaceholderHashDecode.ts
+// packages/shared/src/PlaceholderHashDecode.ts
 /**
 * Decodes a ThumbHash to an RGBA image. RGB is not be premultiplied by A.
 *
@@ -197,5 +197,4 @@ function placeholderHashToPng(hash) {
 function placeholderHashToDataURL(hash) {
 	return `data:image/png;base64,${btoa(String.fromCharCode(...placeholderHashToPng(hash)))}`;
 }
-//#endregion
 export { placeholderHashToDataURL };
