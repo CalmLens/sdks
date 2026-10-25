@@ -15,6 +15,8 @@ export interface TransportSettings {
   signal?: AbortSignal;
   maxRetries: number;
   maxResponseBytes: number;
+  /** Replaces the wait between retries; mock clients wait without real time passing. */
+  sleep?: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
 }
 
 export interface TransportRequest {
@@ -229,7 +231,11 @@ export const toHttpError = (response: Response, bytes: Uint8Array): CalmLensErro
 
 /** Sends requests with the client's credentials, deadlines, retries and response limits. */
 export class CalmLensTransport {
-  constructor(private readonly settings: TransportSettings) {}
+  private readonly sleep: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
+
+  constructor(private readonly settings: TransportSettings) {
+    this.sleep = settings.sleep ?? sleep;
+  }
 
   private headersFor(request: TransportRequest): Record<string, string> {
     const headers = new Headers(request.init?.headers);
@@ -299,7 +305,7 @@ export class CalmLensTransport {
         const failure = toFailure(cause, attempt);
         // Transport failures and timeouts; a cancellation is never retried.
         if (canRetryAgain && failure.isRetryable()) {
-          await sleep(getRetryDelayMs(attemptNumber), this.settings.signal);
+          await this.sleep(getRetryDelayMs(attemptNumber), this.settings.signal);
           continue;
         }
         throw failure;
@@ -319,7 +325,7 @@ export class CalmLensTransport {
         }
         attempt.release();
         await response.body?.cancel().catch(() => {});
-        await sleep(delayMs, this.settings.signal);
+        await this.sleep(delayMs, this.settings.signal);
         continue;
       }
 
@@ -336,7 +342,7 @@ export class CalmLensTransport {
       const shouldRetry =
         canRetryAgain && retryDelayMs <= RETRY_AFTER_MAX_MS && error.isRetryable();
       if (shouldRetry) {
-        await sleep(retryDelayMs, this.settings.signal);
+        await this.sleep(retryDelayMs, this.settings.signal);
         continue;
       }
       throw error;

@@ -7,13 +7,14 @@ import type {
 import {
   CalmLensConnection,
   expectAsset,
+  getMockHooks,
   invalidPayload,
   newIdempotencyKey,
   prepareSubmitAssetOptions,
   resolveConnectionOptions,
 } from "./CalmLensConnection";
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
-import { sleep, type TransportRequest } from "./CalmLensTransport";
+import type { TransportRequest } from "./CalmLensTransport";
 import type {
   Asset,
   AssetChildrenPage,
@@ -157,7 +158,11 @@ export default class CalmLensServerClient {
     this.#apiKey = apiKey;
     this.#settings = {
       ...resolveConnectionOptions(rest),
-      cdnBaseUrl: (rest.cdnBaseUrl ?? DEFAULT_CDN_BASE_URL).replace(/\/+$/, ""),
+      cdnBaseUrl: (
+        rest.cdnBaseUrl ??
+        getMockHooks(rest)?.defaultCdnBaseUrl ??
+        DEFAULT_CDN_BASE_URL
+      ).replace(/\/+$/, ""),
     };
     this.#lenses = lenses ?? { ensuredLenses: new Map(), pendingEnsureLenses: new Map() };
     this.#connection = new CalmLensConnection(this.#settings, apiKey);
@@ -199,7 +204,9 @@ export default class CalmLensServerClient {
   }
 
   private async submitAsset(options: SubmitAssetOptions, queue: boolean): Promise<Asset> {
-    const body = prepareSubmitAssetOptions(options);
+    const body = prepareSubmitAssetOptions(options, {
+      deferUploadChecks: this.#connection.deferUploadChecks,
+    });
     const uploadsPath = `${this.projectPath}/assets`;
     if ("content" in body || "part" in body) {
       return expectAsset(await this.#connection.submitRawUpload(uploadsPath, body, queue));
@@ -280,7 +287,11 @@ export default class CalmLensServerClient {
        * browser or app, which passes it to `CalmLensAppClient` as `token`.
        */
       sign: async (options: SignUploadTokenOptions): Promise<SignedUploadToken> => {
-        return signUploadTokenWithApiKey(this.#apiKey, options);
+        return signUploadTokenWithApiKey(
+          this.#apiKey,
+          options,
+          this.#connection.hooks?.uploadTokenTime(),
+        );
       },
     };
   }
@@ -424,7 +435,12 @@ export default class CalmLensServerClient {
       }: WaitForAssetDecisionOptions): Promise<Asset> => {
         requireId(assetId, "Asset ID");
         const client = options.signal ? this.withRequestOptions({ signal: options.signal }) : this;
-        return pollForDecision(() => client.assets.retrieve({ assetId }), options, sleep);
+        return pollForDecision(
+          () => client.assets.retrieve({ assetId }),
+          options,
+          this.#connection.sleep,
+          this.#connection.hooks?.now,
+        );
       },
 
       /**

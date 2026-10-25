@@ -1,63 +1,6 @@
 import { invalidArgument } from "../client/CalmLensError";
-import type {
-  Asset,
-  AssetSearchResponse,
-  AssetType,
-  SubmitAssetOptions,
-} from "../client/CalmLensTypes";
+import type { Asset, AssetSearchResponse } from "../client/CalmLensTypes";
 import type { CursorPage, CursorPageQuery, Page } from "../contract/Page.js";
-
-export const toRawBase64 = (value: string): string => {
-  const marker = ";base64,";
-  const markerIndex = value.indexOf(marker);
-  if (markerIndex === -1) {
-    return value;
-  }
-  return value.slice(markerIndex + marker.length);
-};
-
-export const byteLengthFromBase64 = (value: string): number => {
-  const raw = toRawBase64(value);
-  return Math.floor((raw.length * 3) / 4) - (raw.endsWith("==") ? 2 : raw.endsWith("=") ? 1 : 0);
-};
-
-export const base64ToArrayBuffer = (value: string): ArrayBuffer => {
-  const raw = toRawBase64(value);
-  let bytes: Uint8Array;
-  if (typeof Buffer !== "undefined") {
-    bytes = new Uint8Array(Buffer.from(raw, "base64"));
-  } else {
-    const binary = atob(raw);
-    bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  }
-  const arrayBuffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(arrayBuffer).set(bytes);
-  return arrayBuffer;
-};
-
-export const inferAssetType = (options: SubmitAssetOptions): AssetType => {
-  if ("url" in options) {
-    return "website";
-  }
-
-  const type = "content" in options ? options.content.type : options.part.type;
-  if (type.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(type)) {
-    return "image";
-  }
-  if (type.startsWith("video/")) {
-    return "video";
-  }
-  if (type.startsWith("audio/")) {
-    return "audio";
-  }
-  if (type === "text/plain" || type === "txt" || type.startsWith("text/")) {
-    return "plaintext-document";
-  }
-  if (type.includes("pdf") || type.includes("document") || ["pdf", "doc", "docx"].includes(type)) {
-    return "multimedia-document";
-  }
-  return "file";
-};
 
 type Ordering = NonNullable<Page<unknown>["ordering"]>;
 

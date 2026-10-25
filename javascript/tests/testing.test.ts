@@ -1006,29 +1006,67 @@ describe("MockCalmLensServerClient", () => {
     expect((await client.assets.list({})).items).toHaveLength(1);
   });
 
-  it("records each call with its operation and options", async () => {
+  it("retries like the real client when maxRetries is set, without waiting out the backoff", async () => {
+    const client = new MockCalmLensServerClient({ apiKey, projectId, maxRetries: 2 });
+    const asset = await client.text.classify({ text: "hello" });
+    client.failNextRequest();
+    client.failNextRequest("timeout");
+    const started = Date.now();
+    await expect(client.assets.retrieve({ assetId: asset.id })).resolves.toMatchObject({
+      id: asset.id,
+    });
+    // Real backoff would wait at least 250 ms before each of the two retries.
+    expect(Date.now() - started).toBeLessThan(250);
+    expect(client.callsTo("assets.retrieve").map(({ status }) => status)).toEqual([
+      undefined,
+      undefined,
+      200,
+    ]);
+  });
+
+  it("records each request with the method that sent it and the status it got", async () => {
     const client = createClient();
     const moderated = await client.text.classify({ text: "hello", externalId: "comment-1" });
-    await client.assets.retrieve({ assetId: moderated.id });
-    await client.ensureLenses({
-      lenses: [
-        { identifier: "thumb", name: "Thumb", type: "imageTransform", active: true, version: 1 },
-      ],
-    });
+    await client.assets.waitForDecision({ assetId: moderated.id });
+    const lens = {
+      identifier: "thumb",
+      name: "Thumb",
+      type: "imageTransform",
+      active: true,
+      version: 1,
+    } as const;
+    await client.ensureLenses({ lenses: [lens] });
+    // The lens cache answers this one without a request.
+    await client.ensureLens(lens);
     const { cursor } = await client.events.list();
     await client.events.list({ after: cursor, limit: 10 });
+    await client.folders.create({ name: "Inbox" });
+    await client.folders
+      .retrieve({ folderId: "00000000-0000-4000-8000-000000000000" })
+      .catch(() => undefined);
 
-    expect(client.calls.map((call) => call.operation)).toEqual([
-      "text.classify",
-      "assets.retrieve",
-      "ensureLenses",
-      "events.list",
-      "events.list",
+    expect(
+      client.calls.map(({ operation, method, path, status }) => [operation, method, path, status]),
+    ).toEqual([
+      ["assets.classify", "POST", `/projects/${projectId}/assets`, 200],
+      ["assets.retrieve", "GET", `/assets/${moderated.id}`, 200],
+      ["ensureLenses", "PUT", `/projects/${projectId}/lenses`, 200],
+      ["events.list", "GET", `/projects/${projectId}/events`, 200],
+      ["events.list", "GET", `/projects/${projectId}/events`, 200],
+      ["folders.create", "POST", `/projects/${projectId}/folders`, 201],
+      ["folders.retrieve", "GET", "/folders/00000000-0000-4000-8000-000000000000", 404],
     ]);
-    expect(client.callsTo("text.classify")).toEqual([
-      { operation: "text.classify", options: { text: "hello", externalId: "comment-1" } },
+    const [classify] = client.callsTo("text.classify");
+    expect(classify).toMatchObject({
+      query: { name: "text", externalId: "comment-1", queue: "false", contentType: "text/plain" },
+      body: "hello",
+    });
+    expect(client.callsTo("assets.waitForDecision").map(({ path }) => path)).toEqual([
+      `/assets/${moderated.id}`,
     ]);
-    expect(client.callsTo("events.list")[1]?.options).toEqual({ after: cursor, limit: 10 });
+    expect(client.callsTo("ensureLens")).toEqual(client.callsTo("ensureLenses"));
+    expect(client.callsTo("events.list")[1]?.query).toEqual({ after: cursor, limit: "10" });
+    expect(client.callsTo("folders.create")[0]?.body).toEqual({ name: "Inbox" });
   });
 
   it("updates assets like the real client", async () => {

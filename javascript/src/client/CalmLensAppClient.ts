@@ -76,7 +76,7 @@ export default class CalmLensAppClient {
     if (!("content" in options) && !("part" in options)) {
       throw invalidArgument("Uploads through an upload preset need content or a part");
     }
-    prepareSubmitAssetOptions(options);
+    prepareSubmitAssetOptions(options, { deferUploadChecks: this.#connection.deferUploadChecks });
     const token = await this.newUploadToken();
     const data = await this.#connection.submitRawUpload(
       this.uploadsPath,

@@ -1,38 +1,15 @@
-import { CalmLensError, invalidArgument, invalidConfig } from "../client/CalmLensError";
-import {
-  API_ERROR_CODES,
-  API_ERROR_DEFINITIONS,
-  type ApiErrorCode,
-} from "../client/CalmLensErrorCodes";
-import type {
-  Asset,
-  CalmLensAppClientOptions,
-  RetrieveAssetOptions,
-  UploadAssetPartOptions,
-  UploadedAsset,
-  UploadPresetSubmitAssetOptions,
-} from "../client/CalmLensTypes";
-import { encodePathSegment, validateAppClientOptions } from "../client/CalmLensUtils";
-import { getAssetPayloadByteLength } from "../contract/AssetPayload.js";
-import { isFileAccepted } from "../ui/UploadController";
+import CalmLensAppClient from "../client/CalmLensAppClient";
+import type { Asset, CalmLensAppClientOptions } from "../client/CalmLensTypes";
+import { validateAppClientOptions } from "../client/CalmLensUtils";
 import { createMockApiKey } from "./MockApiKey";
-import { type MockAssetOutcome, MockCalmLensServerClient } from "./MockCalmLensServerClient";
+import type { MockAssetOutcome, MockEndpoints, MockUploadPreset } from "./MockCalmLensApi";
+import {
+  getMockApi,
+  MockCalmLensServerClient,
+  mockClientOptions,
+} from "./MockCalmLensServerClient";
 
-/** The upload preset settings a `MockCalmLensAppClient` applies, as the API would. */
-export interface MockUploadPreset {
-  /** Refuse uploads without a token, like **Users your server approves**. Defaults to `false`. */
-  requireToken?: boolean;
-  /** Accepted content types, such as `["image/*"]`. Defaults to any type. */
-  allowedContentTypes?: string[];
-  maxFileSizeInBytes?: number;
-  /** Return `status` to the uploader. Defaults to `true`. */
-  showDecisions?: boolean;
-  /** Defaults to `public`. */
-  visibility?: "public" | "private";
-  /** Defaults to `true`, so the CDN can serve the upload. */
-  keepContentAfterProcessing?: boolean;
-  folderId?: string | null;
-}
+export type { MockUploadPreset } from "./MockCalmLensApi";
 
 export interface MockCalmLensAppClientOptions extends CalmLensAppClientOptions {
   mockOptions?: {
@@ -53,27 +30,22 @@ export interface MockCalmLensAppClientOptions extends CalmLensAppClientOptions {
 const MOCK_PROJECT_ID = "00000000-0000-4000-8000-00000000c1a5";
 
 /**
- * An in-memory stand-in for `CalmLensAppClient` with the same methods and error codes. It applies
- * the upload preset settings in `mockOptions.preset` and stores uploads in a
- * `MockCalmLensServerClient`, so tests can check them from the server side too.
+ * The real `CalmLensAppClient`, answered by the in-memory API of a `MockCalmLensServerClient`.
+ * The API applies `mockOptions.preset` to this client's uploads like CalmLens applies an upload
+ * preset: its token, content type and size rules with the API's error codes, and its visibility,
+ * folder, content retention and decision display. The client can check and continue only the
+ * uploads it made.
  */
-export class MockCalmLensAppClient {
+export class MockCalmLensAppClient extends CalmLensAppClient {
   /** The mock project the uploads are stored in. */
   readonly server: MockCalmLensServerClient;
   readonly #uploadPresetId: string;
-  readonly #token: CalmLensAppClientOptions["token"];
-  readonly #preset: MockUploadPreset;
-  /** Uploads this client made, which are the only ones it can check. */
-  readonly #uploads = new Set<string>();
-  #requestCount = 0;
 
   constructor(options: MockCalmLensAppClientOptions) {
     validateAppClientOptions(options);
-    this.#uploadPresetId = options.uploadPresetId;
-    this.#token = options.token;
-    this.#preset = options.mockOptions?.preset ?? {};
-    this.server =
-      options.mockOptions?.server ??
+    const { mockOptions = {}, ...clientOptions } = options;
+    const server =
+      mockOptions.server ??
       new MockCalmLensServerClient({
         apiKey: createMockApiKey([
           {
@@ -84,117 +56,24 @@ export class MockCalmLensAppClient {
         ]),
         projectId: MOCK_PROJECT_ID,
         mockOptions: {
-          queuedOutcome: options.mockOptions?.queuedOutcome,
-          analyzedOutcome: options.mockOptions?.analyzedOutcome,
+          queuedOutcome: mockOptions.queuedOutcome,
+          analyzedOutcome: mockOptions.analyzedOutcome,
         },
       });
+    let endpoints: MockEndpoints | undefined;
+    const { cdnFetch: _cdnFetch, ...requestOptions } = mockClientOptions(
+      getMockApi(server),
+      () => endpoints!,
+      { preset: mockOptions.preset ?? {}, uploads: new Set() },
+    );
+    super({ maxRetries: 0, ...clientOptions, ...requestOptions } as CalmLensAppClientOptions);
+    endpoints = { baseUrl: this.toJSON().baseUrl, cdnBaseUrl: server.toJSON().cdnBaseUrl };
+    this.server = server;
+    this.#uploadPresetId = options.uploadPresetId;
   }
 
+  /** Keeps tokens out of `console.log` and `util.inspect`. */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return `MockCalmLensAppClient { uploadPresetId: ${JSON.stringify(this.#uploadPresetId)} }`;
-  }
-
-  toJSON(): { uploadPresetId: string } {
-    return { uploadPresetId: this.#uploadPresetId };
-  }
-
-  #apiError(code: ApiErrorCode): CalmLensError {
-    const requestId = `mock-app-request-${++this.#requestCount}`;
-    return new CalmLensError(code, {
-      message: API_ERROR_DEFINITIONS[code].message,
-      status: API_ERROR_DEFINITIONS[code].status,
-      requestId,
-      headers: new Headers({ "content-type": "application/json", "x-request-id": requestId }),
-    });
-  }
-
-  #toUploaded(asset: Asset): UploadedAsset {
-    return {
-      id: asset.id,
-      name: asset.name,
-      uploadPresetId: this.#uploadPresetId,
-      createdAt: asset.createdAt,
-      ...(this.#preset.showDecisions !== false && {
-        status: asset.classification.moderation.status,
-      }),
-    };
-  }
-
-  async #submit(options: UploadPresetSubmitAssetOptions, queue: boolean): Promise<UploadedAsset> {
-    if (!options || typeof options !== "object") {
-      throw invalidArgument("Upload options are required");
-    }
-    if (!("content" in options) && !("part" in options)) {
-      throw invalidArgument("Uploads through an upload preset need content or a part");
-    }
-    const token = typeof this.#token === "function" ? await this.#token() : this.#token;
-    if (token !== undefined && (typeof token !== "string" || !token)) {
-      throw invalidConfig("token must return a non-empty string");
-    }
-    const preset = this.#preset;
-    if (preset.requireToken && !token)
-      throw this.#apiError(API_ERROR_CODES.UPLOAD_PRESET_TOKEN_REQUIRED);
-    const payload = "content" in options ? options.content : options.part;
-    const type = payload.type ?? "";
-    if (
-      preset.allowedContentTypes &&
-      !isFileAccepted({ name: options.name, type }, preset.allowedContentTypes.join(","))
-    ) {
-      throw this.#apiError(API_ERROR_CODES.UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED);
-    }
-    const size =
-      "totalSizeInBytes" in options && options.totalSizeInBytes !== undefined
-        ? options.totalSizeInBytes
-        : (payload.sizeInBytes ?? getAssetPayloadByteLength(payload));
-    if (
-      preset.maxFileSizeInBytes !== undefined &&
-      size !== undefined &&
-      size > preset.maxFileSizeInBytes
-    ) {
-      throw this.#apiError(API_ERROR_CODES.UPLOAD_PRESET_TOO_LARGE);
-    }
-    const shared = {
-      visibility: preset.visibility ?? "public",
-      folderId: preset.folderId ?? undefined,
-      processingOptions: { keepContentAfterProcessing: preset.keepContentAfterProcessing ?? true },
-    };
-    const asset = await (queue ? this.server.assets.create : this.server.assets.classify)({
-      ...options,
-      ...shared,
-    });
-    this.#uploads.add(asset.id);
-    return this.#toUploaded(asset);
-  }
-
-  #ownAssetId(assetId: string): string {
-    encodePathSegment(assetId, "Asset ID");
-    if (!this.#uploads.has(assetId)) throw this.#apiError(API_ERROR_CODES.ASSET_NOT_FOUND);
-    return assetId;
-  }
-
-  /** Uploads through the client's upload preset and checks those uploads. */
-  get assets() {
-    return {
-      /** Uploads a file and queues it for moderation. */
-      create: (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.#submit(options, true),
-
-      /** Uploads a file and waits for its moderation decision. */
-      classify: (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.#submit(options, false),
-
-      /** Uploads the next part of a multipart upload this client started. */
-      uploadPart: async (options: UploadAssetPartOptions): Promise<UploadedAsset> =>
-        this.#toUploaded(
-          await this.server.assets.uploadPart({
-            ...options,
-            assetId: this.#ownAssetId(options.assetId),
-          }),
-        ),
-
-      /** Checks an upload this client made. `status` is present when the preset shows decisions. */
-      retrieve: async ({ assetId }: RetrieveAssetOptions): Promise<UploadedAsset> =>
-        this.#toUploaded(await this.server.assets.retrieve({ assetId: this.#ownAssetId(assetId) })),
-    };
   }
 }

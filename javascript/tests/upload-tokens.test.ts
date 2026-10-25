@@ -70,13 +70,24 @@ describe("uploadTokens.sign", () => {
     ).toBe("sdk/invalid-argument");
   });
 
-  it("signs the same verifiable tokens in the mock client", async () => {
-    const mock = new MockCalmLensServerClient({ apiKey: API_KEY, projectId: "project-1" });
-    const { token } = await mock.uploadTokens.sign({ uploadPresetId: PRESET_ID });
+  it("signs the same verifiable tokens in the mock client, at the mock's time and without a request", async () => {
+    const mock = new MockCalmLensServerClient({
+      apiKey: API_KEY,
+      projectId: "project-1",
+      mockOptions: { now: () => 1_700_000_000_000, createId: () => "nonce-1" },
+    });
+    const { token, expiresAt } = await mock.uploadTokens.sign({
+      uploadPresetId: PRESET_ID,
+      expiresInSeconds: 60,
+    });
     const decoded = decodeUploadToken(token)!;
     expect(
       await verifyUploadTokenSignature(decoded.body, decoded.signature, await sha256Hex(API_KEY)),
     ).toBe(true);
-    expect(mock.callsTo("uploadTokens.sign")).toHaveLength(1);
+    expect({ expiresAt, nonce: decoded.claims.n }).toEqual({
+      expiresAt: 1_700_000_060_000,
+      nonce: "nonce-1",
+    });
+    expect(mock.calls).toEqual([]);
   });
 });

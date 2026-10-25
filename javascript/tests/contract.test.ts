@@ -211,8 +211,6 @@ const checkCdnExpectation = (
 };
 
 describe("shared mock scenarios", () => {
-  // Like the other not-applicable cases, the reason is the skipped test's name.
-  test.skip("expect.httpStatus (not applicable: MockCalmLensServerClient answers API methods in memory and sends no HTTP response; cdn.serve steps check expect.cdn.status)", () => {});
   for (const scenario of scenarios) {
     it(scenario.name, async () => {
       const client = new MockCalmLensServerClient({
@@ -228,6 +226,7 @@ describe("shared mock scenarios", () => {
         for (let run = 0; run < (step.repeat ?? 1); run++) {
           const label = `step ${index + 1}${step.repeat ? ` run ${run + 1}` : ""} (${step.operation})`;
           const args = resolveRefs(step.args ?? {}, saved) as Record<string, unknown>;
+          const sent = client.calls.length;
           let result: unknown;
           let error: unknown;
           try {
@@ -247,6 +246,12 @@ describe("shared mock scenarios", () => {
             continue;
           }
           if (error) throw error;
+          if (step.expect?.httpStatus !== undefined) {
+            // The status of the last response the in-memory API sent during the step, so retries
+            // and polls are judged by their final attempt.
+            const calls = client.calls.slice(sent);
+            expect(calls.at(-1)?.status, `${label}: HTTP status`).toBe(step.expect.httpStatus);
+          }
           if (step.expect?.cdn) {
             checkCdnExpectation(result as ServedResponse, step.expect.cdn, saved, label);
           }

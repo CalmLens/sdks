@@ -10,10 +10,10 @@ export type {
   MockAssetOutcome,
   MockCalmLensCall,
   MockCalmLensOperation,
-  MockCalmLensOperationOptions,
   MockCalmLensServerClientOptions,
   MockEventInput,
   MockRequestFailure,
+  MockReviewDecision,
 } from "./testing/MockCalmLensServerClient";
 export { MockCalmLensServerClient } from "./testing/MockCalmLensServerClient";
 export type {

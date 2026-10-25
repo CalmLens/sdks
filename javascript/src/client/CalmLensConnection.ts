@@ -13,7 +13,7 @@ import {
 } from "../contract/SharedConstants.js";
 import { CalmLensError, invalidArgument, SDK_ERROR_CODES } from "./CalmLensError";
 import { API_ERROR_CODES } from "./CalmLensErrorCodes";
-import { CalmLensTransport, type TransportRequest } from "./CalmLensTransport";
+import { CalmLensTransport, sleep, type TransportRequest } from "./CalmLensTransport";
 import type {
   Asset,
   ConnectionOptions,
@@ -29,6 +29,30 @@ import { randomUuid, stringifyQuery } from "./CalmLensUtils";
 // share. Each client keeps one `CalmLensConnection` privately, so credentials stay hidden.
 
 export const DEFAULT_TIMEOUT_MS = 120_000;
+
+/**
+ * Where `@calmlens/sdk/testing` puts its hooks in client options. Not part of the public API:
+ * the mock clients run the real clients against their in-memory API with these.
+ */
+export const MOCK_HOOKS = Symbol.for("@calmlens/sdk.mockHooks");
+
+/** How a mock client changes the real client it runs. */
+export interface MockHooks {
+  /** Waits (retry backoff, `waitForDecision` polls) without real time passing. */
+  sleep: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
+  /** The clock `waitForDecision` reads, which only `sleep` moves on. */
+  now: () => number;
+  /** When an upload token is signed, in epoch milliseconds, and its nonce. */
+  uploadTokenTime: () => { now: number; nonce: string };
+  /** Leaves multipart size checks to the API, so the in-memory API answers them in its order. */
+  deferUploadChecks: boolean;
+  /** The CDN base URL when the options set none. */
+  defaultCdnBaseUrl: string;
+}
+
+/** The mock hooks in client options, if a mock client set them. */
+export const getMockHooks = (options: object): MockHooks | undefined =>
+  (options as { [MOCK_HOOKS]?: MockHooks })[MOCK_HOOKS];
 export const DEFAULT_MAX_RETRIES = 2;
 export const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 
@@ -98,7 +122,10 @@ export const assertDeclaredPayloadSize = (
 };
 
 /** Checks upload options before anything is sent. */
-export const prepareSubmitAssetOptions = (options: SubmitAssetOptions): SubmitAssetOptions => {
+export const prepareSubmitAssetOptions = (
+  options: SubmitAssetOptions,
+  { deferUploadChecks = false }: { deferUploadChecks?: boolean } = {},
+): SubmitAssetOptions => {
   if (!options || typeof options !== "object") {
     throw invalidArgument("Asset options are required");
   }
@@ -128,7 +155,7 @@ export const prepareSubmitAssetOptions = (options: SubmitAssetOptions): SubmitAs
     assertDeclaredPayloadSize(options.part, options.part.sizeInBytes ?? options.sizeInBytes);
     assertValidUploadMimeType(options.part.type);
     const partSizeInBytes = options.part.sizeInBytes ?? getAssetPayloadByteLength(options.part);
-    if (isImageMimeType(options.part.type) && partSizeInBytes !== undefined) {
+    if (!deferUploadChecks && isImageMimeType(options.part.type) && partSizeInBytes !== undefined) {
       if (partSizeInBytes > MAX_IMAGE_UPLOAD_BYTES) {
         throw new CalmLensError(API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE, {
           message: "Multipart image uploads cannot exceed 20MB.",
@@ -140,9 +167,10 @@ export const prepareSubmitAssetOptions = (options: SubmitAssetOptions): SubmitAs
         });
       }
     }
+    // Deferred, only the base64 part boundary is checked here; the API checks part sizes.
     const validation = validateAssetPayload(options.part, {
       multipart: true,
-      isFinal: options.part.isFinal,
+      isFinal: deferUploadChecks || options.part.isFinal,
     });
     if (!validation.ok) throw invalidPayload(validation.error);
   }
@@ -208,6 +236,8 @@ export const resolveConnectionOptions = <T extends ConnectionOptions>(
 /** One client's transport, base URL and deadlines, and the requests both clients make. */
 export class CalmLensConnection {
   readonly transport: CalmLensTransport;
+  /** Set by a mock client; see `MOCK_HOOKS`. */
+  readonly hooks: MockHooks | undefined;
 
   constructor(
     readonly options: ResolvedConnectionOptions,
@@ -222,13 +252,25 @@ export class CalmLensConnection {
       }
       return fetchImpl;
     };
+    this.hooks = getMockHooks(options);
     this.transport = new CalmLensTransport({
       apiKey,
+      sleep: this.hooks?.sleep,
       fetch: ((input, init) => resolveFetch()(input, init)) as typeof fetch,
       signal: options.signal,
       maxRetries: options.maxRetries ?? DEFAULT_MAX_RETRIES,
       maxResponseBytes: options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES,
     });
+  }
+
+  /** How the client waits between polls and retries. */
+  get sleep(): (ms: number, signal: AbortSignal | undefined) => Promise<void> {
+    return this.hooks?.sleep ?? sleep;
+  }
+
+  /** Whether multipart size checks are left to the API (mock clients only). */
+  get deferUploadChecks(): boolean {
+    return this.hooks?.deferUploadChecks ?? false;
   }
 
   get timeoutMs() {
@@ -349,7 +391,7 @@ export class CalmLensConnection {
     assertDeclaredPayloadSize(part);
     const validation = validateAssetPayload(part, {
       multipart: true,
-      isFinal: part.isFinal,
+      isFinal: this.deferUploadChecks || part.isFinal,
     });
     if (!validation.ok) throw invalidPayload(validation.error);
     const query = new URLSearchParams({
