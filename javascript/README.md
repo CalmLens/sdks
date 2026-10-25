@@ -12,10 +12,10 @@ npm install @calmlens/sdk
 
 The package has two clients, each with its own import:
 
-| Import | Client | Runs | Authenticates with |
-| --- | --- | --- | --- |
-| `@calmlens/sdk/server` | `CalmLensServerClient` | On your server: Node.js 22 or later, Bun, Deno, Cloudflare Workers | A project API key |
-| `@calmlens/sdk/app` | `CalmLensAppClient` | In browsers and React Native apps | An [upload preset](#browser-and-app-uploads-with-upload-presets), with an optional upload token from your server |
+| Import                 | Client                 | Runs                                                               | Authenticates with                                                                                               |
+| ---------------------- | ---------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `@calmlens/sdk/server` | `CalmLensServerClient` | On your server: Node.js 22 or later, Bun, Deno, Cloudflare Workers | A project API key                                                                                                |
+| `@calmlens/sdk/app`    | `CalmLensAppClient`    | In browsers and React Native apps                                  | An [upload preset](#browser-and-app-uploads-with-upload-presets), with an optional upload token from your server |
 
 `@calmlens/sdk` itself exports the shared types, `CalmLensError`, the error codes and `SDK_VERSION`. The package ships ES modules and CommonJS with type declarations and loads no other packages at runtime: importing only `verifyWebhookSignature` adds about 5 KB (minified) to a bundle, `CalmLensAppClient` about 19 KB and `CalmLensServerClient` about 28 KB.
 
@@ -54,14 +54,14 @@ const image = await client.assets.create({
 console.log(image.classification.status, image.classification.moderation.status); // "processing" "pending"
 ```
 
-| `classification.status` | `classification.moderation.status` | Meaning |
-| --- | --- | --- |
-| `completed` | `allowed` | Safe to show. |
-| `completed` | `age-restricted` | Delivered only through signed URLs, API keys or URLs built with `allowAgeRestricted: true`. Show it only to viewers your app has age-checked. |
-| `completed` | `blocked` | Your policy blocked it; the CDN doesn't deliver it. Don't show it. |
-| `completed` | `purged` | Your policy blocked it and deleted its content. Don't show it. |
-| `pending` or `processing` | `pending` | Still being received or classified; `upload.status` is `uploading` while parts are arriving. |
-| `failed` | `pending` | Processing failed; see `assets.retry`. |
+| `classification.status`   | `classification.moderation.status` | Meaning                                                                                                                                       |
+| ------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `completed`               | `allowed`                          | Safe to show.                                                                                                                                 |
+| `completed`               | `age-restricted`                   | Delivered only through signed URLs, API keys or URLs built with `allowAgeRestricted: true`. Show it only to viewers your app has age-checked. |
+| `completed`               | `blocked`                          | Your policy blocked it; the CDN doesn't deliver it. Don't show it.                                                                            |
+| `completed`               | `purged`                           | Your policy blocked it and deleted its content. Don't show it.                                                                                |
+| `pending` or `processing` | `pending`                          | Still being received or classified; `upload.status` is `uploading` while parts are arriving.                                                  |
+| `failed`                  | `pending`                          | Processing failed; see `assets.retry`.                                                                                                        |
 
 The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision in
 `classification.moderation.status`.
@@ -126,14 +126,14 @@ const asset = await client.assets.create({
     type: "application/pdf",
   },
   description: "Important document",
-  visibility: "private"
+  visibility: "private",
 });
 
 // Submit from URL
 const asset = await client.assets.create({
   name: "website-content",
   url: "https://example.com/page",
-  description: "Web page to classify"
+  description: "Web page to classify",
 });
 ```
 
@@ -150,15 +150,15 @@ Both resolve to the stored `Asset`, a plain object with camelCase keys exactly a
 
 ```typescript
 const asset = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
-asset.id;            // string
-asset.classification.status;  // "pending" | "processing" | "completed" | "failed"; audio and video keep processing in the background
-asset.classification.moderation.status;  // "pending" | "allowed" | "limited" | "age-restricted" | "blocked" | "purged"
-asset.classification.moderation?.score;                         // number, the overall score
-asset.classification.moderation.categories?.harassment.status;  // "evaluated" | "partial" | "not-evaluated"
-asset.content.status;     // "temporary" | "stored" | "removed"
+asset.id; // string
+asset.classification.status; // "pending" | "processing" | "completed" | "failed"; audio and video keep processing in the background
+asset.classification.moderation.status; // "pending" | "allowed" | "limited" | "age-restricted" | "blocked" | "purged"
+asset.classification.moderation?.score; // number, the overall score
+asset.classification.moderation.categories?.harassment.status; // "evaluated" | "partial" | "not-evaluated"
+asset.content.status; // "temporary" | "stored" | "removed"
 asset.content.removalReason; // "policy" | "retention" | "requested" | "parent-removed" | "disposed" | null
-asset.type;               // "plaintext-document" for text
-asset.createdAt;          // milliseconds since the Unix epoch
+asset.type; // "plaintext-document" for text
+asset.createdAt; // milliseconds since the Unix epoch
 ```
 
 Always present: `id`, `projectId`, `name`, `type`, `createdAt`, `updatedAt`, `upload`, `classification` and `content`. Classification contains its progress, completion time and results grouped by capability. `classification.moderation.categories` and `score` are absent until findings are available; optional detections appear only when requested. Moderation decisions and reviewer details sit under `classification.moderation`. Content is removed after classification unless `processingOptions.keepContentAfterProcessing` is enabled. Check each category’s evaluation `status` before reading its score.
@@ -232,11 +232,11 @@ async assets.list(options: {
 **Example:**
 ```typescript
 const result = await client.assets.list({
-  pageSize: 20
+  pageSize: 20,
 });
 
 console.log(`Received ${result.items.length} assets`);
-result.items.forEach(asset => {
+result.items.forEach((asset) => {
   console.log(`${asset.name}: ${asset.classification.moderation.status}`);
 });
 ```
@@ -244,7 +244,10 @@ result.items.forEach(asset => {
 To read every matching asset, iterate instead of paging by hand. Pages are fetched as you go using continuation cursors. Inserting or deleting other assets does not shift the cursor position. To page manually, pass `nextCursor` as `cursor` with the same filters and ordering until it is null. Lists are not snapshots; assets may still be deleted or change filter membership during traversal.
 
 ```typescript
-for await (const asset of client.assets.iterate({ filter: "classification.moderation.status==blocked", pageSize: 100 })) {
+for await (const asset of client.assets.iterate({
+  filter: "classification.moderation.status==blocked",
+  pageSize: 100,
+})) {
   console.log(asset.id);
 }
 ```
@@ -331,7 +334,10 @@ is no longer `pending`, or `classification.status` is `failed`. The SDK checks t
 `assets.create`, or with an asset ID you stored earlier. Webhooks report decisions without polling.
 
 ```typescript
-const queued = await client.assets.create({ name: "photo.jpg", content: { blob, type: "image/jpeg" } });
+const queued = await client.assets.create({
+  name: "photo.jpg",
+  content: { blob, type: "image/jpeg" },
+});
 const decided = await client.assets.waitForDecision({ assetId: queued.id, timeoutMs: 30_000 });
 const { status } = decided.classification.moderation;
 if (status !== "allowed" && status !== "limited") hidePhoto(decided.id);
@@ -417,7 +423,10 @@ const url = client.cdn.getAssetUrl({
 });
 
 // A public age-restricted asset, for a viewer your app has already age-checked
-const restrictedUrl = client.cdn.getAssetUrl({ assetIdentifier: assetId, allowAgeRestricted: true });
+const restrictedUrl = client.cdn.getAssetUrl({
+  assetIdentifier: assetId,
+  allowAgeRestricted: true,
+});
 
 const response = await client.cdn.serve({
   assetIdentifier: assetId,
@@ -476,8 +485,8 @@ const uploading = await client.assets.create({
   name: "large-image.png",
   part: {
     uint8Array: firstPartBytes,
-    type: "image/png"
-  }
+    type: "image/png",
+  },
 });
 
 await client.assets.uploadPart({
@@ -505,8 +514,8 @@ const analyzed = await client.assets.classify({
   part: {
     base64: finalPartBase64,
     type: "image/png",
-    isFinal: true
-  }
+    isFinal: true,
+  },
 });
 console.log(analyzed.classification.moderation.status);
 ```
@@ -542,10 +551,16 @@ import { CalmLensAppClient } from "@calmlens/sdk/app";
 const client = new CalmLensAppClient({
   uploadPresetId: "your-upload-preset-id",
   // Only for presets that require a token: called once per new upload
-  token: () => fetch("/api/upload-token", { method: "POST" }).then((r) => r.json()).then((b) => b.token),
+  token: () =>
+    fetch("/api/upload-token", { method: "POST" })
+      .then((r) => r.json())
+      .then((b) => b.token),
 });
 
-const asset = await client.assets.classify({ name: file.name, content: { data: file, type: file.type } });
+const asset = await client.assets.classify({
+  name: file.name,
+  content: { data: file, type: file.type },
+});
 // asset.status (the moderation status) is present when the preset shows decisions to uploaders
 ```
 
@@ -571,13 +586,13 @@ Server uploads can also pass `uploadPresetId` to `assets.create` or `assets.clas
 
 Ready-made front-end components for each UI library. They share one core, so they behave the same everywhere:
 
-| Import | Components |
-| --- | --- |
-| `@calmlens/sdk/react` | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload` (also works in Preact through `preact/compat`) |
-| `@calmlens/sdk/vue` | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload` |
-| `@calmlens/sdk/svelte` | `CalmLensUploader`, `CalmLensMedia` (Svelte 5) |
+| Import                   | Components                                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `@calmlens/sdk/react`    | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload` (also works in Preact through `preact/compat`)                      |
+| `@calmlens/sdk/vue`      | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload`                                                                     |
+| `@calmlens/sdk/svelte`   | `CalmLensUploader`, `CalmLensMedia` (Svelte 5)                                                                               |
 | `@calmlens/sdk/elements` | `<calmlens-uploader>`, `<calmlens-media>` for plain HTML, Angular, Solid, Lit and anything else that renders custom elements |
-| `@calmlens/sdk/ui` | The framework-free core: `createUploadController`, `getMediaState`, messages and styles |
+| `@calmlens/sdk/ui`       | The framework-free core: `createUploadController`, `getMediaState`, messages and styles                                      |
 
 `react`, `vue` and `svelte` are optional peer dependencies: install the one you use.
 
@@ -654,7 +669,7 @@ Always narrow on a category's `status` before reading `score`. An `evaluated` or
 
 ```typescript
 const violence = asset.classification.moderation.categories?.violence;
-if (violence?.status === 'evaluated' || violence?.status === 'partial') {
+if (violence?.status === "evaluated" || violence?.status === "partial") {
   console.log(violence.score);
 }
 ```
@@ -683,31 +698,31 @@ try {
 }
 ```
 
-| Property | Meaning |
-| --- | --- |
-| `code` | A stable identifier such as `asset/not-found` or `sdk/timeout`. `CALMLENS_ERROR_CODES` lists the documented ones |
-| `status` | The HTTP status, when the API responded |
-| `requestId` | The `X-Request-Id` response header. Include it when you contact support |
-| `headers` | The response headers, when the API responded |
-| `retryAfter` | Seconds to wait, from the `Retry-After` header (on `429` and `idempotency/request-in-progress`) |
-| `details` | Structured diagnostics from the API, such as validation issues and `traceId` |
-| `cause` | The underlying error, for transport failures |
+| Property     | Meaning                                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `code`       | A stable identifier such as `asset/not-found` or `sdk/timeout`.`CALMLENS_ERROR_CODES` lists the documented ones |
+| `status`     | The HTTP status, when the API responded                                                                         |
+| `requestId`  | The `X-Request-Id` response header. Include it when you contact support                                         |
+| `headers`    | The response headers, when the API responded                                                                    |
+| `retryAfter` | Seconds to wait, from the `Retry-After` header (on `429` and `idempotency/request-in-progress`)                 |
+| `details`    | Structured diagnostics from the API, such as validation issues and `traceId`                                    |
+| `cause`      | The underlying error, for transport failures                                                                    |
 
 `error.isNotFound()` is true for `404`, and `error.isRetryable()` for transport failures, timeouts (`sdk/timeout`, including `waitForDecision`'s deadline), `429`, `502`, `503`, `504` and `idempotency/request-in-progress`. `instanceof CalmLensError` and `CalmLensError.isCalmLensError(error)` recognise errors from any copy of the SDK, including the ES module and CommonJS builds loaded side by side.
 
 Codes the SDK raises itself:
 
-| Code | Meaning |
-| --- | --- |
-| `sdk/invalid-argument` | A method argument is missing or invalid, for example an empty `assetId` |
-| `sdk/invalid-config` | The client options are invalid |
-| `sdk/transport-error` | The request could not be completed (DNS, TLS, refused or reset connections, truncated bodies, decompression errors) |
-| `sdk/timeout` | A deadline passed |
-| `sdk/cancelled` | Your `AbortSignal` cancelled the request |
-| `sdk/invalid-response` | A successful response whose body is not the expected JSON, or a page that repeats a cursor the iterator already used |
-| `sdk/http-error` | An HTTP failure without a CalmLens error body, for example from a proxy, or a redirect, which the SDK never follows |
-| `sdk/response-too-large` | A response larger than `maxResponseBytes` |
-| `sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload` | Thrown by `parseWebhookEvent` |
+| Code                                                           | Meaning                                                                                                              |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `sdk/invalid-argument`                                         | A method argument is missing or invalid, for example an empty `assetId`                                              |
+| `sdk/invalid-config`                                           | The client options are invalid                                                                                       |
+| `sdk/transport-error`                                          | The request could not be completed (DNS, TLS, refused or reset connections, truncated bodies, decompression errors)  |
+| `sdk/timeout`                                                  | A deadline passed                                                                                                    |
+| `sdk/cancelled`                                                | Your `AbortSignal` cancelled the request                                                                             |
+| `sdk/invalid-response`                                         | A successful response whose body is not the expected JSON, or a page that repeats a cursor the iterator already used |
+| `sdk/http-error`                                               | An HTTP failure without a CalmLens error body, for example from a proxy, or a redirect, which the SDK never follows  |
+| `sdk/response-too-large`                                       | A response larger than `maxResponseBytes`                                                                            |
+| `sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload` | Thrown by `parseWebhookEvent`                                                                                        |
 
 Upload content is checked before it is sent with the same codes the API uses, such as `upload/invalid-payload` and `upload/invalid-mime-type`.
 
@@ -753,7 +768,11 @@ The in-memory API behaves like CalmLens where tests depend on it: `assets.list` 
 Every request the client sends is recorded in `client.calls` as `{ operation, method, url, path, query, headers, body, status }`: the client method that sent it (`"assets.retrieve"`, `"events.list"`, `"cdn.serve"`, ...), the request as the API received it (`path` relative to the API or CDN base URL, `body` as parsed JSON, the text of a text upload or the bytes of a file) and the HTTP status of the answer (`undefined` when it failed without one). Methods that send nothing, such as `uploadTokens.sign` or an `ensureLens` answered from the lens cache, are not recorded. `client.callsTo(operation)` filters them; a request several methods send matches each of them, so `callsTo("text.classify")` also lists text uploads through `assets.classify`, and `callsTo("assets.waitForDecision")` the `assets.retrieve` requests it polls with. To test failure handling, `client.failNextRequest()` makes the next request fail like a network failure, so the client throws `sdk/transport-error`; pass `"timeout"` for `sdk/timeout`, an API error code such as `"upload/limit-exceeded"` for that API error with its HTTP status, a `CalmLensError` to throw it as is or another `Error` to fail with it as the cause, and `{ operation }` to fail only the next request that method sends. Each queued failure is used once.
 
 ```typescript
-const client = new MockCalmLensServerClient({ apiKey: createMockApiKey(), projectId, timeoutMs: 5_000 });
+const client = new MockCalmLensServerClient({
+  apiKey: createMockApiKey(),
+  projectId,
+  timeoutMs: 5_000,
+});
 
 client.failNextRequest("timeout", { operation: "text.classify" });
 await expect(postComment(client, "hello")).rejects.toMatchObject({ code: "sdk/timeout" });
@@ -802,10 +821,10 @@ A `webhook` connector POSTs each event to your URL as JSON:
 
 Each delivery has these headers (the names are exported as constants):
 
-| Header | Constant | Value |
-|---|---|---|
-| `x-calmlens-delivery` | `WEBHOOK_DELIVERY_HEADER` | Delivery ID (the same across retries) |
-| `x-calmlens-timestamp` | `WEBHOOK_TIMESTAMP_HEADER` | Unix time in seconds when the delivery was signed |
+| Header                 | Constant                   | Value                                                              |
+| ---------------------- | -------------------------- | ------------------------------------------------------------------ |
+| `x-calmlens-delivery`  | `WEBHOOK_DELIVERY_HEADER`  | Delivery ID (the same across retries)                              |
+| `x-calmlens-timestamp` | `WEBHOOK_TIMESTAMP_HEADER` | Unix time in seconds when the delivery was signed                  |
 | `x-calmlens-signature` | `WEBHOOK_SIGNATURE_HEADER` | `v1=<lowercase hex HMAC-SHA256(secret, "<timestamp>.<raw body>")>` |
 
 Verify the exact raw request body before parsing it; re-serializing parsed JSON can change the signed bytes. `parseWebhookEvent` verifies the delivery and returns the parsed event, or throws `sdk/invalid-webhook-signature` (bad signature or a timestamp more than `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS`, 5 minutes, from your clock, which stops replays) or `sdk/invalid-webhook-payload`. `verifyWebhookSignature` takes the same options and returns a boolean. Both accept the body as a string, `Uint8Array`/`Buffer` or `ArrayBuffer`, and read the two headers from `headers` (a `Headers` object or Node's `req.headers`) when you don't pass `signature` and `timestamp`.
@@ -826,7 +845,8 @@ export async function POST(request: Request) {
       secret: process.env.CALMLENS_WEBHOOK_SECRET!,
     });
   } catch (error) {
-    if (CalmLensError.isCalmLensError(error)) return new Response("Invalid delivery", { status: 401 });
+    if (CalmLensError.isCalmLensError(error))
+      return new Response("Invalid delivery", { status: 401 });
     throw error;
   }
   // Queue the work, keyed by event.id, then respond quickly.

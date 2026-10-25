@@ -61,7 +61,7 @@ function copySvelteComponents() {
   }
 }
 
-/** Source modules each production entry must not bundle, by the `//#region` rolldown writes. */
+/** Source modules each production entry must not bundle, by the module markers rolldown writes. */
 const FORBIDDEN_MODULES = {
   index: [/^src\/testing/, /CalmLensServerClient\.ts$/, /CalmLensAppClient\.ts$/],
   server: [/^src\/testing/, /CalmLensAppClient\.ts$/],
@@ -88,7 +88,8 @@ function bundledModules(buildDir, entryFile) {
     if (visited.has(file)) return;
     visited.add(file);
     const source = fs.readFileSync(file, "utf8");
-    for (const [, name] of source.matchAll(/^\/\/#region (\S+)/gm)) {
+    // Rolldown marks each module with `// <path>` (before 1.2.15, `//#region <path>`).
+    for (const [, name] of source.matchAll(/^\/\/(?:#region)? (\S+\.[cm]?[jt]sx?)$/gm)) {
       modules.add(name.replace(/^(?:\.\.\/)+/, ""));
     }
     for (const [, specifier] of source.matchAll(/(?:from|require\()\s*"(\.\/[^"]+)"/g)) {

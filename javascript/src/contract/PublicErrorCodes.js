@@ -1,13 +1,13 @@
-//#region node_modules/sendable-error/esm/Consts.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Consts.js
 const SENDABLE_ERROR_INSTANCE_SYMBOL = "__isSendableError";
 //#endregion
-//#region node_modules/sendable-error/esm/Utils.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Utils.js
 const isSendableError = (error) => {
 	if (!error || typeof error !== "object") return false;
 	return Boolean(error[SENDABLE_ERROR_INSTANCE_SYMBOL]);
 };
 //#endregion
-//#region node_modules/sendable-error/esm/ErrorCode.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/ErrorCode.js
 var ErrorCode = class ErrorCode {
 	properties;
 	static DEFAULT_CODE = new ErrorCode({
@@ -55,7 +55,7 @@ var ErrorCode = class ErrorCode {
 	}
 };
 //#endregion
-//#region node_modules/sendable-error/esm/Logging.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Logging.js
 const defaultErrorLogger = (options) => {
 	const { message, error, info } = options;
 	const stackLines = error.stack?.split("\n").slice(1).join("\n");
@@ -73,7 +73,7 @@ const getErrorLogger = () => {
 	return currentLogger;
 };
 //#endregion
-//#region node_modules/sendable-error/esm/SendableError.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/SendableError.js
 const DEFAULT_STATUS = 500;
 function hashString(str) {
 	let h = 2166136261;

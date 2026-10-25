@@ -480,7 +480,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Insults or humiliation";
     readonly description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.";
-    readonly exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity. Sarcasm, mocking nicknames and mild name-calling such as fool or dummy are Mild mockery or teasing, and threats are Threats or intimidation.";
+    readonly exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation.";
   };
   readonly "harassment-mild": {
     readonly category: "harassment";

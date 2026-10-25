@@ -13,7 +13,7 @@ var __exportAll = (all, no_symbols) => {
 	return target;
 };
 //#endregion
-//#region node_modules/zod/v4/core/util.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
 	const numericValues = Object.values(entries).filter((v) => typeof v === "number");
 	return Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -579,7 +579,7 @@ function constantCatch(value) {
 	return fn;
 }
 //#endregion
-//#region node_modules/zod/v4/core/core.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/core.js
 var _a$1;
 const _zodDesc = {
 	value: void 0,
@@ -685,7 +685,7 @@ function config(newConfig) {
 	return globalConfig;
 }
 //#endregion
-//#region node_modules/zod/v4/core/errors.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/errors.js
 function _getMessage() {
 	const internals = this._zod;
 	internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -801,7 +801,7 @@ function formatError(error, mapper = (issue) => issue.message) {
 	return fieldErrors;
 }
 //#endregion
-//#region node_modules/zod/v4/core/parse.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
 	return {
 		callee: params?.callee ?? callee,
@@ -1006,7 +1006,7 @@ const _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 	return _safeParseAsync(_Err)(schema, value, _ctx);
 };
 //#endregion
-//#region node_modules/zod/v4/core/regexes.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/regexes.js
 var regexes_exports = /* @__PURE__ */ __exportAll({
 	anyString: () => anyString,
 	base64: () => base64$1,
@@ -1195,7 +1195,7 @@ const sha512_hex = /^[0-9a-fA-F]{128}$/;
 const sha512_base64 = /*@__PURE__*/ fixedBase64(86, "==");
 const sha512_base64url = /*@__PURE__*/ fixedBase64url(86);
 //#endregion
-//#region node_modules/zod/v4/core/checks.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/checks.js
 const $ZodCheck = /*@__PURE__*/ $constructor("$ZodCheck", (inst, def) => {
 	var _a;
 	inst._zod ?? (inst._zod = {});
@@ -1643,7 +1643,7 @@ const $ZodCheckOverwrite = /*@__PURE__*/ $constructor("$ZodCheckOverwrite", (ins
 	};
 });
 //#endregion
-//#region node_modules/zod/v4/core/doc.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/doc.js
 var Doc = class {
 	constructor(args = [], closed = {}) {
 		this.content = [];
@@ -1677,14 +1677,14 @@ var Doc = class {
 	}
 };
 //#endregion
-//#region node_modules/zod/v4/core/versions.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/versions.js
 const version = {
 	major: 4,
 	minor: 6,
 	patch: 7
 };
 //#endregion
-//#region node_modules/zod/v4/core/schemas.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/schemas.js
 const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
 	var _a;
 	inst ?? (inst = {});
@@ -3851,7 +3851,7 @@ function handleRefineResult(result, payload, input, inst) {
 	}
 }
 //#endregion
-//#region node_modules/zod/v4/core/memoizer.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
 	constructor() {
 		super(`Cannot parse a reference cycle that closes through a transform`);
@@ -4104,7 +4104,7 @@ function isBackEdge(ctx, value) {
 	return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
 //#endregion
-//#region node_modules/zod/v4/locales/en.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/locales/en.js
 const error = () => {
 	const Sizable = {
 		string: {
@@ -4212,7 +4212,7 @@ function en_default() {
 	return { localeError: error() };
 }
 //#endregion
-//#region node_modules/zod/v4/core/registries.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/registries.js
 var _a;
 var $ZodRegistry = class {
 	constructor() {
@@ -4259,7 +4259,7 @@ function registry() {
 (_a = globalThis).__zod_globalRegistry ?? (_a.__zod_globalRegistry = registry());
 const globalRegistry = globalThis.__zod_globalRegistry;
 //#endregion
-//#region node_modules/zod/v4/core/api.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
 	if (def.checks) def.checks = [...def.checks];
 	return def;
@@ -5098,7 +5098,7 @@ function _stringFormat(Class, format, fnOrRegex, _params = {}) {
 	return new Class(def);
 }
 //#endregion
-//#region node_modules/zod/v4/core/to-json-schema.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
 	for (const source of sources) for (const key of Reflect.ownKeys(source)) if (Object.prototype.propertyIsEnumerable.call(source, key)) assignProp(target, key, source[key]);
 	return target;
@@ -5542,7 +5542,7 @@ const createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params)
 	return finalize(ctx, schema);
 };
 //#endregion
-//#region node_modules/zod/v4/core/json-schema-processors.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/json-schema-processors.js
 const narrowMin = (agg, key, value) => {
 	if (agg[key] === void 0 || value > agg[key]) agg[key] = value;
 };
@@ -6111,7 +6111,7 @@ const lazyProcessor = (schema, ctx, _json, params) => {
 	seen.ref = innerType;
 };
 //#endregion
-//#region node_modules/zod/v4/classic/checks.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/checks.js
 var checks_exports = /* @__PURE__ */ __exportAll({
 	endsWith: () => _endsWith,
 	gt: () => _gt,
@@ -6145,7 +6145,7 @@ var checks_exports = /* @__PURE__ */ __exportAll({
 	uppercase: () => _uppercase
 });
 //#endregion
-//#region node_modules/zod/v4/classic/errors.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/errors.js
 const _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
 	Object.defineProperty(proto, key, {
@@ -6195,7 +6195,7 @@ const initializer = (inst, issues) => {
 };
 const ZodRealError = /*@__PURE__*/ $constructor("ZodError", initializer, void 0, { Parent: Error });
 //#endregion
-//#region node_modules/zod/v4/classic/parse.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/parse.js
 const parse = /* @__PURE__ */ _parse(ZodRealError);
 const parseAsync = /* @__PURE__ */ _parseAsync(ZodRealError);
 const safeParse = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -6209,7 +6209,7 @@ const safeDecode = /* @__PURE__ */ _safeDecode(ZodRealError);
 const safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 const safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 //#endregion
-//#region node_modules/zod/v4/classic/schemas.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/schemas.js
 var schemas_exports = /* @__PURE__ */ __exportAll({
 	ZodAny: () => ZodAny,
 	ZodArray: () => ZodArray,
@@ -7827,7 +7827,7 @@ function preprocess(fn, schema) {
 	});
 }
 //#endregion
-//#region node_modules/zod/v4/classic/compat.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/compat.js
 /** @deprecated Do not use. Stub definition, only included for zod-to-json-schema compatibility. */
 var ZodFirstPartyTypeKind;
 ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {});
@@ -7836,7 +7836,7 @@ ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {});
 	...checks_exports
 });
 //#endregion
-//#region node_modules/zod-meta/esm/index.js
+//#region ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod-meta/esm/index.js
 const ZOD_META_KEY = "__zod_meta__";
 const createMetaType = (type) => {
 	return Object.assign((value) => {
@@ -7915,7 +7915,7 @@ const metaStore = (meta) => {
 	module.exports = escapeString;
 })))();
 //#endregion
-//#region packages/zodbase/src/index.browser.ts
+//#region ../../../../../../../Users/09jwater/Documents/safemind/packages/zodbase/src/index.browser.ts
 const noop = () => {};
 const primaryKey = noop;
 const updatedAt = noop;
@@ -8453,7 +8453,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Insults or humiliation",
 		description: "Insults, contemptuous name-calling such as idiot, moron, loser or pathetic, humiliation or degrading treatment aimed at a person or at a group that is not a protected identity group.",
-		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity. Sarcasm, mocking nicknames and mild name-calling such as fool or dummy are Mild mockery or teasing, and threats are Threats or intimidation."
+		exclusions: "Dislike or anger without an attack, such as “I hate you”; disagreement or criticism of conduct or competence; untargeted profanity. Sarcasm, mocking nicknames, mild name-calling such as fool or dummy, and a joking comparison such as likening people to an animal in a funny photo or meme, without insulting words or a claim that they are worthless or subhuman, are Mild mockery or teasing, and threats are Threats or intimidation."
 	},
 	"harassment-mild": {
 		category: "harassment",

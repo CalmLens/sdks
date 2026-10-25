@@ -75,7 +75,6 @@
 - ef0c32e: Safer retries, richer errors, streaming transfers and a much smaller bundle.
 
   **Breaking changes** (pre-1.0, so released as a minor version):
-
   - `verifyWebhookSignature` no longer accepts a parsed object as `payload`; it throws `sdk/invalid-argument`, because re-serializing JSON can change the signed bytes. Pass the raw body as a string, `Uint8Array`/`Buffer` (for example from `express.raw()`, which previously failed to verify) or `ArrayBuffer`.
   - `toWebhookEventPayload`, `createWebhookHeaders`, `generateMediaTestCode` and `MEDIA_TEST_SIGNALS` moved from `@calmlens/sdk` to `@calmlens/sdk/testing`.
   - The `requestBackend` option is removed; pass `fetch` instead, which is now used for every request. Passing `requestBackend` throws `sdk/invalid-config`.
@@ -86,7 +85,6 @@
   - Binary uploads no longer have a 120-second deadline by default; set `uploadTimeoutMs` to add one. `cdn.serve`'s `timeoutMs` now ends when response headers arrive, so long downloads aren't cut off.
 
   **New:**
-
   - Reads, and creates and uploads, which now send an `Idempotency-Key`, are retried after network failures, `429`, `502`, `503`, `504` and `idempotency/request-in-progress`, with jittered backoff that honours `Retry-After`. Configure with `maxRetries` (default 2). Pass `idempotencyKey` to `assets.create`, `assets.classify`, `text.classify` or `assets.uploadPart` to retry safely across processes.
   - `CalmLensError` exposes `requestId`, `headers` and `retryAfter`, and `isNotFound()` and `isRetryable()`. `instanceof CalmLensError` and the new `CalmLensError.isCalmLensError()` recognise errors from both the ES module and CommonJS builds. `CALMLENS_ERROR_CODES` lists every documented code.
   - `parseWebhookEvent` verifies a delivery and returns the parsed event. Webhook helpers can read the signature and timestamp from `headers`.
@@ -142,7 +140,6 @@
   The client now checks `baseUrl` and `cdnBaseUrl` before setting anything up: each must be an absolute http(s) URL. An invalid value throws a `CalmLensError` instead of a `TypeError` on the first request. The package now declares `engines.node >= 22`, the minimum its dependencies support.
 
   `MockCalmLensClient` accepts and validates the same options as `CalmLensClient`. Breaking: it now reads the top-level `cdnBaseUrl`, and `mockOptions.cdnBaseUrl` has been removed. It also has new testing features:
-
   - `failNextRequest("transport-error" | "timeout" | error, { operation? })` simulates network failures and timeouts.
   - `calls` and `callsTo(operation)` record each call as `{ operation, options }`.
   - `assets.update` was added.
