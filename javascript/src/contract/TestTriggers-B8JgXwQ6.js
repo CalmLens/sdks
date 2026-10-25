@@ -8781,7 +8781,7 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 	path: ["unless"]
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
-const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "At least as strong as the category action, and never `allow`.");
+const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
 // packages/shared/src/ProcessingFeatures.ts
