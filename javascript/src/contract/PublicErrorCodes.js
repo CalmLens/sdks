@@ -347,7 +347,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	SPEND_LIMIT_REACHED: new ErrorCode({
 		id: "upload/spend-limit-reached",
-		defaultMessage: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner or billing admin can review them in Billing.",
+		defaultMessage: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
 		status: 402
 	}),
 	INVALID_UPLOAD_MIME_TYPE: new ErrorCode({
