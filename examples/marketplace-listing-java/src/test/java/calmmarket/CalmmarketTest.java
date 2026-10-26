@@ -202,8 +202,8 @@ class CalmmarketTest {
     Calmmarket.Response response = submit(app, app.csrf, "Oak reading lamp", "Warm light.", "25", List.of(PNG, GIF, PNG),
         "description-blocked", List.of("text-blocked", "error", "visual-blocked"));
     assertEquals(303, response.status());
-    assertEquals("/?notice=submitted", response.headers().get("location"));
     Calmmarket.Listing listing = app.listings().get(0);
+    assertEquals("/listings/" + listing.id + "?notice=submitted", response.headers().get("location"));
     List<MockCalmLensServerClient.Request> sent = mock.requests();
     assertEquals(5, sent.size());
     assertEquals(listing.id + ":title", sent.get(0).query().get("externalId"));
@@ -262,6 +262,54 @@ class CalmmarketTest {
     assertEquals(List.of(), Calmmarket.explain(null));
   }
 
+  @Test
+  void flaggedCategoriesComeFromThePolicyDecision() {
+    Map<String, Object> flagged = new LinkedHashMap<>(report(Map.of("criminal-activity", evaluated(0.95), "profanity", evaluated(0.4))));
+    flagged.put("policy", Map.of("decision", Map.of("source", "policy", "action", "block", "flaggedCategories", List.of("criminal-activity"))));
+    assertEquals(List.of("criminal-activity"), Calmmarket.flaggedCategories(model(flagged, AssetModeration.class)));
+    assertEquals(List.of(), Calmmarket.flaggedCategories(model(report(Map.of("violence", evaluated(0.9))), AssetModeration.class)), "no policy decision, no flagged categories");
+    assertEquals(List.of(), Calmmarket.flaggedCategories(null));
+  }
+
+  @Test
+  void listingPageRefreshesItsPhotosAndShowsTheTextFoundInThem() {
+    MockCalmLensServerClient mock = liveSubmission(2);
+    Calmmarket app = live(mock, "");
+    live(app, 2);
+    Calmmarket.Listing listing = app.listings().get(0);
+    Map<String, Object> image = photo(listing, 2, "blocked", report(Map.of("criminal-activity", evaluated(0.95))));
+    image.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", "Call 555-0100 <now>")));
+    mock.enqueue(200, photo(listing, 1, "pending", null)).enqueue(200, image);
+    Calmmarket.Response page = get(app, "/listings/" + listing.id);
+    assertEquals(200, page.status());
+    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-2"), paths(mock, 4));
+    assertEquals(AssetModerationStatus.BLOCKED, listing.photos.get(1).moderation);
+    assertEquals(Calmmarket.State.HELD, listing.state(), "one rejected photo holds the listing while another is still checked");
+    assertTrue(html(page).contains("Call 555-0100 &lt;now&gt;"), "the extracted text is shown, escaped");
+    assertEquals(404, get(app, "/listings/unknown").status());
+    assertEquals(405, post(app, "/listings/" + listing.id, "csrf=" + app.csrf).status());
+  }
+
+  @Test
+  void theMarketShowsOnlyLiveListingsAndRanksLimitedOnesLast() throws Exception {
+    Calmmarket app = live(mock(), "");
+    Calmmarket.Listing limited = listing("limited", AssetModerationStatus.LIMITED);
+    Calmmarket.Listing allowed = listing("allowed", AssetModerationStatus.ALLOWED);
+    Calmmarket.Listing blocked = listing("blocked", AssetModerationStatus.BLOCKED);
+    Calmmarket.Listing checking = listing("checking", AssetModerationStatus.PENDING);
+    for (Calmmarket.Listing listing : List.of(allowed, blocked, checking, limited)) app.add(listing);
+    assertEquals(List.of("allowed", "limited"), app.market().stream().map(listing -> listing.id).toList());
+  }
+
+  /** A stored listing with approved text and one photo with {@code status}. */
+  static Calmmarket.Listing listing(String id, AssetModerationStatus status) {
+    Calmmarket.Photo photo = new Calmmarket.Photo(1, "item.png", "image/png", id + "-photo", id + ":photo-1", "no-text");
+    photo.processing = AssetClassificationStatus.COMPLETED;
+    photo.moderation = status;
+    return new Calmmarket.Listing(id, id, "A description", "25.00", Map.of("title", id + "-title", "description", id + "-description"),
+        Map.of("title", AssetModerationStatus.ALLOWED, "description", AssetModerationStatus.ALLOWED), List.of(photo));
+  }
+
   // ------------------------------------------------------------ listing decision
 
   @Test
@@ -273,7 +321,8 @@ class CalmmarketTest {
     String photoLink = "/listings/" + listing.id + "/photos/1";
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, photo(listing, 2, "pending", null));
-    assertFalse(html(get(app, "/")).contains("<article class=\"card\">"));
+    get(app, "/");
+    assertEquals(List.of(), app.market());
     assertEquals(Calmmarket.State.IN_REVIEW, listing.state());
     // A status this app does not know is a decision, but never treated as allowed.
     mock.enqueue(200, photo(listing, 2, "quarantined", null));
@@ -281,7 +330,7 @@ class CalmmarketTest {
     assertEquals("quarantined", listing.photos.get(1).moderation.value());
     assertFalse(listing.photos.get(1).moderation.isKnown());
     assertEquals(Calmmarket.State.HELD, listing.state());
-    assertFalse(html(get(app, "/")).contains("<article class=\"card\">"));
+    assertEquals(List.of(), app.market());
     // Failed processing holds the listing too.
     listing.photos.get(1).processing = AssetClassificationStatus.FAILED;
     listing.photos.get(1).moderation = AssetModerationStatus.PENDING;
@@ -299,7 +348,7 @@ class CalmmarketTest {
       assertEquals(Calmmarket.State.HELD, listing.state(), status.value());
     }
     assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-2", "GET /v1/assets/photo-2"), paths(mock, 4));
-    assertTrue(html(get(app, "/")).contains(photoLink + "\""), "the allowed photo itself can still be previewed by the seller");
+    assertTrue(html(get(app, "/listings/" + listing.id)).contains(photoLink + "\""), "the allowed photo itself can still be previewed by the seller");
   }
 
   // ------------------------------------------------------------ withdrawing
@@ -319,7 +368,7 @@ class CalmmarketTest {
     mock.enqueue(200, removed("photo-1")).enqueue(200, removed("photo-2"));
     Calmmarket.Response withdrawn = post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf);
     assertEquals(303, withdrawn.status());
-    assertEquals("/?notice=withdrawn", withdrawn.headers().get("location"));
+    assertEquals("/listings/" + listing.id + "?notice=withdrawn", withdrawn.headers().get("location"));
     assertEquals(List.of("DELETE /v1/assets/photo-1/content", "DELETE /v1/assets/photo-2/content"), paths(mock, before));
     assertEquals(Calmmarket.State.WITHDRAWN, listing.state());
     assertFalse(listing.removalPending());
@@ -327,6 +376,7 @@ class CalmmarketTest {
     assertEquals(410, get(app, "/listings/" + listing.id + "/photos/2").status());
     // The page no longer links the photos, and nothing about them is requested again.
     assertFalse(html(get(app, "/")).contains("/listings/" + listing.id + "/photos/"));
+    assertFalse(html(get(app, "/listings/" + listing.id)).contains("/listings/" + listing.id + "/photos/"));
     assertEquals(before + 2, mock.requests().size());
     assertEquals(409, post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf).status());
   }
@@ -342,7 +392,7 @@ class CalmmarketTest {
     int before = mock.requests().size();
     mock.enqueue(200, removed("photo-1")).enqueueTimeout().enqueueError(ErrorCodes.ASSET_SAFETY_HELD);
     Calmmarket.Response response = post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf);
-    assertEquals("/?notice=withdrawn-pending", response.headers().get("location"));
+    assertEquals("/listings/" + listing.id + "?notice=withdrawn-pending", response.headers().get("location"));
     assertTrue(listing.removalPending());
     assertEquals(Calmmarket.State.WITHDRAWN, listing.state(), "the listing is down even while removal is pending");
     assertEquals(410, get(app, "/listings/" + listing.id + "/photos/1").status());
@@ -384,6 +434,8 @@ class CalmmarketTest {
   @CsvSource({
       "no-text,allowed,NO_TEXT,NONE,LIVE",
       "clean-text,allowed,FOUND,NONE,LIVE",
+      "limited,limited,NO_TEXT,NONE,LIVE",
+      "age-restricted,age-restricted,NO_TEXT,AUTOMATED,HELD",
       "text-blocked,blocked,FOUND,AUTOMATED,HELD",
       "visual-blocked,blocked,FOUND,AUTOMATED,HELD",
       "error,failed,NOT_CHECKED,NONE,HELD"})
@@ -404,7 +456,7 @@ class CalmmarketTest {
     assertEquals(driver, photo.driver());
     assertEquals(state, listing.state());
     Calmmarket.Response preview = get(app, "/listings/" + listing.id + "/photos/1");
-    assertEquals(status.equals("allowed") ? 200 : 403, preview.status());
+    assertEquals(state == Calmmarket.State.LIVE ? 200 : 403, preview.status());
     if (ocr == Calmmarket.Ocr.FOUND) assertEquals("string", photo.extractedText.type());
   }
 
@@ -414,9 +466,9 @@ class CalmmarketTest {
     demo(app, "allowed", "no-text", "text-blocked", "clean-text");
     Calmmarket.Listing listing = app.listings().get(0);
     expire(listing);
-    String page = html(get(app, "/"));
+    get(app, "/");
     assertEquals(Calmmarket.State.HELD, listing.state());
-    assertFalse(page.contains("<article class=\"card\">"));
+    assertEquals(List.of(), app.market());
     assertEquals(List.of(AssetModerationStatus.ALLOWED, AssetModerationStatus.BLOCKED, AssetModerationStatus.ALLOWED), listing.photos.stream().map(photo -> photo.moderation).toList());
   }
 
@@ -424,7 +476,10 @@ class CalmmarketTest {
   void blockedDescriptionUploadsNoPhoto() {
     Calmmarket app = demoApp("");
     Calmmarket.Response response = demo(app, "description-blocked", "no-text");
-    assertEquals("/?notice=description-not-allowed", response.headers().get("location"));
+    assertEquals("/sell?notice=description-not-allowed", response.headers().get("location"));
+    Calmmarket.Response form = app.handle(new Calmmarket.Request("GET", "/sell", "notice=description-not-allowed", Map.of(), new byte[0]));
+    assertEquals(200, form.status());
+    assertTrue(html(form).contains("role=\"status\""), "the sell form shows why nothing was published");
     assertTrue(app.listings().isEmpty());
     assertEquals("held", app.activity().get(0).kind());
   }
@@ -491,9 +546,9 @@ class CalmmarketTest {
     Calmmarket app = demoApp("");
     String injected = html(app.handle(new Calmmarket.Request("GET", "/", "notice=%3Cb%3EYour+account+is+locked%3C%2Fb%3E", Map.of(), new byte[0])));
     assertFalse(injected.contains("Your account is locked"));
-    assertFalse(injected.contains("class=\"notice\""));
+    assertFalse(injected.contains("role=\"status\""));
     String known = html(app.handle(new Calmmarket.Request("GET", "/", "notice=submitted", Map.of(), new byte[0])));
-    assertTrue(known.contains("class=\"notice\""));
+    assertTrue(known.contains("role=\"status\""));
   }
 
   @Test
@@ -536,9 +591,11 @@ class CalmmarketTest {
   void escapesListingText() {
     Calmmarket app = demoApp("");
     submit(app, "<script>alert(1)</script>", "Fine & \"dandy\"", "25", PNG);
-    String page = html(get(app, "/"));
-    assertFalse(page.contains("<script>alert(1)</script>"));
-    assertTrue(page.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+    String id = app.listings().get(0).id;
+    for (String page : List.of(html(get(app, "/")), html(get(app, "/listings/" + id)))) {
+      assertFalse(page.contains("<script>alert(1)</script>"));
+      assertTrue(page.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+    }
   }
 
   // ------------------------------------------------------------ fail closed (a mock stands in for the API)
@@ -701,6 +758,7 @@ class CalmmarketTest {
     assertEquals("cursor-1", sent.get(8).query().get("after"));
     assertEquals(9, sent.size(), "a repeated event is not retrieved again");
     assertEquals(Calmmarket.State.REMOVED, listing.state());
+    assertEquals(AssetModerationStatus.BLOCKED, listing.textStatus.get("description"), "the later decision replaces the submitted one");
     Calmmarket.Activity review = app.activity().get(0);
     assertEquals(List.of("Sam", "Counterfeit"), review.facts().stream().map(Calmmarket.FactRow::value).toList());
     assertNull(review.facts().get(1).url(), "only HTTP(S) fact URLs become links");

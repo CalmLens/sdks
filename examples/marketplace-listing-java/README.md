@@ -14,6 +14,17 @@ Calmmarket uploads every listing photo with OCR enabled. Image moderation consid
 
 An `evaluated` or `partial` category has a score. A `not-evaluated` result has a reason and no score; it is never treated as zero. See the [OCR guide](https://calmlens.com/docs/guides/ocr) for merging and retention.
 
+## Pages
+
+- **Browse** (`/`): the live listings, then **Your listings**, where each listing shows the
+  decision for its title, description and every photo. Listings that need attention come first;
+  a rejected photo shows the categories the policy acted on (`classification.moderation.policy.decision.flaggedCategories`)
+  and the text read from it. The **Activity** panel lists submissions and review decisions.
+- **Listing** (`/listings/<id>`): the approved photos, and a check per part with the photo's
+  extracted text and its combined moderation report. Withdraw the listing from here.
+- **Sell an item** (`/sell`): the listing form. A title or description that is not allowed
+  brings you back here; a submitted listing opens its own page.
+
 ## Withdrawing a listing and what is retained
 
 A seller can withdraw a listing at any time. It leaves the market at once, and the app calls
@@ -55,15 +66,15 @@ result under the affected listing's own lock, so a slow call never holds up othe
 With `CALMLENS_DEMO=1`, the app runs in an explicitly labelled demo mode. Its CalmLens calls go
 to [Demo.java](src/main/java/calmmarket/Demo.java), which answers from the SDK's
 `MockCalmLensServerClient`; the live code path never uses the mock. Choose a result for the text and
-one for each photo:
+one for each photo on the sell form:
 
-The choices simulate an allowed photo with or without extracted text, a photo blocked for the text in it, a photo blocked for visual content, and processing failures. The page displays the combined report without attributing its scores to one pass.
+The choices simulate an allowed photo with or without extracted text, a limited photo (shown, ranked lower), a photo blocked for the text in it, a photo blocked for visual content, an age-restricted photo (held, as this marketplace has no age gate), and processing failures. The page displays the combined report without attributing its scores to one pass.
 
 Each choice queues fake responses on a fresh mock, which then runs the real client's
 validation and encoding. Reports and extracted text are **synthetic** and labelled
 as such on the page. Nothing is classified. A demo photo stays pending for two seconds and
-takes the selected result when the page refreshes. A live demo listing offers **Simulate a
-reviewer blocking photo 1**, which runs a synthetic `asset.blocked` event through the same
+takes the selected result when the page refreshes. A live demo listing's page offers **Simulate a
+reviewer rejecting photo 1**, which runs a synthetic `asset.blocked` event through the same
 events-feed code as live mode. Withdrawing a demo listing removes the bytes the app kept, so
 its previews stop.
 
@@ -75,7 +86,7 @@ export CALMLENS_PROJECT_ID='your-project-id'
 mvn -q compile exec:java
 ```
 
-The banner changes to **Live** and the demo selectors disappear. Each listing makes two
+The demo-mode note and the demo selectors disappear. Each listing makes two
 synchronous text calls and one queued upload per photo, all with an `externalId` of
 `<listing-id>:<field>` (`title`, `description`, `photo-1` ...) and
 `keepContentAfterProcessing: true`, so a reviewer can see held content in the CalmLens
@@ -99,7 +110,7 @@ placed in a link is never displayed.
 
 ## Review decisions
 
-**Events feed (pull).** Click **Check for review decisions**. The first call to
+**Events feed (pull).** Click **Check now** in the Activity panel. The first call to
 `events.list` without a cursor returns a cursor for "now". Later calls pass it as `after`,
 follow `hasMore`, and apply each `asset.*` event about a local listing by retrieving the
 current state; the event's snapshot is not trusted. An event about a photo refreshes its combined decision and extracted text. A title or
@@ -128,7 +139,7 @@ The handler passes the **exact raw body bytes** to `CalmLensServerClient.parseWe
 verifies the signature and timestamp before parsing, then applies the event through the same code
 as the events feed. A forged, tampered or stale delivery gets 401. If retrieval
 fails, it returns 502 so delivery retries. A repeated event has no further effect. A test send
-(fact `{ key: "test", value: true }`) is logged and changes nothing. The activity panel shows
+(fact `{ key: "test", value: true }`) is logged and changes nothing. The Activity panel shows
 registered facts such as **Reviewer** and **Note**; the hidden reviewer ID and unknown keys
 are not shown, and only absolute HTTP(S) fact URLs become links.
 

@@ -54,12 +54,20 @@ final class Demo implements Calmmarket.Backend {
     switch (photo.demoResult) {
       case "clean-text" -> {
         report = report(Map.of());
-        extractedText = "Hand-made oak · 25.00 · collection only";
+        extractedText = "Collection only · cash or card";
+      }
+      case "limited" -> {
+        status = "limited";
+        report = report(Map.of("profanity", evaluated(0.64)));
+      }
+      case "age-restricted" -> {
+        status = "age-restricted";
+        report = report(Map.of("sexual", evaluated(0.72)));
       }
       case "text-blocked" -> {
         status = "blocked";
         report = report(Map.of("criminal-activity", evaluated(0.88)));
-        extractedText = "Message me for prescription pills, no questions asked";
+        extractedText = "Prescription pills, no prescription needed. Message 555-0142";
       }
       case "visual-blocked" -> {
         status = "blocked";
@@ -170,7 +178,10 @@ final class Demo implements Calmmarket.Backend {
       categories.put(key, result);
       if (result.get("score") instanceof Double score) highest = Math.max(highest, score);
     }
-    return Map.of("categories", categories, "score", highest, "processedAt", System.currentTimeMillis());
+    // The simulated policy acts on every overridden category, as a real report's policy decision names them.
+    List<String> flagged = overrides.keySet().stream().sorted().toList();
+    Map<String, Object> decision = Map.of("source", "policy", "action", flagged.isEmpty() ? "allow" : "block", "flaggedCategories", flagged);
+    return Map.of("categories", categories, "score", highest, "policy", Map.of("decision", decision), "processedAt", System.currentTimeMillis());
   }
 
   private static Map<String, Object> evaluated(double score) {
