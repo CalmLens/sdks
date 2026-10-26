@@ -153,7 +153,7 @@ class SubmissionTest < Minitest::Test
   end
 
   def test_pending_unknown_and_malformed_results_fail_closed
-    ['pending', 'uploading', 'error', 'approved', 'unknown', nil].each do |status|
+    ['pending', 'uploading', 'error', 'approved', 'unknown'].each do |status|
       # A failed name never sends the reply text; a failed text discards the reply.
       [[asset('n', 'allowed'), asset('t', status)], [asset('n', status)]].each do |responses|
         app, mock = live_app(*responses)
@@ -162,15 +162,22 @@ class SubmissionTest < Minitest::Test
         assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| item.body == 'Secret text' })
       end
     end
-    allowed = { 'classification' => { 'status' => 'completed', 'moderation' => { 'status' => 'allowed' } } }
-    [allowed, allowed.merge('id' => ''), [],
-     { 'id' => 't', 'classification' => { 'status' => 'completed', 'moderation' => { 'status' => 'blocked' } } }].each_with_index do |text, index|
-      app, = live_app(asset('n', 'allowed'), text)
-      result = app.discussion.submit('Ada', 'Hello')
-      # Only the last response is a well-formed blocked result, which holds rather than publishes.
-      assert_equal(index == 3 ? :held : :failed, result)
-      refute_includes app.discussion.replies.map { |reply| reply[:state] }, :published
+    # The SDK refuses a response that is not a well-formed asset, so nothing is kept or published.
+    allowed = asset('t', 'allowed')
+    [allowed.merge('id' => ''), allowed.reject { |key, _| key == 'id' }, [],
+     asset('t', nil)].each do |text|
+      [[asset('n', 'allowed'), text], [text]].each do |responses|
+        app, mock = live_app(*responses)
+        error = assert_raises(CalmLens::InvalidResponseError) { app.discussion.submit('Ada', 'Secret text') }
+        assert_equal CalmLens::SdkErrorCodes::INVALID_RESPONSE, error.code
+        assert_empty app.discussion.replies, "kept #{text.inspect}"
+        assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| item.body == 'Secret text' })
+      end
     end
+    app, = live_app(asset('n', 'allowed'), asset('t', 'blocked'))
+    # A well-formed blocked result holds rather than publishes.
+    assert_equal :held, app.discussion.submit('Ada', 'Hello')
+    refute_includes app.discussion.replies.map { |reply| reply[:state] }, :published
   end
 
   def test_transport_failures_fail_closed_without_showing_the_error
