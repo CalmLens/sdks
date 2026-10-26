@@ -384,6 +384,67 @@ public final class Models {
     public MetadataItem value(Object value) { return new MetadataItem(id, value); }
   }
 
+  /** The most recent earlier posts CalmLens uses. */
+  public static final int MODERATION_CONTEXT_USED_ITEMS = 5;
+
+  /**
+   * The most characters (Unicode code points) of earlier posts CalmLens uses. The newest post
+   * always fits, since no post may be longer.
+   */
+  public static final int MODERATION_CONTEXT_USED_CHARACTERS = 2_000;
+
+  /**
+   * An earlier post in the conversation.
+   *
+   * @param text the post's text
+   * @param authorId your identifier for who wrote it, or null
+   */
+  public record ModerationContextItem(String text, String authorId) {
+    /** @param text the post's text, without an author */
+    public ModerationContextItem(String text) { this(text, null); }
+  }
+
+  /**
+   * Earlier posts in the conversation, oldest first. CalmLens moderates only the content and uses
+   * these to read who it addresses, what it refers to and whether it quotes, reports, counters or
+   * mocks something.
+   *
+   * @param items the earlier posts, oldest first
+   */
+  public record ModerationContext(List<ModerationContextItem> items) {
+    /** Copies the list so the record stays immutable. */
+    public ModerationContext {
+      items = list(items);
+    }
+  }
+
+  /**
+   * The earlier posts CalmLens uses: walking from the newest, at most {@link
+   * #MODERATION_CONTEXT_USED_ITEMS} posts within {@link #MODERATION_CONTEXT_USED_CHARACTERS}
+   * Unicode code points, returned oldest first. The newest post is always kept, so an over-long
+   * one is left for the API to reject.
+   *
+   * @param items earlier posts, oldest first
+   * @return the posts the SDK sends, oldest first
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} when the list, a post or its
+   *     text is null
+   */
+  public static List<ModerationContextItem> selectModerationContextItems(List<ModerationContextItem> items) {
+    if (items == null) throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "context.items must be a list of earlier posts");
+    java.util.ArrayDeque<ModerationContextItem> selected = new java.util.ArrayDeque<>();
+    int characters = 0;
+    for (int index = items.size() - 1; index >= 0 && selected.size() < MODERATION_CONTEXT_USED_ITEMS; index--) {
+      ModerationContextItem item = items.get(index);
+      if (item == null || item.text() == null)
+        throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "context.items[" + index + "].text must be a string");
+      int length = item.text().codePointCount(0, item.text().length());
+      if (!selected.isEmpty() && characters + length > MODERATION_CONTEXT_USED_CHARACTERS) break;
+      selected.addFirst(item);
+      characters += length;
+    }
+    return List.copyOf(selected);
+  }
+
   /**
    * One ordering clause for list requests.
    *
@@ -1060,6 +1121,8 @@ public final class Models {
     private ProcessingOptions processingOptions;
     private Visibility visibility;
     private List<MetadataItem> metadata;
+    private String authorId;
+    private ModerationContext context;
     private String externalId;
     private String externalUrl;
     private Patch<String> folderId;
@@ -1091,6 +1154,18 @@ public final class Models {
     public SubmitAsset processingOptions(ProcessingOptions value) { processingOptions = value; return this; }
     public SubmitAsset visibility(Visibility value) { visibility = value; return this; }
     public SubmitAsset metadata(List<MetadataItem> value) { metadata = value; return this; }
+    /**
+     * @param value your identifier for who wrote the content; CalmLens only compares it with the
+     *     author IDs in the context, to tell which posts share a speaker
+     * @return these options
+     */
+    public SubmitAsset authorId(String value) { authorId = value; return this; }
+    /**
+     * @param value earlier posts in the conversation, oldest first; the SDK sends only the posts
+     *     CalmLens uses (see {@link Models#selectModerationContextItems(List)})
+     * @return these options
+     */
+    public SubmitAsset context(ModerationContext value) { context = value; return this; }
     public SubmitAsset externalId(String value) { externalId = value; return this; }
     public SubmitAsset externalUrl(String value) { externalUrl = value; return this; }
     public SubmitAsset folderId(Patch<String> value) { folderId = value; return this; }
@@ -1102,6 +1177,7 @@ public final class Models {
 
     Content contentValue() { return content; }
     Content partValue() { return part; }
+    ModerationContext contextValue() { return context; }
 
     @Override public String toString() { return describe(this); }
   }
@@ -1146,6 +1222,8 @@ public final class Models {
     private String description;
     private ProcessingOptions processingOptions;
     private List<MetadataItem> metadata;
+    private String authorId;
+    private ModerationContext context;
     private String externalId;
     private String externalUrl;
     private Patch<String> folderId;
@@ -1162,6 +1240,18 @@ public final class Models {
     public ClassifyText description(String value) { description = value; return this; }
     public ClassifyText processingOptions(ProcessingOptions value) { processingOptions = value; return this; }
     public ClassifyText metadata(List<MetadataItem> value) { metadata = value; return this; }
+    /**
+     * @param value your identifier for who wrote the content; CalmLens only compares it with the
+     *     author IDs in the context, to tell which posts share a speaker
+     * @return these options
+     */
+    public ClassifyText authorId(String value) { authorId = value; return this; }
+    /**
+     * @param value earlier posts in the conversation, oldest first; the SDK sends only the posts
+     *     CalmLens uses (see {@link Models#selectModerationContextItems(List)})
+     * @return these options
+     */
+    public ClassifyText context(ModerationContext value) { context = value; return this; }
     public ClassifyText externalId(String value) { externalId = value; return this; }
     public ClassifyText externalUrl(String value) { externalUrl = value; return this; }
     public ClassifyText folderId(Patch<String> value) { folderId = value; return this; }
@@ -1175,6 +1265,8 @@ public final class Models {
       asset.description = description;
       asset.processingOptions = processingOptions;
       asset.metadata = metadata;
+      asset.authorId = authorId;
+      asset.context = context;
       asset.externalId = externalId;
       asset.externalUrl = externalUrl;
       asset.folderId = folderId;
@@ -1603,6 +1695,9 @@ public final class Models {
    * @param description description
    * @param externalId your identifier for the asset
    * @param externalUrl your URL for the asset
+   * @param authorId your identifier for who wrote the content, or null
+   * @param context the earlier posts CalmLens used, oldest first; null when none were sent or once
+   *     the content is removed
    * @param tags tags
    * @param processingOptions processing options
    * @param visibility CDN visibility
@@ -1615,7 +1710,7 @@ public final class Models {
       List<MetadataItem> metadata, String userId, String parentId, String uploadPresetId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
-      String description, String externalId, String externalUrl, List<String> tags,
+      String description, String externalId, String externalUrl, String authorId, ModerationContext context, List<String> tags,
       ProcessingOptions processingOptions, Visibility visibility,
       AssetUpload upload, AssetClassification classification, AssetContent content) {
     /** Copies collections so the record stays immutable. */

@@ -30,11 +30,12 @@ from . import error_codes
 from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError, _parse_retry_after)
+from .moderation_context import select_moderation_context_items
 from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
                     BatchAssetsOptions, BatchAssetsResponse,
-                    MetadataItem, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
+                    MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
                     SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, SubmitAssetOptions,
                     UpdateAssetOptions, UpdateFolderOptions, UploadPartOptions,
@@ -1029,8 +1030,8 @@ DEFAULT_DECISION_TIMEOUT = 60.0
 #: ``assets.create_signed_url``'s lifetime when ``expires_in_seconds`` is omitted.
 DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 900
 
-_SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "externalId",
-                      "externalUrl", "folderId", "uploadPresetId")
+_SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context",
+                      "externalId", "externalUrl", "folderId", "uploadPresetId")
 
 
 class Assets:
@@ -1152,7 +1153,8 @@ class Assets:
     def create(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,
                processing_options: ProcessingOptions = _UNSET, visibility: Visibility = _UNSET,
-               metadata: List[MetadataItem] = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
+               metadata: List[MetadataItem] = _UNSET, author_id: str = _UNSET, context: ModerationContext = _UNSET,
+               external_id: str = _UNSET, external_url: str = _UNSET,
                folder_id: str | None = _UNSET, upload_preset_id: str = _UNSET,
                total_size_in_bytes: int = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Upload content (or submit a ``url``) and queue classification; returns at once
@@ -1161,24 +1163,30 @@ class Assets:
         Supply exactly one of ``content``, ``part`` (first part of a multipart upload) or
         ``url``. ``idempotency_key`` makes retries safe; one is generated per call when
         omitted, and reused for the client's own retries.
+
+        ``author_id`` is your label for who wrote the content. ``context`` holds earlier posts in
+        the conversation, oldest first (``{"items": [{"text": ..., "authorId": ...}]}``); CalmLens
+        moderates only the content and uses them to read it in context. Only the posts CalmLens
+        uses are sent: the most recent 5 that fit in 2,000 characters.
         """
         merged = _merge(options, name=name, content=content, part=part, url=url, description=description,
                         processing_options=processing_options, visibility=visibility, metadata=metadata,
-                        external_id=external_id, external_url=external_url, folder_id=folder_id,
+                        author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id,
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
         return self._submit(merged, True, idempotency_key)
 
     def classify(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                  part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,
                  processing_options: ProcessingOptions = _UNSET, visibility: Visibility = _UNSET,
-                 metadata: List[MetadataItem] = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
+                 metadata: List[MetadataItem] = _UNSET, author_id: str = _UNSET, context: ModerationContext = _UNSET,
+                 external_id: str = _UNSET, external_url: str = _UNSET,
                  folder_id: str | None = _UNSET, upload_preset_id: str = _UNSET,
                  total_size_in_bytes: int = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Like :meth:`create`, but waits for the decision where supported (audio and video
         are always asynchronous and return ``pending``)."""
         merged = _merge(options, name=name, content=content, part=part, url=url, description=description,
                         processing_options=processing_options, visibility=visibility, metadata=metadata,
-                        external_id=external_id, external_url=external_url, folder_id=folder_id,
+                        author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id,
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
         payload = merged.get("content")
         if isinstance(payload, Mapping) and "plainText" in payload and (
@@ -1189,6 +1197,12 @@ class Assets:
     def _submit(self, options: dict[str, Any], queue: bool, idempotency_key: str | None) -> Asset:
         if not options.get("name"):
             raise _invalid("Asset name is required", error_codes.INVALID_UPLOAD_PAYLOAD)
+        if "context" in options:
+            context = options["context"]
+            if not isinstance(context, Mapping) or not isinstance(context.get("items"), list):
+                raise _invalid("context.items must be a list of earlier posts")
+            # Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+            options["context"] = {"items": select_moderation_context_items(context["items"])}
         if sum(k in options for k in ("content", "part", "url")) != 1 or "isFinal" in options:
             raise _invalid("Supply exactly one of content, part, or url; isFinal belongs in part",
                            error_codes.INVALID_UPLOAD_PAYLOAD)
@@ -1635,11 +1649,13 @@ class Text:
 
     def classify(self, options: ClassifyTextOptions | None = None, /, *, text: str = _UNSET, name: str = _UNSET,
                  description: str = _UNSET, processing_options: ProcessingOptions = _UNSET,
-                 metadata: List[MetadataItem] = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
+                 metadata: List[MetadataItem] = _UNSET, author_id: str = _UNSET, context: ModerationContext = _UNSET,
+                 external_id: str = _UNSET, external_url: str = _UNSET,
                  folder_id: str | None = _UNSET, idempotency_key: str | None = None) -> Asset:
-        """Classify UTF-8 text and wait for the decision (asset name defaults to ``text``)."""
+        """Classify UTF-8 text and wait for the decision (asset name defaults to ``text``).
+        ``author_id`` and ``context`` work as in :meth:`Assets.create`."""
         merged = _merge(options, text=text, name=name, description=description, processing_options=processing_options,
-                        metadata=metadata, external_id=external_id, external_url=external_url, folder_id=folder_id)
+                        metadata=metadata, author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id)
         value = merged.pop("text", None)
         if not isinstance(value, str) or not value.strip():
             raise _invalid("Text to classify must be a non-empty string", error_codes.INVALID_UPLOAD_PAYLOAD)

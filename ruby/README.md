@@ -64,6 +64,17 @@ show_photo(decided['id']) if %w[allowed limited].include?(decided['classificatio
 
 `timeout:` covers the whole wait; `request_options: {timeout:}` still limits each request. The call only sleeps and sends requests, so you can stop it early by stopping its thread.
 
+### Replies in a conversation
+
+`assets.create`, `assets.classify` and `text.classify` take `author_id:`, your identifier for who wrote the content, and `context:`, the earlier posts in the conversation, oldest first. CalmLens moderates only the content itself and uses the earlier posts to read who it addresses and what it refers to; it compares author IDs only with each other, to tell which posts share a speaker.
+
+```ruby
+client.text.classify(text: 'Same to you', author_id: 'user-9',
+                     context: {items: [{text: 'Nice photo!', author_id: 'user-1'}, {text: 'Thanks', author_id: 'user-9'}]})
+```
+
+The SDK sends only the posts CalmLens uses: the most recent 5 (`CalmLens::ModerationContext::USED_ITEMS`) that fit in 2,000 characters (`CalmLens::ModerationContext::USED_CHARACTERS`, counted as Unicode code points). The newest post is always sent. `CalmLens::ModerationContext.select_items(items)` returns the posts that would be sent. The asset returns `authorId` and the `context` used; `context` is `nil` once the content is removed.
+
 ## Uploads and delivery
 
 Content is `{type:, plain_text:}`, `{type:, base64:}` or `{type:, data:}`, where `data` is a binary String or an IO. An IO is streamed and never read into memory: a File, Tempfile or StringIO (or any IO with `size_in_bytes:`) is sent with a `Content-Length`, and a stream of unknown length, such as a pipe or socket, is sent with chunked transfer encoding and no `sizeInBytes`. A stream that ends early or holds more bytes than declared fails with `upload/invalid-payload`.

@@ -896,6 +896,14 @@ pub struct SubmitAsset {
     /// Metadata items.
     #[serde(default)]
     pub metadata: Option<Vec<MetadataItem>>,
+    /// Your identifier for who wrote the content. CalmLens only compares it with the author IDs
+    /// in `context`, to tell which posts share a speaker.
+    #[serde(default)]
+    pub author_id: Option<String>,
+    /// Earlier posts in the conversation, oldest first. The SDK sends only the posts CalmLens
+    /// uses; see [`select_moderation_context_items`].
+    #[serde(default)]
+    pub context: Option<ModerationContext>,
     /// Your ID for the asset, unique within the project.
     #[serde(default)]
     pub external_id: Option<String>,
@@ -946,6 +954,77 @@ impl SubmitAsset {
             ..Self::default()
         }
     }
+}
+
+/// The most recent earlier posts CalmLens uses.
+pub const MODERATION_CONTEXT_USED_ITEMS: usize = 5;
+/// The most characters (Unicode code points) of earlier posts CalmLens uses. The newest post
+/// always fits, since no post may be longer.
+pub const MODERATION_CONTEXT_USED_CHARACTERS: usize = 2_000;
+
+/// Earlier posts in a conversation, oldest first, that CalmLens reads to understand the content
+/// it moderates.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModerationContext {
+    /// The posts, oldest first.
+    pub items: Vec<ModerationContextItem>,
+}
+impl ModerationContext {
+    /// Context of `items`, oldest first.
+    pub fn new(items: impl IntoIterator<Item = ModerationContextItem>) -> Self {
+        Self {
+            items: items.into_iter().collect(),
+        }
+    }
+}
+
+/// An earlier post in the conversation.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModerationContextItem {
+    /// The post's text.
+    pub text: String,
+    /// Your identifier for who wrote the post.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_id: Option<String>,
+}
+impl ModerationContextItem {
+    /// A post with `text` and no author.
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            author_id: None,
+        }
+    }
+    /// Sets who wrote the post.
+    pub fn author_id(mut self, author_id: impl Into<String>) -> Self {
+        self.author_id = Some(author_id.into());
+        self
+    }
+}
+
+/// The earlier posts CalmLens uses: the most recent ones, newest first, while at most
+/// [`MODERATION_CONTEXT_USED_ITEMS`] posts and [`MODERATION_CONTEXT_USED_CHARACTERS`]
+/// characters allow, returned oldest first. Characters are Unicode code points. The newest post
+/// is always kept, so an over-long one is left for the API to reject.
+pub fn select_moderation_context_items(
+    items: &[ModerationContextItem],
+) -> Vec<ModerationContextItem> {
+    let mut kept = 0;
+    let mut characters = 0;
+    for item in items.iter().rev() {
+        if kept == MODERATION_CONTEXT_USED_ITEMS {
+            break;
+        }
+        let length = item.text.chars().count();
+        if kept > 0 && characters + length > MODERATION_CONTEXT_USED_CHARACTERS {
+            break;
+        }
+        kept += 1;
+        characters += length;
+    }
+    items[items.len() - kept..].to_vec()
 }
 
 /// A metadata item.
@@ -1377,6 +1456,12 @@ pub struct Asset {
     /// Metadata items.
     #[serde(default)]
     pub metadata: Option<Vec<MetadataItem>>,
+    /// Your identifier for who wrote the content.
+    #[serde(default)]
+    pub author_id: Option<String>,
+    /// The earlier posts CalmLens used, oldest first; `None` once the content is removed.
+    #[serde(default)]
+    pub context: Option<ModerationContext>,
     /// Tags.
     #[serde(default)]
     pub tags: Option<Vec<String>>,
@@ -3325,6 +3410,14 @@ pub struct ClassifyText {
     /// Metadata items.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Vec<MetadataItem>>,
+    /// Your identifier for who wrote the text. CalmLens only compares it with the author IDs in
+    /// `context`, to tell which posts share a speaker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_id: Option<String>,
+    /// Earlier posts in the conversation, oldest first. The SDK sends only the posts CalmLens
+    /// uses; see [`select_moderation_context_items`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<ModerationContext>,
     /// Your ID for the asset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,

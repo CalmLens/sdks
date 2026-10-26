@@ -133,6 +133,16 @@ module CalmLens
     private def initialize: (untyped session) -> void
   end
 
+  # The earlier posts CalmLens uses from an upload's `context`.
+  module ModerationContext
+    # The most recent earlier posts CalmLens uses.
+    USED_ITEMS: Integer
+    # The most characters (Unicode code points) of earlier posts CalmLens uses.
+    USED_CHARACTERS: Integer
+    # The most recent posts within USED_ITEMS and USED_CHARACTERS, oldest first; the newest is always kept.
+    def self.select_items: (Array[moderation_context_item_input | Hash[String | Symbol, untyped]] items) -> Array[moderation_context_item]
+  end
+
   class Assets < Resource
     # The moderation status before a decision.
     PENDING_MODERATION_STATUS: String

@@ -119,6 +119,27 @@ must be 10–20MiB; pass `totalSizeInBytes` on the first call when known. The se
 persists the initial queue mode, so later parts can come from another process.
 Only pass `queue` to `uploadPart` to override it.
 
+For a post in a conversation, pass `authorId` (your label for who wrote it) and `context`,
+the earlier posts oldest first. CalmLens moderates only the content and reads the earlier
+posts to understand who it addresses and what it refers to:
+
+```php
+$asset = $client->text->classify([
+    'text' => 'Same to you',
+    'authorId' => 'user-9',
+    'context' => ['items' => [
+        ['text' => 'You played well today', 'authorId' => 'user-1'],
+        ['text' => 'Thanks!', 'authorId' => 'user-9'],
+    ]],
+]);
+```
+
+The SDK sends only the posts CalmLens uses: the 5 most recent that fit in 2,000 characters
+(Unicode code points), always including the newest. `CalmLens\ModerationContext::select($items)`
+applies the same rule, with the limits in `ModerationContext::USED_ITEMS` and
+`USED_CHARACTERS`. Assets return `authorId` and the `context` used, which becomes null once the
+content is removed.
+
 ### Pagination, events and errors
 
 ```php

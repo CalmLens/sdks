@@ -68,7 +68,7 @@ final class MockApi {
 
   private record Saved(String fingerprint, int status, byte[] body) {}
 
-  private static final Set<String> JSON_QUERY = Set.of("metadata", "processingOptions");
+  private static final Set<String> JSON_QUERY = Set.of("metadata", "processingOptions", "context");
   private static final Set<String> INT_QUERY = Set.of("pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes");
   private static final Set<String> BOOL_QUERY = Set.of("queue", "isFinal", "searchAll", "resolveOnly");
   private static final Pattern ORDERING = Pattern.compile("ordering\\[(\\d+)]\\[(\\w+)]");
@@ -451,6 +451,9 @@ final class MockApi {
     asset.add("description", nullable(str(o, "description")));
     asset.add("externalId", nullable(externalId));
     asset.add("externalUrl", nullable(url != null ? url : str(o, "externalUrl")));
+    asset.add("authorId", nullable(str(o, "authorId")));
+    // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
+    asset.add("context", usedContext(o.get("context")));
     asset.addProperty("type", kind);
     asset.add("metadata", o.has("metadata") ? o.get("metadata").deepCopy() : JsonNull.INSTANCE);
     asset.add("tags", JsonNull.INSTANCE);
@@ -501,6 +504,21 @@ final class MockApi {
     return asset;
   }
 
+  /** The earlier posts CalmLens uses from a request's {@code context}, or null when there are none. */
+  private static JsonElement usedContext(JsonElement context) throws Failure {
+    if (context == null || context.isJsonNull()) return JsonNull.INSTANCE;
+    Models.ModerationContext parsed;
+    try {
+      parsed = Json.GSON.fromJson(context, Models.ModerationContext.class);
+    } catch (RuntimeException invalid) {
+      throw Failure.validation("validation/invalid-type", "context");
+    }
+    if (parsed == null || parsed.items() == null || parsed.items().stream().anyMatch(item -> item == null || item.text() == null))
+      throw Failure.validation("validation/invalid-type", "context.items");
+    List<Models.ModerationContextItem> items = Models.selectModerationContextItems(parsed.items());
+    return items.isEmpty() ? JsonNull.INSTANCE : Json.GSON.toJsonTree(new Models.ModerationContext(items));
+  }
+
   /**
    * Moves an asset to an outcome like the pipeline: a decision finishes processing, {@code purged}
    * removes the content (with {@code purgeReason}, {@code policy} for the pipeline), and finished
@@ -531,6 +549,7 @@ final class MockApi {
       storage.content.remove(str(asset, "id"));
       content.addProperty("status", "removed");
       content.addProperty("removalReason", purge ? purgeReason : "retention");
+      asset.add("context", JsonNull.INSTANCE);
       content.addProperty("updatedAt", now);
       content.add("extractedText", JsonNull.INSTANCE);
       image = withoutPlaceholder(image);
@@ -697,6 +716,7 @@ final class MockApi {
    */
   private JsonObject removeContent(JsonObject asset, long now) {
     storage.content.remove(str(asset, "id"));
+    asset.add("context", JsonNull.INSTANCE);
     JsonObject content = asset.getAsJsonObject("content");
     if (!"removed".equals(str(content, "status"))) {
       content.addProperty("status", "removed");

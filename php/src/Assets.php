@@ -192,6 +192,13 @@ final class Assets extends Resource
             || count(array_intersect(['content', 'part', 'url'], array_keys($api))) !== 1 || array_key_exists('isFinal', $api)) {
             Values::invalid('Supply a name and exactly one of content, part or url', 'upload/invalid-payload');
         }
+        if (array_key_exists('context', $api)) {
+            if (!is_array($api['context']) || !is_array($api['context']['items'] ?? null)) {
+                Values::invalid('context.items must be a list of earlier posts');
+            }
+            // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+            $api['context'] = ['items' => ModerationContext::select($api['context']['items'])];
+        }
         if (array_key_exists('url', $api)) {
             return self::asset($this->session->request('POST', $this->session->project('assets'), query: ['queue' => $queue], body: $api, idempotent: true, options: $request));
         }
@@ -209,7 +216,7 @@ final class Assets extends Resource
             Values::invalid('Use uploadPart for subsequent parts', 'upload/use-upload-part');
         }
         $body = UploadBody::from($content, $multipart, !$this->session->deferUploadChecks);
-        $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
+        $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
         $query += ['queue' => $queue, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
         if ($multipart) {
             $total = $api['totalSizeInBytes'] ?? null;

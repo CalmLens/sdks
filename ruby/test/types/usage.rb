@@ -28,6 +28,12 @@ first = client.assets.classify(name: 'big.png', part: { type: 'image/png', base6
                                total_size_in_bytes: 12_000_000)
 client.assets.upload_part(asset_id: first['id'], part: { part_number: 2, data: 'bytes', is_final: true }, queue: true)
 client.assets.classify(name: 'page', url: 'https://example.com')
+reply = client.text.classify(text: 'Same to you', author_id: 'user-9',
+                             context: { items: [{ text: 'Nice photo!', author_id: 'user-1' }, { text: 'Thanks' }] })
+earlier = reply['context']&.fetch('items')&.map { |post| [post['text'], post['authorId']] }
+author = reply['authorId']
+used = CalmLens::ModerationContext.select_items([{ text: 'Nice photo!' }]).map { |post| post['text'] }
+limits = [CalmLens::ModerationContext::USED_ITEMS, CalmLens::ModerationContext::USED_CHARACTERS]
 
 page = client.assets.list(page_size: 20, filter: 'classification.moderation.status==allowed',
                           ordering: [{ field: 'createdAt', direction: 'DESC' }])
@@ -108,4 +114,4 @@ mock.state.assets.each_value { |item| item['classification']['moderation']['stat
 mock.enqueue(status: 503, body: { code: 'server/unavailable' }).requests.map(&:path)
 
 [status, processing, reviews, removal, format, score, ages, names, more, children, matched, expires, lens_width, url, bytes,
- webhook_status, webhook_test]
+ webhook_status, webhook_test, earlier, author, used, limits]

@@ -93,6 +93,20 @@ Every upload carries an `Idempotency-Key`. The client generates one per call and
 client.assets.create(options, new RequestOptions().idempotencyKey(listing.id() + ":photo-1"));
 ```
 
+### Conversation context
+
+For a reply in a thread, set `authorId` (your label for who wrote the content) and `context` (earlier posts in the conversation, oldest first) on `SubmitAsset` or `ClassifyText`. CalmLens moderates only the content itself and uses the earlier posts to read who it addresses, what it refers to and whether it quotes or reports something:
+
+```java
+Asset reply = client.text.classify(new ClassifyText("Same to you")
+    .authorId("user-9")
+    .context(new ModerationContext(List.of(
+        new ModerationContextItem("Nobody asked you", "user-3"),
+        new ModerationContextItem("Please keep it civil")))));
+```
+
+The client sends only the posts CalmLens uses: the most recent `MODERATION_CONTEXT_USED_ITEMS` (5) posts within `MODERATION_CONTEXT_USED_CHARACTERS` (2,000) characters, counted as Unicode code points. The newest post is always sent. `Models.selectModerationContextItems(items)` returns the posts that would be sent. A null item list, post or text is refused with `sdk/invalid-argument`. The asset returns `authorId()` and the `context()` it used; `context()` is null once the content is removed.
+
 ## Upload presets
 
 Call `.uploadPresetId(id)` on `SubmitAsset` or `ClassifyText` to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.

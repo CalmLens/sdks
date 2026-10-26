@@ -16,6 +16,10 @@ import { validateAssetPayload } from "../contract/AssetPayload.js";
 import type { TypedEvent } from "../contract/Event.js";
 import type { Folder } from "../contract/Folder.js";
 import { stringifyJsonCanonical } from "../contract/JsonUtils.js";
+import {
+  type ModerationContextItem,
+  selectModerationContextItems,
+} from "../contract/ModerationContextLimits.js";
 import { type PermissionGrant, permits } from "../contract/Permissions.js";
 import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 import {
@@ -399,6 +403,8 @@ interface UploadFields {
   processingOptions?: Asset["processingOptions"];
   visibility?: Asset["visibility"];
   metadata?: Asset["metadata"];
+  authorId?: string;
+  context?: { items: ModerationContextItem[] };
   externalId?: string;
   externalUrl?: string;
   folderId?: string;
@@ -1201,6 +1207,7 @@ export class MockCalmLensApi {
       const now = this.now();
       removed = await this.databaseStorage.updateAsset({
         ...asset,
+        context: null,
         content: {
           ...asset.content,
           status: "removed",
@@ -1262,6 +1269,8 @@ export class MockCalmLensApi {
       processingOptions: parsed("processingOptions"),
       visibility: text("visibility") as Asset["visibility"] | undefined,
       metadata: parsed("metadata"),
+      authorId: text("authorId"),
+      context: parsed("context"),
       externalId: text("externalId"),
       externalUrl: text("externalUrl"),
       folderId: text("folderId"),
@@ -1336,6 +1345,7 @@ export class MockCalmLensApi {
     const processingOptions = fields.processingOptions ?? { keepContentAfterProcessing: false };
     const keepContent = processingOptions.keepContentAfterProcessing === true;
     const hasContent = fields.url === undefined;
+    const contextItems = selectModerationContextItems(fields.context?.items ?? []);
     // Fields the API returns as `null` when they are not set.
     const asset: Asset = {
       id,
@@ -1352,6 +1362,9 @@ export class MockCalmLensApi {
       externalUrl: fields.url ?? fields.externalUrl ?? null,
       type,
       metadata: fields.metadata ?? null,
+      authorId: fields.authorId ?? null,
+      // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
+      context: contextItems.length ? { items: contextItems } : null,
       tags: null,
       processingOptions,
       visibility: fields.visibility ?? "private",
@@ -1518,6 +1531,7 @@ export class MockCalmLensApi {
     return {
       ...asset,
       updatedAt: now,
+      ...(removeContent && { context: null }),
       content: removeContent
         ? {
             ...asset.content,

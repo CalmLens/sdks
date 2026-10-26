@@ -31,6 +31,7 @@ from . import error_codes
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_TIMEOUT, CalmLensServerClient, _invalid, _json, _merge,
                      _sign_upload_token)
 from .errors import CalmLensError
+from .moderation_context import select_moderation_context_items
 from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, HashList, HashListEntry,
                     SignedUploadToken, SignUploadTokenOptions)
 
@@ -51,7 +52,7 @@ MockAssetOutcome = Literal["pending", "allowed", "limited", "age-restricted", "b
 MockAssetOutcomeOption = Union[MockAssetOutcome, Callable[[Asset], MockAssetOutcome]]
 _INT_QUERY = {"pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal", "searchAll", "resolveOnly"}
-_JSON_QUERY = {"metadata", "processingOptions"}
+_JSON_QUERY = {"metadata", "processingOptions", "context"}
 _MIB = 1024 * 1024
 
 
@@ -910,13 +911,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if not isinstance(processing_options, dict):
             processing_options = {"keepContentAfterProcessing": False}
         keep = processing_options.get("keepContentAfterProcessing") is True
+        context = options.get("context")
+        context_items = select_moderation_context_items(
+            context["items"] if isinstance(context, dict) and isinstance(context.get("items"), list) else [])
         # Fields the API returns as null when they are not set.
         asset: dict[str, Any] = {
             "id": self.create_id(), "projectId": self.project_id, "userId": None, "parentId": None,
             "folderId": options.get("folderId"), "uploadPresetId": options.get("uploadPresetId"),
             "createdAt": now, "updatedAt": now, "name": options.get("name"), "description": options.get("description"),
             "externalId": external_id, "externalUrl": options.get("url", options.get("externalUrl")), "type": kind,
-            "metadata": options.get("metadata"), "tags": None, "processingOptions": processing_options,
+            "metadata": options.get("metadata"), "authorId": options.get("authorId"),
+            # Like the API, only the posts CalmLens uses are kept, and only while the content is held.
+            "context": {"items": context_items} if context_items else None,
+            "tags": None, "processingOptions": processing_options,
             "visibility": options.get("visibility", "private"),
             "content": {"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                         "safetyHold": None, "format": mime or None, "extension": None, "sizeInBytes": size,
@@ -977,6 +984,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self.image_storage.content.pop(asset["id"], None)
             content.update(status="removed", removalReason=purge_reason if purge else "retention", updatedAt=now,
                            extractedText=None, image=_without_placeholder(content.get("image")))
+            asset["context"] = None
         asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None)
         asset["classification"]["moderation"].update(status=outcome if decided else "pending")
         asset["upload"].update(status="completed", updatedAt=now)
@@ -1130,6 +1138,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         else:
             content.update(status="removed", removalReason="requested", updatedAt=now, extractedText=None,
                            image=_without_placeholder(content.get("image")))
+            asset["context"] = None
             asset["updatedAt"] = now
         self._lifecycle_event("asset.content-removed", asset)
         return asset

@@ -49,6 +49,14 @@ module CalmLens
   type metadata_item = { "id" => String, "value" => json_value }
   # A metadata item to send. Keys inside `metadata` are sent unchanged, so use `id:` and `value:`.
   type metadata_item_input = { id: String, value: json_input }
+  # An earlier post in the conversation, as the API returns it.
+  type moderation_context_item = { "text" => String, ?"authorId" => String }
+  # Earlier posts in the conversation, oldest first.
+  type moderation_context = { "items" => Array[moderation_context_item] }
+  # An earlier post to send. `author_id` is your identifier for who wrote it.
+  type moderation_context_item_input = { text: String, ?author_id: String }
+  # Earlier posts to send, oldest first; only the posts CalmLens uses are sent.
+  type moderation_context_input = { items: Array[moderation_context_item_input] }
 
   # ProcessingFeatures.ts: optional analyses to run, keyed by feature. Every feature is off unless
   # `enabled` is true.
@@ -162,6 +170,9 @@ module CalmLens
     ?"externalUrl" => String?,
     "type" => asset_type,
     ?"metadata" => Array[metadata_item]?,
+    ?"authorId" => String?,
+    # The earlier posts CalmLens used; null once the content is removed.
+    ?"context" => moderation_context?,
     ?"tags" => Array[String]?,
     ?"processingOptions" => processing_options?,
     ?"visibility" => asset_visibility?,
@@ -655,6 +666,8 @@ module CalmLens
                           ?description: String?,
                           ?visibility: asset_visibility?,
                           ?metadata: Array[metadata_item_input]?,
+                          ?author_id: String,
+                          ?context: moderation_context_input,
                           ?external_id: String?,
                           ?external_url: String?,
                           ?folder_id: String?,
@@ -669,6 +682,8 @@ module CalmLens
                           ?description: String?,
                           ?visibility: asset_visibility?,
                           ?metadata: Array[metadata_item_input]?,
+                          ?author_id: String,
+                          ?context: moderation_context_input,
                           ?external_id: String?,
                           ?external_url: String?,
                           ?folder_id: String?,
@@ -682,6 +697,8 @@ module CalmLens
                           ?description: String?,
                           ?visibility: asset_visibility?,
                           ?metadata: Array[metadata_item_input]?,
+                          ?author_id: String,
+                          ?context: moderation_context_input,
                           ?external_id: String?,
                           ?external_url: String?,
                           ?folder_id: String?,
@@ -698,6 +715,8 @@ module CalmLens
     ?description: String?,
     ?visibility: asset_visibility?,
     ?metadata: Array[metadata_item_input]?,
+    ?author_id: String,
+    ?context: moderation_context_input,
     ?external_id: String?,
     ?external_url: String?,
     ?folder_id: String?,

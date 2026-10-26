@@ -125,6 +125,13 @@ export type {
 export type { EventFact, EventFacts } from "./contract/EventCatalog.js";
 export type { Folder } from "./contract/Folder.js";
 export type { LensType } from "./contract/Lens.js";
+export type { ModerationContext } from "./contract/ModerationContext.js";
+export type { ModerationContextItem } from "./contract/ModerationContextLimits.js";
+export {
+  MODERATION_CONTEXT_USED_CHARACTERS,
+  MODERATION_CONTEXT_USED_ITEMS,
+  selectModerationContextItems,
+} from "./contract/ModerationContextLimits.js";
 export type { ModerationQualifier } from "./contract/ModerationPolicyDimensions.js";
 export type { CursorPage, Order } from "./contract/Page.js";
 export type {

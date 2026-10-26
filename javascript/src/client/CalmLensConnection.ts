@@ -4,6 +4,7 @@ import {
   getAssetPayloadByteLength,
   validateAssetPayload,
 } from "../contract/AssetPayload.js";
+import { selectModerationContextItems } from "../contract/ModerationContextLimits.js";
 import {
   DOMAIN,
   getRejectedUploadMimeTypeError,
@@ -173,6 +174,13 @@ export const prepareSubmitAssetOptions = (
       isFinal: deferUploadChecks || options.part.isFinal,
     });
     if (!validation.ok) throw invalidPayload(validation.error);
+  }
+  if (options.context !== undefined) {
+    if (!options.context || !Array.isArray(options.context.items)) {
+      throw invalidArgument("context.items must be an array of earlier posts");
+    }
+    // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+    return { ...options, context: { items: selectModerationContextItems(options.context.items) } };
   }
 
   return options;
@@ -344,6 +352,8 @@ export class CalmLensConnection {
     setOptionalQueryValue(query, "processingOptions", options.processingOptions);
     setOptionalQueryValue(query, "visibility", options.visibility);
     setOptionalQueryValue(query, "metadata", options.metadata);
+    setOptionalQueryValue(query, "authorId", options.authorId);
+    setOptionalQueryValue(query, "context", options.context);
     setOptionalQueryValue(query, "externalId", options.externalId);
     setOptionalQueryValue(query, "externalUrl", options.externalUrl);
     setOptionalQueryValue(query, "folderId", options.folderId);

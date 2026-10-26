@@ -1,4 +1,5 @@
-import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BHww9qiT.js";
+import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-CfMMoMw_.js";
+import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-I9R-uNBH.js";
@@ -17,6 +18,33 @@ const ASSET_MODERATION_DECISION_SCHEMA = zod.enum([
 	"blocked",
 	"purged"
 ]);
+// packages/shared/src/ModerationContext.ts
+const MODERATION_AUTHOR_ID_SCHEMA = zod.string().min(1).max(256).meta(metaStore([docPropertyInfo({
+	description: `Your identifier for who wrote the content, up to 256 characters. CalmLens only compares it with the author IDs in \`context\`, to tell which posts share a speaker, so any stable opaque value works. See [Threaded moderation](/docs/guides/threaded-moderation).`,
+	placeholder: "user-123"
+})]));
+const MODERATION_CONTEXT_ITEM_SCHEMA = zod.object({
+	text: zod.string().refine((text) => text.trim().length > 0, "Context text must not be empty").refine((text) => countModerationContextCharacters(text) <= MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, `Context text must be at most ${MODERATION_CONTEXT_MAX_ITEM_CHARACTERS} characters`).meta(metaStore([docPropertyInfo({
+		description: `The earlier post's text, up to ${MODERATION_CONTEXT_MAX_ITEM_CHARACTERS.toLocaleString("en-US")} characters`,
+		placeholder: "Has anyone tried the new update?"
+	})])),
+	authorId: MODERATION_AUTHOR_ID_SCHEMA.optional().meta(metaStore([docPropertyInfo({
+		description: "Your identifier for who wrote the earlier post",
+		placeholder: "user-456"
+	})]))
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "An earlier post in the conversation",
+	namedType: "ModerationContextItem"
+})]));
+zod.object({ items: zod.array(MODERATION_CONTEXT_ITEM_SCHEMA).max(20).refine((items) => items.reduce((sum, item) => sum + countModerationContextCharacters(item.text), 0) <= MODERATION_CONTEXT_MAX_CHARACTERS, `Context must be at most ${MODERATION_CONTEXT_MAX_CHARACTERS} characters in total`).meta(metaStore([docPropertyInfo({ description: `Earlier posts in the conversation, oldest first: up to 20 posts and ${MODERATION_CONTEXT_MAX_CHARACTERS.toLocaleString("en-US")} characters. CalmLens uses the most recent 5 that fit in ${MODERATION_CONTEXT_USED_CHARACTERS.toLocaleString("en-US")} characters.` })])) }).strict().meta(metaStore([docPropertyInfo({
+	description: "Earlier posts in the conversation the content belongs to. CalmLens moderates only the content; the context only helps it read who the content addresses, what it refers to and whether it quotes, reports, counters or mocks something. See [Threaded moderation](/docs/guides/threaded-moderation).",
+	namedType: "ModerationContext"
+})]));
+/** The context CalmLens used, as stored with an asset and returned by the API. */
+const USED_MODERATION_CONTEXT_SCHEMA = zod.object({ items: zod.array(MODERATION_CONTEXT_ITEM_SCHEMA).max(5) }).meta(metaStore([docPropertyInfo({
+	description: `The earlier posts CalmLens used to read the content, oldest first: the most recent 5 sent that fit in ${MODERATION_CONTEXT_USED_CHARACTERS.toLocaleString("en-US")} characters. Removed with the content.`,
+	namedType: "UsedModerationContext"
+})]));
 // packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
 const HUMAN_REVIEW_SETTINGS_SCHEMA = zod.object({
@@ -389,6 +417,8 @@ const STORED_ASSET_SCHEMA = zod.object({
 		description: "External URL associated with the asset (http or https)",
 		placeholder: "https://example.com/asset"
 	})])),
+	authorId: MODERATION_AUTHOR_ID_SCHEMA.nullish(),
+	context: USED_MODERATION_CONTEXT_SCHEMA.nullish(),
 	previewImage: PREVIEW_IMAGE_SCHEMA.nullish().describe("Browser-friendly preview generated for images, documents and websites"),
 	storageId: saneStringField().nullish().describe("Internal storage key of the retained content; `null` when nothing is stored"),
 	uploadPartsReceived: zod.number().int().nullish().describe("Number of parts received so far for a multipart upload"),
@@ -490,6 +520,8 @@ STORED_ASSET_SCHEMA.pick({
 	description: true,
 	externalId: true,
 	externalUrl: true,
+	authorId: true,
+	context: true,
 	metadata: true,
 	tags: true,
 	processingOptions: true,

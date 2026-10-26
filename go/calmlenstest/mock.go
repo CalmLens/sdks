@@ -1020,7 +1020,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 		options = calmlens.JSON{}
 		for key, values := range q {
 			value := values[0]
-			if key == "metadata" || key == "processingOptions" {
+			if key == "metadata" || key == "processingOptions" || key == "context" {
 				var parsed any
 				if err := json.Unmarshal([]byte(value), &parsed); err != nil {
 					return nil, fail(calmlens.CodeInvalidUploadPayload)
@@ -1121,6 +1121,10 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	if options["url"] != nil {
 		externalURL = options["url"]
 	}
+	used, err := usedContext(options["context"])
+	if err != nil {
+		return nil, err
+	}
 	id := m.options.CreateID()
 	// Fields the API returns as null when they are not set.
 	a := calmlens.JSON{
@@ -1128,7 +1132,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 		"folderId": orNull("folderId"), "uploadPresetId": orNull("uploadPresetId"),
 		"createdAt": now, "updatedAt": now, "name": options["name"],
 		"description": orNull("description"), "externalId": orNull("externalId"), "externalUrl": externalURL,
-		"type": kind, "metadata": orNull("metadata"), "tags": nil,
+		"type": kind, "metadata": orNull("metadata"), "authorId": orNull("authorId"), "context": used, "tags": nil,
 		"processingOptions": processingOptions, "visibility": visibility,
 	}
 	content := calmlens.JSON{
@@ -1159,6 +1163,34 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	}
 	m.DatabaseStorage.Assets[id] = a
 	return a, nil
+}
+
+// usedContext is what the API keeps of a request's earlier posts: only the ones CalmLens uses,
+// or null when there are none.
+func usedContext(value any) (any, error) {
+	if value == nil {
+		return nil, nil
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	var context calmlens.ModerationContext
+	if err = json.Unmarshal(data, &context); err != nil {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	items := calmlens.SelectModerationContextItems(context.Items)
+	if len(items) == 0 {
+		return nil, nil
+	}
+	if data, err = json.Marshal(calmlens.ModerationContext{Items: items}); err != nil {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	var stored calmlens.JSON
+	if err = json.Unmarshal(data, &stored); err != nil {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	return stored, nil
 }
 
 // imageSizeError is the API's rule for image uploads in parts: at most 20 MiB, and (checked at
@@ -1287,6 +1319,7 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 // extracted text and the image's placeholder go with it.
 func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int64) {
 	delete(m.ImageStorage.Content, text(a["id"]))
+	a["context"] = nil
 	content := section(a, "content")
 	if content["status"] == calmlens.ContentStatusRemoved {
 		return

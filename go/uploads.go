@@ -128,6 +128,8 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	if options.TotalSizeInBytes != nil && (options.Part == nil || *options.TotalSizeInBytes <= 0) {
 		return nil, invalid(CodeSDKInvalidArgument, "TotalSizeInBytes must be positive and is only used with Part")
 	}
+	// Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+	options.Context = selectedContext(options.Context)
 	key := idempotencyKey(options.IdempotencyKey)
 	var result Asset
 	if options.URL != "" {

@@ -273,6 +273,24 @@ Person and face detection (beta) results are in `Report.Features`, typed as
 `PersonDetectionResult` and `FaceDetectionResult`; each feature is `nil` when it wasn't
 requested. See [People and faces](https://calmlens.com/docs/guides/people-and-faces).
 
+To moderate a reply in its conversation, pass `AuthorID` (your identifier for who wrote it)
+and `Context` with the earlier posts, oldest first. CalmLens moderates only the content and
+uses the earlier posts to read who it addresses and what it refers to. The SDK sends only the
+posts CalmLens uses: the 5 most recent that fit in 2,000 characters
+(`SelectModerationContextItems`). The asset's `AuthorID` and `Context` return what was kept,
+and `Context` is `nil` once the content is removed. The same fields work on `SubmitAssetOptions`.
+
+```go
+asset, err := client.Text.Classify(ctx, calmlens.ClassifyTextOptions{
+    Text:     reply,
+    AuthorID: calmlens.Ptr("user-9"),
+    Context: &calmlens.ModerationContext{Items: []calmlens.ModerationContextItem{
+        {Text: "Anyone tried the new trail?", AuthorID: calmlens.Ptr("user-3")},
+        {Text: "Yes, it was muddy.", AuthorID: calmlens.Ptr("user-7")},
+    }},
+})
+```
+
 ## Uploads
 
 Supply exactly one of `Content`, `Part`, or `URL`. `Content` accepts exactly one of

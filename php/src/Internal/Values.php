@@ -58,7 +58,7 @@ final class Values
             }
         };
         foreach ($values as $key => $value) {
-            $append((string) $key, in_array($key, ['metadata', 'processingOptions'], true) && $value !== null ? self::json($value) : $value);
+            $append((string) $key, in_array($key, ['metadata', 'processingOptions', 'context'], true) && $value !== null ? self::json($value) : $value);
         }
         return implode('&', $pairs);
     }

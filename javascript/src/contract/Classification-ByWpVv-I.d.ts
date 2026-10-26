@@ -1,4 +1,5 @@
 import "./AssetModerationDecision-T9b0RF7k.js";
+import "./ModerationContext-9lGm-Mna.js";
 import "./HashList-CKW9itTf.js";
 import * as zod from "zod";
 declare const MODERATION_QUALIFIER_INFO: {
@@ -69,15 +70,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "personal-information";
     readonly kind: "target";
     readonly displayName: "Own details";
-    readonly description: "The speaker supplies their own private personal details.";
-    readonly exclusions: "Unknown ownership, third-party details, and requests without supplied values.";
+    readonly description: "The speaker supplies private personal details and presents them as their own.";
+    readonly exclusions: "Details whose owner isn't stated, other people's details, and requests without supplied values.";
   };
   readonly "personal-information-third-party": {
     readonly category: "personal-information";
     readonly kind: "target";
     readonly displayName: "Other people’s details";
-    readonly description: "The supplied private details are explicitly attributed to someone other than the speaker.";
-    readonly exclusions: "Unknown ownership, the speaker's own details and requests without supplied values.";
+    readonly description: "The supplied private details belong to someone other than the speaker, or their owner isn't stated, such as a filled-in form or record.";
+    readonly exclusions: "Details the speaker presents as their own, and requests without supplied values.";
   };
   readonly "personal-information-historical": {
     readonly category: "personal-information";

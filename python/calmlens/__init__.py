@@ -7,6 +7,8 @@ from . import error_codes
 from ._version import __version__
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT,
                      USER_AGENT, CalmLensServerClient, CDNResponse, Transport, TransportResponse)
+from .moderation_context import (MODERATION_CONTEXT_USED_CHARACTERS, MODERATION_CONTEXT_USED_ITEMS,
+                                 select_moderation_context_items)
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError, WebhookVerificationError)
 from .types import (
@@ -21,7 +23,7 @@ from .types import (
     ImageTransform, ImageTransformBorder, ImageTransformGravityPoint, ImageTransformOptions, ImageTransformTrim,
     ImageTransformTrimBorder, InlineExtractedText, Lens, LensDefinition, LensTransform, LensType, Likelihood,
     ListAssetsOptions, ListChildrenOptions, ListEventsOptions, MediaClassificationReport, MediaClassificationSegment,
-    MediaSegmentSource, MetadataItem, ClassifyTextOptions, ModerationAction, ModerationQualifier, MoveAssetOptions,
+    MediaSegmentSource, MetadataItem, ClassifyTextOptions, ModerationAction, ModerationContext, ModerationContextItem, ModerationQualifier, MoveAssetOptions,
     ExplainAssetOptions, AssetBatchOperation, BatchAssetsOptions, BatchAssetsResponse,
     MoveFolderOptions, NotEvaluatedCategoryResult, NotEvaluatedFeatureResult, NotEvaluatedQualifierResult,
     NotEvaluatedReason, OcrFeatureOptions, Ordering, PartContent, PartialCategoryResult,
@@ -48,6 +50,7 @@ __all__ = [
     "CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse",
     "CalmLensError", "CalmLensAPIError", "CalmLensTransportError", "CalmLensTimeoutError", "CalmLensValidationError",
     "WebhookVerificationError",
+    "select_moderation_context_items", "MODERATION_CONTEXT_USED_ITEMS", "MODERATION_CONTEXT_USED_CHARACTERS",
     "verify_webhook_signature", "parse_webhook_event", "to_webhook_event_payload", "create_webhook_signature_header",
     "create_webhook_headers", "is_test_webhook_event", "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_SIGNATURE_HEADER", "WEBHOOK_TIMESTAMP_HEADER",
     "WEBHOOK_SIGNATURE_TOLERANCE_SECONDS",
@@ -67,6 +70,7 @@ __all__ = [
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
     "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
+    "ModerationContext", "ModerationContextItem",
     "ModerationQualifier", "MoveAssetOptions", "ExplainAssetOptions", "AssetBatchOperation", "BatchAssetsOptions",
     "BatchAssetsResponse", "MoveFolderOptions", "NotEvaluatedCategoryResult",
     "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",

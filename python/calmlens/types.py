@@ -170,6 +170,20 @@ class MetadataItem(TypedDict):
     value: Any
 
 
+class _ModerationContextItemRequired(TypedDict):
+    text: str
+
+
+class ModerationContextItem(_ModerationContextItemRequired, total=False):
+    """An earlier post in the conversation. ``authorId`` is your label for who wrote it."""
+    authorId: str
+
+
+class ModerationContext(TypedDict):
+    """Earlier posts in the conversation, oldest first."""
+    items: list[ModerationContextItem]
+
+
 class FlaggedContentPolicy(TypedDict):
     """Overrides the project moderation action for one asset: ``allow`` takes no action,
     ``limit`` delivers normally but marks the asset so your app can reduce its reach,
@@ -652,6 +666,10 @@ class Asset(_AssetRequired, total=False):
     externalId: Optional[str]
     externalUrl: Optional[str]
     metadata: Optional[list[MetadataItem]]
+    #: Your label for who wrote the content, or ``None`` when none was given.
+    authorId: Optional[str]
+    #: The earlier posts CalmLens used, or ``None`` when none were given or the content is removed.
+    context: Optional[ModerationContext]
     tags: Optional[list[str]]
     processingOptions: Optional[ProcessingOptions]
     visibility: Union[Visibility, str, None]
@@ -993,6 +1011,8 @@ class SubmitAssetOptions(_SubmitRequired, total=False):
     processingOptions: ProcessingOptions
     visibility: Visibility
     metadata: list[MetadataItem]
+    authorId: str
+    context: ModerationContext
     externalId: str
     externalUrl: str
     folderId: Optional[str]
@@ -1112,6 +1132,8 @@ class ClassifyTextOptions(_ClassifyTextRequired, total=False):
     description: str
     processingOptions: ProcessingOptions
     metadata: list[MetadataItem]
+    authorId: str
+    context: ModerationContext
     externalId: str
     externalUrl: str
     folderId: Optional[str]

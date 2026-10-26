@@ -277,6 +277,29 @@ it starts and applies it to the final part, from any client or process; pass `qu
 `upload_part` only to override it. With `total_size_in_bytes`, parts that don't add up to the
 declared size raise `upload/size-mismatch`.
 
+### Replies in a conversation
+
+When the content is a reply, pass who wrote it and the earlier posts in the conversation,
+oldest first. CalmLens moderates only the content, and uses the earlier posts to understand
+who it addresses and what it refers to. `author_id` is your own label for a person; CalmLens
+only compares it with the author IDs of the earlier posts.
+
+```python
+asset = client.text.classify(
+    text="Same to you",
+    author_id="user-9",
+    context={"items": [
+        {"text": "You're an idiot", "authorId": "user-1"},
+        {"text": "Calm down, both of you"},
+    ]},
+)
+```
+
+`assets.create` and `assets.classify` take the same options. Only the posts CalmLens uses are
+sent: the 5 most recent that fit within 2,000 characters (the most recent post is always
+sent). `select_moderation_context_items` applies the same rule. The asset's `authorId` and
+`context` hold what was used, and `context` becomes `None` once the content is removed.
+
 ## Upload presets
 
 Pass `upload_preset_id` to `client.assets.create` or `client.assets.classify` to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request.

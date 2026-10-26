@@ -918,6 +918,11 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (str(o, "name", "").isEmpty()) throw payloadError("Asset name is required");
     if (List.of("content", "part", "url").stream().filter(k -> o.has(k) && !o.get(k).isJsonNull()).count() != 1)
       throw payloadError("Supply exactly one of content, part, or url");
+    if (options.contextValue() != null) {
+      // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+      List<Models.ModerationContextItem> items = Models.selectModerationContextItems(options.contextValue().items());
+      o.add("context", Json.GSON.toJsonTree(new Models.ModerationContext(items)));
+    }
     JsonObject query = new JsonObject();
     query.addProperty("queue", queue);
     if (o.has("url")) {
@@ -936,7 +941,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     checkMimeType(type);
     Transport.Body body = payload(content, encoded, multipart);
     if (multipart) checkPartSize(body.length(), flag(encoded, "isFinal"), type.strip().toLowerCase(Locale.ROOT).startsWith("image/"));
-    for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
+    for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
       if (o.has(k)) query.add(k, o.get(k));
     query.addProperty("contentType", type);
     if (body.length() >= 0) query.addProperty("sizeInBytes", body.length());

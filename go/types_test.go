@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -231,6 +232,22 @@ func TestClassifyTextForwardsUploadPreset(t *testing.T) {
 	}
 	if got := h.last().URL.Query().Get("uploadPresetId"); got != "preset-1" {
 		t.Fatalf("uploadPresetId %q", got)
+	}
+}
+
+func TestClassifyTextKeepsAnOverLongNewestPost(t *testing.T) {
+	c, h := setup(t)
+	newest := strings.Repeat("a", ModerationContextUsedCharacters+1)
+	items := []ModerationContextItem{{Text: "older", AuthorID: Ptr("user-1")}, {Text: newest}}
+	if _, err := c.Text.Classify(context.Background(), ClassifyTextOptions{Text: "hi", Context: &ModerationContext{Items: items}}); err != nil {
+		t.Fatal(err)
+	}
+	var sent ModerationContext
+	if err := json.Unmarshal([]byte(h.last().URL.Query().Get("context")), &sent); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(sent.Items, []ModerationContextItem{{Text: newest}}) {
+		t.Fatalf("sent %d items, want only the newest", len(sent.Items))
 	}
 }
 

@@ -99,6 +99,19 @@ class ClientTests(ClientTestCase):
         self.assertEqual(json.loads(self.calls[-1].data)["metadata"], [{"id": "a", "value": 1}])
         self.assertTrue(urlsplit(self.calls[-1].full_url).path.endswith("/assets"))
 
+    def test_moderation_context_keeps_an_over_long_newest_post_and_needs_items(self):
+        newest = "🌍" * 2001
+        self.client.text.classify(text="reply", author_id="user-9",
+                                  context={"items": [{"text": "older", "author_id": "user-1"}, {"text": newest}]})
+        query = self.query()
+        self.assertEqual(query["authorId"], ["user-9"])
+        self.assertEqual(json.loads(query["context"][0]), {"items": [{"text": newest}]})
+        for context in ({}, {"items": "post"}, None):
+            with self.subTest(context=context), self.assertRaises(CalmLensValidationError) as raised:
+                self.client.text.classify({"text": "reply", "context": context})
+            self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
+        self.assertEqual(len(self.calls), 1)
+
     def test_invalid_payload_values_are_rejected_before_sending(self):
         for payload in ({"data": 5}, {"data": "abc"}, {"data": [97, 98]}, {"uint8Array": [97]}, {"buffer": b"a"},
                         {"data": io.StringIO("text mode")}):

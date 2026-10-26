@@ -1154,6 +1154,110 @@
       ]
     },
     {
+      "name": "the author and the earlier posts CalmLens uses are kept until the content is removed",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "kept.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "authorId": "user-9",
+            "context": {
+              "items": [
+                {
+                  "text": "Post 1",
+                  "authorId": "user-1"
+                },
+                {
+                  "text": "Post 2",
+                  "authorId": "user-2"
+                },
+                {
+                  "text": "Post 3",
+                  "authorId": "user-3"
+                },
+                {
+                  "text": "Post 4",
+                  "authorId": "user-4"
+                },
+                {
+                  "text": "Post 5",
+                  "authorId": "user-5"
+                },
+                {
+                  "text": "Post 6",
+                  "authorId": "user-6"
+                },
+                {
+                  "text": "Post 7",
+                  "authorId": "user-7"
+                }
+              ]
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "kept",
+          "expect": {
+            "result": {
+              "authorId": "user-9",
+              "context.items.length": 5,
+              "context.items.0.text": "Post 3",
+              "context.items.0.authorId": "user-3",
+              "context.items.4.text": "Post 7"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "removed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "authorId": "user-9",
+            "context": {
+              "items": [
+                {
+                  "text": "Earlier post"
+                }
+              ]
+            }
+          },
+          "expect": {
+            "result": {
+              "authorId": "user-9",
+              "context": null,
+              "content.status": "removed"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.deleteContent",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "authorId": "user-9",
+              "context": null
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
       "name": "waitForDecision times out on a pending asset and returns a decided one",
       "mock": {},
       "steps": [

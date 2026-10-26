@@ -41,7 +41,7 @@ module CalmLens
     # @api private
     class FakeAPI
       JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize pageIndex searchAll resolveOnly limit
-                      processingOptions metadata].freeze
+                      processingOptions metadata context].freeze
       # Keyword search fields, in the order matches are reported, and where each value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
@@ -442,12 +442,15 @@ module CalmLens
         mime = options['contentType'].to_s
         processing = options['processingOptions'] || { 'keepContentAfterProcessing' => false }
         keep = processing.is_a?(Hash) && processing['keepContentAfterProcessing'] == true
+        context = options['context'].is_a?(Hash) ? ModerationContext.select_items(options['context'].fetch('items', [])) : []
         # Fields the API returns as null when they are not set.
         asset = { 'id' => @create_id.call, 'projectId' => @project_id, 'userId' => nil, 'parentId' => nil,
                   'folderId' => options['folderId'], 'uploadPresetId' => options['uploadPresetId'],
                   'createdAt' => now, 'updatedAt' => now, 'name' => options['name'], 'description' => options['description'],
                   'externalId' => options['externalId'], 'externalUrl' => url || options['externalUrl'],
-                  'type' => kind(mime, url), 'metadata' => options['metadata'], 'tags' => nil,
+                  'type' => kind(mime, url), 'metadata' => options['metadata'], 'authorId' => options['authorId'],
+                  # Like the API, only the posts CalmLens uses are kept, and only while the content is held.
+                  'context' => context.empty? ? nil : { 'items' => context }, 'tags' => nil,
                   'processingOptions' => processing, 'visibility' => options.fetch('visibility', 'private'),
                   **sections(now: now, open: open, keep: keep, format: mime, size: data&.bytesize) }
         @state.assets[asset['id']] = asset
@@ -538,7 +541,7 @@ module CalmLens
         end
         asset['content']['image'] = image
         if remove
-          @state.content.delete(asset['id'])
+          forget_content(asset)
           asset['content'].merge!('status' => 'removed', 'removalReason' => purge ? purge_reason : 'retention', 'updatedAt' => now,
                                   'extractedText' => nil, 'image' => without_placeholder(image))
         end
@@ -547,6 +550,12 @@ module CalmLens
         asset['classification']['moderation']['status'] = moderation
         asset['updatedAt'] = now
         fields ? AssetRecord.deep_merge!(asset, fields) : asset
+      end
+
+      # Like the API, the earlier posts CalmLens used go with the stored content.
+      def forget_content(item)
+        @state.content.delete(item['id'])
+        item['context'] = nil
       end
 
       # Removing content removes the placeholder and average colour with it.
@@ -594,7 +603,7 @@ module CalmLens
       # go. Content already removed keeps its reason, and an `asset.content-removed` event is
       # recorded either way.
       def delete_content(item)
-        @state.content.delete(item['id'])
+        forget_content(item)
         content = item['content']
         if content['status'] == 'removed'
           content['image'] = without_placeholder(content['image']) if content.dig('image', 'thumbhash')

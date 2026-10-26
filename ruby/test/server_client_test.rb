@@ -101,10 +101,22 @@ class ServerClientTest < Minitest::Test
       -> { client.assets.list(request_options: { unknown: 1 }) },
       -> { client.assets.update(asset_id: 'a', name: "\xFF".b.force_encoding('UTF-8')) },
       -> { client.assets.wait_for_decision(asset_id: 'a', timeout: -1) },
-      -> { client.assets.wait_for_decision(asset_id: '') }
+      -> { client.assets.wait_for_decision(asset_id: '') },
+      -> { client.text.classify(text: 'Same to you', context: { items: 'Earlier post' }) },
+      -> { client.text.classify(text: 'Same to you', context: { items: [{ author_id: 'user-1' }] }) }
     ].each_with_index do |action, index|
       assert_equal 'sdk/invalid-argument', assert_raises(CalmLens::InvalidArgumentError, index.to_s) { action.call }.code
     end
+  end
+
+  # The newest earlier post is sent even when it alone exceeds the characters CalmLens uses, so the
+  # API can reject it; older posts that would not fit are left out.
+  def test_the_newest_earlier_post_is_always_sent
+    client, sent = scripted([200, OK])
+    newest = 'x' * (CalmLens::ModerationContext::USED_CHARACTERS + 1)
+    client.text.classify(text: 'Same to you', context: { items: [{ text: 'Older post', author_id: 'user-1' }, { text: newest }] })
+    query = URI.decode_www_form(URI(sent.first.url).query).to_h
+    assert_equal({ 'items' => [{ 'text' => newest }] }, JSON.parse(query['context']))
   end
 
   def test_structured_transform_numbers_match_javascript_and_other_values_are_rejected

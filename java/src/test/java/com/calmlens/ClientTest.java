@@ -44,6 +44,29 @@ class ClientTest {
     assertFalse(CalmLensServerClient.verifyWebhookSignature((byte[]) null, header, "1700000000", "key", 1700000000, 300));
   }
 
+  /** request-contract fixtures trim within the limit; the newest post is kept even when it alone is over it. */
+  @Test void anOverLongNewestPostIsStillSentAlone() {
+    String[] context = {null};
+    CalmLensServerClient client = client(request -> {
+      for (String pair : request.uri().getRawQuery().split("&"))
+        if (pair.startsWith("context=")) context[0] = java.net.URLDecoder.decode(pair.substring(8), StandardCharsets.UTF_8);
+      return Fixtures.json(200, Fixtures.assetJson("a", "completed", "allowed"));
+    });
+    String newest = "z".repeat(Models.MODERATION_CONTEXT_USED_CHARACTERS + 1);
+    client.text.classify(new Models.ClassifyText("Same to you").context(new Models.ModerationContext(List.of(
+        new Models.ModerationContextItem("older", "user-1"), new Models.ModerationContextItem(newest)))));
+    assertEquals(JsonParser.parseString("{\"items\":[{\"text\":\"" + newest + "\"}]}"), JsonParser.parseString(context[0]));
+  }
+
+  @Test void malformedContextIsRefusedBeforeSending() {
+    CalmLensServerClient client = client(request -> fail("Sent a malformed context"));
+    for (Models.ModerationContext context : List.of(new Models.ModerationContext(null),
+        new Models.ModerationContext(java.util.Arrays.asList(new Models.ModerationContextItem("a"), null)),
+        new Models.ModerationContext(List.of(new Models.ModerationContextItem(null, "user-1")))))
+      assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
+          () -> client.assets.create(new Models.SubmitAsset().name("reply").url("https://example.com/9").context(context))).getCode());
+  }
+
   /** The fields every SDK has are checked by errors.json and client-cases.json; these accessors are Java's own. */
   @Test void apiErrorsExposeTheirMessageHeadersAndTraceId() {
     CalmLensServerClient client = client(request -> Fixtures.json(400,

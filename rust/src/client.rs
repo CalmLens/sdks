@@ -541,6 +541,11 @@ impl ServerClient {
             ));
         }
         let idempotency_key = options.idempotency_key.clone().unwrap_or_else(uuid);
+        // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+        let context = options
+            .context
+            .as_ref()
+            .map(|context| ModerationContext::new(select_moderation_context_items(&context.items)));
         let mut query = Query::default();
         query.push("name", &options.name);
         query.push("queue", queue);
@@ -548,6 +553,8 @@ impl ServerClient {
         query.json("processingOptions", options.processing_options.as_ref())?;
         query.opt("visibility", options.visibility.as_ref());
         query.json("metadata", options.metadata.as_ref())?;
+        query.opt("authorId", options.author_id.as_ref());
+        query.json("context", context.as_ref())?;
         query.opt("externalId", options.external_id.as_ref());
         query.opt("externalUrl", options.external_url.as_ref());
         if let Patch::Value(folder) = &options.folder_id {
@@ -568,6 +575,10 @@ impl ServerClient {
                 visibility: Option<&'a Visibility>,
                 #[serde(skip_serializing_if = "Option::is_none")]
                 metadata: Option<&'a Vec<MetadataItem>>,
+                #[serde(skip_serializing_if = "Option::is_none")]
+                author_id: Option<&'a String>,
+                #[serde(skip_serializing_if = "Option::is_none")]
+                context: Option<&'a ModerationContext>,
                 #[serde(skip_serializing_if = "Option::is_none")]
                 external_id: Option<&'a String>,
                 #[serde(skip_serializing_if = "Option::is_none")]
@@ -591,6 +602,8 @@ impl ServerClient {
                     processing_options: options.processing_options.as_ref(),
                     visibility: options.visibility.as_ref(),
                     metadata: options.metadata.as_ref(),
+                    author_id: options.author_id.as_ref(),
+                    context: context.as_ref(),
                     external_id: options.external_id.as_ref(),
                     external_url: options.external_url.as_ref(),
                     folder_id: &options.folder_id,
@@ -1405,6 +1418,8 @@ impl TextClient<'_> {
                 description: options.description,
                 processing_options: options.processing_options,
                 metadata: options.metadata,
+                author_id: options.author_id,
+                context: options.context,
                 external_id: options.external_id,
                 external_url: options.external_url,
                 folder_id: options.folder_id,

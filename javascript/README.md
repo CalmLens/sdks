@@ -163,6 +163,26 @@ asset.createdAt; // milliseconds since the Unix epoch
 
 Always present: `id`, `projectId`, `name`, `type`, `createdAt`, `updatedAt`, `upload`, `classification` and `content`. Classification contains its progress, completion time and results grouped by capability. `classification.moderation.categories` and `score` are absent until findings are available; optional detections appear only when requested. Moderation decisions and reviewer details sit under `classification.moderation`. Content is removed after classification unless `processingOptions.keepContentAfterProcessing` is enabled. Check each category’s evaluation `status` before reading its score.
 
+###### Replies in a conversation
+
+For a reply or comment in a thread, pass who wrote it and the earlier posts, oldest first. CalmLens moderates only the content; the earlier posts help it tell who the content addresses and whether it quotes, reports, counters or mocks something. Author IDs are your own opaque identifiers. The SDK sends only the posts CalmLens uses: the most recent 5 that fit in 2,000 characters (the most recent post is always sent).
+
+```typescript
+const reply = await client.text.classify({
+  text: "Same to you",
+  authorId: "user-2",
+  context: {
+    items: [
+      { text: "Has anyone tried the new update?", authorId: "user-1" },
+      { text: "You would say that", authorId: "user-3" },
+    ],
+  },
+});
+reply.context; // the posts CalmLens used, or null once the content is removed
+```
+
+The same options work on `assets.create()` and `assets.classify()` for images, documents, audio and video. See [Threaded moderation](https://calmlens.com/docs/guides/threaded-moderation).
+
 ##### assets.retrieve(options)
 
 Retrieve details of a specific asset.

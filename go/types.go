@@ -120,13 +120,18 @@ type Asset struct {
 	ParentID *string `json:"parentId"`
 	FolderID *string `json:"folderId"`
 	// UploadPresetID is the upload preset the asset was uploaded through, if any.
-	UploadPresetID    *string            `json:"uploadPresetId"`
-	CreatedAt         int64              `json:"createdAt"`
-	UpdatedAt         *int64             `json:"updatedAt"`
-	Description       *string            `json:"description"`
-	ExternalID        *string            `json:"externalId"`
-	ExternalURL       *string            `json:"externalUrl"`
-	Metadata          []MetadataItem     `json:"metadata"`
+	UploadPresetID *string        `json:"uploadPresetId"`
+	CreatedAt      int64          `json:"createdAt"`
+	UpdatedAt      *int64         `json:"updatedAt"`
+	Description    *string        `json:"description"`
+	ExternalID     *string        `json:"externalId"`
+	ExternalURL    *string        `json:"externalUrl"`
+	Metadata       []MetadataItem `json:"metadata"`
+	// AuthorID is who wrote the content, as given when it was submitted.
+	AuthorID *string `json:"authorId"`
+	// Context holds the earlier posts CalmLens used, oldest first. It is nil when none were
+	// given and once the content is removed.
+	Context           *ModerationContext `json:"context"`
 	Tags              []string           `json:"tags"`
 	ProcessingOptions *ProcessingOptions `json:"processingOptions"`
 	// Visibility is VisibilityPrivate or VisibilityPublic.
@@ -748,11 +753,19 @@ type SubmitAssetOptions struct {
 	Description       *string            `json:"description,omitempty"`
 	ProcessingOptions *ProcessingOptions `json:"processingOptions,omitempty"`
 	// Visibility is VisibilityPrivate (the default) or VisibilityPublic.
-	Visibility  string         `json:"visibility,omitempty"`
-	Metadata    []MetadataItem `json:"metadata,omitempty"`
-	ExternalID  *string        `json:"externalId,omitempty"`
-	ExternalURL *string        `json:"externalUrl,omitempty"`
-	FolderID    *string        `json:"folderId,omitempty"`
+	Visibility string         `json:"visibility,omitempty"`
+	Metadata   []MetadataItem `json:"metadata,omitempty"`
+	// AuthorID is your identifier for who wrote the content. CalmLens only compares it with the
+	// author IDs in Context, to tell which posts share a speaker.
+	AuthorID *string `json:"authorId,omitempty"`
+	// Context holds earlier posts in the conversation, oldest first. CalmLens moderates only the
+	// content and uses these to read who it addresses, what it refers to and whether it quotes,
+	// reports, counters or mocks something. The SDK sends only the posts CalmLens uses: the most
+	// recent 5 that fit in 2,000 characters (see SelectModerationContextItems).
+	Context     *ModerationContext `json:"context,omitempty"`
+	ExternalID  *string            `json:"externalId,omitempty"`
+	ExternalURL *string            `json:"externalUrl,omitempty"`
+	FolderID    *string            `json:"folderId,omitempty"`
 	// UploadPresetID applies an upload preset: its folder, visibility, file types and size
 	// limit apply to the upload.
 	UploadPresetID *string `json:"uploadPresetId,omitempty"`
@@ -1138,10 +1151,13 @@ type ClassifyTextOptions struct {
 	Description       *string
 	ProcessingOptions *ProcessingOptions
 	Metadata          []MetadataItem
-	ExternalID        *string
-	ExternalURL       *string
-	FolderID          *string
-	UploadPresetID    *string
+	// AuthorID and Context work as in SubmitAssetOptions.
+	AuthorID       *string
+	Context        *ModerationContext
+	ExternalID     *string
+	ExternalURL    *string
+	FolderID       *string
+	UploadPresetID *string
 	// IdempotencyKey is sent as the Idempotency-Key header; see SubmitAssetOptions.
 	IdempotencyKey string `json:"-"`
 }

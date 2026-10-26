@@ -20,6 +20,7 @@ import type {
 } from "../contract/AssetSearch.js";
 import type { HashList, HashListEntry } from "../contract/HashList.js";
 import type { LENS_SCHEMA } from "../contract/Lens.js";
+import type { ModerationContext } from "../contract/ModerationContext.js";
 import type { CursorPage } from "../contract/Page.js";
 import type {
   AssetBatchOperation,
@@ -544,6 +545,18 @@ export interface SubmitAssetCommonOptions extends IdempotencyOptions {
   processingOptions?: SharedAsset["processingOptions"];
   visibility?: "public" | "private";
   metadata?: SharedAsset["metadata"];
+  /**
+   * Your identifier for who wrote the content. CalmLens only compares it with the author IDs in
+   * `context`, to tell which posts share a speaker.
+   */
+  authorId?: string;
+  /**
+   * Earlier posts in the conversation, oldest first. CalmLens moderates only the content and uses
+   * these to read who it addresses, what it refers to and whether it quotes, reports, counters
+   * or mocks something. The SDK sends only the posts CalmLens uses: the most recent 5 that fit
+   * in 2,000 characters.
+   */
+  context?: ModerationContext;
   externalId?: string;
   externalUrl?: string;
   folderId?: string | null;

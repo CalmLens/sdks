@@ -10,7 +10,7 @@ module CalmLens
   # later appear as they are, so compare `classification.moderation.status` and similar values with known strings
   # and treat anything else as not ready.
   class Assets < Resource
-    SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata externalId externalUrl
+    SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata authorId context externalId externalUrl
                            folderId uploadPresetId].freeze
     MIN_MULTIPART_IMAGE_BYTES = 10 * 1024 * 1024
     MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024
@@ -245,6 +245,11 @@ module CalmLens
     # @option options [Hash] :part `{type:, data:, is_final:}` for the first multipart part
     # @option options [Integer] :total_size_in_bytes the whole file's size, for multipart uploads
     # @option options [String] :url
+    # @option options [String] :author_id your identifier for who wrote the content; CalmLens only
+    #   compares it with the author IDs in `context`, to tell which posts share a speaker.
+    # @option options [Hash] :context `{items: [{text:, author_id:}]}`, earlier posts in the
+    #   conversation, oldest first. Only the posts CalmLens uses are sent: the most recent
+    #   {ModerationContext::USED_ITEMS} that fit in {ModerationContext::USED_CHARACTERS} characters.
     # @return [Hash] the asset
     def create(options)
       call(options) { |api, request| submit(api, request, true) }
@@ -326,6 +331,7 @@ module CalmLens
         raise Internal.invalid('Supply exactly one of content, part, or url; isFinal belongs in part',
                                ErrorCodes::INVALID_UPLOAD_PAYLOAD)
       end
+      options = with_used_context(options)
       if options.key?('url')
         return expect_asset(request('POST', project('assets'), query: { 'queue' => queue }, body: options,
                                                                idempotent: true, request_options: request_options))
@@ -348,6 +354,16 @@ module CalmLens
                            query: query, raw: body, idempotent: true, request_options: request_options,
                            upload: !content.key?('plainText'),
                            headers: { 'Content-Type' => content['type'], 'X-CalmLens-Upload' => multipart ? 'part' : 'content' }))
+    end
+
+    # Keeps only the earlier posts CalmLens uses, which keeps a raw upload's query short.
+    def with_used_context(options)
+      return options unless options.key?('context')
+
+      context = options['context']
+      raise Internal.invalid('context must be a Hash with items') unless context.is_a?(Hash) && context.key?('items')
+
+      options.merge('context' => { 'items' => ModerationContext.select_items(context['items']) })
     end
 
     # The query of a first multipart part: its number, whether it is the last and the declared total.

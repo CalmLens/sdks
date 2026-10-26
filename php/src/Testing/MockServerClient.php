@@ -9,6 +9,7 @@ use CalmLens\CalmLensException;
 use CalmLens\ErrorCodes;
 use CalmLens\Internal\Session;
 use CalmLens\Internal\Values;
+use CalmLens\ModerationContext;
 use CalmLens\ServerClient;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
@@ -628,6 +629,8 @@ final class MockServerClient
         $decode = fn (string $key) => is_string($options[$key] ?? null) && $bytes !== null ? json_decode($options[$key], true) : ($options[$key] ?? null);
         $processing = $decode('processingOptions') ?? ['keepContentAfterProcessing' => false];
         $keep = is_array($processing) && ($processing['keepContentAfterProcessing'] ?? false) === true;
+        // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
+        $context = ModerationContext::select($decode('context')['items'] ?? []);
         // Fields the API returns as null when they are not set.
         $asset = [
             'id' => ($this->createId)(), 'projectId' => $this->projectId, 'userId' => null, 'parentId' => null,
@@ -635,7 +638,8 @@ final class MockServerClient
             'createdAt' => $now, 'updatedAt' => $now, 'name' => $options['name'] ?? null,
             'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,
             'externalUrl' => $url ?? ($multipart ? null : ($options['externalUrl'] ?? null)),
-            'type' => $type, 'metadata' => $decode('metadata'), 'tags' => null, 'processingOptions' => $processing,
+            'type' => $type, 'metadata' => $decode('metadata'),
+            'authorId' => $options['authorId'] ?? null, 'context' => $context === [] ? null : ['items' => $context], 'tags' => null, 'processingOptions' => $processing,
             'visibility' => $options['visibility'] ?? 'private',
             'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
                 'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,
@@ -814,6 +818,7 @@ final class MockServerClient
     private function removeContent(array $asset, string $reason): array
     {
         unset($this->content[$asset['id']]);
+        $asset['context'] = null;
         $asset['content'] = ['status' => 'removed', 'removalReason' => $reason, 'updatedAt' => ($this->now)(), 'extractedText' => null,
             'image' => self::withoutPlaceholder($asset['content']['image'] ?? null)] + $asset['content'];
         return $asset;

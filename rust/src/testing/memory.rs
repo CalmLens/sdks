@@ -1,6 +1,7 @@
 //! The in-memory API behind [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
 use super::MockResponse;
 use crate::error::ErrorCode;
+use crate::models::{select_moderation_context_items, ModerationContext};
 use base64::Engine;
 use http::{HeaderMap, Method};
 use serde_json::{json, Map, Value};
@@ -616,6 +617,7 @@ fn apply_outcome(
     }
     if remove {
         content.remove(text(&asset["id"]));
+        asset["context"] = Value::Null;
     }
     let classification = section(asset, "classification");
     classification.insert("status".into(), status.into());
@@ -741,6 +743,7 @@ impl Backend {
             asset["updatedAt"] = now.into();
         }
         asset["content"]["image"] = image;
+        asset["context"] = Value::Null;
         self.storage.assets.insert(id, asset.clone());
         self.record_lifecycle_event("asset.content-removed", &asset);
         asset
@@ -1454,9 +1457,11 @@ impl Backend {
         if mode == "content" || multipart {
             options = Map::new();
             for (key, value) in q {
-                let value = if key == "metadata" || key == "processingOptions" {
-                    serde_json::from_str(value)
-                        .map_err(|_| invalid("metadata and processingOptions must be JSON"))?
+                let value = if ["metadata", "processingOptions", "context"].contains(&key.as_str())
+                {
+                    serde_json::from_str(value).map_err(|_| {
+                        invalid("metadata, processingOptions and context must be JSON")
+                    })?
                 } else {
                     value.clone().into()
                 };
@@ -1537,13 +1542,23 @@ impl Backend {
             .get("partNumber")
             .and_then(|number| number.parse().ok())
             .unwrap_or(1);
+        // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
+        let context = match options.get("context") {
+            None | Some(Value::Null) => Vec::new(),
+            Some(context) => {
+                let context: ModerationContext = serde_json::from_value(context.clone())
+                    .map_err(|_| validation("invalid-type", "context"))?;
+                select_moderation_context_items(&context.items)
+            }
+        };
         let id = self.create_id();
         // Fields the API returns as `null` when they are not set.
         let mut asset = json!({
             "id": id, "projectId": self.options.project_id, "userId": null, "parentId": null,
             "folderId": null, "uploadPresetId": null, "createdAt": now, "updatedAt": now,
             "name": null, "description": null, "externalId": null, "externalUrl": null,
-            "type": kind, "metadata": null, "tags": null, "processingOptions": processing,
+            "type": kind, "metadata": null, "authorId": null, "context": null, "tags": null,
+            "processingOptions": processing,
             "visibility": "private",
             "content": {
                 "status": if keep { "stored" } else { "temporary" }, "removalReason": null,
@@ -1563,6 +1578,7 @@ impl Backend {
             "name",
             "description",
             "metadata",
+            "authorId",
             "externalId",
             "externalUrl",
             "folderId",
@@ -1572,6 +1588,9 @@ impl Backend {
             if let Some(value) = options.get(key) {
                 asset[key] = value.clone();
             }
+        }
+        if !context.is_empty() {
+            asset["context"] = json!({ "items": context });
         }
         if website {
             asset["externalUrl"] = options["url"].clone();

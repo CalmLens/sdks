@@ -16702,6 +16702,13 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
   description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
   externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
   externalUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  authorId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  context: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+      text: zod.ZodString;
+      authorId: zod.ZodOptional<zod.ZodString>;
+    }, zod.core.$strict>>;
+  }, zod.core.$strip>>>;
   type: zod.ZodEnum<{
     audio: "audio";
     file: "file";

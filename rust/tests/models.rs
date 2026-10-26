@@ -672,3 +672,12 @@ fn report_policy_snapshot_decodes_into_typed_models() {
         vec![ClassificationCategory::Violence]
     );
 }
+
+#[test]
+fn an_over_long_newest_post_is_kept_alone_for_the_api_to_reject() {
+    let newest = ModerationContextItem::new("n".repeat(MODERATION_CONTEXT_USED_CHARACTERS + 1))
+        .author_id("user-2");
+    let items = vec![ModerationContextItem::new("earlier"), newest.clone()];
+    assert_eq!(select_moderation_context_items(&items), vec![newest]);
+    assert_eq!(select_moderation_context_items(&[]), Vec::new());
+}

@@ -137,6 +137,25 @@ let asset = client.assets().classify(SubmitAsset {
 let faces = asset.classification.face_detection.and_then(|f| f.faces);
 ```
 
+### Conversations
+
+For a post in a conversation, set `author_id` to your identifier for who wrote it and `context` to the earlier posts, oldest first. CalmLens moderates only the content itself and uses the earlier posts to read who it addresses, what it refers to and whether it quotes, reports or counters something. `SubmitAsset` and `ClassifyText` both take these fields:
+
+```rust
+use calmlens::models::{ModerationContext, ModerationContextItem};
+
+let asset = client.text().classify(ClassifyText {
+    author_id: Some("user-9".into()),
+    context: Some(ModerationContext::new([
+        ModerationContextItem::new("Anyone going tonight?").author_id("user-3"),
+        ModerationContextItem::new("Not after last time").author_id("user-5"),
+    ])),
+    ..ClassifyText::new("Same here")
+}).await?;
+```
+
+The SDK sends only the posts CalmLens uses: the 5 most recent (`MODERATION_CONTEXT_USED_ITEMS`) that fit in 2,000 characters (`MODERATION_CONTEXT_USED_CHARACTERS`, counted in Unicode code points). The newest post is always sent. `select_moderation_context_items` returns the posts that would be sent. The asset's `author_id` and `context` hold what was stored; `context` is `None` once the content is removed.
+
 ## Upload presets
 
 Set `upload_preset_id` on `SubmitAsset` (or `ClassifyText`) to apply an upload preset's folder, visibility, file types and size limit. To let a browser upload through a preset that requires tokens, sign a single-use token on your server. Signing happens locally with your API key and makes no request; `blocking::ServerClient` and `MockServerClient` have `upload_tokens()` too.

@@ -8098,15 +8098,15 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "personal-information",
 		kind: "target",
 		displayName: "Own details",
-		description: "The speaker supplies their own private personal details.",
-		exclusions: "Unknown ownership, third-party details, and requests without supplied values."
+		description: "The speaker supplies private personal details and presents them as their own.",
+		exclusions: "Details whose owner isn't stated, other people's details, and requests without supplied values."
 	},
 	"personal-information-third-party": {
 		category: "personal-information",
 		kind: "target",
 		displayName: "Other people’s details",
-		description: "The supplied private details are explicitly attributed to someone other than the speaker.",
-		exclusions: "Unknown ownership, the speaker's own details and requests without supplied values."
+		description: "The supplied private details belong to someone other than the speaker, or their owner isn't stated, such as a filled-in form or record.",
+		exclusions: "Details the speaker presents as their own, and requests without supplied values."
 	},
 	"personal-information-historical": {
 		category: "personal-information",

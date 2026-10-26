@@ -12,6 +12,8 @@ module CalmLens
     # Moderates a string as a `text/plain` asset and waits for the decision.
     # @option options [String] :text
     # @option options [String] :name defaults to `text`
+    # @option options [String] :author_id who wrote the text, as for {Assets#create}
+    # @option options [Hash] :context earlier posts in the conversation, as for {Assets#create}
     # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
     #   `allowed` or `limited` (reduce the reach of `limited` content).
     def classify(options)
