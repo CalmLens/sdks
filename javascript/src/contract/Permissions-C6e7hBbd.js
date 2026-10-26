@@ -67,32 +67,5 @@ const permits = (grants, action, folderId, folders) => grants.some((grant) => {
 	}
 	return false;
 });
-/**
-* What a person can let an AI assistant or the CLI do for them. `read` looks at assets, folders and
-* events; `write` also creates, changes and deletes assets and folders. Members, API keys,
-* connectors, sharing, downloads and project settings are never delegated.
-*/
-const AGENT_SCOPE_SCHEMA = zod.enum(["read", "write"]);
-zod.array(AGENT_SCOPE_SCHEMA).min(1).max(2);
-const AGENT_SCOPE_ACTIONS = {
-	read: [
-		"assets:read",
-		"folders:read",
-		"lenses:read",
-		"metadata:read",
-		"reviews:read"
-	],
-	write: [
-		"assets:create",
-		"assets:update",
-		"assets:delete",
-		"folders:create",
-		"folders:update",
-		"folders:delete"
-	]
-};
-const agentActionsFor = (scopes) => [...new Set(scopes)].flatMap((scope) => AGENT_SCOPE_ACTIONS[scope]);
-const isAgentAction = (action) => agentActionsFor(AGENT_SCOPE_SCHEMA.options).includes(action);
-GRANTS_SCHEMA.refine((grants) => grants.every((grant) => grant.actions.every(isAgentAction)), "Agents can't hold this permission");
 zod.enum(["active", "banned"]);
 export { GRANTS_SCHEMA as n, permits as r, ACCESS_ROLE_SCHEMA as t };
