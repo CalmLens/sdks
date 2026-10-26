@@ -85,6 +85,7 @@ declare const ASSET_IMAGE_SCHEMA: zod.ZodObject<{
   thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
   averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
   perceptualHash: zod.ZodNullable<zod.ZodString>;
+  perceptualHashQuality: zod.ZodNullable<zod.ZodNumber>;
 }, zod.core.$strip>;
 type AssetImage = zod.infer<typeof ASSET_IMAGE_SCHEMA>;
 declare const METADATA_ITEM_SCHEMA: zod.ZodObject<{
@@ -15845,6 +15846,7 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
     averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
     perceptualHash: zod.ZodNullable<zod.ZodString>;
+    perceptualHashQuality: zod.ZodNullable<zod.ZodNumber>;
   }, zod.core.$strip>>;
   extractedText: zod.ZodNullable<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     type: zod.ZodLiteral<"string">;
@@ -23834,6 +23836,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
       averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
       perceptualHash: zod.ZodNullable<zod.ZodString>;
+      perceptualHashQuality: zod.ZodNullable<zod.ZodNumber>;
     }, zod.core.$strip>>;
     extractedText: zod.ZodNullable<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       type: zod.ZodLiteral<"string">;

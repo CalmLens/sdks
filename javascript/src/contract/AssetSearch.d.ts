@@ -8001,6 +8001,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         thumbhash: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
         averageColor: zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
         perceptualHash: zod.ZodNullable<zod.ZodString>;
+        perceptualHashQuality: zod.ZodNullable<zod.ZodNumber>;
       }, zod.core.$strip>>;
       extractedText: zod.ZodNullable<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         type: zod.ZodLiteral<"string">;

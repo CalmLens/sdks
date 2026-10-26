@@ -264,7 +264,8 @@ const CHECKSUMS_SCHEMA = zod.object({
 	sha512: zod.string().nullish().describe("SHA-512 digest of the uploaded content")
 });
 const IMAGE_DATA_SCHEMA = zod.object({
-	perceptualHash: zod.string().nullish().describe("Perceptual hash used to match visually similar images"),
+	perceptualHash: zod.string().nullish().describe("PDQ perceptual hash used to match visually similar images, as 64 hexadecimal characters"),
+	perceptualHashQuality: zod.number().int().min(0).max(100).nullish().describe("PDQ quality of `perceptualHash`, from 0 to 100"),
 	width: zod.number().int().positive().nullish().describe("Image width in pixels"),
 	height: zod.number().int().positive().nullish().describe("Image height in pixels")
 });
@@ -285,7 +286,8 @@ const ASSET_IMAGE_SCHEMA = zod.object({
 	height: zod.number().int().positive().nullable().describe("Height in pixels, like `width`"),
 	thumbhash: saneStringField().nullable().describe("ThumbHash placeholder you can render while the image loads; `null` once the image is removed"),
 	averageColor: saneStringField().nullable().describe("Average color of the image; `null` once the image is removed"),
-	perceptualHash: zod.string().nullable().describe("Perceptual hash used to match visually similar images, for image assets")
+	perceptualHash: zod.string().nullable().describe("PDQ perceptual hash used to match visually similar images, as 64 hexadecimal characters, for image assets. Hashes 31 or fewer bits apart are usually the same picture."),
+	perceptualHashQuality: zod.number().int().min(0).max(100).nullable().describe("How much detail `perceptualHash` captured, from 0 to 100. Hashes below 50 come from flat or featureless images and match unrelated pictures, so leave them out of comparisons.")
 });
 const METADATA_ITEM_SCHEMA = zod.object({
 	id: saneStringField().meta(metaStore([docPropertyInfo({
