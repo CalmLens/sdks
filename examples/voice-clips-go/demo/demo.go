@@ -10,20 +10,32 @@ import (
 	"github.com/CalmLens/sdks/go/calmlenstest"
 )
 
-// Duration is a fixed, simulated clip length: the demo never decodes media.
-const Duration = 48.0
-
 // Categories are the category IDs the simulated reports contain.
 var Categories = []string{"sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity"}
 
-// findings lists the simulated category score for each selected outcome, by segment.
-// Segments mirror native analysis: 30-second chunks with a one-second overlap.
-var findings = map[string][]map[string]float64{
-	calmlens.ModerationStatusAllowed:       {{}, {}},
-	calmlens.ModerationStatusLimited:       {{}, {"harassment": 0.58}},
-	calmlens.ModerationStatusAgeRestricted: {{}, {"sexual": 0.72}},
-	calmlens.ModerationStatusBlocked:       {{"violence": 0.91}, {"violence": 0.47}},
-	calmlens.ModerationStatusPurged:        {{"criminal-activity": 0.94}, {}},
+// Scenario is the simulated report for one selected outcome: a fixed clip length (the demo never
+// decodes media) and the category scores in each analysed segment. Categories left out score 0.03.
+type Scenario struct {
+	Duration float64
+	Segments []map[string]float64
+}
+
+// Scenarios holds a simulated report per outcome. Segments mirror native analysis: 30-second
+// chunks that overlap by one second, so a clip of D seconds has ceil((D-1)/29) of them.
+var Scenarios = map[string]Scenario{
+	calmlens.ModerationStatusAllowed:       {Duration: 41, Segments: []map[string]float64{{}, {}}},
+	calmlens.ModerationStatusLimited:       {Duration: 64, Segments: []map[string]float64{{}, {"harassment": 0.58}, {}}},
+	calmlens.ModerationStatusAgeRestricted: {Duration: 52, Segments: []map[string]float64{{}, {"sexual": 0.72}}},
+	calmlens.ModerationStatusBlocked: {Duration: 96, Segments: []map[string]float64{
+		{}, {}, {"violence": 0.91, "harassment": 0.44}, {"violence": 0.47},
+	}},
+	calmlens.ModerationStatusPurged: {Duration: 38, Segments: []map[string]float64{{"criminal-activity": 0.94}, {}}},
+}
+
+// Range returns segment i's start and end: 30-second chunks with a one-second overlap.
+func (s Scenario) Range(i int) (float64, float64) {
+	start := float64(i) * 29
+	return start, min(start+30, s.Duration)
 }
 
 // Backend is the in-memory CalmLens used in demo mode.
@@ -77,10 +89,10 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 		processing["status"] = calmlens.ClassificationStatusFailed
 		return
 	}
-	ranges := [][2]float64{{0, 30}, {29, Duration}}
+	scenario := Scenarios[choice]
 	overall := map[string]float64{}
 	segments := []any{}
-	for i, scores := range findings[choice] {
+	for i, scores := range scenario.Segments {
 		categories := calmlens.JSON{}
 		for _, id := range Categories {
 			score := 0.03
@@ -92,7 +104,8 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 				overall[id] = score
 			}
 		}
-		segments = append(segments, calmlens.JSON{"source": "clip", "startSeconds": ranges[i][0], "endSeconds": ranges[i][1], "categories": categories})
+		start, end := scenario.Range(i)
+		segments = append(segments, calmlens.JSON{"source": "clip", "startSeconds": start, "endSeconds": end, "categories": categories})
 	}
 	top := 0.0
 	categories := calmlens.JSON{}
@@ -100,10 +113,10 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 		categories[id] = categoryResult(score)
 		top = max(top, score)
 	}
-	media := calmlens.JSON{"durationSeconds": Duration, "sampledFrames": 0, "audioTranscribed": false, "segments": segments}
+	media := calmlens.JSON{"durationSeconds": scenario.Duration, "sampledFrames": 0, "audioTranscribed": false, "segments": segments}
 	if video {
 		media["frameIntervalSeconds"] = 0.5
-		media["sampledFrames"] = 98
+		media["sampledFrames"] = int(scenario.Duration * 2)
 	}
 	// The selected outcome is the moderation status the policy decided.
 	processing["status"] = calmlens.ClassificationStatusCompleted
@@ -112,7 +125,6 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 	moderation["score"] = top
 	moderation["categories"] = categories
 	moderation["timeline"] = media
-
 }
 
 func categoryResult(score float64) calmlens.JSON {

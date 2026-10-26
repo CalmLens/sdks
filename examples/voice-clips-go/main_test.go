@@ -430,8 +430,69 @@ func TestDemoOutcomesProduceClipSegments(t *testing.T) {
 	item := mustUpload(t, a, upload{choice: calmlens.ModerationStatusBlocked, contentType: "video/mp4"})
 	decide(item)
 	get(a, "/")
-	if item.Status != calmlens.ModerationStatusBlocked || item.Duration != demo.Duration || len(item.Segments) != 2 || len(item.Segments[0].Findings) == 0 || item.Segments[0].Findings[0].Category != "violence" {
+	scenario := demo.Scenarios[calmlens.ModerationStatusBlocked]
+	if item.Status != calmlens.ModerationStatusBlocked || item.Duration != scenario.Duration || len(item.Segments) != len(scenario.Segments) {
 		t.Fatalf("%+v", item)
+	}
+	// Native chunks: 30 seconds, overlapping by one, the last ending with the clip.
+	for i, s := range item.Segments {
+		if s.Start != float64(i*29) || s.End != min(s.Start+30, scenario.Duration) {
+			t.Fatal("segment", i, s.Start, s.End)
+		}
+	}
+	flagged := []string{}
+	for _, s := range item.Flagged() {
+		flagged = append(flagged, fmt.Sprintf("%v:%s", s.Start, s.Findings[0].Category))
+	}
+	if !reflect.DeepEqual(flagged, []string{"58:violence", "87:violence"}) {
+		t.Fatal("flagged segments", flagged)
+	}
+	reasons := []string{}
+	for _, f := range item.Reasons() {
+		reasons = append(reasons, f.Category)
+	}
+	if !reflect.DeepEqual(reasons, []string{"violence", "harassment"}) || item.Reasons()[0].Score != 0.91 {
+		t.Fatal("reasons are each category once, strongest first", item.Reasons())
+	}
+}
+
+func TestTimelineBarDoesNotOverlap(t *testing.T) {
+	score := 0.9
+	_, rows := timeline(&calmlens.MediaClassificationReport{DurationSeconds: 60, Segments: []calmlens.MediaClassificationSegment{
+		{StartSeconds: 29, EndSeconds: 60, Categories: map[string]calmlens.CategoryResult{}},
+		{StartSeconds: 0, EndSeconds: 30, Categories: map[string]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: &score, Likelihood: "very-likely"}}},
+	}})
+	if rows[0].Left != 0 || rows[0].Left+rows[0].Width > rows[1].Left || rows[1].Left+rows[1].Width != 100 {
+		t.Fatal("bar segments overlap or leave the bar", rows)
+	}
+	if rows[0].Level() != "very-likely" || rows[1].Level() != "" {
+		t.Fatal("segment level", rows[0].Level(), rows[1].Level())
+	}
+}
+
+func TestStatusChecksRecordDecisions(t *testing.T) {
+	a := demoApp(t)
+	item := mustUpload(t, a, upload{choice: calmlens.ModerationStatusBlocked})
+	get(a, "/")
+	if len(a.activity) != 0 {
+		t.Fatal("recorded a clip that is still pending", a.activity)
+	}
+	decide(item)
+	get(a, "/")
+	get(a, "/")
+	if len(a.activity) != 1 || a.activity[0].Name != item.Name || a.activity[0].Status != calmlens.ModerationStatusBlocked {
+		t.Fatal("decision not recorded exactly once", a.activity)
+	}
+}
+
+func TestDemoServesItsUploadScript(t *testing.T) {
+	a := demoApp(t)
+	rec := get(a, "/demo.js")
+	if rec.Code != 200 || !bytes.Equal(rec.Body.Bytes(), demoScript) || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/javascript") {
+		t.Fatal(rec.Code, rec.Header())
+	}
+	if policy := get(a, "/").Header().Get("Content-Security-Policy"); !strings.Contains(policy, "script-src 'self'") || !strings.Contains(policy, "connect-src 'self'") {
+		t.Fatal("demo page cannot run its script", policy)
 	}
 }
 

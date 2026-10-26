@@ -1,26 +1,129 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Calmclips · Go SDK example</title>
+<title>Calmclips</title>
+{{if and .Demo .Pending}}<noscript><meta http-equiv="refresh" content="3"></noscript>{{end}}
 <style>
-:root{font-family:system-ui,sans-serif;color:#223248;background:#f4f6fb;line-height:1.6}*{box-sizing:border-box}body{margin:0}main{max-width:1150px;margin:auto;padding:40px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #d9dfeb;padding-bottom:22px}.wordmark{font-size:22px;font-weight:750;letter-spacing:-1px}.mode,.badge{padding:5px 12px;border-radius:30px;background:#e4eaf7;font-size:12px;font-weight:650}h1{font-size:clamp(32px,5vw,52px);line-height:1.1;letter-spacing:-2px;margin:34px 0 12px}.intro{max-width:680px;color:#5f7089}.layout{display:grid;grid-template-columns:310px 1fr;gap:28px;margin-top:32px}.upload,article,.empty,.activity{background:white;border:1px solid #d9dfeb;border-radius:18px;padding:22px}.upload{align-self:start}h2{font-size:19px;margin:0 0 18px}h3{font-size:13px;margin:16px 0 6px}label{display:block;font-size:14px;font-weight:650;margin:14px 0 8px}input,select,button{font:inherit;width:100%;padding:11px;border-radius:9px}input,select{border:1px solid #c0cbde;background:#fcfcff}input[type=file]{font-size:12px;padding:16px 8px}button{margin-top:20px;border:0;background:#355bd4;color:white;font-weight:650;cursor:pointer}button:hover{background:#2949af}button:disabled{background:#eef1f8;color:#5f7089;border:1px dashed #9aa8c2;cursor:default}progress{display:block;width:100%;margin-top:14px;accent-color:#355bd4}.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:14px}.actions form{display:flex;gap:8px;align-items:end;flex:1 1 200px}.actions select{padding:7px;font-size:13px}.actions button{margin:0;padding:7px 12px;font-size:13px;width:auto;white-space:nowrap}.actions .secondary{background:#e4eaf7;color:#223248}.actions .secondary:hover{background:#d3dcf0}:focus-visible{outline:3px solid #bd8725;outline-offset:3px}.hint,small{font-size:12px;color:#5f7089}.clips{display:grid;gap:16px}article{padding:16px;overflow:hidden}.player{min-height:64px;background:#eef1f8;border-radius:10px;display:flex;justify-content:center;align-items:center;text-align:center;padding:14px;color:#5f7089;font-size:14px}audio{display:block;width:100%}video{display:block;width:100%;max-height:300px;border-radius:10px;background:#11182a}.name{font-size:14px;font-weight:650;overflow-wrap:anywhere;margin:12px 0 4px}.meta{font-size:12px;color:#5f7089;margin:0 0 8px}.allowed{background:#dcf1e4;color:#256345}.blocked,.purged,.error{background:#fce3e2;color:#963f36}.limited{background:#e4eaf7;color:#2b4277}.age-restricted{background:#fff0cc;color:#725515}details summary{cursor:pointer;font-size:14px;font-weight:650;color:#355bd4}details[open] summary{margin-bottom:10px}.track{position:relative;height:14px;background:#eef1f8;border-radius:7px;margin:6px 0 10px;overflow:hidden}.track span{position:absolute;top:0;bottom:0;background:#c9d4ee;border-left:2px solid white}.track span.hit{background:#e7a33a}.segments{list-style:none;margin:0;padding:0;font-size:13px}.segments li{display:flex;gap:10px;padding:4px 0;border-top:1px solid #eef1f8}.segments time{font-variant-numeric:tabular-nums;color:#5f7089;min-width:92px}.empty{padding:65px 24px;text-align:center}.empty strong{display:block}.notice{font-size:13px;color:#5f7089;margin-bottom:18px}.activity{margin-top:16px;font-size:13px}.activity ul{margin:0;padding-left:18px}footer{font-size:12px;color:#5f7089;margin-top:32px}@media(max-width:850px){.layout{grid-template-columns:1fr}}@media(max-width:500px){header{flex-direction:column;align-items:flex-start}}
-</style></head><body><main>
-<header><div class="wordmark">◉ Calmclips</div><span class="mode">{{if .Demo}}Demo · simulated decisions{{else}}Live · CalmLens moderation{{end}}</span></header>
-<h1>Voice notes and clips.<br>Checked before they play.</h1><p class="intro">Upload an audio note or a short video privately. CalmLens reviews the clip in the background; only an allowed clip can be played. Each decision shows where in the clip the evidence was found. A small, working example of the CalmLens Go SDK.</p>
-<div class="layout"><form class="upload" id="upload-form" {{if .Demo}}action="/upload" method="post" enctype="multipart/form-data"{{else}}data-preset="{{.Preset}}" data-api="{{.APIURL}}" data-pending="{{.Pending}}" data-max-mib="{{.MaxMiB}}"{{end}}><h2>Add a clip</h2>
-<input type="hidden" name="csrf" value="{{.CSRF}}">{{if .Demo}}<label for="clip">Choose an audio or video file</label><input id="clip" type="file" name="clip" accept="audio/*,video/*" required>{{else}}<calmlens-uploader accept="audio/*,video/*"></calmlens-uploader>{{end}}
-<p class="hint">MP3, WAV, FLAC, AAC, M4A, Ogg, Opus, AIFF, WMA, MP4, MOV, WebM, MKV, AVI, MPEG, MPEG-TS or WMV · up to {{.MaxMiB}} MiB and 120 seconds · audio and video moderation is in beta</p>
-{{if .Demo}}<label for="demo_result">Try a moderation outcome</label><select id="demo_result" name="demo_result"><option value="allowed">Allow</option><option value="limited">Limit</option><option value="age-restricted">Age-restrict</option><option value="blocked">Block</option><option value="purged">Purge</option><option value="error">Processing error</option></select>{{end}}
-{{if .Demo}}<button type="submit">Upload for review</button>{{else}}<noscript><p class="hint">Uploading needs JavaScript: clips go straight from your browser to CalmLens.</p></noscript>{{end}}<p class="hint">Clips stay private. {{if .Demo}}Larger clips are sent in several parts.{{else}}Your browser sends the clip straight to CalmLens, larger clips in 5 MiB parts; it never passes through this server.{{end}} Playback appears only once a clip is allowed. This local session holds up to 12 clips.</p></form>
-<section aria-label="Your clips"><h2>Your clips</h2><p class="notice">{{if .Pending}}Checking your clips… This page refreshes every 3 seconds.{{else}}Allowed and limited clips can be played; limited clips are collapsed until you choose to show them. Age-restricted, blocked and purged clips are not.{{end}}</p>
-<div class="clips">{{range .Entries}}<article aria-label="{{.Name}}">
-{{if .Error}}<div class="player">{{.Error}}</div>{{else if eq .Status "allowed"}}{{if .Video}}<video controls preload="metadata" src="/media?id={{.ID}}" aria-label="Play allowed clip {{.Name}}"></video>{{else}}<audio controls preload="metadata" src="/media?id={{.ID}}" aria-label="Play allowed clip {{.Name}}"></audio>{{end}}{{else if eq .Status "limited"}}<details><summary>Show limited clip</summary>{{if .Video}}<video controls preload="none" src="/media?id={{.ID}}" aria-label="Play limited clip {{.Name}}"></video>{{else}}<audio controls preload="none" src="/media?id={{.ID}}" aria-label="Play limited clip {{.Name}}"></audio>{{end}}</details>{{else}}<div class="player">{{if not .ID}}Uploading from the browser… No playback until it is allowed.{{else if eq .Status "age-restricted"}}Not published. This clip is age-restricted, and this app has no age check.{{else if eq .Status "blocked"}}Not published. This clip did not pass the moderation policy.{{else if eq .Status "purged"}}Not published. This clip did not pass the moderation policy, and CalmLens deleted its content.{{else if eq .Status "error"}}Processing failed. You can retry it.{{else}}Checking this clip… No playback until it is allowed.{{end}}</div>{{end}}
-<p class="name">{{.Name}}</p><p class="meta">{{.Type}} · {{mib .Size}} · {{if gt .Parts 1}}sent in {{.Parts}} parts{{else}}sent in one request{{end}}{{if .Duration}} · {{clock .Duration}} long{{end}}</p>
-<span class="badge {{.Status}}">{{.Status}}</span>
-{{if .Segments}}<h3>Analysis timeline</h3><div class="track" aria-hidden="true">{{range .Segments}}<span class="{{if .Findings}}hit{{end}}" style="left:{{.Left}}%;width:{{.Width}}%"></span>{{end}}</div>
-<ol class="segments" aria-label="Analysed segments">{{range .Segments}}<li><time>{{clock .Start}}–{{clock .End}}</time><span>{{range $i, $f := .Findings}}{{if $i}}, {{end}}{{$f.Label}} ({{$f.Likelihood}}, {{printf "%.2f" $f.Score}}){{else}}Nothing at possible or above{{end}}</span></li>{{end}}</ol>
-<p class="hint">Ranges are approximate: each covers an analysed chunk, not the exact moment.</p>{{end}}
-<div class="actions">{{if eq .Status "error"}}<form action="/retry" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">{{if $.Demo}}<select name="demo_result" aria-label="Outcome after retry"><option value="allowed">Allow</option><option value="limited">Limit</option><option value="age-restricted">Age-restrict</option><option value="blocked">Block</option><option value="purged">Purge</option><option value="error">Processing error</option></select>{{end}}<button type="submit">Retry processing</button></form>{{end}}
-<form action="/delete" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="clip" value="{{.Key}}"><button class="secondary" type="submit">Delete clip</button></form></div>
-</article>{{else}}<div class="empty"><strong>No clips yet.</strong><span class="hint">Choose a voice note or a short video to try the full upload and review flow.</span></div>{{end}}</div>
-{{if .Activity}}<div class="activity" aria-label="Webhook activity"><h2>Webhook activity</h2><ul>{{range .Activity}}<li>{{.}}</li>{{end}}</ul></div>{{end}}</section></div>
-<footer>Local learning example · session state lives in memory · {{if .Demo}}demo decisions and timelines are simulated and do not run a moderation model{{else}}decisions come from your CalmLens project{{end}}</footer></main>{{if not .Demo}}<script type="module" src="/upload.js"></script>{{end}}</body></html>
+:root{--bg:#f5f6f8;--surface:#fff;--line:#e2e5ea;--text:#1b2230;--muted:#5b6473;--accent:#1f6b64;--accent-strong:#175650;--accent-soft:#e3f0ee;--clear:#cfe6dc;--possible:#f1d27f;--likely:#e79a3c;--very-likely:#cf4f3c;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);background:var(--bg);line-height:1.5;font-size:15px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid #c88a1e;outline-offset:2px}
+.bar{background:var(--surface);border-bottom:1px solid var(--line)}
+.bar-inner{max-width:1180px;margin:auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.wordmark{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;letter-spacing:-.3px}
+.wordmark svg{color:var(--accent)}
+.demo-note{font-size:13px;color:var(--muted)}
+.layout{max-width:1180px;margin:auto;padding:28px 24px 48px;display:grid;grid-template-columns:320px minmax(0,1fr);gap:28px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.panel+.panel{margin-top:16px}
+h1,h2{margin:0;letter-spacing:-.2px}h1{font-size:22px}h2{font-size:15px;margin-bottom:12px}
+.drop{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;border:1.5px dashed #b9c1cc;border-radius:10px;padding:22px 14px;background:#fafbfc;cursor:pointer}
+.drop[data-dragging]{border-color:var(--accent);background:var(--accent-soft)}
+.drop svg{color:var(--accent)}
+.drop strong{font-size:15px}
+.drop .hint{font-size:13px;color:var(--muted)}
+.drop input{max-width:100%;font-size:13px;color:var(--muted);margin-top:6px}
+.drop input::file-selector-button{font:inherit;font-weight:600;color:var(--text);background:var(--surface);border:1px solid #c5ccd6;border-radius:7px;padding:6px 12px;margin-right:10px;cursor:pointer}
+.field{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+select{width:100%;padding:8px 10px;border:1px solid #c5ccd6;border-radius:8px;background:var(--surface)}
+.primary{display:block;width:100%;margin-top:14px;padding:10px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+.primary:hover{background:var(--accent-strong)}
+.upload-error{margin:12px 0 0;font-size:13px;color:#9a2f25}
+calmlens-uploader{--calmlens-accent:#1f6b64;display:block}
+calmlens-uploader .calmlens-upload:not([data-stage="failed"]){display:none}
+.activity ol{list-style:none;margin:0;padding:0;font-size:13px}
+.activity li{display:grid;grid-template-columns:44px 1fr;gap:4px 8px;padding:8px 0;border-top:1px solid var(--line)}
+.activity li:first-child{border-top:0;padding-top:0}
+.activity time{color:var(--muted);font-variant-numeric:tabular-nums}
+.activity .via{grid-column:2;color:var(--muted);font-size:12px}
+.activity .name{font-weight:600;overflow-wrap:anywhere}
+.quiet{margin:0;font-size:13px;color:var(--muted)}
+.list-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+.count{font-size:13px;color:var(--muted)}
+.clips{display:grid;gap:12px}
+.clip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.head{display:flex;align-items:center;gap:12px}
+.kind{flex:none;width:38px;height:38px;border-radius:9px;display:grid;place-items:center;background:#eef1f4;color:#3c4656}
+.title{flex:1;min-width:0}
+.name{margin:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{margin:0;font-size:13px;color:var(--muted)}
+.pill{flex:none;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:#eef0f3;color:#3f4857}
+.pill.allowed{background:#e1f2e8;color:#1b6640}.pill.limited{background:#e6ecf6;color:#2b4877}.pill.age-restricted{background:#fcefd3;color:#77510c}.pill.blocked,.pill.purged,.pill.error{background:#fae3e0;color:#962e23}
+.head form{margin:0}
+.ghost{border:1px solid transparent;background:none;border-radius:7px;padding:5px 9px;font-size:13px;color:var(--muted);cursor:pointer}
+.ghost:hover{border-color:var(--line);color:var(--text)}
+.body{margin-top:14px;display:grid;gap:14px}
+.body.has-video{grid-template-columns:300px minmax(0,1fr);align-items:start}
+audio{display:block;width:100%;height:40px}
+video{display:block;width:100%;aspect-ratio:16/9;border-radius:8px;background:#141a24}
+details summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--accent)}
+details[open] summary{margin-bottom:10px}
+.note{margin:0;font-size:14px;color:var(--muted)}
+.note strong{color:var(--text);font-weight:600}
+.retry{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+.retry select{width:auto;padding:6px 8px;font-size:13px}
+.secondary{border:1px solid #c5ccd6;background:var(--surface);border-radius:7px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
+.secondary:hover{border-color:#9aa4b2}
+.progress{height:6px;border-radius:3px;background:#e7eaee;overflow:hidden}
+.progress span{display:block;height:100%;width:0;background:var(--accent)}
+.progress.indeterminate span{width:30%;background:#9fb6b3}
+.progress-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+.timeline-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+.timeline-head strong{font-weight:600}
+.timeline-head span{color:var(--muted)}
+.track{position:relative;height:12px;border-radius:4px;background:#eef1f4;overflow:hidden}
+.track span{position:absolute;top:0;bottom:0;background:var(--clear);box-shadow:inset -2px 0 0 var(--surface)}
+.track span.possible{background:var(--possible)}.track span.likely{background:var(--likely)}.track span.very-likely{background:var(--very-likely)}
+.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.findings{list-style:none;margin:10px 0 0;padding:0;font-size:13px}
+.findings li{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.findings time{font-variant-numeric:tabular-nums;color:var(--muted)}
+.findings .cats{display:flex;flex-wrap:wrap;gap:4px 14px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--clear)}
+.dot.possible{background:var(--possible)}.dot.likely{background:var(--likely)}.dot.very-likely{background:var(--very-likely)}
+.score{color:var(--muted)}
+.empty{background:var(--surface);border:1px dashed #c5ccd6;border-radius:12px;padding:48px 24px;text-align:center}
+.empty p{margin:4px 0 0;color:var(--muted);font-size:14px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.body.has-video{grid-template-columns:1fr}}
+@media(max-width:520px){.layout,.bar-inner{padding-left:16px;padding-right:16px}.head{flex-wrap:wrap}.name{white-space:normal;overflow-wrap:anywhere}.findings li{grid-template-columns:1fr}}
+</style></head><body>
+<header class="bar"><div class="bar-inner"><span class="wordmark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 10v4M12 7v10M16 9v6"/></svg>Calmclips</span>{{if .Demo}}<span class="demo-note">Demo · decisions are simulated</span>{{end}}</div></header>
+<main class="layout">
+<aside>
+<section class="panel" aria-labelledby="new-clip"><h2 id="new-clip">New clip</h2>
+<form id="upload-form" data-pending="{{.Pending}}" {{if .Demo}}action="/upload" method="post" enctype="multipart/form-data" data-part-size="{{.PartSize}}" data-threshold="{{.Threshold}}"{{else}}data-preset="{{.Preset}}" data-api="{{.APIURL}}" data-max-mib="{{.MaxMiB}}"{{end}}>
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+{{if .Demo}}<label class="drop" for="clip"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg><strong>Drop a voice note or video</strong><span class="hint">Audio or video · up to {{.MaxMiB}} MB · 2 minutes</span><input id="clip" type="file" name="clip" accept="audio/*,video/*" required></label>
+<label class="field" for="demo_result">Demo outcome</label><select id="demo_result" name="demo_result"><option value="allowed">Approve</option><option value="limited">Limit</option><option value="age-restricted">Age-restrict</option><option value="blocked">Block</option><option value="purged">Remove (purge)</option><option value="error">Fail processing</option></select>
+<button class="primary" type="submit">Upload</button><p class="upload-error" role="alert" hidden></p>
+{{else}}<calmlens-uploader accept="audio/*,video/*" multiple></calmlens-uploader><noscript><p class="quiet">Uploading needs JavaScript.</p></noscript>{{end}}
+</form></section>
+<section class="panel activity" aria-labelledby="activity"><h2 id="activity">Activity</h2>{{if .Activity}}<ol>{{range .Activity}}<li><time>{{.Time}}</time>{{if eq .Status "test"}}<span>Test delivery, nothing changed</span>{{else}}<span><span class="name">{{.Name}}</span> {{lower (label .Status)}}</span>{{end}}<span class="via">{{.Via}}</span></li>{{end}}</ol>{{else}}<p class="quiet">Decisions appear here as clips are checked.</p>{{end}}</section>
+</aside>
+<section aria-labelledby="clips-title">
+<div class="list-head"><h1 id="clips-title">Clips</h1><span class="count">{{len .Entries}} {{if eq (len .Entries) 1}}clip{{else}}clips{{end}}{{if .Checking}} · {{.Checking}} in progress{{end}}</span></div>
+<div class="clips" id="clips">{{range .Entries}}<article class="clip" aria-label="{{.Name}}">
+<div class="head"><span class="kind" aria-hidden="true">{{if .Video}}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>{{else}}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>{{end}}</span>
+<div class="title"><p class="name" title="{{.Name}}">{{.Name}}</p><p class="meta">{{.Format}} {{if .Video}}video{{else}}audio{{end}} · {{size .Size}}{{if .Duration}} · {{clock .Duration}}{{end}}{{if gt .Parts 1}} · {{.Parts}} parts{{end}}</p></div>
+<span class="pill {{.Status}}">{{if .ID}}{{label .Status}}{{else}}Not uploaded{{end}}</span>
+<form action="/delete" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="clip" value="{{.Key}}"><button class="ghost" type="submit" aria-label="Delete {{.Name}}">Delete</button></form></div>
+<div class="body{{if and .Video (eq .Status "allowed")}} has-video{{end}}">
+{{if .Error}}<p class="note">{{.Error}}</p>
+{{else if not .ID}}<p class="note">This upload didn't finish. Delete it and upload the clip again.</p>
+{{else if eq .Status "allowed"}}{{if .Video}}<video controls preload="metadata" src="/media?id={{.ID}}" aria-label="Play {{.Name}}"></video>{{else}}<audio controls preload="metadata" src="/media?id={{.ID}}" aria-label="Play {{.Name}}"></audio>{{end}}
+{{else if eq .Status "limited"}}<details><summary>Show limited clip</summary>{{if .Video}}<video controls preload="none" src="/media?id={{.ID}}" aria-label="Play {{.Name}}"></video>{{else}}<audio controls preload="none" src="/media?id={{.ID}}" aria-label="Play {{.Name}}"></audio>{{end}}</details>
+{{else if eq .Status "pending" "uploading"}}<div><div class="progress indeterminate" role="progressbar" aria-label="Checking {{.Name}}"><span></span></div><div class="progress-row"><span>Checking {{if .Video}}frames and sound{{else}}speech and sound{{end}}</span><span>Plays once approved</span></div></div>
+{{else if eq .Status "age-restricted"}}<p class="note"><strong>Age-restricted{{with .Reasons}} for {{lower (index . 0).Label}}{{end}}.</strong> Not played here: Calmclips has no age check.</p>
+{{else if eq .Status "blocked"}}<p class="note"><strong>Blocked{{with .Reasons}} for {{range $i, $f := .}}{{if $i}} and {{end}}{{lower $f.Label}}{{end}}{{end}}.</strong> Only you can see this clip.</p>
+{{else if eq .Status "purged"}}<p class="note"><strong>Removed{{with .Reasons}} for {{lower (index . 0).Label}}{{end}}.</strong> CalmLens deleted the file; the report is kept.</p>
+{{else if eq .Status "error"}}<form class="retry" action="/retry" method="post"><span class="note">Couldn't process this clip. It may be damaged, longer than 2 minutes or in an unsupported format.</span><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">{{if $.Demo}}<select name="demo_result" aria-label="Demo outcome after retry"><option value="allowed">Approve</option><option value="limited">Limit</option><option value="age-restricted">Age-restrict</option><option value="blocked">Block</option><option value="purged">Remove (purge)</option><option value="error">Fail processing</option></select>{{end}}<button class="secondary" type="submit">Retry processing</button></form>{{end}}
+{{if .Segments}}<div class="timeline"><div class="timeline-head"><strong>Timeline</strong><span>{{len .Segments}} segments{{with .Flagged}} · {{len .}} with findings{{else}} · no findings{{end}}</span></div>
+<div class="track" role="img" aria-label="{{len .Flagged}} of {{len .Segments}} segments with findings">{{range .Segments}}<span class="{{.Level}}" style="left:{{pct .Left}};width:{{pct .Width}}" title="{{clock .Start}}–{{clock .End}}"></span>{{end}}</div>
+<div class="axis"><span>0:00</span><span>{{clock .Duration}}</span></div>
+{{with .Flagged}}<ul class="findings" aria-label="Segments with findings">{{range .}}<li><time>{{clock .Start}}–{{clock .End}}</time><span class="cats">{{range .Findings}}<span><i class="dot {{.Likelihood}}" aria-hidden="true"></i>{{.Label}} <span class="score">{{words .Likelihood}} · {{percent .Score}}</span></span>{{end}}</span></li>{{end}}</ul>{{end}}</div>{{end}}
+</div>
+</article>{{else}}<div class="empty"><strong>No clips yet</strong><p>Upload a voice note or a short video to get started.</p></div>{{end}}</div>
+</section>
+</main>
+<template id="uploading-clip"><article class="clip"><div class="head"><span class="kind" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7 9l5-5 5 5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg></span><div class="title"><p class="name" data-field="name"></p><p class="meta" data-field="meta"></p></div><span class="pill">Uploading</span></div><div class="body"><div><div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div><div class="progress-row"><span data-field="sent"></span><span data-field="part"></span></div></div></div></article></template>
+<script type="module" src="{{if .Demo}}/demo.js{{else}}/upload.js{{end}}"></script>
+</body></html>

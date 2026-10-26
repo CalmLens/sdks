@@ -51,7 +51,8 @@ const (
 	signedURLReuse = 150 * time.Second
 	// A segment category is shown as a finding from "possible" (0.4) upwards.
 	findingThreshold = 0.4
-	demoDelay        = 2 * time.Second
+	// A demo clip stays in processing this long before its selected outcome is written.
+	demoDelay = 5 * time.Second
 	// The example only runs locally, on loopback.
 	listenAddr    = "127.0.0.1:6402"
 	defaultAPIURL = "https://api.calmlens.com/v1"
@@ -91,9 +92,16 @@ var pageSource string
 //go:embed upload.js
 var uploadScript []byte
 
+//go:embed demo.js
+var demoScript []byte
+
 // sdkFile matches the files of the SDK's ESM build that the page may import.
 var sdkFile = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.js$`)
-var pageTemplate = template.Must(template.New("page").Funcs(template.FuncMap{"clock": clock, "mib": mib}).Parse(pageSource))
+var pageTemplate = template.Must(template.New("page").Funcs(template.FuncMap{
+	"clock": clock, "size": size, "pct": pct, "label": label, "lower": strings.ToLower,
+	"words":   func(s string) string { return strings.ReplaceAll(s, "-", " ") },
+	"percent": func(score float64) string { return fmt.Sprintf("%.0f%%", score*100) },
+}).Parse(pageSource))
 
 type finding struct {
 	Category   string
@@ -102,10 +110,21 @@ type finding struct {
 	Score      float64
 }
 type segment struct {
-	Start, End  float64
+	Start, End float64
+	// Left and Width place the segment on the clip's timeline bar, in percent. Native chunks
+	// overlap by a second; the bar draws each one up to where the next begins.
 	Left, Width float64
 	Findings    []finding
 }
+
+// Level is the strongest finding's likelihood, for colouring the segment; "" when clear.
+func (s segment) Level() string {
+	if len(s.Findings) == 0 {
+		return ""
+	}
+	return s.Findings[0].Likelihood
+}
+
 type entry struct {
 	// ID is the CalmLens asset ID; Key is this app's own record ID, stored on the asset as its
 	// externalId so every asset can be tied back to the record that created it. ID stays empty
@@ -125,6 +144,58 @@ type entry struct {
 	Segments     []segment
 	signedURL    string
 	signedUntil  time.Time
+}
+
+// Format is the clip's short format name, such as MP3 or MP4.
+func (e entry) Format() string {
+	if name := formatNames[e.Type]; name != "" {
+		return name
+	}
+	return strings.ToUpper(strings.TrimPrefix(strings.TrimPrefix(e.Type, "audio/"), "video/"))
+}
+
+// Flagged lists the segments with at least one finding.
+func (e entry) Flagged() []segment {
+	flagged := []segment{}
+	for _, s := range e.Segments {
+		if len(s.Findings) > 0 {
+			flagged = append(flagged, s)
+		}
+	}
+	return flagged
+}
+
+// Reasons lists each category found anywhere in the clip once, strongest first, as the reason
+// shown next to a decision.
+func (e entry) Reasons() []finding {
+	best := map[string]finding{}
+	for _, s := range e.Segments {
+		for _, f := range s.Findings {
+			if f.Score > best[f.Category].Score {
+				best[f.Category] = f
+			}
+		}
+	}
+	reasons := make([]finding, 0, len(best))
+	for _, f := range best {
+		reasons = append(reasons, f)
+	}
+	sort.Slice(reasons, func(i, j int) bool { return reasons[i].Score > reasons[j].Score })
+	return reasons
+}
+
+var formatNames = map[string]string{
+	"audio/wav": "WAV", "audio/x-wav": "WAV", "audio/wave": "WAV", "audio/mpeg": "MP3", "audio/flac": "FLAC",
+	"audio/x-flac": "FLAC", "audio/aac": "AAC", "audio/mp4": "M4A", "audio/x-m4a": "M4A", "audio/ogg": "Ogg",
+	"audio/opus": "Opus", "audio/aiff": "AIFF", "audio/x-aiff": "AIFF", "audio/x-ms-wma": "WMA",
+	"video/mp4": "MP4", "video/quicktime": "MOV", "video/webm": "WebM", "video/x-matroska": "MKV",
+	"video/x-msvideo": "AVI", "video/avi": "AVI", "video/mpeg": "MPEG", "video/mp2t": "MPEG-TS", "video/x-ms-wmv": "WMV",
+}
+
+// activity is one line in the activity panel: a decision the app picked up for a clip, and
+// how (a status check or a webhook). A test delivery has no clip and the status "test".
+type activity struct {
+	Time, Name, Status, Via string
 }
 
 // config is read from the environment by main.
@@ -153,7 +224,7 @@ type app struct {
 	entries   []*entry
 	uploading int
 	seen      map[string]bool
-	activity  []string
+	activity  []activity
 }
 
 // newApp fails closed: it needs both credentials, or demo mode requested explicitly.
@@ -202,6 +273,7 @@ func (a *app) handler() http.Handler {
 	if a.demo != nil {
 		// The demo has no upload preset: the browser posts the clip to this server.
 		mux.HandleFunc("POST /upload", a.upload)
+		mux.HandleFunc("GET /demo.js", a.script)
 	} else {
 		mux.HandleFunc("POST /uploads/start", a.startUpload)
 		mux.HandleFunc("POST /uploads/finish", a.finishUpload)
@@ -212,10 +284,13 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /retry", a.retry)
 	mux.HandleFunc("POST /delete", a.remove)
 	mux.HandleFunc("POST /webhooks/calmlens", a.webhook)
-	policy := "default-src 'none'; style-src 'unsafe-inline'; media-src 'self' https: http://localhost:* http://127.0.0.1:*; form-action 'self'; frame-ancestors 'none'"
+	policy := "default-src 'none'; style-src 'unsafe-inline'; media-src 'self' https: http://localhost:* http://127.0.0.1:*; form-action 'self'; frame-ancestors 'none'; script-src 'self'"
 	if a.demo == nil {
 		// The page's script and the SDK come from this server; uploads go to the CalmLens API.
-		policy += "; script-src 'self'; connect-src 'self' " + origin(a.apiURL)
+		policy += "; connect-src 'self' " + origin(a.apiURL)
+	} else {
+		// The demo's script posts the clip to this server, with upload progress.
+		policy += "; connect-src 'self'"
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -273,6 +348,13 @@ func clipType(declared string) (string, bool) {
 // refresh always retrieves the authoritative asset. It also makes webhook replays harmless.
 // The network call runs without the lock; only the result is applied under it.
 func (a *app) refresh(ctx context.Context, item *entry) error {
+	_, err := a.refreshDecision(ctx, item)
+	return err
+}
+
+// refreshDecision is refresh that also reports whether the clip has just been decided: it was
+// uploading or pending, and is now decided or failed.
+func (a *app) refreshDecision(ctx context.Context, item *entry) (bool, error) {
 	a.mu.Lock()
 	id, key, choice, video, since := item.ID, item.Key, item.DemoResult, item.Video, item.PendingSince
 	a.mu.Unlock()
@@ -287,10 +369,11 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if err != nil {
-		item.Error = "Could not refresh the decision. Playback is unavailable."
+		item.Error = "Couldn't check this clip's status. Playback is paused until it can be checked."
 		item.signedURL = ""
-		return err
+		return false, err
 	}
+	before := item.Status
 	item.Status = clipStatus(asset)
 	item.Duration, item.Segments = 0, nil
 	if report := asset.Classification.Moderation; report.Timeline != nil {
@@ -300,7 +383,7 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 	if !playable(item.Status) {
 		item.signedURL = ""
 	}
-	return nil
+	return (before == clipPending || before == clipUploading) && item.Status != clipPending && item.Status != clipUploading, nil
 }
 
 // Clip states shown on the page, derived from the asset's processing and moderation status. A
@@ -360,6 +443,10 @@ func timeline(media *calmlens.MediaClassificationReport) (float64, []segment) {
 		rows = append(rows, row)
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Start < rows[j].Start })
+	for i := range rows[:max(0, len(rows)-1)] {
+		// Overlapping chunks: draw this one up to where the next begins.
+		rows[i].Width = math.Max(0, math.Min(rows[i].Width, rows[i+1].Left-rows[i].Left))
+	}
 	return duration, rows
 }
 
@@ -367,7 +454,37 @@ func clock(seconds float64) string {
 	total := int(math.Round(seconds))
 	return fmt.Sprintf("%d:%02d", total/60, total%60)
 }
-func mib(size int64) string { return fmt.Sprintf("%.1f MiB", float64(size)/(1024*1024)) }
+
+// statusLabels name each clip state on the page.
+var statusLabels = map[string]string{
+	clipUploading: "Uploading", clipPending: "Checking", clipError: "Failed",
+	calmlens.ModerationStatusAllowed: "Approved", calmlens.ModerationStatusLimited: "Limited",
+	calmlens.ModerationStatusAgeRestricted: "Age-restricted", calmlens.ModerationStatusBlocked: "Blocked",
+	calmlens.ModerationStatusPurged: "Removed",
+}
+
+func label(status string) string {
+	if name := statusLabels[status]; name != "" {
+		return name
+	}
+	return status
+}
+
+// size formats a byte count for people: 940 KB, 12.4 MB.
+func size(bytes int64) string {
+	switch {
+	case bytes >= 1024*1024:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/(1024*1024))
+	case bytes >= 1024:
+		return fmt.Sprintf("%d KB", (bytes+512)/1024)
+	}
+	return fmt.Sprintf("%d bytes", bytes)
+}
+
+// pct formats a timeline position for a style attribute.
+func pct(value float64) template.CSS {
+	return template.CSS(strconv.FormatFloat(value, 'f', 2, 64) + "%")
+}
 
 func (a *app) home(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
@@ -384,7 +501,11 @@ func (a *app) home(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func(item *entry) {
 			defer wg.Done()
-			_ = a.refresh(r.Context(), item)
+			if decided, err := a.refreshDecision(r.Context(), item); err == nil && decided {
+				a.mu.Lock()
+				a.record(item.Name, item.Status, "status check")
+				a.mu.Unlock()
+			}
 		}(item)
 	}
 	wg.Wait()
@@ -396,23 +517,24 @@ func (a *app) home(w http.ResponseWriter, r *http.Request) {
 		pending = pending || (item.ID != "" && (item.Status == clipPending || item.Status == clipUploading))
 		copies = append(copies, *item)
 	}
-	activity := append([]string(nil), a.activity...)
+	lines := append([]activity(nil), a.activity...)
 	a.mu.Unlock()
-	// In live mode the page's script reloads instead, so a reload never cuts off an upload.
-	if pending && a.demo != nil {
-		w.Header().Set("Refresh", "3")
-	}
+	// The page's script reloads every three seconds while a clip is checked, but never during an
+	// upload; without JavaScript the demo page refreshes itself instead (a <noscript> refresh).
 	var body bytes.Buffer
 	err := pageTemplate.Execute(&body, struct {
-		Demo     bool
-		CSRF     string
-		Entries  []entry
-		Pending  bool
-		Activity []string
-		MaxMiB   int
-		Preset   string
-		APIURL   string
-	}{a.demo != nil, a.csrf, copies, pending, activity, maxClipBytes / (1024 * 1024), a.preset, a.apiURL})
+		Demo      bool
+		CSRF      string
+		Entries   []entry
+		Pending   bool
+		Activity  []activity
+		Checking  int
+		MaxMiB    int
+		PartSize  int
+		Threshold int
+		Preset    string
+		APIURL    string
+	}{a.demo != nil, a.csrf, copies, pending, lines, checking(copies), maxClipBytes / (1024 * 1024), partSize, multipartThreshold, a.preset, a.apiURL})
 	if err != nil {
 		log.Printf("Render failed: %v", err)
 		http.Error(w, "Could not render page", 500)
@@ -420,6 +542,17 @@ func (a *app) home(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(body.Bytes())
+}
+
+// checking counts the clips still being uploaded or checked.
+func checking(entries []entry) int {
+	n := 0
+	for _, item := range entries {
+		if item.Status == clipPending || item.Status == clipUploading {
+			n++
+		}
+	}
+	return n
 }
 
 // demoChoice validates the explicitly selected demo outcome; live mode ignores it.
@@ -557,9 +690,14 @@ func (a *app) finishUpload(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// script serves the page's upload script.
+// script serves the page's upload script: the browser upload through the preset in live mode,
+// or the demo's upload to this server.
 func (a *app) script(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	if a.demo != nil {
+		_, _ = w.Write(demoScript)
+		return
+	}
 	_, _ = w.Write(uploadScript)
 }
 
@@ -850,8 +988,8 @@ func (a *app) remove(w http.ResponseWriter, r *http.Request) {
 }
 
 // record adds a line to the activity panel. Call it with a.mu held.
-func (a *app) record(line string) {
-	a.activity = append([]string{time.Now().Format("15:04:05") + " " + line}, a.activity...)
+func (a *app) record(name, status, via string) {
+	a.activity = append([]activity{{Time: time.Now().Format("15:04"), Name: name, Status: status, Via: via}}, a.activity...)
 	if len(a.activity) > 8 {
 		a.activity = a.activity[:8]
 	}
@@ -879,7 +1017,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if event.Data.Facts.IsTest() {
-		a.record("Test delivery received (" + event.Type + "). Nothing changed.")
+		a.record("", "test", event.Type)
 		a.markSeen(event.ID)
 		a.mu.Unlock()
 		w.WriteHeader(http.StatusNoContent)
@@ -900,7 +1038,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if item != nil {
-		a.record(event.Type + ": " + item.Name + " is " + item.Status + ".")
+		a.record(item.Name, item.Status, event.Type+" webhook")
 	}
 	a.markSeen(event.ID)
 	w.WriteHeader(http.StatusNoContent)

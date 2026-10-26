@@ -35,14 +35,16 @@ real client's validation, multipart splitting and request encoding still run. Th
 no upload preset, so it uses a **simulated server path**: the browser posts the clip to
 this server, which uploads it with the Go SDK (one `Assets.Create` up to 8 MiB, otherwise
 `Assets.Create` with `Part` and then `Assets.UploadPart` in 5 MiB parts, each streamed
-from the uploaded file with `io.NewSectionReader`). The page needs no JavaScript in the
-demo, and setting `CALMLENS_UPLOAD_PRESET_ID` together with `CALMLENS_DEMO=1` stops
-startup. All demo code
+from the uploaded file with `io.NewSectionReader`). [demo.js](demo.js) adds drag and drop
+and an upload progress row; without JavaScript the form posts normally and the page refreshes
+itself while a clip is checked. Setting `CALMLENS_UPLOAD_PRESET_ID` together with
+`CALMLENS_DEMO=1` stops startup. All demo code
 lives in the separate [`demo`](demo/demo.go) package; live mode never calls it. The demo
 selector lets you choose the outcome explicitly: allow, limit, age-restrict, block, purge, or a
-processing error. The clip stays pending for two seconds, then the selected outcome is
-written with a **simulated** report: a fixed 48-second duration and two overlapping
-`clip` segments with synthetic category scores. Nothing is decoded and no moderation
+processing error. The clip stays pending for five seconds, then the selected outcome is
+written with a **simulated** report: a fixed duration per outcome (41 seconds when allowed, up to
+1:36 when blocked) split into overlapping 30-second `clip` segments, with synthetic category
+scores in some of them (`Scenarios` in [demo/demo.go](demo/demo.go)). Nothing is decoded and no moderation
 model runs. Allowed and limited demo clips play through the mock CDN, and a purged demo clip loses its
 stored content.
 
@@ -100,8 +102,9 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   multipart upload: `assets.create` with `part` (part 1) and `totalSizeInBytes`, then
   `assets.uploadPart` for each further part, marking the last with `isFinal`. Every
   non-final part is exactly 5 MiB, the minimum the API accepts, and is a `Blob` slice of
-  the file, so the clip is never copied into memory. A progress bar advances after each
-  part. The preset makes the asset private and keeps its content; the browser can only
+  the file, so the clip is never copied into memory. While it uploads, the clip list shows
+  it with a progress bar and the part being sent; the widget's own queue only shows failed
+  uploads, with its retry. The preset makes the asset private and keeps its content; the browser can only
   name it.
 - **Records.** Each clip gets its own ID (`clip_…`). The upload token sets it as the asset's
   `externalId`, and the browser can't change it. When the upload ends, the page sends the
@@ -114,11 +117,14 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   no longer `pending` (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`), or
   `Classification.Status` is `failed`. While a clip is pending, the page reloads every three seconds (never during
   an upload) and the server calls `Assets.Retrieve`; verified webhooks update a clip
-  sooner.
+  sooner. The **Activity** panel lists each decision the app picked up and whether it came
+  from a status check or a webhook.
 - **Timeline.** `classification.moderation.timeline` provides `durationSeconds` and `segments`. Native analysis
   uses overlapping 30-second chunks (`source: "clip"`). Each segment lists the categories
   that were evaluated (or partially evaluated) with a score of at least 0.4 ("possible").
-  A `not-evaluated` category is never shown as a zero score. Ranges are approximate.
+  A `not-evaluated` category is never shown as a zero score. Ranges are approximate. Each clip
+  shows a bar of its segments, coloured by the strongest finding's likelihood, and lists the
+  segments with findings; the decision line names each category found, strongest first.
 - **Playback.** Only an explicit `allowed` or `limited` status plays. CalmLens delivers a
   `limited` asset exactly like an allowed one and only marks it so your app can reduce its
   reach; this app collapses a limited clip behind a "Show limited clip" control. CalmLens delivers an
@@ -167,7 +173,7 @@ The handler verifies the **exact raw body** before parsing JSON. For `asset.allo
 outcomes and reviewer decisions alike) and `asset.failed`, it retrieves the clip's current state instead of trusting the event snapshot. If that
 retrieval fails it returns 502, so delivery is retried. A delivery that was already
 applied has no further effect, and a test send (fact `{ key: "test", value: true }`) is
-logged in the activity panel and changes nothing.
+listed in the Activity panel and changes nothing.
 
 ## Read the code
 
@@ -177,14 +183,15 @@ logged in the activity panel and changes nothing.
 - [upload.js](upload.js): the browser upload through the preset, single-request or
   multipart, with per-part progress.
 - `upload` and `send`: the demo's simulated server upload.
-- `refresh` and `timeline`: SDK retrieval and turning `classification.moderation.timeline` into segment rows.
+- `refresh` and `timeline`: SDK retrieval and turning `classification.moderation.timeline` into segment rows;
+  `Flagged` and `Reasons` summarise them.
 - `media`: fresh status check, the signed URL cache, live short-lived signed playback
   and streamed demo playback.
 - `retry`, `remove`: `Assets.Retry` and `Assets.Delete`.
 - `webhook`: `VerifyWebhookRequest`, test sends, replays and state refresh.
 - [demo/demo.go](demo/demo.go): the explicitly selected, simulated demo outcomes.
 - [index.html](index.html): server-rendered UI with no external assets; live mode adds
-  `upload.js` as a module script.
+  `upload.js` as a module script, the demo `demo.js`.
 - [main_test.go](main_test.go): format and size limits, upload tokens bound to their clip,
   linking only the clip's own asset, multipart part counts, playback gating, signed URLs,
   timelines, retry, delete, form tokens and webhooks.
