@@ -581,11 +581,7 @@ impl AppState {
         ) else {
             return Ok(EventOutcome::Ignored);
         };
-        if payload
-            .project_id
-            .as_deref()
-            .is_some_and(|project| project != self.library.project_id())
-        {
+        if payload.project_id != self.library.project_id() {
             self.record_unknown(label);
             return Ok(EventOutcome::UnknownAsset);
         }
@@ -644,6 +640,7 @@ impl AppState {
             key: key.into(),
             value: Value::String(value.into()),
             url: None,
+            extra: Default::default(),
         };
         let mut data = WebhookEventData::default();
         data.asset_id = Some(asset_id.into());
@@ -656,7 +653,7 @@ impl AppState {
         let mut payload = WebhookEventPayload::default();
         payload.id = format!("demo-event-{}", random_hex(8));
         payload.event_type = "asset.blocked".into();
-        payload.project_id = Some(self.library.project_id().into());
+        payload.project_id = self.library.project_id().into();
         payload.data = data;
         self.apply_event(&payload, None).await?;
         let folder = self.library.retrieve(asset_id).await?.folder_id;

@@ -327,7 +327,7 @@ impl Library {
                     .assets()
                     .create_signed_url(SignedUrlOptions {
                         asset_id: asset.id.clone(),
-                        resource: Some("content".into()),
+                        resource: Some("rendered".into()),
                         lens: Some(lens.into()),
                         expires_in_seconds: Some(SIGNED_URL_SECONDS),
                         ..Default::default()

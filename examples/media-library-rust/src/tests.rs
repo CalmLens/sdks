@@ -760,7 +760,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     assert_eq!(requests[2].path, "/v1/assets/asset-1/signed-url");
     assert_eq!(body["lens"], THUMB_LENS);
     assert_eq!(body["expiresInSeconds"], SIGNED_URL_SECONDS);
-    assert_eq!(body["resource"], "content");
+    assert_eq!(body["resource"], "rendered");
 
     // Downloads use the 1600px web lens.
     mock.enqueue(200, asset("asset-1", "allowed"));
