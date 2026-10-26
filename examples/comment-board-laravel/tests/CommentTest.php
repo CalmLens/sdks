@@ -23,6 +23,13 @@ final class CommentTest extends TestCase
             'calmlens.project_id' => 'project-1', 'calmlens.webhook_secret' => 'test-secret']);
     }
 
+    /** A classified text asset as the API returns it, with the given moderation status. */
+    private static function asset(string $status): array
+    {
+        return ['id' => 'asset-1', 'upload' => ['status' => 'completed'],
+            'classification' => ['status' => 'completed', 'moderation' => ['status' => $status]]];
+    }
+
     public static function published(): iterable
     {
         yield ['allowed'];
@@ -33,7 +40,7 @@ final class CommentTest extends TestCase
     public function testAllowedOrLimitedCommentIsStoredAndSentToModeration(string $status): void
     {
         $mock = new MockTransport();
-        $mock->enqueueJson(['id' => 'asset-1', 'classification' => ['moderation' => compact('status')]]);
+        $mock->enqueueJson(self::asset($status));
         $this->app->instance(ServerClient::class, $mock->client());
         $this->post('/comments', ['comment' => 'Hello'])->assertRedirect('/')->assertSessionHas('comments', [['text' => 'Hello', 'assetId' => 'asset-1']]);
         self::assertSame('Hello', (string) $mock->requests()[0]->getBody());
@@ -53,7 +60,7 @@ final class CommentTest extends TestCase
     public function testCommentsThatAreNotAllowedAreNotStored(string $status): void
     {
         $mock = new MockTransport();
-        $mock->enqueueJson(['id' => 'asset-1', 'classification' => ['moderation' => compact('status')]]);
+        $mock->enqueueJson(self::asset($status));
         $this->app->instance(ServerClient::class, $mock->client());
         $this->post('/comments', ['comment' => 'example'])->assertSessionHasErrors('comment')->assertSessionMissing('comments');
     }
@@ -70,7 +77,7 @@ final class CommentTest extends TestCase
     {
         config(['calmlens.api_key' => 'key', 'calmlens.api_url' => 'http://localhost:6110/v1', 'calmlens.cdn_url' => 'http://localhost:6130/v1']);
         $client = $this->app->make(ServerClient::class);
-        self::assertSame('http://localhost:6130/v1/assets/project-1/asset-1/content', $client->cdn->getAssetUrl(['assetIdentifier' => 'asset-1']));
+        self::assertSame('http://localhost:6130/v1/assets/project-1/asset-1/rendered', $client->cdn->getAssetUrl(['assetIdentifier' => 'asset-1']));
     }
 
     public function testValidationDoesNotCallApi(): void
