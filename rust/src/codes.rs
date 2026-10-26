@@ -84,6 +84,16 @@ error_codes! {
     FolderParentCycle = "folder/parent-cycle", 409;
     /// `lens/version-conflict` (HTTP 409): Lens updates require a version greater than the current version.
     LensVersionConflict = "lens/version-conflict", 409;
+    /// `hash-list/not-found` (HTTP 404): Hash list not found. Check the list ID in the portal.
+    HashListNotFound = "hash-list/not-found", 404;
+    /// `hash-list/entry-not-found` (HTTP 404): Hash list entry not found.
+    HashListEntryNotFound = "hash-list/entry-not-found", 404;
+    /// `hash-list/limit-reached` (HTTP 409): This project has the most hash lists it can hold. Delete a list to add another.
+    HashListLimitReached = "hash-list/limit-reached", 409;
+    /// `hash-list/entry-limit-reached` (HTTP 409): This project's hash lists hold the most entries they can. Remove entries to add more.
+    HashListEntryLimitReached = "hash-list/entry-limit-reached", 409;
+    /// `hash-list/asset-not-hashed` (HTTP 409): This asset has no perceptual hash. Only image assets that finished processing can be added.
+    HashListAssetNotHashed = "hash-list/asset-not-hashed", 409;
     /// `upload-preset/not-found` (HTTP 404): Upload preset not found. Check the preset ID in the portal.
     UploadPresetNotFound = "upload-preset/not-found", 404;
     /// `upload-preset/disabled` (HTTP 403): This upload preset is paused. Turn it on in the portal to accept uploads.

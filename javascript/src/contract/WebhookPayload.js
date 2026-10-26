@@ -1,7 +1,7 @@
-import { C as POLICY_ALLOWANCE_SCHEMA, D as metaStore, E as backfill, S as FLAGGED_CONTENT_ACTION_SCHEMA, T as getModerationQualifiers, _ as saneStringField, b as PROCESSING_FEATURES_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as primaryUuidField, h as createdAtField, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as updatedAtField, w as POLICY_RESTRICTION_SCHEMA, x as docPropertyInfo, y as uuidField } from "./TestTriggers-B8JgXwQ6.js";
+import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BGyACVB1.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-BG8oOsf8.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-I9R-uNBH.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
 /**
@@ -401,7 +401,8 @@ const ASSET_MODERATION_SCHEMA = zod.object({
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
 	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),
 	timeline: CLASSIFICATION_REPORT_SCHEMA.shape.media,
-	policy: CLASSIFICATION_REPORT_SCHEMA.shape.policy
+	policy: CLASSIFICATION_REPORT_SCHEMA.shape.policy,
+	hashMatches: CLASSIFICATION_REPORT_SCHEMA.shape.hashMatches
 }).meta(metaStore([docPropertyInfo({
 	description: "Moderation findings and decision",
 	namedType: "AssetModeration"
@@ -413,6 +414,9 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	moderation: ASSET_MODERATION_SCHEMA,
 	personDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.personDetection,
 	faceDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.faceDetection,
+	linkDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.linkDetection,
+	aiGeneratedDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.aiGeneratedDetection,
+	textRegions: CLASSIFICATION_REPORT_SCHEMA.shape.textRegions,
 	labels: CLASSIFICATION_REPORT_SCHEMA.shape.labels
 }).meta(metaStore([docPropertyInfo({
 	description: "Classification results",
@@ -953,6 +957,52 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 		automatedOutcome: "allowed"
 	}
 });
+const ASSET_HASH_MATCHED = defineEventType({
+	id: "asset.hash-matched",
+	name: "Hash list match",
+	description: "An uploaded image matched an entry in one of the project's hash lists. A close match on a block list blocks the asset.",
+	category: "moderation",
+	severity: "high",
+	notify: true,
+	permission: "assets:read",
+	fields: {
+		assetName: assetNameField,
+		assetType: assetTypeField,
+		hashListId: field(zod.string(), {
+			label: "Hash list ID",
+			description: "ID of the hash list with the closest match.",
+			display: "code",
+			hidden: true
+		}),
+		hashListName: field(zod.string(), {
+			label: "Hash list",
+			description: "Name of the hash list with the closest match.",
+			display: "text"
+		}),
+		distance: field(zod.number().int(), {
+			label: "Distance",
+			description: "Number of bits that differ between the image's PDQ hash and the listed hash. 0 is the same picture.",
+			display: "number"
+		}),
+		matchAction: field(HASH_LIST_ACTION_SCHEMA, {
+			label: "Action",
+			description: "What the match did: `block` blocked the asset, `flag` only reported it.",
+			display: "enum",
+			valueLabels: {
+				flag: "Flagged",
+				block: "Blocked"
+			}
+		})
+	},
+	example: {
+		assetName: "beach.jpg",
+		assetType: "image",
+		hashListId: "hash-list-123",
+		hashListName: "Banned images",
+		distance: 4,
+		matchAction: "block"
+	}
+});
 const USAGE_SPEND_LIMIT_REACHED = defineEventType({
 	id: "usage.spend-limit-reached",
 	name: "Spend limit reached",
@@ -1228,6 +1278,7 @@ const EVENT_TYPE_INFO = {
 	"asset.content-removed": ASSET_CONTENT_REMOVED,
 	"asset.retried": ASSET_RETRIED,
 	"asset.review-requested": ASSET_REVIEW_REQUESTED,
+	"asset.hash-matched": ASSET_HASH_MATCHED,
 	"usage.limit-reached": USAGE_LIMIT_REACHED,
 	"usage.spend-limit-reached": USAGE_SPEND_LIMIT_REACHED,
 	"upload-preset.daily-limit-reached": UPLOAD_PRESET_DAILY_LIMIT_REACHED,

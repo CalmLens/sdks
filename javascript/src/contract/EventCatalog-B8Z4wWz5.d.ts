@@ -1,4 +1,4 @@
-import { n as PermissionAction } from "./Permissions-DdLV25aB.js";
+import { n as PermissionAction } from "./Permissions-BfEFqPWR.js";
 import * as zod from "zod";
 declare const EVENT_SEVERITY_SCHEMA: zod.ZodEnum<{
   high: "high";
@@ -936,6 +936,85 @@ declare const EVENT_TYPE_INFO: {
         limited: "limited";
         pending: "pending";
         purged: "purged";
+      }>;
+    }, zod.core.$strip>;
+  };
+  readonly "asset.hash-matched": {
+    id: "asset.hash-matched";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      assetName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      assetType: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>>;
+      hashListId: EventFieldDefinition<zod.ZodString>;
+      hashListName: EventFieldDefinition<zod.ZodString>;
+      distance: EventFieldDefinition<zod.ZodNumber>;
+      matchAction: EventFieldDefinition<zod.ZodEnum<{
+        block: "block";
+        flag: "flag";
+      }>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      assetName?: string | null | undefined;
+      assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      hashListId: string;
+      hashListName: string;
+      distance: number;
+      matchAction: "block" | "flag";
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      assetName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      assetType: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>;
+      hashListId: zod.ZodString;
+      hashListName: zod.ZodString;
+      distance: zod.ZodNumber;
+      matchAction: zod.ZodEnum<{
+        block: "block";
+        flag: "flag";
       }>;
     }, zod.core.$strip>;
   };

@@ -28,6 +28,46 @@ class MockTests(unittest.TestCase):
         c.assets.list()["items"][0]["name"] = "changed"
         self.assertEqual(c.database_storage.assets[a["id"]]["name"], "text")
 
+    def test_hash_list_entries_come_from_assets_once_and_go_with_their_list(self):
+        c = MockCalmLensServerClient()
+        statuses = []
+        serve = c.transport
+
+        def recording(request, timeout):
+            response = serve(request, timeout)
+            statuses.append(response.status)
+            return response
+        c.transport = recording
+        hashed = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"})
+        unhashed = c.assets.classify(name="b.png", content={"data": b"png", "type": "image/png"})
+        c.database_storage.assets[hashed["id"]]["content"]["image"].update(perceptualHash="ab" * 32,
+                                                                            perceptualHashQuality=87)
+        hash_list = c.hash_lists.create(name="Removed", action="block")
+        added = c.hash_lists.add_entry(hash_list_id=hash_list["id"], asset_id=hashed["id"], label="Report 1")
+        self.assertEqual((statuses[-1], added["hash"], added["quality"], added["sourceAssetId"], added["label"]),
+                         (201, "ab" * 32, 87, hashed["id"], "Report 1"))
+        again = c.hash_lists.add_entry(hash_list_id=hash_list["id"], hash="AB" * 32)
+        self.assertEqual((statuses[-1], again["id"]), (200, added["id"]))
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.hash_lists.add_entry(hash_list_id=hash_list["id"], asset_id=unhashed["id"])
+        self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.HASH_LIST_ASSET_NOT_HASHED, 409))
+
+        second = c.hash_lists.add_entry(hash_list_id=hash_list["id"], hash="cd" * 32)
+        first_page = c.hash_lists.list_entries(hash_list_id=hash_list["id"], page_size=1)
+        last_page = c.hash_lists.list_entries(hash_list_id=hash_list["id"], page_size=1,
+                                              cursor=first_page["nextCursor"])
+        self.assertEqual(([e["id"] for e in first_page["items"]], first_page["hasMore"],
+                          [e["id"] for e in last_page["items"]], last_page["hasMore"]),
+                         ([second["id"]], True, [added["id"]], False))
+
+        other = c.hash_lists.create(name="Other", action="flag")
+        kept = c.hash_lists.add_entry(hash_list_id=other["id"], hash="ef" * 32)
+        c.hash_lists.delete(hash_list_id=hash_list["id"])
+        self.assertEqual(list(c.database_storage.hash_list_entries), [kept["id"]])
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.hash_lists.remove_entry(entry_id=added["id"])
+        self.assertEqual(raised.exception.code, error_codes.HASH_LIST_ENTRY_NOT_FOUND)
+
     def test_unknown_mock_options_and_outcomes_are_configuration_errors(self):
         for options in ({"queued_outcome": "error"}, {"queued_status": "pending"}):
             with self.assertRaises(CalmLensError) as raised:

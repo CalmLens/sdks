@@ -39,6 +39,27 @@ class MockTest < Minitest::Test
     assert_equal 'sdk/invalid-argument', error.code
   end
 
+  def test_hash_list_entries_take_an_assets_hash_and_go_with_their_list
+    mock = CalmLens::MockServerClient.new
+    list = mock.hash_lists.create(name: 'Removed images', action: 'flag')
+    asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' })
+    error = assert_raises(CalmLens::APIError) { mock.hash_lists.add_entry(hash_list_id: list['id'], asset_id: asset['id']) }
+    assert_equal ['hash-list/asset-not-hashed', 409], [error.code, error.status]
+
+    mock.state.assets[asset['id']]['content']['image'] = { 'perceptualHash' => 'ab' * 32, 'perceptualHashQuality' => 80 }
+    entry = mock.hash_lists.add_entry(hash_list_id: list['id'], asset_id: asset['id'], label: 'Report 1042')
+    assert_equal ['ab' * 32, 80, asset['id'], 'Report 1042'], entry.values_at('hash', 'quality', 'sourceAssetId', 'label')
+    again = mock.hash_lists.add_entry(hash_list_id: list['id'], hash: 'AB' * 32)
+    assert_equal [entry['id'], 1], [again['id'], mock.state.hash_list_entries.size]
+
+    mock.hash_lists.delete(hash_list_id: list['id'])
+    assert_empty mock.state.hash_list_entries
+    error = assert_raises(CalmLens::APIError) { mock.hash_lists.remove_entry(entry_id: entry['id']) }
+    assert_equal ['hash-list/entry-not-found', 404], [error.code, error.status]
+    error = assert_raises(CalmLens::APIError) { mock.hash_lists.list_entries(hash_list_id: list['id']) }
+    assert_equal 'hash-list/not-found', error.code
+  end
+
   def test_wait_for_decision_checks_the_mock_storage
     mock = CalmLens::MockServerClient.new
     asset = mock.assets.create(name: 'later.txt', content: { plain_text: 'x', type: 'text/plain' })

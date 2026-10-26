@@ -407,3 +407,93 @@ async fn mock_options_set_the_base_urls() {
         "{urls:?}"
     );
 }
+
+/// The shared scenario covers the list lifecycle; these are entries taken from an asset's
+/// perceptual hash, repeated hashes, entry paging and the entries a deleted list takes with it.
+#[tokio::test]
+async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let hashed = mock.assets().create(kept("a.png", b"png")).await.unwrap();
+    let unhashed = mock.assets().create(kept("b.png", b"png")).await.unwrap();
+    let perceptual = "ab".repeat(32);
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&hashed.id).unwrap()["content"]["image"] =
+            json!({"perceptualHash": perceptual, "perceptualHashQuality": 87});
+    });
+    let lists = mock.hash_lists();
+    let list = lists
+        .create(CreateHashList {
+            name: "Removed".into(),
+            action: HashListAction::Block,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let from_asset = AddHashListEntry {
+        hash_list_id: list.id.clone(),
+        asset_id: Some(hashed.id.clone()),
+        label: Some("Report 1".into()),
+        ..Default::default()
+    };
+    let entry = lists.add_entry(from_asset.clone()).await.unwrap();
+    assert_eq!(
+        (
+            entry.hash.as_str(),
+            entry.quality,
+            entry.source_asset_id.as_deref()
+        ),
+        (perceptual.as_str(), Some(87), Some(hashed.id.as_str()))
+    );
+    assert_eq!(mock.requests().last().unwrap().response_status, Some(201));
+    let again = lists.add_entry(from_asset).await.unwrap();
+    assert_eq!(again.id, entry.id);
+    assert_eq!(mock.requests().last().unwrap().response_status, Some(200));
+
+    let not_hashed = lists
+        .add_entry(AddHashListEntry {
+            hash_list_id: list.id.clone(),
+            asset_id: Some(unhashed.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(not_hashed.code(), &ErrorCode::HashListAssetNotHashed);
+
+    let newest = lists
+        .add_entry(AddHashListEntry {
+            hash_list_id: list.id.clone(),
+            hash: Some("0".repeat(64)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let first = lists
+        .list_entries(ListHashListEntries {
+            hash_list_id: list.id.clone(),
+            page_size: Some(1),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(first.items[0].id, newest.id);
+    assert_eq!(first.has_more, Some(true));
+    let second = lists
+        .list_entries(ListHashListEntries {
+            hash_list_id: list.id.clone(),
+            page_size: Some(1),
+            cursor: first.next_cursor,
+        })
+        .await
+        .unwrap();
+    assert_eq!(second.items[0].id, entry.id);
+    assert_eq!(second.has_more, Some(false));
+
+    lists.delete(HashListId::new(&list.id)).await.unwrap();
+    let removed = lists
+        .remove_entry(HashListEntryId::new(&entry.id))
+        .await
+        .unwrap_err();
+    assert_eq!(removed.code(), &ErrorCode::HashListEntryNotFound);
+    assert!(mock.with_storage(|storage| storage.hash_list_entries.is_empty()));
+}

@@ -4,7 +4,7 @@
 //! client's validation, request encoding, retries and error mapping; only the network is
 //! replaced, and no HTTP client is created. [`MockServerClient::in_memory`] adds an in-memory
 //! API behind the queue: uploads create assets with a chosen [`MockOutcome`], and assets,
-//! folders, events and CDN downloads behave like the API's. Enable the feature in
+//! folders, hash lists, events and CDN downloads behave like the API's. Enable the feature in
 //! `[dev-dependencies]`:
 //!
 //! ```toml
@@ -322,8 +322,8 @@ impl MockServerClient {
     /// [`MockOptions::analyzed_outcome`]. Finished processing removes the content unless the
     /// upload set `keep_content_after_processing`; `purged` removes it with reason `policy`.
     /// Retrieve, list (RSQL filter, ordering, folder, cursor), children, update, move, delete,
-    /// delete content, retry, keyword search, signed URLs, folders, lenses and the events feed
-    /// read and change that storage, with the API's error codes, statuses and idempotent
+    /// delete content, retry, keyword search, signed URLs, folders, hash lists, lenses and the
+    /// events feed read and change that storage, with the API's error codes, statuses and idempotent
     /// replays. `wait_for_decision` returns at once for a decided asset; a pending one waits
     /// for [`decide`](Self::decide) or the timeout. The CDN serves stored bytes, refusing
     /// blocked and purged assets, and private or age-restricted ones unless the API key has

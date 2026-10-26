@@ -1,11 +1,12 @@
-import "./Asset-C7keh1sF.js";
+import "./Asset-CttmFD1i.js";
 import "./AssetPayload-BpPkhqVM.js";
+import { n as HashListEntry } from "./HashList-CKW9itTf.js";
 import "./Folder-D1CVstEY.js";
-import "./EventCatalog-DK8SUPrz.js";
-import "./Page-CHCx12S3.js";
-import { r as TypedEvent } from "./Event-C8D_wM3x.js";
-import "./Lens-CH-hrR_K.js";
-import "./PublicErrorCodes-BPH1sv1T.js";
+import "./EventCatalog-B8Z4wWz5.js";
+import { t as CursorPage } from "./Page-CHCx12S3.js";
+import { r as TypedEvent } from "./Event-C1cZsK7E.js";
+import "./Lens-DBy74NnU.js";
+import "./PublicErrorCodes-DqqJEW8i.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
@@ -123,4 +124,46 @@ type GetEventsResponse = {
   cursor: string;
   hasMore: boolean;
 };
-export type { AssetBatchOperation, GetAssetChildrenQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, PatchAssetBody, PatchFolderBody, PostAssetBatchOperationResponse, PostAssetSignedUrlResponse, PostFolderBody };
+declare const GET_HASH_LISTS_RESPONSE_SCHEMA: zod.ZodObject<{
+  items: zod.ZodArray<zod.ZodObject<{
+    id: zod.ZodString;
+    projectId: zod.ZodString;
+    name: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
+    description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
+    action: zod.ZodEnum<{
+      block: "block";
+      flag: "flag";
+    }>;
+    createdByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    createdAt: zod.ZodNumber;
+    updatedAt: zod.ZodOptional<zod.ZodNumber>;
+  }, zod.core.$strip>>;
+}, zod.core.$strip>;
+type GetHashListsResponse = zod.infer<typeof GET_HASH_LISTS_RESPONSE_SCHEMA>;
+declare const POST_HASH_LIST_BODY_SCHEMA: zod.ZodObject<{
+  name: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
+  description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
+  action: zod.ZodEnum<{
+    block: "block";
+    flag: "flag";
+  }>;
+}, zod.core.$strip>;
+type PostHashListBody = zod.infer<typeof POST_HASH_LIST_BODY_SCHEMA>;
+declare const PATCH_HASH_LIST_BODY_SCHEMA: zod.ZodObject<{
+  name: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+  description: zod.ZodOptional<zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>>;
+  action: zod.ZodOptional<zod.ZodEnum<{
+    block: "block";
+    flag: "flag";
+  }>>;
+}, zod.core.$strip>;
+type PatchHashListBody = zod.infer<typeof PATCH_HASH_LIST_BODY_SCHEMA>;
+type GetHashListEntriesResponse = CursorPage<HashListEntry>;
+declare const POST_HASH_LIST_ENTRY_BODY_SCHEMA: zod.ZodObject<{
+  hash: zod.ZodOptional<zod.ZodString>;
+  quality: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+  assetId: zod.ZodOptional<zod.ZodString>;
+  label: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
+}, zod.core.$strip>;
+type PostHashListEntryBody = zod.infer<typeof POST_HASH_LIST_ENTRY_BODY_SCHEMA>;
+export type { AssetBatchOperation, GetAssetChildrenQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, GetHashListEntriesResponse, GetHashListsResponse, PatchAssetBody, PatchFolderBody, PatchHashListBody, PostAssetBatchOperationResponse, PostAssetSignedUrlResponse, PostFolderBody, PostHashListBody, PostHashListEntryBody };

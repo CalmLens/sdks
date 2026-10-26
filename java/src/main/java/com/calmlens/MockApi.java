@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -90,6 +91,8 @@ final class MockApi {
   /** Open multipart uploads by asset ID: their queue choice and declared total size. */
   private final Map<String, JsonObject> uploads = new HashMap<>();
   private final Map<String, JsonObject> lenses = new LinkedHashMap<>();
+  /** Whether the request being answered created a hash list or hash list entry. */
+  private boolean created;
   /** The key's grants once {@link MockCalmLensServerClient#setApiKeyGrants} replaced them, else null. */
   JsonArray grants;
 
@@ -127,6 +130,8 @@ final class MockApi {
         case "PUT lenses" -> Set.of("ensureLens", "ensureLenses");
         case "GET folders" -> Set.of("folders.list");
         case "POST folders" -> Set.of("folders.create");
+        case "GET hash-lists" -> Set.of("hashLists.list");
+        case "POST hash-lists" -> Set.of("hashLists.create");
         case "GET assets/search" -> Set.of("assets.search");
         case "GET assets/page" -> Set.of("assets.list", "assets.iterate");
         case "POST assets/batch" -> Set.of("assets.batch");
@@ -151,6 +156,12 @@ final class MockApi {
       case "folders PATCH " -> Set.of("folders.update");
       case "folders DELETE " -> Set.of("folders.delete");
       case "folders POST move" -> Set.of("folders.move");
+      case "hash-lists GET " -> Set.of("hashLists.retrieve");
+      case "hash-lists PATCH " -> Set.of("hashLists.update");
+      case "hash-lists DELETE " -> Set.of("hashLists.delete");
+      case "hash-lists GET entries" -> Set.of("hashLists.listEntries");
+      case "hash-lists POST entries" -> Set.of("hashLists.addEntry");
+      case "hash-list-entries DELETE " -> Set.of("hashLists.removeEntry");
       default -> Set.of();
     };
   }
@@ -181,17 +192,18 @@ final class MockApi {
     }
     String upload = Objects.requireNonNullElse(request.header("X-CalmLens-Upload"), "");
     JsonElement result;
+    created = false;
     try {
       result = dispatch(request.method(), parts, query(request.query()), body, request.body(), upload);
     } catch (Failure failure) {
       // A failed request frees its key, as the API does.
       return error(failure);
     }
-    // Like the API: deletes answer 200 with an empty object, a new folder is 201 Created and a
-    // queued batch 202 Accepted.
+    // Like the API: deletes answer 200 with an empty object, a new folder, hash list or hash list
+    // entry is 201 Created and a queued batch 202 Accepted.
     byte[] bytes = Json.write(result == null ? new JsonObject() : result).getBytes(StandardCharsets.UTF_8);
     Set<String> operations = operations(request);
-    int status = operations.contains("folders.create") ? 201 : operations.contains("assets.batch") ? 202 : 200;
+    int status = operations.contains("folders.create") || created ? 201 : operations.contains("assets.batch") ? 202 : 200;
     if (key != null) idempotent.put(key, new Saved(fingerprint, status, bytes));
     return respond(status, "application/json", bytes);
   }
@@ -311,6 +323,14 @@ final class MockApi {
         case "PUT lenses": return putLenses(body);
         case "GET folders": return listFolders(q);
         case "POST folders": return createFolder(body, now);
+        case "GET hash-lists": {
+          JsonArray items = new JsonArray();
+          projectHashLists().forEach(items::add);
+          JsonObject result = new JsonObject();
+          result.add("items", items);
+          return result;
+        }
+        case "POST hash-lists": return createHashList(body, now);
         case "GET assets/search": return search(q);
         case "GET assets/page": {
           String folderId = str(q, "folderId");
@@ -331,6 +351,13 @@ final class MockApi {
       String suffix = parts.size() == 3 ? parts.get(2) : "";
       if (parts.get(0).equals("assets")) return assetRoute(method, parts.get(1), suffix, q, body, raw, now);
       if (parts.get(0).equals("folders")) return folderRoute(method, parts.get(1), suffix, body, now);
+      if (parts.get(0).equals("hash-lists")) return hashListRoute(method, parts.get(1), suffix, q, body, now);
+      if (parts.get(0).equals("hash-list-entries") && parts.size() == 2 && method.equals("DELETE")) {
+        JsonObject entry = storage.hashListEntries.get(parts.get(1));
+        if (entry == null || !projectId.equals(str(entry, "projectId"))) throw new Failure(ErrorCodes.HASH_LIST_ENTRY_NOT_FOUND, "Hash list entry not found");
+        storage.hashListEntries.remove(parts.get(1));
+        return null;
+      }
     }
     throw unsupported(method, "/" + String.join("/", parts));
   }
@@ -492,6 +519,7 @@ final class MockApi {
       classified.add("width", JsonNull.INSTANCE);
       classified.add("height", JsonNull.INSTANCE);
       classified.add("perceptualHash", JsonNull.INSTANCE);
+      classified.add("perceptualHashQuality", JsonNull.INSTANCE);
       if (image != null && image.isJsonObject()) image.getAsJsonObject().entrySet().forEach(e -> classified.add(e.getKey(), e.getValue()));
       classified.addProperty("thumbhash", MOCK_THUMBHASH);
       if (str(classified, "averageColor") == null) classified.addProperty("averageColor", "#7f7f7f");
@@ -1111,6 +1139,127 @@ final class MockApi {
     }
     folder.addProperty("updatedAt", now);
     return folder;
+  }
+
+  // ------------------------------------------------------------------ Hash lists
+  // Lists and entries live in memory for the mock's lifetime. Uploads aren't matched against them.
+
+  private static final Pattern PDQ_HASH = Pattern.compile("[0-9a-f]{64}");
+
+  private List<JsonObject> projectHashLists() {
+    return storage.hashLists.values().stream().filter(l -> projectId.equals(str(l, "projectId"))).collect(Collectors.toList());
+  }
+
+  private JsonObject hashList(String id) throws Failure {
+    JsonObject list = storage.hashLists.get(id);
+    if (list == null || !projectId.equals(str(list, "projectId"))) throw new Failure(ErrorCodes.HASH_LIST_NOT_FOUND, "Hash list not found");
+    return list;
+  }
+
+  private static String hashListAction(JsonObject body) {
+    String action = str(body, "action");
+    return "flag".equals(action) || "block".equals(action) ? action : null;
+  }
+
+  private JsonObject createHashList(JsonObject body, long now) throws Failure {
+    String name = str(body, "name");
+    String action = hashListAction(body);
+    if (name == null || name.isBlank() || action == null)
+      throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "A hash list needs a name and an action of flag or block");
+    JsonObject list = new JsonObject();
+    list.addProperty("id", createId());
+    list.addProperty("projectId", projectId);
+    list.addProperty("name", name.trim());
+    list.add("description", nullable(str(body, "description")));
+    list.addProperty("action", action);
+    list.add("createdByUserId", JsonNull.INSTANCE);
+    list.addProperty("createdAt", now);
+    list.addProperty("updatedAt", now);
+    storage.hashLists.put(str(list, "id"), list);
+    created = true;
+    return list;
+  }
+
+  private JsonElement hashListRoute(String method, String id, String suffix, JsonObject q, JsonObject body, long now) throws Failure, IOException {
+    JsonObject list = hashList(id);
+    switch (method + " " + suffix) {
+      case "GET ": return list;
+      case "PATCH ": {
+        if (str(body, "name") != null) list.addProperty("name", str(body, "name").trim());
+        if (body.has("description")) list.add("description", nullable(str(body, "description")));
+        if (hashListAction(body) != null) list.addProperty("action", hashListAction(body));
+        list.addProperty("updatedAt", now);
+        return list;
+      }
+      case "DELETE ":
+        storage.hashLists.remove(id);
+        storage.hashListEntries.values().removeIf(entry -> id.equals(str(entry, "hashListId")));
+        return null;
+      case "GET entries": {
+        int pageSize = (int) bounded(q, "pageSize", 20, MAX_PAGE_SIZE);
+        List<JsonObject> entries = storage.hashListEntries.values().stream().filter(entry -> id.equals(str(entry, "hashListId"))).collect(Collectors.toList());
+        Collections.reverse(entries);
+        String cursor = str(q, "cursor");
+        int start = 0;
+        if (cursor != null) {
+          try {
+            start = Integer.parseInt(new String(Base64.getDecoder().decode(cursor), StandardCharsets.UTF_8));
+          } catch (IllegalArgumentException invalid) {
+            start = -1;
+          }
+          if (start < 0) throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
+        }
+        JsonArray items = new JsonArray();
+        entries.stream().skip(start).limit(pageSize).forEach(items::add);
+        boolean hasMore = start + pageSize < entries.size();
+        JsonObject page = new JsonObject();
+        page.add("items", items);
+        page.addProperty("hasMore", hasMore);
+        page.add("nextCursor", hasMore ? new JsonPrimitive(Base64.getEncoder().encodeToString(String.valueOf(start + pageSize).getBytes(StandardCharsets.UTF_8))) : JsonNull.INSTANCE);
+        page.addProperty("pageSize", pageSize);
+        JsonArray ordering = new JsonArray();
+        for (String field : List.of("createdAt", "id")) {
+          JsonObject order = new JsonObject();
+          order.addProperty("field", field);
+          order.addProperty("direction", "DESC");
+          ordering.add(order);
+        }
+        page.add("ordering", ordering);
+        return page;
+      }
+      case "POST entries": {
+        String hash = str(body, "hash") == null ? null : str(body, "hash").trim().toLowerCase(Locale.ROOT);
+        JsonElement rawQuality = body.get("quality");
+        JsonElement quality = rawQuality != null && rawQuality.isJsonPrimitive() && rawQuality.getAsJsonPrimitive().isNumber() ? rawQuality : JsonNull.INSTANCE;
+        String assetId = str(body, "assetId");
+        if ((hash == null) == (assetId == null)) throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Send either hash or assetId");
+        if (assetId != null) {
+          JsonElement image = path(asset(assetId), "content.image");
+          String perceptualHash = image != null && image.isJsonObject() ? str(image.getAsJsonObject(), "perceptualHash") : null;
+          if (perceptualHash == null) throw new Failure(ErrorCodes.HASH_LIST_ASSET_NOT_HASHED, "This asset has no perceptual hash.");
+          hash = perceptualHash;
+          JsonElement imageQuality = image.getAsJsonObject().get("perceptualHashQuality");
+          quality = imageQuality == null ? JsonNull.INSTANCE : imageQuality;
+        }
+        if (!PDQ_HASH.matcher(hash).matches()) throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Use a PDQ hash of 64 hexadecimal characters");
+        for (JsonObject existing : storage.hashListEntries.values())
+          if (id.equals(str(existing, "hashListId")) && hash.equals(str(existing, "hash"))) return existing;
+        JsonObject entry = new JsonObject();
+        entry.addProperty("id", createId());
+        entry.addProperty("projectId", projectId);
+        entry.addProperty("hashListId", id);
+        entry.addProperty("hash", hash);
+        entry.add("quality", quality);
+        entry.add("label", nullable(str(body, "label")));
+        entry.add("sourceAssetId", nullable(assetId));
+        entry.add("createdByUserId", JsonNull.INSTANCE);
+        entry.addProperty("createdAt", now);
+        storage.hashListEntries.put(str(entry, "id"), entry);
+        created = true;
+        return entry;
+      }
+      default: throw unsupported(method, "/hash-lists/" + id + "/" + suffix);
+    }
   }
 
   /** A JSON value with object keys sorted, so equal definitions compare equal. */

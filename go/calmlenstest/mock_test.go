@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -315,5 +316,64 @@ func TestMockExplainCompletesEvidenceOrReruns(t *testing.T) {
 	}
 	if _, err = c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotDecided {
 		t.Fatal("explained an undecided asset", err)
+	}
+}
+
+func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
+	c, err := NewServerClient(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	list, err := c.HashLists.Create(ctx, calmlens.CreateHashListOptions{Name: "Removed", Action: calmlens.HashListActionBlock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeHashListAssetNotHashed {
+		t.Fatalf("added an asset without a perceptual hash: %v", err)
+	}
+	hash := strings.Repeat("ab", 32)
+	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
+		db.Assets[a.ID]["content"].(calmlens.JSON)["image"] = calmlens.JSON{"perceptualHash": hash, "perceptualHashQuality": float64(73)}
+	})
+	fromAsset, err := c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, AssetID: a.ID, Label: calmlens.Ptr("Report 1")})
+	if err != nil || fromAsset.Hash != hash || fromAsset.Quality == nil || *fromAsset.Quality != 73 || fromAsset.SourceAssetID == nil || *fromAsset.SourceAssetID != a.ID || *fromAsset.Label != "Report 1" || c.lastStatus != http.StatusCreated {
+		t.Fatalf("entry from asset: %+v, status %d, %v", fromAsset, c.lastStatus, err)
+	}
+	again, err := c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, Hash: strings.ToUpper(hash)})
+	if err != nil || again.ID != fromAsset.ID || c.lastStatus != http.StatusOK {
+		t.Fatalf("re-adding a listed hash: %+v, status %d, %v", again, c.lastStatus, err)
+	}
+	second, err := c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, Hash: strings.Repeat("0", 64)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{}
+	for cursor := ""; ; {
+		page, err := c.HashLists.ListEntries(ctx, calmlens.ListHashListEntriesOptions{HashListID: list.ID, Cursor: cursor, PageSize: 1})
+		if err != nil || len(page.Items) != 1 {
+			t.Fatalf("page after %q: %+v, %v", cursor, page, err)
+		}
+		ids = append(ids, page.Items[0].ID)
+		if !page.HasMore {
+			break
+		}
+		cursor = page.NextCursor
+	}
+	if len(ids) != 2 || !slices.Contains(ids, fromAsset.ID) || !slices.Contains(ids, second.ID) {
+		t.Fatalf("paged entries %v, want %s and %s", ids, fromAsset.ID, second.ID)
+	}
+	if err = c.HashLists.Delete(ctx, calmlens.HashListIDOptions{HashListID: list.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.HashLists.RemoveEntry(ctx, calmlens.HashListEntryIDOptions{EntryID: second.ID}); calmlens.ErrorCode(err) != calmlens.CodeHashListEntryNotFound {
+		t.Fatalf("entry outlived its list: %v", err)
+	}
+	if _, err = c.HashLists.ListEntries(ctx, calmlens.ListHashListEntriesOptions{HashListID: list.ID}); calmlens.ErrorCode(err) != calmlens.CodeHashListNotFound {
+		t.Fatalf("listed entries of a deleted list: %v", err)
 	}
 }

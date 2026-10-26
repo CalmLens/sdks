@@ -18,6 +18,7 @@ import type {
   AssetSearchQuery,
   AssetSearchResult as SharedAssetSearchResult,
 } from "../contract/AssetSearch.js";
+import type { HashList, HashListEntry } from "../contract/HashList.js";
 import type { LENS_SCHEMA } from "../contract/Lens.js";
 import type { CursorPage } from "../contract/Page.js";
 import type {
@@ -27,11 +28,16 @@ import type {
   GetEventsQuery,
   GetFoldersQuery,
   GetFoldersResponse,
+  GetHashListEntriesResponse,
+  GetHashListsResponse,
   PatchAssetBody,
   PatchFolderBody,
+  PatchHashListBody,
   PostAssetBatchOperationResponse,
   PostAssetSignedUrlResponse,
   PostFolderBody,
+  PostHashListBody,
+  PostHashListEntryBody,
 } from "../contract/PublicApiSchemas.js";
 
 // ---- Models -------------------------------------------------------------------------------
@@ -133,6 +139,13 @@ export interface ImageTransformOptions {
   background?: string;
   /** The blur radius. */
   blur?: number;
+  /** Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged. */
+  redact?: {
+    /** Blurs every paragraph of text OCR found. */
+    text?: boolean;
+    /** Blurs the email addresses, phone numbers, card numbers, IBANs and social security numbers OCR found. */
+    personalInformation?: boolean;
+  };
   /** A border drawn around the image. */
   border?: {
     /** The border colour. */
@@ -467,6 +480,26 @@ export interface FolderIdOptions {
 export interface MoveFolderOptions extends FolderIdOptions {
   parentId: string | null;
 }
+export type { HashList, HashListEntry };
+/** Every hash list in the project, newest first. */
+export type HashListList = GetHashListsResponse;
+export type CreateHashListOptions = PostHashListBody;
+export type UpdateHashListOptions = PatchHashListBody & { hashListId: string };
+export interface HashListIdOptions {
+  hashListId: string;
+}
+export interface ListHashListEntriesOptions extends HashListIdOptions {
+  /** The previous page's `nextCursor`; omit for the first page. */
+  cursor?: string;
+  pageSize?: number;
+}
+export type HashListEntryPage = GetHashListEntriesResponse;
+/** Send `hash` (and `quality` when you know it) or `assetId`, an image asset in the project. */
+export type AddHashListEntryOptions = PostHashListEntryBody & HashListIdOptions;
+export interface HashListEntryIdOptions {
+  entryId: string;
+}
+
 export interface MoveAssetOptions {
   assetId: string;
   folderId: string | null;

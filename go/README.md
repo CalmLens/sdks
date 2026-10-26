@@ -97,6 +97,12 @@ send `Accept: application/json`. `calmlens.Version` is the SDK version.
 | `folders.list` | `Folders.List(ctx, ListFoldersOptions{})` |
 | `folders.retrieve/delete` | `Folders.Retrieve/Delete(ctx, FolderIDOptions)` |
 | `folders.create/update/move` | `Folders.Create/Update/Move(ctx, …FolderOptions)` |
+| `hashLists.list` | `HashLists.List(ctx, ListHashListsOptions{})` |
+| `hashLists.retrieve/delete` | `HashLists.Retrieve/Delete(ctx, HashListIDOptions)` (`Delete` returns only `error`) |
+| `hashLists.create/update` | `HashLists.Create/Update(ctx, CreateHashListOptions/UpdateHashListOptions)` |
+| `hashLists.listEntries` | `HashLists.ListEntries(ctx, ListHashListEntriesOptions)` |
+| `hashLists.addEntry` | `HashLists.AddEntry(ctx, AddHashListEntryOptions)` |
+| `hashLists.removeEntry` | `HashLists.RemoveEntry(ctx, HashListEntryIDOptions)` (returns only `error`) |
 | `events.list` | `Events.List(ctx, ListEventsOptions)`; follow the cursor: `Events.ListAll(ListEventsOptions)` |
 | `ensureLens/ensureLenses` | `EnsureLens/EnsureLenses(ctx, …Options)` |
 | `cdn.getAssetUrl/serve` | `CDN.GetAssetURL(CDNAssetURLOptions)` / `CDN.Serve(ctx, CDNServeOptions)` |
@@ -149,6 +155,27 @@ stops serving it); `Delete` removes the record and its content. Lists default to
 signed URLs default to the rendered resource and 900 seconds. Lens ensures cache full definitions,
 deduplicate batches/concurrent calls, and invalidate prior definitions by identifier.
 
+### Hash lists
+
+A hash list holds perceptual (PDQ) hashes of images the project never wants again. Image
+uploads are compared with every list in the project: a `HashListActionFlag` list records
+matches in `Classification.Moderation.HashMatches`, and a `HashListActionBlock` list also
+blocks close matches (the policy decision's `Source` is then `DecisionSourceHashList`). Add a
+64-character hex `Hash` (with an optional `Quality`), or the `AssetID` of a processed image
+asset to use its `Content.Image.PerceptualHash`; adding a hash already in the list returns its
+entry. Deleting a list deletes its entries.
+
+```go
+list, err := client.HashLists.Create(ctx, calmlens.CreateHashListOptions{Name: "Removed images", Action: calmlens.HashListActionBlock})
+entry, err := client.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, AssetID: assetID, Label: calmlens.Ptr("Report 1042")})
+page, err := client.HashLists.ListEntries(ctx, calmlens.ListHashListEntriesOptions{HashListID: list.ID, PageSize: 50})
+list, err = client.HashLists.Update(ctx, calmlens.UpdateHashListOptions{HashListID: list.ID, Description: calmlens.Null[string](), Action: calmlens.Ptr(calmlens.HashListActionFlag)})
+```
+
+`ListEntries` returns entries newest first; pass `page.NextCursor` as `Cursor` while
+`page.HasMore` is true. `UpdateHashListOptions` sends only the fields you set, and its
+`Description` is a `calmlens.Patch`, so `calmlens.Null[string]()` clears it.
+
 ### Pagination
 
 `ListAll`, `ListChildrenAll` and `Events.ListAll` return iterators that fetch pages
@@ -184,7 +211,7 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 `processing`, `moderation`, `content`, ...). The state is in three nested structs:
 
 - `Upload` (`AssetUpload`): `Status` is `uploading` or `completed`; `PartsReceived` counts multipart parts while they arrive, and `UpdatedAt` records the latest upload state change.
-- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection` and `Labels` sit alongside `Moderation`, which holds `Status`, `Categories`, `Score`, `Timeline`, `Policy` and reviewer details. Reviewer actions do not change classification completion time.
+- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection`, `LinkDetection`, `AIGeneratedDetection`, `TextRegions` and `Labels` sit alongside `Moderation`, which holds `Status`, `Categories`, `Score`, `Timeline`, `Policy`, `HashMatches` and reviewer details. Reviewer actions do not change classification completion time.
 - `Content` (`AssetContent`): `Status` is whether CalmLens holds the content
   (`ContentStatusTemporary` until processing finishes, `ContentStatusStored` or
   `ContentStatusRemoved`, with `RemovalReason`), plus `Format` (MIME type), `Extension`,
@@ -497,7 +524,8 @@ url, err = client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{
 
 `ImageTransformOptions` types every image option; `Gravity` and `Trim` accept both the
 named form (`&calmlens.ImageGravity{Side: "face"}`, `&calmlens.ImageTrim{Border: &calmlens.ImageTrimBorder{}}`)
-and the detailed form, and `Quality` takes a number (`&calmlens.ImageQuality{Value: 80}`) or a
+and the detailed form, `Redact` (`&calmlens.ImageRedaction{Text: calmlens.Ptr(true)}`) blurs the
+text or personal-information regions found when the image was processed, and `Quality` takes a number (`&calmlens.ImageQuality{Value: 80}`) or a
 level (`&calmlens.ImageQuality{Level: calmlens.ImageQualityHigh}`). A selector has one path
 segment per step, such as `fit=cover,width=640/format=webp`: options are sorted `key=value`
 pairs, nested options are dotted (`border.color=ff0000`) and hex colours drop the `#`. A lens
@@ -567,6 +595,11 @@ same way), plus database/content storage, deterministic IDs/timestamps, upload o
   (`lens/version-conflict` with `currentVersion`, `requestedVersion` and `minimumVersion`), and
   lenses saved before a conflict stay saved. Folder names are unique among siblings (case
   matters), lists sort by code point, and moves refuse cycles.
+- Hash lists and their entries live in `DatabaseStorage` (`HashLists`, `HashListEntries`).
+  `AddEntry` answers 201 for a new entry and 200 with the existing one for a hash already
+  listed, takes an asset's `content.image.perceptualHash` and `perceptualHashQuality` for
+  `AssetID` (`hash-list/asset-not-hashed` without one), and deleting a list deletes its
+  entries. Uploads are not matched against the lists.
 - `EnqueueEvent` adds events to the feed, and returns them as stored, which `Events.List` and
   `ListAll` return after cursors taken earlier (50 per page by default).
 - `CDN.Serve` answers with content type and length, and `Cache-Control` as the CDN sets it

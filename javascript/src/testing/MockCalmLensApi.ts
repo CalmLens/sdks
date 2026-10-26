@@ -4,7 +4,14 @@ import {
   API_ERROR_DEFINITIONS,
   type ApiErrorCode,
 } from "../client/CalmLensErrorCodes";
-import type { Asset, AssetType, Lens } from "../client/CalmLensTypes";
+import type {
+  Asset,
+  AssetType,
+  HashList,
+  HashListEntry,
+  HashListEntryPage,
+  Lens,
+} from "../client/CalmLensTypes";
 import { validateAssetPayload } from "../contract/AssetPayload.js";
 import type { TypedEvent } from "../contract/Event.js";
 import type { Folder } from "../contract/Folder.js";
@@ -84,6 +91,14 @@ export type MockCalmLensOperation =
   | "folders.update"
   | "folders.delete"
   | "folders.move"
+  | "hashLists.list"
+  | "hashLists.retrieve"
+  | "hashLists.create"
+  | "hashLists.update"
+  | "hashLists.delete"
+  | "hashLists.listEntries"
+  | "hashLists.addEntry"
+  | "hashLists.removeEntry"
   | "ensureLens"
   | "ensureLenses";
 
@@ -290,6 +305,8 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         return ["ensureLenses", "ensureLens"];
       case "folders":
         return method === "GET" ? ["folders.list"] : ["folders.create"];
+      case "hash-lists":
+        return method === "GET" ? ["hashLists.list"] : ["hashLists.create"];
       case "assets/page":
         return ["assets.list", "assets.iterate"];
       case "assets/search":
@@ -319,6 +336,17 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         ? ["folders.update"]
         : ["folders.delete"];
   }
+  if (root === "hash-lists" && id !== undefined) {
+    if (action === "entries") {
+      return method === "GET" ? ["hashLists.listEntries"] : ["hashLists.addEntry"];
+    }
+    return method === "GET"
+      ? ["hashLists.retrieve"]
+      : method === "PATCH"
+        ? ["hashLists.update"]
+        : ["hashLists.delete"];
+  }
+  if (root === "hash-list-entries" && id !== undefined) return ["hashLists.removeEntry"];
   if (root !== "assets" || id === undefined) return [];
   switch (action) {
     case undefined:
@@ -352,6 +380,7 @@ const isTextUpload = (request: MockRequest) =>
 /** Like the API: a new folder is 201 Created, a queued batch 202 Accepted, everything else 200. */
 const SUCCESS_STATUS: Partial<Record<MockCalmLensOperation, number>> = {
   "folders.create": 201,
+  "hashLists.create": 201,
   "assets.batch": 202,
 };
 
@@ -730,6 +759,10 @@ export class MockCalmLensApi {
           return [200, await this.listFolders(request.query)];
         case "POST folders":
           return [201, await this.createFolder(this.json(request))];
+        case "GET hash-lists":
+          return [200, { items: [...this.hashLists.values()].reverse() }];
+        case "POST hash-lists":
+          return [201, this.createHashList(this.json(request))];
         case "PUT lenses":
           return [200, this.ensureLenses(this.json(request))];
       }
@@ -773,7 +806,149 @@ export class MockCalmLensApi {
           return [200, await this.moveFolder(id, this.json(request))];
       }
     }
+    if (root === "hash-lists" && id !== undefined && rest.length === 0) {
+      switch (`${method} ${action ?? ""}`) {
+        case "GET ":
+          return [200, this.findHashList(id)];
+        case "PATCH ":
+          return [200, this.updateHashList(id, this.json(request))];
+        case "DELETE ":
+          return [200, this.deleteHashList(id)];
+        case "GET entries":
+          return [200, this.listHashListEntries(id, request.query)];
+        case "POST entries":
+          return this.addHashListEntry(id, this.json(request));
+      }
+    }
+    if (root === "hash-list-entries" && id !== undefined && method === "DELETE" && !action) {
+      if (!this.hashListEntries.delete(id)) throw fail(API_ERROR_CODES.HASH_LIST_ENTRY_NOT_FOUND);
+      return [200, {}];
+    }
     throw new ApiFailure(404, "not-found", `No route for ${method} /${segments.join("/")}`);
+  }
+
+  // ---- Hash lists --------------------------------------------------------------------------
+  // Lists and entries live in memory for the mock's lifetime. Uploads aren't matched against them.
+
+  private readonly hashLists = new Map<string, HashList>();
+  private readonly hashListEntries = new Map<string, HashListEntry>();
+
+  private createHashList(body: Record<string, unknown>): HashList {
+    const { name, description, action } = body;
+    if (typeof name !== "string" || !name.trim() || (action !== "flag" && action !== "block")) {
+      throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
+        message: "A hash list needs a name and an action of flag or block",
+      });
+    }
+    const now = this.now();
+    const list: HashList = {
+      id: this.createId(),
+      projectId: this.projectId,
+      name: name.trim(),
+      description: typeof description === "string" ? description : null,
+      action,
+      createdByUserId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.hashLists.set(list.id, list);
+    return list;
+  }
+
+  private findHashList(hashListId: string): HashList {
+    const list = this.hashLists.get(hashListId);
+    if (!list) throw fail(API_ERROR_CODES.HASH_LIST_NOT_FOUND);
+    return list;
+  }
+
+  private updateHashList(hashListId: string, body: Record<string, unknown>): HashList {
+    const list = this.findHashList(hashListId);
+    const updated: HashList = {
+      ...list,
+      ...(typeof body.name === "string" ? { name: body.name.trim() } : {}),
+      ...(body.description !== undefined
+        ? { description: (body.description as string | null) ?? null }
+        : {}),
+      ...(body.action === "flag" || body.action === "block" ? { action: body.action } : {}),
+      updatedAt: this.now(),
+    };
+    this.hashLists.set(hashListId, updated);
+    return updated;
+  }
+
+  private deleteHashList(hashListId: string): Record<string, never> {
+    this.findHashList(hashListId);
+    this.hashLists.delete(hashListId);
+    for (const [id, entry] of this.hashListEntries) {
+      if (entry.hashListId === hashListId) this.hashListEntries.delete(id);
+    }
+    return {};
+  }
+
+  private listHashListEntries(hashListId: string, query: URLSearchParams): HashListEntryPage {
+    this.findHashList(hashListId);
+    const pageSize = this.integer(query, "pageSize", 20);
+    const entries = [...this.hashListEntries.values()]
+      .filter((entry) => entry.hashListId === hashListId)
+      .reverse();
+    const cursor = query.get("cursor");
+    const start = cursor ? Number(atob(cursor)) : 0;
+    if (!Number.isInteger(start) || start < 0) throw fail(API_ERROR_CODES.INVALID_CURSOR);
+    const items = entries.slice(start, start + pageSize);
+    const hasMore = start + pageSize < entries.length;
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore ? btoa(String(start + pageSize)) : null,
+      pageSize,
+      ordering: [
+        { field: "createdAt", direction: "DESC" },
+        { field: "id", direction: "DESC" },
+      ],
+    };
+  }
+
+  private async addHashListEntry(
+    hashListId: string,
+    body: Record<string, unknown>,
+  ): Promise<Answer> {
+    const list = this.findHashList(hashListId);
+    let hash = typeof body.hash === "string" ? body.hash.trim().toLowerCase() : undefined;
+    let quality = typeof body.quality === "number" ? body.quality : null;
+    const assetId = typeof body.assetId === "string" ? body.assetId : undefined;
+    if ((hash === undefined) === (assetId === undefined)) {
+      throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
+        message: "Send either hash or assetId",
+      });
+    }
+    if (assetId) {
+      const image = (await this.findOwnAsset(assetId)).content.image;
+      if (!image?.perceptualHash) throw fail(API_ERROR_CODES.HASH_LIST_ASSET_NOT_HASHED);
+      hash = image.perceptualHash;
+      quality = image.perceptualHashQuality ?? null;
+    }
+    if (!/^[0-9a-f]{64}$/.test(hash!)) {
+      throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
+        message: "Use a PDQ hash of 64 hexadecimal characters",
+      });
+    }
+    const existing = [...this.hashListEntries.values()].find(
+      (entry) => entry.hashListId === list.id && entry.hash === hash,
+    );
+    if (existing) return [200, existing];
+    const entry: HashListEntry = {
+      id: this.createId(),
+      projectId: this.projectId,
+      hashListId: list.id,
+      hash: hash!,
+      quality,
+      label: typeof body.label === "string" ? body.label : null,
+      sourceAssetId: assetId ?? null,
+      createdByUserId: null,
+      createdAt: this.now(),
+    };
+    this.hashListEntries.set(entry.id, entry);
+    return [201, entry];
   }
 
   /** The request's JSON body, or `{}` without one. */

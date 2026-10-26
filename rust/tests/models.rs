@@ -28,7 +28,8 @@ fn asset_nested_fields_decode_into_typed_models() {
           "height": 20,
           "thumbhash": "th",
           "averageColor": "#000",
-          "perceptualHash": "ph"
+          "perceptualHash": "ph",
+          "perceptualHashQuality": 87
         },
         "safetyHold": {
           "placedAt": 1,
@@ -74,6 +75,7 @@ fn asset_nested_fields_decode_into_typed_models() {
             }
           },
           "score": 0.9,
+          "hashMatches": [{"source": "hash-list", "listId": "list-1", "entryId": "entry-1", "distance": 4, "action": "block"}],
           "timeline": {
             "durationSeconds": 3,
             "sampledFrames": 1,
@@ -95,6 +97,19 @@ fn asset_nested_fields_decode_into_typed_models() {
           }
         },
         "completedAt": 8,
+        "linkDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "qrCodes": [{"value": "https://example.com", "box": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.4}}],
+          "links": [{"url": "https://example.com", "source": "qr-code"}]
+        },
+        "aiGeneratedDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "provenance": "ai-edited",
+          "signals": [{"kind": "c2pa", "value": "trainedAlgorithmicMedia"}]
+        },
+        "textRegions": [{"box": {"left": 0.5, "top": 0.5, "width": 0.1, "height": 0.1}, "personalInformation": true}],
         "labels": [
           {
             "description": "beach",
@@ -166,9 +181,17 @@ fn asset_nested_fields_decode_into_typed_models() {
             image.height,
             image.thumbhash.as_deref(),
             image.average_color.as_deref(),
-            image.perceptual_hash.as_deref()
+            image.perceptual_hash.as_deref(),
+            image.perceptual_hash_quality
         ),
-        (Some(10), Some(20), Some("th"), Some("#000"), Some("ph"))
+        (
+            Some(10),
+            Some(20),
+            Some("th"),
+            Some("#000"),
+            Some("ph"),
+            Some(87)
+        )
     );
     assert_eq!(
         content.safety_hold.as_ref().unwrap().reason,
@@ -212,6 +235,34 @@ fn asset_nested_fields_decode_into_typed_models() {
         asset.classification.labels.as_ref().unwrap()[0].likelihood,
         Likelihood::VeryLikely
     );
+    let hash_match = &report.hash_matches.as_ref().unwrap()[0];
+    assert_eq!(
+        (
+            hash_match.list_id.as_str(),
+            hash_match.entry_id.as_str(),
+            hash_match.distance,
+            &hash_match.action
+        ),
+        ("list-1", "entry-1", 4.0, &HashListAction::Block)
+    );
+    let links = asset.classification.link_detection.as_ref().unwrap();
+    assert_eq!(links.qr_codes.as_ref().unwrap()[0].bounding_box.top, 0.2);
+    assert_eq!(links.links.as_ref().unwrap()[0].source, LinkSource::QrCode);
+    let provenance = asset
+        .classification
+        .ai_generated_detection
+        .as_ref()
+        .unwrap();
+    assert_eq!(
+        (
+            &provenance.provenance,
+            &provenance.signals.as_ref().unwrap()[0].kind
+        ),
+        (&Some(AiProvenance::AiEdited), &AiSignalKind::C2pa)
+    );
+    let region = &asset.classification.text_regions.as_ref().unwrap()[0];
+    assert!(region.personal_information);
+    assert_eq!(region.bounding_box.left, 0.5);
     let segment = &report.timeline.as_ref().unwrap().segments[0];
     assert_eq!(segment.source, MediaSegmentSource::FrameText);
     assert_eq!(

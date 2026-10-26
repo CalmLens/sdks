@@ -1,6 +1,6 @@
 # CalmLens PHP SDK
 
-PHP 8.2+ server-side client for moderation, uploads, assets, folders, events, webhooks,
+PHP 8.2+ server-side client for moderation, uploads, assets, folders, hash lists, events, webhooks,
 upload tokens, named lenses and CDN delivery. Uses Guzzle 7 and PSR-7 streams.
 Methods and option keys use camelCase; responses are associative arrays with the
 API's field names. Unknown response fields and event types are preserved.
@@ -52,6 +52,7 @@ configuration. The defaults are constants on `ServerClient`. Requests send a
 | --- | --- |
 | `assets` | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
 | `folders` | `list`, `create`, `retrieve`, `update`, `move`, `delete` |
+| `hashLists` | `list`, `retrieve`, `create`, `update`, `delete`, `listEntries`, `addEntry`, `removeEntry` |
 | `text` | `classify` |
 | `events` | `list`, `each`, `eachPage` |
 | `cdn` | `getAssetUrl`, `serve` |
@@ -61,7 +62,22 @@ configuration. The defaults are constants on `ServerClient`. Requests send a
 
 Methods take option arrays matching the API, e.g. `['assetId' => 'asset-1']`.
 Use `['folderId' => null]` or `['parentId' => null]` to move to the root.
-`delete` returns void; other network methods return decoded JSON.
+`delete` and `removeEntry` return void; other network methods return decoded JSON.
+
+Hash lists hold PDQ hashes of images you never want again. Image uploads are compared with
+every list in the project: a `flag` list reports matches, a `block` list also blocks close ones.
+
+```php
+$list = $client->hashLists->create(['name' => 'Removed images', 'action' => 'block']);
+// Add a 64-character hex PDQ hash, or the hash of an image asset that finished processing.
+$entry = $client->hashLists->addEntry(['hashListId' => $list['id'], 'assetId' => $assetId, 'label' => 'Report 1042']);
+$page = $client->hashLists->listEntries(['hashListId' => $list['id'], 'pageSize' => 50]);
+$client->hashLists->removeEntry(['entryId' => $entry['id']]);
+```
+
+Adding a hash the list already holds returns the existing entry. An asset without a perceptual
+hash fails with `ErrorCodes::HASH_LIST_ASSET_NOT_HASHED`. `update` takes `name`, `description`
+(null clears it) and `action`; deleting a list deletes its entries.
 
 ### Uploads and moderation
 
@@ -115,7 +131,7 @@ foreach ($client->events->eachPage(['after' => $savedCursor]) as $page) {
 ```
 
 Asset lists use `cursor`, `pageSize`, `ordering` and `filter`. Child lists work the
-same way. Folder lists retain `pageIndex`. An event list without `after` starts at
+same way, as do hash list entries (`listEntries`, newest first). Folder lists retain `pageIndex`. An event list without `after` starts at
 the current feed position; save the returned cursor to consume subsequent events.
 `assets->each` and `eachChild` stop at a page without a next cursor, with `hasMore` false or
 with no items, and `events->eachPage` when `hasMore` is false. Rather than loop, they throw
@@ -238,13 +254,14 @@ fresh token per upload after authenticating and authorizing the browser user.
 `CalmLens\Testing\MockServerClient` is an in-memory CalmLens behind the real client, which
 runs its usual validation, encoding, retries and error handling: uploads (including multipart
 uploads with `uploadPart`) create assets you can retrieve, list, search, update, move and
-delete; folders, lenses, idempotency keys and the events feed behave like the API's; errors
+delete; folders, hash lists, lenses, idempotency keys and the events feed behave like the API's
+(uploads are not matched against hash lists); errors
 carry the API's codes, statuses, `X-Request-Id` and body shape (schema errors are
 `validation/<issue>` with the field in `details['path']`); and the CDN serves stored bytes and
 placeholders. Unset asset fields are `null`, as in the API. Like the API, deleting an asset,
 removing its content and retrying it add `asset.deleted`, `asset.content-removed` and
 `asset.retried` events; processing adds none. Arrange or inspect state through the public
-`assets`, `content`, `folders`, `events` and `lenses` arrays.
+`assets`, `content`, `folders`, `hashLists`, `hashListEntries`, `events` and `lenses` arrays.
 
 ```php
 $mock = new CalmLens\Testing\MockServerClient(queuedOutcome: 'age-restricted');

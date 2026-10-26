@@ -78,7 +78,7 @@ class ContractTest {
       Object result = Fixtures.invoke(client, operation, fixture.getAsJsonObject("options"));
       assertEquals(fixture.get("request"), captured[0]);
       JsonElement response = fixture.get("response");
-      JsonElement expected = operation.endsWith(".delete") ? JsonNull.INSTANCE
+      JsonElement expected = operation.endsWith(".delete") || operation.equals("hashLists.removeEntry") ? JsonNull.INSTANCE
           : operation.equals("ensureLenses") ? response.getAsJsonObject().get("lenses") : response;
       assertEquals(Fixtures.withoutNulls(expected), Fixtures.withoutNulls(tree(result)), "result");
     });

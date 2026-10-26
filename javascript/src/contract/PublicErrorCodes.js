@@ -495,6 +495,31 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "Lens updates require a version greater than the current version.",
 		status: 409
 	}),
+	HASH_LIST_NOT_FOUND: new ErrorCode({
+		id: "hash-list/not-found",
+		defaultMessage: "Hash list not found. Check the list ID in the portal.",
+		status: 404
+	}),
+	HASH_LIST_ENTRY_NOT_FOUND: new ErrorCode({
+		id: "hash-list/entry-not-found",
+		defaultMessage: "Hash list entry not found.",
+		status: 404
+	}),
+	HASH_LIST_LIMIT_REACHED: new ErrorCode({
+		id: "hash-list/limit-reached",
+		defaultMessage: "This project has the most hash lists it can hold. Delete a list to add another.",
+		status: 409
+	}),
+	HASH_LIST_ENTRY_LIMIT_REACHED: new ErrorCode({
+		id: "hash-list/entry-limit-reached",
+		defaultMessage: "This project's hash lists hold the most entries they can. Remove entries to add more.",
+		status: 409
+	}),
+	HASH_LIST_ASSET_NOT_HASHED: new ErrorCode({
+		id: "hash-list/asset-not-hashed",
+		defaultMessage: "This asset has no perceptual hash. Only image assets that finished processing can be added.",
+		status: 409
+	}),
 	UPLOAD_PRESET_NOT_FOUND: new ErrorCode({
 		id: "upload-preset/not-found",
 		defaultMessage: "Upload preset not found. Check the preset ID in the portal.",

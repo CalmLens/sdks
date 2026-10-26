@@ -11,7 +11,7 @@ module CalmLens
   # error handling, then reach an in-memory stand-in for the API and CDN instead of the network.
   #
   # By default the stand-in is stateful: uploads create assets you can retrieve, list, filter,
-  # search, move and delete, folders behave like the API's, the CDN serves stored bytes, and errors use
+  # search, move and delete, folders and hash lists behave like the API's, the CDN serves stored bytes, and errors use
   # the API's codes, HTTP statuses and body shape. It does not classify content: assets moderated
   # synchronously get `analyzed_outcome` and queued ones `queued_outcome`. Content is kept only with
   # `keepContentAfterProcessing: true`; otherwise it is removed once classification is `completed`, as in the API.
@@ -55,7 +55,9 @@ module CalmLens
     # The methods {#fail_next_request} can target, by resource. Iterators are their list calls.
     OPERATIONS = { assets: %i[search list retrieve list_children update create classify upload_part create_signed_url move
                               retry explain wait_for_decision delete_content delete batch],
-                   folders: %i[list retrieve create update delete move], text: %i[classify], events: %i[list],
+                   folders: %i[list retrieve create update delete move],
+                   hash_lists: %i[list retrieve create update delete list_entries add_entry remove_entry],
+                   text: %i[classify], events: %i[list],
                    cdn: %i[serve] }.freeze
     private_constant :OPERATIONS
 

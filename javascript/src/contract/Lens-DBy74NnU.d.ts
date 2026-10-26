@@ -51,6 +51,27 @@ declare const DEFAULT_ASSET_TRANSFORMS: {
           type: "number";
           description: "The blur radius.";
         };
+        redact: {
+          type: "object";
+          title: "Redaction";
+          description: "Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged.";
+          properties: {
+            text: {
+              type: "boolean";
+              description: "Blurs every paragraph of text OCR found.";
+            };
+            personalInformation: {
+              type: "boolean";
+              description: "Blurs the email addresses, phone numbers, card numbers, IBANs and social security numbers OCR found.";
+            };
+            faces?: {
+              type: "boolean";
+              description: "Blurs every face that face detection found.";
+            } | undefined;
+          };
+          required: [];
+          additionalProperties: false;
+        };
         border: {
           type: "object";
           title: "Border";

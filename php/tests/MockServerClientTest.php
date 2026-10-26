@@ -166,6 +166,37 @@ final class MockServerClientTest extends TestCase
         }
     }
 
+    public function testHashListEntryFromAnAssetTakesItsPerceptualHashAndGoesWithTheList(): void
+    {
+        $mock = new MockServerClient(analyzedOutcome: 'allowed');
+        $client = $mock->client();
+        $status = fn (): ?int => (fn (): ?int => $this->lastStatus)->call($mock);
+        $list = $client->hashLists->create(['name' => 'Removed images', 'action' => 'block']);
+        $unhashed = self::image($mock);
+        try {
+            $client->hashLists->addEntry(['hashListId' => $list['id'], 'assetId' => $unhashed['id']]);
+            self::fail('Expected hash-list/asset-not-hashed');
+        } catch (Exception\ConflictException $error) {
+            self::assertSame(ErrorCodes::HASH_LIST_ASSET_NOT_HASHED, $error->errorCode);
+        }
+        $hash = str_repeat('ab', 32);
+        $mock->assets[$unhashed['id']]['content']['image'] = ['perceptualHash' => $hash, 'perceptualHashQuality' => 87];
+        $entry = $client->hashLists->addEntry(['hashListId' => $list['id'], 'assetId' => $unhashed['id'], 'label' => 'Report 1042']);
+        self::assertSame(201, $status());
+        self::assertSame([$hash, 87, $unhashed['id'], 'Report 1042'], [$entry['hash'], $entry['quality'], $entry['sourceAssetId'], $entry['label']]);
+        $again = $client->hashLists->addEntry(['hashListId' => $list['id'], 'hash' => strtoupper($hash)]);
+        self::assertSame(200, $status());
+        self::assertSame($entry['id'], $again['id']);
+        $client->hashLists->delete(['hashListId' => $list['id']]);
+        self::assertSame([], $mock->hashListEntries);
+        try {
+            $client->hashLists->removeEntry(['entryId' => $entry['id']]);
+            self::fail('Expected hash-list/entry-not-found');
+        } catch (Exception\NotFoundException $error) {
+            self::assertSame(ErrorCodes::HASH_LIST_ENTRY_NOT_FOUND, $error->errorCode);
+        }
+    }
+
     public function testExplainCompletesTheEvidenceAndRerunModeratesAgain(): void
     {
         $mock = new MockServerClient(queuedOutcome: 'blocked');

@@ -339,6 +339,10 @@ impl ServerClient {
     pub fn folders(&self) -> FoldersClient<'_> {
         FoldersClient(self)
     }
+    /// Hash list operations.
+    pub fn hash_lists(&self) -> HashListsClient<'_> {
+        HashListsClient(self)
+    }
     /// The project's events feed.
     pub fn events(&self) -> EventsClient<'_> {
         EventsClient(self)
@@ -1197,6 +1201,73 @@ impl FoldersClient<'_> {
     /// Deletes an empty folder.
     pub async fn delete(&self, options: FolderId) -> Result<()> {
         let path = format!("/folders/{}", id(&options.folder_id)?);
+        self.0
+            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .await
+    }
+}
+
+/// Hash list operations. Get it from [`ServerClient::hash_lists`].
+///
+/// Hash lists hold PDQ hashes of images the project never wants again. Image uploads are
+/// compared with every list: `flag` lists record matches, `block` lists also block close ones.
+#[derive(Debug, Clone, Copy)]
+pub struct HashListsClient<'a>(&'a ServerClient);
+impl HashListsClient<'_> {
+    /// Every hash list in the project.
+    pub async fn list(&self) -> Result<HashListList> {
+        let request = self
+            .0
+            .prepare(Method::GET, &self.0.project_path("hash-lists")?, &[])?;
+        self.0.call(request).await
+    }
+    /// Retrieves a hash list.
+    pub async fn retrieve(&self, options: HashListId) -> Result<HashList> {
+        let path = format!("/hash-lists/{}", id(&options.hash_list_id)?);
+        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+    }
+    /// Creates a hash list.
+    pub async fn create(&self, options: CreateHashList) -> Result<HashList> {
+        let request = self
+            .0
+            .prepare(Method::POST, &self.0.project_path("hash-lists")?, &[])?
+            .json(&options)?;
+        self.0.call(request).await
+    }
+    /// Renames a hash list or changes what its matches do; the new action applies to later
+    /// uploads.
+    pub async fn update(&self, options: UpdateHashList) -> Result<HashList> {
+        let path = format!("/hash-lists/{}", id(&options.hash_list_id)?);
+        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Deletes a hash list and every entry in it.
+    pub async fn delete(&self, options: HashListId) -> Result<()> {
+        let path = format!("/hash-lists/{}", id(&options.hash_list_id)?);
+        self.0
+            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .await
+    }
+    /// One page of a hash list's entries, newest first.
+    pub async fn list_entries(&self, options: ListHashListEntries) -> Result<HashListEntryPage> {
+        let path = format!("/hash-lists/{}/entries", id(&options.hash_list_id)?);
+        let mut query = Query::default();
+        query.opt("cursor", options.cursor.as_ref());
+        query.opt("pageSize", options.page_size);
+        self.0
+            .call(self.0.prepare(Method::GET, &path, &query.0)?)
+            .await
+    }
+    /// Adds a hash, or an image asset's perceptual hash, to a hash list. A hash the list
+    /// already holds returns its existing entry.
+    pub async fn add_entry(&self, options: AddHashListEntry) -> Result<HashListEntry> {
+        let path = format!("/hash-lists/{}/entries", id(&options.hash_list_id)?);
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Removes a hash from its hash list.
+    pub async fn remove_entry(&self, options: HashListEntryId) -> Result<()> {
+        let path = format!("/hash-list-entries/{}", id(&options.entry_id)?);
         self.0
             .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
             .await

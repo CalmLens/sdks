@@ -590,6 +590,22 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		result, err = m.Folders.Move(ctx, decode[calmlens.MoveFolderOptions](t, args))
 	case "folders.delete":
 		err = m.Folders.Delete(ctx, decode[calmlens.FolderIDOptions](t, args))
+	case "hashLists.list":
+		result, err = m.HashLists.List(ctx, decode[calmlens.ListHashListsOptions](t, args))
+	case "hashLists.retrieve":
+		result, err = m.HashLists.Retrieve(ctx, decode[calmlens.HashListIDOptions](t, args))
+	case "hashLists.create":
+		result, err = m.HashLists.Create(ctx, decode[calmlens.CreateHashListOptions](t, args))
+	case "hashLists.update":
+		result, err = m.HashLists.Update(ctx, decode[calmlens.UpdateHashListOptions](t, args))
+	case "hashLists.delete":
+		err = m.HashLists.Delete(ctx, decode[calmlens.HashListIDOptions](t, args))
+	case "hashLists.listEntries":
+		result, err = m.HashLists.ListEntries(ctx, decode[calmlens.ListHashListEntriesOptions](t, args))
+	case "hashLists.addEntry":
+		result, err = m.HashLists.AddEntry(ctx, decode[calmlens.AddHashListEntryOptions](t, args))
+	case "hashLists.removeEntry":
+		err = m.HashLists.RemoveEntry(ctx, decode[calmlens.HashListEntryIDOptions](t, args))
 	case "ensureLens":
 		result, err = m.EnsureLens(ctx, decode[calmlens.EnsureLensOptions](t, args))
 	case "ensureLenses":

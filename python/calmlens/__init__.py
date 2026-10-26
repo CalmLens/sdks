@@ -31,6 +31,11 @@ from .types import (
     SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, StoredExtractedText, SubmitAssetOptions,
     UpdateAssetOptions, UpdateFolderOptions,
     UploadPartOptions, Visibility, WaitForDecisionOptions, WebhookEventData, WebhookEventPayload,
+    ImageTransformRedaction, TextRegion, DetectedQrCode, DetectedLink, EvaluatedLinkDetectionResult,
+    LinkDetectionResult, ProvenanceSignal, EvaluatedAiGeneratedDetectionResult, AiGeneratedDetectionResult,
+    LinkDetectionFeatureOptions, AiGeneratedDetectionFeatureOptions, HashMatch, HashListAction, HashList,
+    HashListEntry, HashListList, HashListEntryPage, HashListIdOptions, HashListEntryIdOptions,
+    CreateHashListOptions, UpdateHashListOptions, ListHashListEntriesOptions, AddHashListEntryOptions,
 )
 from .webhooks import (WEBHOOK_DELIVERY_HEADER, WEBHOOK_SIGNATURE_HEADER, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
                        WEBHOOK_TIMESTAMP_HEADER, parse_webhook_event, create_webhook_headers,
@@ -72,4 +77,9 @@ __all__ = [
     "StoredExtractedText",
     "SubmitAssetOptions", "UpdateAssetOptions", "UpdateFolderOptions", "UploadPartOptions", "Visibility",
     "WaitForDecisionOptions", "WebhookEventData", "WebhookEventPayload",
+    "ImageTransformRedaction", "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult",
+    "LinkDetectionResult", "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult",
+    "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "HashMatch", "HashListAction", "HashList",
+    "HashListEntry", "HashListList", "HashListEntryPage", "HashListIdOptions", "HashListEntryIdOptions",
+    "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
 ]

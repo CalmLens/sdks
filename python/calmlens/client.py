@@ -38,6 +38,9 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
                     SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, SubmitAssetOptions,
                     UpdateAssetOptions, UpdateFolderOptions, UploadPartOptions,
+                    AddHashListEntryOptions, CreateHashListOptions, HashList, HashListAction, HashListEntry,
+                    HashListEntryIdOptions, HashListEntryPage, HashListIdOptions, HashListList,
+                    ListHashListEntriesOptions, UpdateHashListOptions,
                     Visibility, WaitForDecisionOptions)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
@@ -788,7 +791,7 @@ class CalmLensServerClient:
         self._bind()
 
     def _bind(self) -> None:
-        self.assets, self.folders = Assets(self), Folders(self)
+        self.assets, self.folders, self.hash_lists = Assets(self), Folders(self), HashLists(self)
         self.upload_tokens = UploadTokens(self)
         self.text, self.events, self.cdn = Text(self), Events(self), CDN(self)
 
@@ -1376,6 +1379,73 @@ class Folders:
         """Delete an empty folder."""
         merged = _merge(options, folder_id=folder_id)
         self._c._request("DELETE", "/folders/" + _id(merged.get("folderId"), "folderId"))
+
+
+class HashLists:
+    """``client.hash_lists``: perceptual hashes that image uploads are compared with. A ``flag``
+    list reports matches; a ``block`` list also blocks close matches."""
+
+    def __init__(self, client: CalmLensServerClient):
+        self._c = client
+
+    def list(self, options: Mapping[str, Any] | None = None, /) -> HashListList:
+        """Every hash list in the project, newest first. Takes no options; an empty options dict
+        is accepted like the other methods'."""
+        if _merge(options):
+            raise _invalid("hash_lists.list takes no options")
+        return cast(HashListList, self._c._request("GET", self._c._project("hash-lists")))
+
+    def retrieve(self, options: HashListIdOptions | None = None, /, *, hash_list_id: str = _UNSET) -> HashList:
+        """Fetch a hash list by ID."""
+        merged = _merge(options, hash_list_id=hash_list_id)
+        return cast(HashList, self._c._request("GET", "/hash-lists/" + _id(merged.get("hashListId"), "hashListId")))
+
+    def create(self, options: CreateHashListOptions | None = None, /, *, name: str = _UNSET,
+               action: HashListAction = _UNSET, description: str | None = _UNSET) -> HashList:
+        """Create a hash list. ``action`` is ``flag`` (report matches) or ``block`` (also block
+        close matches)."""
+        merged = _merge(options, name=name, action=action, description=description)
+        _require(merged, "name")
+        _require(merged, "action")
+        return cast(HashList, self._c._request("POST", self._c._project("hash-lists"), body=merged))
+
+    def update(self, options: UpdateHashListOptions | None = None, /, *, hash_list_id: str = _UNSET,
+               name: str = _UNSET, description: str | None = _UNSET, action: HashListAction = _UNSET) -> HashList:
+        """Rename a list or change what its matches do; the new action applies to later uploads.
+        ``description=None`` clears the description."""
+        merged = _merge(options, hash_list_id=hash_list_id, name=name, description=description, action=action)
+        return cast(HashList, self._c._request("PATCH", "/hash-lists/" + _id(merged.get("hashListId"), "hashListId"),
+                                               body={k: v for k, v in merged.items() if k != "hashListId"}))
+
+    def delete(self, options: HashListIdOptions | None = None, /, *, hash_list_id: str = _UNSET) -> None:
+        """Delete a hash list and every entry in it."""
+        merged = _merge(options, hash_list_id=hash_list_id)
+        self._c._request("DELETE", "/hash-lists/" + _id(merged.get("hashListId"), "hashListId"))
+
+    def list_entries(self, options: ListHashListEntriesOptions | None = None, /, *, hash_list_id: str = _UNSET,
+                     cursor: str = _UNSET, page_size: int = _UNSET) -> HashListEntryPage:
+        """One page of a list's entries, newest first; pass the previous page's ``nextCursor``
+        as ``cursor`` for the next."""
+        merged = _merge(options, hash_list_id=hash_list_id, cursor=cursor, page_size=page_size)
+        path = "/hash-lists/" + _id(merged.get("hashListId"), "hashListId") + "/entries"
+        return cast(HashListEntryPage, self._c._request(
+            "GET", path, query={k: v for k, v in merged.items() if k != "hashListId"}))
+
+    def add_entry(self, options: AddHashListEntryOptions | None = None, /, *, hash_list_id: str = _UNSET,
+                  hash: str = _UNSET, quality: int | None = _UNSET, asset_id: str = _UNSET,
+                  label: str | None = _UNSET) -> HashListEntry:
+        """Add a PDQ ``hash`` (with its ``quality`` when known), or the hash of the image asset
+        ``asset_id``. A hash already in the list returns its existing entry."""
+        merged = _merge(options, hash_list_id=hash_list_id, hash=hash, quality=quality, asset_id=asset_id,
+                        label=label)
+        path = "/hash-lists/" + _id(merged.get("hashListId"), "hashListId") + "/entries"
+        return cast(HashListEntry, self._c._request(
+            "POST", path, body={k: v for k, v in merged.items() if k != "hashListId"}))
+
+    def remove_entry(self, options: HashListEntryIdOptions | None = None, /, *, entry_id: str = _UNSET) -> None:
+        """Remove one entry from its list."""
+        merged = _merge(options, entry_id=entry_id)
+        self._c._request("DELETE", "/hash-list-entries/" + _id(merged.get("entryId"), "entryId"))
 
 
 class Events:

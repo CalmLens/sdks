@@ -485,3 +485,97 @@ func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions)
 	}
 	return s.c.Assets.Classify(ctx, SubmitAssetOptions{Name: options.Name, Content: &Content{Type: "text/plain", PlainText: &options.Text}, Description: options.Description, ProcessingOptions: options.ProcessingOptions, Metadata: options.Metadata, ExternalID: options.ExternalID, ExternalURL: options.ExternalURL, FolderID: options.FolderID, UploadPresetID: options.UploadPresetID, IdempotencyKey: options.IdempotencyKey})
 }
+
+// HashListsService manages hash lists: perceptual hashes of images the project never wants
+// again. Image uploads are compared with every list: flag lists record matches, block lists
+// also block close ones.
+type HashListsService struct{ c *ServerClient }
+
+// List returns every hash list in the project.
+func (s *HashListsService) List(ctx context.Context, options ListHashListsOptions) (*HashListList, error) {
+	var result HashListList
+	if err := s.c.request(ctx, "GET", s.c.project("hash-lists"), nil, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Retrieve returns a hash list.
+func (s *HashListsService) Retrieve(ctx context.Context, options HashListIDOptions) (*HashList, error) {
+	return s.listRequest(ctx, "GET", options.HashListID, nil)
+}
+
+// Create creates a hash list.
+func (s *HashListsService) Create(ctx context.Context, options CreateHashListOptions) (*HashList, error) {
+	var result HashList
+	if err := s.c.request(ctx, "POST", s.c.project("hash-lists"), nil, options, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Update renames a hash list or changes its action; the new action applies to later uploads.
+func (s *HashListsService) Update(ctx context.Context, options UpdateHashListOptions) (*HashList, error) {
+	return s.listRequest(ctx, "PATCH", options.HashListID, options)
+}
+
+// Delete deletes a hash list and every entry in it.
+func (s *HashListsService) Delete(ctx context.Context, options HashListIDOptions) error {
+	path, err := resourcePath("hash-lists", options.HashListID, "")
+	if err != nil {
+		return err
+	}
+	return s.c.request(ctx, "DELETE", path, nil, nil, nil)
+}
+
+// ListEntries returns one page of a hash list's entries, newest first.
+func (s *HashListsService) ListEntries(ctx context.Context, options ListHashListEntriesOptions) (*HashListEntryPage, error) {
+	path, err := resourcePath("hash-lists", options.HashListID, "/entries")
+	if err != nil {
+		return nil, err
+	}
+	params, err := query(ListAssetsOptions{Cursor: options.Cursor, PageSize: options.PageSize})
+	if err != nil {
+		return nil, err
+	}
+	var result HashListEntryPage
+	if err = s.c.request(ctx, "GET", path, params, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// AddEntry adds a hash, or an image asset's hash, to a hash list. A hash already in the list
+// returns its existing entry.
+func (s *HashListsService) AddEntry(ctx context.Context, options AddHashListEntryOptions) (*HashListEntry, error) {
+	path, err := resourcePath("hash-lists", options.HashListID, "/entries")
+	if err != nil {
+		return nil, err
+	}
+	var result HashListEntry
+	if err = s.c.request(ctx, "POST", path, nil, options, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// RemoveEntry removes an entry from its hash list.
+func (s *HashListsService) RemoveEntry(ctx context.Context, options HashListEntryIDOptions) error {
+	path, err := resourcePath("hash-list-entries", options.EntryID, "")
+	if err != nil {
+		return err
+	}
+	return s.c.request(ctx, "DELETE", path, nil, nil, nil)
+}
+
+func (s *HashListsService) listRequest(ctx context.Context, method, id string, body any) (*HashList, error) {
+	path, err := resourcePath("hash-lists", id, "")
+	if err != nil {
+		return nil, err
+	}
+	var result HashList
+	if err = s.c.request(ctx, method, path, nil, body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

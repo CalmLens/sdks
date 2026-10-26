@@ -112,6 +112,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final Text text = new Text();
   /** Folders. */
   public final Folders folders = new Folders();
+  /** Hash lists that image uploads are compared with. */
+  public final HashLists hashLists = new HashLists();
   /** Signs upload tokens for upload presets, locally. */
   public final UploadTokens uploadTokens = new UploadTokens();
   /** The events feed. */
@@ -1386,6 +1388,64 @@ public final class CalmLensServerClient implements AutoCloseable {
     /** Deletes an empty folder. @param options the folder */
     public void delete(Models.FolderId options) {
       success(json("DELETE", "/folders/" + id(str(Models.encode(options), "folderId", null)), null, null));
+    }
+  }
+
+  /**
+   * Hash lists: PDQ perceptual hashes that image uploads are compared with. A {@code flag} list
+   * reports matches in {@code classification.moderation.hashMatches}; a {@code block} list also
+   * blocks close matches.
+   */
+  public final class HashLists {
+    private HashLists() {}
+
+    /** @return every hash list in the project */
+    public Models.HashListList list() {
+      return decode(json("GET", project("hash-lists"), null, null), Models.HashListList.class);
+    }
+
+    /** @param options the hash list @return the hash list */
+    public Models.HashList retrieve(Models.HashListId options) {
+      return decode(json("GET", "/hash-lists/" + id(str(Models.encode(options), "hashListId", null)), null, null), Models.HashList.class);
+    }
+
+    /** @param options name, action and description @return the new hash list */
+    public Models.HashList create(Models.CreateHashList options) {
+      return decode(json("POST", project("hash-lists"), null, Models.encode(options)), Models.HashList.class);
+    }
+
+    /** Renames a list or changes its action; the new action applies to later uploads. @param options the hash list and fields to change @return the hash list */
+    public Models.HashList update(Models.UpdateHashList options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("PATCH", "/hash-lists/" + id(str(o, "hashListId", null)), null, without(o, "hashListId")), Models.HashList.class);
+    }
+
+    /** Deletes the list and every entry in it. @param options the hash list */
+    public void delete(Models.HashListId options) {
+      success(json("DELETE", "/hash-lists/" + id(str(Models.encode(options), "hashListId", null)), null, null));
+    }
+
+    /** @param options the hash list, cursor and page size @return one page of entries, newest first */
+    public Models.HashListEntryPage listEntries(Models.ListHashListEntries options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("GET", "/hash-lists/" + id(str(o, "hashListId", null)) + "/entries", without(o, "hashListId"), null), Models.HashListEntryPage.class);
+    }
+
+    /**
+     * Adds a hash, or an image asset's perceptual hash; a hash the list already holds returns its
+     * existing entry.
+     *
+     * @param options the hash list and either a hash or an asset
+     * @return the entry
+     */
+    public Models.HashListEntry addEntry(Models.AddHashListEntry options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("POST", "/hash-lists/" + id(str(o, "hashListId", null)) + "/entries", null, without(o, "hashListId")), Models.HashListEntry.class);
+    }
+
+    /** Removes a hash from its list; later uploads no longer match it. @param options the entry */
+    public void removeEntry(Models.HashListEntryId options) {
+      success(json("DELETE", "/hash-list-entries/" + id(str(Models.encode(options), "entryId", null)), null, null));
     }
   }
 

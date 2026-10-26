@@ -664,6 +664,23 @@ public final class Models {
     public ImageBorder width(Double value) { return new ImageBorder(color, value); }
   }
 
+  /**
+   * Regions to blur, from those found when the image was processed.
+   *
+   * @param text blur every text region (needs OCR on the upload)
+   * @param personalInformation blur text regions holding personal information
+   */
+  public record Redaction(Boolean text, Boolean personalInformation) {
+    /** No redaction settings. */
+    public Redaction() { this(null, null); }
+
+    /** @param value whether to blur every text region @return a copy with this setting */
+    public Redaction text(Boolean value) { return new Redaction(value, personalInformation); }
+
+    /** @param value whether to blur text regions holding personal information @return a copy with this setting */
+    public Redaction personalInformation(Boolean value) { return new Redaction(text, value); }
+  }
+
   /** What an image transform trims: a uniform border ({@link #border()}) or edges ({@link #edges(TrimEdges)}). */
   @JsonAdapter(Trim.Adapter.class)
   public static final class Trim {
@@ -812,6 +829,7 @@ public final class Models {
     private Boolean anim;
     private String background;
     private Double blur;
+    private Redaction redact;
     private ImageBorder border;
     private Double brightness;
     private Double contrast;
@@ -857,6 +875,10 @@ public final class Models {
     public ImageTransformOptions blur(Double value) { blur = value; return this; }
     /** @return The blur radius. */
     public Double blur() { return blur; }
+    /** @param value Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged. @return these options */
+    public ImageTransformOptions redact(Redaction value) { redact = value; return this; }
+    /** @return Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged. */
+    public Redaction redact() { return redact; }
     /** @param value A border drawn around the image. @return these options */
     public ImageTransformOptions border(ImageBorder value) { border = value; return this; }
     /** @return A border drawn around the image. */
@@ -1602,9 +1624,84 @@ public final class Models {
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       @JsonAdapter(Json.EpochMillis.class) Instant completedAt,
       AssetModeration moderation, PersonDetectionResult personDetection,
-      FaceDetectionResult faceDetection, List<ClassificationLabel> labels) {
-    public AssetClassification { labels = list(labels); }
+      FaceDetectionResult faceDetection, LinkDetectionResult linkDetection,
+      AiGeneratedDetectionResult aiGeneratedDetection, List<TextRegion> textRegions,
+      List<ClassificationLabel> labels) {
+    public AssetClassification { labels = list(labels); textRegions = list(textRegions); }
   }
+
+  /**
+   * A link detection result. {@code qrCodes} and {@code links} are set only for {@code
+   * evaluated}; {@code reason} only for {@code not-evaluated}.
+   *
+   * @param status {@code evaluated} or {@code not-evaluated}
+   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
+   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param qrCodes QR codes found in the image
+   * @param links links found in QR codes and text
+   */
+  public record LinkDetectionResult(String status, String stage, String reason, List<DetectedQrCode> qrCodes, List<DetectedLink> links) {
+    /** Copies collections so the record stays immutable. */
+    public LinkDetectionResult { qrCodes = list(qrCodes); links = list(links); }
+  }
+
+  /**
+   * A QR code found in an image.
+   *
+   * @param value the decoded value
+   * @param box where the code is in the image
+   */
+  public record DetectedQrCode(String value, BoundingBox box) {}
+
+  /**
+   * A link found in an asset.
+   *
+   * @param url the link
+   * @param source where it was found: {@code qr-code} or {@code text}
+   */
+  public record DetectedLink(String url, String source) {}
+
+  /**
+   * An AI-generated content detection result from provenance metadata. {@code provenance} and
+   * {@code signals} are set only for {@code evaluated}; {@code reason} only for {@code not-evaluated}.
+   *
+   * @param status {@code evaluated} or {@code not-evaluated}
+   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
+   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param provenance {@code ai-generated}, {@code ai-edited} or {@code unknown}
+   * @param signals the metadata that indicated it
+   */
+  public record AiGeneratedDetectionResult(String status, String stage, String reason, String provenance, List<ProvenanceSignal> signals) {
+    /** Copies collections so the record stays immutable. */
+    public AiGeneratedDetectionResult { signals = list(signals); }
+  }
+
+  /**
+   * One provenance signal.
+   *
+   * @param kind {@code c2pa}, {@code generator-metadata} or {@code iptc-digital-source-type}
+   * @param value the signal's value
+   */
+  public record ProvenanceSignal(String kind, String value) {}
+
+  /**
+   * A text region found by OCR; {@code redact} transform options blur these.
+   *
+   * @param box where the text is in the image
+   * @param personalInformation whether the region holds personal information
+   */
+  public record TextRegion(BoundingBox box, Boolean personalInformation) {}
+
+  /**
+   * An upload's match against a hash list entry.
+   *
+   * @param source {@code hash-list}
+   * @param listId the hash list
+   * @param entryId the matching entry
+   * @param distance Hamming distance between the hashes
+   * @param action the list's action when matched: {@code flag} or {@code block}
+   */
+  public record HashMatch(String source, String listId, String entryId, Integer distance, HashListAction action) {}
 
   /**
    * One reviewer decision in an asset's review history.
@@ -1621,8 +1718,8 @@ public final class Models {
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
       Map<String, CategoryResult> categories, Double score,
-      MediaClassificationReport timeline, ReportPolicy policy) {
-    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); }
+      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches) {
+    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); hashMatches = list(hashMatches); }
   }
 
   /**
@@ -1688,7 +1785,11 @@ public final class Models {
     public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
   }
 
-  /** Final automatic action, flagged categories and decision source. */
+  /**
+   * Final automatic action, flagged categories and decision source.
+   *
+   * @param source what decided: {@code policy}, {@code asset-override}, {@code children} or {@code hash-list}
+   */
   public record ReportPolicyDecision(String source, String action, List<String> flaggedCategories) {
     public ReportPolicyDecision { flaggedCategories = list(flaggedCategories); }
   }
@@ -1845,9 +1946,10 @@ public final class Models {
    * @param thumbhash ThumbHash placeholder to render while the image loads; null once removed
    * @param averageColor average colour of the image; null once removed
    * @param perceptualHash perceptual hash for matching similar images, for image assets
+   * @param perceptualHashQuality the perceptual hash's quality from 0 to 100; low values match less reliably
    */
   public record AssetImage(
-      Integer width, Integer height, String thumbhash, String averageColor, String perceptualHash) {}
+      Integer width, Integer height, String thumbhash, String averageColor, String perceptualHash, Integer perceptualHashQuality) {}
 
   /**
    * Digests of an asset's uploaded content. Each is null when not computed.
@@ -1931,6 +2033,196 @@ public final class Models {
   public record Folder(String id, String name, String parentId, String projectId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt) {}
+
+  // ------------------------------------------------------------------ Hash lists
+
+  /** What a hash list's matches do. Unknown values are kept like {@link Visibility}. */
+  @JsonAdapter(HashListAction.Adapter.class)
+  public static final class HashListAction {
+    /** Matches are reported in {@code classification.moderation.hashMatches}. */
+    public static final HashListAction FLAG = new HashListAction("flag");
+    /** Matches are reported, and close matches are blocked. */
+    public static final HashListAction BLOCK = new HashListAction("block");
+    private final String value;
+
+    private HashListAction(String value) { this.value = value; }
+
+    /**
+     * @param value the API value
+     * @return the matching constant, or a new instance keeping an unknown value
+     */
+    public static HashListAction of(String value) {
+      return switch (Objects.requireNonNull(value, "value")) {
+        case "flag" -> FLAG;
+        case "block" -> BLOCK;
+        default -> new HashListAction(value);
+      };
+    }
+
+    /** @return the API value */
+    public String value() { return value; }
+
+    /** @return whether this SDK version knows the value */
+    public boolean isKnown() { return this == FLAG || this == BLOCK; }
+
+    @Override public boolean equals(Object other) { return other instanceof HashListAction action && action.value.equals(value); }
+    @Override public int hashCode() { return value.hashCode(); }
+    @Override public String toString() { return value; }
+
+    static final class Adapter extends TypeAdapter<HashListAction> {
+      @Override public void write(JsonWriter out, HashListAction action) throws IOException { if (action == null) out.nullValue(); else out.value(action.value); }
+      @Override public HashListAction read(JsonReader in) throws IOException {
+        if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
+        return of(in.nextString());
+      }
+    }
+  }
+
+  /**
+   * A list of PDQ perceptual hashes that image uploads are compared with.
+   *
+   * @param id hash list ID
+   * @param projectId owning project
+   * @param name name
+   * @param description description, or null
+   * @param action what matches do
+   * @param createdByUserId the user who created it, or null when created with an API key
+   * @param createdAt creation time
+   * @param updatedAt last update time
+   */
+  public record HashList(String id, String projectId, String name, String description, HashListAction action,
+      String createdByUserId,
+      @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
+      @JsonAdapter(Json.EpochMillis.class) Instant updatedAt) {}
+
+  /**
+   * One hash in a hash list.
+   *
+   * @param id entry ID
+   * @param projectId owning project
+   * @param hashListId the hash list
+   * @param hash PDQ hash, 64 lowercase hexadecimal characters
+   * @param quality the hash's quality from 0 to 100, or null when unknown
+   * @param label label, or null
+   * @param sourceAssetId the asset the hash was taken from, or null
+   * @param createdByUserId the user who added it, or null when added with an API key
+   * @param createdAt when it was added
+   */
+  public record HashListEntry(String id, String projectId, String hashListId, String hash, Integer quality,
+      String label, String sourceAssetId, String createdByUserId,
+      @JsonAdapter(Json.EpochMillis.class) Instant createdAt) {}
+
+  /**
+   * Every hash list in a project.
+   *
+   * @param items the hash lists
+   */
+  public record HashListList(List<HashList> items) {
+    /** Copies collections; a missing item list becomes empty. */
+    public HashListList { items = listOrEmpty(items); }
+  }
+
+  /**
+   * One page of a hash list's entries, newest first.
+   *
+   * @param items entries on this page
+   * @param nextCursor continuation cursor, or null
+   * @param pageSize page size
+   * @param hasMore whether another page follows
+   * @param ordering ordering applied
+   */
+  public record HashListEntryPage(List<HashListEntry> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+    /** Copies collections; a missing item list becomes empty. */
+    public HashListEntryPage { items = listOrEmpty(items); ordering = list(ordering); }
+  }
+
+  /** Identifies one hash list. */
+  public static final class HashListId {
+    private String hashListId;
+    public HashListId() {}
+    /** @param hashListId the hash list ID */
+    public HashListId(String hashListId) { this.hashListId = hashListId; }
+    public HashListId hashListId(String value) { hashListId = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Identifies one hash list entry. */
+  public static final class HashListEntryId {
+    private String entryId;
+    public HashListEntryId() {}
+    /** @param entryId the entry ID */
+    public HashListEntryId(String entryId) { this.entryId = entryId; }
+    public HashListEntryId entryId(String value) { entryId = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code hashLists.create}. */
+  public static final class CreateHashList {
+    private String name;
+    private String description;
+    private HashListAction action;
+    public CreateHashList() {}
+    /** @param name the list name @param action what matches do */
+    public CreateHashList(String name, HashListAction action) { this.name = name; this.action = action; }
+    public CreateHashList name(String value) { name = value; return this; }
+    public CreateHashList description(String value) { description = value; return this; }
+    public CreateHashList action(HashListAction value) { action = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code hashLists.update}; unset fields keep their value. A new action applies to later uploads. */
+  public static final class UpdateHashList {
+    private String hashListId;
+    private Patch<String> name;
+    private Patch<String> description;
+    private Patch<HashListAction> action;
+    public UpdateHashList() {}
+    /** @param hashListId the hash list */
+    public UpdateHashList(String hashListId) { this.hashListId = hashListId; }
+    public UpdateHashList hashListId(String value) { hashListId = value; return this; }
+    public UpdateHashList name(Patch<String> value) { name = value; return this; }
+    public UpdateHashList description(Patch<String> value) { description = value; return this; }
+    public UpdateHashList action(Patch<HashListAction> value) { action = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code hashLists.listEntries}. */
+  public static final class ListHashListEntries {
+    private String hashListId;
+    private String cursor;
+    private Integer pageSize;
+    public ListHashListEntries() {}
+    /** @param hashListId the hash list */
+    public ListHashListEntries(String hashListId) { this.hashListId = hashListId; }
+    public ListHashListEntries hashListId(String value) { hashListId = value; return this; }
+    public ListHashListEntries cursor(String value) { cursor = value; return this; }
+    public ListHashListEntries pageSize(Integer value) { pageSize = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * Options for {@code hashLists.addEntry}: set either {@code hash} (with an optional {@code
+   * quality}) or {@code assetId}, whose image's perceptual hash is added.
+   */
+  public static final class AddHashListEntry {
+    private String hashListId;
+    private String hash;
+    private Integer quality;
+    private String assetId;
+    private String label;
+    public AddHashListEntry() {}
+    /** @param hashListId the hash list */
+    public AddHashListEntry(String hashListId) { this.hashListId = hashListId; }
+    public AddHashListEntry hashListId(String value) { hashListId = value; return this; }
+    /** @param value a PDQ hash of 64 hexadecimal characters @return these options */
+    public AddHashListEntry hash(String value) { hash = value; return this; }
+    /** @param value the hash's quality from 0 to 100 @return these options */
+    public AddHashListEntry quality(Integer value) { quality = value; return this; }
+    /** @param value an image asset whose perceptual hash to add @return these options */
+    public AddHashListEntry assetId(String value) { assetId = value; return this; }
+    public AddHashListEntry label(String value) { label = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
 
   /**
    * One registered event fact. Render {@code url} only after checking it (see the events docs).

@@ -84,6 +84,27 @@
         "folderId": ".."
       },
       "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "hashLists.retrieve",
+      "options": {
+        "hashListId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "hashLists.listEntries",
+      "options": {
+        "hashListId": "."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "hashLists.removeEntry",
+      "options": {
+        "entryId": ".."
+      },
+      "error": "sdk/invalid-argument"
     }
   ],
   "cdnUrls": [

@@ -105,7 +105,7 @@ final class ContractTest extends TestCase
     private static function expectedResult(array $fixture): mixed
     {
         return match (true) {
-            str_ends_with($fixture['operation'], '.delete') => null,
+            str_ends_with($fixture['operation'], '.delete'), $fixture['operation'] === 'hashLists.removeEntry' => null,
             $fixture['operation'] === 'ensureLenses' => $fixture['response']['lenses'],
             default => $fixture['response'],
         };

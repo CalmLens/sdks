@@ -7900,6 +7900,85 @@ const noop = () => {};
 const primaryKey = noop;
 const updatedAt = noop;
 const backfill = noop;
+// packages/shared/src/DocMetaTypes.ts
+const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
+// packages/shared/src/ZodUtils.ts
+const primaryUuidField = () => zod.string().uuid({ version: "v4" }).meta({
+	...metaStore([primaryKey()]),
+	examples: ["123e4567-e89b-42d3-a456-426614174000"]
+});
+const uuidField = () => zod.string().uuid({ version: "v4" });
+const createdAtField = () => zod.number().int().meta({ examples: [17672256e5] });
+const updatedAtField = () => zod.number().int().optional().meta({
+	...metaStore([updatedAt()]),
+	examples: [17672259e5]
+});
+const SIZE_LIMITS = {
+	small: 64,
+	medium: 200,
+	large: 1500,
+	xlarge: 1e4,
+	token: 1e4
+};
+const saneStringField = (options) => {
+	return zod.string().transform((value) => value.trim()).refine((value) => {
+		if (options?.minWidth && value.length < options.minWidth) return false;
+		return true;
+	}, "Not long enough").refine((value) => {
+		const sizeLimit = options?.maxLength ?? SIZE_LIMITS[options?.type ?? "medium"];
+		return typeof value === "string" && value.length < sizeLimit;
+	}, "Too long");
+};
+/** A real PDQ hash, for documentation examples. */
+const EXAMPLE_PDQ_HASH = "d8f8f0cce0f4a84f0e370a22028f67f0b36e2ed596623e1d33e6b39c4e9c9b22";
+const PDQ_HASH_SCHEMA = zod.string().trim().toLowerCase().regex(/^[0-9a-f]{64}$/, "Use a PDQ hash of 64 hexadecimal characters");
+/**
+* What a match does: `flag` reports it on the asset and in an event without changing the
+* decision, `block` also blocks close matches.
+*/
+const HASH_LIST_ACTION_SCHEMA = zod.enum(["flag", "block"]);
+zod.object({
+	id: primaryUuidField().describe("Unique hash list ID"),
+	projectId: uuidField().describe("ID of the project that owns the list"),
+	name: saneStringField({
+		type: "medium",
+		minWidth: 1
+	}).meta(metaStore([docPropertyInfo({
+		description: "Display name",
+		example: "Removed images"
+	})])),
+	description: saneStringField({ type: "large" }).nullish().describe("What the list is for, such as the policy it enforces"),
+	action: HASH_LIST_ACTION_SCHEMA.describe(`What a match does: \`flag\` reports it without changing the decision, \`block\` blocks matches 16 bits apart or fewer and flags looser ones`),
+	createdByUserId: zod.string().nullish().describe("ID of the user who created the list"),
+	createdAt: createdAtField().describe("When the list was created, in milliseconds since the Unix epoch"),
+	updatedAt: updatedAtField().describe("When the list was last updated, in milliseconds since the Unix epoch")
+});
+zod.object({
+	id: primaryUuidField().describe("Unique entry ID"),
+	projectId: uuidField().describe("ID of the project that owns the entry"),
+	hashListId: uuidField().describe("ID of the list the entry belongs to"),
+	hash: PDQ_HASH_SCHEMA.meta(metaStore([docPropertyInfo({
+		description: "PDQ hash of the listed image, as 64 hexadecimal characters",
+		example: EXAMPLE_PDQ_HASH
+	})])),
+	quality: zod.number().int().min(0).max(100).nullable().describe(`PDQ quality of the hash from 0 to 100, or \`null\` when it was added without one. Entries below 50 are never matched.`),
+	label: saneStringField({ type: "medium" }).nullish().describe("Your own note or reference for the entry"),
+	sourceAssetId: uuidField().nullish().describe("ID of the asset the hash was taken from, when it was added from an asset"),
+	createdByUserId: zod.string().nullish().describe("ID of the user who added the entry"),
+	createdAt: createdAtField().describe("When the entry was added, in milliseconds since the Unix epoch")
+});
+/**
+* Where a match came from. Project hash lists are the only source today; shared industry lists
+* join this enum as they are connected.
+*/
+const HASH_MATCH_SOURCE_SCHEMA = zod.enum(["hash-list"]);
+const HASH_MATCH_SCHEMA = zod.object({
+	source: HASH_MATCH_SOURCE_SCHEMA.describe("Where the matching hash came from"),
+	listId: zod.string().describe("ID of the matching list"),
+	entryId: zod.string().describe("ID of the matching entry in that list"),
+	distance: zod.number().int().min(0).max(256).describe("Number of bits that differ between the hashes. 0 is the same picture."),
+	action: HASH_LIST_ACTION_SCHEMA.describe("What this match did: `block` when it is close enough for a block list to block, otherwise `flag`")
+}).strict();
 const MODERATION_CATEGORY_DEFINITIONS = {
 	sexual: {
 		summary: "Sexual acts, explicit sexual anatomy, sexual services, sexual assault depictions and clearly erotic material.",
@@ -8782,8 +8861,6 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
-// packages/shared/src/DocMetaTypes.ts
-const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
 // packages/shared/src/ProcessingFeatures.ts
 /**
 * Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
@@ -8812,6 +8889,14 @@ const createFeatureOptionsSchemas = (booleanSchema) => {
 		}).strict().meta(metaStore([docPropertyInfo({
 			description: "Preview. Locate faces in images and optionally estimate an age range for each. Faces are not identified or stored as biometric templates. Results are informational and never change the moderation decision.",
 			namedType: "FaceDetectionFeatureOptions"
+		})])),
+		linkDetection: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
+			description: "Find QR codes and web links in images. QR code contents are moderated as text. With OCR on, links in the extracted text are listed too. Free.",
+			namedType: "LinkDetectionFeatureOptions"
+		})])),
+		aiGeneratedDetection: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
+			description: "Preview. Read the provenance metadata AI image generators attach (C2PA Content Credentials, the IPTC digital source type and generator tool settings) to tell whether an image says it was made or edited with AI. Images whose metadata was stripped, such as screenshots, report no provenance. Results are informational and never change the moderation decision. Free.",
+			namedType: "AiGeneratedDetectionFeatureOptions"
 		})]))
 	};
 };
@@ -8820,10 +8905,13 @@ const createProcessingFeaturesSchema = (booleanSchema) => {
 	return zod.object({
 		ocr: options.ocr.nullish(),
 		personDetection: options.personDetection.nullish(),
-		faceDetection: options.faceDetection.nullish()
+		faceDetection: options.faceDetection.nullish(),
+		linkDetection: options.linkDetection.nullish(),
+		aiGeneratedDetection: options.aiGeneratedDetection.nullish()
 	}).strict().omit({
 		personDetection: true,
-		faceDetection: true
+		faceDetection: true,
+		aiGeneratedDetection: true
 	}).meta(metaStore([docPropertyInfo({
 		description: "Optional analyses to run on this asset, keyed by feature. Unknown features are rejected.",
 		namedType: "ProcessingFeatures"
@@ -8839,6 +8927,13 @@ const BOUNDING_BOX_SCHEMA = zod.object({
 }).strict().meta(metaStore([docPropertyInfo({
 	description: "Position and size as fractions of the image width and height, from 0 to 1. `left` and `top` can be slightly negative when the subject extends past the edge.",
 	namedType: "BoundingBox"
+})]));
+const TEXT_REGION_SCHEMA = zod.object({
+	box: BOUNDING_BOX_SCHEMA,
+	personalInformation: zod.boolean().describe("Whether the region is personal information, such as an email address, phone number or card number, rather than a paragraph of text")
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "Where OCR found text in the image",
+	namedType: "TextRegion"
 })]));
 const DETECTION_CONFIDENCE_SCHEMA = zod.number().min(0).max(1).describe("Detection confidence from 0 to 1");
 const AGE_RANGE_SCHEMA = zod.object({
@@ -8875,40 +8970,52 @@ const createFeatureResultSchema = (shape) => zod.discriminatedUnion("status", [z
 }).strict(), NOT_EVALUATED_FEATURE_RESULT_SCHEMA]);
 const PERSON_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({ people: zod.array(DETECTED_PERSON_SCHEMA) });
 const FACE_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({ faces: zod.array(DETECTED_FACE_SCHEMA) });
+const DETECTED_QR_CODE_SCHEMA = zod.object({
+	value: zod.string().describe("The text the QR code holds, such as a URL"),
+	box: BOUNDING_BOX_SCHEMA
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "A decoded QR code",
+	namedType: "DetectedQrCode"
+})]));
+const DETECTED_LINK_SCHEMA = zod.object({
+	url: zod.string().describe("The link, with `https://` added when the image left it out"),
+	source: zod.enum(["qr-code", "text"]).describe("Where the link was found: in a QR code, or in the text OCR extracted")
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "A web link found in the image",
+	namedType: "DetectedLink"
+})]));
+const LINK_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({
+	qrCodes: zod.array(DETECTED_QR_CODE_SCHEMA),
+	links: zod.array(DETECTED_LINK_SCHEMA)
+});
+const PROVENANCE_SIGNAL_SCHEMA = zod.object({
+	kind: zod.enum([
+		"c2pa",
+		"iptc-digital-source-type",
+		"generator-metadata"
+	]).describe("Where the evidence was found: a C2PA manifest, the IPTC digital source type in XMP, or settings an image generator wrote"),
+	value: zod.string().describe("What it says, such as the digital source type or the generator's name")
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "Provenance metadata found in the image file",
+	namedType: "ProvenanceSignal"
+})]));
+const AI_GENERATED_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({
+	provenance: zod.enum([
+		"ai-generated",
+		"ai-edited",
+		"unknown"
+	]).describe("What the metadata says: `ai-generated`, `ai-edited` (a composite or edit made with AI), or `unknown` when the file carries no AI provenance. `unknown` doesn't mean a person made it: screenshots and re-saved images lose their metadata."),
+	signals: zod.array(PROVENANCE_SIGNAL_SCHEMA)
+});
 const PROCESSING_FEATURE_RESULTS_SCHEMA = zod.object({
 	personDetection: PERSON_DETECTION_RESULT_SCHEMA.optional(),
-	faceDetection: FACE_DETECTION_RESULT_SCHEMA.optional()
+	faceDetection: FACE_DETECTION_RESULT_SCHEMA.optional(),
+	linkDetection: LINK_DETECTION_RESULT_SCHEMA.optional(),
+	aiGeneratedDetection: AI_GENERATED_DETECTION_RESULT_SCHEMA.optional()
 }).strict().meta(metaStore([docPropertyInfo({
 	description: "Results of the optional features requested in `processingOptions.features`, keyed by feature",
 	namedType: "ProcessingFeatureResults"
 })]));
-// packages/shared/src/ZodUtils.ts
-const primaryUuidField = () => zod.string().uuid({ version: "v4" }).meta({
-	...metaStore([primaryKey()]),
-	examples: ["123e4567-e89b-42d3-a456-426614174000"]
-});
-const uuidField = () => zod.string().uuid({ version: "v4" });
-const createdAtField = () => zod.number().int().meta({ examples: [17672256e5] });
-const updatedAtField = () => zod.number().int().optional().meta({
-	...metaStore([updatedAt()]),
-	examples: [17672259e5]
-});
-const SIZE_LIMITS = {
-	small: 64,
-	medium: 200,
-	large: 1500,
-	xlarge: 1e4,
-	token: 1e4
-};
-const saneStringField = (options) => {
-	return zod.string().transform((value) => value.trim()).refine((value) => {
-		if (options?.minWidth && value.length < options.minWidth) return false;
-		return true;
-	}, "Not long enough").refine((value) => {
-		const sizeLimit = options?.maxLength ?? SIZE_LIMITS[options?.type ?? "medium"];
-		return typeof value === "string" && value.length < sizeLimit;
-	}, "Too long");
-};
 const CLASSIFICATION_INPUT_TYPE_SCHEMA = zod.enum(["text", "image"]);
 const CLASSIFICATION_CATEGORIES = [
 	"sexual",
@@ -9032,11 +9139,12 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 		source: zod.enum([
 			"policy",
 			"asset-override",
-			"children"
+			"children",
+			"hash-list"
 		]),
 		action: FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["allow"]).nullable(),
 		flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA)
-	}).strict().optional().describe("The automatic asset decision, including a per-asset action override or a decision inherited from children.")
+	}).strict().optional().describe("The automatic asset decision, including a per-asset action override, a decision inherited from children, or a block from a hash list match.")
 }).strict();
 const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	description: saneStringField(),
@@ -9068,6 +9176,8 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	}).strict().optional(),
 	labels: zod.array(CLASSIFICATION_LABEL_SCHEMA).nullish(),
 	features: PROCESSING_FEATURE_RESULTS_SCHEMA.optional(),
+	textRegions: zod.array(TEXT_REGION_SCHEMA).max(200).optional().describe("Where OCR found text, and personal information within it, in an image. Redaction transforms blur these regions."),
+	hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched."),
 	policy: CLASSIFICATION_REPORT_POLICY_SCHEMA.optional().describe("What the project's moderation policy made of this report when the asset was decided. Absent until then.")
 }).strict();
 // packages/shared/src/TestTriggers.ts
@@ -9379,4 +9489,4 @@ const detectTestImage = async (image, testInputKey) => {
 		if (timingSafeEqual(tag, await getTestInputTag("image", category, testInputKey))) return category;
 	}
 };
-export { POLICY_ALLOWANCE_SCHEMA as C, metaStore as D, backfill as E, FLAGGED_CONTENT_ACTION_SCHEMA as S, getModerationQualifiers as T, saneStringField as _, generateTestTextCode as a, PROCESSING_FEATURES_SCHEMA as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, primaryUuidField as g, createdAtField as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORY_SCHEMA as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORIES as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, updatedAtField as v, POLICY_RESTRICTION_SCHEMA as w, docPropertyInfo as x, uuidField as y };
+export { saneStringField as C, backfill as D, docPropertyInfo as E, metaStore as O, primaryUuidField as S, uuidField as T, POLICY_ALLOWANCE_SCHEMA as _, generateTestTextCode as a, HASH_LIST_ACTION_SCHEMA as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, FLAGGED_CONTENT_ACTION_SCHEMA as g, PROCESSING_FEATURES_SCHEMA as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORY_SCHEMA as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORIES as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, POLICY_RESTRICTION_SCHEMA as v, updatedAtField as w, createdAtField as x, getModerationQualifiers as y };

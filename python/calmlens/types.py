@@ -38,6 +38,11 @@ __all__ = [
     "SignedUploadToken", "SignUploadTokenOptions", "SubmitAssetOptions", "UpdateAssetOptions",
     "UpdateFolderOptions", "UploadPartOptions", "Visibility", "WaitForDecisionOptions",
     "WebhookEventData", "WebhookEventPayload",
+    "ImageTransformRedaction", "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult",
+    "LinkDetectionResult", "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult",
+    "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "HashMatch", "HashListAction", "HashList",
+    "HashListEntry", "HashListList", "HashListEntryPage", "HashListIdOptions", "HashListEntryIdOptions",
+    "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
 ]
 
 # ---- Enum-like values -----------------------------------------------------------------------
@@ -118,6 +123,10 @@ EventFactKey = Union[Literal[
 #: ``flagged-categories``) or ``None``.
 EventFactValue = Any
 
+#: What a hash list's matches do (request values): ``flag`` reports matches, ``block`` also blocks
+#: close matches. Responses may add others.
+HashListAction = Literal["flag", "block"]
+
 #: Raw bytes accepted by ``Content.data``: bytes-like objects or a binary file object.
 BinaryData = Union[bytes, bytearray, memoryview, BinaryIO]
 
@@ -188,12 +197,24 @@ class FaceDetectionFeatureOptions(_FaceDetectionFeatureRequired, total=False):
     ageEstimation: bool
 
 
+class LinkDetectionFeatureOptions(TypedDict):
+    """Beta. Find web links in images, in QR codes and in OCR text."""
+    enabled: bool
+
+
+class AiGeneratedDetectionFeatureOptions(TypedDict):
+    """Beta. Read AI provenance metadata (C2PA, IPTC, generator settings) from image files."""
+    enabled: bool
+
+
 class ProcessingFeatures(TypedDict, total=False):
     """Optional analyses to run on an asset, keyed by feature. Every feature is off unless
     its ``enabled`` is true; unknown features are rejected."""
     ocr: Optional[OcrFeatureOptions]
     personDetection: Optional[PersonDetectionFeatureOptions]
     faceDetection: Optional[FaceDetectionFeatureOptions]
+    linkDetection: Optional[LinkDetectionFeatureOptions]
+    aiGeneratedDetection: Optional[AiGeneratedDetectionFeatureOptions]
 
 
 class ProcessingOptions(TypedDict, total=False):
@@ -349,16 +370,69 @@ class EvaluatedFaceDetectionResult(TypedDict):
     faces: list[DetectedFace]
 
 
+class TextRegion(TypedDict):
+    """Where OCR found text in the image."""
+    box: BoundingBox
+    #: Whether the region is personal information, such as an email address, phone number or card
+    #: number, rather than a paragraph of text.
+    personalInformation: bool
+
+
+class DetectedQrCode(TypedDict):
+    """A decoded QR code."""
+    #: The text the QR code holds, such as a URL.
+    value: str
+    box: BoundingBox
+
+
+class DetectedLink(TypedDict):
+    """A web link found in the image."""
+    #: The link, with ``https://`` added when the image left it out.
+    url: str
+    #: ``qr-code`` or ``text`` (the text OCR extracted). New sources may be added.
+    source: Union[Literal["qr-code", "text"], str]
+
+
+class EvaluatedLinkDetectionResult(TypedDict):
+    status: Literal["evaluated"]
+    stage: ProcessingFeatureStage
+    qrCodes: list[DetectedQrCode]
+    links: list[DetectedLink]
+
+
+class ProvenanceSignal(TypedDict):
+    """Provenance metadata found in the image file."""
+    #: ``c2pa``, ``iptc-digital-source-type`` or ``generator-metadata``. New kinds may be added.
+    kind: Union[Literal["c2pa", "iptc-digital-source-type", "generator-metadata"], str]
+    #: What it says, such as the digital source type or the generator's name.
+    value: str
+
+
+class EvaluatedAiGeneratedDetectionResult(TypedDict):
+    status: Literal["evaluated"]
+    stage: ProcessingFeatureStage
+    #: ``ai-generated``, ``ai-edited`` or ``unknown`` when the file carries no AI provenance
+    #: (which doesn't mean a person made it: re-saved images lose their metadata).
+    provenance: Union[Literal["ai-generated", "ai-edited", "unknown"], str]
+    signals: list[ProvenanceSignal]
+
+
 #: Person detection result; narrow on ``result["status"]`` before reading ``people``.
 PersonDetectionResult = Union[EvaluatedPersonDetectionResult, NotEvaluatedFeatureResult]
 #: Face detection result; narrow on ``result["status"]`` before reading ``faces``.
 FaceDetectionResult = Union[EvaluatedFaceDetectionResult, NotEvaluatedFeatureResult]
+#: Link detection result; narrow on ``result["status"]`` before reading ``qrCodes`` and ``links``.
+LinkDetectionResult = Union[EvaluatedLinkDetectionResult, NotEvaluatedFeatureResult]
+#: AI provenance result; narrow on ``result["status"]`` before reading ``provenance``.
+AiGeneratedDetectionResult = Union[EvaluatedAiGeneratedDetectionResult, NotEvaluatedFeatureResult]
 
 
 class ProcessingFeatureResults(TypedDict, total=False):
     """Results of the features requested in ``processingOptions.features``."""
     personDetection: PersonDetectionResult
     faceDetection: FaceDetectionResult
+    linkDetection: LinkDetectionResult
+    aiGeneratedDetection: AiGeneratedDetectionResult
 
 
 class _PolicyRuleSnapshotRequired(TypedDict):
@@ -393,7 +467,9 @@ class CategoryPolicySource(_CategoryPolicySourceRequired, total=False):
 
 
 class ReportPolicyDecision(TypedDict):
-    source: str
+    #: ``policy``, ``asset-override``, ``children`` or ``hash-list`` (a block from a hash list
+    #: match). New sources may be added.
+    source: Union[Literal["policy", "asset-override", "children", "hash-list"], str]
     action: Optional[ModerationAction]
     flaggedCategories: List[str]
 
@@ -444,6 +520,9 @@ class AssetImage(TypedDict):
     thumbhash: Optional[str]
     averageColor: Optional[str]
     perceptualHash: Optional[str]
+    #: How much detail ``perceptualHash`` captured, from 0 to 100. Hashes below 50 come from flat or
+    #: featureless images and are never matched.
+    perceptualHashQuality: Optional[int]
 
 
 class _SafetyHoldRequired(TypedDict):
@@ -492,6 +571,18 @@ class AssetReview(_AssetReviewRequired, total=False):
     reviewerEmail: Optional[str]
 
 
+class HashMatch(TypedDict):
+    """An entry in the project's hash lists that the image matched."""
+    #: Where the matching hash came from. New sources may be added.
+    source: Union[Literal["hash-list"], str]
+    listId: str
+    entryId: str
+    #: Number of bits that differ between the hashes, 0 to 256. 0 is the same picture.
+    distance: int
+    #: ``block`` when the match is close enough for a block list to block, otherwise ``flag``.
+    action: Union[HashListAction, str]
+
+
 class _AssetModerationRequired(TypedDict):
     manualReviews: List[AssetReview]
     status: AssetModerationStatus
@@ -501,6 +592,9 @@ class AssetModeration(_AssetModerationRequired, total=False):
     score: float
     timeline: MediaClassificationReport
     policy: ReportPolicy
+    #: Hash list entries the image matched, blocking matches first and then the closest. Absent
+    #: when nothing matched.
+    hashMatches: List[HashMatch]
 
 
 class _AssetClassificationRequired(TypedDict):
@@ -513,6 +607,11 @@ class _AssetClassificationRequired(TypedDict):
 class AssetClassification(_AssetClassificationRequired, total=False):
     personDetection: PersonDetectionResult
     faceDetection: FaceDetectionResult
+    linkDetection: LinkDetectionResult
+    aiGeneratedDetection: AiGeneratedDetectionResult
+    #: Where OCR found text, and personal information within it, in an image. Redaction
+    #: transforms blur these regions.
+    textRegions: List[TextRegion]
     labels: Optional[list[ClassificationLabel]]
 
 
@@ -602,10 +701,67 @@ class Folder(_FolderRequired, total=False):
     updatedAt: int
 
 
+# ---- Hash lists -------------------------------------------------------------------------------
+
+class _HashListRequired(TypedDict):
+    id: str
+    projectId: str
+    name: str
+    action: Union[HashListAction, str]
+    createdAt: int
+
+
+class HashList(_HashListRequired, total=False):
+    """A list of perceptual hashes that image uploads are compared with."""
+    description: Optional[str]
+    createdByUserId: Optional[str]
+    updatedAt: int
+
+
+class _HashListEntryRequired(TypedDict):
+    id: str
+    projectId: str
+    hashListId: str
+    #: PDQ hash of the listed image, as 64 hexadecimal characters.
+    hash: str
+    #: PDQ quality of the hash from 0 to 100, or ``None`` when it was added without one. Entries
+    #: below 50 are never matched.
+    quality: Optional[int]
+    createdAt: int
+
+
+class HashListEntry(_HashListEntryRequired, total=False):
+    label: Optional[str]
+    #: The asset the hash was taken from, when it was added by ``assetId``.
+    sourceAssetId: Optional[str]
+    createdByUserId: Optional[str]
+
+
+class HashListList(TypedDict):
+    """Every hash list in the project, newest first."""
+    items: List[HashList]
+
+
+class HashListEntryPage(TypedDict):
+    items: List[HashListEntry]
+    hasMore: bool
+    nextCursor: Optional[str]
+    pageSize: int
+    ordering: List[Ordering]
+
+
 # ---- Lenses and CDN transforms ----------------------------------------------------------------
 
 # <generated: image-transform-options>
 # Generated by packages/sdk-contract/generate.ts from IMAGE_TRANSFORM_OPTIONS_SCHEMA; do not edit.
+
+class ImageTransformRedaction(TypedDict, total=False):
+    """Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged."""
+    #: Blurs every paragraph of text OCR found.
+    text: bool
+    #: Blurs the email addresses, phone numbers, card numbers, IBANs and social security numbers OCR found.
+    personalInformation: bool
+
 
 class ImageTransformBorder(TypedDict, total=False):
     """A border drawn around the image."""
@@ -669,6 +825,8 @@ class ImageTransformOptions(TypedDict, total=False):
     background: str
     #: The blur radius.
     blur: float
+    #: Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged.
+    redact: ImageTransformRedaction
     #: A border drawn around the image.
     border: ImageTransformBorder
     #: The brightness factor.
@@ -863,6 +1021,43 @@ class AssetIdOptions(TypedDict):
 
 class FolderIdOptions(TypedDict):
     folderId: str
+
+
+class HashListIdOptions(TypedDict):
+    hashListId: str
+
+
+class HashListEntryIdOptions(TypedDict):
+    entryId: str
+
+
+class _CreateHashListRequired(TypedDict):
+    name: str
+    action: HashListAction
+
+
+class CreateHashListOptions(_CreateHashListRequired, total=False):
+    description: Optional[str]
+
+
+class UpdateHashListOptions(HashListIdOptions, total=False):
+    name: str
+    description: Optional[str]
+    action: HashListAction
+
+
+class ListHashListEntriesOptions(HashListIdOptions, total=False):
+    #: The previous page's ``nextCursor``; omit for the first page.
+    cursor: str
+    pageSize: int
+
+
+class AddHashListEntryOptions(HashListIdOptions, total=False):
+    """Send ``hash`` (and ``quality`` when you know it) or ``assetId``, an image asset in the project."""
+    hash: str
+    quality: Optional[int]
+    assetId: str
+    label: Optional[str]
 
 
 class _UploadPartRequired(AssetIdOptions):

@@ -188,8 +188,10 @@ class RequestTests(unittest.TestCase):
                     body = json.loads(body)
                 self.assertEqual({"method": request.method, "path": url.path, "query": dict(parse_qsl(url.query)),
                                   "body": body}, fixture["request"])
-                # Deletes return nothing; ensureLenses returns the lenses; everything else the body.
-                expected = (None if fixture["operation"].endswith(".delete") else fixture["response"]["lenses"]
+                # Deletes and removeEntry return nothing; ensureLenses returns the lenses; everything
+                # else the body.
+                returns_nothing = fixture["operation"].endswith(".delete") or fixture["operation"] == "hashLists.removeEntry"
+                expected = (None if returns_nothing else fixture["response"]["lenses"]
                             if fixture["operation"] == "ensureLenses" else fixture["response"])
                 self.assertEqual(_json(result), expected)
 

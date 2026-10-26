@@ -31,7 +31,8 @@ class ModelsTest {
       "height": 3,
       "thumbhash": "t",
       "averageColor": "#fff",
-      "perceptualHash": "p"
+      "perceptualHash": "p",
+      "perceptualHashQuality": 90
     },
     "extractedText": null
   },
@@ -58,8 +59,12 @@ class ModelsTest {
           "score": 0.7
         }
       },
-      "score": 0.7
+      "score": 0.7,
+      "hashMatches": [{"source": "hash-list", "listId": "list-1", "entryId": "entry-1", "distance": 12, "action": "block"}]
     },
+    "linkDetection": {"status": "evaluated", "stage": "beta", "qrCodes": [{"value": "https://example.com", "box": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.4}}], "links": [{"url": "https://example.com", "source": "qr-code"}]},
+    "aiGeneratedDetection": {"status": "evaluated", "stage": "beta", "provenance": "ai-generated", "signals": [{"kind": "c2pa", "value": "trainedAlgorithmicMedia"}]},
+    "textRegions": [{"box": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.4}, "personalInformation": true}],
     "completedAt": 1700000000300
   }
 }
@@ -85,7 +90,14 @@ class ModelsTest {
     assertEquals("png", content.extension());
     assertEquals(9007199254740993L, content.sizeInBytes());
     assertEquals(new Models.Checksums(null, null, "abc", null, null), content.checksums());
-    assertEquals(new Models.AssetImage(4, 3, "t", "#fff", "p"), content.image());
+    assertEquals(new Models.AssetImage(4, 3, "t", "#fff", "p", 90), content.image());
+    Models.BoundingBox box = new Models.BoundingBox(0.1, 0.2, 0.3, 0.4);
+    assertEquals(List.of(new Models.HashMatch("hash-list", "list-1", "entry-1", 12, Models.HashListAction.BLOCK)), moderation.hashMatches());
+    assertEquals(new Models.LinkDetectionResult("evaluated", "beta", null, List.of(new Models.DetectedQrCode("https://example.com", box)),
+        List.of(new Models.DetectedLink("https://example.com", "qr-code"))), asset.classification().linkDetection());
+    assertEquals(new Models.AiGeneratedDetectionResult("evaluated", "beta", null, "ai-generated",
+        List.of(new Models.ProvenanceSignal("c2pa", "trainedAlgorithmicMedia"))), asset.classification().aiGeneratedDetection());
+    assertEquals(List.of(new Models.TextRegion(box, true)), asset.classification().textRegions());
     assertNull(content.extractedText());
     assertEquals(new Models.FlaggedContentPolicy("purge"), asset.processingOptions().flaggedContentPolicy());
     assertEquals(Boolean.TRUE, asset.processingOptions().keepContentAfterProcessing());

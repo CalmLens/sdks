@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  * encoding, retries, error mapping) whose transport answers from an in-memory API, and records
  * every request it receives.
  *
- * <p>The in-memory API keeps assets, folders, events and content: uploads create assets you can
+ * <p>The in-memory API keeps assets, folders, hash lists, events and content: uploads create assets you can
  * retrieve, list (RSQL filters such as {@code classification.moderation.status==blocked},
  * ordering, folder and cursor paging), search, update, move and delete, and the CDN serves their
  * stored bytes. It does not classify content: {@code assets.create} (and queued multipart uploads)
@@ -241,6 +241,10 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     public final Map<String, JsonObject> assets = new LinkedHashMap<>();
     /** Folders by ID. */
     public final Map<String, JsonObject> folders = new LinkedHashMap<>();
+    /** Hash lists by ID. */
+    public final Map<String, JsonObject> hashLists = new LinkedHashMap<>();
+    /** Hash list entries by ID, oldest first. */
+    public final Map<String, JsonObject> hashListEntries = new LinkedHashMap<>();
     /** The events feed, oldest first. */
     public final List<JsonObject> events = new ArrayList<>();
     /** Stored content by asset ID. */

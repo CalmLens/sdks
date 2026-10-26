@@ -48,6 +48,11 @@ declare const PUBLIC_ERROR_CODES: {
   readonly FOLDER_NOT_EMPTY: RequestErrorCode;
   readonly FOLDER_PARENT_CYCLE: RequestErrorCode;
   readonly LENS_VERSION_CONFLICT: RequestErrorCode;
+  readonly HASH_LIST_NOT_FOUND: RequestErrorCode;
+  readonly HASH_LIST_ENTRY_NOT_FOUND: RequestErrorCode;
+  readonly HASH_LIST_LIMIT_REACHED: RequestErrorCode;
+  readonly HASH_LIST_ENTRY_LIMIT_REACHED: RequestErrorCode;
+  readonly HASH_LIST_ASSET_NOT_HASHED: RequestErrorCode;
   readonly UPLOAD_PRESET_NOT_FOUND: RequestErrorCode;
   readonly UPLOAD_PRESET_DISABLED: RequestErrorCode;
   readonly UPLOAD_PRESET_TOKEN_REQUIRED: RequestErrorCode;

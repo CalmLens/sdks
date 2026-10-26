@@ -24,8 +24,8 @@ use Psr\Http\Message\ResponseInterface;
  * error handling, then reach an in-memory stand-in for the API and CDN instead of the network.
  *
  * The stand-in is stateful: uploads (including multipart uploads) create assets you can
- * retrieve, list, search, update, move and delete; folders, lenses, idempotency keys and the
- * events feed behave like the API's; the CDN serves stored bytes and placeholders; and errors use
+ * retrieve, list, search, update, move and delete; folders, hash lists, lenses, idempotency keys
+ * and the events feed behave like the API's (uploads are not matched against hash lists); the CDN serves stored bytes and placeholders; and errors use
  * the API's codes, statuses, `X-Request-Id` header and body shape (schema errors are
  * `validation/<issue>` with the field in `details.path`). It does not classify content: assets
  * submitted with `classify` get `analyzedOutcome` and those submitted with `create` get
@@ -67,6 +67,10 @@ final class MockServerClient
     public array $content = [];
     /** @var array<string, array> Folders by ID. */
     public array $folders = [];
+    /** @var array<string, array> Hash lists by ID, oldest first. */
+    public array $hashLists = [];
+    /** @var array<string, array> Hash list entries by ID, oldest first. */
+    public array $hashListEntries = [];
     /** @var list<array> The events feed, oldest first. */
     public array $events = [];
     /** @var array<string, array> Lenses by identifier. */
@@ -84,7 +88,7 @@ final class MockServerClient
     private array $grants;
     private float $elapsed = 0.0;
     private int $requestCount = 0;
-    /** The status of the response being answered: 200, 201 for a new folder or 202 for a queued batch. */
+    /** The status of the response being answered: 200, 201 for a new folder, hash list or entry, or 202 for a queued batch. */
     private int $status = 200;
     /** The status of the last response, null when the last request failed without one; the contract tests check it. */
     private ?int $lastStatus = null;
@@ -313,6 +317,8 @@ final class MockServerClient
                 'PUT lenses' => ['ensureLenses', 'ensureLens'],
                 'GET folders' => ['folders.list'],
                 'POST folders' => ['folders.create'],
+                'GET hash-lists' => ['hashLists.list'],
+                'POST hash-lists' => ['hashLists.create'],
                 'GET assets/page' => ['assets.list'],
                 'GET assets/search' => ['assets.search'],
                 'POST assets/batch' => ['assets.batch'],
@@ -322,6 +328,13 @@ final class MockServerClient
         }
         $suffix = $parts[2] ?? '';
         $resource = $parts[0] ?? '';
+        if ($resource === 'hash-lists' && isset($parts[1])) {
+            $name = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'GET entries' => 'listEntries', 'POST entries' => 'addEntry'][$method . ' ' . $suffix] ?? null;
+            return $name === null ? [] : ["hashLists.$name"];
+        }
+        if ($resource === 'hash-list-entries' && isset($parts[1])) {
+            return $method === 'DELETE' && $suffix === '' ? ['hashLists.removeEntry'] : [];
+        }
         $names = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST move' => 'move',
             'GET children' => 'listChildren', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
             'POST explain' => 'explain', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
@@ -453,6 +466,8 @@ final class MockServerClient
                 $route === 'PUT lenses' => $this->saveLenses($json['lenses'] ?? []),
                 $route === 'GET folders' => $this->listFolders($query),
                 $route === 'POST folders' => $this->createFolder($json),
+                $route === 'GET hash-lists' => ['items' => array_values(array_reverse($this->hashLists))],
+                $route === 'POST hash-lists' => $this->createHashList($json),
                 $route === 'GET assets/page' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
                 $route === 'POST assets/batch' => $this->batch($json),
@@ -463,6 +478,16 @@ final class MockServerClient
         }
         if (($parts[0] ?? null) === 'folders' && isset($parts[1])) {
             return $this->folderRoute($method, $parts[1], $parts[2] ?? '', $json);
+        }
+        if (($parts[0] ?? null) === 'hash-lists' && isset($parts[1])) {
+            return $this->hashListRoute($method, $parts[1], $parts[2] ?? '', $query, $json);
+        }
+        if (($parts[0] ?? null) === 'hash-list-entries' && isset($parts[1]) && !isset($parts[2]) && $method === 'DELETE') {
+            if (!isset($this->hashListEntries[$parts[1]])) {
+                self::fail(ErrorCodes::HASH_LIST_ENTRY_NOT_FOUND, null, 'Hash list entry not found.');
+            }
+            unset($this->hashListEntries[$parts[1]]);
+            return null;
         }
         if (($parts[0] ?? null) !== 'assets' || !isset($parts[1])) {
             throw new \LogicException("MockServerClient does not emulate $method /" . implode('/', $parts) . '; enqueue a response for it');
@@ -697,7 +722,7 @@ final class MockServerClient
         $image = $asset['content']['image'] ?? null;
         if ($decided && $asset['type'] === 'image' && $asset['content']['status'] !== 'removed' && !$purge) {
             $image = ['thumbhash' => self::THUMBHASH, 'averageColor' => $image['averageColor'] ?? '#7f7f7f']
-                + ($image ?? []) + ['width' => null, 'height' => null, 'perceptualHash' => null];
+                + ($image ?? []) + ['width' => null, 'height' => null, 'perceptualHash' => null, 'perceptualHashQuality' => null];
         } elseif ($outcome === 'purged') {
             $image = self::withoutPlaceholder($image);
         }
@@ -1183,6 +1208,92 @@ final class MockServerClient
                 return $this->folders[$id] = $this->touch(['parentId' => $parentId] + $folder);
         }
         throw new \LogicException("MockServerClient does not emulate $method $suffix for a folder; enqueue a response for it");
+    }
+
+    private function hashList(string $id): array
+    {
+        return $this->hashLists[$id] ?? self::fail(ErrorCodes::HASH_LIST_NOT_FOUND, null, 'Hash list not found.');
+    }
+
+    private static function hashListAction(mixed $action): bool { return $action === 'flag' || $action === 'block'; }
+
+    private function createHashList(array $json): array
+    {
+        $name = $json['name'] ?? null;
+        if (!is_string($name) || trim($name) === '' || !self::hashListAction($json['action'] ?? null)) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'A hash list needs a name and an action of flag or block');
+        }
+        $now = ($this->now)();
+        $list = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'name' => trim($name),
+            'description' => is_string($json['description'] ?? null) ? $json['description'] : null, 'action' => $json['action'],
+            'createdByUserId' => null, 'createdAt' => $now, 'updatedAt' => $now];
+        // Like the API, a new hash list is 201 Created.
+        $this->status = 201;
+        return $this->hashLists[$list['id']] = $list;
+    }
+
+    /** GET, PATCH and DELETE /hash-lists/:id and its entries, like the API. Deleting a list deletes its entries. */
+    private function hashListRoute(string $method, string $id, string $suffix, array $query, array $json): ?array
+    {
+        $list = $this->hashList($id);
+        switch ($method . ' ' . $suffix) {
+            case 'GET ':
+                return $list;
+            case 'PATCH ':
+                if (is_string($json['name'] ?? null)) {
+                    $list['name'] = trim($json['name']);
+                }
+                if (array_key_exists('description', $json)) {
+                    $list['description'] = is_string($json['description']) ? $json['description'] : null;
+                }
+                if (self::hashListAction($json['action'] ?? null)) {
+                    $list['action'] = $json['action'];
+                }
+                $list['updatedAt'] = ($this->now)();
+                return $this->hashLists[$id] = $list;
+            case 'DELETE ':
+                unset($this->hashLists[$id]);
+                $this->hashListEntries = array_filter($this->hashListEntries, fn (array $entry) => $entry['hashListId'] !== $id);
+                return null;
+            case 'GET entries':
+                return $this->page(array_filter($this->hashListEntries, fn (array $entry) => $entry['hashListId'] === $id),
+                    $query, Values::json(['hash-list-entries', $id]));
+            case 'POST entries':
+                return $this->addHashListEntry($list, $json);
+        }
+        throw new \LogicException("MockServerClient does not emulate $method $suffix for a hash list; enqueue a response for it");
+    }
+
+    /** A hash, or an image asset's perceptual hash; a hash the list already holds returns its entry with 200. */
+    private function addHashListEntry(array $list, array $json): array
+    {
+        $hash = is_string($json['hash'] ?? null) ? strtolower(trim($json['hash'])) : null;
+        $quality = is_int($json['quality'] ?? null) ? $json['quality'] : null;
+        $assetId = is_string($json['assetId'] ?? null) ? $json['assetId'] : null;
+        if (($hash === null) === ($assetId === null)) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Send either hash or assetId');
+        }
+        if ($assetId !== null) {
+            $image = ($this->assets[$assetId] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found'))['content']['image'] ?? null;
+            if (!is_string($image['perceptualHash'] ?? null) || $image['perceptualHash'] === '') {
+                self::fail(ErrorCodes::HASH_LIST_ASSET_NOT_HASHED, null, 'This asset has no perceptual hash.');
+            }
+            $hash = $image['perceptualHash'];
+            $quality = $image['perceptualHashQuality'] ?? null;
+        }
+        if (!preg_match('/^[0-9a-f]{64}$/D', $hash)) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Use a PDQ hash of 64 hexadecimal characters');
+        }
+        foreach ($this->hashListEntries as $entry) {
+            if ($entry['hashListId'] === $list['id'] && $entry['hash'] === $hash) {
+                return $entry;
+            }
+        }
+        $entry = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'hashListId' => $list['id'], 'hash' => $hash,
+            'quality' => $quality, 'label' => is_string($json['label'] ?? null) ? $json['label'] : null,
+            'sourceAssetId' => $assetId, 'createdByUserId' => null, 'createdAt' => ($this->now)()];
+        $this->status = 201;
+        return $this->hashListEntries[$entry['id']] = $entry;
     }
 
     /** Without `after` the feed starts from now, like the API; `limit` is 1 to 100, 50 by default. */

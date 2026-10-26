@@ -28,7 +28,8 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
       "height": 480,
       "thumbhash": "th",
       "averageColor": "#fff",
-      "perceptualHash": "ph"
+      "perceptualHash": "ph",
+      "perceptualHashQuality": 88
     },
     "safetyHold": {
       "placedAt": 1760000000000,
@@ -89,8 +90,23 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
           "reason": "unavailable"
         }
       },
-      "score": 0.9
+      "score": 0.9,
+      "hashMatches": [{"source": "hash-list", "listId": "list-1", "entryId": "entry-1", "distance": 4, "action": "block"}],
+      "policy": {"score": 1, "categories": {}, "decision": {"source": "hash-list", "action": "block", "flaggedCategories": []}}
     },
+    "linkDetection": {
+      "status": "evaluated",
+      "stage": "beta",
+      "qrCodes": [{"value": "https://example.com", "box": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.4}}],
+      "links": [{"url": "https://example.com", "source": "qr-code"}]
+    },
+    "aiGeneratedDetection": {
+      "status": "evaluated",
+      "stage": "beta",
+      "provenance": "ai-generated",
+      "signals": [{"kind": "c2pa", "value": "trainedAlgorithmicMedia"}]
+    },
+    "textRegions": [{"box": {"left": 0.5, "top": 0.5, "width": 0.1, "height": 0.1}, "personalInformation": true}],
     "completedAt": 1760000000700,
     "labels": [
       {
@@ -126,7 +142,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if *a.UploadPresetID != "preset-1" || *content.Checksums.SHA256 != "abc" || content.Checksums.MD5 != nil {
 		t.Fatalf("checksums: %+v", content.Checksums)
 	}
-	if i := content.Image; *i.PerceptualHash != "ph" || *i.Width != 640 || *i.Height != 480 || *i.Thumbhash != "th" || *i.AverageColor != "#fff" {
+	if i := content.Image; *i.PerceptualHash != "ph" || *i.PerceptualHashQuality != 88 || *i.Width != 640 || *i.Height != 480 || *i.Thumbhash != "th" || *i.AverageColor != "#fff" {
 		t.Fatalf("image: %+v", i)
 	}
 	if h := content.SafetyHold; h.PlacedAt != 1760000000000 || h.Reason != SafetyHoldReasonSuspectedIllegalContent || h.DisposedAt != nil {
@@ -151,6 +167,21 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	}
 	if hate := report.Categories[CategoryHate]; hate.Reason != ReasonUnavailable || hate.Score != nil || hate.Qualifiers != nil {
 		t.Fatalf("hate: %+v", hate)
+	}
+	if !reflect.DeepEqual(report.HashMatches, []HashMatch{{Source: HashMatchSourceHashList, ListID: "list-1", EntryID: "entry-1", Distance: 4, Action: HashListActionBlock}}) ||
+		report.Policy.Decision.Source != DecisionSourceHashList {
+		t.Fatalf("hash matches: %+v, decision %+v", report.HashMatches, report.Policy.Decision)
+	}
+	links := a.Classification.LinkDetection
+	if links.Status != ResultEvaluated || !reflect.DeepEqual(links.QRCodes, []DetectedQRCode{{Value: "https://example.com", Box: BoundingBox{Left: 0.1, Top: 0.2, Width: 0.3, Height: 0.4}}}) ||
+		!reflect.DeepEqual(links.Links, []DetectedLink{{URL: "https://example.com", Source: "qr-code"}}) {
+		t.Fatalf("link detection: %+v", links)
+	}
+	if ai := a.Classification.AIGeneratedDetection; ai.Provenance != "ai-generated" || !reflect.DeepEqual(ai.Signals, []ProvenanceSignal{{Kind: "c2pa", Value: "trainedAlgorithmicMedia"}}) {
+		t.Fatalf("AI-generated detection: %+v", ai)
+	}
+	if regions := a.Classification.TextRegions; !reflect.DeepEqual(regions, []TextRegion{{Box: BoundingBox{Left: 0.5, Top: 0.5, Width: 0.1, Height: 0.1}, PersonalInformation: true}}) {
+		t.Fatalf("text regions: %+v", regions)
 	}
 	labels := a.Classification.Labels
 	if len(labels) != 2 || labels[0].Description != "Beach" || labels[0].Score != 0.7 || *labels[0].TopicalityScore != 0.6 ||

@@ -1119,6 +1119,222 @@
     }
   },
   {
+    "operation": "hashLists.list",
+    "options": {},
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/hash-lists",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "list-1",
+          "projectId": "project-1",
+          "name": "Removed images",
+          "description": null,
+          "action": "block",
+          "createdByUserId": null,
+          "createdAt": 1760000000000,
+          "updatedAt": 1760000000000
+        }
+      ]
+    }
+  },
+  {
+    "operation": "hashLists.retrieve",
+    "options": {
+      "hashListId": "list-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/hash-lists/list-1",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "list-1",
+      "projectId": "project-1",
+      "name": "Removed images",
+      "description": null,
+      "action": "block",
+      "createdByUserId": null,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "hashLists.create",
+    "options": {
+      "name": "Removed images",
+      "action": "block"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/hash-lists",
+      "query": {},
+      "body": {
+        "name": "Removed images",
+        "action": "block"
+      }
+    },
+    "response": {
+      "id": "list-1",
+      "projectId": "project-1",
+      "name": "Removed images",
+      "description": null,
+      "action": "block",
+      "createdByUserId": null,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "hashLists.update",
+    "options": {
+      "hashListId": "list-1",
+      "description": null,
+      "action": "flag"
+    },
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/hash-lists/list-1",
+      "query": {},
+      "body": {
+        "description": null,
+        "action": "flag"
+      }
+    },
+    "response": {
+      "id": "list-1",
+      "projectId": "project-1",
+      "name": "Removed images",
+      "description": null,
+      "action": "block",
+      "createdByUserId": null,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "hashLists.delete",
+    "options": {
+      "hashListId": "list-1"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/hash-lists/list-1",
+      "query": {},
+      "body": null
+    },
+    "response": {}
+  },
+  {
+    "operation": "hashLists.listEntries",
+    "options": {
+      "hashListId": "list-1",
+      "cursor": "opaque+/cursor=",
+      "pageSize": 50
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/hash-lists/list-1/entries",
+      "query": {
+        "cursor": "opaque+/cursor=",
+        "pageSize": "50"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "entry-1",
+          "projectId": "project-1",
+          "hashListId": "list-1",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "quality": 90,
+          "label": null,
+          "sourceAssetId": null,
+          "createdByUserId": null,
+          "createdAt": 1760000000000
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 50
+    }
+  },
+  {
+    "operation": "hashLists.addEntry",
+    "options": {
+      "hashListId": "list-1",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "quality": 90
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/hash-lists/list-1/entries",
+      "query": {},
+      "body": {
+        "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "quality": 90
+      }
+    },
+    "response": {
+      "id": "entry-1",
+      "projectId": "project-1",
+      "hashListId": "list-1",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "quality": 90,
+      "label": null,
+      "sourceAssetId": null,
+      "createdByUserId": null,
+      "createdAt": 1760000000000
+    }
+  },
+  {
+    "operation": "hashLists.addEntry",
+    "options": {
+      "hashListId": "list-1",
+      "assetId": "asset-1",
+      "label": "Report 1042"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/hash-lists/list-1/entries",
+      "query": {},
+      "body": {
+        "assetId": "asset-1",
+        "label": "Report 1042"
+      }
+    },
+    "response": {
+      "id": "entry-1",
+      "projectId": "project-1",
+      "hashListId": "list-1",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "quality": 90,
+      "label": null,
+      "sourceAssetId": null,
+      "createdByUserId": null,
+      "createdAt": 1760000000000
+    }
+  },
+  {
+    "operation": "hashLists.removeEntry",
+    "options": {
+      "entryId": "entry-1"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/hash-list-entries/entry-1",
+      "query": {},
+      "body": null
+    },
+    "response": {}
+  },
+  {
     "operation": "events.list",
     "options": {
       "after": "123_abc",

@@ -89,6 +89,16 @@ const (
 	CodeFolderParentCycle = "folder/parent-cycle"
 	// CodeLensVersionConflict is returned with HTTP 409.
 	CodeLensVersionConflict = "lens/version-conflict"
+	// CodeHashListNotFound is returned with HTTP 404.
+	CodeHashListNotFound = "hash-list/not-found"
+	// CodeHashListEntryNotFound is returned with HTTP 404.
+	CodeHashListEntryNotFound = "hash-list/entry-not-found"
+	// CodeHashListLimitReached is returned with HTTP 409.
+	CodeHashListLimitReached = "hash-list/limit-reached"
+	// CodeHashListEntryLimitReached is returned with HTTP 409.
+	CodeHashListEntryLimitReached = "hash-list/entry-limit-reached"
+	// CodeHashListAssetNotHashed is returned with HTTP 409.
+	CodeHashListAssetNotHashed = "hash-list/asset-not-hashed"
 	// CodeUploadPresetNotFound is returned with HTTP 404.
 	CodeUploadPresetNotFound = "upload-preset/not-found"
 	// CodeUploadPresetDisabled is returned with HTTP 403.
@@ -182,6 +192,11 @@ var publicErrorStatuses = map[string]int{
 	CodeFolderNotEmpty:                    409,
 	CodeFolderParentCycle:                 409,
 	CodeLensVersionConflict:               409,
+	CodeHashListNotFound:                  404,
+	CodeHashListEntryNotFound:             404,
+	CodeHashListLimitReached:              409,
+	CodeHashListEntryLimitReached:         409,
+	CodeHashListAssetNotHashed:            409,
 	CodeUploadPresetNotFound:              404,
 	CodeUploadPresetDisabled:              403,
 	CodeUploadPresetTokenRequired:         401,

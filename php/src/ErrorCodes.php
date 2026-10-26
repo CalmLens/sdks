@@ -54,6 +54,11 @@ final class ErrorCodes
     public const FOLDER_NOT_EMPTY = 'folder/not-empty';
     public const FOLDER_PARENT_CYCLE = 'folder/parent-cycle';
     public const LENS_VERSION_CONFLICT = 'lens/version-conflict';
+    public const HASH_LIST_NOT_FOUND = 'hash-list/not-found';
+    public const HASH_LIST_ENTRY_NOT_FOUND = 'hash-list/entry-not-found';
+    public const HASH_LIST_LIMIT_REACHED = 'hash-list/limit-reached';
+    public const HASH_LIST_ENTRY_LIMIT_REACHED = 'hash-list/entry-limit-reached';
+    public const HASH_LIST_ASSET_NOT_HASHED = 'hash-list/asset-not-hashed';
     public const UPLOAD_PRESET_NOT_FOUND = 'upload-preset/not-found';
     public const UPLOAD_PRESET_DISABLED = 'upload-preset/disabled';
     public const UPLOAD_PRESET_TOKEN_REQUIRED = 'upload-preset/token-required';
@@ -123,6 +128,11 @@ final class ErrorCodes
         'folder/not-empty' => 409,
         'folder/parent-cycle' => 409,
         'lens/version-conflict' => 409,
+        'hash-list/not-found' => 404,
+        'hash-list/entry-not-found' => 404,
+        'hash-list/limit-reached' => 409,
+        'hash-list/entry-limit-reached' => 409,
+        'hash-list/asset-not-hashed' => 409,
         'upload-preset/not-found' => 404,
         'upload-preset/disabled' => 403,
         'upload-preset/token-required' => 401,

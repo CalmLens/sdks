@@ -112,6 +112,7 @@ module CalmLens
     ENSURE_LENSES_MAX_PER_REQUEST: Integer
     attr_reader assets: Assets
     attr_reader folders: Folders
+    attr_reader hash_lists: HashLists
     attr_reader text: Text
     attr_reader upload_tokens: UploadTokens
     attr_reader events: Events
@@ -175,6 +176,17 @@ module CalmLens
     def update: (update_folder_options options) -> folder
     def move: (move_folder_options options) -> folder
     def delete: (folder_id_options options) -> nil
+  end
+
+  class HashLists < Resource
+    def list: (?{ ?request_options: request_options } options) -> hash_list_list
+    def retrieve: (hash_list_id_options options) -> hash_list
+    def create: (create_hash_list_options options) -> hash_list
+    def update: (update_hash_list_options options) -> hash_list
+    def delete: (hash_list_id_options options) -> nil
+    def list_entries: (list_hash_list_entries_options options) -> hash_list_entry_page
+    def add_entry: (add_hash_list_entry_options options) -> hash_list_entry
+    def remove_entry: (hash_list_entry_id_options options) -> nil
   end
 
   class UploadTokens < Resource
@@ -265,6 +277,8 @@ module CalmLens
       attr_accessor content: Hash[String, { "type" => String, "parts" => Hash[Integer, String] }]
       attr_accessor events: Array[event]
       attr_accessor lenses: Hash[String, lens]
+      attr_accessor hash_lists: Hash[String, hash_list]
+      attr_accessor hash_list_entries: Hash[String, hash_list_entry]
     end
   end
 

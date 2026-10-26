@@ -55,6 +55,17 @@ client.folders.list['folders'].map { |item| item['parentId'] }
 client.folders.retrieve(folder_id: folder['id'])
 client.folders.delete(folder_id: folder['id'])
 
+hash_list = client.hash_lists.create(name: 'Removed images', action: 'block', description: nil)
+client.hash_lists.update(hash_list_id: hash_list['id'], action: 'flag', description: nil)
+client.hash_lists.list['items'].map { |item| item['action'] }
+client.hash_lists.retrieve(hash_list_id: hash_list['id'])
+entry = client.hash_lists.add_entry(hash_list_id: hash_list['id'], hash: '0' * 64, quality: 90, label: 'Report 1042')
+client.hash_lists.add_entry(hash_list_id: hash_list['id'], asset_id: 'asset-1')
+entries = client.hash_lists.list_entries(hash_list_id: hash_list['id'], page_size: 50)
+client.hash_lists.list_entries(hash_list_id: hash_list['id'], cursor: entries['nextCursor']) if entries['nextCursor']
+client.hash_lists.remove_entry(entry_id: entry['id'])
+client.hash_lists.delete(hash_list_id: hash_list['id'])
+
 lenses = client.ensure_lenses(lenses: [{ identifier: 'thumb', name: 'Thumb', type: 'image', active: true, version: 2,
                                          transforms: [{ type: 'imageTransform', options: { width: 128, format: 'webp' } }] }])
 lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image', active: true)

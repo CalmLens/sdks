@@ -144,7 +144,7 @@ class ContractClientTest < Minitest::Test
   # requests.json, in camelCase and snake_case: the request sent and the result returned.
   def replay_request(fixture)
     expected = case fixture['operation']
-               when /\.delete\z/ then nil
+               when /\.(delete|removeEntry)\z/ then nil
                when 'ensureLenses' then fixture['response']['lenses']
                else fixture['response']
                end

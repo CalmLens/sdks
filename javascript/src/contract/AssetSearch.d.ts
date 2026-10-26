@@ -71,6 +71,12 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           enabled: zod.ZodBoolean;
           ageEstimation: zod.ZodOptional<zod.ZodBoolean>;
         }, zod.core.$strict>>>;
+        linkDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
+          enabled: zod.ZodBoolean;
+        }, zod.core.$strict>>>;
+        aiGeneratedDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
+          enabled: zod.ZodBoolean;
+        }, zod.core.$strict>>>;
       }, zod.core.$strict>>>;
     }, zod.core.$strict>>>;
     visibility: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
@@ -7873,6 +7879,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             source: zod.ZodEnum<{
               "asset-override": "asset-override";
               children: "children";
+              "hash-list": "hash-list";
               policy: "policy";
             }>;
             action: zod.ZodNullable<zod.ZodEnum<{
@@ -7893,6 +7900,18 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>>;
           }, zod.core.$strict>>;
         }, zod.core.$strict>>;
+        hashMatches: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+          source: zod.ZodEnum<{
+            "hash-list": "hash-list";
+          }>;
+          listId: zod.ZodString;
+          entryId: zod.ZodString;
+          distance: zod.ZodNumber;
+          action: zod.ZodEnum<{
+            block: "block";
+            flag: "flag";
+          }>;
+        }, zod.core.$strict>>>;
       }, zod.core.$strip>;
       personDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
@@ -7950,6 +7969,78 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           unavailable: "unavailable";
         }>;
       }, zod.core.$strict>], "status">>;
+      linkDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        qrCodes: zod.ZodArray<zod.ZodObject<{
+          value: zod.ZodString;
+          box: zod.ZodObject<{
+            left: zod.ZodNumber;
+            top: zod.ZodNumber;
+            width: zod.ZodNumber;
+            height: zod.ZodNumber;
+          }, zod.core.$strict>;
+        }, zod.core.$strict>>;
+        links: zod.ZodArray<zod.ZodObject<{
+          url: zod.ZodString;
+          source: zod.ZodEnum<{
+            "qr-code": "qr-code";
+            text: "text";
+          }>;
+        }, zod.core.$strict>>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>;
+      aiGeneratedDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+        status: zod.ZodLiteral<"evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        provenance: zod.ZodEnum<{
+          "ai-edited": "ai-edited";
+          "ai-generated": "ai-generated";
+          unknown: "unknown";
+        }>;
+        signals: zod.ZodArray<zod.ZodObject<{
+          kind: zod.ZodEnum<{
+            c2pa: "c2pa";
+            "generator-metadata": "generator-metadata";
+            "iptc-digital-source-type": "iptc-digital-source-type";
+          }>;
+          value: zod.ZodString;
+        }, zod.core.$strict>>;
+      }, zod.core.$strict>, zod.ZodObject<{
+        status: zod.ZodLiteral<"not-evaluated">;
+        stage: zod.ZodEnum<{
+          beta: "beta";
+          ga: "ga";
+        }>;
+        reason: zod.ZodEnum<{
+          "not-supported": "not-supported";
+          unavailable: "unavailable";
+        }>;
+      }, zod.core.$strict>], "status">>;
+      textRegions: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        box: zod.ZodObject<{
+          left: zod.ZodNumber;
+          top: zod.ZodNumber;
+          width: zod.ZodNumber;
+          height: zod.ZodNumber;
+        }, zod.core.$strict>;
+        personalInformation: zod.ZodBoolean;
+      }, zod.core.$strict>>>;
       labels: zod.ZodOptional<zod.ZodNullable<zod.ZodArray<zod.ZodObject<{
         description: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
         score: zod.ZodNumber;

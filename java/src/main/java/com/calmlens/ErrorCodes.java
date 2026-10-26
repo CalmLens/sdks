@@ -96,6 +96,16 @@ public final class ErrorCodes {
   public static final String FOLDER_PARENT_CYCLE = "folder/parent-cycle";
   /** {@code lens/version-conflict} (HTTP 409). */
   public static final String LENS_VERSION_CONFLICT = "lens/version-conflict";
+  /** {@code hash-list/not-found} (HTTP 404). */
+  public static final String HASH_LIST_NOT_FOUND = "hash-list/not-found";
+  /** {@code hash-list/entry-not-found} (HTTP 404). */
+  public static final String HASH_LIST_ENTRY_NOT_FOUND = "hash-list/entry-not-found";
+  /** {@code hash-list/limit-reached} (HTTP 409). */
+  public static final String HASH_LIST_LIMIT_REACHED = "hash-list/limit-reached";
+  /** {@code hash-list/entry-limit-reached} (HTTP 409). */
+  public static final String HASH_LIST_ENTRY_LIMIT_REACHED = "hash-list/entry-limit-reached";
+  /** {@code hash-list/asset-not-hashed} (HTTP 409). */
+  public static final String HASH_LIST_ASSET_NOT_HASHED = "hash-list/asset-not-hashed";
   /** {@code upload-preset/not-found} (HTTP 404). */
   public static final String UPLOAD_PRESET_NOT_FOUND = "upload-preset/not-found";
   /** {@code upload-preset/disabled} (HTTP 403). */
@@ -211,6 +221,11 @@ public final class ErrorCodes {
       Map.entry(FOLDER_NOT_EMPTY, 409),
       Map.entry(FOLDER_PARENT_CYCLE, 409),
       Map.entry(LENS_VERSION_CONFLICT, 409),
+      Map.entry(HASH_LIST_NOT_FOUND, 404),
+      Map.entry(HASH_LIST_ENTRY_NOT_FOUND, 404),
+      Map.entry(HASH_LIST_LIMIT_REACHED, 409),
+      Map.entry(HASH_LIST_ENTRY_LIMIT_REACHED, 409),
+      Map.entry(HASH_LIST_ASSET_NOT_HASHED, 409),
       Map.entry(UPLOAD_PRESET_NOT_FOUND, 404),
       Map.entry(UPLOAD_PRESET_DISABLED, 403),
       Map.entry(UPLOAD_PRESET_TOKEN_REQUIRED, 401),

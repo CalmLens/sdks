@@ -1216,6 +1216,137 @@
       ]
     },
     {
+      "name": "hash lists hold entries until the list is deleted",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "hashLists.create",
+          "args": {
+            "name": "Removed images",
+            "action": "block"
+          },
+          "save": "list",
+          "expect": {
+            "result": {
+              "name": "Removed images",
+              "action": "block"
+            },
+            "httpStatus": 201
+          }
+        },
+        {
+          "operation": "hashLists.addEntry",
+          "args": {
+            "hashListId": {
+              "$ref": "list.id"
+            },
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "quality": 100
+          },
+          "save": "entry",
+          "expect": {
+            "result": {
+              "hashListId": {
+                "$ref": "list.id"
+              },
+              "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+              "quality": 100
+            },
+            "httpStatus": 201
+          }
+        },
+        {
+          "operation": "hashLists.listEntries",
+          "args": {
+            "hashListId": {
+              "$ref": "list.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "hasMore": false
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "hashLists.update",
+          "args": {
+            "hashListId": {
+              "$ref": "list.id"
+            },
+            "action": "flag"
+          },
+          "expect": {
+            "result": {
+              "action": "flag"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "hashLists.list",
+          "expect": {
+            "result": {
+              "items.length": 1
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "hashLists.removeEntry",
+          "args": {
+            "entryId": {
+              "$ref": "entry.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "hashLists.listEntries",
+          "args": {
+            "hashListId": {
+              "$ref": "list.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "hashLists.delete",
+          "args": {
+            "hashListId": {
+              "$ref": "list.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "hashLists.retrieve",
+          "args": {
+            "hashListId": {
+              "$ref": "list.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "hash-list/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "a folder with assets cannot be deleted",
       "mock": {},
       "steps": [

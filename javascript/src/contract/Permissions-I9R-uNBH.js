@@ -25,6 +25,8 @@ const ACTION_SCHEMA = zod.enum([
 	"lenses:write",
 	"upload-presets:read",
 	"upload-presets:write",
+	"hash-lists:read",
+	"hash-lists:write",
 	"reviews:read",
 	"reviews:write",
 	"project:manage"
@@ -37,6 +39,7 @@ const PROJECT_ACTIONS = [...[
 	"metadata",
 	"lenses",
 	"upload-presets",
+	"hash-lists",
 	"reviews"
 ].flatMap((feature) => [`${feature}:read`, `${feature}:write`]), "project:manage"];
 const isProjectAction = (action) => PROJECT_ACTIONS.includes(action);

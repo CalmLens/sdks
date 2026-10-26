@@ -35,11 +35,22 @@ Create one client per API key, share it across threads and close it on shutdown.
 | `client.assets` | `create`, `classify`, `search`, `list`, `iterate`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `iterateChildren`, `uploadPart`, `createSignedUrl` |
 | `client.text` | `classify` |
 | `client.folders` | `list`, `create`, `retrieve`, `update`, `move`, `delete` |
+| `client.hashLists` | `list`, `create`, `retrieve`, `update`, `delete`, `listEntries`, `addEntry`, `removeEntry` |
 | `client.events` | `list`, `pages` |
 | `client.cdn` | `getAssetUrl`, `serve` |
 | `client` | `ensureLens`, `ensureLenses` |
 
 `assets.create` queues processing and returns the asset while its `classification().status()` is `processing`; `assets.classify` and `text.classify` wait for classification. `text.classify` supplies `text/plain` content and names the asset `text` unless you set a name. `assets.deleteContent` removes the stored bytes (the record and report stay, with `content().status()` `removed` and `content().removalReason()` `requested`); `assets.retry` processes an asset whose `classification().status()` is `failed` again; `assets.explain` completes the policy evidence behind a decision (`policy().evidence()` becomes `full`, every action stays as decided), or with `rerun(true)` moderates the asset again with the current policy; `assets.delete` removes everything. `assets.batch(new BatchAssets().assetIds(ids).operation(AssetBatchOperation.DELETE))` deletes up to 500 assets, or removes their content with `AssetBatchOperation.REMOVE_CONTENT`, in one request: every asset must exist and the key needs `assets:delete` for its folder, or nothing is queued (`asset/not-found`, `auth/permission-denied`). It returns `BatchAssetsResponse` (`queued()` is true) once queued, the work runs in the background, and it is not retried.
+
+Hash lists hold PDQ perceptual hashes that image uploads are compared with. A `HashListAction.FLAG` list reports matches in `classification().moderation().hashMatches()`; a `HashListAction.BLOCK` list also blocks close matches (the decision's `policy().decision().source()` is `hash-list`). `hashLists.addEntry` takes a 64-character hex `hash` (with an optional `quality`) or an image `assetId`, whose `content().image().perceptualHash()` is added (`hash-list/asset-not-hashed` when it has none); adding a hash the list already holds returns the existing entry. `hashLists.delete` removes the list and every entry in it.
+
+```java
+HashList list = client.hashLists.create(new CreateHashList("Removed images", HashListAction.BLOCK));
+HashListEntry entry = client.hashLists.addEntry(new AddHashListEntry(list.id()).assetId(asset.id()).label("Report 1042"));
+HashListEntryPage page = client.hashLists.listEntries(new ListHashListEntries(list.id()).pageSize(50));
+client.hashLists.update(new UpdateHashList(list.id()).action(Patch.value(HashListAction.FLAG)).description(Patch.clear()));
+client.hashLists.removeEntry(new HashListEntryId(entry.id()));
+```
 
 `assets.waitForDecision` retrieves an asset until its `classification().moderation().status()` is no longer `pending` (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`), or its `classification().status()` is `failed`, and returns it. It checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5 seconds. If there's no decision within the timeout (60 seconds by default), it throws `sdk/timeout` with `assetId` and the last `classificationStatus` and `moderationStatus` in `getDetails()`. Interrupting the thread stops it with `sdk/cancelled` and keeps the interrupt flag. Webhooks report decisions without polling.
 
@@ -188,7 +199,7 @@ client.cdn.getAssetUrl(new CdnRequest(id).transform(List.of(
     Transform.image(new ImageTransformOptions().format("webp")))));
 ```
 
-A selector has one path segment per step, such as `fit=cover,width=640/format=webp`: options are sorted `key=value` pairs, nested options are dotted (`border.color=fff`) and hex colours drop the `#`. A lens runs before any additional transforms, and the two are joined with `/` (`/rendered/@thumbnail/width=320`). `quality` takes `Quality.of(80)` or `Quality.level("high")`.
+A selector has one path segment per step, such as `fit=cover,width=640/format=webp`: options are sorted `key=value` pairs, nested options are dotted (`border.color=fff`) and hex colours drop the `#`. `redact(new Redaction().text(true))` blurs the text regions found when the image was processed (`personalInformation(true)` blurs only those holding personal information) before any other option applies; text regions need OCR on the upload. A lens runs before any additional transforms, and the two are joined with `/` (`/rendered/@thumbnail/width=320`). `quality` takes `Quality.of(80)` or `Quality.level("high")`.
 
 `readAllBytes(maxBytes)` buffers a body up to a limit. The client's `timeout` bounds the wait for the response headers, and a stream read that then receives nothing for that long fails with `HttpTimeoutException`; pass `new RequestOptions().timeout(...)` to `cdn.serve` to change it per call. Use `assets.createSignedUrl` for private content in browsers.
 
@@ -251,7 +262,7 @@ mock.client.assets.retrieve(new Models.AssetId(asset.id()));         // classifi
 MockCalmLensServerClient.Request sent = mock.requests().get(0);      // method(), path(), query(), header(...), bodyText()
 ```
 
-The mock is the real client in front of an in-memory API: validation, encoding, retries and error mapping all run, without waiting between retries. It keeps assets, folders, events and content, so uploads can be retrieved, listed (RSQL filters such as `classification.moderation.status==blocked`, with `;` binding tighter than `,` and parenthesised groups; ordering; folders; cursors that resume after the last item), searched (the API's keyword search, scores and ranking, without semantic search), updated, moved and deleted. It does not classify content: outcomes are `PENDING`, `ALLOWED`, `LIMITED` (served by the CDN like `ALLOWED`), `AGE_RESTRICTED`, `BLOCKED`, `PURGED` (which also removes the content) and `FAILED`. Finished processing removes content unless the upload sets `keepContentAfterProcessing`.
+The mock is the real client in front of an in-memory API: validation, encoding, retries and error mapping all run, without waiting between retries. It keeps assets, folders, hash lists, events and content, so uploads can be retrieved, listed (RSQL filters such as `classification.moderation.status==blocked`, with `;` binding tighter than `,` and parenthesised groups; ordering; folders; cursors that resume after the last item), searched (the API's keyword search, scores and ranking, without semantic search), updated, moved and deleted. It does not classify content: outcomes are `PENDING`, `ALLOWED`, `LIMITED` (served by the CDN like `ALLOWED`), `AGE_RESTRICTED`, `BLOCKED`, `PURGED` (which also removes the content) and `FAILED`. Finished processing removes content unless the upload sets `keepContentAfterProcessing`.
 
 - **Errors** use the API's codes, HTTP statuses and error body, and every response has an `X-Request-Id`. Requests the API's schema refuses fail with `validation/too-small` or `validation/too-big` and the field in `getDetails().get("path")` (page sizes from 1 to 100, event limits from 1 to 100, search limits from 1 to 20 and queries of 1 to 200 characters), and a list cursor only continues the query it came from. Idempotency keys replay the first response; a key reused for a different request fails with `idempotency/key-reused`, an invalid key with `idempotency/invalid-key`, and a failed request frees its key.
 - **Multipart uploads** follow the API's order of checks: parts arrive in order (`upload/invalid-part-number` with the expected and received numbers), non-final parts are at least 5 MiB, image uploads total 10 to 20 MiB, parts add up to a declared `totalSizeInBytes`, and the final part uses the queue choice saved when the upload started.

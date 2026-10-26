@@ -50,8 +50,8 @@ pub use webhooks::*;
 #[cfg(feature = "async")]
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use client::{
-    AssetsClient, CdnClient, CdnResponse, EventsClient, FoldersClient, ServerClient,
-    ServerClientBuilder, TextClient, UploadTokensClient, ASSET_BATCH_MAX_ASSETS,
+    AssetsClient, CdnClient, CdnResponse, EventsClient, FoldersClient, HashListsClient,
+    ServerClient, ServerClientBuilder, TextClient, UploadTokensClient, ASSET_BATCH_MAX_ASSETS,
     DECISION_POLL_FIRST_INTERVAL, DECISION_POLL_INTERVAL_FACTOR, DECISION_POLL_MAX_INTERVAL,
     DEFAULT_BASE_URL, DEFAULT_CDN_BASE_URL, DEFAULT_DECISION_TIMEOUT, DEFAULT_MAX_RETRIES,
     DEFAULT_SIGNED_URL_SECONDS, DEFAULT_TIMEOUT, DEFAULT_UPLOAD_TIMEOUT,

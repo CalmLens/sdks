@@ -7,7 +7,7 @@ import * as zod from "zod";
 /** How mature a feature is. Beta results may change shape. */
 declare const PROCESSING_FEATURE_STAGES: readonly ["beta", "ga"];
 type ProcessingFeatureStage = (typeof PROCESSING_FEATURE_STAGES)[number];
-declare const PROCESSING_FEATURE_IDS: readonly ["ocr", "personDetection", "faceDetection"];
+declare const PROCESSING_FEATURE_IDS: readonly ["ocr", "personDetection", "faceDetection", "linkDetection", "aiGeneratedDetection"];
 type ProcessingFeatureId = (typeof PROCESSING_FEATURE_IDS)[number];
 declare const PROCESSING_FEATURES_SCHEMA: zod.ZodObject<{
   ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
@@ -19,6 +19,12 @@ declare const PROCESSING_FEATURES_SCHEMA: zod.ZodObject<{
   faceDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     enabled: zod.ZodBoolean;
     ageEstimation: zod.ZodOptional<zod.ZodBoolean>;
+  }, zod.core.$strict>>>;
+  linkDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
+    enabled: zod.ZodBoolean;
+  }, zod.core.$strict>>>;
+  aiGeneratedDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
+    enabled: zod.ZodBoolean;
   }, zod.core.$strict>>>;
 }, zod.core.$strict>;
 type ProcessingFeatures = zod.infer<typeof PROCESSING_FEATURES_SCHEMA>;
@@ -104,6 +110,69 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
         low: zod.ZodNumber;
         high: zod.ZodNumber;
       }, zod.core.$strict>>;
+    }, zod.core.$strict>>;
+  }, zod.core.$strict>, zod.ZodObject<{
+    status: zod.ZodLiteral<"not-evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    reason: zod.ZodEnum<{
+      "not-supported": "not-supported";
+      unavailable: "unavailable";
+    }>;
+  }, zod.core.$strict>], "status">>;
+  linkDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+    status: zod.ZodLiteral<"evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    qrCodes: zod.ZodArray<zod.ZodObject<{
+      value: zod.ZodString;
+      box: zod.ZodObject<{
+        left: zod.ZodNumber;
+        top: zod.ZodNumber;
+        width: zod.ZodNumber;
+        height: zod.ZodNumber;
+      }, zod.core.$strict>;
+    }, zod.core.$strict>>;
+    links: zod.ZodArray<zod.ZodObject<{
+      url: zod.ZodString;
+      source: zod.ZodEnum<{
+        "qr-code": "qr-code";
+        text: "text";
+      }>;
+    }, zod.core.$strict>>;
+  }, zod.core.$strict>, zod.ZodObject<{
+    status: zod.ZodLiteral<"not-evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    reason: zod.ZodEnum<{
+      "not-supported": "not-supported";
+      unavailable: "unavailable";
+    }>;
+  }, zod.core.$strict>], "status">>;
+  aiGeneratedDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+    status: zod.ZodLiteral<"evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    provenance: zod.ZodEnum<{
+      "ai-edited": "ai-edited";
+      "ai-generated": "ai-generated";
+      unknown: "unknown";
+    }>;
+    signals: zod.ZodArray<zod.ZodObject<{
+      kind: zod.ZodEnum<{
+        c2pa: "c2pa";
+        "generator-metadata": "generator-metadata";
+        "iptc-digital-source-type": "iptc-digital-source-type";
+      }>;
+      value: zod.ZodString;
     }, zod.core.$strict>>;
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;

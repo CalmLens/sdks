@@ -108,8 +108,8 @@ class ContractTest < Minitest::Test
       options = args.except('idempotencyKey')
       options['request_options'] = { idempotency_key: args['idempotencyKey'] } if args.key?('idempotencyKey')
       *resources, method = operation.split('.')
-      target = resources.reduce(mock) { |value, resource| value.public_send(resource) }
-      json(target.public_send(method.gsub(/([a-z])([A-Z])/, '\1_\2').downcase, options))
+      target = resources.reduce(mock) { |value, resource| value.public_send(snake_name(resource)) }
+      json(target.public_send(snake_name(method), options))
     end
   end
 
@@ -213,7 +213,7 @@ class ContractTest < Minitest::Test
       CalmLens::Response.new(status: spec['status'], headers: spec['headers'], body: JSON.generate(spec['body']))
     end)
     resource, method = spec['operation'].split('.')
-    failing.public_send(resource).public_send(snake_name(method), spec['options'])
+    failing.public_send(snake_name(resource)).public_send(snake_name(method), spec['options'])
     flunk "#{spec['operation']} did not fail"
   rescue CalmLens::Error => e
     e
@@ -278,7 +278,7 @@ class ContractTest < Minitest::Test
   def replay_rejection(rejection)
     resource, method = rejection['operation'].split('.')
     error = assert_raises(CalmLens::Error, rejection['name']) do
-      client.public_send(resource).public_send(snake_name(method), rejection['options'])
+      client.public_send(snake_name(resource)).public_send(snake_name(method), rejection['options'])
     end
     assert_equal rejection['error'], error.code, rejection['name']
   end

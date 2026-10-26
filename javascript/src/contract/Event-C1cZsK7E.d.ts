@@ -1,5 +1,5 @@
-import "./Asset-C7keh1sF.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-DK8SUPrz.js";
+import "./Asset-CttmFD1i.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-B8Z4wWz5.js";
 import "./Page-CHCx12S3.js";
 import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
@@ -55,6 +55,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "asset.content-removed": "asset.content-removed";
     "asset.deleted": "asset.deleted";
     "asset.failed": "asset.failed";
+    "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
     "asset.purged": "asset.purged";
     "asset.retried": "asset.retried";

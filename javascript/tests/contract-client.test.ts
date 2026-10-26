@@ -105,11 +105,12 @@ describe("request fixtures", () => {
       const result = await invoke(client, operation, options);
       expect(sent).toEqual([request]);
       // Deletes return nothing; ensureLenses returns the lenses; everything else the body.
-      const expected = operation.endsWith(".delete")
-        ? undefined
-        : operation === "ensureLenses"
-          ? (response as { lenses: Json }).lenses
-          : response;
+      const expected =
+        operation.endsWith(".delete") || operation === "hashLists.removeEntry"
+          ? undefined
+          : operation === "ensureLenses"
+            ? (response as { lenses: Json }).lenses
+            : response;
       expect(result).toEqual(expected);
     });
   }

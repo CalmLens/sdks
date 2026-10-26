@@ -54,13 +54,16 @@ type StoredContent struct {
 	Parts map[int][]byte
 }
 
-// InMemoryDatabaseStorage holds assets and folders as API-shaped JSON maps. An asset's
+// InMemoryDatabaseStorage holds assets, folders, hash lists and hash list entries as
+// API-shaped JSON maps. An asset's
 // processing, moderation and content objects are nested calmlens.JSON maps, so a test can change
 // them in place, such as
 // db.Assets[id]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = "blocked".
 type InMemoryDatabaseStorage struct {
-	Assets  map[string]calmlens.JSON
-	Folders map[string]calmlens.JSON
+	Assets          map[string]calmlens.JSON
+	Folders         map[string]calmlens.JSON
+	HashLists       map[string]calmlens.JSON
+	HashListEntries map[string]calmlens.JSON
 }
 
 // InMemoryImageStorage holds uploaded content by asset ID.
@@ -167,6 +170,8 @@ type MockServerClient struct {
 	// lastStatus is the HTTP status of the last response, 0 when the last request failed
 	// without one; the contract tests check it.
 	lastStatus int
+	// status overrides successStatus for the request being answered, 0 when it does not.
+	status int
 	// waited is the time the client has spent waiting; mock waits advance it instead of sleeping.
 	waited time.Duration
 	mu     sync.Mutex
@@ -439,6 +444,12 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	if db.Folders == nil {
 		db.Folders = map[string]calmlens.JSON{}
 	}
+	if db.HashLists == nil {
+		db.HashLists = map[string]calmlens.JSON{}
+	}
+	if db.HashListEntries == nil {
+		db.HashListEntries = map[string]calmlens.JSON{}
+	}
 	images := options.ImageStorage
 	if images == nil {
 		images = &InMemoryImageStorage{}
@@ -610,10 +621,15 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 			return response(req, saved.status, header, "application/json", saved.data), nil
 		}
 	}
+	m.status = 0
 	result, err := m.dispatch(req.Method, parts, req.URL.Query(), raw, req.Header)
 	res := m.jsonResponse(req, header, result, err)
 	if err == nil {
-		setStatus(res, successStatus(operations))
+		status := successStatus(operations)
+		if m.status != 0 {
+			status = m.status
+		}
+		setStatus(res, status)
 	}
 	// A failed request frees its key, like the API.
 	if key != "" && err == nil {
@@ -653,6 +669,10 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 			return []string{"folders.list"}
 		case route == "folders":
 			return []string{"folders.create"}
+		case route == "hash-lists" && method == "GET":
+			return []string{"hashLists.list"}
+		case route == "hash-lists":
+			return []string{"hashLists.create"}
 		case route == "assets/page":
 			return []string{"assets.list", "assets.iterate"}
 		case route == "assets/search":
@@ -670,6 +690,20 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		return nil
 	}
 	suffix := strings.Join(parts[2:], "/")
+	switch {
+	case parts[0] == "hash-list-entries":
+		return []string{"hashLists.removeEntry"}
+	case parts[0] == "hash-lists" && suffix == "entries" && method == "GET":
+		return []string{"hashLists.listEntries"}
+	case parts[0] == "hash-lists" && suffix == "entries":
+		return []string{"hashLists.addEntry"}
+	case parts[0] == "hash-lists" && method == "GET":
+		return []string{"hashLists.retrieve"}
+	case parts[0] == "hash-lists" && method == "PATCH":
+		return []string{"hashLists.update"}
+	case parts[0] == "hash-lists":
+		return []string{"hashLists.delete"}
+	}
 	if parts[0] == "folders" {
 		switch {
 		case suffix == "move":
@@ -722,10 +756,11 @@ func (m *MockServerClient) jsonResponse(req *http.Request, header http.Header, r
 }
 
 // successStatus is the status the API answers a successful request with: 201 Created for a new
-// folder, 202 Accepted for a queued batch, otherwise 200 OK.
+// folder or hash list, 202 Accepted for a queued batch, otherwise 200 OK. Adding a hash list
+// entry sets its own status.
 func successStatus(operations []string) int {
 	switch {
-	case contains(operations, "folders.create"):
+	case contains(operations, "folders.create"), contains(operations, "hashLists.create"):
 		return http.StatusCreated
 	case contains(operations, "assets.batch"):
 		return http.StatusAccepted
@@ -860,6 +895,10 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.listFolders(q)
 		case route == "folders" && method == "POST":
 			return m.createFolder(body, now)
+		case route == "hash-lists" && method == "GET":
+			return m.listHashLists(), nil
+		case route == "hash-lists" && method == "POST":
+			return m.createHashList(body, now)
 		case route == "assets/page" && method == "GET":
 			folder, hasFolder := q["folderId"]
 			return m.page(func(a calmlens.JSON) bool { return !hasFolder || a["folderId"] == folder[0] }, q, "assets:"+q.Get("filter")+":"+strings.Join(folder, ""))
@@ -879,6 +918,18 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		return m.assetRoute(method, id, suffix, body, q, raw, now)
 	case "folders":
 		return m.folderRoute(method, id, suffix, body, now)
+	case "hash-lists":
+		return m.hashListRoute(method, id, suffix, body, q, now)
+	case "hash-list-entries":
+		entry := m.DatabaseStorage.HashListEntries[id]
+		if method != "DELETE" || suffix != "" {
+			return nil, errUnknownRoute
+		}
+		if entry == nil || entry["projectId"] != m.options.ProjectID {
+			return nil, fail(calmlens.CodeHashListEntryNotFound)
+		}
+		delete(m.DatabaseStorage.HashListEntries, id)
+		return calmlens.JSON{}, nil
 	}
 	return nil, errUnknownRoute
 }
@@ -1194,7 +1245,7 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 	image := content["image"]
 	switch {
 	case decided && a["type"] == calmlens.AssetTypeImage && !removed && !purge:
-		classified := calmlens.JSON{"width": nil, "height": nil, "perceptualHash": nil}
+		classified := calmlens.JSON{"width": nil, "height": nil, "perceptualHash": nil, "perceptualHashQuality": nil}
 		for key, value := range asJSON(image) {
 			classified[key] = value
 		}
@@ -2005,4 +2056,163 @@ func (m *MockServerClient) canDownload(folder, apiKey string) bool {
 		}
 	}
 	return false
+}
+
+// ---- Hash lists -----------------------------------------------------------------------------
+// Lists and entries live in DatabaseStorage. Uploads aren't matched against them.
+
+const defaultHashListEntryPageSize = 20
+
+var pdqHash = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// newestFirst sorts items by createdAt, then ID, newest first, like the API.
+func newestFirst(items []calmlens.JSON) {
+	sort.Slice(items, func(i, j int) bool {
+		if order := cmp.Compare(number(items[i]["createdAt"]), number(items[j]["createdAt"])); order != 0 {
+			return order > 0
+		}
+		return text(items[i]["id"]) > text(items[j]["id"])
+	})
+}
+
+func (m *MockServerClient) listHashLists() calmlens.JSON {
+	items := []calmlens.JSON{}
+	for _, list := range m.DatabaseStorage.HashLists {
+		if list["projectId"] == m.options.ProjectID {
+			items = append(items, list)
+		}
+	}
+	newestFirst(items)
+	return calmlens.JSON{"items": items}
+}
+
+func validHashListAction(value any) bool {
+	return value == calmlens.HashListActionFlag || value == calmlens.HashListActionBlock
+}
+
+func (m *MockServerClient) createHashList(body calmlens.JSON, now int64) (any, error) {
+	name, _ := body["name"].(string)
+	if strings.TrimSpace(name) == "" || !validHashListAction(body["action"]) {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	var description any
+	if value, ok := body["description"].(string); ok {
+		description = value
+	}
+	list := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "name": strings.TrimSpace(name), "description": description, "action": body["action"], "createdByUserId": nil, "createdAt": now, "updatedAt": now}
+	m.DatabaseStorage.HashLists[text(list["id"])] = list
+	return list, nil
+}
+
+func (m *MockServerClient) hashListRoute(method, id, suffix string, body calmlens.JSON, q url.Values, now int64) (any, error) {
+	list := m.DatabaseStorage.HashLists[id]
+	if list == nil || list["projectId"] != m.options.ProjectID {
+		return nil, fail(calmlens.CodeHashListNotFound)
+	}
+	switch {
+	case method == "GET" && suffix == "":
+	case method == "PATCH" && suffix == "":
+		if name, ok := body["name"].(string); ok {
+			list["name"] = strings.TrimSpace(name)
+		}
+		if description, ok := body["description"]; ok {
+			list["description"] = description
+		}
+		if validHashListAction(body["action"]) {
+			list["action"] = body["action"]
+		}
+		list["updatedAt"] = now
+	case method == "DELETE" && suffix == "":
+		delete(m.DatabaseStorage.HashLists, id)
+		for entryID, entry := range m.DatabaseStorage.HashListEntries {
+			if entry["hashListId"] == id {
+				delete(m.DatabaseStorage.HashListEntries, entryID)
+			}
+		}
+		return calmlens.JSON{}, nil
+	case method == "GET" && suffix == "entries":
+		return m.listHashListEntries(id, q)
+	case method == "POST" && suffix == "entries":
+		return m.addHashListEntry(id, body, now)
+	default:
+		return nil, errUnknownRoute
+	}
+	return list, nil
+}
+
+// listHashListEntries pages a list's entries newest first. The cursor is the base64 offset of
+// the next page.
+func (m *MockServerClient) listHashListEntries(id string, q url.Values) (any, error) {
+	size, err := intRange(q, "pageSize", defaultHashListEntryPageSize, 1, maxPageSize)
+	if err != nil {
+		return nil, err
+	}
+	entries := []calmlens.JSON{}
+	for _, entry := range m.DatabaseStorage.HashListEntries {
+		if entry["hashListId"] == id {
+			entries = append(entries, entry)
+		}
+	}
+	newestFirst(entries)
+	start := 0
+	if encoded := q.Get("cursor"); encoded != "" {
+		raw, err := base64.StdEncoding.DecodeString(encoded)
+		if err == nil {
+			start, err = strconv.Atoi(string(raw))
+		}
+		if err != nil || start < 0 {
+			return nil, fail(calmlens.CodeInvalidCursor)
+		}
+	}
+	start = min(start, len(entries))
+	end := min(start+size, len(entries))
+	var next any
+	if end < len(entries) {
+		next = base64.StdEncoding.EncodeToString([]byte(strconv.Itoa(end)))
+	}
+	ordering := []calmlens.Order{{Field: "createdAt", Direction: "DESC"}, {Field: "id", Direction: "DESC"}}
+	return calmlens.JSON{"items": entries[start:end], "hasMore": end < len(entries), "nextCursor": next, "pageSize": size, "ordering": ordering}, nil
+}
+
+// addHashListEntry adds a hash, or an image asset's perceptual hash, answering 201 for a new
+// entry and 200 with the existing entry when the hash is already listed.
+func (m *MockServerClient) addHashListEntry(id string, body calmlens.JSON, now int64) (any, error) {
+	hash, hasHash := body["hash"].(string)
+	assetID, hasAsset := body["assetId"].(string)
+	if hasHash == hasAsset {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	var quality any
+	if value, ok := body["quality"].(float64); ok {
+		quality = value
+	}
+	var source any
+	if hasAsset {
+		a, err := m.asset(assetID)
+		if err != nil {
+			return nil, err
+		}
+		image := asJSON(section(a, "content")["image"])
+		if text(image["perceptualHash"]) == "" {
+			return nil, fail(calmlens.CodeHashListAssetNotHashed)
+		}
+		hash, quality, source = text(image["perceptualHash"]), image["perceptualHashQuality"], assetID
+	}
+	if !pdqHash.MatchString(hash) {
+		return nil, fail(calmlens.CodeInvalidUploadPayload)
+	}
+	for _, entry := range m.DatabaseStorage.HashListEntries {
+		if entry["hashListId"] == id && entry["hash"] == hash {
+			return entry, nil
+		}
+	}
+	var label any
+	if value, ok := body["label"].(string); ok {
+		label = value
+	}
+	entry := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "hashListId": id, "hash": hash, "quality": quality, "label": label, "sourceAssetId": source, "createdByUserId": nil, "createdAt": now}
+	m.DatabaseStorage.HashListEntries[text(entry["id"])] = entry
+	m.status = http.StatusCreated
+	return entry, nil
 }

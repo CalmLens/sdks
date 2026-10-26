@@ -29,7 +29,10 @@ module CalmLens
     # @!attribute content [Hash{String => Hash}] stored bytes by asset ID: `{'type', 'parts' => {n => bytes}}`.
     # @!attribute events [Array<Hash>] the events feed, oldest first.
     # @!attribute lenses [Hash{String => Hash}] lenses by identifier.
-    State = Struct.new(:assets, :folders, :content, :events, :lenses, :uploads, :idempotency, keyword_init: true)
+    # @!attribute hash_lists [Hash{String => Hash}] hash lists by ID.
+    # @!attribute hash_list_entries [Hash{String => Hash}] hash list entries by ID.
+    State = Struct.new(:assets, :folders, :content, :events, :lenses, :uploads, :idempotency, :hash_lists,
+                       :hash_list_entries, keyword_init: true)
 
     # A stateful stand-in for the CalmLens API and CDN. It stores assets and folders, applies
     # filters and ordering, serves stored bytes, and answers errors with the API's codes, statuses,
@@ -76,7 +79,8 @@ module CalmLens
         @queued_outcome = queued_outcome
         @analyzed_outcome = analyzed_outcome
         @grants = grants
-        @state = State.new(assets: {}, folders: {}, content: {}, events: [], lenses: {}, uploads: {}, idempotency: {})
+        @state = State.new(assets: {}, folders: {}, content: {}, events: [], lenses: {}, uploads: {}, idempotency: {},
+                           hash_lists: {}, hash_list_entries: {})
         @request_count = 0
       end
 
@@ -218,6 +222,8 @@ module CalmLens
                when 'projects' then project(method, parts, query, json, body, upload)
                when 'assets' then asset(method, parts, query, json, body)
                when 'folders' then folder(method, parts, json)
+               when 'hash-lists' then hash_list(method, parts, query, json)
+               when 'hash-list-entries' then remove_hash_list_entry(method, parts)
                else fail!(ErrorCodes::ASSET_NOT_FOUND, 'Not found')
                end
         data.is_a?(Response) ? data : respond(200, deep_copy(data))
@@ -234,6 +240,8 @@ module CalmLens
         in ['PUT', ['lenses'], _] then lenses(json.fetch('lenses', []))
         in ['GET', ['folders'], _] then folder_page(query)
         in ['POST', ['folders'], _] then create_folder(json)
+        in ['GET', ['hash-lists'], _] then { 'items' => project_hash_lists.reverse }
+        in ['POST', ['hash-lists'], _] then create_hash_list(json)
         in ['GET', ['assets', 'page'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
         in ['POST', ['assets', 'batch'], _] then batch(json)
@@ -724,6 +732,89 @@ module CalmLens
         end
         unique_name(item['name'], parent_id, item['id']) unless parent_id == item['parentId']
         touch(item.merge!('parentId' => parent_id))
+      end
+
+      # Hash lists and their entries. Uploads are not compared with them.
+      def project_hash_lists = @state.hash_lists.values.select { |item| item['projectId'] == @project_id }
+
+      def check_hash_list(id)
+        item = @state.hash_lists[id]
+        fail!(ErrorCodes::HASH_LIST_NOT_FOUND) unless item && item['projectId'] == @project_id
+        item
+      end
+
+      def hash_list_action?(action) = %w[flag block].include?(action)
+
+      def create_hash_list(json)
+        name = json['name']
+        unless name.is_a?(String) && !name.strip.empty? && hash_list_action?(json['action'])
+          fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'A hash list needs a name and an action of flag or block')
+        end
+        now = @now.call
+        item = { 'id' => @create_id.call, 'projectId' => @project_id, 'name' => name.strip,
+                 'description' => json['description'].is_a?(String) ? json['description'] : nil,
+                 'action' => json['action'], 'createdByUserId' => nil, 'createdAt' => now, 'updatedAt' => now }
+        @state.hash_lists[item['id']] = item
+        # Like the API, a new hash list is 201 Created.
+        respond(201, deep_copy(item))
+      end
+
+      def hash_list(method, parts, query, json)
+        id = parts[1]
+        item = check_hash_list(id)
+        case [method, parts[2..]]
+        in ['GET', []] then item
+        in ['PATCH', []] then update_hash_list(item, json)
+        in ['DELETE', []]
+          @state.hash_lists.delete(id)
+          @state.hash_list_entries.delete_if { |_, entry| entry['hashListId'] == id }
+          {}
+        in ['GET', ['entries']] then page(@state.hash_list_entries.values.select { |entry| entry['hashListId'] == id }, query, id)
+        in ['POST', ['entries']] then add_hash_list_entry(item, json)
+        else fail!(ErrorCodes::HASH_LIST_NOT_FOUND, 'Not found')
+        end
+      end
+
+      def update_hash_list(item, json)
+        item['name'] = json['name'].strip if json['name'].is_a?(String)
+        item['description'] = json['description'].is_a?(String) ? json['description'] : nil if json.key?('description')
+        item['action'] = json['action'] if hash_list_action?(json['action'])
+        touch(item)
+      end
+
+      # Like the API: a hash or an image asset's hash; a hash already in the list returns its entry (200).
+      def add_hash_list_entry(list, json)
+        hash = json['hash'].is_a?(String) ? json['hash'].strip.downcase : nil
+        quality = json['quality'].is_a?(Numeric) ? json['quality'] : nil
+        asset_id = json['assetId'].is_a?(String) ? json['assetId'] : nil
+        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Send either hash or assetId') if hash.nil? == asset_id.nil?
+        if asset_id
+          asset = @state.assets[asset_id]
+          fail!(ErrorCodes::ASSET_NOT_FOUND) unless asset && asset['projectId'] == @project_id
+          image = asset.dig('content', 'image')
+          fail!(ErrorCodes::HASH_LIST_ASSET_NOT_HASHED) unless image.is_a?(Hash) && image['perceptualHash']
+          hash = image['perceptualHash']
+          quality = image['perceptualHashQuality']
+        end
+        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Use a PDQ hash of 64 hexadecimal characters') unless hash.match?(/\A\h{64}\z/)
+
+        existing = @state.hash_list_entries.values.find { |entry| entry['hashListId'] == list['id'] && entry['hash'] == hash }
+        return existing if existing
+
+        entry = { 'id' => @create_id.call, 'projectId' => @project_id, 'hashListId' => list['id'], 'hash' => hash,
+                  'quality' => quality, 'label' => json['label'].is_a?(String) ? json['label'] : nil,
+                  'sourceAssetId' => asset_id, 'createdByUserId' => nil, 'createdAt' => @now.call }
+        @state.hash_list_entries[entry['id']] = entry
+        respond(201, deep_copy(entry))
+      end
+
+      def remove_hash_list_entry(method, parts)
+        entry = @state.hash_list_entries[parts[1]]
+        found = method == 'DELETE' && parts.size == 2 && entry && entry['projectId'] == @project_id
+        fail!(ErrorCodes::HASH_LIST_ENTRY_NOT_FOUND) unless found
+
+        @state.hash_list_entries.delete(parts[1])
+        {}
       end
 
       # One keyset page like the API's: ordered by `createdAt` and `id` (an `id` tie-breaker is

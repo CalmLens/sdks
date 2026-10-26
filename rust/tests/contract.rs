@@ -8,8 +8,8 @@ mod common;
 use calmlens::models::*;
 use calmlens::testing::{self, MockOptions, MockResponse, MockServerClient};
 use calmlens::{
-    AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, ServerClient, TextClient,
-    UploadTokensClient,
+    AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, HashListsClient, ServerClient,
+    TextClient, UploadTokensClient,
 };
 use common::{compare_typed, fixture, input, invoke, typed, whole_numbers};
 use futures_util::FutureExt;
@@ -118,6 +118,7 @@ fn serve_once(listener: TcpListener, response: String) -> thread::JoinHandle<Val
 fn expected_result(fixture: &Value) -> Value {
     match fixture["operation"].as_str().unwrap() {
         "ensureLenses" => fixture["response"]["lenses"].clone(),
+        "hashLists.removeEntry" => Value::Null,
         operation if operation.ends_with(".delete") => Value::Null,
         _ => fixture["response"].clone(),
     }
@@ -1141,6 +1142,14 @@ fn references() -> BTreeSet<&'static str> {
         "folders().update" => ServerClient::folders, FoldersClient::update;
         "folders().delete" => ServerClient::folders, FoldersClient::delete;
         "folders().move_folder" => ServerClient::folders, FoldersClient::move_folder;
+        "hash_lists().list" => ServerClient::hash_lists, HashListsClient::list;
+        "hash_lists().retrieve" => ServerClient::hash_lists, HashListsClient::retrieve;
+        "hash_lists().create" => ServerClient::hash_lists, HashListsClient::create;
+        "hash_lists().update" => ServerClient::hash_lists, HashListsClient::update;
+        "hash_lists().delete" => ServerClient::hash_lists, HashListsClient::delete;
+        "hash_lists().list_entries" => ServerClient::hash_lists, HashListsClient::list_entries;
+        "hash_lists().add_entry" => ServerClient::hash_lists, HashListsClient::add_entry;
+        "hash_lists().remove_entry" => ServerClient::hash_lists, HashListsClient::remove_entry;
         "assets().create" => ServerClient::assets, AssetsClient::create;
         "assets().upload_part" => ServerClient::assets, AssetsClient::upload_part;
         "assets().list" => ServerClient::assets, AssetsClient::list;

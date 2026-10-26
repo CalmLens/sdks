@@ -12,6 +12,7 @@
     "anim",
     "background",
     "blur",
+    "redact",
     "border",
     "brightness",
     "contrast",
@@ -36,6 +37,10 @@
         "anim": false,
         "background": "#FF0000",
         "blur": 1.5,
+        "redact": {
+          "text": false,
+          "personalInformation": false
+        },
         "border": {
           "color": "#FF0000",
           "width": 1.5
@@ -53,7 +58,7 @@
         "sharpen": 1.5,
         "trim": "border"
       },
-      "selector": "anim=false,background=ff0000,blur=1.5,border.color=ff0000,border.width=1.5,brightness=1.5,contrast=1.5,dpr=1.5,fit=scale-down,flip=h,format=jpg,gamma=1.5,gravity=face,height=2,quality=2,rotate=0,saturation=1.5,segment=foreground,sharpen=1.5,trim=border,width=2"
+      "selector": "anim=false,background=ff0000,blur=1.5,border.color=ff0000,border.width=1.5,brightness=1.5,contrast=1.5,dpr=1.5,fit=scale-down,flip=h,format=jpg,gamma=1.5,gravity=face,height=2,quality=2,redact.personalInformation=false,redact.text=false,rotate=0,saturation=1.5,segment=foreground,sharpen=1.5,trim=border,width=2"
     },
     {
       "options": {

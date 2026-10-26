@@ -356,6 +356,22 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		return one(c.Folders.Move(ctx, into[MoveFolderOptions](t, args)))
 	case "folders.delete":
 		return fixtureCall{}, c.Folders.Delete(ctx, into[FolderIDOptions](t, args))
+	case "hashLists.list":
+		return one(c.HashLists.List(ctx, into[ListHashListsOptions](t, args)))
+	case "hashLists.retrieve":
+		return one(c.HashLists.Retrieve(ctx, into[HashListIDOptions](t, args)))
+	case "hashLists.create":
+		return one(c.HashLists.Create(ctx, into[CreateHashListOptions](t, args)))
+	case "hashLists.update":
+		return one(c.HashLists.Update(ctx, into[UpdateHashListOptions](t, args)))
+	case "hashLists.delete":
+		return fixtureCall{}, c.HashLists.Delete(ctx, into[HashListIDOptions](t, args))
+	case "hashLists.listEntries":
+		return one(c.HashLists.ListEntries(ctx, into[ListHashListEntriesOptions](t, args)))
+	case "hashLists.addEntry":
+		return one(c.HashLists.AddEntry(ctx, into[AddHashListEntryOptions](t, args)))
+	case "hashLists.removeEntry":
+		return fixtureCall{}, c.HashLists.RemoveEntry(ctx, into[HashListEntryIDOptions](t, args))
 	case "ensureLens":
 		return one(c.EnsureLens(ctx, into[EnsureLensOptions](t, args)))
 	case "ensureLenses":
@@ -532,10 +548,11 @@ func TestRequestFixtures(t *testing.T) {
 			if r.method != fixture.Request.Method || r.url.EscapedPath() != fixture.Request.Path || !reflect.DeepEqual(normalizeJSONQuery(params), normalizeJSONQuery(fixture.Request.Query)) || !reflect.DeepEqual(body, fixture.Request.Body) {
 				t.Fatalf("got %s %s %v %#v; want %+v", r.method, r.url.EscapedPath(), params, body, fixture.Request)
 			}
-			// Deletes return nothing; ensureLenses returns the lenses; everything else the body.
+			// Deletes and removals return nothing; ensureLenses returns the lenses; everything
+			// else the body.
 			want := fixture.Response
 			switch {
-			case strings.HasSuffix(fixture.Operation, ".delete"):
+			case strings.HasSuffix(fixture.Operation, ".delete"), fixture.Operation == "hashLists.removeEntry":
 				want = json.RawMessage("null")
 			case fixture.Operation == "ensureLenses":
 				var response struct{ Lenses json.RawMessage }

@@ -168,6 +168,10 @@ impl ServerClient {
     pub fn folders(&self) -> FoldersClient<'_> {
         FoldersClient(self)
     }
+    /// Hash list operations.
+    pub fn hash_lists(&self) -> HashListsClient<'_> {
+        HashListsClient(self)
+    }
     /// The project's events feed.
     pub fn events(&self) -> EventsClient<'_> {
         EventsClient(self)
@@ -290,6 +294,28 @@ blocking_methods!(FoldersClient => folders {
     fn move_folder(options: MoveFolder) -> Result<Folder>;
     /// See [`crate::FoldersClient::delete`].
     fn delete(options: FolderId) -> Result<()>;
+});
+
+/// Hash list operations. See [`crate::HashListsClient`].
+#[derive(Debug, Clone, Copy)]
+pub struct HashListsClient<'a>(&'a ServerClient);
+blocking_methods!(HashListsClient => hash_lists {
+    /// See [`crate::HashListsClient::list`].
+    fn list() -> Result<HashListList>;
+    /// See [`crate::HashListsClient::retrieve`].
+    fn retrieve(options: HashListId) -> Result<HashList>;
+    /// See [`crate::HashListsClient::create`].
+    fn create(options: CreateHashList) -> Result<HashList>;
+    /// See [`crate::HashListsClient::update`].
+    fn update(options: UpdateHashList) -> Result<HashList>;
+    /// See [`crate::HashListsClient::delete`].
+    fn delete(options: HashListId) -> Result<()>;
+    /// See [`crate::HashListsClient::list_entries`].
+    fn list_entries(options: ListHashListEntries) -> Result<HashListEntryPage>;
+    /// See [`crate::HashListsClient::add_entry`].
+    fn add_entry(options: AddHashListEntry) -> Result<HashListEntry>;
+    /// See [`crate::HashListsClient::remove_entry`].
+    fn remove_entry(options: HashListEntryId) -> Result<()>;
 });
 
 /// The events feed. See [`crate::EventsClient`].

@@ -102,7 +102,7 @@ pub enum MockFailure {
 
 /// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// takes: the JavaScript SDK's method paths.
-pub(super) const OPERATIONS: [&str; 29] = [
+pub(super) const OPERATIONS: [&str; 37] = [
     "assets.create",
     "assets.classify",
     "text.classify",
@@ -127,6 +127,14 @@ pub(super) const OPERATIONS: [&str; 29] = [
     "folders.update",
     "folders.delete",
     "folders.move",
+    "hashLists.list",
+    "hashLists.retrieve",
+    "hashLists.create",
+    "hashLists.update",
+    "hashLists.delete",
+    "hashLists.listEntries",
+    "hashLists.addEntry",
+    "hashLists.removeEntry",
     "events.list",
     "events.pages",
     "ensureLens",
@@ -250,7 +258,7 @@ impl MockOptions {
         self.analyzed_outcome = Arc::new(outcome);
         self
     }
-    /// Creates asset, folder, lens and event IDs.
+    /// Creates asset, folder, hash list, lens and event IDs.
     pub fn create_id(mut self, value: impl Fn() -> String + Send + Sync + 'static) -> Self {
         self.create_id = Arc::new(value);
         self
@@ -292,6 +300,10 @@ pub struct MockStorage {
     pub assets: HashMap<String, Value>,
     /// Folders by ID.
     pub folders: HashMap<String, Value>,
+    /// Hash lists, oldest first.
+    pub hash_lists: Vec<Value>,
+    /// Hash list entries, oldest first.
+    pub hash_list_entries: Vec<Value>,
     /// Uploaded content by asset ID; removed content is absent.
     pub content: HashMap<String, StoredContent>,
     /// The events feed, oldest first.
@@ -892,13 +904,18 @@ impl Backend {
         } else {
             Map::new()
         };
-        // Like the API: a new folder is 201 Created, a queued batch 202 Accepted.
-        let status = match self.operation(method, url, headers) {
-            Some("folders.create") => 201,
+        // Like the API: a new folder, hash list or entry is 201 Created, a queued batch 202
+        // Accepted. Adding a hash a list already holds returns the entry with 200.
+        let operation = self.operation(method, url, headers);
+        let entries = self.storage.hash_list_entries.len();
+        let outcome = self.dispatch(method, &parts, &query, body, raw, headers);
+        let status = match operation {
+            Some("folders.create" | "hashLists.create") => 201,
+            Some("hashLists.addEntry") if self.storage.hash_list_entries.len() > entries => 201,
             Some("assets.batch") => 202,
             _ => 200,
         };
-        match self.dispatch(method, &parts, &query, body, raw, headers) {
+        match outcome {
             Ok(value) => {
                 let response = MockResponse::json(status, value);
                 if !key.is_empty() {
@@ -935,6 +952,10 @@ impl Backend {
                     ("PUT", "lenses") => self.ensure_lenses(body, now),
                     ("GET", "folders") => self.list_folders(q),
                     ("POST", "folders") => self.create_folder(body, now),
+                    ("GET", "hash-lists") => Ok(json!({
+                        "items": self.own_hash_lists().rev().collect::<Vec<_>>(),
+                    })),
+                    ("POST", "hash-lists") => self.create_hash_list(body, now),
                     ("GET", "assets/page") => {
                         let folder = q.get("folderId").cloned();
                         let scope =
@@ -958,6 +979,23 @@ impl Backend {
             }
             [scope, id, suffix @ ..] if scope == "folders" => {
                 self.folder_route(method, id, &suffix.join("/"), body, now)
+            }
+            [scope, id, suffix @ ..] if scope == "hash-lists" => {
+                self.hash_list_route(method, id, &suffix.join("/"), body, q, now)
+            }
+            [scope, id] if scope == "hash-list-entries" && method == "DELETE" => {
+                let project = self.options.project_id.as_str();
+                let before = self.storage.hash_list_entries.len();
+                self.storage
+                    .hash_list_entries
+                    .retain(|entry| !(entry["id"] == id.as_str() && entry["projectId"] == project));
+                if self.storage.hash_list_entries.len() == before {
+                    return Err(fail(
+                        ErrorCode::HashListEntryNotFound,
+                        "Hash list entry not found",
+                    ));
+                }
+                Ok(json!({}))
             }
             _ => Err(unknown_route()),
         }
@@ -1216,6 +1254,189 @@ impl Backend {
         let folder = self.storage.folders.get_mut(id).expect("folder");
         folder["updatedAt"] = now.into();
         Ok(folder.clone())
+    }
+
+    /// This project's hash lists, oldest first.
+    fn own_hash_lists(&self) -> impl DoubleEndedIterator<Item = &Value> {
+        let project = self.options.project_id.as_str();
+        self.storage
+            .hash_lists
+            .iter()
+            .filter(move |list| list["projectId"] == project)
+    }
+    fn hash_list(&self, id: &str) -> Outcome<Value> {
+        self.own_hash_lists()
+            .find(|list| list["id"] == id)
+            .cloned()
+            .ok_or_else(|| fail(ErrorCode::HashListNotFound, "Hash list not found"))
+    }
+    fn create_hash_list(&mut self, body: Map<String, Value>, now: u64) -> Outcome<Value> {
+        let name = body.get("name").and_then(Value::as_str).map(str::trim);
+        let action = body.get("action").and_then(Value::as_str);
+        let (Some(name), Some(action @ ("flag" | "block"))) = (name, action) else {
+            return Err(invalid(
+                "A hash list needs a name and an action of flag or block",
+            ));
+        };
+        if name.is_empty() {
+            return Err(invalid(
+                "A hash list needs a name and an action of flag or block",
+            ));
+        }
+        let list = json!({
+            "id": self.create_id(),
+            "projectId": self.options.project_id,
+            "name": name,
+            "description": body.get("description").filter(|value| value.is_string()),
+            "action": action,
+            "createdByUserId": null,
+            "createdAt": now,
+            "updatedAt": now,
+        });
+        self.storage.hash_lists.push(list.clone());
+        Ok(list)
+    }
+    /// `/hash-lists/:id` and its entries.
+    fn hash_list_route(
+        &mut self,
+        method: &str,
+        id: &str,
+        suffix: &str,
+        body: Map<String, Value>,
+        q: &HashMap<String, String>,
+        now: u64,
+    ) -> Outcome<Value> {
+        let list = self.hash_list(id)?;
+        let position = |storage: &MockStorage| {
+            storage
+                .hash_lists
+                .iter()
+                .position(|stored| {
+                    stored["id"] == list["id"] && stored["projectId"] == list["projectId"]
+                })
+                .expect("hash list")
+        };
+        match (method, suffix) {
+            ("GET", "") => Ok(list),
+            ("PATCH", "") => {
+                let index = position(&self.storage);
+                let stored = &mut self.storage.hash_lists[index];
+                if let Some(name) = body.get("name").and_then(Value::as_str) {
+                    stored["name"] = name.trim().into();
+                }
+                if let Some(description) = body.get("description") {
+                    stored["description"] = description.clone();
+                }
+                if let Some(action @ ("flag" | "block")) =
+                    body.get("action").and_then(Value::as_str)
+                {
+                    stored["action"] = action.into();
+                }
+                stored["updatedAt"] = now.into();
+                Ok(stored.clone())
+            }
+            ("DELETE", "") => {
+                let index = position(&self.storage);
+                self.storage.hash_lists.remove(index);
+                self.storage
+                    .hash_list_entries
+                    .retain(|entry| entry["hashListId"] != id);
+                Ok(json!({}))
+            }
+            ("GET", "entries") => {
+                let page_size = bounded(q.get("pageSize"), 20, 1, 100, "pageSize")?;
+                let entries: Vec<&Value> = self
+                    .storage
+                    .hash_list_entries
+                    .iter()
+                    .filter(|entry| entry["hashListId"] == id)
+                    .rev()
+                    .collect();
+                // Cursors are the number of entries already returned.
+                let start = match q.get("cursor") {
+                    None => 0,
+                    Some(cursor) => cursor
+                        .strip_suffix("_mock")
+                        .and_then(|n| n.parse::<usize>().ok())
+                        .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?,
+                };
+                let end = (start + page_size).min(entries.len());
+                let has_more = end < entries.len();
+                Ok(json!({
+                    "items": entries.get(start..end).unwrap_or_default(),
+                    "hasMore": has_more,
+                    "nextCursor": has_more.then(|| format!("{end}_mock")),
+                    "pageSize": page_size,
+                    "ordering": [
+                        {"field": "createdAt", "direction": "DESC"},
+                        {"field": "id", "direction": "DESC"},
+                    ],
+                }))
+            }
+            ("POST", "entries") => self.add_hash_list_entry(id, body, now),
+            _ => Err(unknown_route()),
+        }
+    }
+    fn add_hash_list_entry(
+        &mut self,
+        list_id: &str,
+        body: Map<String, Value>,
+        now: u64,
+    ) -> Outcome<Value> {
+        let mut hash = body
+            .get("hash")
+            .and_then(Value::as_str)
+            .map(|hash| hash.trim().to_ascii_lowercase());
+        let mut quality = body
+            .get("quality")
+            .filter(|value| value.is_number())
+            .cloned();
+        let asset_id = body.get("assetId").and_then(Value::as_str);
+        if hash.is_some() == asset_id.is_some() {
+            return Err(invalid("Send either hash or assetId"));
+        }
+        if let Some(asset_id) = asset_id {
+            let asset = self
+                .owned(&self.storage.assets, asset_id)
+                .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?;
+            let image = &asset["content"]["image"];
+            let Some(perceptual) = image["perceptualHash"].as_str() else {
+                return Err(fail(
+                    ErrorCode::HashListAssetNotHashed,
+                    "This asset has no perceptual hash",
+                ));
+            };
+            hash = Some(perceptual.to_owned());
+            quality = image
+                .get("perceptualHashQuality")
+                .filter(|value| value.is_number())
+                .cloned();
+        }
+        let hash = hash.unwrap_or_default();
+        if hash.len() != 64 || !hash.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+            return Err(invalid("Use a PDQ hash of 64 hexadecimal characters"));
+        }
+        if let Some(existing) = self
+            .storage
+            .hash_list_entries
+            .iter()
+            .find(|entry| entry["hashListId"] == list_id && entry["hash"] == hash.as_str())
+        {
+            return Ok(existing.clone());
+        }
+        let entry = json!({
+            "id": self.create_id(),
+            "projectId": self.options.project_id,
+            "hashListId": list_id,
+            "hash": hash,
+            "quality": quality,
+            "label": body.get("label").filter(|value| value.is_string()),
+            "sourceAssetId": asset_id,
+            "createdByUserId": null,
+            "createdAt": now,
+        });
+        self.storage.hash_list_entries.push(entry.clone());
+        Ok(entry)
     }
 
     /// `POST /projects/:id/assets`. `x-calmlens-upload` is empty for a JSON (URL) body,
@@ -1993,6 +2214,14 @@ impl Backend {
             ("PATCH", ["folders", _]) => "folders.update",
             ("DELETE", ["folders", _]) => "folders.delete",
             ("POST", ["folders", _, "move"]) => "folders.move",
+            ("GET", ["projects", _, "hash-lists"]) => "hashLists.list",
+            ("POST", ["projects", _, "hash-lists"]) => "hashLists.create",
+            ("GET", ["hash-lists", _]) => "hashLists.retrieve",
+            ("PATCH", ["hash-lists", _]) => "hashLists.update",
+            ("DELETE", ["hash-lists", _]) => "hashLists.delete",
+            ("GET", ["hash-lists", _, "entries"]) => "hashLists.listEntries",
+            ("POST", ["hash-lists", _, "entries"]) => "hashLists.addEntry",
+            ("DELETE", ["hash-list-entries", _]) => "hashLists.removeEntry",
             _ => return None,
         })
     }

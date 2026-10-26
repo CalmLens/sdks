@@ -7,7 +7,7 @@ require 'calmlens/testing'
 
 # The RBS signatures in sig/ must resolve and cover the public API that the gem defines.
 class SignatureTest < Minitest::Test
-  PUBLIC_CLASSES = %w[ServerClient Assets Folders Text Events CDN Response Error WebhookEvent MockServerClient
+  PUBLIC_CLASSES = %w[ServerClient Assets Folders HashLists Text Events CDN Response Error WebhookEvent MockServerClient
                       MockServerClient::Request Transport::Request Transport::NetHTTP].freeze
 
   def self.environment

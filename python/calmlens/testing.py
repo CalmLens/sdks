@@ -31,8 +31,8 @@ from . import error_codes
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_TIMEOUT, CalmLensServerClient, _invalid, _json, _merge,
                      _sign_upload_token)
 from .errors import CalmLensError
-from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, SignedUploadToken,
-                    SignUploadTokenOptions)
+from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, HashList, HashListEntry,
+                    SignedUploadToken, SignUploadTokenOptions)
 
 __all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetOutcome", "MockAssetOutcomeOption",
            "MockApiKeyGrant",
@@ -80,11 +80,14 @@ def create_mock_api_key(grants: list[MockApiKeyGrant] | None = None) -> str:
 
 
 class InMemoryMockDatabaseStorage:
-    """Assets, folders and events by ID; inspect or seed them between calls."""
+    """Assets, folders, hash lists, hash list entries and events by ID; inspect or seed them
+    between calls."""
 
     def __init__(self) -> None:
         self.assets: dict[str, Asset] = {}
         self.folders: dict[str, Folder] = {}
+        self.hash_lists: dict[str, HashList] = {}
+        self.hash_list_entries: dict[str, HashListEntry] = {}
         self.events: list[Event] = []
 
 
@@ -106,6 +109,13 @@ class _Response(io.BytesIO):
         super().__init__(body)
         self.status = status
         self.headers = dict(headers or {})
+
+
+class _Answer:
+    """A fake API result with a success status other than the operation's usual one."""
+
+    def __init__(self, status: int, body: Any):
+        self.status, self.body = status, body
 
 
 class _Failure(Exception):
@@ -310,7 +320,7 @@ class MockOptions(TypedDict, total=False):
     """``mock_options`` for :class:`MockCalmLensServerClient`."""
     database_storage: InMemoryMockDatabaseStorage
     image_storage: InMemoryMockImageStorage
-    #: Returns new asset, folder, lens and event IDs.
+    #: Returns new asset, folder, hash list, hash list entry, lens and event IDs.
     create_id: Callable[[], str]
     #: Returns the current time in milliseconds since the Unix epoch. The default is the
     #: system clock, moved on by at least a millisecond per reading, so assets created in a row
@@ -337,6 +347,9 @@ _MAX_FOLDER_PAGE_SIZE = 100
 _REVIEW_DECISIONS = ("allowed", "limited", "age-restricted", "blocked", "purged")
 #: Like the API: 1 to 255 printable ASCII characters, once HTTP has trimmed the header value.
 _IDEMPOTENCY_KEY = re.compile(r"[\x21-\x7e](?:[\x20-\x7e]{0,253}[\x21-\x7e])?")
+#: A PDQ hash, as the API accepts it once trimmed and lowercased.
+_PDQ_HASH = re.compile(r"[0-9a-f]{64}")
+_HASH_LIST_ACTIONS = ("flag", "block")
 #: Content a browser could run as a document, which the CDN serves as a download.
 _ACTIVE_CONTENT_TYPES = {"image/svg+xml", "application/xhtml+xml", "text/html", "application/xml", "text/xml"}
 
@@ -665,9 +678,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return "assets.create" if query.get("queue") else "assets.classify"
             if resource == "folders":
                 return "folders.list" if method == "GET" else "folders.create"
+            if resource == "hash-lists":
+                return "hashLists.list" if method == "GET" else "hashLists.create"
             return {"events": "events.list", "lenses": "ensureLenses"}.get(resource, resource)
         resource = parts[0]
         suffix = parts[2] if len(parts) > 2 else ""
+        if resource == "hash-list-entries":
+            return "hashLists.removeEntry"
+        if resource == "hash-lists":
+            if suffix == "entries":
+                return "hashLists.listEntries" if method == "GET" else "hashLists.addEntry"
+            return "hashLists." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, method.lower())
         if suffix:
             return {"children": "assets.listChildren", "part": "assets.uploadPart", "signed-url": "assets.createSignedUrl",
                     "content": "assets.deleteContent"}.get(suffix, f"{resource}.{suffix}")
@@ -736,9 +757,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
             except _Failure as failure_response:
                 # A failed request frees its idempotency key.
                 return self._failure_response(failure_response)
-            # Like the API: a new folder is 201 Created, a queued batch 202 Accepted, and deletes
-            # answer 200 with an empty object.
-            status = {"folders.create": 201, "assets.batch": 202}.get(operation, 200)
+            # Like the API: a new folder or hash list is 201 Created, a queued batch 202 Accepted,
+            # and deletes answer 200 with an empty object.
+            status = {"folders.create": 201, "hashLists.create": 201, "assets.batch": 202}.get(operation, 200)
+            if isinstance(result, _Answer):
+                status, result = result.status, result.body
             response = self._respond(status, {} if result is None else result)
             if key is not None:
                 self._idempotent[key] = (fingerprint, response.status, response.getvalue())
@@ -784,6 +807,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
         suffix = parts[2] if len(parts) > 2 else ""
         if resource == "assets":
             return self._dispatch_asset(method, identifier, suffix, query, body, raw)
+        if resource == "hash-lists":
+            return self._dispatch_hash_list(method, identifier, suffix, query, body)
+        if resource == "hash-list-entries":
+            if method != "DELETE" or suffix:
+                raise _Failure("not-found", f"No route for {method} /{'/'.join(parts)}", 404)
+            entry = self.database_storage.hash_list_entries.get(identifier)
+            if not entry or entry["projectId"] != self.project_id:
+                raise _Failure(error_codes.HASH_LIST_ENTRY_NOT_FOUND)
+            del self.database_storage.hash_list_entries[identifier]
+            return None
         return self._dispatch_folder(method, identifier, suffix, body)
 
     def _dispatch_project(self, method: str, parts: list[str], query: dict[str, Any], body: dict[str, Any],
@@ -804,6 +837,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
                       "name": body["name"], "createdAt": now, "updatedAt": now}
             self.database_storage.folders[folder["id"]] = cast(Folder, folder)
             return folder
+        if resource == "hash-lists":
+            if method == "GET":
+                lists = [h for h in self.database_storage.hash_lists.values() if h["projectId"] == self.project_id]
+                return {"items": sorted(lists, key=lambda h: (h["createdAt"], _code_points(h["id"])), reverse=True)}
+            return self._create_hash_list(body, now)
         suffix = parts[1] if len(parts) > 1 else ""
         if suffix == "batch":
             return self._batch(body, now)
@@ -929,7 +967,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         purge = outcome == "purged" and content["status"] != "removed"
         remove = purge or (status == "completed" and content["status"] == "temporary")
         if decided and asset["type"] == "image" and content["status"] != "removed" and not purge:
-            content["image"] = {"width": None, "height": None, "perceptualHash": None, **(content.get("image") or {}),
+            content["image"] = {"width": None, "height": None, "perceptualHash": None,
+                                "perceptualHashQuality": None, **(content.get("image") or {}),
                                 "thumbhash": _MOCK_THUMBHASH,
                                 "averageColor": (content.get("image") or {}).get("averageColor") or "#7f7f7f"}
         elif outcome == "purged":
@@ -1124,6 +1163,77 @@ class MockCalmLensServerClient(CalmLensServerClient):
             folder["name"] = body["name"]
         folder["updatedAt"] = self.now()
         return folder
+
+    # Hash lists: kept in memory for the mock's lifetime. Uploads aren't matched against them.
+
+    def _hash_list(self, hash_list_id: str) -> dict[str, Any]:
+        hash_list = self.database_storage.hash_lists.get(hash_list_id)
+        if not hash_list or hash_list["projectId"] != self.project_id:
+            raise _Failure(error_codes.HASH_LIST_NOT_FOUND)
+        return cast(dict[str, Any], hash_list)
+
+    def _create_hash_list(self, body: dict[str, Any], now: int) -> dict[str, Any]:
+        name, description, action = body.get("name"), body.get("description"), body.get("action")
+        if not isinstance(name, str) or not name.strip() or action not in _HASH_LIST_ACTIONS:
+            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "A hash list needs a name and an action of flag or block")
+        hash_list = {"id": self.create_id(), "projectId": self.project_id, "name": name.strip(),
+                     "description": description if isinstance(description, str) else None, "action": action,
+                     "createdByUserId": None, "createdAt": now, "updatedAt": now}
+        self.database_storage.hash_lists[hash_list["id"]] = cast(HashList, hash_list)
+        return hash_list
+
+    def _dispatch_hash_list(self, method: str, identifier: str, suffix: str, query: dict[str, Any],
+                            body: dict[str, Any]) -> Any:
+        hash_list = self._hash_list(identifier)
+        entries = self.database_storage.hash_list_entries
+        if suffix == "entries":
+            if method == "GET":
+                items = [cast(dict[str, Any], e) for e in entries.values() if e["hashListId"] == identifier]
+                return self._page(items, query, [identifier])
+            return self._add_hash_list_entry(hash_list, body)
+        if method == "GET":
+            return hash_list
+        if method == "DELETE":
+            del self.database_storage.hash_lists[identifier]
+            for entry_id in [i for i, e in entries.items() if e["hashListId"] == identifier]:
+                del entries[entry_id]
+            return None
+        if isinstance(body.get("name"), str):
+            hash_list["name"] = body["name"].strip()
+        if "description" in body:
+            hash_list["description"] = body["description"]
+        if body.get("action") in _HASH_LIST_ACTIONS:
+            hash_list["action"] = body["action"]
+        hash_list["updatedAt"] = self.now()
+        return hash_list
+
+    def _add_hash_list_entry(self, hash_list: dict[str, Any], body: dict[str, Any]) -> Any:
+        """Like the API: a new entry is 201 Created; a hash already in the list answers 200 with
+        its entry. ``assetId`` takes the asset's perceptual hash and its quality."""
+        hash_value = body["hash"].strip().lower() if isinstance(body.get("hash"), str) else None
+        quality = body.get("quality")
+        quality = quality if isinstance(quality, int) and not isinstance(quality, bool) else None
+        asset_id = body.get("assetId") if isinstance(body.get("assetId"), str) else None
+        if (hash_value is None) == (asset_id is None):
+            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Send either hash or assetId")
+        if asset_id is not None:
+            image = self._asset(asset_id)["content"].get("image") or {}
+            if not image.get("perceptualHash"):
+                raise _Failure(error_codes.HASH_LIST_ASSET_NOT_HASHED)
+            hash_value, quality = image["perceptualHash"], image.get("perceptualHashQuality")
+        if not _PDQ_HASH.fullmatch(cast(str, hash_value)):
+            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Use a PDQ hash of 64 hexadecimal characters")
+        entries = self.database_storage.hash_list_entries
+        existing = next((e for e in entries.values() if e["hashListId"] == hash_list["id"] and e["hash"] == hash_value),
+                        None)
+        if existing is not None:
+            return existing
+        entry = {"id": self.create_id(), "projectId": self.project_id, "hashListId": hash_list["id"],
+                 "hash": hash_value, "quality": quality,
+                 "label": body["label"] if isinstance(body.get("label"), str) else None,
+                 "sourceAssetId": asset_id, "createdByUserId": None, "createdAt": self.now()}
+        entries[entry["id"]] = cast(HashListEntry, entry)
+        return _Answer(201, entry)
 
     def _lenses_put(self, body: dict[str, Any], now: int) -> dict[str, Any]:
         # Each definition is saved in turn, so earlier ones stay saved when a later one conflicts.

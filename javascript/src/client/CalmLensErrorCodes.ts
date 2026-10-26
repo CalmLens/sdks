@@ -44,6 +44,11 @@ export const API_ERROR_CODES = {
   FOLDER_NOT_EMPTY: "folder/not-empty",
   FOLDER_PARENT_CYCLE: "folder/parent-cycle",
   LENS_VERSION_CONFLICT: "lens/version-conflict",
+  HASH_LIST_NOT_FOUND: "hash-list/not-found",
+  HASH_LIST_ENTRY_NOT_FOUND: "hash-list/entry-not-found",
+  HASH_LIST_LIMIT_REACHED: "hash-list/limit-reached",
+  HASH_LIST_ENTRY_LIMIT_REACHED: "hash-list/entry-limit-reached",
+  HASH_LIST_ASSET_NOT_HASHED: "hash-list/asset-not-hashed",
   UPLOAD_PRESET_NOT_FOUND: "upload-preset/not-found",
   UPLOAD_PRESET_DISABLED: "upload-preset/disabled",
   UPLOAD_PRESET_TOKEN_REQUIRED: "upload-preset/token-required",
@@ -246,6 +251,26 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "lens/version-conflict": {
     status: 409,
     message: "Lens updates require a version greater than the current version.",
+  },
+  "hash-list/not-found": {
+    status: 404,
+    message: "Hash list not found. Check the list ID in the portal.",
+  },
+  "hash-list/entry-not-found": {
+    status: 404,
+    message: "Hash list entry not found.",
+  },
+  "hash-list/limit-reached": {
+    status: 409,
+    message: "This project has the most hash lists it can hold. Delete a list to add another.",
+  },
+  "hash-list/entry-limit-reached": {
+    status: 409,
+    message: "This project's hash lists hold the most entries they can. Remove entries to add more.",
+  },
+  "hash-list/asset-not-hashed": {
+    status: 409,
+    message: "This asset has no perceptual hash. Only image assets that finished processing can be added.",
   },
   "upload-preset/not-found": {
     status: 404,

@@ -15,6 +15,8 @@ declare const ACTION_SCHEMA: zod.ZodEnum<{
   "folders:delete": "folders:delete";
   "folders:read": "folders:read";
   "folders:update": "folders:update";
+  "hash-lists:read": "hash-lists:read";
+  "hash-lists:write": "hash-lists:write";
   "lenses:read": "lenses:read";
   "lenses:write": "lenses:write";
   "members:read": "members:read";
@@ -46,6 +48,8 @@ declare const GRANT_SCHEMA: zod.ZodObject<{
     "folders:delete": "folders:delete";
     "folders:read": "folders:read";
     "folders:update": "folders:update";
+    "hash-lists:read": "hash-lists:read";
+    "hash-lists:write": "hash-lists:write";
     "lenses:read": "lenses:read";
     "lenses:write": "lenses:write";
     "members:read": "members:read";
@@ -79,6 +83,8 @@ declare const GRANTS_SCHEMA: zod.ZodArray<zod.ZodObject<{
     "folders:delete": "folders:delete";
     "folders:read": "folders:read";
     "folders:update": "folders:update";
+    "hash-lists:read": "hash-lists:read";
+    "hash-lists:write": "hash-lists:write";
     "lenses:read": "lenses:read";
     "lenses:write": "lenses:write";
     "members:read": "members:read";

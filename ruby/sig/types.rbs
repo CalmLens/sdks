@@ -314,6 +314,10 @@ module CalmLens
     ?anim: bool,
     ?background: String,
     ?blur: number,
+    ?redact: {
+      ?text: bool,
+      ?personalInformation: bool
+    },
     ?border: {
       ?color: String,
       ?width: number
@@ -356,6 +360,10 @@ module CalmLens
     ?"anim" => bool,
     ?"background" => String,
     ?"blur" => number,
+    ?"redact" => {
+      ?"text" => bool,
+      ?"personalInformation" => bool
+    },
     ?"border" => {
       ?"color" => String,
       ?"width" => number
@@ -433,6 +441,41 @@ module CalmLens
     "name" => String,
     "createdAt" => Integer,
     ?"updatedAt" => Integer
+  }
+
+  # ---- Hash lists (HashList.ts) ----------------------------------------------------------------
+
+  type hash_list_action = "flag" | "block"
+
+  type hash_list = {
+    "id" => String,
+    "projectId" => String,
+    "name" => String,
+    ?"description" => String?,
+    "action" => hash_list_action,
+    ?"createdByUserId" => String?,
+    "createdAt" => Integer,
+    ?"updatedAt" => Integer
+  }
+
+  type hash_list_entry = {
+    "id" => String,
+    "projectId" => String,
+    "hashListId" => String,
+    "hash" => String,
+    "quality" => number?,
+    ?"label" => String?,
+    ?"sourceAssetId" => String?,
+    ?"createdByUserId" => String?,
+    "createdAt" => Integer
+  }
+
+  type hash_list_entry_page = {
+    "items" => Array[hash_list_entry],
+    "hasMore" => bool,
+    "nextCursor" => String?,
+    "pageSize" => Integer,
+    "ordering" => Array[order]
   }
 
   # ---- Events and webhooks (Event.ts, EventCatalog.ts, WebhookPayload.ts) ----------------------
@@ -633,6 +676,16 @@ module CalmLens
   type create_folder_options = { name: String, ?parent_id: String?, ?request_options: request_options }
   type update_folder_options = { folder_id: String, ?name: String, ?request_options: request_options }
   type move_folder_options = { folder_id: String, parent_id: String?, ?request_options: request_options }
+  type hash_list_list = { "items" => Array[hash_list] }
+  type hash_list_id_options = { hash_list_id: String, ?request_options: request_options }
+  type create_hash_list_options = { name: String, action: hash_list_action, ?description: String?, ?request_options: request_options }
+  type update_hash_list_options = { hash_list_id: String, ?name: String, ?description: String?, ?action: hash_list_action,
+                                    ?request_options: request_options }
+  type list_hash_list_entries_options = { hash_list_id: String, ?cursor: String, ?page_size: Integer,
+                                          ?request_options: request_options }
+  type add_hash_list_entry_options = { hash_list_id: String, ?hash: String, ?quality: number, ?asset_id: String, ?label: String,
+                                       ?request_options: request_options }
+  type hash_list_entry_id_options = { entry_id: String, ?request_options: request_options }
 
   type list_events_options = { ?after: String, ?limit: Integer, ?request_options: request_options }
 

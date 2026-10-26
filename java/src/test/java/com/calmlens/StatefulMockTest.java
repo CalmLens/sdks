@@ -77,4 +77,39 @@ class StatefulMockTest {
     ApiException missing = assertThrows(ApiException.class, () -> mock.client.assets.retrieve(new Models.AssetId("nope")));
     assertTrue(missing.getRequestId().startsWith("req_mock_"), missing.getRequestId());
   }
+
+  /** The shared scenario covers create, update, listing and deletion; this is adding from an asset and the cascade. */
+  @Test void hashListEntriesComeFromAnAssetsHashAndGoWithTheirList() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    String hash = "ab".repeat(32);
+    Models.Asset hashed = mock.client.assets.classify(kept("hashed.png"));
+    Models.Asset unhashed = mock.client.assets.classify(kept("unhashed.png"));
+    mock.withStorage(storage -> {
+      var image = storage.assets.get(hashed.id()).getAsJsonObject("content").getAsJsonObject("image");
+      image.addProperty("perceptualHash", hash);
+      image.addProperty("perceptualHashQuality", 80);
+    });
+    Models.HashList list = mock.client.hashLists.create(new Models.CreateHashList("Removed", Models.HashListAction.BLOCK));
+
+    Models.HashListEntry entry = mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).assetId(hashed.id()).label("Report 1"));
+    assertEquals(hash, entry.hash());
+    assertEquals(80, entry.quality());
+    assertEquals(hashed.id(), entry.sourceAssetId());
+    assertEquals(entry.id(), mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).hash(hash.toUpperCase())).id());
+    assertEquals(ErrorCodes.HASH_LIST_ASSET_NOT_HASHED, assertThrows(ApiException.class,
+        () -> mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).assetId(unhashed.id()))).getCode());
+
+    Models.HashListEntry second = mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).hash("cd".repeat(32)));
+    Models.HashListEntryPage first = mock.client.hashLists.listEntries(new Models.ListHashListEntries(list.id()).pageSize(1));
+    assertEquals(List.of(second.id()), first.items().stream().map(Models.HashListEntry::id).toList());
+    assertTrue(first.hasMore());
+    Models.HashListEntryPage next = mock.client.hashLists.listEntries(new Models.ListHashListEntries(list.id()).pageSize(1).cursor(first.nextCursor()));
+    assertEquals(List.of(entry.id()), next.items().stream().map(Models.HashListEntry::id).toList());
+    assertFalse(next.hasMore());
+
+    mock.client.hashLists.delete(new Models.HashListId(list.id()));
+    assertEquals(ErrorCodes.HASH_LIST_ENTRY_NOT_FOUND, assertThrows(ApiException.class,
+        () -> mock.client.hashLists.removeEntry(new Models.HashListEntryId(entry.id()))).getCode());
+    assertEquals(List.of(), mock.client.hashLists.list().items());
+  }
 }

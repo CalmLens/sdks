@@ -16,6 +16,7 @@ import {
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
 import type { TransportRequest } from "./CalmLensTransport";
 import type {
+  AddHashListEntryOptions,
   Asset,
   AssetChildrenPage,
   AssetPage,
@@ -29,6 +30,7 @@ import type {
   ClassifyTextOptions,
   CreateAssetSignedUrlOptions,
   CreateFolderOptions,
+  CreateHashListOptions,
   DeleteAssetContentOptions,
   DeleteAssetOptions,
   EnsureLensesOptions,
@@ -36,6 +38,12 @@ import type {
   ExplainAssetOptions,
   FolderIdOptions,
   FolderPage,
+  HashList,
+  HashListEntry,
+  HashListEntryIdOptions,
+  HashListEntryPage,
+  HashListIdOptions,
+  HashListList,
   IterateAssetChildrenOptions,
   IterateAssetsOptions,
   Lens,
@@ -43,6 +51,7 @@ import type {
   ListAssetsOptions,
   ListEventsOptions,
   ListFoldersOptions,
+  ListHashListEntriesOptions,
   MoveAssetOptions,
   MoveFolderOptions,
   RequestOptions,
@@ -53,6 +62,7 @@ import type {
   SubmitAssetOptions,
   UpdateAssetOptions,
   UpdateFolderOptions,
+  UpdateHashListOptions,
   UploadAssetPartOptions,
   VerifyWebhookSignatureOptions,
   WaitForAssetDecisionOptions,
@@ -550,6 +560,54 @@ export default class CalmLensServerClient {
         this.request("POST", `/folders/${requireId(folderId, "Folder ID")}/move`, {
           body: { parentId },
         }),
+    };
+  }
+
+  /**
+   * Hash lists hold PDQ hashes of images the project never wants again. Image uploads are
+   * compared with every list: `flag` lists record matches, `block` lists also block close ones.
+   */
+  get hashLists() {
+    return {
+      list: async (): Promise<HashListList> =>
+        this.request("GET", `${this.projectPath}/hash-lists`),
+
+      retrieve: async ({ hashListId }: HashListIdOptions): Promise<HashList> =>
+        this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}`),
+
+      create: async (options: CreateHashListOptions): Promise<HashList> =>
+        this.request("POST", `${this.projectPath}/hash-lists`, { body: options }),
+
+      /** Renames a list or changes its action; the new action applies to later uploads. */
+      update: async ({ hashListId, ...body }: UpdateHashListOptions): Promise<HashList> =>
+        this.request("PATCH", `/hash-lists/${requireId(hashListId, "Hash list ID")}`, { body }),
+
+      /** Deletes the list and every entry in it. */
+      delete: async ({ hashListId }: HashListIdOptions): Promise<void> => {
+        await this.request("DELETE", `/hash-lists/${requireId(hashListId, "Hash list ID")}`);
+      },
+
+      /** Lists one page of a list's entries, newest first. */
+      listEntries: async ({
+        hashListId,
+        ...query
+      }: ListHashListEntriesOptions): Promise<HashListEntryPage> =>
+        this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}/entries`, {
+          query,
+        }),
+
+      /** Adds a hash, or an image asset's hash; a hash already in the list returns its entry. */
+      addEntry: async ({ hashListId, ...body }: AddHashListEntryOptions): Promise<HashListEntry> =>
+        this.request("POST", `/hash-lists/${requireId(hashListId, "Hash list ID")}/entries`, {
+          body,
+        }),
+
+      removeEntry: async ({ entryId }: HashListEntryIdOptions): Promise<void> => {
+        await this.request(
+          "DELETE",
+          `/hash-list-entries/${requireId(entryId, "Hash list entry ID")}`,
+        );
+      },
     };
   }
 

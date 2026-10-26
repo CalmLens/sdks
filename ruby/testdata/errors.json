@@ -1387,6 +1387,171 @@
     }
   },
   {
+    "code": "hash-list/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-hash-list-not-found"
+      },
+      "body": {
+        "code": "hash-list/not-found",
+        "message": "Hash list not found. Check the list ID in the portal.",
+        "details": {
+          "reason": "hash_list_not_found"
+        },
+        "traceId": "trace-hash-list-not-found"
+      }
+    },
+    "expected": {
+      "code": "hash-list/not-found",
+      "status": 404,
+      "requestId": "req-hash-list-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "hash_list_not_found",
+        "traceId": "trace-hash-list-not-found"
+      }
+    }
+  },
+  {
+    "code": "hash-list/entry-not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-hash-list-entry-not-found"
+      },
+      "body": {
+        "code": "hash-list/entry-not-found",
+        "message": "Hash list entry not found.",
+        "details": {
+          "reason": "hash_list_entry_not_found"
+        },
+        "traceId": "trace-hash-list-entry-not-found"
+      }
+    },
+    "expected": {
+      "code": "hash-list/entry-not-found",
+      "status": 404,
+      "requestId": "req-hash-list-entry-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "hash_list_entry_not_found",
+        "traceId": "trace-hash-list-entry-not-found"
+      }
+    }
+  },
+  {
+    "code": "hash-list/limit-reached",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-hash-list-limit-reached"
+      },
+      "body": {
+        "code": "hash-list/limit-reached",
+        "message": "This project has the most hash lists it can hold. Delete a list to add another.",
+        "details": {
+          "reason": "hash_list_limit_reached"
+        },
+        "traceId": "trace-hash-list-limit-reached"
+      }
+    },
+    "expected": {
+      "code": "hash-list/limit-reached",
+      "status": 409,
+      "requestId": "req-hash-list-limit-reached",
+      "retryAfter": null,
+      "details": {
+        "reason": "hash_list_limit_reached",
+        "traceId": "trace-hash-list-limit-reached"
+      }
+    }
+  },
+  {
+    "code": "hash-list/entry-limit-reached",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-hash-list-entry-limit-reached"
+      },
+      "body": {
+        "code": "hash-list/entry-limit-reached",
+        "message": "This project's hash lists hold the most entries they can. Remove entries to add more.",
+        "details": {
+          "reason": "hash_list_entry_limit_reached"
+        },
+        "traceId": "trace-hash-list-entry-limit-reached"
+      }
+    },
+    "expected": {
+      "code": "hash-list/entry-limit-reached",
+      "status": 409,
+      "requestId": "req-hash-list-entry-limit-reached",
+      "retryAfter": null,
+      "details": {
+        "reason": "hash_list_entry_limit_reached",
+        "traceId": "trace-hash-list-entry-limit-reached"
+      }
+    }
+  },
+  {
+    "code": "hash-list/asset-not-hashed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-hash-list-asset-not-hashed"
+      },
+      "body": {
+        "code": "hash-list/asset-not-hashed",
+        "message": "This asset has no perceptual hash. Only image assets that finished processing can be added.",
+        "details": {
+          "reason": "hash_list_asset_not_hashed"
+        },
+        "traceId": "trace-hash-list-asset-not-hashed"
+      }
+    },
+    "expected": {
+      "code": "hash-list/asset-not-hashed",
+      "status": 409,
+      "requestId": "req-hash-list-asset-not-hashed",
+      "retryAfter": null,
+      "details": {
+        "reason": "hash_list_asset_not_hashed",
+        "traceId": "trace-hash-list-asset-not-hashed"
+      }
+    }
+  },
+  {
     "code": "upload-preset/not-found",
     "status": 404,
     "operation": "assets.retrieve",

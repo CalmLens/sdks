@@ -152,6 +152,9 @@ retried.
 | `assets.waitForDecision({ assetId, timeoutMs })` | `assets.wait_for_decision(asset_id=, timeout=60)`; `timeout` in seconds, no `signal` |
 | `folders.list()` | `folders.list()` |
 | `folders.create/retrieve/update/move/delete(options)` | Same names |
+| `hashLists.list()` | `hash_lists.list()`; returns `{"items": [...]}`, newest first |
+| `hashLists.create/retrieve/update/delete(options)` | `hash_lists.create/retrieve/update/delete(...)`; `delete` returns `None` |
+| `hashLists.listEntries/addEntry/removeEntry(options)` | `hash_lists.list_entries/add_entry/remove_entry(...)`; `remove_entry` returns `None` |
 | `events.list(options)` | `events.list(...)`; `events.iter(...)` and `events.iter_pages(...)` (see [Events feed](#events-feed)) |
 | `ensureLens/ensureLenses(options)` | `ensure_lens/ensure_lenses(...)` |
 | `cdn.getAssetUrl/serve(options)` | `cdn.get_asset_url/serve(...)` |
@@ -180,6 +183,12 @@ client.assets.delete(asset_id=queued["id"])
 # Up to 500 assets at once, "delete" or "remove-content"; runs in the background once queued:
 client.assets.batch(asset_ids=[first_id, second_id], operation="remove-content")
 
+# Compare image uploads with known images: a "flag" list reports matches, a "block" list also
+# blocks close matches. Add a PDQ hash, or the hash of an image asset in the project:
+removed = client.hash_lists.create(name="Removed images", action="block")
+client.hash_lists.add_entry(hash_list_id=removed["id"], asset_id=asset_id, label="Report 1042")
+entries = client.hash_lists.list_entries(hash_list_id=removed["id"], page_size=50)  # entries["nextCursor"]
+
 client.ensure_lens(identifier="thumbnail", name="Thumbnail", type="image", active=True, version=1,
                    transforms=[{"type": "imageTransform", "options": {"width": 128}}])
 signed = client.assets.create_signed_url(asset_id=asset_id, resource="rendered", lens="thumbnail")
@@ -206,7 +215,7 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
 `projectId`, `name`, `type`, `createdAt` and three nested objects are always present:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and `manualReviews` (each with a reviewer's `decision`: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection`, `linkDetection`, `aiGeneratedDetection`, `textRegions` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline`, optional `hashMatches` (the hash list entries an image matched) and `manualReviews` (each with a reviewer's `decision`: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
   `status` is `pending` until moderation decides, then:
   - `allowed`: show the content.
   - `limited`: delivered like `allowed`, but reduce its reach: keep it out of recommendations, trending and notifications, rank it lower or collapse it.
@@ -220,7 +229,8 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
   finishes, `stored` when `keepContentAfterProcessing` is on, or `removed`), `removalReason`
   (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updatedAt`,
   `safetyHold`, `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image` (the
-  picture served at the rendered resource, with its size, ThumbHash and average colour) and
+  picture served at the rendered resource, with its size, ThumbHash, average colour and
+  perceptual hash with its quality) and
   `extractedText`. Fields that don't apply are `None`.
 
 `description`, `externalId`, `externalUrl`, `folderId`, `parentId`, `metadata` and `tags`
@@ -306,7 +316,9 @@ client.cdn.get_asset_url(asset_identifier=queued["id"],
 A selector has one path segment per step, such as `fit=cover,width=640/format=webp`, and a lens
 and a transform are joined with `/` (`/rendered/@thumbnail/width=320`). Structured options are
 sorted, nested options are dotted (`border.color`), hex colours drop the `#` and values are
-percent-encoded, so both calls return the same URL. `serve` returns a `CDNResponse` (`status`, `ok`, `headers`,
+percent-encoded, so both calls return the same URL. The `redact` option
+(`{"text": True, "personalInformation": True}`, `redact.text=true` in a selector) blurs the
+text regions OCR found when the image was processed, before any other option applies. `serve` returns a `CDNResponse` (`status`, `ok`, `headers`,
 `content_type`, `request_id`, `read()`, `iter_bytes()`, `close()`) even for non-2xx responses
 (after retrying retryable ones, see [Retries](#retries)); check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
 
@@ -498,6 +510,11 @@ returns them.
   Either option can also be a function that takes the uploaded asset and returns its outcome.
   A classified image gets a ThumbHash (`content.image.thumbhash` and `averageColor`), which goes
   when its content is removed.
+- Hash lists and their entries live in `database_storage.hash_lists` and
+  `database_storage.hash_list_entries`; deleting a list deletes its entries. `add_entry` with an
+  `asset_id` copies the asset's `content.image.perceptualHash` and `perceptualHashQuality`
+  (seed them through `database_storage`; the mock computes no hashes) and raises
+  `hash-list/asset-not-hashed` without one. Uploads are not matched against the lists.
   `cdn.serve` serves a `limited` asset like an `allowed` one, and treats an `age-restricted` asset like a private one: it needs the
   `assets:download` permission, unless a public one is requested with `allow_age_restricted=True`.
 - Like the API, content is `stored` when `processingOptions.keepContentAfterProcessing` is

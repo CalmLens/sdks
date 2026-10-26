@@ -332,6 +332,118 @@
       }
     },
     {
+      "id": "hashLists.list",
+      "kind": "method",
+      "description": "List every hash list in a project",
+      "names": {
+        "javascript": "hashLists.list",
+        "python": "hash_lists.list",
+        "go": "HashLists.List",
+        "rust": "hash_lists().list",
+        "java": "hashLists.list",
+        "ruby": "hash_lists.list",
+        "php": "hashLists->list"
+      }
+    },
+    {
+      "id": "hashLists.retrieve",
+      "kind": "method",
+      "description": "Get a hash list by ID",
+      "names": {
+        "javascript": "hashLists.retrieve",
+        "python": "hash_lists.retrieve",
+        "go": "HashLists.Retrieve",
+        "rust": "hash_lists().retrieve",
+        "java": "hashLists.retrieve",
+        "ruby": "hash_lists.retrieve",
+        "php": "hashLists->retrieve"
+      }
+    },
+    {
+      "id": "hashLists.create",
+      "kind": "method",
+      "description": "Create a hash list. Image uploads are compared with every list in the project: a `flag` list reports matches, a `block` list also blocks close matches.",
+      "names": {
+        "javascript": "hashLists.create",
+        "python": "hash_lists.create",
+        "go": "HashLists.Create",
+        "rust": "hash_lists().create",
+        "java": "hashLists.create",
+        "ruby": "hash_lists.create",
+        "php": "hashLists->create"
+      }
+    },
+    {
+      "id": "hashLists.update",
+      "kind": "method",
+      "description": "Rename a hash list or change what its matches do. The new action applies to later uploads.",
+      "names": {
+        "javascript": "hashLists.update",
+        "python": "hash_lists.update",
+        "go": "HashLists.Update",
+        "rust": "hash_lists().update",
+        "java": "hashLists.update",
+        "ruby": "hash_lists.update",
+        "php": "hashLists->update"
+      }
+    },
+    {
+      "id": "hashLists.delete",
+      "kind": "method",
+      "description": "Delete a hash list and every entry in it. Later uploads are no longer compared with it.",
+      "names": {
+        "javascript": "hashLists.delete",
+        "python": "hash_lists.delete",
+        "go": "HashLists.Delete",
+        "rust": "hash_lists().delete",
+        "java": "hashLists.delete",
+        "ruby": "hash_lists.delete",
+        "php": "hashLists->delete"
+      }
+    },
+    {
+      "id": "hashLists.listEntries",
+      "kind": "method",
+      "description": "Get a page of the hashes in a hash list, newest first",
+      "names": {
+        "javascript": "hashLists.listEntries",
+        "python": "hash_lists.list_entries",
+        "go": "HashLists.ListEntries",
+        "rust": "hash_lists().list_entries",
+        "java": "hashLists.listEntries",
+        "ruby": "hash_lists.list_entries",
+        "php": "hashLists->listEntries"
+      }
+    },
+    {
+      "id": "hashLists.addEntry",
+      "kind": "method",
+      "description": "Add a PDQ hash to a hash list, either as a hash or from an image asset. Adding a hash the list already holds returns the existing entry.",
+      "names": {
+        "javascript": "hashLists.addEntry",
+        "python": "hash_lists.add_entry",
+        "go": "HashLists.AddEntry",
+        "rust": "hash_lists().add_entry",
+        "java": "hashLists.addEntry",
+        "ruby": "hash_lists.add_entry",
+        "php": "hashLists->addEntry"
+      }
+    },
+    {
+      "id": "hashLists.removeEntry",
+      "kind": "method",
+      "description": "Remove a hash from its hash list. Later uploads no longer match it.",
+      "names": {
+        "javascript": "hashLists.removeEntry",
+        "python": "hash_lists.remove_entry",
+        "go": "HashLists.RemoveEntry",
+        "rust": "hash_lists().remove_entry",
+        "java": "hashLists.removeEntry",
+        "ruby": "hash_lists.remove_entry",
+        "php": "hashLists->removeEntry"
+      }
+    },
+    {
       "id": "text.classify",
       "kind": "method",
       "description": "Moderates text and waits for the decision.",
@@ -1343,6 +1455,31 @@
     },
     {
       "code": "lens/version-conflict",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "hash-list/not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "hash-list/entry-not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "hash-list/limit-reached",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "hash-list/entry-limit-reached",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "hash-list/asset-not-hashed",
       "status": 409,
       "retryable": false
     },

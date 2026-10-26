@@ -156,7 +156,14 @@ type AssetClassification struct {
 	Moderation      AssetModeration        `json:"moderation"`
 	PersonDetection *PersonDetectionResult `json:"personDetection,omitempty"`
 	FaceDetection   *FaceDetectionResult   `json:"faceDetection,omitempty"`
-	Labels          []ClassificationLabel  `json:"labels,omitempty"`
+	// LinkDetection holds QR codes and web links found in the image.
+	LinkDetection *LinkDetectionResult `json:"linkDetection,omitempty"`
+	// AIGeneratedDetection holds what the image's provenance metadata says about AI use.
+	AIGeneratedDetection *AIGeneratedDetectionResult `json:"aiGeneratedDetection,omitempty"`
+	// TextRegions are where OCR found text, and personal information within it, in an image.
+	// Redaction transforms (ImageRedaction) blur these regions.
+	TextRegions []TextRegion          `json:"textRegions,omitempty"`
+	Labels      []ClassificationLabel `json:"labels,omitempty"`
 }
 
 // AssetReview records one reviewer decision without erasing earlier reviews.
@@ -179,7 +186,27 @@ type AssetModeration struct {
 	Score      *float64                   `json:"score,omitempty"`
 	Timeline   *MediaClassificationReport `json:"timeline,omitempty"`
 	Policy     *ReportPolicy              `json:"policy,omitempty"`
-	Raw        JSON                       `json:"-"`
+	// HashMatches are the hash list entries the image matched, blocking matches first and then
+	// the closest. Empty when nothing matched.
+	HashMatches []HashMatch `json:"hashMatches,omitempty"`
+	Raw         JSON        `json:"-"`
+}
+
+// HashMatchSourceHashList is the HashMatch.Source of a match against a project hash list.
+// Source is a plain string so sources added later still decode.
+const HashMatchSourceHashList = "hash-list"
+
+// HashMatch is a hash list entry an image matched.
+type HashMatch struct {
+	// Source is where the matching hash came from, such as HashMatchSourceHashList.
+	Source  string `json:"source"`
+	ListID  string `json:"listId"`
+	EntryID string `json:"entryId"`
+	// Distance is the number of bits that differ between the hashes; 0 is the same picture.
+	Distance int `json:"distance"`
+	// Action is what this match did: HashListActionBlock when it was close enough for a block
+	// list to block, otherwise HashListActionFlag.
+	Action string `json:"action"`
 }
 
 // AssetContent describes an asset's content: its format and properties, and whether CalmLens
@@ -227,6 +254,9 @@ type AssetImage struct {
 	AverageColor *string `json:"averageColor"`
 	// PerceptualHash matches visually similar images, for image assets.
 	PerceptualHash *string `json:"perceptualHash"`
+	// PerceptualHashQuality is how much detail PerceptualHash captured, from 0 to 100. Hashes
+	// below 50 come from flat or featureless images and match less reliably.
+	PerceptualHashQuality *int `json:"perceptualHashQuality"`
 }
 
 // SafetyHoldReasonSuspectedIllegalContent is the SafetyHold.Reason for suspected illegal
@@ -368,8 +398,19 @@ type CategoryPolicySettingsSnapshot struct {
 	Restrictions   []PolicyRuleSnapshot `json:"restrictions"`
 }
 
+// Values of ReportPolicyDecision.Source. Source is a plain string so sources added later
+// still decode.
+const (
+	DecisionSourcePolicy        = "policy"
+	DecisionSourceAssetOverride = "asset-override"
+	DecisionSourceChildren      = "children"
+	// DecisionSourceHashList is a block from a hash list match.
+	DecisionSourceHashList = "hash-list"
+)
+
 // ReportPolicyDecision records the automatic action and what triggered it.
 type ReportPolicyDecision struct {
+	// Source is one of the DecisionSource constants.
 	Source            string   `json:"source"`
 	Action            *string  `json:"action"`
 	FlaggedCategories []string `json:"flaggedCategories"`
@@ -384,8 +425,67 @@ const (
 // ProcessingFeatureResults holds the results of optional processing features, keyed by feature.
 // A feature that wasn't requested is nil.
 type ProcessingFeatureResults struct {
-	PersonDetection *PersonDetectionResult `json:"personDetection,omitempty"`
-	FaceDetection   *FaceDetectionResult   `json:"faceDetection,omitempty"`
+	PersonDetection      *PersonDetectionResult      `json:"personDetection,omitempty"`
+	FaceDetection        *FaceDetectionResult        `json:"faceDetection,omitempty"`
+	LinkDetection        *LinkDetectionResult        `json:"linkDetection,omitempty"`
+	AIGeneratedDetection *AIGeneratedDetectionResult `json:"aiGeneratedDetection,omitempty"`
+}
+
+// LinkDetectionResult is the result of link detection.
+type LinkDetectionResult struct {
+	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
+	Status string `json:"status"`
+	// Stage is FeatureStageBeta or FeatureStageGA.
+	Stage string `json:"stage"`
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	Reason  string           `json:"reason,omitempty"`
+	QRCodes []DetectedQRCode `json:"qrCodes,omitempty"`
+	Links   []DetectedLink   `json:"links,omitempty"`
+}
+
+// DetectedQRCode is a decoded QR code.
+type DetectedQRCode struct {
+	// Value is the text the QR code holds, such as a URL.
+	Value string      `json:"value"`
+	Box   BoundingBox `json:"box"`
+}
+
+// DetectedLink is a web link found in an image.
+type DetectedLink struct {
+	// URL is the link, with https:// added when the image left it out.
+	URL string `json:"url"`
+	// Source is "qr-code" or "text" (found in the text OCR extracted).
+	Source string `json:"source"`
+}
+
+// AIGeneratedDetectionResult is what an image's provenance metadata says about AI use.
+type AIGeneratedDetectionResult struct {
+	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
+	Status string `json:"status"`
+	// Stage is FeatureStageBeta or FeatureStageGA.
+	Stage string `json:"stage"`
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	Reason string `json:"reason,omitempty"`
+	// Provenance is "ai-generated", "ai-edited" or "unknown" (no AI provenance in the file,
+	// which does not mean a person made it).
+	Provenance string             `json:"provenance,omitempty"`
+	Signals    []ProvenanceSignal `json:"signals,omitempty"`
+}
+
+// ProvenanceSignal is provenance metadata found in an image file.
+type ProvenanceSignal struct {
+	// Kind is "c2pa", "iptc-digital-source-type" or "generator-metadata".
+	Kind string `json:"kind"`
+	// Value is what it says, such as the digital source type or the generator's name.
+	Value string `json:"value"`
+}
+
+// TextRegion is where OCR found text in an image.
+type TextRegion struct {
+	Box BoundingBox `json:"box"`
+	// PersonalInformation reports whether the region is personal information, such as an email
+	// address, phone number or card number, rather than a paragraph of text.
+	PersonalInformation bool `json:"personalInformation"`
 }
 
 // PersonDetectionResult is the result of person detection (beta).
@@ -785,6 +885,135 @@ type UpdateFolderOptions struct {
 type MoveFolderOptions struct {
 	FolderID string
 	ParentID *string
+}
+
+// Hash list actions: what a match against the list does. Action is a plain string so actions
+// added later still decode.
+const (
+	// HashListActionFlag records matches on the asset.
+	HashListActionFlag = "flag"
+	// HashListActionBlock also blocks close matches.
+	HashListActionBlock = "block"
+)
+
+// HashList holds perceptual (PDQ) hashes of images the project never wants again. Image uploads
+// are compared with every list in the project.
+type HashList struct {
+	ID          string  `json:"id"`
+	ProjectID   string  `json:"projectId"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	// Action is HashListActionFlag or HashListActionBlock.
+	Action          string  `json:"action"`
+	CreatedByUserID *string `json:"createdByUserId"`
+	CreatedAt       int64   `json:"createdAt"`
+	UpdatedAt       *int64  `json:"updatedAt"`
+}
+
+// HashListEntry is one hash in a hash list.
+type HashListEntry struct {
+	ID         string `json:"id"`
+	ProjectID  string `json:"projectId"`
+	HashListID string `json:"hashListId"`
+	// Hash is the 256-bit PDQ hash as 64 hexadecimal characters.
+	Hash string `json:"hash"`
+	// Quality is the PDQ quality of Hash from 0 to 100, nil when unknown.
+	Quality       *int    `json:"quality"`
+	Label         *string `json:"label"`
+	SourceAssetID *string `json:"sourceAssetId"`
+	// CreatedByUserID is the portal user who added the entry, nil for API keys.
+	CreatedByUserID *string `json:"createdByUserId"`
+	CreatedAt       int64   `json:"createdAt"`
+}
+
+// HashListList is every hash list in a project.
+type HashListList struct {
+	Items []HashList `json:"items"`
+}
+
+// HashListEntryPage is one page of a hash list's entries, newest first.
+type HashListEntryPage struct {
+	Items      []HashListEntry `json:"items"`
+	HasMore    bool            `json:"hasMore"`
+	NextCursor string          `json:"nextCursor"`
+	PageSize   int             `json:"pageSize"`
+	Ordering   []Order         `json:"ordering"`
+}
+
+// ListHashListsOptions lists a project's hash lists. It has no fields yet.
+type ListHashListsOptions struct{}
+
+// HashListIDOptions identifies a hash list.
+type HashListIDOptions struct{ HashListID string }
+
+// HashListEntryIDOptions identifies a hash list entry.
+type HashListEntryIDOptions struct{ EntryID string }
+
+// CreateHashListOptions creates a hash list. Action is HashListActionFlag or
+// HashListActionBlock.
+type CreateHashListOptions struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	Action      string  `json:"action"`
+}
+
+// UpdateHashListOptions renames a hash list or changes what its matches do. Fields left unset
+// are unchanged; Description: calmlens.Null[string]() clears the description. A new Action
+// applies to later uploads.
+type UpdateHashListOptions struct {
+	HashListID  string        `json:"hashListId"`
+	Name        *string       `json:"name"`
+	Description Patch[string] `json:"description"`
+	Action      *string       `json:"action"`
+}
+
+// MarshalJSON encodes the request body: only the fields that are set, without HashListID.
+func (o UpdateHashListOptions) MarshalJSON() ([]byte, error) {
+	body := map[string]any{}
+	if o.Name != nil {
+		body["name"] = *o.Name
+	}
+	o.Description.put(body, "description")
+	if o.Action != nil {
+		body["action"] = *o.Action
+	}
+	return json.Marshal(body)
+}
+
+// ListHashListEntriesOptions selects a page of a hash list's entries.
+type ListHashListEntriesOptions struct {
+	HashListID string
+	Cursor     string
+	PageSize   int
+}
+
+// AddHashListEntryOptions adds a hash to a list: either Hash (64 hexadecimal characters, with
+// an optional Quality from 0 to 100) or AssetID, an image asset whose perceptual hash is used.
+// Adding a hash already in the list returns its existing entry.
+type AddHashListEntryOptions struct {
+	HashListID string  `json:"hashListId"`
+	Hash       string  `json:"hash"`
+	Quality    *int    `json:"quality"`
+	AssetID    string  `json:"assetId"`
+	Label      *string `json:"label"`
+}
+
+// MarshalJSON encodes the request body: only the fields that are set, without HashListID.
+func (o AddHashListEntryOptions) MarshalJSON() ([]byte, error) {
+	body := map[string]any{}
+	if o.Hash != "" {
+		body["hash"] = o.Hash
+	}
+	if o.Quality != nil {
+		body["quality"] = *o.Quality
+	}
+	if o.AssetID != "" {
+		body["assetId"] = o.AssetID
+	}
+	if o.Label != nil {
+		body["label"] = *o.Label
+	}
+	return json.Marshal(body)
 }
 
 // Lens types: the asset type a lens applies to.
