@@ -72,11 +72,11 @@ test("shows an age-restricted photo's placeholder and a sensitive-content notice
 test("opts in to an age-restricted photo for a viewer who turned on sensitive media", async () => {
   const media = postMediaFor(env, post("age-restricted"), "feed", viewer(true));
   expect(media).toEqual({
-    url: `${ASSET}/content/@calmgram-feed?allowAgeRestricted=true`,
+    url: `${ASSET}/rendered/@calmgram-feed?allowAgeRestricted=true`,
     placeholderUrl: null,
   });
   const card = await renderCard("age-restricted", viewer(true));
-  expect(card.images).toEqual([`${ASSET}/content/@calmgram-feed?allowAgeRestricted=true`]);
+  expect(card.images).toEqual([`${ASSET}/rendered/@calmgram-feed?allowAgeRestricted=true`]);
   expect(card.figures).not.toContain("Sensitive content");
 });
 
@@ -105,7 +105,7 @@ test("publishes allowed, limited and age-restricted posts but keeps blocked and 
   for (const status of ["allowed", "limited"] as const) {
     expect(isVisibleTo(post(status), null)).toBe(true);
     expect(postMediaFor(env, post(status), "thumb", viewer(true))).toEqual({
-      url: `${ASSET}/content/@calmgram-thumb`,
+      url: `${ASSET}/rendered/@calmgram-thumb`,
       placeholderUrl: null,
     });
   }
