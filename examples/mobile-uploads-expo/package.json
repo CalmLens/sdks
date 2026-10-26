@@ -10,7 +10,8 @@
     "ios": "expo start --ios",
     "android": "expo start --android",
     "server": "bun server/index.ts",
-    "check": "tsc --noEmit && tsc --project server"
+    "check": "tsc --noEmit && tsc --project server",
+    "test": "bun test"
   },
   "dependencies": {
     "@calmlens/sdk": "file:../../javascript",

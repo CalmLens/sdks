@@ -5,6 +5,7 @@ import {
   type UploadedAsset,
 } from "@calmlens/sdk/app";
 import { File } from "expo-file-system";
+import type { PickedPhoto } from "./uploads";
 
 const uploadPresetId = process.env.EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID;
 export const isConfigured = !!uploadPresetId;
@@ -28,40 +29,47 @@ const fetchUploadToken = async (): Promise<string> => {
   return token;
 };
 
-// No API key here: the client uploads through the preset, with a new token for each upload.
-const client = uploadPresetId
-  ? new CalmLensAppClient({
-      uploadPresetId,
-      token: fetchUploadToken,
-      // Only set for a local backend. Leave it unset to use https://api.calmlens.com/v1.
-      baseUrl: process.env.EXPO_PUBLIC_CALMLENS_BASE_URL || undefined,
-    })
-  : undefined;
+const baseUrl = process.env.EXPO_PUBLIC_CALMLENS_BASE_URL || undefined;
 
-const requireClient = () => {
-  if (!client) throw new Error("Set EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID (see the README).");
-  return client;
+// No API key here: the client uploads through the preset, with a new token for each upload.
+const createClient = () => {
+  if (!uploadPresetId)
+    throw new Error("Set EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID (see the README).");
+  return new CalmLensAppClient({
+    uploadPresetId,
+    token: fetchUploadToken,
+    // Only set for a local backend. Leave it unset to use https://api.calmlens.com/v1.
+    baseUrl,
+  });
 };
 
-export interface PickedPhoto {
-  uri: string;
-  name: string;
-  type: string;
-}
+/**
+ * The client each upload was made with. It keeps the token the upload started with, which its
+ * status checks reuse, and each upload gets a new client and a new token.
+ */
+const clients = new Map<string, CalmLensAppClient>();
 
 /** Uploads a photo straight from the phone and returns the upload with its status. */
 export const uploadPhoto = async (photo: PickedPhoto): Promise<UploadedAsset> => {
   // Read the picked file's bytes. The SDK sends them as they are.
   const buffer = await new File(photo.uri).arrayBuffer();
-  return requireClient().assets.classify({
+  const client = createClient();
+  // `classify` asks CalmLens to decide before answering. Photos are checked after they're
+  // stored, so the first answer is usually `pending` and the app polls for the decision.
+  const asset = await client.assets.classify({
     name: photo.name,
     content: { buffer, type: photo.type },
   });
+  clients.set(asset.id, client);
+  return asset;
 };
 
-/** Checks an upload again. The client reuses the token the upload started with. */
-export const checkUpload = (assetId: string): Promise<UploadedAsset> =>
-  requireClient().assets.retrieve({ assetId });
+/** Checks an upload again, with the client (and token) the upload started with. */
+export const checkUpload = (assetId: string): Promise<UploadedAsset> => {
+  const client = clients.get(assetId);
+  if (!client) throw new Error("This upload was made before the app restarted.");
+  return client.assets.retrieve({ assetId });
+};
 
 const MESSAGES: Record<string, string> = {
   [CALMLENS_ERROR_CODES.UPLOAD_PRESET_NOT_FOUND]:
@@ -92,7 +100,7 @@ const MESSAGES: Record<string, string> = {
 export const describeError = (error: unknown): { message: string; code?: string } => {
   if (error instanceof TokenServerError) return { message: error.message };
   if (CalmLensError.isCalmLensError(error)) {
-    return { message: MESSAGES[error.code] ?? error.message, code: error.code };
+    return { message: `${MESSAGES[error.code] ?? error.message}`, code: error.code };
   }
   return { message: error instanceof Error ? error.message : String(error) };
 };

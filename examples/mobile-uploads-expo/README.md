@@ -4,9 +4,7 @@ An Expo (React Native) app that uploads photos straight from the phone to CalmLe
 [upload preset](https://calmlens.com/docs/guides/upload-presets), then shows the decision. The app
 never holds an API key: a tiny token server signs a single-use upload token for each upload.
 
-| Allowed | Blocked |
-| --- | --- |
-| ![A landscape photo marked as allowed](docs/approved.png) | ![A CalmLens violence test image marked as not shown](docs/rejected.png) |
+<img src="docs/calmsnap.png" alt="Calmsnap showing a shared lake photo above recent uploads: three shared, one for adults only and one not allowed." width="402">
 
 ## How it works
 
@@ -29,19 +27,28 @@ never holds an API key: a tiny token server signs a single-use upload token for 
   each upload, and `assets.retrieve` reuses the token the upload started with.
 - [`App.tsx`](App.tsx) picks a photo with `expo-image-picker`, reads it with `expo-file-system`
   and uploads it with `assets.classify`. Photos are checked after they're stored, so the first
-  answer is usually `pending`; the app shows **Still checking** and polls `assets.retrieve`
-  until CalmLens decides. After 60 seconds it stops and offers **Check again**. `allowed` and
-  `limited` photos are shown (`limited` ones are only marked so your app can reduce their reach,
-  such as keeping them out of recommendations), and `age-restricted` photos are hidden until the
-  person shares an age range of 18 or older (see [Age-restricted photos](#age-restricted-photos)).
-- Errors show a message for the person using the app and the error code for you. The app handles
-  every `upload-preset/*` and `upload-token/*` code, timeouts, network errors and an unreachable
-  token server.
+  answer is usually `pending`; the app shows **Checking photo** and polls `assets.retrieve`
+  until CalmLens decides. After 60 seconds it stops and offers **Check again**. You can keep
+  sharing while a photo is checked: each upload polls on its own, and **Recent** lists every
+  upload this session with its state. Tap one to show it again.
+- How each decision is shown is in [`src/uploads.ts`](src/uploads.ts): `allowed` and `limited`
+  photos are **Shared** (`limited` ones are only marked so your app can reduce their reach, such
+  as keeping them out of recommendations), `age-restricted` photos are **Adults only** and stay
+  blurred until the person shares an age range of 18 or older (see
+  [Age-restricted photos](#age-restricted-photos)), and `blocked` and `purged` photos are
+  **Not allowed** and stay blurred. The upload preset only returns the status to the app, never
+  the report, so the app gives a general reason.
+- Errors show a message for the person using the app and the error code for you, with
+  **Try again**. The app handles every `upload-preset/*` and `upload-token/*` code, timeouts,
+  network errors and an unreachable token server. Trying again uploads the photo again only when
+  the upload never finished; otherwise it checks the existing upload.
 
 ## Age-restricted photos
 
-When CalmLens marks a photo `age-restricted`, the app hides it and offers **Share my age range**.
-[`src/ageCheck.ts`](src/ageCheck.ts) asks the phone's OS with
+When CalmLens marks a photo `age-restricted`, the app blurs it and offers **Share my age range**.
+[`src/ageCheck.ts`](src/ageCheck.ts) loads `expo-age-range` on first use, so the app still runs
+in Expo Go, which doesn't include that native module (there the check answers that the device
+can't share an age range). It asks the phone's OS with
 [`expo-age-range`](https://docs.expo.dev/versions/v57.0.0/sdk/age-range/):
 
 - **iOS 26+** uses Apple's Declared Age Range. The OS shows its own sheet, and the app learns
@@ -81,12 +88,12 @@ upload. HEIC photos arrive as JPEG; JPEG and PNG files are uploaded unchanged.
 
 In the portal, open **Developer → Upload presets** and create a preset with:
 
-| Setting | Value |
-| --- | --- |
-| Who can upload? | **Users your server approves** (requires a token) |
-| File types | `image/*` |
-| Show the decision to the uploader | On, so the app can show the moderation status |
-| Allowed sites | **Leave empty.** Mobile apps send no `Origin` header, so a preset that lists sites refuses them with `upload-preset/origin-not-allowed` |
+| Setting                           | Value                                                                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Who can upload?                   | **Users your server approves** (requires a token)                                                                                       |
+| File types                        | `image/*`                                                                                                                               |
+| Show the decision to the uploader | On, so the app can show the moderation status                                                                                           |
+| Allowed sites                     | **Leave empty.** Mobile apps send no `Origin` header, so a preset that lists sites refuses them with `upload-preset/origin-not-allowed` |
 
 The token is what keeps strangers out: anyone can read the preset ID from the app, but only your
 server can sign tokens for it.
@@ -119,6 +126,8 @@ CALMLENS_UPLOAD_PRESET_ID=your-upload-preset-id
 # The app
 EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID=your-upload-preset-id
 ```
+
+Run the tests for the upload states with `bun test`, and type-check with `bun run check`.
 
 Start the token server in one terminal:
 
@@ -162,13 +171,14 @@ changing `.env.local`.
 
 ## Files
 
-| File | What it does |
-| --- | --- |
-| [`App.tsx`](App.tsx) | Picker, upload, polling, the result card and the age gate |
-| [`src/ageCheck.ts`](src/ageCheck.ts) | Asks iOS or Android for the person's age range, with their consent |
-| [`src/calmlens.ts`](src/calmlens.ts) | The upload preset client, token fetching and error messages |
-| [`server/index.ts`](server/index.ts) | Token server: signs one upload token per request |
-| [`metro.config.js`](metro.config.js) | Lets Metro bundle the SDK linked from `javascript` |
+| File                                 | What it does                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| [`App.tsx`](App.tsx)                 | Picker, upload, polling, the photo card, recent uploads and the age gate           |
+| [`src/uploads.ts`](src/uploads.ts)   | Each upload's state and how its decision is shown, tested in `src/uploads.test.ts` |
+| [`src/ageCheck.ts`](src/ageCheck.ts) | Asks iOS or Android for the person's age range, with their consent                 |
+| [`src/calmlens.ts`](src/calmlens.ts) | The upload preset client, token fetching and error messages                        |
+| [`server/index.ts`](server/index.ts) | Token server: signs one upload token per request                                   |
+| [`metro.config.js`](metro.config.js) | Lets Metro bundle the SDK linked from `javascript`                                 |
 
 This is an example, not a production app: the token server signs a token for anyone who asks.
 Put it behind your sign-in, and limit how many tokens one user can get.

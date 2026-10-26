@@ -1,54 +1,108 @@
-import type { UploadedAsset } from "@calmlens/sdk";
+import type { UploadedAsset } from "@calmlens/sdk/app";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useReducer, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { type AgeCheck, requestAgeCheck } from "./src/ageCheck";
+import { checkUpload, describeError, isConfigured, uploadPhoto } from "./src/calmlens";
 import {
-  checkUpload,
-  describeError,
-  isConfigured,
+  getOutcome,
+  getRetryKind,
+  isBusy,
   type PickedPhoto,
-  uploadPhoto,
-} from "./src/calmlens";
+  type Upload,
+  uploadsReducer,
+} from "./src/uploads";
 
 const POLL_INTERVAL_MS = 1_500;
 const MAX_POLLS = 40;
 
-type UploadState =
-  | { step: "idle" }
-  | { step: "uploading" }
-  | { step: "checking"; asset: UploadedAsset; gaveUp: boolean }
-  | { step: "done"; asset: UploadedAsset }
-  | { step: "failed"; message: string; code?: string };
+const colors = {
+  page: "#f7f7f5",
+  surface: "#ffffff",
+  ink: "#17191c",
+  soft: "#5b6168",
+  line: "#e3e4e1",
+  good: "#1f7a4d",
+  warn: "#9a5b00",
+  bad: "#b4232a",
+};
 
 export default function App() {
-  const [photo, setPhoto] = useState<PickedPhoto>();
-  const [state, setState] = useState<UploadState>({ step: "idle" });
+  const [uploads, dispatch] = useReducer(uploadsReducer, []);
+  const [selectedKey, setSelectedKey] = useState<string>();
   // Kept for the session, so the person is asked once rather than for every photo.
   const [ageCheck, setAgeCheck] = useState<AgeCheck>();
   const [checkingAge, setCheckingAge] = useState(false);
-  const run = useRef(0);
+  // The latest run for each upload, so an older upload or poll for it stops updating it.
+  const runs = useRef(new Map<string, number>());
 
-  useEffect(() => () => void run.current++, []);
+  useEffect(() => {
+    const current = runs.current;
+    return () => current.clear();
+  }, []);
+
+  /** Starts a new run for an upload and returns a check for whether it's still the latest. */
+  const beginRun = (key: string) => {
+    const run = (runs.current.get(key) ?? 0) + 1;
+    runs.current.set(key, run);
+    return () => runs.current.get(key) === run;
+  };
 
   /** Checks an upload until CalmLens decides, or until MAX_POLLS checks. */
-  const pollUntilDecided = async (asset: UploadedAsset, id: number) => {
+  const pollUntilDecided = async (key: string, asset: UploadedAsset, isLatest: () => boolean) => {
     let latest = asset;
-    for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-      // `status` is the moderation status: `pending` until CalmLens decides.
-      if (latest.status !== "pending") break;
-      setState({ step: "checking", asset: latest, gaveUp: false });
+    for (let attempt = 0; latest.status === "pending" && attempt < MAX_POLLS; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-      if (run.current !== id) return;
+      if (!isLatest()) return;
       latest = await checkUpload(latest.id);
+      if (!isLatest()) return;
+      dispatch({ type: "checked", key, asset: latest });
     }
-    if (run.current !== id) return;
-    const decided = latest.status !== "pending";
-    setState(
-      decided ? { step: "done", asset: latest } : { step: "checking", asset: latest, gaveUp: true },
-    );
+    if (latest.status === "pending") dispatch({ type: "stalled", key });
+  };
+
+  const upload = async (key: string, photo: PickedPhoto) => {
+    const isLatest = beginRun(key);
+    try {
+      const asset = await uploadPhoto(photo);
+      if (!isLatest()) return;
+      dispatch({ type: "checked", key, asset });
+      await pollUntilDecided(key, asset, isLatest);
+    } catch (error) {
+      if (isLatest()) dispatch({ type: "failed", key, ...describeError(error) });
+    }
+  };
+
+  const checkAgain = async (key: string, asset: UploadedAsset) => {
+    const isLatest = beginRun(key);
+    try {
+      const latest = await checkUpload(asset.id);
+      if (!isLatest()) return;
+      dispatch({ type: "checked", key, asset: latest });
+      await pollUntilDecided(key, latest, isLatest);
+    } catch (error) {
+      if (isLatest()) dispatch({ type: "failed", key, ...describeError(error) });
+    }
+  };
+
+  const retry = (item: Upload) => {
+    const kind = getRetryKind(item);
+    if (kind === "check" && "asset" in item && item.asset) {
+      void checkAgain(item.key, item.asset);
+    } else if (kind === "upload") {
+      dispatch({ type: "retried", key: item.key });
+      void upload(item.key, item.photo);
+    }
   };
 
   const pickAndUpload = async () => {
@@ -62,29 +116,17 @@ export default function App() {
     if (result.canceled) return;
     const picked = result.assets[0];
     const type = picked.mimeType ?? "image/jpeg";
-    const next = {
+    const photo: PickedPhoto = {
       uri: picked.uri,
       type,
       name: picked.fileName ?? `photo.${type.split("/")[1] ?? "jpg"}`,
+      width: picked.width,
+      height: picked.height,
     };
-    setPhoto(next);
-    const id = ++run.current;
-    setState({ step: "uploading" });
-    try {
-      const asset = await uploadPhoto(next);
-      if (run.current === id) await pollUntilDecided(asset, id);
-    } catch (error) {
-      if (run.current === id) setState({ step: "failed", ...describeError(error) });
-    }
-  };
-
-  const checkAgain = async (asset: UploadedAsset) => {
-    const id = ++run.current;
-    try {
-      await pollUntilDecided(await checkUpload(asset.id), id);
-    } catch (error) {
-      if (run.current === id) setState({ step: "failed", ...describeError(error) });
-    }
+    const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    dispatch({ type: "started", key, photo, at: Date.now() });
+    setSelectedKey(key);
+    void upload(key, photo);
   };
 
   const checkAge = async () => {
@@ -96,141 +138,208 @@ export default function App() {
     }
   };
 
-  // Age-restricted photos stay hidden until the person shares an age range of 18 or older.
-  const hidden =
-    state.step === "done" &&
-    state.asset.status === "age-restricted" &&
-    ageCheck?.result !== "adult";
-  const busy = state.step === "uploading" || (state.step === "checking" && !state.gaveUp);
+  const selected = uploads.find((item) => item.key === selectedKey) ?? uploads[0];
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
         <StatusBar style="dark" />
-        <View style={styles.content}>
-          <Text style={styles.title} accessibilityRole="header">
+        <View style={styles.header}>
+          <Text style={styles.brand} accessibilityRole="header">
             Calmsnap
           </Text>
-          <Text style={styles.lead}>
-            Photos upload straight from this phone to CalmLens through an upload preset. The app
-            never sees an API key.
-          </Text>
-
-          <View style={styles.preview}>
-            {photo && !hidden ? (
-              <Image source={{ uri: photo.uri }} style={styles.image} resizeMode="contain" />
-            ) : (
-              <Text style={styles.placeholder}>
-                {photo ? "Hidden: age restricted" : "No photo yet"}
-              </Text>
-            )}
-          </View>
-
-          <Result
-            state={state}
-            onCheckAgain={checkAgain}
-            ageCheck={ageCheck}
-            checkingAge={checkingAge}
-            onCheckAge={checkAge}
-          />
-
           {isConfigured ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
               onPress={pickAndUpload}
-              style={({ pressed }) => [
-                styles.button,
-                busy && styles.buttonBusy,
-                pressed && styles.buttonPressed,
-              ]}
+              style={({ pressed }) => [styles.newButton, pressed && styles.pressed]}
             >
-              <Text style={[styles.buttonText, busy && styles.buttonTextBusy]}>
-                {photo ? "Choose another photo" : "Choose a photo"}
-              </Text>
+              <Text style={styles.newButtonText}>New photo</Text>
             </Pressable>
-          ) : (
-            <Text style={styles.error}>
-              Set EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID in .env.local, then restart Expo.
-            </Text>
-          )}
+          ) : null}
         </View>
+
+        <ScrollView contentContainerStyle={styles.content}>
+          {!isConfigured ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Not set up yet</Text>
+              <Text style={styles.body}>
+                Set EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID in .env.local, then restart Expo.
+              </Text>
+            </View>
+          ) : selected ? (
+            <Featured
+              upload={selected}
+              ageCheck={ageCheck}
+              checkingAge={checkingAge}
+              onCheckAge={checkAge}
+              onRetry={() => retry(selected)}
+              onChooseAnother={pickAndUpload}
+            />
+          ) : (
+            <View style={[styles.card, styles.empty]}>
+              <Text style={styles.cardTitle}>Share a photo</Text>
+              <Text style={[styles.body, styles.center]}>
+                Pick one from your library. It's checked before anyone sees it.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={pickAndUpload}
+                style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+              >
+                <Text style={styles.primaryText}>Choose a photo</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {uploads.length > 1 ? (
+            <View style={styles.recent}>
+              <Text style={styles.sectionTitle} accessibilityRole="header">
+                Recent
+              </Text>
+              <View style={styles.list}>
+                {uploads.map((item, index) => (
+                  <RecentRow
+                    key={item.key}
+                    upload={item}
+                    selected={item.key === selected?.key}
+                    first={index === 0}
+                    hidden={isHidden(item, ageCheck)}
+                    onPress={() => setSelectedKey(item.key)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
   );
 }
 
-function Result({
-  state,
-  onCheckAgain,
+/**
+ * Whether the photo is covered: refused photos never show, and age-restricted ones stay hidden
+ * until the person shares an age range of 18 or older.
+ */
+const isHidden = (upload: Upload, ageCheck: AgeCheck | undefined) => {
+  const outcome = getOutcome(upload);
+  return outcome === "refused" || (outcome === "age-restricted" && ageCheck?.result !== "adult");
+};
+
+function Featured({
+  upload,
   ageCheck,
   checkingAge,
   onCheckAge,
+  onRetry,
+  onChooseAnother,
 }: {
-  state: UploadState;
-  onCheckAgain: (asset: UploadedAsset) => void;
+  upload: Upload;
   ageCheck: AgeCheck | undefined;
   checkingAge: boolean;
   onCheckAge: () => void;
+  onRetry: () => void;
+  onChooseAnother: () => void;
 }) {
-  switch (state.step) {
-    case "idle":
-      return null;
-    case "uploading":
-      return <Status tone="neutral" title="Uploading…" busy />;
-    case "checking":
-      return state.gaveUp ? (
-        <Status
-          tone="neutral"
-          title="Still checking"
-          detail="CalmLens hasn't decided yet. Check again in a moment."
-          action={{ label: "Check again", onPress: () => onCheckAgain(state.asset) }}
+  const { width, height } = upload.photo;
+  // Portrait photos up to 4:5 and landscape ones up to 16:9 keep their shape.
+  const aspectRatio = width && height ? Math.min(Math.max(width / height, 4 / 5), 16 / 9) : 1;
+  const hidden = isHidden(upload, ageCheck);
+  return (
+    <View style={styles.card}>
+      <View style={[styles.photoFrame, { aspectRatio }]}>
+        <Image
+          source={{ uri: upload.photo.uri }}
+          style={styles.photo}
+          resizeMode="cover"
+          blurRadius={hidden ? 40 : 0}
+          accessibilityIgnoresInvertColors
         />
-      ) : (
+        {hidden ? <View style={[StyleSheet.absoluteFill, styles.veil]} /> : null}
+      </View>
+      <View style={styles.status}>
         <Status
-          tone="neutral"
-          title="Still checking…"
-          detail="Uploaded. Waiting for the decision."
+          upload={upload}
+          ageCheck={ageCheck}
+          checkingAge={checkingAge}
+          onCheckAge={onCheckAge}
+          onRetry={onRetry}
+          onChooseAnother={onChooseAnother}
+        />
+      </View>
+    </View>
+  );
+}
+
+function Status({
+  upload,
+  ageCheck,
+  checkingAge,
+  onCheckAge,
+  onRetry,
+  onChooseAnother,
+}: {
+  upload: Upload;
+  ageCheck: AgeCheck | undefined;
+  checkingAge: boolean;
+  onCheckAge: () => void;
+  onRetry: () => void;
+  onChooseAnother: () => void;
+}) {
+  switch (getOutcome(upload)) {
+    case "busy":
+      if (upload.stage === "uploading") return <Line busy title="Uploading" />;
+      return (
+        <Line
           busy
+          title="Checking photo"
+          detail="Usually takes a few seconds. You can keep sharing meanwhile."
         />
       );
-    case "done":
-      switch (state.asset.status) {
-        case "allowed":
-          return <Status tone="good" title="Allowed" detail="This photo can be shown." />;
-        case "limited":
-          return (
-            <Status
-              tone="good"
-              title="Limited"
-              detail="This photo can be shown, but keep it out of recommendations."
-            />
-          );
-        case "age-restricted":
-          return <AgeRestricted ageCheck={ageCheck} checking={checkingAge} onCheck={onCheckAge} />;
-        case "blocked":
-          return (
-            <Status tone="bad" title="Blocked" detail="This photo breaks the project's policy." />
-          );
-        case "purged":
-          return (
-            <Status
-              tone="bad"
-              title="Removed"
-              detail="This photo breaks the project's policy and CalmLens deleted it."
-            />
-          );
-      }
+    case "stalled":
       return (
-        <Status
-          tone="neutral"
+        <Line
+          title="Still checking"
+          detail="This is taking longer than usual."
+          action={{ label: "Check again", onPress: onRetry }}
+        />
+      );
+    case "shared":
+      return <Line tone="good" title="Shared" detail="Visible to everyone." />;
+    case "limited":
+      return <Line tone="good" title="Shared" detail="Visible, but kept out of recommendations." />;
+    case "age-restricted":
+      return <AgeRestricted ageCheck={ageCheck} checking={checkingAge} onCheck={onCheckAge} />;
+    case "refused":
+      return (
+        <Line
+          tone="bad"
+          title="Not allowed"
+          detail={
+            upload.stage === "decided" && upload.asset.status === "purged"
+              ? "This photo breaks the community rules, so it wasn't shared and has been deleted."
+              : "This photo breaks the community rules, so it wasn't shared."
+          }
+          action={{ label: "Choose another photo", onPress: onChooseAnother }}
+        />
+      );
+    case "failed":
+      return upload.stage === "failed" ? (
+        <Line
+          tone="bad"
+          title="Upload failed"
+          detail={upload.message}
+          code={upload.code}
+          action={{ label: "Try again", onPress: onRetry }}
+        />
+      ) : null;
+    case "unknown":
+      return (
+        <Line
           title="Uploaded"
           detail="This preset doesn't show decisions to the app. Turn on “Show the decision to the uploader” to see them."
         />
       );
-    case "failed":
-      return <Status tone="bad" title="Upload failed" detail={state.message} code={state.code} />;
   }
 }
 
@@ -244,26 +353,22 @@ function AgeRestricted({
   onCheck: () => void;
 }) {
   const ask = { label: "Share my age range", onPress: onCheck };
-  if (checking) {
-    return (
-      <Status tone="neutral" title="Age restricted" detail="Asking for your age range…" busy />
-    );
-  }
+  if (checking) return <Line busy title="Adults only" detail="Asking for your age range…" />;
   switch (ageCheck?.result) {
     case undefined:
       return (
-        <Status
-          tone="neutral"
-          title="Age restricted"
-          detail="This photo is only shown to adults. Share your age range from your Apple or Google account to see it. The app only learns whether you're 18 or older."
+        <Line
+          tone="warn"
+          title="Adults only"
+          detail="Share your age range from your Apple or Google account to see it. The app only learns whether you're 18 or older."
           action={ask}
         />
       );
     case "adult":
       return (
-        <Status
+        <Line
           tone="good"
-          title="Age restricted"
+          title="Adults only"
           detail={
             ageCheck.confirmed
               ? "Shown because your account confirms you're 18 or older."
@@ -273,50 +378,52 @@ function AgeRestricted({
       );
     case "minor":
       return (
-        <Status
-          tone="bad"
-          title="Age restricted"
+        <Line
+          tone="warn"
+          title="Adults only"
           detail="Your age range may be under 18, so this photo isn't shown."
         />
       );
     case "declined":
       return (
-        <Status
-          tone="bad"
-          title="Age restricted"
+        <Line
+          tone="warn"
+          title="Adults only"
           detail="You didn't share your age range, so this photo isn't shown."
           action={ask}
         />
       );
     case "verification-required":
       return (
-        <Status
-          tone="bad"
-          title="Age restricted"
+        <Line
+          tone="warn"
+          title="Adults only"
           detail="Google Play needs you to verify your age in the Play Store first. Then try again."
           action={ask}
         />
       );
     case "unavailable":
       return (
-        <Status
-          tone="bad"
-          title="Age restricted"
+        <Line
+          tone="warn"
+          title="Adults only"
           detail="This device can't share an age range. It needs iOS 26 or Android with Google Play, signed in to an account."
         />
       );
   }
 }
 
-function Status({
-  tone,
+const toneColor = { neutral: colors.ink, good: colors.good, warn: colors.warn, bad: colors.bad };
+
+function Line({
+  tone = "neutral",
   title,
   detail,
   code,
   busy,
   action,
 }: {
-  tone: "neutral" | "good" | "bad";
+  tone?: keyof typeof toneColor;
   title: string;
   detail?: string;
   code?: string;
@@ -324,61 +431,172 @@ function Status({
   action?: { label: string; onPress: () => void };
 }) {
   return (
-    <View style={[styles.status, styles[tone]]} accessibilityLiveRegion="polite" accessible>
-      <View style={styles.statusRow}>
-        {busy ? <ActivityIndicator color="#1f2a37" /> : null}
-        <Text style={styles.statusTitle}>{title}</Text>
+    <View style={styles.statusBody} accessibilityLiveRegion="polite">
+      <View style={styles.statusRow} accessible>
+        {busy ? (
+          <ActivityIndicator size="small" color={colors.soft} />
+        ) : (
+          <View style={[styles.dot, { backgroundColor: toneColor[tone] }]} />
+        )}
+        <Text style={[styles.statusTitle, { color: toneColor[tone] }]}>{title}</Text>
       </View>
-      {detail ? <Text style={styles.statusDetail}>{detail}</Text> : null}
-      {code ? <Text style={styles.statusCode}>{code}</Text> : null}
+      {detail ? <Text style={styles.body}>{detail}</Text> : null}
+      {code ? <Text style={styles.code}>{code}</Text> : null}
       {action ? (
-        <Pressable accessibilityRole="button" onPress={action.onPress} style={styles.link}>
-          <Text style={styles.linkText}>{action.label}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={action.onPress}
+          style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+        >
+          <Text style={styles.secondaryText}>{action.label}</Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
 
+const rowLabel: Record<
+  ReturnType<typeof getOutcome>,
+  { text: string; hint: string; tone: keyof typeof toneColor }
+> = {
+  busy: { text: "Checking", hint: "Usually takes a few seconds", tone: "neutral" },
+  stalled: { text: "Still checking", hint: "Tap to check again", tone: "neutral" },
+  shared: { text: "Shared", hint: "Visible to everyone", tone: "good" },
+  limited: { text: "Shared", hint: "Kept out of recommendations", tone: "good" },
+  "age-restricted": { text: "Adults only", hint: "Shown to people 18 and over", tone: "warn" },
+  refused: { text: "Not allowed", hint: "Breaks the community rules", tone: "bad" },
+  failed: { text: "Upload failed", hint: "Tap to try again", tone: "bad" },
+  unknown: { text: "Uploaded", hint: "No decision shown", tone: "neutral" },
+};
+
+function RecentRow({
+  upload,
+  selected,
+  first,
+  hidden,
+  onPress,
+}: {
+  upload: Upload;
+  selected: boolean;
+  first: boolean;
+  hidden: boolean;
+  onPress: () => void;
+}) {
+  const label =
+    upload.stage === "uploading"
+      ? { text: "Uploading", hint: "Sending your photo", tone: "neutral" as const }
+      : rowLabel[getOutcome(upload)];
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${label.text}, ${label.hint}, ${timeAgo(upload.startedAt)}`}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        !first && styles.rowDivider,
+        selected && styles.rowSelected,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Image source={{ uri: upload.photo.uri }} style={styles.thumb} blurRadius={hidden ? 20 : 0} />
+      <View style={styles.rowText}>
+        <View style={styles.statusRow}>
+          {isBusy(upload) ? (
+            <ActivityIndicator size="small" color={colors.soft} />
+          ) : (
+            <View style={[styles.dot, { backgroundColor: toneColor[label.tone] }]} />
+          )}
+          <Text style={[styles.rowName, { color: toneColor[label.tone] }]}>{label.text}</Text>
+        </View>
+        <Text style={styles.meta} numberOfLines={1}>
+          {label.hint}
+        </Text>
+      </View>
+      <Text style={styles.meta}>{timeAgo(upload.startedAt)}</Text>
+    </Pressable>
+  );
+}
+
+const timeAgo = (at: number) => {
+  const minutes = Math.floor((Date.now() - at) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  return `${Math.floor(minutes / 60)} h ago`;
+};
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#f6f7f9" },
-  content: { flex: 1, padding: 20, gap: 16 },
-  title: { fontSize: 32, fontWeight: "700", color: "#111827", marginTop: 8 },
-  lead: { fontSize: 16, lineHeight: 22, color: "#374151" },
-  preview: {
-    flex: 1,
-    borderRadius: 16,
-    backgroundColor: "#e5e7eb",
+  screen: { flex: 1, backgroundColor: colors.page },
+  header: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  brand: { fontSize: 26, fontWeight: "700", color: colors.ink, letterSpacing: -0.3 },
+  newButton: {
+    backgroundColor: colors.ink,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  newButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
+  content: { paddingHorizontal: 16, paddingBottom: 40, gap: 24 },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
     overflow: "hidden",
   },
-  image: { width: "100%", height: "100%" },
-  placeholder: { fontSize: 16, color: "#4b5563" },
-  status: { borderRadius: 12, padding: 16, gap: 6, borderWidth: 1 },
-  neutral: { backgroundColor: "#ffffff", borderColor: "#d1d5db" },
-  good: { backgroundColor: "#ecfdf3", borderColor: "#34a853" },
-  bad: { backgroundColor: "#fef2f2", borderColor: "#dc2626" },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  statusTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
-  statusDetail: { fontSize: 15, lineHeight: 21, color: "#1f2937" },
-  statusCode: { fontSize: 13, fontFamily: "Menlo", color: "#374151" },
-  link: { alignSelf: "flex-start", paddingVertical: 4 },
-  linkText: { fontSize: 16, fontWeight: "600", color: "#1d4ed8" },
-  button: {
-    backgroundColor: "#111827",
+  empty: { alignItems: "center", padding: 28, gap: 10 },
+  cardTitle: { fontSize: 19, fontWeight: "700", color: colors.ink },
+  center: { textAlign: "center" },
+  photoFrame: { width: "100%", backgroundColor: "#e9eae7" },
+  photo: { width: "100%", height: "100%" },
+  veil: { backgroundColor: "rgba(23,25,28,0.18)" },
+  status: { padding: 16 },
+  statusBody: { gap: 6 },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  statusTitle: { fontSize: 17, fontWeight: "700", color: colors.ink, flex: 1 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  body: { fontSize: 15, lineHeight: 21, color: colors.soft },
+  meta: { fontSize: 13, color: colors.soft },
+  code: { fontSize: 12, fontFamily: "Menlo", color: colors.soft },
+  primary: {
+    marginTop: 6,
+    backgroundColor: colors.ink,
     borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
+    paddingVertical: 13,
+    paddingHorizontal: 22,
   },
-  buttonBusy: {
-    backgroundColor: "#e5e7eb",
+  primaryText: { color: "#ffffff", fontSize: 16, fontWeight: "600" },
+  secondary: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    borderRadius: 10,
     borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "#6b7280",
+    borderColor: colors.line,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
   },
-  buttonPressed: { backgroundColor: "#374151" },
-  buttonText: { color: "#ffffff", fontSize: 17, fontWeight: "600" },
-  buttonTextBusy: { color: "#374151" },
-  error: { fontSize: 15, color: "#b91c1c" },
+  secondaryText: { fontSize: 15, fontWeight: "600", color: colors.ink },
+  pressed: { opacity: 0.85 },
+  recent: { gap: 10 },
+  sectionTitle: { fontSize: 17, fontWeight: "700", color: colors.ink, paddingHorizontal: 4 },
+  list: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
+    overflow: "hidden",
+  },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  rowSelected: { backgroundColor: "#f1f3f9" },
+  thumb: { width: 48, height: 48, borderRadius: 10, backgroundColor: colors.line },
+  rowText: { flex: 1, gap: 2 },
+  rowName: { fontSize: 15, fontWeight: "600", color: colors.ink },
 });

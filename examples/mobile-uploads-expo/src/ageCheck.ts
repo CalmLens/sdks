@@ -1,4 +1,3 @@
-import * as AgeRange from "expo-age-range";
 import { Platform } from "react-native";
 
 const ADULT_AGE = 18;
@@ -31,6 +30,9 @@ const canAskTheOs = () =>
 export const requestAgeCheck = async (): Promise<AgeCheck> => {
   if (!canAskTheOs()) return { result: "unavailable" };
   try {
+    // Loaded on first use: Expo Go doesn't include this native module, so the app still starts
+    // there and the check answers `unavailable`. Development and store builds include it.
+    const AgeRange = await import("expo-age-range");
     // Android only: Play shows its consent screen. Resolves null on iOS.
     const access = await AgeRange.requestAgeSignalsAccessAsync();
     if (access === "NOT_SHARED") return { result: "declined" };
