@@ -3,7 +3,7 @@ import type data from "./example-data.json";
 type ExamplePostMedia = NonNullable<(typeof data.posts)[number]["media"]>;
 
 /** Both apps serve the same local photos and illustrations from assets/post-examples. */
-const PHOTOGRAPHS: readonly ExamplePostMedia[] = [
+export const PHOTOGRAPHS: readonly ExamplePostMedia[] = [
   "garden",
   "bread",
   "kitten",

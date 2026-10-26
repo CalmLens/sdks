@@ -3,7 +3,7 @@ import type { Child } from "hono/jsx";
 import { CalmLensIcon } from "./CalmLensIcons";
 import type { Comment, Flash, ModerationFields, Post } from "./data";
 import { examplePostArtworkUrl } from "./example-artwork";
-import { EXAMPLE_POSTS_BY_ID } from "./examples";
+import { EXAMPLE_POSTS_BY_ID, exampleLikeCount } from "./examples";
 import {
   CATEGORY_LABELS,
   describeFindings,
@@ -90,6 +90,24 @@ const BlockedIcon = () => (
   <svg {...icon}>
     <circle cx="12" cy="12" r="8.5" />
     <path d="m6 6 12 12" />
+  </svg>
+);
+const RetryIcon = () => (
+  <svg {...icon}>
+    <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+    <path d="M19.5 4.5v4h-4" />
+  </svg>
+);
+const HiddenIcon = () => (
+  <svg {...icon}>
+    <path d="M3.5 3.5l17 17" />
+    <path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c4.6 0 7.7 3.4 9 6-0.5 1-1.3 2.2-2.4 3.2M6.6 7.4C4.8 8.6 3.6 10.3 3 12c1.3 2.6 4.4 6 9 6 1.6 0 3-.4 4.2-1.1" />
+    <path d="M9.9 10a3 3 0 0 0 4.1 4.1" />
+  </svg>
+);
+const TextIcon = () => (
+  <svg {...icon}>
+    <path d="M5 6.5h14M5 11h14M5 15.5h9" />
   </svg>
 );
 
@@ -284,7 +302,7 @@ export const PostImage = ({
 }) => {
   if (post.exampleId) {
     const example = EXAMPLE_POSTS_BY_ID.get(post.exampleId);
-    const blocked = post.status !== "allowed";
+    const blocked = !isShownToEveryone(post.status);
     if (variant === "feed" && !example?.media && !blocked) return null;
     if (!blocked && example?.media)
       return (
@@ -299,18 +317,17 @@ export const PostImage = ({
           }
         />
       );
+    // A blocked example's content is never shown, and a text-only example has no picture.
     return (
       <div
         class={cx(
-          "flex flex-col items-center justify-center gap-2 bg-subtle p-4 text-center text-muted",
+          "flex w-full flex-col items-center justify-center gap-1.5 bg-subtle p-3 text-center text-muted [&_svg]:size-6",
           variant === "thumb" ? "aspect-square" : "min-h-40",
         )}
+        title={blocked ? "Content hidden" : undefined}
       >
-        <span aria-hidden="true" class="text-4xl">
-          {blocked ? "◌" : "≡"}
-        </span>
-        <span>{blocked ? "Content blocked" : example?.label}</span>
-        <small>Illustrative example</small>
+        {blocked ? <HiddenIcon /> : <TextIcon />}
+        {variant === "feed" && <span>{blocked ? "Content hidden" : example?.label}</span>}
       </div>
     );
   }
@@ -334,41 +351,44 @@ export const PostImage = ({
       />
     );
   }
-  const placeholder = cx(
-    "flex aspect-square w-full flex-col items-center justify-center gap-1.5 text-center text-muted [&_strong]:text-fg [&_svg]:size-9",
-    variant === "thumb" ? "p-2" : "p-6",
+  // The author's own post that isn't published: a square tile on their profile grid, and a
+  // short notice in the feed and on the post's page.
+  const pending = post.status === "pending";
+  const tile = cx(
+    "flex shrink-0 items-center justify-center text-muted",
+    pending
+      ? "bg-subtle [&_svg]:animate-pulse motion-reduce:[&_svg]:animate-none"
+      : "bg-danger-soft text-danger",
   );
-  if (post.status === "pending") {
+  const statusIcon = pending ? <ClockIcon /> : <BlockedIcon />;
+  if (variant === "thumb") {
     return (
-      <div class={cx(placeholder, "[&_svg]:animate-pulse motion-reduce:[&_svg]:animate-none")}>
-        <ClockIcon />
-        {variant === "feed" && (
-          <>
-            <strong>Checking your photo…</strong>
-            <span>Only you can see this post until CalmLens allows it.</span>
-          </>
-        )}
-        {!post.exampleId && pendingPoller(post.id)}
+      <div class={cx(tile, "aspect-square w-full [&_svg]:size-8")}>
+        {statusIcon}
+        {pending && pendingPoller(post.id)}
       </div>
     );
   }
   return (
-    <div class={cx(placeholder, "bg-danger-soft [&_svg]:text-danger")}>
-      <BlockedIcon />
-      {variant === "feed" && (
-        <>
-          <strong>
-            {post.status === "error"
+    <div class="flex items-center gap-3.5 px-3 py-3" role="status">
+      <span class={cx(tile, "size-14 rounded-lg [&_svg]:size-7")}>{statusIcon}</span>
+      <span class="grid gap-0.5">
+        <strong>
+          {pending
+            ? "Checking your photo…"
+            : post.status === "error"
               ? "We couldn't check this photo"
               : "This photo wasn't published"}
-          </strong>
-          <span>
-            {post.status === "error"
-              ? "Please try uploading it again."
+        </strong>
+        <span class="text-muted">
+          {pending
+            ? "Only you can see this post until it's approved."
+            : post.status === "error"
+              ? "Something went wrong while it was checked. Try again, or delete it."
               : `It may contain ${describeFindings(post.findings)}. Only you can see this notice.`}
-          </span>
-        </>
-      )}
+        </span>
+      </span>
+      {pending && pendingPoller(post.id)}
     </div>
   );
 };
@@ -386,7 +406,9 @@ export const PostCard = (props: {
   const { post, comments, likes, viewer, linkToPost = true } = props;
   const visibleComments = comments.filter((c) => isShownToEveryone(c.status));
   const liked = !!viewer && likes.includes(viewer);
+  const likeCount = likes.length + (post.exampleId ? exampleLikeCount(post.exampleId) : 0);
   const published = isShownToEveryone(post.status) || post.status === "age-restricted";
+  const ownPost = post.author === viewer && !post.exampleId;
   const image = (
     <PostImage
       post={post}
@@ -404,13 +426,41 @@ export const PostCard = (props: {
           <span>{post.author}</span>
         </a>
         <span class="text-muted">· {timeAgo(post.createdAt)}</span>
-        {post.exampleId && <span class="text-xs text-muted">Example</span>}
+        {post.exampleId && <span class="ml-auto text-xs text-muted">Example</span>}
       </header>
 
-      {linkToPost &&
-      published &&
-      !props.placeholderUrl &&
-      (!post.exampleId || EXAMPLE_POSTS_BY_ID.get(post.exampleId)?.media) ? (
+      {!published ? (
+        <div class="border-t border-line">
+          {image}
+          {post.caption && <p class="mx-3 mt-0 mb-3 text-muted">{post.caption}</p>}
+          {ownPost && post.status !== "pending" && (
+            <div class="flex flex-wrap gap-2 border-t border-line px-3 py-2.5">
+              {post.status === "error" && (
+                <PostButton
+                  action={`/p/${post.id}/retry`}
+                  class={cx(buttonClass("secondary", "small"), "[&_svg]:size-4")}
+                >
+                  <RetryIcon />
+                  <span class="ml-1.5">Try again</span>
+                </PostButton>
+              )}
+              <PostButton
+                action={`/p/${post.id}/delete`}
+                class={buttonClass("danger", "small")}
+                confirm={{
+                  title: "Delete this post?",
+                  description: "Its photo is deleted from CalmLens too.",
+                  action: "Delete",
+                }}
+              >
+                Delete
+              </PostButton>
+            </div>
+          )}
+        </div>
+      ) : linkToPost &&
+        !props.placeholderUrl &&
+        (!post.exampleId || EXAMPLE_POSTS_BY_ID.get(post.exampleId)?.media) ? (
         <a href={`/p/${post.id}`} class="block bg-subtle">
           {image}
         </a>
@@ -420,29 +470,29 @@ export const PostCard = (props: {
 
       {published && (
         <div class="px-3 pt-1.5 pb-3">
-          {post.status === "age-restricted" && post.author === viewer && !post.exampleId && (
+          {post.status === "age-restricted" && ownPost && (
             <p class="text-warn" role="status">
-              Age-restricted: shown only to people who turned on sensitive media. Everyone else sees
-              a blurred placeholder.
+              Age-restricted: only people who turned on sensitive media see this photo. Everyone
+              else sees it blurred.
             </p>
           )}
           <div class="-ml-1 flex items-center gap-1">
-            <div class="flex items-center gap-1">
-              <PostButton
-                action={`/p/${post.id}/like`}
-                class={cx(iconButtonClass, liked && "text-danger")}
-                label={liked ? "Unlike" : "Like"}
-              >
-                <HeartIcon filled={liked} />
-              </PostButton>
-              <span class="mr-2 font-semibold">
-                {likes.length === 1 ? "1 like" : `${likes.length} likes`}
-              </span>
-            </div>
+            <PostButton
+              action={`/p/${post.id}/like`}
+              class={cx(iconButtonClass, liked && "text-danger")}
+              label={liked ? "Unlike" : "Like"}
+            >
+              <HeartIcon filled={liked} />
+            </PostButton>
             <a href={`/p/${post.id}#comments`} class={iconButtonClass} aria-label="Comments">
               <CommentIcon />
             </a>
           </div>
+          {likeCount > 0 && (
+            <p class="mt-1 mb-0 font-semibold">
+              {likeCount === 1 ? "1 like" : `${likeCount.toLocaleString("en")} likes`}
+            </p>
+          )}
           {post.caption && (
             <p>
               <a href={`/u/${post.author}`} class="font-semibold">
@@ -559,15 +609,19 @@ const CalmLensEmblem = () => (
 );
 
 /**
- * CalmLens's side of the demo, drawn over Calmgram: the review tools an app owner gets from
- * CalmLens, kept visibly apart from the app their users see.
+ * CalmLens's side of the demo, beside Calmgram: the review tools an app owner gets from CalmLens,
+ * kept visibly apart from the app their users see. A sidebar on wide screens, and a collapsible
+ * panel in the corner on narrower ones.
  */
-export const CalmLensOverlay = (props: { title: string; children: Child }) => (
-  <div class="calmlens fixed right-4 bottom-4 z-50 w-[calc(100%-32px)] max-w-[460px] max-sm:right-2 max-sm:bottom-2 max-sm:w-[calc(100%-16px)]">
+export const CalmLensPanel = (props: { title: string; children: Child }) => (
+  <aside
+    aria-labelledby="calmlens-panel-title"
+    class="calmlens fixed right-4 bottom-4 z-50 w-[calc(100%-32px)] max-w-[440px] max-sm:right-2 max-sm:bottom-2 max-sm:w-[calc(100%-16px)] xl:sticky xl:top-[84px] xl:right-auto xl:bottom-auto xl:z-0 xl:w-auto xl:max-w-none xl:self-start"
+  >
     <details
       open
-      aria-labelledby="calmlens-overlay-title"
-      class="overflow-hidden rounded-xl border border-line bg-cl-page text-fg shadow-2xl"
+      id="calmlens-panel"
+      class="overflow-hidden rounded-xl border border-line bg-cl-page text-fg shadow-2xl xl:shadow-none"
     >
       <summary class="flex cursor-pointer list-none items-center gap-3 bg-surface px-5 py-4 [&::-webkit-details-marker]:hidden">
         <span class="text-fg">
@@ -575,19 +629,23 @@ export const CalmLensOverlay = (props: { title: string; children: Child }) => (
         </span>
         <div class="min-w-0 flex-1">
           <p class="m-0 text-[15px] font-semibold">CalmLens</p>
-          <h1 id="calmlens-overlay-title" class="m-0 text-[13px] font-normal text-muted">
+          <h2 id="calmlens-panel-title" class="m-0 text-[13px] font-normal text-muted">
             {props.title}
-          </h1>
+          </h2>
         </div>
         <span class="queue-toggle" aria-hidden="true">
           <CalmLensIcon name="toggle" />
         </span>
       </summary>
-      <div class="max-h-[calc(80dvh-80px)] overflow-y-auto overscroll-contain border-t border-line px-5 py-4">
+      <div class="max-h-[calc(80dvh-80px)] overflow-y-auto overscroll-contain border-t border-line px-4 py-4 xl:max-h-[calc(100dvh-180px)]">
         {props.children}
       </div>
     </details>
-  </div>
+    {/* On phones the panel would cover the whole app, so it starts collapsed there. */}
+    {raw(
+      `<script>if (matchMedia("(max-width: 639px)").matches) document.getElementById("calmlens-panel").open = false;</script>`,
+    )}
+  </aside>
 );
 
 export const logoClass = "font-logo text-[28px] font-semibold tracking-[0.5px] hover:no-underline";
@@ -596,8 +654,8 @@ export const Layout = (props: {
   title?: string;
   username: string | null;
   demo: boolean;
-  /** Floating review panel; the feed remains interactive underneath. */
-  overlay?: Child;
+  /** The CalmLens review panel shown beside every page. */
+  panel?: Child;
   children: Child;
 }) => (
   <html lang="en">
@@ -605,67 +663,65 @@ export const Layout = (props: {
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>{props.title ? `${props.title} · Calmgram` : "Calmgram"}</title>
-      <meta name="description" content="An Instagram-style example app moderated by CalmLens." />
+      <meta
+        name="description"
+        content="Calmgram, a small photo sharing app whose photos, captions, comments and bios are moderated by CalmLens."
+      />
       <link rel="stylesheet" href="/styles.css" />
       <script type="module" src="/confirm.js" />
     </head>
     <body>
-      <div>
+      <div class="bg-banner px-4 py-1.5 text-center text-xs text-banner-fg">
         {props.demo ? (
-          <div class="bg-banner px-4 py-2 text-center text-[13px] text-banner-fg">
-            <strong>Demo mode:</strong> moderation is simulated locally. Add your CalmLens API key
-            and project ID to <code>.dev.vars</code> for real moderation.
-          </div>
+          <>
+            Demo mode: moderation is simulated. Add CalmLens keys to <code>.dev.vars</code> for real
+            decisions.
+          </>
         ) : (
-          <div class="bg-banner px-4 py-2 text-center text-[13px] text-banner-fg">
-            <strong>Your private sandbox:</strong> only you see what you post here, and it's deleted
-            24 hours after your last visit. Every photo, caption, comment and bio is checked by{" "}
-            <a href="https://calmlens.com">CalmLens</a>.
-          </div>
+          <>
+            This is a private demo. Only you see what you post, and it's deleted 24 hours after your
+            last visit.
+          </>
         )}
-        <header class="sticky top-0 z-10 border-b border-line bg-surface">
-          <div class="mx-auto flex max-w-[935px] items-center justify-between gap-3 px-4 py-2.5">
-            <a href="/" class={logoClass}>
-              Calmgram
-            </a>
-            <nav class="flex items-center gap-3.5 max-sm:gap-2">
-              <a href="/" aria-label="Home" class={iconButtonClass}>
-                <HomeIcon />
-              </a>
-              <a href="/new" aria-label="New post" class={iconButtonClass}>
-                <PlusIcon />
-              </a>
-              {props.username ? (
-                <>
-                  <a href={`/u/${props.username}`} aria-label="Your profile">
-                    <Avatar username={props.username} size={26} />
-                  </a>
-                  <PostButton
-                    action="/start-over"
-                    class="cursor-pointer whitespace-nowrap text-muted hover:text-fg"
-                    confirm={{
-                      title: "Start over?",
-                      description:
-                        "You'll get a new username, and everything you've posted here will be lost.",
-                      action: "Start over",
-                    }}
-                  >
-                    Start over
-                  </PostButton>
-                </>
-              ) : null}
-            </nav>
-          </div>
-        </header>
-        <main class="mx-auto max-w-[935px] px-4 pt-6 pb-12 max-sm:px-0 max-sm:pt-3 max-sm:pb-10">
-          {props.children}
-        </main>
-        <footer class="px-4 pb-8 text-center text-xs text-muted [&_a]:underline">
-          Calmgram is an example app. Photos, captions, comments and bios are moderated by{" "}
-          <a href="https://calmlens.com">CalmLens</a>.
-        </footer>
       </div>
-      {props.overlay}
+      <header class="sticky top-0 z-10 border-b border-line bg-surface">
+        <div class="mx-auto flex max-w-[1080px] items-center justify-between gap-3 px-4 py-2.5">
+          <a href="/" class={logoClass}>
+            Calmgram
+          </a>
+          <nav class="flex items-center gap-3.5 max-sm:gap-2">
+            <a href="/" aria-label="Home" class={iconButtonClass}>
+              <HomeIcon />
+            </a>
+            <a href="/new" aria-label="New post" class={iconButtonClass}>
+              <PlusIcon />
+            </a>
+            {props.username ? (
+              <>
+                <a href={`/u/${props.username}`} aria-label="Your profile">
+                  <Avatar username={props.username} size={26} />
+                </a>
+                <PostButton
+                  action="/start-over"
+                  class="cursor-pointer whitespace-nowrap text-muted hover:text-fg"
+                  confirm={{
+                    title: "Start over?",
+                    description:
+                      "You'll get a new username, and everything you've posted here will be lost.",
+                    action: "Start over",
+                  }}
+                >
+                  Start over
+                </PostButton>
+              </>
+            ) : null}
+          </nav>
+        </div>
+      </header>
+      <div class="mx-auto max-w-[1080px] gap-10 px-4 pt-6 pb-12 max-sm:px-0 max-sm:pt-3 max-sm:pb-10 xl:grid xl:grid-cols-[minmax(0,1fr)_420px]">
+        <main class="min-w-0">{props.children}</main>
+        {props.panel}
+      </div>
       <ConfirmDialog />
     </body>
   </html>

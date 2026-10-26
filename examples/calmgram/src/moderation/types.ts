@@ -74,6 +74,8 @@ export interface ModerationProvider {
   /** Signs a single-use token that lets one browser upload one photo through `uploadPresetId`. */
   signUploadToken(input: { externalId: string }): Promise<{ token: string; expiresAt: number }>;
   checkAsset(assetId: string): Promise<ModerationOutcome>;
+  /** Processes an asset whose classification failed again; it returns as `pending`. */
+  retryAsset(assetId: string): Promise<ModerationOutcome>;
   /**
    * Waits up to `timeoutMs` for the asset's decision. Returns a `pending` outcome if there is
    * none by then, so callers can simply ask again.
@@ -104,6 +106,8 @@ export const CATEGORY_LABELS: Record<string, string> = {
   harassment: "harassment",
   hate: "hate speech",
   "criminal-activity": "criminal activity",
+  profanity: "profanity",
+  "personal-information": "personal information",
 };
 
 export const describeFindings = (findings: CategoryFinding[], minimumScore = 0.5) => {

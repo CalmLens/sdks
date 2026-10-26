@@ -308,6 +308,18 @@ export const deletePost = async (env: Env, sandbox: Sandbox, postId: string) => 
   await saveSandbox(env, sandbox);
 };
 
+/**
+ * Checks the author's failed photo again (`assets.retry`). CalmLens processes it like a new
+ * upload, so the post is pending until the decision arrives by webhook or polling.
+ */
+export const retryPost = async (env: Env, sandbox: Sandbox, postId: string) => {
+  const post = sandbox.posts.find((p) => p.id === postId);
+  if (post?.status !== "error") return;
+  await spend(env);
+  applyOutcomeTo(post, await getModeration(env).retryAsset(post.assetId));
+  await saveSandbox(env, sandbox);
+};
+
 export const deleteComment = async (env: Env, sandbox: Sandbox, commentId: string) => {
   sandbox.comments = sandbox.comments.filter((c) => c.id !== commentId);
   await saveSandbox(env, sandbox);

@@ -102,6 +102,19 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
     return demoOutcome(assetId, await readDemoAsset(kv, assetId));
   },
 
+  async retryAsset(assetId) {
+    const asset = await readDemoAsset(kv, assetId);
+    if (!asset) return demoOutcome(assetId, null);
+    // The simulator never fails, but a retry still starts a new check.
+    const bytes = await kv.get(`demo-image:${assetId}`, "arrayBuffer");
+    if (bytes)
+      await storeDemoImage(kv, assetId, new Uint8Array(bytes), {
+        ...asset,
+        readyAt: Date.now() + IMAGE_DELAY_MS,
+      });
+    return { assetId, externalId: asset.outcome.externalId, status: "pending", findings: [] };
+  },
+
   async waitForDecision(assetId, { timeoutMs, signal }) {
     // The simulator decides at a known time, so sleep until then (or the timeout).
     const asset = await readDemoAsset(kv, assetId);

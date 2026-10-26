@@ -31,8 +31,10 @@ test("the first page already contains example queue entries without KV or API ac
   );
   expect(response.status).toBe(200);
   const html = await response.text();
-  expect(html).toContain("/p/example-obituary");
-  expect(html).toContain("/p/example-insult");
+  expect(html).toContain('id="queue-example-obituary"');
+  expect(html).toContain('id="queue-example-insult"');
+  // A blocked example is never published, so the queue doesn't link to its page or offer deletes.
+  expect(html).not.toContain('href="/p/example-insult"');
   expect(html).not.toContain('action="/p/example-insult/delete"');
   expect(html).not.toContain("/demo-media/example-");
 });

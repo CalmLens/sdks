@@ -3,6 +3,7 @@ import { type Context, Hono } from "hono";
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 import { DailyLimitReached } from "./budget";
+import { CalmLensIcon } from "./CalmLensIcons";
 import {
   addComment,
   attachUpload,
@@ -17,6 +18,7 @@ import {
   ModerationRejection,
   postMediaFor,
   refreshPending,
+  retryPost,
   startUpload,
   syncAsset,
   toggleLike,
@@ -24,12 +26,22 @@ import {
   updateBio,
   viewerOf,
 } from "./content";
-import type { Env, ModerationFields, Sandbox } from "./data";
-import { EXAMPLE_AUTHORS, exampleContentType } from "./examples";
+import type { Comment, Env, ModerationFields, Post, Sandbox } from "./data";
+import {
+  EXAMPLE_AUTHORS,
+  EXAMPLE_POSTS_BY_ID,
+  exampleContentType,
+  isExamplePhoto,
+} from "./examples";
 import { getModeration, isLoopbackHost, ModerationNotConfigured } from "./moderation";
 import { describeCalmLensError } from "./moderation/calmlens";
 import { readDemoPlaceholder, readDemoUpload } from "./moderation/demo";
-import { describeFindings, isShownToEveryone, type ModerationStatus } from "./moderation/types";
+import {
+  CATEGORY_LABELS,
+  describeFindings,
+  isShownToEveryone,
+  type ModerationStatus,
+} from "./moderation/types";
 import { encodePng } from "./png";
 import {
   currentSandbox,
@@ -50,7 +62,7 @@ import { requireHuman } from "./turnstile";
 import {
   Avatar,
   buttonClass,
-  CalmLensOverlay,
+  CalmLensPanel,
   cx,
   Decision,
   Findings,
@@ -136,7 +148,7 @@ const page = async (
       title={title}
       username={sandbox?.username ?? null}
       demo={getModeration(c.env).mode === "demo"}
-      overlay={await moderationQueue(c, sandbox)}
+      panel={await moderationQueue(c, sandbox)}
     >
       {body}
     </Layout>,
@@ -175,9 +187,9 @@ const feedView = async (c: AppContext, sandbox: Sandbox | null) => {
     feed.posts.filter((post) => isVisibleTo(post, viewer)),
   );
   // The feed shows published posts (age-restricted ones behind a placeholder unless the viewer
-  // turned on sensitive media) and the viewer's own pending ones. Their blocked, purged or failed
-  // posts stay on their profile.
-  const visible = posts.filter((post) => isPublished(post) || post.status === "pending");
+  // turned on sensitive media), and the viewer's own posts that aren't published, with why. Of
+  // the shared examples, it shows the photos.
+  const visible = posts.filter((post) => !post.exampleId || isExamplePhoto(post));
   return (
     <div class={FEED}>
       {visible.length === 0 && (
@@ -544,6 +556,7 @@ app.get("/p/:id", async (c) => {
         viewer={viewer}
         linkToPost={false}
       />
+      {!isPublished(post) && <FlashMessage flash={message} class="px-3" />}
       {isPublished(post) && (
         <section id="comments" class={cx(panelClass, "grid gap-2.5 p-3 max-sm:px-4")}>
           {visible.length === 0 && <p class="text-muted">No comments yet.</p>}
@@ -586,7 +599,7 @@ app.get("/p/:id", async (c) => {
           ) : null}
         </section>
       )}
-      {post.author === viewer && !post.exampleId && (
+      {post.author === viewer && !post.exampleId && isPublished(post) && (
         <div class={cx(ROW, "justify-end")}>
           <PostButton
             action={`/p/${post.id}/delete`}
@@ -598,6 +611,18 @@ app.get("/p/:id", async (c) => {
       )}
     </div>,
   );
+});
+
+// A photo whose processing failed can be checked again; it goes back to pending.
+app.post("/p/:id/retry", async (c) => {
+  const sandbox = await currentSandbox(c);
+  if (!sandbox) return c.redirect("/", 303);
+  try {
+    await retryPost(c.env, sandbox, c.req.param("id"));
+  } catch (error) {
+    await flash(c.env, sandbox, { error: toError(error) });
+  }
+  return c.redirect(`/p/${c.req.param("id")}`, 303);
 });
 
 app.post("/p/:id/like", async (c) => {
@@ -757,102 +782,179 @@ app.post("/settings/sensitive-media", async (c) => {
 
 // Demo-only review tools: each visitor sees only their own sandbox. A production app
 // should keep these tools in a separate, authenticated admin interface.
+
+/** Queue sections, in order: still being checked, flagged by the policy, then allowed. */
+const QUEUE_SECTIONS = [
+  { title: "Checking", statuses: ["pending"] },
+  { title: "Flagged", statuses: ["limited", "age-restricted", "blocked", "purged", "error"] },
+  { title: "Allowed", statuses: ["allowed"] },
+] satisfies { title: string; statuses: ModerationStatus[] }[];
+
+export type QueueEntry = { kind: "post"; item: Post } | { kind: "comment"; item: Comment };
+
+/** A CalmLens test input names its category in plain text, after its authentication tag. */
+const TEST_TEXT_CODE = /^<!calmlens-test [0-9a-f]+ ([a-z-]+)>$/;
+
+/** What a queue entry is called: its caption or text, or an example's label when it's hidden. */
+export const queueName = (entry: QueueEntry) => {
+  if (entry.kind === "comment") {
+    const testCategory = TEST_TEXT_CODE.exec(entry.item.text.trim())?.[1];
+    return testCategory ? `Test input: ${testCategory}` : entry.item.text;
+  }
+  const example = entry.item.exampleId ? EXAMPLE_POSTS_BY_ID.get(entry.item.exampleId) : null;
+  if (example && !isShownToEveryone(entry.item.status)) return example.label;
+  return entry.item.caption || "Photo";
+};
+
+/** The category behind a flagged decision, such as "Harassment 93%". */
+const flaggedReason = (item: ModerationFields) => {
+  const [top] = item.findings;
+  if (isShownToEveryone(item.status) && item.status !== "limited") return null;
+  if (!top || top.score < 0.5) return null;
+  const label = CATEGORY_LABELS[top.category] ?? top.category;
+  return `${label[0].toUpperCase()}${label.slice(1)} ${Math.round(top.score * 100)}%`;
+};
+
+const QueueCard = ({
+  c,
+  entry,
+  viewer,
+}: {
+  c: AppContext;
+  entry: QueueEntry;
+  viewer: ReturnType<typeof viewerOf>;
+}) => {
+  const { item } = entry;
+  const example = entry.kind === "post" && !!entry.item.exampleId;
+  const hasPicture =
+    entry.kind === "post" && (!entry.item.exampleId || exampleContentType(entry.item) !== "Text");
+  const reason = flaggedReason(item);
+  return (
+    // Each card is a link target, such as /#queue-<asset ID>.
+    <details class="queue-card" id={`queue-${item.assetId}`}>
+      <summary class="queue-summary">
+        <span class="queue-preview">
+          {hasPicture && entry.kind === "post" ? (
+            <PostImage
+              post={entry.item}
+              variant="thumb"
+              {...thumbProps(postMediaFor(c.env, entry.item, "thumb", viewer))}
+            />
+          ) : (
+            <span class="queue-text-preview" aria-hidden="true">
+              {isShownToEveryone(item.status) ? (
+                <>
+                  <QueueTypeIcon kind="comment" />
+                  <span>{queueName(entry)}</span>
+                </>
+              ) : (
+                // Text that wasn't allowed isn't previewed; open the card to read it.
+                <span class="queue-hidden">
+                  <CalmLensIcon name="blocked" />
+                </span>
+              )}
+            </span>
+          )}
+        </span>
+        <span class="queue-body">
+          <span class="queue-row">
+            <span class="queue-name">{queueName(entry)}</span>
+            <Decision item={item} />
+          </span>
+          <QueueScores item={item} />
+          <span class="queue-meta">
+            {[
+              entry.kind === "post" ? exampleContentType(entry.item) : "Comment",
+              reason,
+              timeAgo(item.createdAt),
+              example ? "Example" : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        </span>
+      </summary>
+      <div class="queue-detail">
+        <p class="text-muted">
+          By <a href={`/u/${item.author}`}>{item.author}</a>
+          {" · "}
+          {entry.kind === "post" ? (
+            isPublished(entry.item) || !example ? (
+              <a href={`/p/${entry.item.id}`}>View post</a>
+            ) : (
+              "Never published"
+            )
+          ) : (
+            <a href={`/p/${entry.item.postId}#comments`}>View post</a>
+          )}
+        </p>
+        {entry.kind === "comment" ? (
+          <blockquote>{entry.item.text}</blockquote>
+        ) : (
+          entry.item.caption &&
+          (!example || isShownToEveryone(item.status)) && (
+            <blockquote>{entry.item.caption}</blockquote>
+          )
+        )}
+        <Findings item={item} />
+        {!example && (
+          <div class={ROW}>
+            {entry.kind === "post" && item.status === "error" && (
+              <PostButton action={`/p/${item.id}/retry`} class={buttonClass("secondary", "small")}>
+                Try again
+              </PostButton>
+            )}
+            <PostButton
+              action={
+                entry.kind === "post" ? `/p/${item.id}/delete` : `/comments/${item.id}/delete`
+              }
+              class={buttonClass("danger", "small")}
+              confirm={
+                entry.kind === "post"
+                  ? { title: "Remove this post and its image?", action: "Remove" }
+                  : undefined
+              }
+            >
+              Remove {entry.kind}
+            </PostButton>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+};
+
 const moderationQueue = async (c: AppContext, sandbox: Sandbox | null) => {
   const posts = await refreshPending(c.env, sandbox, (await loadFeed(c.env, sandbox)).posts);
-  const items = [
-    ...posts.map((item) => ({ kind: "post" as const, item })),
+  const viewer = viewerOf(sandbox);
+  // Calmgram is a photo app, so its queue leaves out the shared examples of other media.
+  const entries: QueueEntry[] = [
+    ...posts
+      .filter((post) => !post.exampleId || ["Image", "Text"].includes(exampleContentType(post)))
+      .map((item) => ({ kind: "post" as const, item })),
     ...(sandbox?.comments ?? []).map((item) => ({ kind: "comment" as const, item })),
   ].sort((a, b) => b.item.createdAt - a.item.createdAt);
 
   return (
-    <CalmLensOverlay title="Moderation queue">
-      <p class="text-muted">
-        Includes illustrative examples. Your uploads are checked by CalmLens separately.
-      </p>
-      <div class="queue-heading">
-        <span>Assets</span>
-        <span>{items.length}</span>
-      </div>
-      {items.length === 0 && (
-        <p class="text-muted">No assets yet. Share a photo or comment to see its status here.</p>
-      )}
-      {items.map((entry) => (
-        <details class="queue-card">
-          <summary class="queue-summary">
-            <span class="queue-preview">
-              {entry.kind === "post" ? (
-                <PostImage
-                  post={entry.item}
-                  variant="thumb"
-                  {...thumbProps(postMediaFor(c.env, entry.item, "thumb", viewerOf(sandbox)))}
-                />
-              ) : (
-                <span class="queue-text-preview" aria-hidden="true">
-                  <QueueTypeIcon kind={entry.kind} />
-                  <span>{entry.item.text}</span>
-                </span>
-              )}
-            </span>
-            <span class="queue-body">
-              <span class="queue-row">
-                <span class="queue-name">
-                  {entry.kind === "post"
-                    ? entry.item.exampleId && entry.item.status !== "allowed"
-                      ? "Blocked example"
-                      : entry.item.caption || "Photo"
-                    : entry.item.text}
-                </span>
-                <Decision item={entry.item} />
-              </span>
-              <QueueScores item={entry.item} />
-              <span class="queue-meta">
-                {entry.kind === "post" ? exampleContentType(entry.item) : "Text"} ·{" "}
-                {timeAgo(entry.item.createdAt)}
-              </span>
-            </span>
-          </summary>
-          <div class="queue-detail">
-            <p class="text-muted">
-              By <a href={`/u/${entry.item.author}`}>{entry.item.author}</a>
-            </p>
-            <a
-              href={`/p/${entry.kind === "post" ? entry.item.id : entry.item.postId}`}
-              class="text-accent"
-            >
-              {entry.kind === "post"
-                ? entry.item.exampleId
-                  ? "Example post"
-                  : "Photo"
-                : "Comment"}
-            </a>
-            {entry.kind === "post" ? (
-              entry.item.caption && <p class="text-muted">“{entry.item.caption}”</p>
-            ) : (
-              <blockquote>{entry.item.text}</blockquote>
-            )}
-            <Findings item={entry.item} />
-            {!(entry.kind === "post" && entry.item.exampleId) && (
-              <div class={ROW}>
-                <PostButton
-                  action={
-                    entry.kind === "post"
-                      ? `/p/${entry.item.id}/delete`
-                      : `/comments/${entry.item.id}/delete`
-                  }
-                  confirm={
-                    entry.kind === "post"
-                      ? { title: "Remove this post and its image?", action: "Remove" }
-                      : undefined
-                  }
-                >
-                  Remove {entry.kind}
-                </PostButton>
-              </div>
-            )}
-          </div>
-        </details>
-      ))}
-    </CalmLensOverlay>
+    <CalmLensPanel title="Moderation queue">
+      {QUEUE_SECTIONS.map(({ title, statuses }) => {
+        const section = entries.filter((entry) =>
+          (statuses as ModerationStatus[]).includes(entry.item.status),
+        );
+        if (section.length === 0) return null;
+        return (
+          <section class="queue-section" aria-label={title}>
+            <h3 class="queue-heading">
+              {title}
+              <span class="queue-count">{section.length}</span>
+            </h3>
+            {section.map((entry) => (
+              <QueueCard c={c} entry={entry} viewer={viewer} />
+            ))}
+          </section>
+        );
+      })}
+    </CalmLensPanel>
   );
 };
 

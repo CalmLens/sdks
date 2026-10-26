@@ -18,8 +18,12 @@ people can see it.
   placeholder with a "Sensitive content" notice.
 - **Captions, comments and bios** are checked before they're saved. Text that isn't allowed is
   never shown, and the author is told why.
-- The **moderation queue** lists every photo and text with its moderation status and category
-  scores.
+- **Your own posts that aren't published** stay in your feed, visible only to you: "Checking your
+  photo…" while CalmLens decides, the category behind a block, or **Try again** when processing
+  failed (`assets.retry`).
+- The **moderation queue** lists every photo and comment with its moderation status and category
+  scores, grouped into those still being checked, those the policy flagged (limited,
+  age-restricted, blocked, purged or failed) and those allowed.
 
 Try it at **[example.calmlens.com](https://example.calmlens.com)**. It's a single Cloudflare Worker
 ([Hono](https://hono.dev), server-rendered HTML, Workers KV, styled with [Tailwind CSS](https://tailwindcss.com)) with two small browser scripts: one for photo uploads, and one that asks before deletes in a native `<dialog>`. Every form also works without JavaScript. It uses Bun, TypeScript 7 and Biome (`bun run check`).
@@ -56,14 +60,16 @@ Open http://localhost:6400 (you're given a random username straight away; change
   the others blocked) or any normal photo (allowed after ~2 seconds);
 - turning on **Show sensitive media** on your profile to see the age-restricted photo instead of
   its blurred placeholder, and off again;
-- the CalmLens moderation panel, open by default over every page. Click its header to collapse or reopen it.
+- the CalmLens moderation panel: beside the feed on wide screens, and in the corner on narrower
+  ones (collapsed to start with on phones). Click its header to collapse or reopen it.
 
 Demo mode is a stand-in, not a moderation model. Use live mode to see real decisions.
 
 ## Live mode
 
 1. Create a CalmLens account and open the portal.
-2. **API key:** Developer → API Keys → create a key.
+2. **API key:** Developer → API Keys → create a key. Calmgram reads, creates, updates (retrying
+   failed photos), deletes and shares assets, and writes lenses.
 3. **Project ID:** open the project selector, choose **Edit** on your project, and copy the
    Project ID.
 4. **Policy:** Moderation Policies → pick a preset (*General community* suits most social apps).
@@ -165,7 +171,8 @@ and a reviewer can change it later. The app only needs one field:
 | `purged` | As `blocked`. CalmLens has also deleted the stored content |
 | `pending` | Show only to the author with a "Checking…" placeholder |
 
-When `classification.status` is `failed`, Calmgram doesn't publish and asks the author to retry.
+When `classification.status` is `failed`, Calmgram doesn't publish and offers the author **Try
+again**, which calls `assets.retry` (the API key needs the `assets:update` permission for this).
 
 Text has no sensitive view: a caption, comment or bio that comes back `age-restricted` is refused
 like any other text that isn't `allowed` or `limited`.
@@ -287,4 +294,4 @@ test-input helpers.
 
 Links to `/new?caption=...` prefill the new post caption (up to 2,200 characters). The visitor can edit it and choose a photo before sharing. A draft retained after a failed submission takes precedence.
 
-The landing page and Calmgram use `packages/shared/src/ModerationExamplePosts.ts` as their fixed example list. These fictional posts and their illustrative decisions are available immediately in the feed and moderation queue. They are never seeded into KV or uploaded to CalmLens, and incur no moderation usage. Visitor-created posts remain isolated to their sandbox and use the configured moderation provider.
+The landing page and Calmgram use `packages/shared/src/ModerationExamplePosts.ts` as their fixed example list. These fictional posts and their illustrative decisions are available immediately: the feed shows the example photographs, and the moderation queue also lists the image and text examples, including blocked ones, which it names by their description without showing their content. They are never seeded into KV or uploaded to CalmLens, and incur no moderation usage. Visitor-created posts remain isolated to their sandbox and use the configured moderation provider.

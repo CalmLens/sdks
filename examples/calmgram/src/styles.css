@@ -92,12 +92,15 @@
   blockquote {
     @apply my-1.5 border-l-3 border-line px-2.5 py-1.5 wrap-anywhere;
   }
-  input,
+  input:not([type="checkbox"]),
   textarea {
     @apply w-full rounded-lg border border-line bg-surface px-[11px] py-[9px] text-fg focus:outline-2 focus:-outline-offset-1 focus:outline-accent;
   }
   textarea {
     @apply resize-y;
+  }
+  input[type="checkbox"] {
+    @apply size-4 shrink-0 accent-accent;
   }
 }
 
@@ -149,15 +152,26 @@
 }
 
 /* The landing page DecisionFeed's compact card layout, adapted to server-rendered assets. */
+.queue-section + .queue-section {
+  margin-top: 20px;
+}
 .queue-heading {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  color: var(--muted);
-  font-size: 11px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--fg);
+  font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+}
+.queue-count {
+  border-radius: 999px;
+  padding: 0 7px;
+  background: var(--cl-track);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
 }
 .queue-card {
   margin-bottom: 10px;
@@ -168,8 +182,8 @@
 .queue-summary {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px;
+  gap: 12px;
+  padding: 12px;
   cursor: pointer;
   list-style: none;
 }
@@ -203,7 +217,7 @@
 }
 .queue-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
@@ -211,10 +225,12 @@
   flex-shrink: 0;
 }
 .queue-name {
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .queue-meta {
   color: var(--muted);
@@ -223,7 +239,7 @@
 .queue-scores {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 5px;
 }
 .queue-scores:empty {
   display: none;
@@ -231,13 +247,13 @@
 .queue-score {
   position: relative;
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   color: var(--fg);
 }
 .queue-score > svg {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
 }
 .queue-score-icon {
   position: absolute;
@@ -246,8 +262,8 @@
   place-items: center;
 }
 .queue-score-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 .queue-status {
   display: inline-flex;
@@ -337,4 +353,14 @@ details[open] > summary > .queue-toggle {
 }
 .queue-text-preview > span:last-child {
   overflow: hidden;
+}
+.queue-hidden {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  color: var(--muted);
+}
+.queue-hidden svg {
+  width: 20px;
+  height: 20px;
 }

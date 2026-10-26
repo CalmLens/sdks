@@ -137,6 +137,7 @@ const examples: Record<string, Example> = {
       "assets:read",
       "assets:download",
       "assets:create",
+      "assets:update",
       "assets:delete",
       "assets:share",
       "lenses:write",

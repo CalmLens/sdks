@@ -167,6 +167,12 @@ export const createCalmLensProvider = (options: {
       return toOutcome(await client.assets.retrieve({ assetId }));
     },
 
+    async retryAsset(assetId) {
+      // Only for assets whose classification failed. CalmLens moderates it again like a new
+      // upload, so the decision arrives as usual.
+      return toOutcome(await client.assets.retry({ assetId }));
+    },
+
     async waitForDecision(assetId, { timeoutMs, signal }) {
       try {
         return toOutcome(await client.assets.waitForDecision({ assetId, timeoutMs, signal }));
