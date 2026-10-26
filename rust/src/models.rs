@@ -3305,7 +3305,7 @@ pub struct ImageTransformOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trim: Option<Trim>,
     /// Options this SDK version does not know, as received in a lens.
-    #[serde(flatten, deserialize_with = "extra_fields::<ImageTransformOptions, _>")]
+    #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
 // </generated: image-transform-options>

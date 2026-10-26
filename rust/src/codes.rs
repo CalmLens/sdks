@@ -12,13 +12,13 @@ error_codes! {
     ApiKeyNotAccepted = "auth/api-key-not-accepted", 403;
     /// `auth/permission-denied` (HTTP 403): This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.
     PermissionDenied = "auth/permission-denied", 403;
-    /// `upload/file-too-large` (HTTP 400): File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.
+    /// `upload/file-too-large` (HTTP 400): File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.
     FileTooLarge = "upload/file-too-large", 400;
-    /// `upload/image-requires-multipart-upload` (HTTP 400): Images of 10MB or more must use a multipart upload.
+    /// `upload/image-requires-multipart-upload` (HTTP 400): Images of 10 MiB or more must use a multipart upload.
     ImageRequiresMultipartUpload = "upload/image-requires-multipart-upload", 400;
-    /// `upload/multipart-image-too-small` (HTTP 400): Multipart image uploads must total at least 10MB.
+    /// `upload/multipart-image-too-small` (HTTP 400): Multipart image uploads must total at least 10 MiB.
     MultipartImageTooSmall = "upload/multipart-image-too-small", 400;
-    /// `upload/multipart-image-too-large` (HTTP 400): Multipart image uploads cannot exceed 20MB.
+    /// `upload/multipart-image-too-large` (HTTP 400): Multipart image uploads cannot exceed 20 MiB.
     MultipartImageTooLarge = "upload/multipart-image-too-large", 400;
     /// `upload/image-exceeded-max-dimensions` (HTTP 400): Image exceeds maximum dimensions. Maximum dimensions are 12,000px.
     ImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions", 400;

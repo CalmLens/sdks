@@ -8231,8 +8231,16 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "sexual",
 		kind: "harm",
 		displayName: "Non-consensual sexual content",
-		description: "Sexual content depicting or describing non-consensual sexual activity, such as sexual assault, rape or coerced sex presented as sexual or erotic material, including fiction, animation and generated images; or intimate images of a person shared, or threatened to be shared, without their consent.",
-		exclusions: "Factual reports, survivor accounts, support, prevention or non-graphic discussion of sexual assault that do not present it as sexual material; consensual sexual activity."
+		description: "Sexual content depicting or describing non-consensual sexual activity, such as sexual assault, rape or coerced sex presented as sexual or erotic material, including fiction, animation and generated images.",
+		exclusions: "Factual reports, survivor accounts, support, prevention or non-graphic discussion of sexual assault that do not present it as sexual material; consensual sexual activity. A real person's intimate images shared without consent are intimate image abuse."
+	},
+	"sexual-intimate-image-abuse": {
+		category: "sexual",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Intimate image abuse",
+		description: "Intimate images of a real, identifiable person shared, offered, sought or traded without their consent, or threatened to be shared: nudity, sexual acts or sexualised images, including hidden-camera, upskirt, leaked or hacked images, sextortion threats, and sexual deepfakes or digitally undressed images of real people.",
+		exclusions: "Consensual adult content, including people sharing their own images or professional adult content; fictional, drawn or invented characters with no real person depicted; non-sexual images; factual reports, survivor accounts, prevention or support that share no such image and make no threat; mentioning a leak without sharing, offering or seeking the images."
 	},
 	"sexual-minors": {
 		category: "sexual",
@@ -8276,7 +8284,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "context",
 		displayName: "Non-erotic nudity",
 		description: "Exposed anatomy in a non-erotic setting: breastfeeding, childbirth, medical or health care such as post-surgery images or self-examination, protest, or fine art such as a painting or sculpture.",
-		exclusions: "Erotic posing, sexual focus or arousal; a sexual act; photographs or generated images presented as art to show nudity; pornographic drawings; any person who appears to be a minor. An educational or artistic label alone does not make erotic nudity non-erotic."
+		exclusions: "Erotic posing, sexual focus or arousal, including a person posed on a bed or in a private setting with clothing pulled down, open or pushed aside to show the pubic area, buttocks or genitals; a sexual act; photographs or generated images presented as art to show nudity; pornographic drawings; any person who appears to be a minor. An educational or artistic label alone does not make erotic nudity non-erotic."
 	},
 	"sexual-text": {
 		category: "sexual",
@@ -8356,6 +8364,14 @@ const MODERATION_QUALIFIER_INFO = {
 		displayName: "Encouragement of violence",
 		description: "The author urges, endorses, praises or promotes physical violence.",
 		exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention."
+	},
+	"violence-extremism": {
+		category: "violence",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Violent extremism",
+		description: "Support for terrorism or violent extremism by the author: propaganda, recruitment, fundraising, instructions or praise for a terrorist or violent extremist organisation, its leaders or its attacks, including glorifying attackers as heroes or martyrs; and perpetrator-produced attack footage or manifestos, however they are presented.",
+		exclusions: "News, documentary, research, education, history or counterspeech that reports, explains or condemns terrorism without promoting it or reproducing perpetrator material; neutral mention of a group's name; fiction that does not promote a real organisation or attack; lawful political movements, protest and military conflict between states."
 	},
 	"violence-injury": {
 		category: "violence",
@@ -9148,11 +9164,12 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 			"policy",
 			"asset-override",
 			"children",
-			"hash-list"
+			"hash-list",
+			"platform-restriction"
 		]),
 		action: FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["allow"]).nullable(),
 		flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA)
-	}).strict().optional().describe("The automatic asset decision, including a per-asset action override, a decision inherited from children, or a block from a hash list match.")
+	}).strict().optional().describe("The automatic asset decision, including a per-asset action override, a decision inherited from children, a block from a hash list match, or a block from a platform restriction that every policy includes.")
 }).strict();
 const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	description: saneStringField(),

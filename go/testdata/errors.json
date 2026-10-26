@@ -212,7 +212,7 @@
       },
       "body": {
         "code": "upload/file-too-large",
-        "message": "File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.",
+        "message": "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
         "details": {
           "reason": "file_too_large"
         },
@@ -245,7 +245,7 @@
       },
       "body": {
         "code": "upload/image-requires-multipart-upload",
-        "message": "Images of 10MB or more must use a multipart upload.",
+        "message": "Images of 10 MiB or more must use a multipart upload.",
         "details": {
           "reason": "image_requires_multipart_upload"
         },
@@ -278,7 +278,7 @@
       },
       "body": {
         "code": "upload/multipart-image-too-small",
-        "message": "Multipart image uploads must total at least 10MB.",
+        "message": "Multipart image uploads must total at least 10 MiB.",
         "details": {
           "reason": "multipart_image_too_small"
         },
@@ -311,7 +311,7 @@
       },
       "body": {
         "code": "upload/multipart-image-too-large",
-        "message": "Multipart image uploads cannot exceed 20MB.",
+        "message": "Multipart image uploads cannot exceed 20 MiB.",
         "details": {
           "reason": "multipart_image_too_large"
         },

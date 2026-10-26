@@ -96,7 +96,7 @@
     {
       "id": "assets.create",
       "kind": "method",
-      "description": "Upload a new asset to a project. Direct image uploads must be smaller than 10MB. Images from 10MB through 20MB must use multipart upload; CalmLens accumulates parts and enforces the final total, and checks `totalSizeInBytes` up front when you send it. Retained multipart image originals are served through CalmLens CDN URLs. Send an `Idempotency-Key` header to retry safely without creating a second asset.",
+      "description": "Upload a new asset to a project. Direct image uploads must be smaller than 10 MiB. Images from 10 MiB through 20 MiB must use multipart upload; CalmLens accumulates parts and enforces the final total, and checks `totalSizeInBytes` up front when you send it. Retained multipart image originals are served through CalmLens CDN URLs. Send an `Idempotency-Key` header to retry safely without creating a second asset.",
       "names": {
         "javascript": "assets.create",
         "python": "assets.create",
@@ -110,7 +110,7 @@
     {
       "id": "assets.uploadPart",
       "kind": "method",
-      "description": "Upload a sequential part for an in-progress asset upload. Image multipart uploads must total from 10MB through 20MB; each non-final part must be at least 5MiB. The final part is classified with the `queue` choice saved when the upload started unless you pass `queue` here. To stream raw bytes instead of JSON, send the `X-CalmLens-Upload: part` header and pass `partNumber`, `isFinal` and `sizeInBytes` as query parameters.",
+      "description": "Upload a sequential part for an in-progress asset upload. Image multipart uploads must total from 10 MiB through 20 MiB; each non-final part must be at least 5MiB. The final part is classified with the `queue` choice saved when the upload started unless you pass `queue` here. To stream raw bytes instead of JSON, send the `X-CalmLens-Upload: part` header and pass `partNumber`, `isFinal` and `sizeInBytes` as query parameters.",
       "names": {
         "javascript": "assets.uploadPart",
         "python": "assets.upload_part",

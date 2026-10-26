@@ -1,4 +1,4 @@
-import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-Dkpn16x2.js";
+import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BjmCOt03.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-I9R-uNBH.js";
@@ -66,6 +66,36 @@ const normalizePolicyCondition = (condition) => [...new Map(condition.map((claus
 	return [JSON.stringify(normalized), normalized];
 })).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, clause]) => clause);
 const policyConditionKey = (scope, condition) => `${scope}:${JSON.stringify(normalizePolicyCondition(condition))}`;
+new Set([
+	{
+		id: "sexualised-minors",
+		category: "sexual",
+		condition: [{
+			all: ["sexual-minors"],
+			none: []
+		}],
+		safetyHold: true
+	},
+	{
+		id: "intimate-image-abuse",
+		category: "sexual",
+		condition: [{
+			all: ["sexual-intimate-image-abuse"],
+			none: []
+		}],
+		safetyHold: false
+	},
+	{
+		id: "violent-extremism",
+		category: "violence",
+		condition: [{
+			all: ["violence-extremism"],
+			none: []
+		}],
+		safetyHold: false
+	},
+	...[]
+].map((restriction) => restriction.category));
 // packages/shared/src/Project.ts
 const MINIMUM_MODERATION_THRESHOLD = .1;
 const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTION_SCHEMA });

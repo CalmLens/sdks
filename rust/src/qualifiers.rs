@@ -60,6 +60,8 @@ string_enum! {
         SexualExplicitLanguage = "sexual-explicit-language",
         /// Sexual: Non-consensual sexual content.
         SexualNonConsensual = "sexual-non-consensual",
+        /// Sexual: Intimate image abuse.
+        SexualIntimateImageAbuse = "sexual-intimate-image-abuse",
         /// Sexual: Sexualised minors.
         SexualMinors = "sexual-minors",
         /// Sexual: Sexual solicitation.
@@ -94,6 +96,8 @@ string_enum! {
         ViolencePreparation = "violence-preparation",
         /// Violence: Encouragement of violence.
         ViolenceEncouragement = "violence-encouragement",
+        /// Violence: Violent extremism.
+        ViolenceExtremism = "violence-extremism",
         /// Violence: Injury.
         ViolenceInjury = "violence-injury",
         /// Violence: Violent death.

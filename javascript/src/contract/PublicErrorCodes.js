@@ -317,22 +317,22 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	FILE_TOO_LARGE: new ErrorCode({
 		id: "upload/file-too-large",
-		defaultMessage: "File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.",
+		defaultMessage: "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
 		status: 400
 	}),
 	IMAGE_REQUIRES_MULTIPART_UPLOAD: new ErrorCode({
 		id: "upload/image-requires-multipart-upload",
-		defaultMessage: "Images of 10MB or more must use a multipart upload.",
+		defaultMessage: "Images of 10 MiB or more must use a multipart upload.",
 		status: 400
 	}),
 	MULTIPART_IMAGE_TOO_SMALL: new ErrorCode({
 		id: "upload/multipart-image-too-small",
-		defaultMessage: "Multipart image uploads must total at least 10MB.",
+		defaultMessage: "Multipart image uploads must total at least 10 MiB.",
 		status: 400
 	}),
 	MULTIPART_IMAGE_TOO_LARGE: new ErrorCode({
 		id: "upload/multipart-image-too-large",
-		defaultMessage: "Multipart image uploads cannot exceed 20MB.",
+		defaultMessage: "Multipart image uploads cannot exceed 20 MiB.",
 		status: 400
 	}),
 	IMAGE_EXCEEDED_MAX_DIMENSIONS: new ErrorCode({
