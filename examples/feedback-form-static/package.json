@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "sdk": "bun bundle-sdk.ts",
-    "dev": "bun bundle-sdk.ts && bun server.ts"
+    "dev": "bun bundle-sdk.ts && bun server.ts",
+    "test": "bun test"
   }
 }

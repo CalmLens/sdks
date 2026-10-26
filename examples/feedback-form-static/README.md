@@ -1,45 +1,67 @@
 # Calmform: static feedback form
 
-A feedback form on a static page. Visitors describe a problem and attach a screenshot, and the
-page uploads it straight to CalmLens through an upload preset open to anyone. There's no
-backend and no API key: the page only knows the preset ID.
+A feedback form on a static page. Visitors pick a type, describe the problem, attach a screenshot
+and, if they want a reply, leave an email address. The page uploads the screenshot straight to
+CalmLens through an upload preset open to anyone, with the feedback as its description, and shows
+the moderation decision in the form. There's no backend and no API key: the page only knows the
+preset ID.
 
-The whole integration is in [`app.js`](app.js):
+The attachment is the JavaScript SDK's upload widget, `<calmlens-uploader>` from
+`@calmlens/sdk/elements`, which shows the preview, upload progress, the check and the decision.
+[`app.js`](app.js) gives it an upload queue that waits for the form (`autoUpload: false`) and
+uploads with the feedback as the description:
 
 ```js
-const client = new CalmLensAppClient({ uploadPresetId: "your-upload-preset-id" });
-
-const asset = await client.assets.classify({
-  name: file.name,
-  description: message,
-  content: { data: file, type: file.type },
+const controller = createUploadController({
+  accept: "image/*",
+  maxFileSize: 10 * 1024 * 1024,
+  autoUpload: false,
+  upload: async (file, { signal, onProgress }) => {
+    const client = new CalmLensAppClient({
+      uploadPresetId,
+      signal,
+      uploadFetch: createProgressFetch(onProgress),
+    });
+    const asset = await client.assets.create({
+      name: file.name,
+      description, // The category, message and reply address
+      content: { data: file, type: file.type },
+    });
+    return { assetId: asset.id, status: asset.status };
+  },
+  checkStatus: async (assetId) => (await statusClient.assets.retrieve({ assetId })).status,
 });
+uploader.controller = controller;
 
-if (asset.status === "blocked" || asset.status === "purged") {
-  // "This image can't be posted."
-}
+// On submit:
+controller.start();
 ```
 
-`assets.classify` waits for the decision. `blocked` and `purged` screenshots break your policy;
-an `age-restricted` one is still accepted, because feedback screenshots are only seen by your
-team. Errors with an `upload-preset/*` code, such as `upload-preset/daily-limit-reached` and
-`upload-preset/content-type-not-allowed`, are turned into friendly messages.
+The widget checks the upload until CalmLens decides, for up to 15 seconds. What the form does
+with the decision is in [`feedback.js`](feedback.js):
+
+| Decision                               | The form                                                                                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `allowed`, `limited`, `age-restricted` | Sends the feedback. Screenshots are only seen by your team, so restricted ones are fine.                                                   |
+| Still `pending` after 15 seconds       | Sends the feedback; your team sees the screenshot once it's checked.                                                                       |
+| `blocked`, `purged`                    | Doesn't send it. The widget says the image breaks the content rules, and the visitor keeps their message and picks a different screenshot. |
+| An upload error                        | Shows a message for its code, such as `upload-preset/daily-limit-reached`, and sending again retries the upload.                           |
 
 ## 1. Create the upload preset
 
 In the CalmLens portal, open [Upload presets](https://calmlens.com/portal/upload-presets), choose **New preset** and set:
 
-| Setting | Value for this example |
-| --- | --- |
-| Who can upload? | **Anyone with the preset ID** |
-| Daily upload limit | Required. The most uploads you'll accept per UTC day, for example `100`. |
-| Allowed sites | `http://localhost:6406` |
-| File types | `image/*` |
-| Maximum file size (MB) | For example `10`. |
-| Show the decision to the uploader | On, so the page can say when a screenshot breaks your policy. |
-| Folder and visibility | Where uploads go. Leave visibility private unless you want to show uploads publicly. |
+| Setting                           | Value for this example                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------ |
+| Who can upload?                   | **Anyone with the preset ID**                                                        |
+| Daily upload limit                | Required. The most uploads you'll accept per UTC day, for example `100`.             |
+| Allowed sites                     | `http://localhost:6406`                                                              |
+| File types                        | `image/*`                                                                            |
+| Maximum file size (MB)            | For example `10`.                                                                    |
+| Show the decision to the uploader | On, so the page can say when a screenshot breaks your policy.                        |
+| Folder and visibility             | Where uploads go. Leave visibility private unless you want to show uploads publicly. |
 
-Copy the preset ID and paste it into `UPLOAD_PRESET_ID` in [`app.js`](app.js).
+Copy the preset ID and paste it into `UPLOAD_PRESET_ID` in [`config.js`](config.js).
 
 ## 2. Run it
 
@@ -57,17 +79,32 @@ cd examples/feedback-form-static
 bun run dev
 ```
 
-`bun run dev` bundles the SDK's `@calmlens/sdk/app` build into `sdk/calmlens.js` and serves the folder. Open
-http://localhost:6406, write a message, attach a screenshot and send it. Use `localhost`
-rather than `127.0.0.1`: they're different origins, and only the one in the preset's allowed
-sites can upload.
+`bun run dev` bundles the SDK's app client, upload widget and stylesheet into `sdk/` and serves
+the folder. Open http://localhost:6406, write a message, attach a screenshot and send it. Use
+`localhost` rather than `127.0.0.1`: they're different origins, and only the one in the preset's
+allowed sites can upload.
+
+To see a refusal, attach a [test image](https://calmlens.com/docs/guides/testing): download one
+from **Assets → Try test inputs** in your project.
+
+### Demo mode
+
+While `config.js` still holds the placeholder preset ID, the page runs in demo mode: uploads go to
+the SDK's in-memory `MockCalmLensAppClient` from `@calmlens/sdk/testing`, and nothing leaves the
+page. Screenshots with `blocked` in the file name are refused; everything else is accepted.
+
+To try a preset without editing `config.js`, set `CALMLENS_UPLOAD_PRESET_ID` (and
+`CALMLENS_API_URL` for a CalmLens instance other than `https://api.calmlens.com/v1`) when starting
+the server, which then serves `config.js` from them.
+
+Run the tests for the form's logic with `bun test`.
 
 ### Using a published SDK release
 
 Once a published `@calmlens/sdk` release includes `CalmLensAppClient`, point the
-`@calmlens/sdk/app` entry of the import map in [`index.html`](index.html) at it instead of
-`./sdk/calmlens.js`, for example with `https://esm.sh/@calmlens/sdk@<version>/app`, and drop the
-bundling step.
+import map in [`index.html`](index.html) at it instead of `./sdk/`, for example
+`https://esm.sh/@calmlens/sdk@<version>/app` and `.../elements`, link
+`https://esm.sh/@calmlens/sdk@<version>/styles.css`, and drop the bundling step.
 
 Uploads appear in the preset's folder in the portal. To hear about them without a server,
 connect Slack or email in
