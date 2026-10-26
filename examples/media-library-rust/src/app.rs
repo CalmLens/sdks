@@ -23,7 +23,8 @@ use axum::routing::{get, post};
 use axum::{middleware, Form, Router};
 use calmlens::models::{
     Asset, AssetClassificationStatus, AssetContentStatus, AssetModerationStatus, AssetPage,
-    AssetSearchResponse, EventFact, Folder, MetadataItem, WebhookEventData, WebhookEventPayload,
+    AssetReview, AssetSearchResponse, ClassificationCategory, EventFact, Folder, MetadataItem,
+    WebhookEventData, WebhookEventPayload,
 };
 use calmlens::ErrorCode;
 use serde::de::DeserializeOwned;
@@ -76,7 +77,7 @@ pub const STATUS_FILTERS: [(&str, &str); 8] = [
     ("", "All statuses"),
     ("allowed", "Allowed"),
     ("limited", "Limited"),
-    ("pending", "In review"),
+    ("pending", "Processing"),
     ("age-restricted", "Age-restricted"),
     ("blocked", "Blocked"),
     ("purged", "Purged"),
@@ -933,7 +934,7 @@ async fn remove_file(
             state.record(
                 "lifecycle",
                 format!(
-                    "Removed the file of {}. Its record and metadata remain.",
+                    "Removed the file of {}.",
                     asset.name.as_deref().unwrap_or(&id)
                 ),
                 Vec::new(),
@@ -1088,11 +1089,7 @@ async fn upload(
             let folder = upload.folder.clone();
             let name = upload.name.clone();
             let asset = state.library.upload(upload).await?;
-            state.record(
-                "upload",
-                format!("Uploaded {name} privately. It is in review."),
-                Vec::new(),
-            );
+            state.record("upload", format!("Uploaded {name}."), Vec::new());
             Ok(location(
                 folder.as_deref(),
                 Some(&asset.id),
@@ -1283,6 +1280,47 @@ pub fn content_removed(asset: &Asset) -> bool {
 pub fn deliverable(asset: &Asset) -> bool {
     matches!(decision(asset), Decision::Allowed | Decision::Limited)
         && asset.content.status == AssetContentStatus::Stored
+}
+
+/// Labels for the moderation categories a report can flag.
+const CATEGORY_LABELS: [(&str, &str); 8] = [
+    ("personal-information", "Personal information"),
+    ("profanity", "Profanity"),
+    ("sexual", "Sexual content"),
+    ("violence", "Violence"),
+    ("self-harm", "Self-harm"),
+    ("harassment", "Harassment"),
+    ("hate", "Hate"),
+    ("criminal-activity", "Criminal activity"),
+];
+
+pub(crate) fn category_label(category: &ClassificationCategory) -> &str {
+    CATEGORY_LABELS
+        .iter()
+        .find(|(key, _)| *key == category.as_str())
+        .map_or(category.as_str(), |(_, label)| *label)
+}
+
+/// The categories behind the automatic decision, from the asset's moderation report.
+pub(crate) fn flagged_categories(asset: &Asset) -> &[ClassificationCategory] {
+    asset
+        .classification
+        .moderation
+        .policy
+        .as_ref()
+        .and_then(|policy| policy.decision.as_ref())
+        .map_or(&[], |decision| decision.flagged_categories.as_slice())
+}
+
+/// The latest reviewer decision that changed the asset's status, if a reviewer decided it.
+pub(crate) fn latest_review(asset: &Asset) -> Option<&AssetReview> {
+    asset
+        .classification
+        .moderation
+        .manual_reviews
+        .iter()
+        .rev()
+        .find(|review| review.applied_to_asset)
 }
 
 /// The catalogue ID this app issued for an asset, or `None` for an asset it did not upload.

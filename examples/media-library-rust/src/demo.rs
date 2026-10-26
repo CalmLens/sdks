@@ -13,9 +13,10 @@ use crate::library::{NewUpload, DEMO_PROJECT_ID};
 use crate::messages::{rejected, Failure};
 use axum::http::StatusCode;
 use calmlens::models::{
-    Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus,
+    Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus, AssetImage,
     AssetModerationDecision, AssetModerationStatus, AssetPage, AssetReview, AssetSearchMatch,
-    AssetSearchResponse, Folder, MetadataItem, ProcessingOptions, SearchMatchField, Visibility,
+    AssetSearchResponse, ClassificationCategory, Folder, MetadataItem, ProcessingOptions,
+    ReportPolicy, ReportPolicyDecision, SearchMatchField, Visibility,
 };
 use calmlens::{Bytes, Error, ErrorCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -44,6 +45,18 @@ pub fn demo_outcome(value: &str) -> Option<Decision> {
         "blocked" => Some(Decision::Blocked),
         "purged" => Some(Decision::Purged),
         "failed" => Some(Decision::Failed),
+        _ => None,
+    }
+}
+
+/// The category a demo outcome reports as flagged, so undelivered demo images show a reason like
+/// a real moderation report. Allowed and failed outcomes flag nothing.
+fn demo_category(outcome: Decision) -> Option<ClassificationCategory> {
+    match outcome {
+        Decision::Limited => Some(ClassificationCategory::Profanity),
+        Decision::AgeRestricted => Some(ClassificationCategory::Sexual),
+        Decision::Blocked => Some(ClassificationCategory::Violence),
+        Decision::Purged => Some(ClassificationCategory::CriminalActivity),
         _ => None,
     }
 }
@@ -98,6 +111,23 @@ impl DemoStore {
                 if let Some(status) = status {
                     asset.classification.moderation.status = status;
                     asset.classification.completed_at = Some(now_ms());
+                    let mut decision = ReportPolicyDecision::default();
+                    decision.source = "policy".into();
+                    decision.action = Some(
+                        match entry.outcome {
+                            Decision::Limited => "limit",
+                            Decision::AgeRestricted => "age-restrict",
+                            Decision::Blocked => "block",
+                            Decision::Purged => "purge",
+                            _ => "allow",
+                        }
+                        .into(),
+                    );
+                    decision.flagged_categories =
+                        demo_category(entry.outcome).into_iter().collect();
+                    let mut policy = ReportPolicy::default();
+                    policy.decision = Some(decision);
+                    asset.classification.moderation.policy = Some(policy);
                 }
                 // Like CalmLens, purging deletes the stored file; the record stays.
                 if entry.outcome == Decision::Purged {
@@ -107,6 +137,262 @@ impl DemoStore {
                     asset.content.updated_at = Some(now_ms());
                 }
             }
+        }
+    }
+
+    /// Fills an empty demo library with a small team library: nested folders and images in
+    /// every state, so the demo shows what the app does before anything is uploaded. The photos
+    /// are the shared example photos in `sdks/assets/post-examples` (see PHOTOS.md there).
+    pub fn seed_samples(&mut self) {
+        const LAKE: &[u8] = include_bytes!("../../../assets/post-examples/mountain-lake.webp");
+        const GARDEN: &[u8] = include_bytes!("../../../assets/post-examples/garden.webp");
+        const BREAD: &[u8] = include_bytes!("../../../assets/post-examples/bread.webp");
+        const KITTEN: &[u8] = include_bytes!("../../../assets/post-examples/kitten.webp");
+        const PUPPY: &[u8] = include_bytes!("../../../assets/post-examples/puppy.webp");
+        let folder = |store: &mut Self, name: &str, parent: Option<&str>| {
+            store
+                .create_folder(name, parent)
+                .map(|folder| folder.id)
+                .ok()
+        };
+        let campaigns = folder(self, "Campaigns", None);
+        let spring = folder(self, "Spring 2026", campaigns.as_deref());
+        let editorial = folder(self, "Editorial", None);
+        let food = folder(self, "Food", editorial.as_deref());
+        let brand = folder(self, "Brand", None);
+        // (name, folder, catalogue ID, photographer, licence, campaign, description, tags,
+        //  photo, outcome, hours ago)
+        type Sample<'a> = (
+            &'a str,
+            &'a Option<String>,
+            &'a str,
+            &'a str,
+            &'a str,
+            &'a str,
+            &'a str,
+            &'a [&'a str],
+            Option<(&'static [u8], (u32, u32))>,
+            Decision,
+            u64,
+        );
+        let samples: [Sample; 10] = [
+            (
+                "Morning at the lake",
+                &spring,
+                "CAM-2026-014",
+                "Mara Lind",
+                "licensed-stock",
+                "Spring launch",
+                "Still lake with a snow-capped peak and pine forest reflected in the water.",
+                &["landscape", "hero"],
+                Some((LAKE, (1000, 667))),
+                Decision::Allowed,
+                50,
+            ),
+            (
+                "First harvest",
+                &food,
+                "ED-0412",
+                "Tomás Berg",
+                "staff",
+                "Grow your own",
+                "Ripening tomatoes on the vine in a raised garden bed.",
+                &["garden", "food"],
+                Some((GARDEN, (1000, 883))),
+                Decision::Allowed,
+                46,
+            ),
+            (
+                "Fresh from the oven",
+                &food,
+                "ED-0413",
+                "Tomás Berg",
+                "staff",
+                "Weekend baking",
+                "Sourdough loaf cooling on a wire rack.",
+                &["bread", "food"],
+                Some((BREAD, (1000, 926))),
+                Decision::Allowed,
+                45,
+            ),
+            (
+                "Shelter kitten",
+                &brand,
+                "BR-0091",
+                "Priya Shah",
+                "cc-by-4.0",
+                "Adoption week",
+                "Grey kitten looking up at the camera.",
+                &["animals"],
+                Some((KITTEN, (1000, 672))),
+                Decision::Allowed,
+                30,
+            ),
+            (
+                "Puppy portrait",
+                &brand,
+                "BR-0092",
+                "Priya Shah",
+                "licensed-stock",
+                "Adoption week",
+                "Puppy resting its head on a blanket.",
+                &["animals"],
+                Some((PUPPY, (1000, 667))),
+                Decision::Limited,
+                29,
+            ),
+            (
+                "Crowd at the finish line",
+                &spring,
+                "CAM-2026-021",
+                "Mara Lind",
+                "staff",
+                "Spring launch",
+                "",
+                &[],
+                None,
+                Decision::Blocked,
+                20,
+            ),
+            (
+                "Swimwear look 4",
+                &spring,
+                "CAM-2026-022",
+                "Jonah Reed",
+                "licensed-stock",
+                "Summer preview",
+                "",
+                &[],
+                None,
+                Decision::AgeRestricted,
+                18,
+            ),
+            (
+                "scan-0042.png",
+                &editorial,
+                "ED-0420",
+                "",
+                "",
+                "",
+                "",
+                &[],
+                None,
+                Decision::Failed,
+                6,
+            ),
+            (
+                "Old storefront",
+                &brand,
+                "BR-0050",
+                "Jonah Reed",
+                "editorial-only",
+                "",
+                "Shopfront before the refit.",
+                &["archive"],
+                None,
+                Decision::Allowed,
+                300,
+            ),
+            (
+                "Night market stall",
+                &editorial,
+                "ED-0431",
+                "Jonah Reed",
+                "licensed-stock",
+                "",
+                "",
+                &[],
+                None,
+                Decision::Purged,
+                2,
+            ),
+        ];
+        let now = now_ms();
+        for (
+            name,
+            folder,
+            catalogue,
+            photographer,
+            licence,
+            campaign,
+            description,
+            tags,
+            photo,
+            outcome,
+            hours,
+        ) in samples
+        {
+            let metadata = [
+                ("photographer", photographer),
+                ("licence", licence),
+                ("campaign", campaign),
+            ]
+            .into_iter()
+            .filter(|(_, value)| !value.is_empty())
+            .map(|(id, value)| MetadataItem::new(id, value))
+            .collect();
+            let (bytes, mime) = match photo {
+                Some((bytes, _)) => (Bytes::from_static(bytes), "image/webp"),
+                None => (Bytes::from_static(b"sample"), "image/png"),
+            };
+            let Ok(asset) = self.upload(NewUpload {
+                name: name.into(),
+                bytes,
+                mime,
+                folder: folder.clone(),
+                external_id: format!("calmlibrary:{catalogue}"),
+                description: Some(description.to_string()).filter(|text| !text.is_empty()),
+                metadata,
+                demo_outcome: outcome,
+            }) else {
+                continue;
+            };
+            let Ok(entry) = self.entry_mut(&asset.id) else {
+                continue;
+            };
+            let at = now.saturating_sub(hours * 3_600_000);
+            entry.asset.created_at = Some(at);
+            entry.asset.tags = Some(tags.iter().map(|tag| tag.to_string()).collect());
+            if photo.is_none() {
+                // A plausible size for the samples that carry no photo bytes.
+                entry.asset.content.size_in_bytes = Some(1_200_000 + hours * 7_300);
+            }
+            if let Some((_, (width, height))) = photo {
+                let mut image = AssetImage::default();
+                image.width = Some(width);
+                image.height = Some(height);
+                entry.asset.content.image = Some(image);
+            }
+            // Settled: back-date the review delay.
+            entry.submitted_at = Instant::now() - DEMO_REVIEW_DELAY;
+        }
+        self.settle();
+        // Back-date the decisions to a few seconds after each upload.
+        for entry in &mut self.assets {
+            if let (Some(created), Some(_)) = (
+                entry.asset.created_at,
+                entry.asset.classification.completed_at,
+            ) {
+                entry.asset.classification.completed_at = Some(created + 4_000);
+                if content_removed(&entry.asset) {
+                    entry.asset.content.updated_at = Some(created + 4_000);
+                }
+            }
+            if entry
+                .file
+                .as_ref()
+                .is_some_and(|(bytes, _)| bytes.as_ref() == b"sample")
+            {
+                entry.file = None;
+            }
+        }
+        if let Some(id) = self
+            .assets
+            .iter()
+            .find(|entry| entry.asset.name.as_deref() == Some("Old storefront"))
+            .map(|entry| entry.asset.id.clone())
+        {
+            let _ = self.delete_content(&id);
         }
     }
 
@@ -309,11 +595,11 @@ impl DemoStore {
             .filter(|asset| folder.is_none_or(|id| asset.folder_id.as_deref() == Some(id)))
             .filter(|asset| status.is_empty() || decision(asset).as_str() == status)
             .collect();
-        matching.sort_by(|a, b| b.id.cmp(&a.id));
-        if let Some(cursor) = cursor {
-            matching.retain(|asset| asset.id.as_str() < cursor);
-        }
-        let start = 0;
+        // Newest first; the cursor is the ID of the previous page's last asset.
+        matching.sort_by(|a, b| b.created_at.cmp(&a.created_at).then(b.id.cmp(&a.id)));
+        let start = cursor
+            .and_then(|cursor| matching.iter().position(|asset| asset.id == cursor))
+            .map_or(0, |index| index + 1);
         let items: Vec<Asset> = matching
             .iter()
             .skip(start)
@@ -406,6 +692,7 @@ impl DemoStore {
                 review.decision = decision;
                 review.note = Some("Simulated portal decision".to_string());
                 review.reviewer_user_id = Some("demo-reviewer".to_string());
+                review.reviewer_name = Some("Demo reviewer".to_string());
                 review.reviewed_at = now_ms();
                 review.applied_to_asset = true;
                 moderation.manual_reviews.push(review);

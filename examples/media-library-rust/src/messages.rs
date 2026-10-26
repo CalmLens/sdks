@@ -76,13 +76,11 @@ impl Notice {
             Notice::FolderRenamed => "Folder renamed.",
             Notice::FolderMoved => "Folder moved.",
             Notice::FolderDeleted => "Folder deleted.",
-            Notice::Uploaded => {
-                "Uploaded privately. A thumbnail appears once the image is allowed."
-            }
+            Notice::Uploaded => "Uploaded privately. The image appears once it has been checked.",
             Notice::DetailsSaved => "Details saved.",
             Notice::AssetMoved => "Asset moved.",
             Notice::FileRemoved => {
-                "File removed. The record, metadata and classification results remain; the CDN no longer serves it."
+                "File removed. The record, its details and moderation report remain."
             }
             Notice::AssetDeleted => "Asset deleted.",
             Notice::ReviewSimulated => {

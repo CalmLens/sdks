@@ -13,6 +13,11 @@ moderation:
   `campaign`, and a catalogue ID. The catalogue ID is stored as the asset's `external_id` with
   the prefix `calmlibrary:` (for example `calmlibrary:CAM-2026-014`). A reused catalogue ID
   shows `asset/duplicate-external-id`.
+- **Status and reasons.** Each image shows its status. An undelivered image shows why: the
+  categories in its moderation report (`classification.moderation.policy.decision.flaggedCategories`),
+  the reviewer and note from its latest applied review (`manualReviews`), or why its file was
+  removed (`content.removalReason`). The details panel also lists its upload, automatic decision
+  and review history.
 - **Details.** Edit an asset's description, tags and metadata with `assets().update`, and move
   it between folders with `assets().move_asset`.
 - **Listing.** Each folder lists 12 images a page with `assets().list`, using `cursor`,
@@ -64,15 +69,20 @@ Open **http://127.0.0.1:6405**. `cargo run -- --demo` also starts the demo, and
 
 Demo mode runs only when you ask for it with `CALMLENS_DEMO=1` or `--demo`, and the page is
 labelled as a demo. The library lives in memory in [src/demo.rs](src/demo.rs) and resets when
-the app restarts. It holds up to 40 assets and 30 folders. Folder rules (empty deletes only, no
+the app restarts. It starts with sample folders (Campaigns / Spring 2026, Editorial / Food and
+Brand) and sample images in every state: allowed and limited photos (the shared example photos in
+`sdks/assets/post-examples`), plus blocked, age-restricted, purged, failed and file-removed records.
+It holds up to 40 assets and 30 folders. Folder rules (empty deletes only, no
 cycles, unique sibling names) and duplicate catalogue IDs return the same error codes as the
 API. Demo mode does not use the SDK's test mock.
 
 Each upload takes the moderation outcome you select: **Allow**, **Limit**, **Age-restrict**, **Block**,
-**Purge** or **Processing error**. Nothing is classified. A demo upload stays in review for two
+**Purge** or **Processing error**. Nothing is classified; the demo report flags a fixed category
+for each restricting outcome (profanity, sexual content, violence or criminal activity) so the
+page can show a reason. A demo upload stays in review for two
 seconds, then takes the selected outcome when the page refreshes; **Purge** also deletes the
 kept file, with removal reason `policy`. Allowed and limited demo images are served from the bytes
-the app kept. An allowed or limited image offers **Simulate a reviewer blocking it**, which applies a synthetic
+the app kept. An allowed or limited image offers **Demo: simulate a reviewer blocking it**, which applies a synthetic
 `asset.blocked` event through the same code as a webhook.
 
 Demo search results are **simulated** and labelled as such: local keyword matching over names,
@@ -161,8 +171,10 @@ assets when the secret is set.
   credentials unless demo mode is requested.
 - [src/messages.rs](src/messages.rs): the fixed notices and error explanations, and error
   logging with request IDs.
-- [src/page.rs](src/page.rs): server-rendered HTML with no JavaScript or external assets. Every
-  dynamic value is escaped.
+- [src/page.rs](src/page.rs): server-rendered HTML with no JavaScript or external assets: a
+  folder tree, a toolbar with search and status filters, the image grid, and a details panel.
+  Upload, new folder, folder settings, edit, move, remove-file and delete open as native HTML
+  popovers (`popovertarget`), so they need no script. Every dynamic value is escaped.
 - [src/tests.rs](src/tests.rs): startup checks, folder operations and error codes, the upload,
   list, search, edit, move and delete requests the SDK sends, delivery only for allowed
   images, file removal, webhook verification, replays and unknown assets, notices and error

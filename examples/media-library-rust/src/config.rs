@@ -69,7 +69,7 @@ pub fn settings_from_env(
             Library::Live(builder.build().map_err(|_| StartupError::InvalidClient)?)
         }
         (None, None) if !demo_requested => return Err(StartupError::MissingCredentials),
-        (None, None) => Library::demo(),
+        (None, None) => Library::demo_with_samples(),
     };
     Ok(Settings {
         library,

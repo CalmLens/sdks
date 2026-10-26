@@ -1408,3 +1408,99 @@ async fn library_load_failure_shows_nothing() {
     assert_eq!(response.status, StatusCode::BAD_GATEWAY);
     assert!(!response.html().contains("/assets/"));
 }
+
+// ------------------------------------------------------------ moderation reasons and samples
+
+#[tokio::test]
+async fn undelivered_images_show_the_flagged_categories_from_the_report() {
+    let mock = MockServerClient::new().unwrap();
+    let app = live(&mock, "");
+    let mut blocked = asset("asset-1", "blocked");
+    blocked["classification"]["moderation"]["policy"] = json!({
+        "score": 0.95,
+        "decision": {"source": "policy", "action": "block", "flaggedCategories": ["violence", "hate"]}
+    });
+    mock.enqueue(
+        200,
+        json!({"folders": [], "ancestors": [], "hasMore": false}),
+    );
+    mock.enqueue(200, json!({"items": [blocked.clone()], "hasMore": false}));
+    mock.enqueue(200, blocked);
+    let page = app.get("/?asset=asset-1").await.html();
+    assert!(page.contains(r#"data-flagged="violence hate""#), "{page}");
+    assert!(!page.contains("/assets/asset-1/thumb"));
+}
+
+#[tokio::test]
+async fn demo_reports_flag_a_category_for_restricted_outcomes() {
+    for (outcome, flagged) in [
+        ("blocked", Some("violence")),
+        ("age-restricted", Some("sexual")),
+        ("allowed", None),
+    ] {
+        let app = demo();
+        let id = app.demo_upload("", outcome, "Ana").await;
+        app.state.library.expire_demo_reviews();
+        let page = app.get(&format!("/?asset={id}")).await.html();
+        match flagged {
+            Some(category) => assert!(
+                page.contains(&format!(r#"data-flagged="{category}""#)),
+                "{outcome}"
+            ),
+            None => assert!(!page.contains("data-flagged"), "{outcome}"),
+        }
+    }
+}
+
+#[tokio::test]
+async fn the_sample_demo_library_holds_images_in_every_state() {
+    let app = app(Library::demo_with_samples(), "");
+    let (folders, assets) = app.state.library.demo_counts();
+    assert!(
+        folders >= 3 && assets >= 8,
+        "{folders} folders, {assets} assets"
+    );
+    for status in [
+        "allowed",
+        "limited",
+        "age-restricted",
+        "blocked",
+        "purged",
+        "failed",
+    ] {
+        let page = app.get(&format!("/?status={status}")).await.html();
+        assert!(
+            page.contains(&format!(r#"data-status="{status}""#)),
+            "no sample is {status}"
+        );
+    }
+    // A sample whose file was removed keeps its record but gets no thumbnail.
+    let removed = app.get("/?status=allowed").await.html();
+    let thumbs = removed.matches("/thumb\"").count();
+    let cards = removed.matches(r#"class="card""#).count();
+    assert!(cards > thumbs, "{cards} cards, {thumbs} thumbnails");
+}
+
+#[tokio::test]
+async fn demo_listing_pages_without_overlap() {
+    let app = demo();
+    let mut uploaded = Vec::new();
+    for _ in 0..(PAGE_SIZE + 1) {
+        uploaded.push(app.demo_upload("", "allowed", "Ana").await);
+    }
+    let first = app.get("/").await.html();
+    let cursor = first
+        .split("cursor=")
+        .nth(1)
+        .and_then(|rest| rest.split(['&', '"']).next())
+        .expect("a next page link")
+        .to_string();
+    let second = app.get(&format!("/?cursor={cursor}")).await.html();
+    let on = |page: &str, id: &str| page.contains(&format!("asset={id}\""));
+    for id in &uploaded {
+        assert!(
+            on(&first, id) != on(&second, id),
+            "{id} must be on exactly one page"
+        );
+    }
+}

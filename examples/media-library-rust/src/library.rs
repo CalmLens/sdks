@@ -61,6 +61,19 @@ impl Library {
         Library::Demo(Arc::default())
     }
 
+    /// The demo library with sample folders and images in every state.
+    pub fn demo_with_samples() -> Self {
+        let store = DemoStore::default();
+        let library = Library::Demo(Arc::new(Mutex::new(store)));
+        if let Library::Demo(store) = &library {
+            store
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .seed_samples();
+        }
+        library
+    }
+
     pub fn is_demo(&self) -> bool {
         matches!(self, Library::Demo(_))
     }
