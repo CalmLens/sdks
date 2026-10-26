@@ -129,7 +129,7 @@ final class Demo
             return $this->placeholder($assetId);
         }
         $this->mock->downloadPermission = false;
-        $response = $this->mock->client()->cdn->serve(['assetIdentifier' => $assetId, 'resource' => $resource === 'preview' ? 'preview' : 'content',
+        $response = $this->mock->client()->cdn->serve(['assetIdentifier' => $assetId, 'resource' => $resource === 'original' ? 'original' : 'rendered',
             'allowAgeRestricted' => ($query['allowAgeRestricted'] ?? null) === 'true']);
         return [$response->getStatusCode(), ['Content-Type' => $response->getHeaderLine('Content-Type'),
             'Cache-Control' => $response->getHeaderLine('Cache-Control') ?: 'no-store'], (string) $response->getBody()];

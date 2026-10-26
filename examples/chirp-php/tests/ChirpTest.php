@@ -250,7 +250,7 @@ final class ChirpTest extends TestCase
         $this->signIn('bob');
         $page = $this->request('GET', '/');
         self::assertSame([$post['id']], self::shown($page));
-        self::assertSame([self::CDN . '/assets/project-1/' . $post['image']['assetId'] . '/content/@chirp-feed'], self::imageSources($page));
+        self::assertSame([self::CDN . '/assets/project-1/' . $post['image']['assetId'] . '/rendered/@chirp-feed'], self::imageSources($page));
     }
 
     public function testAgeRestrictedImageShowsThePlaceholderUntilTheViewerOptsIn(): void
@@ -265,7 +265,7 @@ final class ChirpTest extends TestCase
         self::assertSame(422, $this->request('POST', '/profile/sensitive', ['show' => '1'])->status);
         self::assertSame($placeholder, self::imageSources($this->request('GET', '/')));
         self::assertSame(303, $this->request('POST', '/profile/sensitive', ['show' => '1', 'confirmAdult' => '1'])->status);
-        $url = self::CDN . "/assets/project-1/$assetId/content/@chirp-feed?allowAgeRestricted=true";
+        $url = self::CDN . "/assets/project-1/$assetId/rendered/@chirp-feed?allowAgeRestricted=true";
         self::assertSame([$url], self::imageSources($this->request('GET', '/')));
         self::assertSame(303, $this->request('POST', '/profile/sensitive', ['show' => '0'])->status);
         self::assertSame($placeholder, self::imageSources($this->request('GET', '/')));
@@ -417,8 +417,8 @@ final class ChirpTest extends TestCase
         self::assertSame('age-restricted', $this->onlyPost()['image']['status']);
         $base = 'http://127.0.0.1:6407/demo-cdn/v1/assets/chirp-demo/' . $assetId;
         self::assertSame(["$base/placeholder"], self::imageSources($page));
-        self::assertSame(403, $this->request('GET', "/demo-cdn/v1/assets/chirp-demo/$assetId/content/@chirp-feed")->status);
-        $optedIn = $this->app->handle(new Request('GET', "/demo-cdn/v1/assets/chirp-demo/$assetId/content/@chirp-feed", ['allowAgeRestricted' => 'true']));
+        self::assertSame(403, $this->request('GET', "/demo-cdn/v1/assets/chirp-demo/$assetId/rendered/@chirp-feed")->status);
+        $optedIn = $this->app->handle(new Request('GET', "/demo-cdn/v1/assets/chirp-demo/$assetId/rendered/@chirp-feed", ['allowAgeRestricted' => 'true']));
         self::assertSame([200, 'image/png'], [$optedIn->status, $optedIn->headers['Content-Type']]);
         $placeholder = $this->request('GET', "/demo-cdn/v1/assets/chirp-demo/$assetId/placeholder");
         self::assertSame([200, 'image/png'], [$placeholder->status, $placeholder->headers['Content-Type']]);
