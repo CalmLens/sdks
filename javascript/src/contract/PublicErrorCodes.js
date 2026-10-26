@@ -1,11 +1,11 @@
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Consts.js
+// node_modules/sendable-error/esm/Consts.js
 const SENDABLE_ERROR_INSTANCE_SYMBOL = "__isSendableError";
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Utils.js
+// node_modules/sendable-error/esm/Utils.js
 const isSendableError = (error) => {
 	if (!error || typeof error !== "object") return false;
 	return Boolean(error[SENDABLE_ERROR_INSTANCE_SYMBOL]);
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/ErrorCode.js
+// node_modules/sendable-error/esm/ErrorCode.js
 var ErrorCode = class ErrorCode {
 	properties;
 	static DEFAULT_CODE = new ErrorCode({
@@ -52,7 +52,7 @@ var ErrorCode = class ErrorCode {
 		return this.getId();
 	}
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Logging.js
+// node_modules/sendable-error/esm/Logging.js
 const defaultErrorLogger = (options) => {
 	const { message, error, info } = options;
 	const stackLines = error.stack?.split("\n").slice(1).join("\n");
@@ -69,7 +69,7 @@ let currentLogger = defaultErrorLogger;
 const getErrorLogger = () => {
 	return currentLogger;
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/SendableError.js
+// node_modules/sendable-error/esm/SendableError.js
 const DEFAULT_STATUS = 500;
 function hashString(str) {
 	let h = 2166136261;
