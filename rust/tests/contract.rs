@@ -153,6 +153,102 @@ async fn request_contracts() {
     .await;
 }
 
+/// The JSON paths in `value` holding object key `key` (`by_key`) or the string `key`.
+fn json_paths(value: &Value, key: &str, by_key: bool, path: &str, found: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            for (name, child) in map {
+                let here = format!("{path}.{name}");
+                if by_key && name == key {
+                    found.push(here.clone());
+                }
+                json_paths(child, key, by_key, &here, found);
+            }
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                json_paths(child, key, by_key, &format!("{path}.{index}"), found);
+            }
+        }
+        Value::String(text) if !by_key && text == key => found.push(path.to_owned()),
+        _ => {}
+    }
+}
+
+/// Decodes `response` through the client, as `operation` does, and returns what the typed models
+/// kept untyped (an `extra` field or an `Unknown` enum value), each with where it is in
+/// `response`, sorted. `extra` maps and `Unknown` round-trip, so `compare_typed` cannot see them.
+async fn untyped_in(operation: &str, options: Value, response: &Value) -> Vec<String> {
+    use calmlens::models::strict::{self, Finding};
+    let mock = MockServerClient::new().unwrap();
+    mock.enqueue(200, response.clone());
+    strict::start();
+    let decoded = invoke(&mock, operation, options).await;
+    let findings = strict::finish();
+    decoded.unwrap();
+    let mut untyped: Vec<String> = findings
+        .into_iter()
+        .map(|(model, finding)| {
+            let (what, text, by_key) = match &finding {
+                Finding::Field(key) => ("field", key, true),
+                Finding::Value(value) => ("value", value, false),
+            };
+            let mut paths = Vec::new();
+            json_paths(response, text, by_key, "$", &mut paths);
+            format!("{model}: {what} `{text}` at {}", paths.join(", "))
+        })
+        .collect();
+    untyped.sort();
+    untyped.dedup();
+    untyped
+}
+
+/// Full-model fixtures hold every field and value the API can send, so decoding them must leave
+/// nothing in an `extra` map or an `Unknown` variant.
+#[tokio::test]
+async fn full_model_contracts_are_fully_typed() {
+    let fixtures = fixture("requests");
+    let full = fixtures
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, case)| case["fullModel"] == true)
+        .map(|(i, case)| (format!("{i}: {}", case["operation"]), case));
+    each_case("full models", full, |f| async move {
+        let untyped = untyped_in(
+            f["operation"].as_str().unwrap(),
+            f["options"].clone(),
+            &f["response"],
+        )
+        .await;
+        assert_eq!(untyped, Vec::<String>::new(), "{}", f["operation"]);
+    })
+    .await;
+}
+
+/// The check above sees a field no model types and an enum value no variant covers, with paths.
+#[tokio::test]
+async fn untyped_fields_and_values_are_found() {
+    let fixtures = fixture("requests");
+    let case = fixtures
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["fullModel"] == true && case["operation"] == "assets.retrieve")
+        .unwrap();
+    let mut response = case["response"].clone();
+    response["classification"]["moderation"]["futureField"] = json!(1);
+    response["classification"]["moderation"]["status"] = json!("future-status");
+    assert_eq!(
+        untyped_in("assets.retrieve", case["options"].clone(), &response).await,
+        vec![
+            "AssetModeration: field `futureField` at $.classification.moderation.futureField",
+            "AssetModerationStatus: value `future-status` at $.classification.moderation.status",
+        ]
+    );
+}
+
 /// Queued responses still pass through the real client, so every request contract holds against the mock.
 #[tokio::test]
 async fn request_contracts_through_the_mock() {

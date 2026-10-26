@@ -224,6 +224,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -375,6 +376,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -522,6 +524,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -674,6 +677,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -825,6 +829,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -972,6 +977,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -1124,6 +1130,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -1275,6 +1282,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -1422,6 +1430,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -1574,6 +1583,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -1725,6 +1735,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -1872,6 +1883,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -2024,6 +2036,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -2175,6 +2188,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -2322,6 +2336,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -2474,6 +2489,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -2625,6 +2641,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -2772,6 +2789,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -2924,6 +2942,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -3075,6 +3094,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -3222,6 +3242,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -3374,6 +3395,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -3525,6 +3547,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -3672,6 +3695,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-explicit-language": "sexual-explicit-language";
               "sexual-fictional": "sexual-fictional";
               "sexual-historical": "sexual-historical";
+              "sexual-minors": "sexual-minors";
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
@@ -3841,6 +3865,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -3992,6 +4017,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -4139,6 +4165,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -4291,6 +4318,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -4442,6 +4470,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -4589,6 +4618,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -4741,6 +4771,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -4892,6 +4923,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -5039,6 +5071,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -5191,6 +5224,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -5342,6 +5376,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -5489,6 +5524,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -5641,6 +5677,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -5792,6 +5829,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -5939,6 +5977,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -6091,6 +6130,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -6242,6 +6282,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -6389,6 +6430,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -6541,6 +6583,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -6692,6 +6735,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -6839,6 +6883,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -6991,6 +7036,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -7142,6 +7188,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -7289,6 +7336,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -7481,6 +7529,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -7596,6 +7645,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -7720,6 +7770,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";
@@ -7835,6 +7886,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-explicit-language": "sexual-explicit-language";
                   "sexual-fictional": "sexual-fictional";
                   "sexual-historical": "sexual-historical";
+                  "sexual-minors": "sexual-minors";
                   "sexual-non-consensual": "sexual-non-consensual";
                   "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                   "sexual-nudity": "sexual-nudity";

@@ -173,6 +173,10 @@ type AssetReview struct {
 	Decision       string  `json:"decision"`
 	Note           *string `json:"note"`
 	ReviewerUserID *string `json:"reviewerUserId"`
+	// ReviewerName is the reviewer's display name, when known.
+	ReviewerName *string `json:"reviewerName,omitempty"`
+	// ReviewerEmail is the reviewer's email address, when known.
+	ReviewerEmail  *string `json:"reviewerEmail,omitempty"`
 	ReviewedAt     int64   `json:"reviewedAt"`
 	AppliedToAsset bool    `json:"appliedToAsset"`
 }
@@ -317,6 +321,9 @@ type ProcessingFeatures struct {
 	PersonDetection *PersonDetectionFeatureOptions `json:"personDetection,omitempty"`
 	// FaceDetection (beta) locates faces; results are in Report.Features.
 	FaceDetection *FaceDetectionFeatureOptions `json:"faceDetection,omitempty"`
+	// LinkDetection finds QR codes and web links in images (free); results are in
+	// AssetClassification.LinkDetection. With OCR on, links in the extracted text are listed too.
+	LinkDetection *LinkDetectionFeatureOptions `json:"linkDetection,omitempty"`
 }
 
 // OCRFeatureOptions configures OCR.
@@ -326,6 +333,11 @@ type OCRFeatureOptions struct {
 
 // PersonDetectionFeatureOptions configures person detection (beta).
 type PersonDetectionFeatureOptions struct {
+	Enabled bool `json:"enabled"`
+}
+
+// LinkDetectionFeatureOptions configures link detection.
+type LinkDetectionFeatureOptions struct {
 	Enabled bool `json:"enabled"`
 }
 

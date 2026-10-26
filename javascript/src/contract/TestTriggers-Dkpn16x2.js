@@ -8210,14 +8210,14 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "sexual",
 		kind: "harm",
 		displayName: "Nudity",
-		description: "Explicitly exposed intimate sexual anatomy, including partially exposed breasts, genitals or buttocks and a pubic area or pubic hair exposed by clothing pulled down or open.",
-		exclusions: "Swimwear, revealing clothing and diagrams without exposed sexual anatomy. Actual exposed sexual anatomy in a clinical or medical diagram still qualifies; educational framing is separate."
+		description: "Explicitly exposed intimate sexual anatomy, including partially exposed breasts, genitals or buttocks and a pubic area or pubic hair exposed by clothing pulled down or open. Drawn, animated and generated characters count, including creature or anthropomorphic characters drawn with genitals or other sexual anatomy.",
+		exclusions: "Swimwear, revealing clothing and diagrams without exposed sexual anatomy; ordinary animals and cartoon characters without drawn sexual anatomy. Actual exposed sexual anatomy in a clinical or medical diagram still qualifies; educational framing is separate."
 	},
 	"sexual-activity": {
 		category: "sexual",
 		kind: "harm",
 		displayName: "Sexual activity",
-		description: "A depicted or described sexual act, including sexual assault.",
+		description: "A depicted or described sexual act, including sexual assault. Solo acts count: masturbation, touching or stimulating one's own genitals, and using a sex toy. So do explicitly sexual fetish acts and sexual acts by drawn, animated, generated, creature or anthropomorphic characters.",
 		exclusions: "Ordinary affection, non-sexual touching and general sexual-health education alone."
 	},
 	"sexual-explicit-language": {
@@ -8233,6 +8233,14 @@ const MODERATION_QUALIFIER_INFO = {
 		displayName: "Non-consensual sexual content",
 		description: "Sexual content depicting or describing non-consensual sexual activity, such as sexual assault, rape or coerced sex presented as sexual or erotic material, including fiction, animation and generated images; or intimate images of a person shared, or threatened to be shared, without their consent.",
 		exclusions: "Factual reports, survivor accounts, support, prevention or non-graphic discussion of sexual assault that do not present it as sexual material; consensual sexual activity."
+	},
+	"sexual-minors": {
+		category: "sexual",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Sexualised minors",
+		description: "Sexual content involving a child or a character presented as a child: nudity, a sexual act, or sexualised posing or focus on the body of someone who clearly appears to be under 18 from childlike body proportions, a stated or obvious age, or a childlike framing such as a school-age character in explicit content. Drawings, animation and generated images count.",
+		exclusions: "Adults, including youthful-looking adults and drawn characters with adult bodies and no childlike framing; school uniforms or costumes on clearly adult people; non-sexual images or mentions of children; factual reports, prevention or support about child sexual abuse that present no sexual material. Do not infer a child from a youthful face, small stature or art style alone."
 	},
 	"sexual-solicitation": {
 		category: "sexual",
@@ -8253,7 +8261,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Revealing clothing",
 		description: "People shown in swimwear, underwear or lingerie-style clothing, or other clothing that exposes much of the body, with no exposed sexual anatomy, sexual act or explicit erotic display. Fitness clothing counts only when it exposes much of the body.",
-		exclusions: "Exposed sexual anatomy, including a pubic area, buttocks or genitals exposed by clothing pulled down, open or pushed aside, which is nudity; a sexual act or an explicit erotic display; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.",
+		exclusions: "Exposed sexual anatomy, including a pubic area, buttocks or genitals exposed by clothing pulled down, open or pushed aside, which is nudity; a sexual act or an explicit erotic display; sexual solicitation or adult content promotion, such as an adult cam or paid adult-creator page; ordinary clothing, sportswear and team kits that cover the torso and thighs; costumes or uniforms that are not revealing.",
 		inputs: ["image"]
 	},
 	"sexual-suggestive": {

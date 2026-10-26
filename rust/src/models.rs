@@ -41,6 +41,66 @@ impl<T> From<T> for Patch<T> {
     }
 }
 
+/// Reads a model's `extra` map: the fields `T` does not type.
+#[cfg_attr(
+    not(feature = "strict-contract"),
+    allow(clippy::extra_unused_type_parameters)
+)]
+fn extra_fields<'de, T, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<HashMap<String, Value>, D::Error> {
+    let extra = HashMap::<String, Value>::deserialize(deserializer)?;
+    #[cfg(feature = "strict-contract")]
+    for key in extra.keys() {
+        let name = std::any::type_name::<T>()
+            .rsplit("::")
+            .next()
+            .unwrap_or_default();
+        strict::record(name, strict::Finding::Field(key.clone()));
+    }
+    Ok(extra)
+}
+
+/// Contract-test support, not part of the public API: records what decoding kept untyped, an
+/// `extra` field or an `Unknown` enum value, so a fixture of a full model can check that every
+/// field and value it holds has a typed home.
+#[cfg(feature = "strict-contract")]
+#[doc(hidden)]
+pub mod strict {
+    use std::cell::RefCell;
+
+    /// What a model kept untyped.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum Finding {
+        /// A wire field the model has no field for, kept in its `extra` map.
+        Field(String),
+        /// A wire value the enum has no variant for, kept as `Unknown`.
+        Value(String),
+    }
+
+    thread_local! {
+        static FINDINGS: RefCell<Option<Vec<(&'static str, Finding)>>> = const { RefCell::new(None) };
+    }
+
+    /// Starts recording on this thread, discarding anything recorded before.
+    pub fn start() {
+        FINDINGS.with(|findings| *findings.borrow_mut() = Some(Vec::new()));
+    }
+
+    /// Stops recording and returns each type with what it kept untyped since [`start`].
+    pub fn finish() -> Vec<(&'static str, Finding)> {
+        FINDINGS.with(|findings| findings.borrow_mut().take().unwrap_or_default())
+    }
+
+    pub(crate) fn record(model: &'static str, finding: Finding) {
+        FINDINGS.with(|findings| {
+            if let Some(findings) = findings.borrow_mut().as_mut() {
+                findings.push((model, finding));
+            }
+        });
+    }
+}
+
 macro_rules! string_enum {
     ($(#[$meta:meta])* $name:ident { $( $(#[$vmeta:meta])* $variant:ident = $value:literal ),* $(,)? }) => {
         $(#[$meta])*
@@ -96,7 +156,12 @@ macro_rules! string_enum {
         }
         impl<'de> Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                Ok(Self::from(String::deserialize(deserializer)?.as_str()))
+                let value = Self::from(String::deserialize(deserializer)?.as_str());
+                #[cfg(feature = "strict-contract")]
+                if let Self::Unknown(unknown) = &value {
+                    strict::record(stringify!($name), strict::Finding::Value(unknown.clone()));
+                }
+                Ok(value)
             }
         }
     };
@@ -497,7 +562,7 @@ pub struct FlaggedContentPolicy {
     /// The action.
     pub action: FlaggedContentAction,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<FlaggedContentPolicy, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl FlaggedContentPolicy {
@@ -524,7 +589,7 @@ pub struct ProcessingOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub features: Option<ProcessingFeatures>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<ProcessingOptions, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -554,7 +619,7 @@ pub struct ProcessingFeatures {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_generated_detection: Option<FeatureOptions>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<ProcessingFeatures, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -565,7 +630,7 @@ pub struct FeatureOptions {
     /// Whether to run the feature.
     pub enabled: bool,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<FeatureOptions, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl FeatureOptions {
@@ -588,7 +653,7 @@ pub struct FaceDetectionOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub age_estimation: Option<bool>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<FaceDetectionOptions, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl FaceDetectionOptions {
@@ -1110,7 +1175,7 @@ pub struct BatchAssetsResponse {
     /// Always `true`: the operation is queued.
     pub queued: bool,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<BatchAssetsResponse, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1331,7 +1396,7 @@ pub struct Asset {
     #[serde(default)]
     pub content: AssetContent,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<Asset, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl Asset {
@@ -1382,7 +1447,7 @@ pub struct AssetUpload {
     #[serde(default)]
     pub parts_received: Option<u32>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetUpload, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1422,7 +1487,7 @@ pub struct AssetClassification {
     #[serde(default)]
     pub labels: Option<Vec<ClassificationLabel>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetClassification, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1439,6 +1504,12 @@ pub struct AssetReview {
     pub note: Option<String>,
     /// The reviewing user, or none for an API key.
     pub reviewer_user_id: Option<String>,
+    /// The reviewing user's name, when known.
+    #[serde(default)]
+    pub reviewer_name: Option<String>,
+    /// The reviewing user's email address, when known.
+    #[serde(default)]
+    pub reviewer_email: Option<String>,
     /// Review time in milliseconds since the Unix epoch.
     pub reviewed_at: u64,
     /// Whether this review changed the asset's moderation status.
@@ -1473,7 +1544,7 @@ pub struct AssetModeration {
     #[serde(default)]
     pub hash_matches: Option<Vec<HashMatch>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetModeration, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1513,7 +1584,7 @@ pub struct AssetContent {
     #[serde(default)]
     pub extracted_text: Option<ExtractedText>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetContent, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1658,7 +1729,7 @@ pub struct CategoryResult {
     #[serde(default)]
     pub policy_conditions: Option<HashMap<String, PolicyConditionResult>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<CategoryResult, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1699,7 +1770,7 @@ pub struct QualifierResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<NotEvaluatedReason>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<QualifierResult, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1745,7 +1816,10 @@ pub struct ProcessingFeatureResults {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub face_detection: Option<FaceDetectionResult>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<ProcessingFeatureResults, _>"
+    )]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1768,7 +1842,7 @@ pub struct PersonDetectionResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub people: Option<Vec<DetectedPerson>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<PersonDetectionResult, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1791,7 +1865,7 @@ pub struct FaceDetectionResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub faces: Option<Vec<DetectedFace>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<FaceDetectionResult, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1817,7 +1891,7 @@ pub struct LinkDetectionResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub links: Option<Vec<DetectedLink>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<LinkDetectionResult, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1833,7 +1907,7 @@ pub struct DetectedQrCode {
     #[serde(default, rename = "box")]
     pub bounding_box: BoundingBox,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<DetectedQrCode, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1859,7 +1933,7 @@ pub struct DetectedLink {
     #[serde(default)]
     pub source: LinkSource,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<DetectedLink, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1909,7 +1983,10 @@ pub struct AiGeneratedDetectionResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signals: Option<Vec<AiGeneratedSignal>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<AiGeneratedDetectionResult, _>"
+    )]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1925,7 +2002,7 @@ pub struct AiGeneratedSignal {
     #[serde(default)]
     pub value: String,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AiGeneratedSignal, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1941,7 +2018,7 @@ pub struct TextRegion {
     #[serde(default)]
     pub personal_information: bool,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<TextRegion, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1966,7 +2043,7 @@ pub struct HashMatch {
     #[serde(default)]
     pub action: HashListAction,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<HashMatch, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1982,7 +2059,7 @@ pub struct DetectedPerson {
     #[serde(default)]
     pub confidence: f64,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<DetectedPerson, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2001,7 +2078,7 @@ pub struct DetectedFace {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub age_range: Option<AgeRange>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<DetectedFace, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2024,7 +2101,7 @@ pub struct BoundingBox {
     #[serde(default)]
     pub height: f64,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<BoundingBox, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2040,7 +2117,7 @@ pub struct AgeRange {
     #[serde(default)]
     pub high: u32,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AgeRange, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2065,7 +2142,7 @@ pub struct ClassificationLabel {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub knowledge_base_id: Option<String>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<ClassificationLabel, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2090,7 +2167,10 @@ pub struct MediaClassificationReport {
     #[serde(default)]
     pub segments: Vec<MediaClassificationSegment>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<MediaClassificationReport, _>"
+    )]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2112,7 +2192,10 @@ pub struct MediaClassificationSegment {
     #[serde(default)]
     pub categories: HashMap<ClassificationCategory, CategoryResult>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<MediaClassificationSegment, _>"
+    )]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2137,7 +2220,7 @@ pub struct AssetPage {
     #[serde(default)]
     pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl AssetPage {
@@ -2174,7 +2257,7 @@ pub struct Folder {
     #[serde(default)]
     pub updated_at: Option<u64>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<Folder, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl Folder {
@@ -2201,7 +2284,7 @@ pub struct EventFact {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<EventFact, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2253,7 +2336,7 @@ pub struct Event {
     #[serde(default)]
     pub read_at: Option<u64>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<Event, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl Event {
@@ -2447,7 +2530,7 @@ pub struct EventsPage {
     #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<EventsPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl EventsPage {
@@ -2503,7 +2586,7 @@ pub struct Lens {
     #[serde(default)]
     pub transforms: Option<Vec<Transform>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<Lens, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2518,7 +2601,7 @@ pub struct SignedUrl {
     #[serde(default)]
     pub expires_at: Option<u64>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<SignedUrl, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2549,7 +2632,7 @@ pub struct AssetImage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub perceptual_hash_quality: Option<i64>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetImage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2574,7 +2657,7 @@ pub struct Checksums {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha512: Option<String>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<Checksums, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2593,7 +2676,7 @@ pub struct SafetyHold {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disposed_at: Option<u64>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<SafetyHold, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2612,7 +2695,7 @@ pub struct ExtractedText {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<ExtractedText, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2679,6 +2762,11 @@ impl<'de> Deserialize<'de> for Transform {
                 return Ok(Self::image(options));
             }
         }
+        #[cfg(feature = "strict-contract")]
+        strict::record(
+            "Transform",
+            strict::Finding::Value(repr.transform_type.clone()),
+        );
         Ok(Self::Unknown {
             transform_type: repr.transform_type,
             options: repr.options,
@@ -3217,7 +3305,7 @@ pub struct ImageTransformOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trim: Option<Trim>,
     /// Options this SDK version does not know, as received in a lens.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<ImageTransformOptions, _>")]
     pub extra: HashMap<String, Value>,
 }
 // </generated: image-transform-options>
@@ -3327,7 +3415,7 @@ pub struct AssetSearchMatch {
     #[serde(default)]
     pub matched_fields: Vec<SearchMatchField>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetSearchMatch, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -3346,7 +3434,7 @@ pub struct AssetSearchResponse {
     #[serde(default)]
     pub semantic_status: SemanticStatus,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetSearchResponse, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -3434,7 +3522,7 @@ pub struct HashList {
     #[serde(default)]
     pub updated_at: Option<u64>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<HashList, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl HashList {
@@ -3481,7 +3569,7 @@ pub struct HashListEntry {
     #[serde(default)]
     pub created_at: u64,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<HashListEntry, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -3494,7 +3582,7 @@ pub struct HashListList {
     #[serde(default)]
     pub items: Vec<HashList>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<HashListList, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -3519,7 +3607,7 @@ pub struct HashListEntryPage {
     #[serde(default)]
     pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten)]
+    #[serde(flatten, deserialize_with = "extra_fields::<HashListEntryPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 

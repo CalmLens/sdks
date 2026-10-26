@@ -33,6 +33,7 @@ ModerationQualifier = Union[Literal[
     "sexual-activity",
     "sexual-explicit-language",
     "sexual-non-consensual",
+    "sexual-minors",
     "sexual-solicitation",
     "sexual-adult-promotion",
     "sexual-revealing-clothing",

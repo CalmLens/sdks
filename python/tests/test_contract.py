@@ -17,6 +17,7 @@ import json
 import re
 import typing
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
@@ -223,6 +224,108 @@ class RequestTests(unittest.TestCase):
                 with self.assertRaises(CalmLensAPIError) as raised:
                     _invoke(_client(transport), fixture["operation"], fixture["args"])
                 self.assertEqual(_error_fields(raised.exception), fixture["expected"])
+
+
+# ---- requests.json against the declared types ---------------------------------------------------
+
+def _type_name(hint: Any) -> str:
+    return getattr(hint, "__name__", None) or repr(hint)
+
+
+def _type_errors(value: Any, hint: Any, path: str, complete: bool = True) -> list[str]:
+    """Where ``value`` (decoded JSON) breaks the declared type ``hint``: keys a ``TypedDict`` does
+    not declare, missing required keys (when ``complete``), wrong scalar types, list items and
+    mapping keys and values, literals outside the declared set and values matching no union member.
+    Open enums are declared as ``Union[Literal[...], str]``, so any string matches them through the
+    ``str`` member."""
+    origin, args = typing.get_origin(hint), typing.get_args(hint)
+    if hint is Any:
+        return []
+    if hint is None or hint is type(None):
+        return [] if value is None else [f"{path}: {value!r} is not None"]
+    if origin is typing.Union or (origin is not None and origin.__name__ == "UnionType"):
+        failures = [_type_errors(value, member, path, complete) for member in args]
+        if any(not errors for errors in failures):
+            return []
+        # Report the non-None member that came closest, so an undeclared key deep inside shows its
+        # path rather than "is not None".
+        return min((errors for member, errors in zip(args, failures) if member is not type(None)), key=len)
+    if origin is typing.Literal:
+        return [] if any(value == arg and type(value) is type(arg) for arg in args) else [
+            f"{path}: {value!r} is not one of {list(args)}"]
+    if typing.is_typeddict(hint):
+        if not isinstance(value, dict):
+            return [f"{path}: {value!r} is not an object ({_type_name(hint)})"]
+        fields = typing.get_type_hints(hint)
+        errors = [f"{path}.{key}: not declared on {_type_name(hint)}" for key in value if key not in fields]
+        errors += [f"{path}.{key}: required by {_type_name(hint)} but missing"
+                   for key in sorted(hint.__required_keys__) if complete and key not in value]
+        for key, item in value.items():
+            if key in fields:
+                errors += _type_errors(item, fields[key], f"{path}.{key}", complete)
+        return errors
+    if origin in (list, typing.List):
+        if not isinstance(value, list):
+            return [f"{path}: {value!r} is not a list"]
+        return [error for index, item in enumerate(value) for error in _type_errors(item, args[0], f"{path}[{index}]", complete)]
+    if origin in (dict, typing.Dict) or origin is Mapping:
+        if not isinstance(value, dict):
+            return [f"{path}: {value!r} is not an object"]
+        return [error for key, item in value.items()
+                for error in _type_errors(key, args[0], f"{path} key {key!r}", complete)
+                + _type_errors(item, args[1], f"{path}.{key}", complete)]
+    if hint is bool:
+        return [] if isinstance(value, bool) else [f"{path}: {value!r} is not a bool"]
+    if hint is int:
+        return [] if isinstance(value, int) and not isinstance(value, bool) else [f"{path}: {value!r} is not an int"]
+    if hint is float:
+        # PEP 484's numeric tower: an int is acceptable where a float is declared.
+        return [] if isinstance(value, (int, float)) and not isinstance(value, bool) else [
+            f"{path}: {value!r} is not a number"]
+    if hint is str:
+        return [] if isinstance(value, str) else [f"{path}: {value!r} is not a str"]
+    raise AssertionError(f"{path}: the type checker can't check {hint!r}")
+
+
+def _declared(operation: str) -> tuple[Any, Any]:
+    """The Python method behind a fixture operation (as ``_invoke`` resolves it): its options type
+    and its return type."""
+    method = _resolve_name(_client(), _ITERATORS.get(operation) or _snake(operation))
+    assert method is not None, f"no Python method for {operation}"
+    hints = typing.get_type_hints(method, vars(client_module))
+    first = next(iter(inspect.signature(method).parameters))
+    options = [member for member in typing.get_args(hints[first]) if member is not type(None)]
+    return options[0], hints["return"]
+
+
+class TypeContractTests(unittest.TestCase):
+    """The request fixtures, including the full models the generator fills from the API's schemas,
+    match the TypedDicts the client methods declare: every field the API sends is declared, every
+    required field is present and every value has its declared type."""
+
+    def test_responses_match_the_declared_return_types(self) -> None:
+        """Every response holds only declared fields of the declared types; the generator's
+        full-model cases (``fullModel``) must also hold every required field."""
+        for index, fixture in enumerate(_fixture("requests.json"), 1):
+            operation = fixture["operation"]
+            with self.subTest(f"{index}: {operation}"):
+                _, returns = _declared(operation)
+                if returns is type(None):
+                    continue
+                response = fixture["response"]
+                if operation == "ensureLenses":
+                    response = response["lenses"]
+                self.assertEqual(_type_errors(response, returns, "response",
+                                              complete=fixture.get("fullModel") is True), [])
+
+    def test_options_match_the_declared_option_types(self) -> None:
+        for index, fixture in enumerate(_fixture("requests.json"), 1):
+            operation = fixture["operation"]
+            with self.subTest(f"{index}: {operation}"):
+                options_type, _ = _declared(operation)
+                options = {key: _content(value) if key in ("content", "part") else value
+                           for key, value in (fixture["options"] or {}).items() if key != "idempotencyKey"}
+                self.assertEqual(_type_errors(options, options_type, "options"), [])
 
 
 class TransformTests(unittest.TestCase):

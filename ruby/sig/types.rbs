@@ -55,7 +55,8 @@ module CalmLens
   type processing_features_input = {
     ?ocr: { enabled: bool }?,
     ?person_detection: { enabled: bool }?,
-    ?face_detection: { enabled: bool, ?age_estimation: bool }?
+    ?face_detection: { enabled: bool, ?age_estimation: bool }?,
+    ?link_detection: { enabled: bool }?
   }
   type processing_options_input = {
     ?keep_content_after_processing: bool?,
@@ -66,7 +67,9 @@ module CalmLens
   type processing_features = {
     ?"ocr" => { "enabled" => bool }?,
     ?"personDetection" => { "enabled" => bool }?,
-    ?"faceDetection" => { "enabled" => bool, ?"ageEstimation" => bool }?
+    ?"faceDetection" => { "enabled" => bool, ?"ageEstimation" => bool }?,
+    ?"linkDetection" => { "enabled" => bool }?,
+    ?"aiGeneratedDetection" => { "enabled" => bool }?
   }
   # The processing options an asset was uploaded with.
   type processing_options = {
@@ -88,7 +91,9 @@ module CalmLens
     "height" => Integer?,
     "thumbhash" => String?,
     "averageColor" => String?,
-    "perceptualHash" => String?
+    "perceptualHash" => String?,
+    # How much detail `perceptualHash` captured, from 0 to 100; hashes below 50 match unrelated pictures.
+    "perceptualHashQuality" => Integer?
   }
   type safety_hold = { "placedAt" => Integer, "reason" => "suspected-illegal-content", ?"disposedAt" => Integer? }
   # `type: "string"` carries the text in `content`; `type: "document"` stores it under `id`.
@@ -102,6 +107,10 @@ module CalmLens
     "moderation" => asset_moderation,
     ?"personDetection" => person_detection_result,
     ?"faceDetection" => face_detection_result,
+    ?"linkDetection" => link_detection_result,
+    ?"aiGeneratedDetection" => ai_generated_detection_result,
+    # Where OCR found text, and personal information within it; redaction transforms blur these regions.
+    ?"textRegions" => Array[text_region],
     ?"labels" => Array[classification_label]?
   }
   type asset_review = {
@@ -120,7 +129,9 @@ module CalmLens
     ?"categories" => classification_categories,
     ?"score" => number,
     ?"timeline" => media_report,
-    ?"policy" => report_policy
+    ?"policy" => report_policy,
+    # Hash list entries the image matched, blocking matches first; absent when nothing matched.
+    ?"hashMatches" => Array[hash_match]
   }
   # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
   type asset_content = {
@@ -239,11 +250,35 @@ module CalmLens
     ?"faces" => Array[detected_face],
     ?"reason" => not_evaluated_reason
   }
+  type detected_qr_code = { "value" => String, "box" => bounding_box }
+  # A web link found in a QR code or in the text OCR extracted.
+  type detected_link = { "url" => String, "source" => "qr-code" | "text" }
+  # `status: "evaluated"` carries `qrCodes` and `links`; `"not-evaluated"` carries `reason`.
+  type link_detection_result = {
+    "status" => "evaluated" | "not-evaluated",
+    "stage" => processing_feature_stage,
+    ?"qrCodes" => Array[detected_qr_code],
+    ?"links" => Array[detected_link],
+    ?"reason" => not_evaluated_reason
+  }
+  type provenance_signal = { "kind" => "c2pa" | "iptc-digital-source-type" | "generator-metadata", "value" => String }
+  # `status: "evaluated"` carries `provenance` and `signals`; `"not-evaluated"` carries `reason`.
+  type ai_generated_detection_result = {
+    "status" => "evaluated" | "not-evaluated",
+    "stage" => processing_feature_stage,
+    ?"provenance" => "ai-generated" | "ai-edited" | "unknown",
+    ?"signals" => Array[provenance_signal],
+    ?"reason" => not_evaluated_reason
+  }
+  # Where OCR found text in an image, and whether it is personal information.
+  type text_region = { "box" => bounding_box, "personalInformation" => bool }
   # Results of the features requested in `processingOptions.features`. OCR stores extracted text on the image
   # asset instead of a result here.
   type processing_feature_results = {
     ?"personDetection" => person_detection_result,
-    ?"faceDetection" => face_detection_result
+    ?"faceDetection" => face_detection_result,
+    ?"linkDetection" => link_detection_result,
+    ?"aiGeneratedDetection" => ai_generated_detection_result
   }
 
   # How strongly each assessed category meets the policy and what the policy does with it.
@@ -458,6 +493,16 @@ module CalmLens
     ?"updatedAt" => Integer
   }
 
+  # A hash list entry an image matched. `distance` is the number of differing bits (0 is the same
+  # picture); `action` is `block` when the match was close enough for a block list to block.
+  type hash_match = {
+    "source" => "hash-list",
+    "listId" => String,
+    "entryId" => String,
+    "distance" => Integer,
+    "action" => hash_list_action
+  }
+
   type hash_list_entry = {
     "id" => String,
     "projectId" => String,
@@ -484,7 +529,7 @@ module CalmLens
   # deliveries and the public events feed leave out facts that hold personal or account data.
   type event_type = "asset.uploaded" | "asset.classified" | "asset.allowed" | "asset.limited" |
                     "asset.age-restricted" | "asset.blocked" | "asset.purged" | "asset.failed" | "asset.deleted" | "asset.content-removed" | "asset.retried" |
-                    "asset.review-requested" | "usage.limit-reached" | "usage.spend-limit-reached" |
+                    "asset.review-requested" | "asset.hash-matched" | "usage.limit-reached" | "usage.spend-limit-reached" |
                     "upload-preset.daily-limit-reached" | "project.member-joined" | "project.member-removed" |
                     "project.member-role-changed" | "project.invitation-sent" | "api-key.created" |
                     "api-key.revoked" | "connector.failing" | "appeal.submitted" | "appeal.resolved"

@@ -60,6 +60,8 @@ string_enum! {
         SexualExplicitLanguage = "sexual-explicit-language",
         /// Sexual: Non-consensual sexual content.
         SexualNonConsensual = "sexual-non-consensual",
+        /// Sexual: Sexualised minors.
+        SexualMinors = "sexual-minors",
         /// Sexual: Sexual solicitation.
         SexualSolicitation = "sexual-solicitation",
         /// Sexual: Adult content promotion.

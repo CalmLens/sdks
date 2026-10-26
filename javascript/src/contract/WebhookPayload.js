@@ -1,4 +1,4 @@
-import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BGyACVB1.js";
+import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-Dkpn16x2.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-I9R-uNBH.js";
@@ -212,7 +212,7 @@ const ASSET_REVIEW_SCHEMA = zod.object({
 	reviewerUserId: zod.string().nullable(),
 	reviewerName: zod.string().nullish(),
 	reviewerEmail: zod.string().nullish(),
-	reviewedAt: zod.number(),
+	reviewedAt: zod.number().int(),
 	appliedToAsset: zod.boolean()
 });
 /**
@@ -244,9 +244,9 @@ const ASSET_TYPE_SCHEMA = zod.enum([
 const ASSET_VISIBILITY_SCHEMA = zod.enum(["public", "private"]);
 const ASSET_SAFETY_HOLD_REASON_SCHEMA = zod.enum(["suspected-illegal-content"]);
 const ASSET_SAFETY_HOLD_SCHEMA = zod.object({
-	placedAt: zod.number().describe("When the hold was placed, in milliseconds since the Unix epoch"),
+	placedAt: zod.number().int().describe("When the hold was placed, in milliseconds since the Unix epoch"),
 	reason: ASSET_SAFETY_HOLD_REASON_SCHEMA.describe("Why the asset is held"),
-	disposedAt: zod.number().nullish().describe("When the held content was disposed of, in milliseconds since the Unix epoch")
+	disposedAt: zod.number().int().nullish().describe("When the held content was disposed of, in milliseconds since the Unix epoch")
 });
 const SMALL_PLAINTEXT_DOCUMENT_MAX_BYTES = 16384;
 const EXTRACTED_TEXT_SCHEMA = zod.discriminatedUnion("type", [zod.object({
@@ -322,7 +322,7 @@ const EXTERNAL_URL_SCHEMA = zod.string().url().refine((url) => /^https?:\/\//i.t
 const STORED_ASSET_SCHEMA = zod.object({
 	id: primaryUuidField().describe("Unique asset ID"),
 	projectId: uuidField().describe("ID of the project that owns the asset"),
-	sizeInBytes: zod.number().nullish().describe("Size of the uploaded content in bytes"),
+	sizeInBytes: zod.number().int().nullish().describe("Size of the uploaded content in bytes"),
 	userId: saneStringField().nullish().describe("ID of the user whose account created the asset"),
 	parentId: uuidField().nullish().describe("ID of the parent asset for child assets CalmLens extracts during processing, such as images in a document. `null` for uploaded assets."),
 	folderId: uuidField().nullish().meta(metaStore([docPropertyInfo({ description: "Folder containing the asset" })])),
@@ -367,7 +367,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
 	reviewRevision: zod.number().int().default(0).meta(metaStore([backfill({ value: 0 })])),
-	completedAt: zod.number().nullish(),
+	completedAt: zod.number().int().nullish(),
 	contentStatus: ASSET_CONTENT_STATUS_SCHEMA,
 	contentRemovalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullish(),
 	contentUpdatedAt: zod.number().nullish(),
@@ -384,7 +384,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	description: "An asset as stored",
 	namedType: "StoredAsset"
 })]));
-const epoch = (description) => zod.number().nullable().describe(`${description}, in milliseconds since the Unix epoch`);
+const epoch = (description) => zod.number().int().nullable().describe(`${description}, in milliseconds since the Unix epoch`);
 const ASSET_UPLOAD_STATUS_SCHEMA = zod.enum(["uploading", "completed"]);
 const ASSET_UPLOAD_SCHEMA = zod.object({
 	status: ASSET_UPLOAD_STATUS_SCHEMA,
@@ -429,7 +429,7 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullable().describe("Internal delivery restriction for suspected illegal content. Held content cannot be viewed, changed, or deleted through normal asset operations."),
 	format: zod.string().nullable().describe("MIME type of the content"),
 	extension: zod.string().nullable().describe("File extension of the content"),
-	sizeInBytes: zod.number().nullable().describe("Size of the uploaded content in bytes"),
+	sizeInBytes: zod.number().int().nullable().describe("Size of the uploaded content in bytes"),
 	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the uploaded content"),
 	image: ASSET_IMAGE_SCHEMA.nullable().describe("The picture CalmLens serves at the rendered resource: the original image for image assets, or a generated image for documents and websites. It remains after the content is removed, so check `status` before loading it; `null` when the asset has no image."),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document")
@@ -1392,7 +1392,7 @@ const EVENT_FIELDS = {
 	notify: zod.boolean().nullish().describe("Whether the event triggers in-app notifications"),
 	createdAt: createdAtField().describe("When the event was created, in milliseconds since the Unix epoch"),
 	updatedAt: updatedAtField().describe("When the event was last updated, in milliseconds since the Unix epoch"),
-	readAt: zod.number().nullish().describe("When the event was marked as read in the portal, in milliseconds since the Unix epoch")
+	readAt: zod.number().int().nullish().describe("When the event was marked as read in the portal, in milliseconds since the Unix epoch")
 };
 const EVENT_SCHEMA = zod.strictObject(EVENT_FIELDS).meta(metaStore([docPropertyInfo({
 	description: "An event or alert in the system",

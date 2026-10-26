@@ -449,25 +449,34 @@ public final class Models {
 
   /**
    * Optional analyses to run on an asset, keyed by feature. Each feature is off unless its {@code
-   * enabled} is true. Results of person and face detection appear in {@link
-   * AssetClassification#faceDetection()}; OCR stores extracted text on the image asset.
+   * enabled} is true. Results of person, face, link and AI-generated detection appear on {@link
+   * AssetClassification}; OCR stores extracted text on the image asset.
    *
    * @param ocr extract text onto the image asset and add text moderation
    * @param personDetection (beta) locate people in images
    * @param faceDetection (beta) locate faces in images and optionally estimate ages
+   * @param linkDetection find QR codes and web links in images
+   * @param aiGeneratedDetection (beta) read the AI provenance metadata images carry
    */
-  public record ProcessingFeatures(FeatureOptions ocr, FeatureOptions personDetection, FaceDetectionOptions faceDetection) {
+  public record ProcessingFeatures(FeatureOptions ocr, FeatureOptions personDetection, FaceDetectionOptions faceDetection,
+      FeatureOptions linkDetection, FeatureOptions aiGeneratedDetection) {
     /** No features set. */
-    public ProcessingFeatures() { this(null, null, null); }
+    public ProcessingFeatures() { this(null, null, null, null, null); }
 
     /** @param value OCR options @return a copy with these options */
-    public ProcessingFeatures ocr(FeatureOptions value) { return new ProcessingFeatures(value, personDetection, faceDetection); }
+    public ProcessingFeatures ocr(FeatureOptions value) { return new ProcessingFeatures(value, personDetection, faceDetection, linkDetection, aiGeneratedDetection); }
 
     /** @param value person detection options @return a copy with these options */
-    public ProcessingFeatures personDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, value, faceDetection); }
+    public ProcessingFeatures personDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, value, faceDetection, linkDetection, aiGeneratedDetection); }
 
     /** @param value face detection options @return a copy with these options */
-    public ProcessingFeatures faceDetection(FaceDetectionOptions value) { return new ProcessingFeatures(ocr, personDetection, value); }
+    public ProcessingFeatures faceDetection(FaceDetectionOptions value) { return new ProcessingFeatures(ocr, personDetection, value, linkDetection, aiGeneratedDetection); }
+
+    /** @param value link detection options @return a copy with these options */
+    public ProcessingFeatures linkDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, personDetection, faceDetection, value, aiGeneratedDetection); }
+
+    /** @param value AI-generated detection options @return a copy with these options */
+    public ProcessingFeatures aiGeneratedDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, personDetection, faceDetection, linkDetection, value); }
   }
 
   /**
@@ -1707,8 +1716,11 @@ public final class Models {
    * One reviewer decision in an asset's review history.
    *
    * @param decision the reviewer's decision
+   * @param reviewerName the reviewer's display name, when known
+   * @param reviewerEmail the reviewer's email address, when known
    */
   public record AssetReview(String id, AssetModerationDecision decision, String note, String reviewerUserId,
+      String reviewerName, String reviewerEmail,
       @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean appliedToAsset) {}
 
   /**
@@ -1840,8 +1852,11 @@ public final class Models {
    *
    * @param personDetection person detection result (beta)
    * @param faceDetection face detection result (beta)
+   * @param linkDetection QR codes and links found in the image
+   * @param aiGeneratedDetection AI provenance read from the image's metadata (beta)
    */
-  public record ProcessingFeatureResults(PersonDetectionResult personDetection, FaceDetectionResult faceDetection) {}
+  public record ProcessingFeatureResults(PersonDetectionResult personDetection, FaceDetectionResult faceDetection,
+      LinkDetectionResult linkDetection, AiGeneratedDetectionResult aiGeneratedDetection) {}
 
   /**
    * A person detection result. {@code people} is set only for {@code evaluated}; {@code reason}

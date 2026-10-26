@@ -1,4 +1,4 @@
-import { n as ClassificationCategory } from "./Classification-C0aTFEDP.js";
+import { n as ClassificationCategory } from "./Classification-DZ51wUXQ.js";
 type ClassificationTestSignal = ClassificationCategory | "sexual.involving-minors" | "violence.graphic";
 declare const TEST_IMAGE_PALETTES: Partial<Record<ClassificationTestSignal, [[number, number, number, number], [number, number, number, number], [number, number, number, number], [number, number, number, number]]>>;
 /** A project's test input key: 32 hexadecimal characters only its members can see. */

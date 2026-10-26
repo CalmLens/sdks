@@ -516,6 +516,8 @@ func TestRequestFixtures(t *testing.T) {
 			Body   any
 		}
 		Response json.RawMessage
+		// FullModel marks a response holding every field of the model its endpoint returns.
+		FullModel bool
 	}](t, "requests.json")
 	for index, fixture := range fixtures {
 		t.Run(fmt.Sprintf("%d %s", index+1, fixture.Operation), func(t *testing.T) {
@@ -560,7 +562,67 @@ func TestRequestFixtures(t *testing.T) {
 				want = response.Lenses
 			}
 			checkResult(t, "result", called.result, want)
+			if fixture.FullModel {
+				checkCarriesEveryField(t, called.result, want)
+			}
 		})
+	}
+}
+
+// checkCarriesEveryField requires that result, encoded back to JSON, holds every leaf of want
+// with an equal value. checkResult decodes want into result's own type, so it cannot see a
+// field the Go models drop; a full-model fixture fills every field the API can send.
+func checkCarriesEveryField(t *testing.T, result any, want json.RawMessage) {
+	t.Helper()
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got, expected any
+	if err = json.Unmarshal(encoded, &got); err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(want, &expected); err != nil {
+		t.Fatal(err)
+	}
+	gotLeaves, wantLeaves := map[string]any{}, map[string]any{}
+	jsonLeaves(got, "$", gotLeaves)
+	jsonLeaves(expected, "$", wantLeaves)
+	paths := make([]string, 0, len(wantLeaves))
+	for path := range wantLeaves {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		value, ok := gotLeaves[path]
+		if !ok {
+			t.Errorf("result drops %s", path)
+		} else if !reflect.DeepEqual(value, wantLeaves[path]) {
+			t.Errorf("result has %s = %#v, want %#v", path, value, wantLeaves[path])
+		}
+	}
+}
+
+// jsonLeaves records each scalar, null, empty object and empty array in value by its path.
+// Numbers decode as float64, so they compare numerically.
+func jsonLeaves(value any, path string, out map[string]any) {
+	switch v := value.(type) {
+	case map[string]any:
+		if len(v) == 0 {
+			out[path] = v
+		}
+		for key, item := range v {
+			jsonLeaves(item, path+"."+key, out)
+		}
+	case []any:
+		if len(v) == 0 {
+			out[path] = v
+		}
+		for index, item := range v {
+			jsonLeaves(item, fmt.Sprintf("%s[%d]", path, index), out)
+		}
+	default:
+		out[path] = v
 	}
 }
 

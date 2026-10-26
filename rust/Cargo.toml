@@ -27,6 +27,9 @@ rustls-native-roots = ["reqwest?/rustls-tls-native-roots"]
 native-tls = ["reqwest?/native-tls"]
 ## `calmlens::testing::MockServerClient` for offline tests. Enable it in `[dev-dependencies]` only.
 testing = ["async"]
+## Internal: lets the contract tests check that full-model fixtures decode with no untyped fields
+## or enum values. Not for applications.
+strict-contract = []
 
 [dependencies]
 base64 = "0.22"
@@ -43,7 +46,7 @@ tokio = { version = "1.38", default-features = false, features = ["time", "fs", 
 tokio-util = { version = "0.7", default-features = false, features = ["io"], optional = true }
 
 [dev-dependencies]
-calmlens = { path = ".", features = ["blocking", "testing"] }
+calmlens = { path = ".", features = ["blocking", "testing", "strict-contract"] }
 tokio = { version = "1.38", features = ["rt-multi-thread", "macros", "time", "test-util"] }
 regex-lite = "0.1"
 
