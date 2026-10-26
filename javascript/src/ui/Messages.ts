@@ -1,4 +1,4 @@
-import type { UploadItem } from "./UploadController";
+import type { UploadControllerOptions, UploadItem, UploadSnapshot } from "./UploadController";
 
 /**
  * The text the components show. Pass `messages` to any component to replace some or all of it,
@@ -8,9 +8,16 @@ import type { UploadItem } from "./UploadController";
 export interface CalmLensMessages {
   dropzoneTitle: string;
   dropzoneTitleDragging: string;
+  /** The picker button when the uploader takes one file. */
+  chooseFile: string;
+  /** The picker button with `multiple`. */
   chooseFiles: string;
+  /** Replaces the picked file when the uploader takes one file. */
+  chooseAnother: string;
   /** `{size}` is replaced with the largest accepted size, such as `20 MB`. */
   maxFileSizeHint: string;
+  /** Under a file waiting for `start()`. Empty by default, so the row shows only its size. */
+  selected: string;
   queued: string;
   uploading: string;
   checking: string;
@@ -38,10 +45,13 @@ export interface CalmLensMessages {
 }
 
 export const DEFAULT_MESSAGES: CalmLensMessages = {
-  dropzoneTitle: "Drag and drop files here",
+  dropzoneTitle: "Click to upload or drag and drop",
   dropzoneTitleDragging: "Drop to upload",
-  chooseFiles: "Choose files",
+  chooseFile: "Select file",
+  chooseFiles: "Select files",
+  chooseAnother: "Choose another",
   maxFileSizeHint: "Up to {size}",
+  selected: "",
   queued: "Waiting…",
   uploading: "Uploading…",
   checking: "Checking…",
@@ -149,3 +159,24 @@ export const getDropzoneHint = (messages: CalmLensMessages, maxFileSize?: number
   maxFileSize === undefined
     ? undefined
     : formatMessage(messages.maxFileSizeHint, { size: formatBytes(maxFileSize) });
+
+/** What an uploader shows around its file list, worked out once for every framework. */
+export interface UploaderView {
+  /**
+   * Whether to show the drop zone. An uploader that takes one file swaps it for the file's row,
+   * with a button to choose another, once a file is picked.
+   */
+  showDropzone: boolean;
+  chooseLabel: string;
+  hint?: string;
+}
+
+export const describeUploader = (
+  snapshot: UploadSnapshot,
+  options: Pick<UploadControllerOptions, "multiple" | "maxFileSize">,
+  messages: CalmLensMessages,
+): UploaderView => ({
+  showDropzone: Boolean(options.multiple) || snapshot.items.length === 0,
+  chooseLabel: options.multiple ? messages.chooseFiles : messages.chooseFile,
+  hint: getDropzoneHint(messages, options.maxFileSize),
+});

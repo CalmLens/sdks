@@ -23,8 +23,8 @@ import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
 import { getMediaState, type MediaAsset, type MediaOptions, resolveMediaProps } from "./ui/Media";
 import {
   type CalmLensMessages,
+  describeUploader,
   describeUploadItem,
-  getDropzoneHint,
   resolveMessages,
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
@@ -49,7 +49,25 @@ export interface UseCalmLensUploadResult {
   cancel: UploadController["cancel"];
   remove: UploadController["remove"];
   clear: UploadController["clear"];
+  start: UploadController["start"];
 }
+
+/** Keeps a ref to a controller's snapshot, following the controller if it changes. */
+const subscribeSnapshot = (controller: MaybeRefOrGetter<UploadController>) => {
+  const snapshot = shallowRef(toValue(controller).getSnapshot());
+  watch(
+    () => toValue(controller),
+    (current, _previous, onCleanup) => {
+      onCleanup(
+        current.subscribe((next) => {
+          snapshot.value = next;
+        }),
+      );
+    },
+    { immediate: true },
+  );
+  return snapshot;
+};
 
 /**
  * Uploads files through an upload preset and keeps `snapshot` up to date as each one uploads and
@@ -61,14 +79,8 @@ export const useCalmLensUpload = (
 ): UseCalmLensUploadResult => {
   const controller = createUploadController(toValue(options));
   watchEffect(() => controller.setOptions(toValue(options)));
-  const snapshot = shallowRef(controller.getSnapshot());
-  const unsubscribe = controller.subscribe((next) => {
-    snapshot.value = next;
-  });
-  onScopeDispose(() => {
-    unsubscribe();
-    controller.clear();
-  });
+  const snapshot = subscribeSnapshot(controller);
+  onScopeDispose(() => controller.clear());
   return {
     snapshot,
     controller,
@@ -77,6 +89,7 @@ export const useCalmLensUpload = (
     cancel: (key) => controller.cancel(key),
     remove: (key) => controller.remove(key),
     clear: () => controller.clear(),
+    start: () => controller.start(),
   };
 };
 
@@ -98,6 +111,7 @@ export const CalmLensUploader = defineComponent({
     tokenUrl: optional(String),
     accept: optional(String),
     maxFileSize: optional(Number),
+    autoUpload: { type: Boolean, default: true },
     multiple: { type: Boolean, default: false },
     maxFiles: optional(Number),
     concurrency: optional(Number),
@@ -106,6 +120,7 @@ export const CalmLensUploader = defineComponent({
     disabled: { type: Boolean, default: false },
     capture: optional(String as PropType<"user" | "environment">),
     messages: messagesProp,
+    controller: optional(Object as PropType<UploadController>),
   },
   emits: {
     uploaded: (_upload: CalmLensUpload) => true,
@@ -114,7 +129,7 @@ export const CalmLensUploader = defineComponent({
     removed: (_item: UploadItem) => true,
   },
   setup(props, { emit }) {
-    const upload = useCalmLensUpload(() => ({
+    const own = useCalmLensUpload(() => ({
       uploadPresetId: props.uploadPresetId,
       upload: props.upload,
       checkStatus: props.checkStatus,
@@ -123,6 +138,7 @@ export const CalmLensUploader = defineComponent({
       tokenUrl: props.tokenUrl,
       accept: props.accept,
       maxFileSize: props.maxFileSize,
+      autoUpload: props.autoUpload,
       multiple: props.multiple,
       maxFiles: props.maxFiles,
       concurrency: props.concurrency,
@@ -133,6 +149,8 @@ export const CalmLensUploader = defineComponent({
       onFailed: (item) => emit("failed", item),
       onRemoved: (item) => emit("removed", item),
     }));
+    const controller = computed(() => props.controller ?? own.controller);
+    const snapshot = subscribeSnapshot(controller);
     const messages = computed(() => resolveMessages(props.messages));
     const dragging = ref(false);
     const input = ref<HTMLInputElement>();
@@ -146,83 +164,88 @@ export const CalmLensUploader = defineComponent({
 
     return () => {
       const text = messages.value;
-      const hint = getDropzoneHint(text, props.maxFileSize);
-      const items = upload.snapshot.value.items;
+      const queue = controller.value;
+      const { accept, multiple } = queue.options;
+      const items = snapshot.value.items;
+      const view = describeUploader(snapshot.value, queue.options, text);
       return h("div", { class: "calmlens-uploader" }, [
-        h(
-          "div",
-          {
-            class: "calmlens-dropzone",
-            "data-dragging": dragging.value || undefined,
-            "data-disabled": props.disabled || undefined,
-            onClick: openPicker,
-            onDragover: onDragOver,
-            onDragenter: onDragOver,
-            onDragleave: (event: DragEvent) => {
-              const zone = event.currentTarget as HTMLElement;
-              if (!zone.contains(event.relatedTarget as Node | null)) dragging.value = false;
+        view.showDropzone &&
+          h(
+            "div",
+            {
+              class: "calmlens-dropzone",
+              "data-dragging": dragging.value || undefined,
+              "data-disabled": props.disabled || undefined,
+              onClick: openPicker,
+              onDragover: onDragOver,
+              onDragenter: onDragOver,
+              onDragleave: (event: DragEvent) => {
+                const zone = event.currentTarget as HTMLElement;
+                if (!zone.contains(event.relatedTarget as Node | null)) dragging.value = false;
+              },
+              onDrop: (event: DragEvent) => {
+                event.preventDefault();
+                dragging.value = false;
+                if (!props.disabled && event.dataTransfer) queue.addFiles(event.dataTransfer.files);
+              },
+              onPaste: (event: ClipboardEvent) => {
+                const files = event.clipboardData?.files;
+                if (!props.disabled && files?.length) queue.addFiles(files);
+              },
             },
-            onDrop: (event: DragEvent) => {
-              event.preventDefault();
-              dragging.value = false;
-              if (!props.disabled && event.dataTransfer) upload.addFiles(event.dataTransfer.files);
-            },
-            onPaste: (event: ClipboardEvent) => {
-              const files = event.clipboardData?.files;
-              if (!props.disabled && files?.length) upload.addFiles(files);
-            },
-          },
-          [
-            h("span", { class: "calmlens-dropzone__icon" }, [icon("upload")]),
-            h(
-              "p",
-              { class: "calmlens-dropzone__title" },
-              dragging.value ? text.dropzoneTitleDragging : text.dropzoneTitle,
-            ),
-            hint && h("p", { class: "calmlens-dropzone__hint" }, hint),
-            h(
-              "button",
-              {
-                type: "button",
-                class: "calmlens-button",
-                disabled: props.disabled,
-                onClick: (event: MouseEvent) => {
-                  event.stopPropagation();
-                  openPicker();
+            [
+              h("span", { class: "calmlens-dropzone__icon" }, [icon("upload")]),
+              h("div", { class: "calmlens-dropzone__text" }, [
+                h(
+                  "p",
+                  { class: "calmlens-dropzone__title" },
+                  dragging.value ? text.dropzoneTitleDragging : text.dropzoneTitle,
+                ),
+                view.hint && h("p", { class: "calmlens-dropzone__hint" }, view.hint),
+              ]),
+              h(
+                "button",
+                {
+                  type: "button",
+                  class: "calmlens-button",
+                  "data-variant": "outline",
+                  disabled: props.disabled,
+                  onClick: (event: MouseEvent) => {
+                    event.stopPropagation();
+                    openPicker();
+                  },
                 },
-              },
-              text.chooseFiles,
-            ),
-            h("input", {
-              ref: input,
-              type: "file",
-              hidden: true,
-              accept: props.accept,
-              multiple: props.multiple,
-              capture: props.capture,
-              disabled: props.disabled,
-              onClick: (event: MouseEvent) => event.stopPropagation(),
-              onChange: (event: Event) => {
-                const target = event.target as HTMLInputElement;
-                if (target.files) upload.addFiles(target.files);
-                target.value = "";
-              },
-            }),
-          ],
-        ),
+                view.chooseLabel,
+              ),
+            ],
+          ),
+        h("input", {
+          ref: input,
+          type: "file",
+          hidden: true,
+          accept,
+          multiple,
+          capture: props.capture,
+          disabled: props.disabled,
+          onChange: (event: Event) => {
+            const target = event.target as HTMLInputElement;
+            if (target.files) queue.addFiles(target.files);
+            target.value = "";
+          },
+        }),
         items.length > 0 &&
           h(
             "ul",
             { class: "calmlens-uploads" },
             items.map((item) => {
-              const view = describeUploadItem(item, text);
+              const itemView = describeUploadItem(item, text);
               return h(
                 "li",
                 {
                   key: item.key,
                   class: "calmlens-upload",
                   "data-stage": item.stage,
-                  "data-outcome": view.outcome,
+                  "data-outcome": itemView.outcome,
                 },
                 [
                   item.previewUrl
@@ -230,38 +253,54 @@ export const CalmLensUploader = defineComponent({
                     : h(
                         "span",
                         { class: "calmlens-upload__thumb", "aria-hidden": "true" },
-                        view.extension,
+                        itemView.extension,
                       ),
                   h("div", { class: "calmlens-upload__body" }, [
-                    h("span", { class: "calmlens-upload__name" }, [
-                      item.file.name,
-                      h("span", { class: "calmlens-upload__size" }, view.size),
-                    ]),
-                    view.busy &&
+                    h("span", { class: "calmlens-upload__name" }, item.file.name),
+                    h("span", { class: "calmlens-upload__size" }, itemView.size),
+                    itemView.busy &&
                       h(
                         "div",
                         {
                           class: "calmlens-progress",
                           role: "progressbar",
-                          "aria-label": view.message,
+                          "aria-label": itemView.message,
                           "aria-valuemin": 0,
                           "aria-valuemax": 100,
-                          "aria-valuenow": view.progressPercent,
+                          "aria-valuenow": itemView.progressPercent,
                         },
                         [
                           h("div", {
                             class: "calmlens-progress__bar",
                             style:
-                              view.progressPercent === undefined
+                              itemView.progressPercent === undefined
                                 ? undefined
-                                : { width: `${view.progressPercent}%` },
+                                : { width: `${itemView.progressPercent}%` },
                           }),
                         ],
                       ),
-                    h("p", { class: "calmlens-upload__message", role: "status" }, view.message),
+                    itemView.message &&
+                      h(
+                        "p",
+                        { class: "calmlens-upload__message", role: "status" },
+                        itemView.message,
+                      ),
                   ]),
                   h("div", { class: "calmlens-upload__actions" }, [
-                    view.canRetry &&
+                    !view.showDropzone &&
+                      h(
+                        "button",
+                        {
+                          type: "button",
+                          class: "calmlens-button",
+                          "data-variant": "outline",
+                          "data-size": "small",
+                          disabled: props.disabled,
+                          onClick: openPicker,
+                        },
+                        text.chooseAnother,
+                      ),
+                    itemView.canRetry &&
                       h(
                         "button",
                         {
@@ -269,7 +308,7 @@ export const CalmLensUploader = defineComponent({
                           class: "calmlens-icon-button",
                           "aria-label": text.retry,
                           title: text.retry,
-                          onClick: () => upload.retry(item.key),
+                          onClick: () => queue.retry(item.key),
                         },
                         [icon("retry")],
                       ),
@@ -278,9 +317,9 @@ export const CalmLensUploader = defineComponent({
                       {
                         type: "button",
                         class: "calmlens-icon-button",
-                        "aria-label": view.removeLabel,
-                        title: view.removeLabel,
-                        onClick: () => upload.remove(item.key),
+                        "aria-label": itemView.removeLabel,
+                        title: itemView.removeLabel,
+                        onClick: () => queue.remove(item.key),
                       },
                       [icon("remove")],
                     ),

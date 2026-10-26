@@ -33,7 +33,14 @@ const done = (container: HTMLElement, unmount: () => void): Mounted => ({
 const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 
 /** The elements' options that are properties rather than attributes. */
-const PROPERTIES = new Set(["token", "upload", "checkStatus", "createClient", "messages"]);
+const PROPERTIES = new Set([
+  "token",
+  "upload",
+  "checkStatus",
+  "createClient",
+  "messages",
+  "controller",
+]);
 
 /** Sets props on a custom element: plain values as attributes, everything else as properties. */
 const assign = (
@@ -44,6 +51,7 @@ const assign = (
   for (const [name, value] of Object.entries(props)) {
     if (value === undefined) continue;
     if (PROPERTIES.has(name)) (element as unknown as Record<string, unknown>)[name] = value;
+    else if (name === "autoUpload") element.toggleAttribute("no-auto-upload", value === false);
     else if (name in events) {
       element.addEventListener(events[name] as string, (event) =>
         (value as (detail: unknown) => void)((event as CustomEvent).detail),

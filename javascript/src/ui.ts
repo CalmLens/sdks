@@ -6,9 +6,10 @@ export type { IconName } from "./ui/Icons";
 export { ICON_ATTRIBUTES, ICONS } from "./ui/Icons";
 export type { MediaAsset, MediaOptions, MediaSettings, MediaSource, MediaState } from "./ui/Media";
 export { getMediaState, resolveMediaProps } from "./ui/Media";
-export type { CalmLensMessages, UploadItemView } from "./ui/Messages";
+export type { CalmLensMessages, UploaderView, UploadItemView } from "./ui/Messages";
 export {
   DEFAULT_MESSAGES,
+  describeUploader,
   describeUploadItem,
   formatBytes,
   formatMessage,

@@ -7,8 +7,8 @@ import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
 import { getMediaState, type MediaAsset, type MediaOptions, resolveMediaProps } from "./ui/Media";
 import {
   type CalmLensMessages,
+  describeUploader,
   describeUploadItem,
-  getDropzoneHint,
   resolveMessages,
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
@@ -87,9 +87,9 @@ const BaseElement = (
  * `<calmlens-uploader upload-preset-id="…" token-url="/api/upload-token">` uploads through an
  * upload preset and dispatches `calmlens-uploaded` with `{ assetId, status, file }` for each
  * finished upload. Attributes: `upload-preset-id`, `token-url`, `accept`, `max-file-size`
- * (bytes), `multiple`, `max-files`, `disabled`, `capture` and `base-url`. Set the
- * `token`, `upload`, `checkStatus` and `messages` properties from script for anything an
- * attribute can't hold.
+ * (bytes), `no-auto-upload`, `multiple`, `max-files`, `disabled`, `capture` and `base-url`. Set
+ * the `token`, `upload`, `checkStatus`, `messages` and `controller` properties from script for
+ * anything an attribute can't hold.
  */
 export class CalmLensUploaderElement extends BaseElement {
   static observedAttributes = [
@@ -97,6 +97,7 @@ export class CalmLensUploaderElement extends BaseElement {
     "token-url",
     "accept",
     "max-file-size",
+    "no-auto-upload",
     "multiple",
     "max-files",
     "disabled",
@@ -110,6 +111,8 @@ export class CalmLensUploaderElement extends BaseElement {
   #createClient?: UploadControllerOptions["createClient"];
   #messages?: Partial<CalmLensMessages>;
   #controller?: UploadController;
+  /** Whether `controller` was set from script, so its options and uploads aren't this element's. */
+  #external = false;
   #unsubscribe?: () => void;
   #dragging = false;
   #input?: HTMLInputElement;
@@ -120,7 +123,7 @@ export class CalmLensUploaderElement extends BaseElement {
   }
   set token(value: UploadControllerOptions["token"]) {
     this.#token = value;
-    this.#controller?.setOptions(this.#options());
+    this.#updateOptions();
   }
 
   /** Uploads each file your own way instead of through `upload-preset-id`. */
@@ -129,7 +132,7 @@ export class CalmLensUploaderElement extends BaseElement {
   }
   set upload(value: UploadControllerOptions["upload"]) {
     this.#upload = value;
-    this.#controller?.setOptions(this.#options());
+    this.#updateOptions();
   }
 
   /** Checks a pending upload made with `upload`. */
@@ -138,7 +141,7 @@ export class CalmLensUploaderElement extends BaseElement {
   }
   set checkStatus(value: UploadControllerOptions["checkStatus"]) {
     this.#checkStatus = value;
-    this.#controller?.setOptions(this.#options());
+    this.#updateOptions();
   }
 
   /** Creates the client for each upload, for example a `MockCalmLensAppClient` in tests. */
@@ -147,7 +150,7 @@ export class CalmLensUploaderElement extends BaseElement {
   }
   set createClient(value: UploadControllerOptions["createClient"]) {
     this.#createClient = value;
-    this.#controller?.setOptions(this.#options());
+    this.#updateOptions();
   }
 
   get messages(): Partial<CalmLensMessages> | undefined {
@@ -158,10 +161,35 @@ export class CalmLensUploaderElement extends BaseElement {
     this.#render();
   }
 
-  /** The upload queue, for reading items or calling `retry`, `remove` and `clear`. */
+  /**
+   * The upload queue, for reading items or calling `start`, `retry`, `remove` and `clear`. Set it
+   * to show a queue your script created; its own options then apply instead of the attributes.
+   */
   get controller(): UploadController {
     this.#controller ??= createUploadController(this.#options());
     return this.#controller;
+  }
+  set controller(value: UploadController) {
+    if (value === this.#controller) return;
+    this.#unsubscribe?.();
+    if (!this.#external) this.#controller?.clear();
+    this.#controller = value;
+    this.#external = true;
+    if (this.isConnected) {
+      this.#subscribe();
+      this.#render();
+    }
+  }
+
+  #updateOptions() {
+    if (!this.#external) this.#controller?.setOptions(this.#options());
+  }
+
+  #subscribe() {
+    this.#unsubscribe = this.controller.subscribe((snapshot) => {
+      this.#renderItems();
+      this.dispatchEvent(new CustomEvent("calmlens-change", { detail: snapshot }));
+    });
   }
 
   #options(): UploadControllerOptions {
@@ -178,6 +206,7 @@ export class CalmLensUploaderElement extends BaseElement {
       tokenUrl: this.getAttribute("token-url") ?? undefined,
       accept: this.getAttribute("accept") ?? undefined,
       maxFileSize: numberAttribute(this, "max-file-size"),
+      autoUpload: !this.hasAttribute("no-auto-upload"),
       multiple: this.hasAttribute("multiple"),
       maxFiles: numberAttribute(this, "max-files"),
       baseUrl: this.getAttribute("base-url") ?? undefined,
@@ -189,62 +218,66 @@ export class CalmLensUploaderElement extends BaseElement {
   }
 
   connectedCallback() {
-    upgradeProperties(this, ["token", "upload", "checkStatus", "createClient", "messages"]);
+    upgradeProperties(this, [
+      "token",
+      "upload",
+      "checkStatus",
+      "createClient",
+      "messages",
+      "controller",
+    ]);
     this.classList.add("calmlens-uploader");
-    this.#unsubscribe = this.controller.subscribe((snapshot) => {
-      this.#renderItems();
-      this.dispatchEvent(new CustomEvent("calmlens-change", { detail: snapshot }));
-    });
+    this.#subscribe();
     this.#render();
   }
 
   disconnectedCallback() {
     this.#unsubscribe?.();
-    this.controller.clear();
+    if (!this.#external) this.controller.clear();
   }
 
   attributeChangedCallback() {
-    this.#controller?.setOptions(this.#options());
+    this.#updateOptions();
     if (this.isConnected) this.#render();
   }
 
   #render() {
     if (!this.isConnected) return;
-    this.controller.setOptions(this.#options());
+    this.#updateOptions();
+    const { accept, multiple } = this.controller.options;
     const messages = resolveMessages(this.#messages);
     const disabled = this.hasAttribute("disabled");
-    const hint = getDropzoneHint(messages, numberAttribute(this, "max-file-size"));
+    const view = describeUploader(this.controller.getSnapshot(), this.controller.options, messages);
     const input = el("input", {
       type: "file",
       hidden: true,
-      accept: this.getAttribute("accept") ?? undefined,
-      multiple: this.hasAttribute("multiple"),
+      accept,
+      multiple,
       capture: this.getAttribute("capture") ?? undefined,
       disabled,
     });
     this.#input = input;
-    input.addEventListener("click", (event) => event.stopPropagation());
     input.addEventListener("change", () => {
       if (input.files) this.controller.addFiles(input.files);
       input.value = "";
     });
-    const openPicker = () => {
-      if (!this.hasAttribute("disabled")) this.#input?.click();
-    };
-    const button = el("button", { type: "button", class: "calmlens-button", disabled }, [
-      messages.chooseFiles,
-    ]);
+    const button = el(
+      "button",
+      { type: "button", class: "calmlens-button", "data-variant": "outline", disabled },
+      [view.chooseLabel],
+    );
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      openPicker();
+      this.#openPicker();
     });
     const title = el("p", { class: "calmlens-dropzone__title" }, [messages.dropzoneTitle]);
     const zone = el("div", { class: "calmlens-dropzone", "data-disabled": disabled }, [
       el("span", { class: "calmlens-dropzone__icon" }, [icon("upload")]),
-      title,
-      hint && el("p", { class: "calmlens-dropzone__hint" }, [hint]),
+      el("div", { class: "calmlens-dropzone__text" }, [
+        title,
+        view.hint && el("p", { class: "calmlens-dropzone__hint" }, [view.hint]),
+      ]),
       button,
-      input,
     ]);
     const setDragging = (dragging: boolean) => {
       this.#dragging = dragging;
@@ -255,7 +288,7 @@ export class CalmLensUploaderElement extends BaseElement {
       event.preventDefault();
       if (!this.hasAttribute("disabled") && !this.#dragging) setDragging(true);
     };
-    zone.addEventListener("click", openPicker);
+    zone.addEventListener("click", () => this.#openPicker());
     zone.addEventListener("dragover", onDragOver);
     zone.addEventListener("dragenter", onDragOver);
     zone.addEventListener("dragleave", (event) => {
@@ -272,15 +305,23 @@ export class CalmLensUploaderElement extends BaseElement {
       const files = event.clipboardData?.files;
       if (!this.hasAttribute("disabled") && files?.length) this.controller.addFiles(files);
     });
-    this.replaceChildren(zone, el("ul", { class: "calmlens-uploads", hidden: true }));
+    this.replaceChildren(zone, input, el("ul", { class: "calmlens-uploads", hidden: true }));
     this.#renderItems();
+  }
+
+  #openPicker() {
+    if (!this.hasAttribute("disabled")) this.#input?.click();
   }
 
   #renderItems() {
     const list = this.querySelector<HTMLUListElement>(":scope > .calmlens-uploads");
-    if (!list) return;
+    const zone = this.querySelector<HTMLElement>(":scope > .calmlens-dropzone");
+    if (!list || !zone) return;
     const messages = resolveMessages(this.#messages);
-    const { items } = this.controller.getSnapshot();
+    const snapshot = this.controller.getSnapshot();
+    const { items } = snapshot;
+    const view = describeUploader(snapshot, this.controller.options, messages);
+    zone.hidden = !view.showDropzone;
     list.hidden = items.length === 0;
     // Rows are rebuilt on each change except their thumbnails, so previews don't flash.
     const thumbnails = new Map(
@@ -289,20 +330,36 @@ export class CalmLensUploaderElement extends BaseElement {
         row.querySelector(".calmlens-upload__thumb"),
       ]),
     );
+    const disabled = this.hasAttribute("disabled");
     list.replaceChildren(
       ...items.map((item) => {
-        const view = describeUploadItem(item, messages);
+        const itemView = describeUploadItem(item, messages);
         const thumbnail =
           thumbnails.get(item.key) ??
           (item.previewUrl
             ? el("img", { class: "calmlens-upload__thumb", src: item.previewUrl, alt: "" })
             : el("span", { class: "calmlens-upload__thumb", "aria-hidden": "true" }, [
-                view.extension,
+                itemView.extension,
               ]));
         const bar = el("div", { class: "calmlens-progress__bar" });
-        if (view.progressPercent !== undefined) bar.style.width = `${view.progressPercent}%`;
+        if (itemView.progressPercent !== undefined)
+          bar.style.width = `${itemView.progressPercent}%`;
+        const chooseAnother =
+          !view.showDropzone &&
+          el(
+            "button",
+            {
+              type: "button",
+              class: "calmlens-button",
+              "data-variant": "outline",
+              "data-size": "small",
+              disabled,
+            },
+            [messages.chooseAnother],
+          );
+        if (chooseAnother) chooseAnother.addEventListener("click", () => this.#openPicker());
         const retry =
-          view.canRetry &&
+          itemView.canRetry &&
           el(
             "button",
             {
@@ -319,38 +376,37 @@ export class CalmLensUploaderElement extends BaseElement {
           {
             type: "button",
             class: "calmlens-icon-button",
-            "aria-label": view.removeLabel,
-            title: view.removeLabel,
+            "aria-label": itemView.removeLabel,
+            title: itemView.removeLabel,
           },
           [icon("remove")],
         );
         remove.addEventListener("click", () => this.controller.remove(item.key));
         const row = el(
           "li",
-          { class: "calmlens-upload", "data-stage": item.stage, "data-outcome": view.outcome },
+          { class: "calmlens-upload", "data-stage": item.stage, "data-outcome": itemView.outcome },
           [
             thumbnail,
             el("div", { class: "calmlens-upload__body" }, [
-              el("span", { class: "calmlens-upload__name" }, [
-                item.file.name,
-                el("span", { class: "calmlens-upload__size" }, [view.size]),
-              ]),
-              view.busy &&
+              el("span", { class: "calmlens-upload__name" }, [item.file.name]),
+              el("span", { class: "calmlens-upload__size" }, [itemView.size]),
+              itemView.busy &&
                 el(
                   "div",
                   {
                     class: "calmlens-progress",
                     role: "progressbar",
-                    "aria-label": view.message,
+                    "aria-label": itemView.message,
                     "aria-valuemin": 0,
                     "aria-valuemax": 100,
-                    "aria-valuenow": view.progressPercent,
+                    "aria-valuenow": itemView.progressPercent,
                   },
                   [bar],
                 ),
-              el("p", { class: "calmlens-upload__message", role: "status" }, [view.message]),
+              itemView.message &&
+                el("p", { class: "calmlens-upload__message", role: "status" }, [itemView.message]),
             ]),
-            el("div", { class: "calmlens-upload__actions" }, [retry, remove]),
+            el("div", { class: "calmlens-upload__actions" }, [chooseAnother, retry, remove]),
           ],
         );
         row.dataset.key = item.key;

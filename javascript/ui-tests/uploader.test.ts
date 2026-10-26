@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { waitFor, within } from "@testing-library/dom";
 import { MockCalmLensAppClient } from "../src/testing";
-import type { CalmLensUpload, UploaderProps, UploadItem } from "../src/ui";
+import {
+  type CalmLensUpload,
+  createUploadController,
+  type UploaderProps,
+  type UploadItem,
+} from "../src/ui";
 import { BINDINGS, type Mounted } from "./bindings";
 
 const PRESET_ID = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
@@ -13,7 +18,9 @@ const messages = {
   pending: "msg:pending",
   failed: "msg:failed",
   "file/too-large": "msg:too-large",
+  chooseFile: "msg:choose",
   chooseFiles: "msg:choose",
+  chooseAnother: "msg:choose-another",
   retry: "msg:retry",
   remove: "msg:remove {name}",
   cancel: "msg:cancel {name}",
@@ -116,6 +123,72 @@ for (const binding of BINDINGS) {
       await waitFor(() => expect(statuses(mounted!.container)).toEqual([]));
       expect(removed.map((item) => item.file.name)).toEqual(["big.png"]);
       expect(upload).not.toHaveBeenCalled();
+    });
+
+    it("swaps the drop zone for the picked file, and back once it is removed", async () => {
+      mounted = binding.mountUploader({
+        upload: async () => ({ assetId: "a1", status: "allowed" }),
+        messages,
+      });
+      const view = within(mounted.container);
+      pick(mounted.container, [photo("first.png")]);
+
+      await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:allowed"]));
+      expect(view.queryByRole("button", { name: messages.chooseFile })).toBeNull();
+      expect(
+        (view.getByRole("button", { name: messages.chooseAnother }) as HTMLButtonElement).disabled,
+      ).toBe(false);
+
+      pick(mounted.container, [photo("second.png")]);
+      await waitFor(() =>
+        expect(view.queryByRole("button", { name: "msg:remove second.png" })).not.toBeNull(),
+      );
+      expect(view.queryByRole("button", { name: "msg:remove first.png" })).toBeNull();
+      view.getByRole("button", { name: "msg:remove second.png" }).click();
+
+      await waitFor(() =>
+        expect(view.queryByRole("button", { name: messages.chooseFile })).not.toBeNull(),
+      );
+      expect(view.queryByRole("button", { name: messages.chooseAnother })).toBeNull();
+    });
+
+    it("keeps picked files until start() with autoUpload off", async () => {
+      const upload = mock(async () => ({ assetId: "a1", status: "allowed" as const }));
+      const controller = createUploadController({ upload, autoUpload: false });
+      mounted = binding.mountUploader({ controller, messages });
+      pick(mounted.container, [photo()]);
+
+      await waitFor(() =>
+        expect(controller.getSnapshot().items.map((item) => item.stage)).toEqual(["selected"]),
+      );
+      within(mounted.container).getByRole("button", { name: "msg:remove photo.png" });
+      expect(upload).not.toHaveBeenCalled();
+      expect(statuses(mounted.container)).toEqual([]);
+
+      controller.start();
+      await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:allowed"]));
+      expect(upload).toHaveBeenCalledTimes(1);
+      controller.clear();
+    });
+
+    it("leaves the uploads of a controller it was given running when it unmounts", async () => {
+      let signal: AbortSignal | undefined;
+      const controller = createUploadController({
+        upload: (_file, context) => {
+          signal = context.signal;
+          return new Promise(() => {});
+        },
+      });
+      mounted = binding.mountUploader({ controller, messages });
+      pick(mounted.container, [photo()]);
+      await waitFor(() => expect(signal).toBeDefined());
+      mounted.unmount();
+      mounted = undefined;
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(signal?.aborted).toBe(false);
+      controller.clear();
+      expect(signal?.aborted).toBe(true);
     });
 
     it("retries a failed upload", async () => {

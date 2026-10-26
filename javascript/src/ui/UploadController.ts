@@ -3,8 +3,11 @@ import { CalmLensError, SDK_ERROR_CODES } from "../client/CalmLensError";
 import type { AssetModerationStatus, CalmLensAppClientOptions } from "../client/CalmLensTypes";
 import { createProgressFetch } from "./ProgressFetch";
 
-/** Where a file is in the upload: waiting its turn, sending bytes, being moderated, or finished. */
-export type UploadStage = "queued" | "uploading" | "checking" | "complete" | "failed";
+/**
+ * Where a file is in the upload: picked and waiting for `start()` (with `autoUpload: false`),
+ * waiting its turn, sending bytes, being moderated, or finished.
+ */
+export type UploadStage = "selected" | "queued" | "uploading" | "checking" | "complete" | "failed";
 
 /** One file the uploader has picked, as the components render it. */
 export interface UploadItem {
@@ -90,6 +93,11 @@ export interface UploadControllerOptions {
   accept?: string;
   /** The largest file to accept, in bytes. Your preset's own limit still applies. */
   maxFileSize?: number;
+  /**
+   * Upload files as soon as they're picked. Defaults to `true`. With `false`, picked files wait in
+   * the `selected` stage until you call `start()`, for example when a form is submitted.
+   */
+  autoUpload?: boolean;
   /** Accept more than one file. Defaults to `false`; a new file then replaces the last one. */
   multiple?: boolean;
   /** The most files kept at once when `multiple` is on. Defaults to 10. */
@@ -168,6 +176,11 @@ export class UploadController {
     this.#options = options;
   }
 
+  /** The current options. */
+  get options(): Readonly<UploadControllerOptions> {
+    return this.#options;
+  }
+
   /** Replaces the options, for example when a component's props change. */
   setOptions(options: UploadControllerOptions): void {
     this.#options = options;
@@ -188,9 +201,18 @@ export class UploadController {
     };
   };
 
-  /** Adds files from a file input, a drop or a paste, and starts uploading them. */
+  /**
+   * Adds files from a file input, a drop or a paste, and starts uploading them, or keeps them
+   * `selected` with `autoUpload: false`.
+   */
   addFiles(files: Iterable<File> | ArrayLike<File>): void {
-    const { multiple = false, maxFiles = DEFAULT_MAX_FILES, accept, maxFileSize } = this.#options;
+    const {
+      multiple = false,
+      maxFiles = DEFAULT_MAX_FILES,
+      accept,
+      maxFileSize,
+      autoUpload = true,
+    } = this.#options;
     let picked = Array.from(files as ArrayLike<File>);
     if (picked.length === 0) return;
     if (!multiple) {
@@ -211,10 +233,18 @@ export class UploadController {
           : undefined;
       return errorCode
         ? { key, file, previewUrl, stage: "failed", progress: null, errorCode }
-        : { key, file, previewUrl, stage: "queued", progress: null };
+        : { key, file, previewUrl, stage: autoUpload ? "queued" : "selected", progress: null };
     });
     this.#set([...this.#snapshot.items, ...added]);
     for (const item of added) if (item.stage === "failed") this.#options.onFailed?.(item);
+    this.#pump();
+  }
+
+  /** Uploads every `selected` file, for an uploader with `autoUpload: false`. */
+  start(): void {
+    for (const item of this.#snapshot.items) {
+      if (item.stage === "selected") this.#update(item.key, { stage: "queued" });
+    }
     this.#pump();
   }
 

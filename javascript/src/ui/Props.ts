@@ -1,6 +1,6 @@
 import type { MediaOptions, MediaState } from "./Media";
 import type { CalmLensMessages } from "./Messages";
-import type { UploadControllerOptions } from "./UploadController";
+import type { UploadController, UploadControllerOptions } from "./UploadController";
 
 /** Props every framework's uploader takes, on top of the upload options. */
 export interface UploaderDisplayOptions {
@@ -9,6 +9,12 @@ export interface UploaderDisplayOptions {
   capture?: "user" | "environment";
   /** Replaces some or all of the text the uploader shows. */
   messages?: Partial<CalmLensMessages>;
+  /**
+   * Shows this upload queue instead of creating one, such as `useCalmLensUpload`'s `controller`,
+   * so your app can read the picked files and call `start()`. The upload options then come from
+   * the controller, and the uploader leaves its uploads running when it unmounts.
+   */
+  controller?: UploadController;
 }
 
 export type UploaderProps = UploadControllerOptions & UploaderDisplayOptions;

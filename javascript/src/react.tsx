@@ -15,7 +15,7 @@ import {
 } from "react";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
 import { getMediaState, resolveMediaProps } from "./ui/Media";
-import { describeUploadItem, getDropzoneHint, resolveMessages } from "./ui/Messages";
+import { describeUploader, describeUploadItem, resolveMessages } from "./ui/Messages";
 import {
   getMediaAspectRatio,
   getMediaLoadKey,
@@ -74,26 +74,11 @@ export interface UseCalmLensUploadResult extends UploadSnapshot {
   cancel: UploadController["cancel"];
   remove: UploadController["remove"];
   clear: UploadController["clear"];
+  start: UploadController["start"];
 }
 
-/**
- * Uploads files through an upload preset and re-renders as each one uploads and is checked. Use
- * it to build your own upload UI; `CalmLensUploader` is built on it. Uploads still running when
- * the component unmounts are cancelled.
- */
-export const useCalmLensUpload = (options: UploadControllerOptions): UseCalmLensUploadResult => {
-  const [controller] = useState(() => createUploadController(options));
-  // The latest callbacks, without restarting uploads when a parent re-renders.
-  controller.setOptions(options);
-  // Cancels uploads on unmount. The cancel waits a tick so StrictMode's simulated unmount, which
-  // mounts again straight away, keeps them.
-  const pendingClear = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => {
-    clearTimeout(pendingClear.current);
-    return () => {
-      pendingClear.current = setTimeout(() => controller.clear());
-    };
-  }, [controller]);
+/** Re-renders with a controller's snapshot. */
+const useUploadSnapshot = (controller: UploadController): UseCalmLensUploadResult => {
   const snapshot = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
@@ -108,10 +93,36 @@ export const useCalmLensUpload = (options: UploadControllerOptions): UseCalmLens
       cancel: (key) => controller.cancel(key),
       remove: (key) => controller.remove(key),
       clear: () => controller.clear(),
+      start: () => controller.start(),
     }),
     [snapshot, controller],
   );
 };
+
+/** A controller this component owns: it takes the latest options and cancels on unmount. */
+const useOwnController = (options: UploadControllerOptions, active = true) => {
+  const [controller] = useState(() => createUploadController(options));
+  // The latest callbacks, without restarting uploads when a parent re-renders.
+  if (active) controller.setOptions(options);
+  // Cancels uploads on unmount. The cancel waits a tick so StrictMode's simulated unmount, which
+  // mounts again straight away, keeps them.
+  const pendingClear = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    clearTimeout(pendingClear.current);
+    return () => {
+      pendingClear.current = setTimeout(() => controller.clear());
+    };
+  }, [controller]);
+  return controller;
+};
+
+/**
+ * Uploads files through an upload preset and re-renders as each one uploads and is checked. Use
+ * it to build your own upload UI; `CalmLensUploader` is built on it. Uploads still running when
+ * the component unmounts are cancelled.
+ */
+export const useCalmLensUpload = (options: UploadControllerOptions): UseCalmLensUploadResult =>
+  useUploadSnapshot(useOwnController(options));
 
 /** Leaves out the stylesheet the components render, so you can style the `calmlens-*` classes. */
 type StyleOptions = { unstyled?: boolean };
@@ -131,15 +142,18 @@ export function CalmLensUploader({
   capture,
   messages: overrides,
   unstyled,
+  controller: external,
   className,
   style,
   ...options
 }: CalmLensUploaderProps) {
-  const upload = useCalmLensUpload(options);
+  const own = useOwnController(options, !external);
+  const upload = useUploadSnapshot(external ?? own);
+  const { accept, multiple } = upload.controller.options;
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
+  const view = describeUploader(upload, upload.controller.options, messages);
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const hint = getDropzoneHint(messages, options.maxFileSize);
 
   const openPicker = () => {
     if (!disabled) input.current?.click();
@@ -152,109 +166,126 @@ export function CalmLensUploader({
   return (
     <div className={joinClassNames("calmlens-uploader", className)} style={style}>
       <CalmLensStyles unstyled={unstyled} />
-      {/* Keyboard users open the picker with the button; the zone adds drop and click targets. */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: the button inside is the accessible control */}
-      <div
-        className="calmlens-dropzone"
-        data-dragging={dragging || undefined}
-        data-disabled={disabled || undefined}
-        onClick={openPicker}
-        onDragOver={onDragOver}
-        onDragEnter={onDragOver}
-        onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-          if (!disabled) upload.addFiles(event.dataTransfer.files);
-        }}
-        onPaste={(event) => {
-          if (!disabled && event.clipboardData.files.length)
-            upload.addFiles(event.clipboardData.files);
-        }}
-      >
-        <span className="calmlens-dropzone__icon">
-          <Icon name="upload" />
-        </span>
-        <p className="calmlens-dropzone__title">
-          {dragging ? messages.dropzoneTitleDragging : messages.dropzoneTitle}
-        </p>
-        {hint && <p className="calmlens-dropzone__hint">{hint}</p>}
-        <button
-          type="button"
-          className="calmlens-button"
-          disabled={disabled}
-          onClick={(event) => {
-            event.stopPropagation();
-            openPicker();
+      {view.showDropzone && (
+        // Keyboard users open the picker with the button; the zone adds drop and click targets.
+        // biome-ignore lint/a11y/noStaticElementInteractions: the button inside is the accessible control
+        <div
+          className="calmlens-dropzone"
+          data-dragging={dragging || undefined}
+          data-disabled={disabled || undefined}
+          onClick={openPicker}
+          onDragOver={onDragOver}
+          onDragEnter={onDragOver}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+              setDragging(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(false);
+            if (!disabled) upload.addFiles(event.dataTransfer.files);
+          }}
+          onPaste={(event) => {
+            if (!disabled && event.clipboardData.files.length)
+              upload.addFiles(event.clipboardData.files);
           }}
         >
-          {messages.chooseFiles}
-        </button>
-        <input
-          ref={input}
-          type="file"
-          hidden
-          accept={options.accept}
-          multiple={options.multiple}
-          capture={capture}
-          disabled={disabled}
-          onClick={(event) => event.stopPropagation()}
-          onChange={(event) => {
-            if (event.target.files) upload.addFiles(event.target.files);
-            event.target.value = "";
-          }}
-        />
-      </div>
+          <span className="calmlens-dropzone__icon">
+            <Icon name="upload" />
+          </span>
+          <div className="calmlens-dropzone__text">
+            <p className="calmlens-dropzone__title">
+              {dragging ? messages.dropzoneTitleDragging : messages.dropzoneTitle}
+            </p>
+            {view.hint && <p className="calmlens-dropzone__hint">{view.hint}</p>}
+          </div>
+          <button
+            type="button"
+            className="calmlens-button"
+            data-variant="outline"
+            disabled={disabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              openPicker();
+            }}
+          >
+            {view.chooseLabel}
+          </button>
+        </div>
+      )}
+      <input
+        ref={input}
+        type="file"
+        hidden
+        accept={accept}
+        multiple={multiple}
+        capture={capture}
+        disabled={disabled}
+        onChange={(event) => {
+          if (event.target.files) upload.addFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
       {upload.items.length > 0 && (
         <ul className="calmlens-uploads">
           {upload.items.map((item) => {
-            const view = describeUploadItem(item, messages);
+            const itemView = describeUploadItem(item, messages);
             return (
               <li
                 key={item.key}
                 className="calmlens-upload"
                 data-stage={item.stage}
-                data-outcome={view.outcome}
+                data-outcome={itemView.outcome}
               >
                 {item.previewUrl ? (
                   <img className="calmlens-upload__thumb" src={item.previewUrl} alt="" />
                 ) : (
                   <span className="calmlens-upload__thumb" aria-hidden="true">
-                    {view.extension}
+                    {itemView.extension}
                   </span>
                 )}
                 <div className="calmlens-upload__body">
-                  <span className="calmlens-upload__name">
-                    {item.file.name}
-                    <span className="calmlens-upload__size">{view.size}</span>
-                  </span>
-                  {view.busy && (
+                  <span className="calmlens-upload__name">{item.file.name}</span>
+                  <span className="calmlens-upload__size">{itemView.size}</span>
+                  {itemView.busy && (
                     <div
                       className="calmlens-progress"
                       role="progressbar"
-                      aria-label={view.message}
+                      aria-label={itemView.message}
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-valuenow={view.progressPercent}
+                      aria-valuenow={itemView.progressPercent}
                     >
                       <div
                         className="calmlens-progress__bar"
                         style={
-                          view.progressPercent === undefined
+                          itemView.progressPercent === undefined
                             ? undefined
-                            : { width: `${view.progressPercent}%` }
+                            : { width: `${itemView.progressPercent}%` }
                         }
                       />
                     </div>
                   )}
-                  <p className="calmlens-upload__message" role="status">
-                    {view.message}
-                  </p>
+                  {itemView.message && (
+                    <p className="calmlens-upload__message" role="status">
+                      {itemView.message}
+                    </p>
+                  )}
                 </div>
                 <div className="calmlens-upload__actions">
-                  {view.canRetry && (
+                  {!view.showDropzone && (
+                    <button
+                      type="button"
+                      className="calmlens-button"
+                      data-variant="outline"
+                      data-size="small"
+                      disabled={disabled}
+                      onClick={openPicker}
+                    >
+                      {messages.chooseAnother}
+                    </button>
+                  )}
+                  {itemView.canRetry && (
                     <button
                       type="button"
                       className="calmlens-icon-button"
@@ -268,8 +299,8 @@ export function CalmLensUploader({
                   <button
                     type="button"
                     className="calmlens-icon-button"
-                    aria-label={view.removeLabel}
-                    title={view.removeLabel}
+                    aria-label={itemView.removeLabel}
+                    title={itemView.removeLabel}
                     onClick={() => upload.remove(item.key)}
                   >
                     <Icon name="remove" />

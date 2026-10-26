@@ -16,7 +16,7 @@ const catPhoto = () =>
 const open = async (page: Page, hash: string) => {
   await page.goto(`/#${hash}`);
   const panel = page.getByRole("tabpanel");
-  await expect(panel.getByRole("button", { name: "Choose files" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: /^Select files?$/ })).toBeVisible();
   return panel;
 };
 
@@ -40,7 +40,7 @@ for (const tab of TABS) {
     }) => {
       const panel = await open(page, tab.hash);
       const chooser = page.waitForEvent("filechooser");
-      await panel.getByRole("button", { name: "Choose files" }).focus();
+      await panel.getByRole("button", { name: /^Select files?$/ }).focus();
       await page.keyboard.press("Enter");
       await (await chooser).setFiles({
         name: "picked-cat.jpg",
