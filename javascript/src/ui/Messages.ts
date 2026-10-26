@@ -1,4 +1,8 @@
+import { getFileIcon, renderFileIconSvg } from "./FileIcons";
 import type { UploadControllerOptions, UploadItem, UploadSnapshot } from "./UploadController";
+
+/** The size of a row's file-type icon, the same as an image preview. */
+const FILE_ICON_SIZE = 40;
 
 /**
  * The text the components show. Pass `messages` to any component to replace some or all of it,
@@ -128,8 +132,8 @@ export interface UploadItemView {
   canRetry: boolean;
   /** The remove button's accessible name: cancel while the file is busy. */
   removeLabel: string;
-  /** The extension shown when there is no image preview, such as `PDF`. */
-  extension: string;
+  /** The file-type icon shown when there is no image preview, as SVG markup. */
+  fileIcon: string;
   size: string;
 }
 
@@ -138,7 +142,6 @@ export const describeUploadItem = (
   messages: CalmLensMessages,
 ): UploadItemView => {
   const busy = item.stage === "queued" || item.stage === "uploading" || item.stage === "checking";
-  const dot = item.file.name.lastIndexOf(".");
   return {
     message: getUploadItemMessage(item, messages),
     outcome: getUploadItemOutcome(item),
@@ -149,7 +152,7 @@ export const describeUploadItem = (
         : undefined,
     canRetry: item.stage === "failed" && !item.errorCode?.startsWith("file/"),
     removeLabel: formatMessage(busy ? messages.cancel : messages.remove, { name: item.file.name }),
-    extension: dot > 0 ? item.file.name.slice(dot + 1, dot + 5) : "file",
+    fileIcon: item.previewUrl ? "" : renderFileIconSvg(getFileIcon(item.file), FILE_ICON_SIZE),
     size: formatBytes(item.file.size),
   };
 };

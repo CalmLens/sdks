@@ -106,7 +106,9 @@
           {#if item.previewUrl}
             <img class="calmlens-upload__thumb" src={item.previewUrl} alt="" />
           {:else}
-            <span class="calmlens-upload__thumb" aria-hidden="true">{itemView.extension}</span>
+            <span class="calmlens-upload__thumb" data-kind="file" aria-hidden="true"
+              >{@html itemView.fileIcon}</span
+            >
           {/if}
           <div class="calmlens-upload__body">
             <span class="calmlens-upload__name">{item.file.name}</span>

@@ -17,6 +17,9 @@ export const CALMLENS_STYLES = `
   --calmlens-success: #12a26f;
   --calmlens-warning: #e8a317;
   --calmlens-danger: #e5484d;
+  --calmlens-focus-ring: var(--calmlens-accent);
+  --calmlens-focus-width: 2px;
+  --calmlens-focus-offset: 2px;
   box-sizing: border-box;
   font: inherit;
 }
@@ -58,12 +61,12 @@ export const CALMLENS_STYLES = `
   white-space: nowrap; transition: background-color 150ms, border-color 150ms;
 }
 .calmlens-button:focus-visible, .calmlens-icon-button:focus-visible {
-  outline: 2px solid var(--calmlens-accent); outline-offset: 2px;
+  outline: var(--calmlens-focus-width) solid var(--calmlens-focus-ring); outline-offset: var(--calmlens-focus-offset);
 }
 .calmlens-button:hover:not(:disabled) { background: var(--calmlens-accent); filter: brightness(1.08); }
 .calmlens-button[data-variant="outline"] { background: none; color: inherit; border-color: var(--calmlens-border); }
 .calmlens-button[data-variant="outline"]:hover:not(:disabled) {
-  filter: none; background: var(--calmlens-surface); border-color: color-mix(in srgb, currentColor 30%, transparent);
+  filter: none; background: color-mix(in srgb, var(--calmlens-accent) 8%, transparent); border-color: var(--calmlens-accent);
 }
 .calmlens-button[data-size="small"] { padding: 4px 10px; }
 .calmlens-button:disabled {
@@ -83,6 +86,7 @@ export const CALMLENS_STYLES = `
   background: var(--calmlens-surface); border: 1px solid var(--calmlens-border);
   font-size: 0.6875em; font-weight: 700; text-transform: uppercase; overflow: hidden;
 }
+.calmlens-upload__thumb[data-kind="file"] { background: none; border: none; }
 .calmlens-upload[data-outcome="rejected"] img.calmlens-upload__thumb { filter: blur(6px); }
 .calmlens-upload__body { min-width: 0; display: grid; gap: 4px; }
 .calmlens-upload__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -104,7 +108,7 @@ export const CALMLENS_STYLES = `
   display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
   border: 1px solid transparent; background: none; color: inherit;
 }
-.calmlens-icon-button:hover { background: var(--calmlens-surface); border-color: var(--calmlens-border); }
+.calmlens-icon-button:hover { background: color-mix(in srgb, var(--calmlens-accent) 8%, transparent); border-color: var(--calmlens-border); }
 @media (prefers-reduced-motion: reduce) {
   .calmlens-progress__bar, .calmlens-dropzone, .calmlens-dropzone__icon, .calmlens-media__content { transition: none; }
   .calmlens-progress:not([aria-valuenow]) .calmlens-progress__bar { animation: none; left: 0; width: 100%; }

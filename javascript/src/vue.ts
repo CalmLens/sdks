@@ -250,11 +250,12 @@ export const CalmLensUploader = defineComponent({
                 [
                   item.previewUrl
                     ? h("img", { class: "calmlens-upload__thumb", src: item.previewUrl, alt: "" })
-                    : h(
-                        "span",
-                        { class: "calmlens-upload__thumb", "aria-hidden": "true" },
-                        itemView.extension,
-                      ),
+                    : h("span", {
+                        class: "calmlens-upload__thumb",
+                        "data-kind": "file",
+                        "aria-hidden": "true",
+                        innerHTML: itemView.fileIcon,
+                      }),
                   h("div", { class: "calmlens-upload__body" }, [
                     h("span", { class: "calmlens-upload__name" }, item.file.name),
                     h("span", { class: "calmlens-upload__size" }, itemView.size),

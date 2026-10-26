@@ -112,6 +112,17 @@
       },
       "default": "./esm/ui.js"
     },
+    "./file-icons": {
+      "import": {
+        "types": "./esm/file-icons.d.ts",
+        "default": "./esm/file-icons.js"
+      },
+      "require": {
+        "types": "./cjs/file-icons.d.ts",
+        "default": "./cjs/file-icons.js"
+      },
+      "default": "./esm/file-icons.js"
+    },
     "./react": {
       "import": {
         "types": "./esm/react.d.ts",

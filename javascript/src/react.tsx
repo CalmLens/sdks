@@ -240,9 +240,12 @@ export function CalmLensUploader({
                 {item.previewUrl ? (
                   <img className="calmlens-upload__thumb" src={item.previewUrl} alt="" />
                 ) : (
-                  <span className="calmlens-upload__thumb" aria-hidden="true">
-                    {itemView.extension}
-                  </span>
+                  <span
+                    className="calmlens-upload__thumb"
+                    data-kind="file"
+                    aria-hidden="true"
+                    dangerouslySetInnerHTML={{ __html: itemView.fileIcon }}
+                  />
                 )}
                 <div className="calmlens-upload__body">
                   <span className="calmlens-upload__name">{item.file.name}</span>

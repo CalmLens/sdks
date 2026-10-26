@@ -59,6 +59,17 @@ const icon = (name: IconName) => {
   return svg;
 };
 
+/** A row's file-type icon, from the SDK's own SVG markup. */
+const fileThumbnail = (svg: string) => {
+  const thumbnail = el("span", {
+    class: "calmlens-upload__thumb",
+    "data-kind": "file",
+    "aria-hidden": "true",
+  });
+  thumbnail.innerHTML = svg;
+  return thumbnail;
+};
+
 const numberAttribute = (element: Element, name: string) => {
   const value = element.getAttribute(name);
   return value === null || value === "" ? undefined : Number(value);
@@ -338,9 +349,7 @@ export class CalmLensUploaderElement extends BaseElement {
           thumbnails.get(item.key) ??
           (item.previewUrl
             ? el("img", { class: "calmlens-upload__thumb", src: item.previewUrl, alt: "" })
-            : el("span", { class: "calmlens-upload__thumb", "aria-hidden": "true" }, [
-                itemView.extension,
-              ]));
+            : fileThumbnail(itemView.fileIcon));
         const bar = el("div", { class: "calmlens-progress__bar" });
         if (itemView.progressPercent !== undefined)
           bar.style.width = `${itemView.progressPercent}%`;

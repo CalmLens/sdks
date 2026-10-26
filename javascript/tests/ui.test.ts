@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { getFileIcon, renderFileIconSvg } from "../src/file-icons";
 import { MockCalmLensAppClient } from "../src/testing";
 import {
   type CalmLensUpload,
@@ -436,5 +437,28 @@ describe("UploadController", () => {
     controller.addFiles([photo()]);
     await settle(controller);
     expect(controller.getSnapshot().items[0]?.errorCode).toBe("sdk/invalid-config");
+  });
+});
+
+describe("getFileIcon", () => {
+  it("finds the family from the extension, then the MIME type", () => {
+    expect(getFileIcon({ name: "Report.PDF", type: "" })).toEqual({
+      family: "documents",
+      extension: "pdf",
+    });
+    expect(getFileIcon({ name: "clip", type: "video/quicktime" })).toEqual({
+      family: "video",
+      extension: "",
+    });
+    expect(getFileIcon({ name: "notes.unknownext", type: "application/x-thing" })).toEqual({
+      family: "unknown",
+      extension: "",
+    });
+  });
+
+  it("keeps file names out of the icon markup", () => {
+    const icon = getFileIcon({ name: 'x.<svg onload="alert(1)">', type: "image/svg+xml" });
+    expect(icon.extension).toBe("");
+    expect(renderFileIconSvg(icon, 40)).not.toContain("onload");
   });
 });

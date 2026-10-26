@@ -21,6 +21,7 @@ const input = {
   server: "src/server.ts",
   app: "src/app.ts",
   ui: "src/ui.ts",
+  "file-icons": "src/file-icons.ts",
   react: "src/react.tsx",
   vue: "src/vue.ts",
   elements: "src/elements.ts",
