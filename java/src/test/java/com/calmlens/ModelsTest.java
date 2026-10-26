@@ -187,10 +187,10 @@ class ModelsTest {
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
     Models.ReportPolicy policy = Json.GSON.fromJson("""
-        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
+        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
         """, Models.ReportPolicy.class);
     Models.CategoryPolicyScore category = policy.categories().get("violence");
-    assertEquals(0.6, category.settings().threshold());
+    assertEquals("block", category.settings().categoryAction());
     assertEquals("snapshot-rule", category.settings().restrictions().get(0).name());
     assertEquals(0, category.source().index());
     assertEquals("asset-override", policy.decision().source());

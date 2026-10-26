@@ -385,7 +385,7 @@ type CategoryPolicyScore struct {
 	Settings *CategoryPolicySettingsSnapshot `json:"settings,omitempty"`
 }
 
-// CategoryPolicySource identifies the deciding rule or threshold.
+// CategoryPolicySource identifies the deciding rule, or that the policy score stayed below 50%.
 type CategoryPolicySource struct {
 	Kind    string `json:"kind"`
 	Index   *int   `json:"index,omitempty"`
@@ -404,7 +404,6 @@ type PolicyRuleSnapshot struct {
 // CategoryPolicySettingsSnapshot preserves settings independently of later policy edits.
 type CategoryPolicySettingsSnapshot struct {
 	Enabled        *bool                `json:"enabled,omitempty"`
-	Threshold      float64              `json:"threshold"`
 	CategoryAction string               `json:"categoryAction"`
 	Allowances     []PolicyRuleSnapshot `json:"allowances"`
 	Restrictions   []PolicyRuleSnapshot `json:"restrictions"`

@@ -447,7 +447,6 @@ class PolicyRuleSnapshot(_PolicyRuleSnapshotRequired, total=False):
 
 
 class _CategoryPolicySettingsSnapshotRequired(TypedDict):
-    threshold: float
     categoryAction: ModerationAction
     allowances: List[PolicyRuleSnapshot]
     restrictions: List[PolicyRuleSnapshot]

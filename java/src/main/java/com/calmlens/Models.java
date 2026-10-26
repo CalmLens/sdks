@@ -1781,7 +1781,7 @@ public final class Models {
   public record CategoryPolicyScore(Double score, String action, CategoryPolicySource source,
       CategoryPolicySettingsSnapshot settings) {}
 
-  /** The category threshold or rule that decided the outcome. */
+  /** The rule that decided the outcome, or that the policy score stayed below 50%. */
   public record CategoryPolicySource(String kind, Integer index, List<Integer> indexes) {
     public CategoryPolicySource { indexes = list(indexes); }
   }
@@ -1792,7 +1792,7 @@ public final class Models {
   }
 
   /** Historical category settings used to explain the saved decision. */
-  public record CategoryPolicySettingsSnapshot(Double threshold, String categoryAction,
+  public record CategoryPolicySettingsSnapshot(String categoryAction,
       List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions, Boolean enabled) {
     public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
   }

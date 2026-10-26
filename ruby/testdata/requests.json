@@ -574,7 +574,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.6,
                   "categoryAction": "purge",
                   "allowances": [
                     {
@@ -1834,7 +1833,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -2424,7 +2422,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -3031,7 +3028,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -3628,7 +3624,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -4216,7 +4211,6 @@
                       },
                       "settings": {
                         "enabled": true,
-                        "threshold": 0.5,
                         "categoryAction": "allow",
                         "allowances": [
                           {
@@ -4810,7 +4804,6 @@
                     },
                     "settings": {
                       "enabled": true,
-                      "threshold": 0.5,
                       "categoryAction": "allow",
                       "allowances": [
                         {
@@ -5410,7 +5403,6 @@
                     },
                     "settings": {
                       "enabled": true,
-                      "threshold": 0.5,
                       "categoryAction": "allow",
                       "allowances": [
                         {
@@ -5999,7 +5991,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -6582,7 +6573,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -7160,7 +7150,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -7738,7 +7727,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -8316,7 +8304,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -8897,7 +8884,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -9533,7 +9519,6 @@
                 },
                 "settings": {
                   "enabled": true,
-                  "threshold": 0.5,
                   "categoryAction": "allow",
                   "allowances": [
                     {

@@ -106,10 +106,14 @@ string_enum! {
         ViolenceNaturalDeath = "violence-natural-death",
         /// Violence: Graphic detail.
         ViolenceGraphic = "violence-graphic",
+        /// Violence: Excessive gore.
+        ViolenceGore = "violence-gore",
         /// Violence: Weapon without an attack.
         ViolenceWeapon = "violence-weapon",
         /// Violence: Combat sport or training.
         ViolenceSport = "violence-sport",
+        /// Violence: Text.
+        ViolenceText = "violence-text",
         /// Violence: Historical.
         ViolenceHistorical = "violence-historical",
         /// Violence: Reporting or documentary.
@@ -178,6 +182,10 @@ string_enum! {
         HateInferiority = "hate-inferiority",
         /// Hate: Exclusion or discrimination.
         HateExclusion = "hate-exclusion",
+        /// Hate: Hate symbol.
+        HateSymbol = "hate-symbol",
+        /// Hate: Stated hatred.
+        HateHostility = "hate-hostility",
         /// Hate: Threats or incitement.
         HateThreat = "hate-threat",
         /// Hate: Historical.

@@ -486,11 +486,11 @@ func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 
 func TestReportPolicySnapshotDecode(t *testing.T) {
 	var policy ReportPolicy
-	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"threshold":0.6,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
+	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
 		t.Fatal(err)
 	}
 	category := policy.Categories["violence"]
-	if category.Settings.Threshold != 0.6 || category.Settings.Restrictions[0].Name != "snapshot-rule" || *category.Source.Index != 0 {
+	if category.Settings.CategoryAction != "block" || category.Settings.Restrictions[0].Name != "snapshot-rule" || *category.Source.Index != 0 {
 		t.Fatalf("lost category snapshot: %#v", category)
 	}
 	rule := category.Settings.Restrictions[0]

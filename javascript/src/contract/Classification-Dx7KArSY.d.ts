@@ -370,8 +370,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "violence";
     readonly kind: "harm";
     readonly displayName: "Graphic detail";
-    readonly description: "Severe bodily injury or death shown or described with explicit disturbing bodily detail, such as exposed organs, dismemberment or gore.";
-    readonly exclusions: "A threat or mention of violence without explicit disturbing bodily detail; inferred or unseen injuries; solely intentional self-injury or suicide.";
+    readonly description: "Severe bodily injury or death shown or described with explicit disturbing bodily detail, such as exposed organs, dismemberment or gore. In images, visible open wounds and heavy bleeding are graphic too.";
+    readonly exclusions: "A threat or mention of violence without explicit disturbing bodily detail; in text, heavy bleeding, gashes, cuts, bruises or other serious injuries described without exposed tissue, bone or organs, mutilation or dismemberment; in images, modest blood or minor wounds; inferred or unseen injuries; solely intentional self-injury or suicide.";
+  };
+  readonly "violence-gore": {
+    readonly category: "violence";
+    readonly kind: "harm";
+    readonly displayName: "Excessive gore";
+    readonly description: "Gruesome bodily harm beyond graphic detail: dismembered, mutilated or decapitated bodies, exposed internal organs or bones, charred human remains, or an animal tortured or killed in gruesome detail.";
+    readonly exclusions: "Visible wounds, blood, burns or injuries without gruesome detail, which are Graphic detail; clinical or surgical images in a medical setting; ordinary hunting, fishing or food processing.";
   };
   readonly "violence-weapon": {
     readonly category: "violence";
@@ -388,6 +395,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "Recognizable consensual combat sport or protective training, such as boxing, martial arts, wrestling, fencing or self-defence practice, without graphic bodily detail or abusive conduct.";
     readonly exclusions: "Graphic bodily detail, death, an attack outside the sport, abusive conduct or a non-consensual fight dressed as sport. A non-graphic sports injury alone does not invalidate the sport context.";
     readonly inputs: readonly ["image"];
+  };
+  readonly "violence-text": {
+    readonly category: "violence";
+    readonly kind: "context";
+    readonly displayName: "Text";
+    readonly description: "The content is text, not an image or video. It is set from the input type and never judged from the content.";
+    readonly exclusions: "Images and video, including readable text shown in them.";
+    readonly inputs: readonly ["text"];
+    readonly fromInput: true;
   };
   readonly "violence-historical": {
     readonly category: "violence";
@@ -626,6 +642,21 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly displayName: "Exclusion or discrimination";
     readonly description: "The author advocates or endorses denying rights to, or excluding, people because of a protected identity.";
     readonly exclusions: "Reporting, criticising a policy, or lawful distinctions that attack no identity.";
+  };
+  readonly "hate-symbol": {
+    readonly category: "hate";
+    readonly kind: "harm";
+    readonly displayName: "Hate symbol";
+    readonly description: "A recognised hate emblem, slogan or gesture with supported hateful meaning, such as a Nazi swastika, including one shown in a factual report or counter-hate material, with no other attack on a protected group.";
+    readonly exclusions: "Ordinary religious or cultural symbols, similar shapes, ambiguous marks, a colour scheme alone or a discussion displaying no actual hate emblem; a Confederate flag on its own, without slurs, threats, other hate emblems or an identity-based attack; a dehumanizing depiction, slur or other attack, which are other forms.";
+    readonly inputs: readonly ["image"];
+  };
+  readonly "hate-hostility": {
+    readonly category: "hate";
+    readonly kind: "harm";
+    readonly displayName: "Stated hatred";
+    readonly description: "Hatred, dislike or hostility stated towards a protected identity group as a whole, such as saying “I hate men”, with no slur, insult or epithet, dehumanization, inferiority claim or harmful stereotype, exclusion or threat. It counts so that a policy can allow or restrict it.";
+    readonly exclusions: "Slurs, identity-based insults or epithets such as calling a group disgusting or repulsive, dehumanization, inferiority claims or harmful stereotypes, exclusion and threats, which are other forms; dislike of particular people; dislike of something a group does, such as “I hate how they …”; sarcastic or ironic praise; criticism of beliefs, ideologies or conduct.";
   };
   readonly "hate-threat": {
     readonly category: "hate";
@@ -910,9 +941,11 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "hate-exclusion": "hate-exclusion";
   "hate-fictional": "hate-fictional";
   "hate-historical": "hate-historical";
+  "hate-hostility": "hate-hostility";
   "hate-inferiority": "hate-inferiority";
   "hate-slurs": "hate-slurs";
   "hate-support-prevention": "hate-support-prevention";
+  "hate-symbol": "hate-symbol";
   "hate-threat": "hate-threat";
   "personal-information-contact": "personal-information-contact";
   "personal-information-credentials": "personal-information-credentials";
@@ -975,6 +1008,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "violence-extremism": "violence-extremism";
   "violence-fantasy": "violence-fantasy";
   "violence-fictional": "violence-fictional";
+  "violence-gore": "violence-gore";
   "violence-graphic": "violence-graphic";
   "violence-historical": "violence-historical";
   "violence-injury": "violence-injury";
@@ -982,6 +1016,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "violence-preparation": "violence-preparation";
   "violence-sport": "violence-sport";
   "violence-support-prevention": "violence-support-prevention";
+  "violence-text": "violence-text";
   "violence-threat": "violence-threat";
   "violence-violent-death": "violence-violent-death";
   "violence-weapon": "violence-weapon";
@@ -1061,9 +1096,11 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-exclusion": "hate-exclusion";
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
+    "hate-hostility": "hate-hostility";
     "hate-inferiority": "hate-inferiority";
     "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
+    "hate-symbol": "hate-symbol";
     "hate-threat": "hate-threat";
     "personal-information-contact": "personal-information-contact";
     "personal-information-credentials": "personal-information-credentials";
@@ -1126,6 +1163,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-extremism": "violence-extremism";
     "violence-fantasy": "violence-fantasy";
     "violence-fictional": "violence-fictional";
+    "violence-gore": "violence-gore";
     "violence-graphic": "violence-graphic";
     "violence-historical": "violence-historical";
     "violence-injury": "violence-injury";
@@ -1133,6 +1171,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-preparation": "violence-preparation";
     "violence-sport": "violence-sport";
     "violence-support-prevention": "violence-support-prevention";
+    "violence-text": "violence-text";
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
@@ -1215,9 +1254,11 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-exclusion": "hate-exclusion";
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
+    "hate-hostility": "hate-hostility";
     "hate-inferiority": "hate-inferiority";
     "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
+    "hate-symbol": "hate-symbol";
     "hate-threat": "hate-threat";
     "personal-information-contact": "personal-information-contact";
     "personal-information-credentials": "personal-information-credentials";
@@ -1280,6 +1321,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-extremism": "violence-extremism";
     "violence-fantasy": "violence-fantasy";
     "violence-fictional": "violence-fictional";
+    "violence-gore": "violence-gore";
     "violence-graphic": "violence-graphic";
     "violence-historical": "violence-historical";
     "violence-injury": "violence-injury";
@@ -1287,6 +1329,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-preparation": "violence-preparation";
     "violence-sport": "violence-sport";
     "violence-support-prevention": "violence-support-prevention";
+    "violence-text": "violence-text";
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
@@ -1365,9 +1408,11 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-exclusion": "hate-exclusion";
     "hate-fictional": "hate-fictional";
     "hate-historical": "hate-historical";
+    "hate-hostility": "hate-hostility";
     "hate-inferiority": "hate-inferiority";
     "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
+    "hate-symbol": "hate-symbol";
     "hate-threat": "hate-threat";
     "personal-information-contact": "personal-information-contact";
     "personal-information-credentials": "personal-information-credentials";
@@ -1430,6 +1475,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-extremism": "violence-extremism";
     "violence-fantasy": "violence-fantasy";
     "violence-fictional": "violence-fictional";
+    "violence-gore": "violence-gore";
     "violence-graphic": "violence-graphic";
     "violence-historical": "violence-historical";
     "violence-injury": "violence-injury";
@@ -1437,6 +1483,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-preparation": "violence-preparation";
     "violence-sport": "violence-sport";
     "violence-support-prevention": "violence-support-prevention";
+    "violence-text": "violence-text";
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
@@ -1522,9 +1569,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -1587,6 +1636,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -1594,6 +1644,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -1676,9 +1727,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -1741,6 +1794,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -1748,6 +1802,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -1826,9 +1881,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -1891,6 +1948,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -1898,6 +1956,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -1981,9 +2040,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -2046,6 +2107,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -2053,6 +2115,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -2135,9 +2198,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -2200,6 +2265,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -2207,6 +2273,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -2285,9 +2352,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -2350,6 +2419,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -2357,6 +2427,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -2440,9 +2511,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -2505,6 +2578,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -2512,6 +2586,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -2594,9 +2669,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -2659,6 +2736,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -2666,6 +2744,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -2744,9 +2823,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -2809,6 +2890,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -2816,6 +2898,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -2899,9 +2982,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -2964,6 +3049,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -2971,6 +3057,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -3053,9 +3140,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -3118,6 +3207,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -3125,6 +3215,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -3203,9 +3294,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -3268,6 +3361,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -3275,6 +3369,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -3358,9 +3453,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -3423,6 +3520,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -3430,6 +3528,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -3512,9 +3611,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -3577,6 +3678,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -3584,6 +3686,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -3662,9 +3765,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -3727,6 +3832,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -3734,6 +3840,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -3817,9 +3924,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -3882,6 +3991,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -3889,6 +3999,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -3971,9 +4082,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -4036,6 +4149,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -4043,6 +4157,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -4121,9 +4236,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -4186,6 +4303,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -4193,6 +4311,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -4276,9 +4395,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -4341,6 +4462,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -4348,6 +4470,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -4430,9 +4553,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -4495,6 +4620,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -4502,6 +4628,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -4580,9 +4707,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -4645,6 +4774,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -4652,6 +4782,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -4735,9 +4866,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -4800,6 +4933,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -4807,6 +4941,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -4889,9 +5024,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -4954,6 +5091,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -4961,6 +5099,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
@@ -5039,9 +5178,11 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-exclusion": "hate-exclusion";
       "hate-fictional": "hate-fictional";
       "hate-historical": "hate-historical";
+      "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
+      "hate-symbol": "hate-symbol";
       "hate-threat": "hate-threat";
       "personal-information-contact": "personal-information-contact";
       "personal-information-credentials": "personal-information-credentials";
@@ -5104,6 +5245,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-extremism": "violence-extremism";
       "violence-fantasy": "violence-fantasy";
       "violence-fictional": "violence-fictional";
+      "violence-gore": "violence-gore";
       "violence-graphic": "violence-graphic";
       "violence-historical": "violence-historical";
       "violence-injury": "violence-injury";
@@ -5111,6 +5253,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-preparation": "violence-preparation";
       "violence-sport": "violence-sport";
       "violence-support-prevention": "violence-support-prevention";
+      "violence-text": "violence-text";
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";

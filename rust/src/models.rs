@@ -1621,7 +1621,7 @@ pub struct CategoryPolicyScore {
     /// `allow`, `limit`, `age-restrict`, `block` or `purge`.
     #[serde(default)]
     pub action: String,
-    /// The rule or threshold that decided the category.
+    /// The rule that decided the category, or that its policy score stayed below 50%.
     #[serde(default)]
     pub source: Option<CategoryPolicySource>,
     /// Settings at decision time, independent of subsequent policy edits.
@@ -1629,7 +1629,7 @@ pub struct CategoryPolicyScore {
     pub settings: Option<CategoryPolicySettingsSnapshot>,
 }
 
-/// The category threshold or rule that decided the outcome.
+/// The rule that decided the outcome, or that the policy score stayed below 50%.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1675,9 +1675,6 @@ pub struct CategoryPolicySettingsSnapshot {
     /// Whether the category was enabled.
     #[serde(default)]
     pub enabled: Option<bool>,
-    /// Saved threshold.
-    #[serde(default)]
-    pub threshold: f64,
     /// Saved category action.
     #[serde(default)]
     pub category_action: String,

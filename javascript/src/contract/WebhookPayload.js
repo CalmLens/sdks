@@ -1,4 +1,4 @@
-import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BLLGx94V.js";
+import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BHww9qiT.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-I9R-uNBH.js";
@@ -66,7 +66,10 @@ const normalizePolicyCondition = (condition) => [...new Map(condition.map((claus
 	return [JSON.stringify(normalized), normalized];
 })).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, clause]) => clause);
 const policyConditionKey = (scope, condition) => `${scope}:${JSON.stringify(normalizePolicyCondition(condition))}`;
-new Set([
+// packages/shared/src/PlatformRestrictions.ts
+/** A platform restriction acts at this policy score (category score × condition evidence). */
+const PLATFORM_RESTRICTION_THRESHOLD = .5;
+const PLATFORM_RESTRICTION_CATEGORIES = new Set([
 	{
 		id: "sexualised-minors",
 		category: "sexual",
@@ -97,7 +100,8 @@ new Set([
 	...[]
 ].map((restriction) => restriction.category));
 // packages/shared/src/Project.ts
-const MINIMUM_MODERATION_THRESHOLD = .1;
+/** The policy score from which a category's action applies. The same for every policy and category. */
+const POLICY_THRESHOLD = .5;
 const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTION_SCHEMA });
 /** Ranks actions by strength: allowances must be softer than the category action, restrictions not. */
 const FLAGGED_CONTENT_ACTION_RANK = {
@@ -122,10 +126,9 @@ const policyRuleKey = (rule) => policyConditionKey("some", ruleCondition(rule));
 const uniqueRules = (rules) => new Set(rules.map(policyRuleKey)).size === rules.length;
 const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	enabled: zod.boolean().optional().meta({ description: "Whether this category can affect policy decisions. Disabled categories retain their configured actions and rules." }),
-	threshold: zod.number().min(0).max(1).transform((threshold) => Math.max(threshold, MINIMUM_MODERATION_THRESHOLD)).meta({ description: "The policy score at which the category's action applies. The policy score is the category score, lowered by allowances that cover the content and raised to a restriction's presence score." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
-	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches its threshold: allow it, limit it so it is delivered normally but marked for reduced reach, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
+	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches 0.5: allow it, limit it so it is delivered normally but marked for reduced reach, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
 	const categoryAction = value.flaggedContentPolicy?.action ?? "block";
 	for (const kind of ["allowance", "restriction"]) {
@@ -189,6 +192,12 @@ const REMOTE_URL_RULE_SCHEMA = zod.object({
 	mode: zod.enum(["allow", "deny"]).meta({ description: "`allow` accepts only the listed domains; `deny` accepts every domain except the listed ones." }),
 	domains: zod.array(zod.string().regex(/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/, { message: "Use a bare lowercase domain such as example.com" })).min(1).max(100).refine((domains) => new Set(domains).size === domains.length, { message: "Domains must be unique" })
 });
+zod.enum([
+	"general-community",
+	"children-platform",
+	"education-support",
+	"wholesome-community"
+]);
 const PROJECT_SETTINGS_SCHEMA = zod.object({
 	aiMediaSearchEnabled: zod.boolean().optional().meta({ description: "Index audio speech and video frames and transcripts for AI search. Billed per indexed media unit. Disabled by default; images are always searchable." }),
 	moderationProfileId: zod.string().min(1).optional(),
@@ -221,7 +230,7 @@ zod.object({
 	/** Secret that the project's test inputs carry, so only its members can make one. */
 	testInputKey: zod.string().regex(TEST_INPUT_KEY_PATTERN).nullish()
 });
-Object.fromEntries(MODERATION_POLICY_CATEGORIES.map((category) => [category, MINIMUM_MODERATION_THRESHOLD]));
+Object.fromEntries(MODERATION_POLICY_CATEGORIES.map((category) => [category, PLATFORM_RESTRICTION_CATEGORIES.has(category) ? Math.min(POLICY_THRESHOLD, PLATFORM_RESTRICTION_THRESHOLD) : POLICY_THRESHOLD]));
 // packages/shared/src/Asset.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
 const ASSET_CLASSIFICATION_STATUS_SCHEMA = zod.enum([

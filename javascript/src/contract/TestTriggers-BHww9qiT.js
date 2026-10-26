@@ -8399,8 +8399,15 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "violence",
 		kind: "harm",
 		displayName: "Graphic detail",
-		description: "Severe bodily injury or death shown or described with explicit disturbing bodily detail, such as exposed organs, dismemberment or gore.",
-		exclusions: "A threat or mention of violence without explicit disturbing bodily detail; inferred or unseen injuries; solely intentional self-injury or suicide."
+		description: "Severe bodily injury or death shown or described with explicit disturbing bodily detail, such as exposed organs, dismemberment or gore. In images, visible open wounds and heavy bleeding are graphic too.",
+		exclusions: "A threat or mention of violence without explicit disturbing bodily detail; in text, heavy bleeding, gashes, cuts, bruises or other serious injuries described without exposed tissue, bone or organs, mutilation or dismemberment; in images, modest blood or minor wounds; inferred or unseen injuries; solely intentional self-injury or suicide."
+	},
+	"violence-gore": {
+		category: "violence",
+		kind: "harm",
+		displayName: "Excessive gore",
+		description: "Gruesome bodily harm beyond graphic detail: dismembered, mutilated or decapitated bodies, exposed internal organs or bones, charred human remains, or an animal tortured or killed in gruesome detail.",
+		exclusions: "Visible wounds, blood, burns or injuries without gruesome detail, which are Graphic detail; clinical or surgical images in a medical setting; ordinary hunting, fishing or food processing."
 	},
 	"violence-weapon": {
 		category: "violence",
@@ -8417,6 +8424,15 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "Recognizable consensual combat sport or protective training, such as boxing, martial arts, wrestling, fencing or self-defence practice, without graphic bodily detail or abusive conduct.",
 		exclusions: "Graphic bodily detail, death, an attack outside the sport, abusive conduct or a non-consensual fight dressed as sport. A non-graphic sports injury alone does not invalidate the sport context.",
 		inputs: ["image"]
+	},
+	"violence-text": {
+		category: "violence",
+		kind: "context",
+		displayName: "Text",
+		description: "The content is text, not an image or video. It is set from the input type and never judged from the content.",
+		exclusions: "Images and video, including readable text shown in them.",
+		inputs: ["text"],
+		fromInput: true
 	},
 	"violence-historical": {
 		category: "violence",
@@ -8655,6 +8671,21 @@ const MODERATION_QUALIFIER_INFO = {
 		displayName: "Exclusion or discrimination",
 		description: "The author advocates or endorses denying rights to, or excluding, people because of a protected identity.",
 		exclusions: "Reporting, criticising a policy, or lawful distinctions that attack no identity."
+	},
+	"hate-symbol": {
+		category: "hate",
+		kind: "harm",
+		displayName: "Hate symbol",
+		description: "A recognised hate emblem, slogan or gesture with supported hateful meaning, such as a Nazi swastika, including one shown in a factual report or counter-hate material, with no other attack on a protected group.",
+		exclusions: "Ordinary religious or cultural symbols, similar shapes, ambiguous marks, a colour scheme alone or a discussion displaying no actual hate emblem; a Confederate flag on its own, without slurs, threats, other hate emblems or an identity-based attack; a dehumanizing depiction, slur or other attack, which are other forms.",
+		inputs: ["image"]
+	},
+	"hate-hostility": {
+		category: "hate",
+		kind: "harm",
+		displayName: "Stated hatred",
+		description: "Hatred, dislike or hostility stated towards a protected identity group as a whole, such as saying “I hate men”, with no slur, insult or epithet, dehumanization, inferiority claim or harmful stereotype, exclusion or threat. It counts so that a policy can allow or restrict it.",
+		exclusions: "Slurs, identity-based insults or epithets such as calling a group disgusting or repulsive, dehumanization, inferiority claims or harmful stereotypes, exclusion and threats, which are other forms; dislike of particular people; dislike of something a group does, such as “I hate how they …”; sarcastic or ironic praise; criticism of beliefs, ideologies or conduct."
 	},
 	"hate-threat": {
 		category: "hate",
@@ -9134,7 +9165,7 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 	score: zod.number().min(0).max(1).describe("The highest category policy score."),
 	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, zod.object({
 		score: zod.number().min(0).max(1).describe("How strongly the content meets the policy, from 0 to 1: the category score, lowered by allowances that cover the content and raised to the presence score of a restriction."),
-		action: FLAGGED_CONTENT_ACTION_SCHEMA.describe("What the policy does with this category. `allow` when the policy score is below the category threshold."),
+		action: FLAGGED_CONTENT_ACTION_SCHEMA.describe("What the policy does with this category. `allow` when the policy score is below 0.5."),
 		source: zod.discriminatedUnion("kind", [
 			zod.object({ kind: zod.literal("default") }).strict(),
 			zod.object({ kind: zod.literal("below-threshold") }).strict(),
@@ -9152,11 +9183,10 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 		]).optional(),
 		settings: zod.object({
 			enabled: zod.boolean().optional(),
-			threshold: zod.number().min(0).max(1),
 			categoryAction: FLAGGED_CONTENT_ACTION_SCHEMA,
 			allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50),
 			restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
-		}).strict().optional().describe("The category threshold, default action and rules in force at decision time.")
+		}).strict().optional().describe("The category's default action and rules in force at decision time.")
 	}).strict()).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
 	evidence: zod.enum(["decision", "full"]).optional().describe("`decision` when questions that could not change any action were skipped: every action is final, but a category's policy score and the rule credited with its action can differ from a detailed report. `full` (or absent) when every question was answered. Request a detailed report to answer the rest."),
 	decision: zod.object({

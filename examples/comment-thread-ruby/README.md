@@ -95,9 +95,9 @@ which may be `age-restrict` (deliver only through signed URLs or API keys) or `p
 the content, leaving nothing to review) for the project's other uploads.
 
 The override changes only what happens to a flagged asset. Your project's moderation policy
-still decides what counts as flagged: category thresholds and rules work as usual. With the
-override, a category above its threshold is held even if the project sets that category's
-action to `allow`. See the moderation policies guide in the CalmLens docs.
+still decides what counts as flagged: its allowances and restrictions work as usual. With the
+override, a category whose policy score reaches 50% is held even if the project sets that
+category's action to `allow`. See the moderation policies guide in the CalmLens docs.
 
 ## Review decisions
 
