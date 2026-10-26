@@ -694,7 +694,7 @@ public final class Calmmarket {
         lensReady.set(true);
       }
       SignedUrl signed = client.assets.createSignedUrl(new SignedUrlOptions(photo.assetId)
-          .resource("content").lens(CARD_LENS).expiresInSeconds((long) SIGNED_URL_SECONDS));
+          .resource("rendered").lens(CARD_LENS).expiresInSeconds((long) SIGNED_URL_SECONDS));
       if (!safePreviewUrl(signed.url())) return text(502, "Invalid preview URL");
       Map<String, String> headers = securityHeaders();
       headers.put("location", signed.url());

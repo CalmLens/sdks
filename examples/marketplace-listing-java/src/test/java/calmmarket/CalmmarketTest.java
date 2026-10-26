@@ -599,7 +599,7 @@ class CalmmarketTest {
     JsonObject body = JsonParser.parseString(signing.bodyText()).getAsJsonObject();
     assertEquals(Calmmarket.CARD_LENS, body.get("lens").getAsString());
     assertEquals(60, body.get("expiresInSeconds").getAsInt());
-    assertEquals("content", body.get("resource").getAsString());
+    assertEquals("rendered", body.get("resource").getAsString());
 
     // The lens is ensured once; an unsafe signed URL is refused.
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
