@@ -1332,6 +1332,7 @@ export class MockCalmLensApi {
           width: null,
           height: null,
           perceptualHash: null,
+          perceptualHashQuality: null,
           ...asset.content.image,
           thumbhash: MOCK_THUMBHASH,
           averageColor: asset.content.image?.averageColor ?? "#7f7f7f",
