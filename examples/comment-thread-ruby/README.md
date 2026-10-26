@@ -9,12 +9,17 @@ held for a person to review before anyone sees it.
   or `limited`. CalmLens delivers a limited field like an allowed one, and this thread has no
   recommendations or ranking to keep it out of, so it shows as usual.
 - A reply with any field `blocked`, `age-restricted` or `purged` is **held**. The thread has no
-  age check, so it holds age-restricted fields too. The thread shows a "held for review"
-  placeholder, never its name or text, and the **Held for review** panel lists its asset IDs.
+  age check, so it holds age-restricted fields too. Only its author (the browser that posted it)
+  sees a held reply, marked as awaiting review with the categories the moderation report's
+  policy decision flagged (`classification.moderation.policy.decision.flaggedCategories`).
+  Everyone else sees nothing until it is approved. The **Review queue** beside the thread lists
+  held replies by their flagged categories, without their name or text.
 - A moderator reviews held assets in the CalmLens portal. Allowing or limiting a held asset
-  releases the reply into the thread. Blocking, purging or age-restricting it keeps the reply out for
-  good, and the app then deletes the reply's stored content from CalmLens. The asset record
-  and its moderation report remain.
+  releases the reply into the thread, marked as approved after review. Blocking, purging or
+  age-restricting it keeps the reply out for good, and the app then deletes the reply's stored
+  content from CalmLens. The asset record and its moderation report remain. The app forgets the
+  reply's name and text too, but keeps a record its author sees: the reply was removed after
+  review, and for which categories.
 - Pending, unknown and unreachable results, and fields whose `classification.status` is `failed`,
   never publish.
 
@@ -37,12 +42,14 @@ key never silently runs the demo instead of live mode. The server listens on `12
 ## Demo mode
 
 With `CALMLENS_DEMO=1`, the app loads [demo.rb](demo.rb), which uses the SDK's offline
-`CalmLens::MockServerClient`, labelled **Demo** in the banner. The live code path never loads the
-mock. Choose an outcome before posting:
+`CalmLens::MockServerClient`; the header says moderation outcomes are simulated. The live code
+path never loads the mock. The demo thread starts with a few replies from other people, posted
+through the same submit path; one of them was held and then approved by the simulated reviewer.
+Choose a **Demo outcome** under the reply box:
 
-- **Clean**: both fields are allowed and the reply publishes.
-- **Blocked reply**: the reply text comes back blocked and the reply is held.
-- **Blocked display name**: the name comes back blocked and the reply is held.
+- **Allowed**: both fields are allowed and the reply publishes.
+- **Reply flagged**: the reply text comes back blocked for harassment and the reply is held.
+- **Display name flagged**: the name comes back blocked for profanity and the reply is held.
 - **Processing error**: the reply text ends in `error`, so nothing is posted.
 - **CalmLens unavailable**: the request fails, so nothing is posted.
 
@@ -50,10 +57,10 @@ The mock stores each field as an asset, with the status your choice selects, and
 real client's validation and encoding. Nothing is classified: there is no keyword matching
 and no moderation model.
 
-A held demo reply offers **Simulate a reviewer allowing it** and **Simulate a reviewer
-blocking it**. Each button records a reviewer decision on the stored asset's moderation and adds
-an `asset.allowed` or `asset.blocked` event to the mock's events feed. The app then reads the
-feed, retrieves the assets and deletes blocked content through the same code it uses in live mode.
+In the **Review queue**, a held demo reply offers **Approve** and **Reject**. Each button
+records a reviewer decision on the stored asset's moderation and adds an `asset.allowed` or
+`asset.blocked` event to the mock's events feed. The app then reads the feed, retrieves the
+assets and deletes rejected content through the same code it uses in live mode.
 
 ## Live mode
 
@@ -65,7 +72,7 @@ export CALMLENS_PROJECT_ID='your-project-id'
 bundle exec ruby app.rb
 ```
 
-The banner changes to **Live**, and the demo selector disappears. Missing or partial
+The demo note and outcome selector disappear. Missing or partial
 credentials fail startup. `CALMLENS_API_URL` optionally points to a
 local API. Live SDK requests time out after 30 seconds. No API key is sent to the browser.
 
@@ -120,7 +127,7 @@ the event's snapshot:
 - Anything else, or a response for a different asset or another reply's field (checked with
   its `externalId`): nothing changes.
 
-**Events feed (pull).** Click **Check for review decisions**. The app calls
+**Events feed (pull).** Click **Check for decisions** in the review queue. The app calls
 `client.events.list(after: cursor, limit: 50)` and follows `hasMore`. The first call without
 a cursor returns a cursor for "now". The app takes it before its first moderation request,
 so only later events count. Pages are read with `client.events.each_page`. The cursor advances
@@ -153,7 +160,8 @@ feed, so a slow CalmLens request never delays the acknowledgement. A repeated
 `x-calmlens-delivery` ID is acknowledged and skipped. If applying fails after three
 attempts, the next events-feed check applies the same event. Webhooks need live mode.
 
-The activity panel shows each decision with its registered facts, such as **Reviewer** and
+The **Moderation log** shows each decision with how it arrived (events feed, verified webhook
+or, in demo mode, a simulated decision) and its registered facts, such as **Reviewer** and
 **Note**. Labels follow the event catalog. The hidden reviewer ID and unknown keys are not
 shown. Only absolute HTTP(S) fact URLs become links. A test send (fact
 `{ key: "test", value: true }`) is logged and changes nothing.
@@ -171,8 +179,12 @@ shown. Only absolute HTTP(S) fact URLs become links. A test send (fact
   `SameSite=Strict` cookie, notices chosen from a fixed list (never text from the URL) and
   redirect-after-submit, so refreshing the page does not post again. `Calmthread.server`
   serves it with WEBrick, one thread per connection.
+- `Discussion#visible_to`: published replies for everyone, held and removed replies only for
+  their author. Authors are identified by a digest of the browser's form-token cookie.
 - [index.html.erb](index.html.erb): server-rendered UI with no JavaScript or external
-  assets. Every dynamic value goes through `h`.
+  assets. Every dynamic value goes through `h`. CalmLens
+  [text test inputs](https://calmlens.com/docs/guides/testing) in a reply are shown as a short
+  marker rather than their full code.
 - [app_test.rb](app_test.rb): the override on every request, holding and blocking flagged
   replies, release and removal rules, content deletion, retries, replays, webhook
   tampering, test sends, fail-closed states, form tokens, request limits and the server.

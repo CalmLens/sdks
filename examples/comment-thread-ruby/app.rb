@@ -4,6 +4,7 @@
 # Clean replies publish at once. Anything the project policy does not allow is held, with its
 # content retained, until a person reviews it in the CalmLens portal.
 require 'calmlens'
+require 'digest'
 require 'erb'
 require 'json'
 require 'openssl'
@@ -31,11 +32,19 @@ module Calmthread
   PROCESSING_OPTIONS = { keep_content_after_processing: true, flagged_content_policy: { action: 'block' } }.freeze
 
   DEMO_RESULTS = {
-    'clean' => 'Clean: publish immediately',
-    'held' => 'Blocked reply: hold it for review',
-    'name-held' => 'Blocked display name: hold for review',
+    'clean' => 'Allowed',
+    'held' => 'Reply flagged',
+    'name-held' => 'Display name flagged',
     'error' => 'Processing error',
     'unavailable' => 'CalmLens unavailable'
+  }.freeze
+
+  # The post that opens the thread. Replies are what users add and CalmLens moderates.
+  OPENING_POST = {
+    author: 'Mara Lindqvist', role: 'Host', posted: 'Posted this morning',
+    title: 'What small habit made your week a little calmer?',
+    body: 'Mine was leaving my phone in the hallway until after breakfast. It sounds minor, but the ' \
+          'first hour of the day feels like mine again. What worked for you? Small and specific is best.'
   }.freeze
 
   # Each reply field becomes its own text asset, moderated in this order.
@@ -46,7 +55,6 @@ module Calmthread
   # this app shows. Other keys (such as the hidden reviewer-user-id) are not shown.
   FACT_LABELS = {
     'asset-name' => 'Asset',
-    'asset-type' => 'Asset type',
     'reviewer-name' => 'Reviewer',
     'note' => 'Note'
   }.freeze
@@ -129,6 +137,18 @@ module Calmthread
     HELD_STATUSES.include?(status) ? :held : :failed
   end
 
+  # The categories the policy flagged, from the moderation report's policy decision.
+  def self.flagged_categories(asset)
+    decision = section(section(section(asset, 'classification'), 'moderation'), 'policy')['decision']
+    categories = decision.is_a?(Hash) ? decision['flaggedCategories'] : nil
+    Array(categories).grep(String).map { |category| category[0, 40] }
+  end
+
+  def self.category_label(category) = category.tr('-', ' ').capitalize
+
+  # A reply's author is the browser that posted it, identified by a digest of its form token.
+  def self.author_id(token) = token ? Digest::SHA256.hexdigest("calmthread-author:#{token}")[0, 32] : nil
+
   # The current status of a retrieved asset, or nil when the response is not that asset of
   # that reply. A returned external ID must name the same reply and field.
   def self.current_status(asset, asset_id, reply = nil)
@@ -141,7 +161,9 @@ module Calmthread
     status(asset)
   end
 
-  # The in-memory thread: published replies and replies held for review.
+  # The in-memory thread. A reply is :published, :held (shown only to its author until a reviewer
+  # decides) or :removed (a reviewer kept it out: its name and text are gone, the record stays so
+  # the author can see what happened).
   class Discussion
     attr_reader :moderator
 
@@ -152,8 +174,9 @@ module Calmthread
       @lock = Mutex.new
     end
 
-    # Returns :published, :held or :failed. Raises InputError for an invalid form.
-    def submit(name, text, demo_result = 'clean')
+    # Returns :published, :held or :failed. Raises InputError for an invalid form. `author` is the
+    # posting browser's Calmthread.author_id; `at` lets demo mode seed earlier replies.
+    def submit(name, text, demo_result = 'clean', author: nil, at: Time.now)
       name = name.to_s.strip
       text = text.to_s.strip
       if name.empty? || name.length > MAX_NAME || name.match?(/[[:cntrl:]]/)
@@ -176,22 +199,30 @@ module Calmthread
 
       held = decisions.select { |_, decision| decision == :held }.keys
       state = held.empty? ? :published : :held
-      reply = { id: id, name: name, text: text, created_at: Time.now, state: state, held_fields: held,
-                asset_ids: assets.transform_values { |asset| asset['id'] } }
+      flagged = held.flat_map { |field| Calmthread.flagged_categories(assets[field]) }.uniq
+      reply = { id: id, author: author, name: name, text: text, created_at: at, state: state, held_fields: held,
+                flagged: flagged, review: nil, asset_ids: assets.transform_values { |asset| asset['id'] } }
       @lock.synchronize do
         @replies.unshift(reply)
         @replies.pop while @replies.size > MAX_REPLIES
       end
       # Held replies are logged without their name or text.
       if state == :held
-        record(:held, "A reply was held for review: its #{held.map { |item| FIELD_LABELS[item] }.join(' and ')} was not allowed.")
+        reason = flagged.empty? ? '' : " for #{flagged.map { |item| Calmthread.category_label(item).downcase }.join(', ')}"
+        fields = held == [:text] ? '' : "#{held.map { |item| FIELD_LABELS[item] }.join(' and ')} "
+        record(:held, "Held a reply for review: #{fields}flagged#{reason}.")
       else
-        record(:published, "#{name} replied.")
+        record(:published, "Published #{name}'s reply.")
       end
       state
     end
 
     def replies = @lock.synchronize { @replies.map(&:dup) }
+
+    # Everyone sees published replies; a held or removed reply is shown only to its author.
+    def visible_to(author)
+      replies.select { |reply| reply[:state] == :published || (author && reply[:author] == author) }
+    end
     def activity = @lock.synchronize { @activity.dup }
 
     def find_by_asset(asset_id)
@@ -202,22 +233,28 @@ module Calmthread
       @lock.synchronize { @replies.find { |reply| reply[:id] == reply_id }&.dup }
     end
 
-    def publish(reply_id)
+    # Publishes a held reply. `review` records the decision ({ decision:, reviewer:, note:, at: }).
+    def publish(reply_id, review = nil)
       @lock.synchronize do
         reply = @replies.find { |item| item[:id] == reply_id && item[:state] == :held }
-        reply && (reply[:state] = :published)
+        reply&.merge!(state: :published, review: review)
         !reply.nil?
       end
     end
 
-    # Forgets the reply, including its text, so a removed reply can never be published.
-    def remove(reply_id)
-      @lock.synchronize { !@replies.reject! { |reply| reply[:id] == reply_id }.nil? }
+    # Forgets the reply's name and text, so a removed reply can never be published. The record
+    # stays, with its flagged categories and the review, so its author can see why.
+    def remove(reply_id, review = nil)
+      @lock.synchronize do
+        reply = @replies.find { |item| item[:id] == reply_id && item[:state] != :removed }
+        reply&.merge!(state: :removed, name: nil, text: nil, review: review)
+        !reply.nil?
+      end
     end
 
-    def record(kind, text, facts: [])
+    def record(kind, text, facts: [], via: nil, at: Time.now)
       @lock.synchronize do
-        @activity.unshift({ kind: kind, text: text, facts: facts, at: Time.now })
+        @activity.unshift({ kind: kind, text: text, facts: facts, via: via, at: at })
         @activity.pop while @activity.size > MAX_ACTIVITY
       end
     end
@@ -226,14 +263,17 @@ module Calmthread
   # Applies portal review decisions from the events feed (pull) and verified webhooks (push).
   class ReviewFeed
     OUTCOME_TEXT = {
-      released: 'a held reply is now published.',
-      removed: 'the reply is out of the thread for good, and its stored text was deleted from CalmLens.',
+      released: 'the held reply is now published.',
+      removed: 'the reply stays out of the thread, and its stored text was deleted from CalmLens.',
       unchanged: 'no change. A reply publishes only once every field is allowed.'
     }.freeze
+    SOURCES = { feed: 'Events feed', webhook: 'Verified webhook', demo: 'Simulated decision' }.freeze
 
-    def initialize(discussion, cursor: nil)
+    # source: how this feed's events arrive, shown in the moderation log (:feed, or :demo).
+    def initialize(discussion, cursor: nil, source: :feed)
       @discussion = discussion
       @cursor = cursor
+      @source = source
       @state_lock = Mutex.new
       @sync_lock = Mutex.new
       @claimed = {}
@@ -263,7 +303,7 @@ module Calmthread
         end
         applied = 0
         client.events.each_page(after: cursor, limit: EVENT_PAGE_SIZE).first(MAX_EVENT_PAGES).each do |page|
-          page['events'].each { |event| applied += 1 if %i[released removed].include?(apply(event, client)) }
+          page['events'].each { |event| applied += 1 if %i[released removed].include?(apply(event, client, source: @source)) }
           @state_lock.synchronize { @cursor = Calmthread.cursor(page) }
         end
         applied
@@ -275,12 +315,12 @@ module Calmthread
     # Accepts the flat events-feed shape. Returns :released, :removed, :unchanged, :test,
     # :ignored, :duplicate or :invalid. An event is claimed before it runs, so the feed and a
     # webhook never apply it twice at once; a failure releases the claim for a retry.
-    def apply(event, client)
+    def apply(event, client, source: :feed)
       return :invalid unless event.is_a?(Hash) && event['id'].is_a?(String) && event['type'].is_a?(String)
       return :duplicate unless claim(event['id'])
 
       begin
-        outcome = run(event, client)
+        outcome = run(event, client, source)
       rescue StandardError
         release(event['id'])
         raise
@@ -290,7 +330,7 @@ module Calmthread
 
     private
 
-    def run(event, client)
+    def run(event, client, source)
       facts = Array(event['facts']).select { |fact| fact.is_a?(Hash) && fact['key'].is_a?(String) }
       if facts.any? { |fact| fact['key'] == 'test' && fact['value'] == true }
         @discussion.record(:test, "Test event received (#{event['type'][0, 40]}). Nothing changed.")
@@ -299,21 +339,28 @@ module Calmthread
       asset_id = event['assetId']
       reviewed = facts.any? { |fact| fact['key'] == 'decided-by' && fact['value'] == 'reviewer' }
       reply = EVENT_LABELS.key?(event['type']) && reviewed && asset_id.is_a?(String) && @discussion.find_by_asset(asset_id)
-      return :ignored unless reply
+      # A removed reply has no content left to act on, and can never come back.
+      return :ignored unless reply && reply[:state] != :removed
 
       # Act on the asset's current status, never on the event's snapshot.
       status = Calmthread.current_status(client.assets.retrieve(asset_id: asset_id), asset_id, reply)
+      review = { decision: status, reviewer: fact(facts, 'reviewer-name'), note: fact(facts, 'note'), at: Time.now }
       outcome = if HELD_STATUSES.include?(status) && !%w[asset.allowed asset.limited].include?(event['type'])
-                  remove(reply, client)
+                  remove(reply, client, review)
                 elsif SHOWN_STATUSES.include?(status) && reply[:state] == :held && allowed_elsewhere?(reply, asset_id, client)
-                  @discussion.publish(reply[:id]) ? :released : :unchanged
+                  @discussion.publish(reply[:id], review) ? :released : :unchanged
                 else
                   :unchanged
                 end
       @discussion.record(outcome == :unchanged ? :review : outcome,
                          "#{EVENT_LABELS[event['type']]}: #{OUTCOME_TEXT.fetch(outcome)}",
-                         facts: Calmthread.display_facts(facts))
+                         facts: Calmthread.display_facts(facts), via: source)
       outcome
+    end
+
+    def fact(facts, key)
+      value = facts.find { |item| item['key'] == key }&.fetch('value', nil)
+      value.is_a?(String) && !value.empty? ? value[0, 200] : nil
     end
 
     # Every other field of the reply must also be allowed or limited right now.
@@ -325,9 +372,9 @@ module Calmthread
 
     # Deletes the stored content of every field first; the record and report stay in
     # CalmLens. The reply is dropped locally only after that succeeded, so a failure retries.
-    def remove(reply, client)
+    def remove(reply, client, review)
       reply[:asset_ids].each_value { |id| client.assets.delete_content(asset_id: id) }
-      @discussion.remove(reply[:id])
+      @discussion.remove(reply[:id], review)
       :removed
     end
 
@@ -389,7 +436,7 @@ module Calmthread
       attempts = 0
       begin
         attempts += 1
-        @feed.apply(event, @client)
+        @feed.apply(event, @client, source: :webhook)
       rescue CalmLens::Error => e
         if attempts < MAX_ATTEMPTS
           sleep(attempts) if @worker
@@ -432,9 +479,37 @@ module Calmthread
       locals.each { |key, value| instance_variable_set("@#{key}", value) }
     end
 
+    # CalmLens text test inputs (`<!calmlens-test <tag> <category>>`) are shown as a short marker
+    # instead of their 32-character tag. Matched on the escaped text, so the output stays escaped.
+    TEST_INPUT = /&lt;!calmlens-test\s+[a-f0-9]{32}\s+([a-z.-]+)\s*&gt;/i
+    AVATAR_TONES = 6
+
     def render = TEMPLATE.result(binding)
-    def initial(name) = name.each_grapheme_cluster.first.to_s.upcase
+    def initial(name) = name.to_s.each_grapheme_cluster.first.to_s.upcase
+    def tone(name) = Digest::SHA256.digest(name.to_s).bytes.first % AVATAR_TONES
     def held_labels(reply) = reply[:held_fields].map { |field| FIELD_LABELS[field] }.join(' and ')
+    def mine?(reply) = !@viewer.nil? && reply[:author] == @viewer
+
+    def reasons(reply) = reply[:flagged].map { |category| Calmthread.category_label(category).downcase }.join(', ')
+
+    # "Reply flagged for harassment", "Display name flagged", ...
+    def flag_summary(reply)
+      summary = "#{held_labels(reply).capitalize} flagged"
+      reply[:flagged].empty? ? summary : "#{summary} for #{reasons(reply)}"
+    end
+
+    def body_html(text)
+      h(text).gsub(TEST_INPUT) { %(<span class="test-input">test input: #{Regexp.last_match(1).downcase}</span>) }
+    end
+
+    def ago(time)
+      seconds = (Time.now - time).to_i
+      return 'just now' if seconds < 60
+      return "#{seconds / 60} min ago" if seconds < 3600
+      return "#{seconds / 3600} h ago" if seconds < 86_400
+
+      time.strftime('%-d %b')
+    end
   end
 
   # A Rack-compatible application: call(env) returns [status, headers, body].
@@ -447,15 +522,15 @@ module Calmthread
     }.freeze
     # Redirects name a notice by key; the page shows only these texts, never text from the URL.
     NOTICES = {
-      'published' => 'Published. Thanks for joining the conversation!',
-      'held' => 'Held for review. A moderator checks this reply before anyone sees it.',
-      'failed' => 'Not posted: moderation did not complete. Please try again.',
+      'published' => 'Your reply is posted.',
+      'held' => 'Your reply is waiting for review. Only you can see it until a moderator approves it.',
+      'failed' => 'Your reply was not posted because moderation did not complete. Please try again.',
       'watching' => 'Watching for review decisions from now on. Check again after a reviewer acts.',
       'no-decisions' => 'No new review decisions changed the thread.',
       'applied' => 'Applied %<count>d review decision(s).',
       'busy' => 'A check for review decisions is already running. Try again in a moment.',
-      'demo-allowed' => 'A simulated reviewer allowed the reply. It is now published.',
-      'demo-blocked' => 'A simulated reviewer blocked the reply. It stays out of the thread and its stored text was deleted.'
+      'demo-allowed' => 'The simulated reviewer approved the reply. It is now published.',
+      'demo-blocked' => 'The simulated reviewer rejected the reply. Its stored text was deleted.'
     }.freeze
     CSRF_COOKIE = 'calmthread_csrf'
     TOKEN = /\A[A-Za-z0-9_-]{43}\z/
@@ -466,7 +541,11 @@ module Calmthread
     # until #webhooks.drain is called.
     def initialize(discussion, feed: nil, webhook_secret: '', webhooks: :background)
       @discussion = discussion
-      @feed = feed || ReviewFeed.new(discussion, cursor: discussion.moderator.demo? ? discussion.moderator.start_cursor : nil)
+      @feed = feed || (if discussion.moderator.demo?
+                         ReviewFeed.new(discussion, cursor: discussion.moderator.start_cursor, source: :demo)
+                       else
+                         ReviewFeed.new(discussion)
+                       end)
       @webhook_secret = webhook_secret.to_s
       @webhooks = WebhookInbox.new(@feed, discussion.moderator.client, mode: webhooks) unless @webhook_secret.empty? || demo?
     end
@@ -485,7 +564,7 @@ module Calmthread
     def route(env)
       case [env['REQUEST_METHOD'], env['PATH_INFO']]
       in ['GET' | 'HEAD', '/'] then home(env)
-      in ['POST', '/replies'] then form_action(env) { |fields| submit(fields) }
+      in ['POST', '/replies'] then form_action(env) { |fields| submit(fields, env) }
       in ['POST', '/reviews/sync'] then form_action(env) { sync }
       in ['POST', '/demo/review'] if demo? then form_action(env) { |fields| demo_review(fields) }
       in ['POST', '/webhooks/calmlens'] then webhook(env)
@@ -511,10 +590,11 @@ module Calmthread
         token = SecureRandom.urlsafe_base64(32)
         headers['set-cookie'] = "#{CSRF_COOKIE}=#{token}; Path=/; HttpOnly; SameSite=Strict"
       end
-      replies = @discussion.replies
+      viewer = Calmthread.author_id(token)
       body = View.new(
-        demo: demo?, csrf: token, notice: notice, replies: replies,
-        held: replies.select { |reply| reply[:state] == :held }, activity: @discussion.activity,
+        demo: demo?, csrf: token, notice: notice, viewer: viewer, post: OPENING_POST,
+        replies: @discussion.visible_to(viewer).reverse,
+        held: @discussion.replies.select { |reply| reply[:state] == :held }, activity: @discussion.activity,
         demo_results: DEMO_RESULTS, webhooks: !@webhooks.nil?, max_name: MAX_NAME, max_text: MAX_TEXT
       ).render
       [status, headers, [body]]
@@ -546,11 +626,11 @@ module Calmthread
       page(env, 'Not posted: CalmLens could not be reached or did not complete the request. Please try again.', 502)
     end
 
-    def submit(fields)
+    def submit(fields, env)
       # A submitted demo override must never affect live moderation.
       choice = demo? ? fields.fetch('demo_result', 'clean') : 'clean'
       ensure_cursor
-      @discussion.submit(fields['name'], fields['text'], choice).to_s
+      @discussion.submit(fields['name'], fields['text'], choice, author: Calmthread.author_id(cookie_token(env))).to_s
     end
 
     def sync
@@ -689,6 +769,7 @@ module Calmthread
     end.parse!(argv)
     moderator = moderator_from(env)
     app = App.new(Discussion.new(moderator), webhook_secret: env.fetch('CALMLENS_WEBHOOK_SECRET', ''))
+    Demo.seed(app) if moderator.demo?
     server = server(app, port: port)
     %w[INT TERM].each { |signal| trap(signal) { server.shutdown } }
     puts "Calmthread: http://#{DEFAULT_HOST}:#{port} (#{moderator.demo? ? 'demo' : 'live'})"

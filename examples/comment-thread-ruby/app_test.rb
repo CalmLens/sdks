@@ -32,11 +32,13 @@ module TestHelpers
 
   # An asset with content stored. `status` is `pending` or `uploading` (still processing), `error`
   # (processing failed) or the moderation status once processing is done.
-  def asset(id, status)
+  # `flagged` lists the categories the report's policy decision flagged.
+  def asset(id, status, flagged: nil)
     classification = { 'pending' => 'processing', 'uploading' => 'pending', 'error' => 'failed' }.fetch(status, 'completed')
-    moderation = classification == 'completed' ? status : 'pending'
+    moderation = { 'status' => classification == 'completed' ? status : 'pending', 'categories' => {} }
+    moderation['policy'] = { 'decision' => { 'source' => 'asset-override', 'action' => 'block', 'flaggedCategories' => flagged } } if flagged
     { 'id' => id, 'upload' => { 'status' => status == 'uploading' ? 'uploading' : 'completed' },
-      'classification' => { 'status' => classification, 'moderation' => { 'status' => moderation, 'categories' => {} } },
+      'classification' => { 'status' => classification, 'moderation' => moderation },
       'content' => { 'status' => 'stored' } }
   end
 
@@ -84,7 +86,10 @@ module TestHelpers
   end
 
   def sync(app) = form(app, '/reviews/sync', {})
+  # The page for a new visitor, and for the browser that posted with #form.
   def home(app) = request(app, 'GET', '/').last
+  def home_as_author(app) = request(app, 'GET', '/', headers: { 'Cookie' => "calmthread_csrf=#{token(app)}" }).last
+  def states(app) = app.discussion.replies.map { |reply| reply[:state] }
   def calls(mock) = mock.requests.map { |item| [item.method, item.path] }
 end
 
@@ -119,18 +124,29 @@ class SubmissionTest < Minitest::Test
     end
   end
 
-  def test_a_blocked_reply_is_held_and_its_text_is_never_rendered
+  def test_a_blocked_reply_is_held_and_shown_only_to_its_author
     app, = held_app
     reply = app.discussion.replies.first
     assert_equal [:text], reply[:held_fields]
     page = home(app)
     refute_includes page, 'Held reply text'
     refute_includes page, 'Held Name'
-    assert_includes page, 'aria-label="Reply held for review"'
-    assert_includes page, 'text-1'
-    assert_includes page, 'name-1'
+    author = home_as_author(app)
+    assert_includes author, 'Held reply text'
+    assert_includes author, 'Held Name'
+    assert_equal [reply[:id]], app.discussion.visible_to(Calmthread.author_id(token(app))).map { |item| item[:id] }
+    assert_empty app.discussion.visible_to(nil)
     refute_includes app.discussion.activity.inspect, 'Held reply text'
     refute_includes app.discussion.activity.inspect, 'Held Name'
+  end
+
+  def test_a_held_reply_keeps_the_categories_its_report_flagged
+    app, = live_app(CURSOR, asset('name-1', 'blocked', flagged: ['profanity']), asset('text-1', 'blocked', flagged: %w[harassment profanity]))
+    post_reply(app)
+    assert_equal [%w[profanity harassment]], app.discussion.replies.map { |reply| reply[:flagged] }
+    app, = live_app(CURSOR, asset('name-1', 'allowed', flagged: ['hate']), asset('text-1', 'blocked'))
+    post_reply(app)
+    assert_equal [[]], app.discussion.replies.map { |reply| reply[:flagged] }, 'only held fields give reasons'
   end
 
   def test_a_blocked_name_holds_the_reply_but_still_sends_the_text_for_review
@@ -238,6 +254,19 @@ class ConfigurationTest < Minitest::Test
     assert Calmthread.moderator_from({ 'CALMLENS_DEMO' => '1' }).demo?
   end
 
+  def test_the_demo_thread_starts_with_other_peoples_replies_one_approved_after_review
+    app = Calmthread::App.new(Calmthread::Discussion.new(Calmthread::Demo::Moderator.new), webhooks: :manual)
+    Calmthread::Demo.seed(app)
+    replies = app.discussion.replies
+    assert_equal [:published] * Calmthread::Demo::SEED.size, replies.map { |reply| reply[:state] }
+    assert_equal replies.size, replies.map { |reply| reply[:author] }.compact.uniq.size, 'each from its own author'
+    assert_equal ['allowed'], replies.filter_map { |reply| reply[:review]&.fetch(:decision) }
+    assert_equal replies.sort_by { |reply| -reply[:created_at].to_f }, replies, 'newest first'
+    # A new visitor sees every seeded reply, and none of them as their own.
+    assert_equal replies.size, app.discussion.visible_to(Calmthread.author_id('a' * 43)).size
+    refute(replies.any? { |reply| reply[:author] == Calmthread.author_id('a' * 43) })
+  end
+
   def test_the_live_path_does_not_load_the_sdk_mock
     output = IO.popen([RbConfig.ruby, '-e', "require #{File.join(__dir__, 'app').dump}; print defined?(CalmLens::MockServerClient).inspect"],
                       err: File::NULL, &:read)
@@ -255,10 +284,12 @@ class ReviewTest < Minitest::Test
         .enqueue(body: asset('text-1', 'allowed')).enqueue(body: asset('name-1', 'allowed'))
     _, headers, = sync(app)
     assert_equal '/?notice=applied&count=1', headers['location']
-    assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
+    assert_equal [:published], states(app)
     assert_equal [%w[GET /assets/text-1], %w[GET /assets/name-1]], calls(mock).last(2)
     assert_includes home(app), 'Held reply text'
-    assert_includes home(app), '<dt>Reviewer</dt><dd>Sam</dd>'
+    assert_equal({ decision: 'allowed', reviewer: 'Sam', note: nil }, app.discussion.replies.first[:review].except(:at))
+    entry = app.discussion.activity.first
+    assert_equal [:released, :feed, [{ label: 'Reviewer', value: 'Sam', url: nil }]], entry.values_at(:kind, :via, :facts)
     assert_equal 'c1', app.feed.cursor
   end
 
@@ -299,14 +330,20 @@ class ReviewTest < Minitest::Test
     sync(app)
     assert_equal [%w[GET /assets/text-1], %w[DELETE /assets/name-1/content], %w[DELETE /assets/text-1/content]],
                  calls(mock).last(3)
-    assert_empty app.discussion.replies
-    refute_includes home(app), 'Held reply text'
-    # A later allowed decision on the same asset cannot bring it back: the reply is gone.
+    # The record stays for its author, without its name or text.
+    reply = app.discussion.replies.first
+    assert_equal [:removed, nil, nil], reply.values_at(:state, :name, :text)
+    assert_equal({ decision: 'blocked', reviewer: nil, note: 'Off topic' }, reply[:review].except(:at))
+    assert_equal [reply[:id]], app.discussion.visible_to(Calmthread.author_id(token(app))).map { |item| item[:id] }
+    assert_empty app.discussion.visible_to(nil)
+    refute_includes home_as_author(app), 'Held reply text'
+    refute_includes home_as_author(app), 'Held Name'
+    # A later allowed decision on the same asset cannot bring it back.
     mock.enqueue(body: page_of(event('e2', 'asset.allowed', 'text-1'), cursor: 'c2'))
     before = mock.requests.size
     sync(app)
     assert_equal before + 1, mock.requests.size, 'only the events page was requested'
-    assert_empty app.discussion.replies
+    assert_equal [:removed], states(app)
   end
 
   def test_automated_decisions_neither_delete_nor_release_a_held_reply
@@ -341,7 +378,7 @@ class ReviewTest < Minitest::Test
         .enqueue(body: asset('name-1', 'allowed')).enqueue(body: asset('text-1', 'blocked'))
     assert_equal 303, sync(app).first
     assert_equal 'c1', app.feed.cursor
-    assert_empty app.discussion.replies
+    assert_equal [:removed], states(app)
     assert_equal 0, mock.remaining_responses
   end
 
@@ -388,16 +425,18 @@ class ReviewTest < Minitest::Test
     app.discussion.submit('Bo', 'Block me', 'name-held')
     allow, block = app.discussion.replies.reverse
     review = ->(reply, decision) { form(app, '/demo/review', { reply: reply[:id], decision: decision }).first }
-    assert_includes home(app), 'Simulate a reviewer allowing it'
     assert_equal 303, review.(allow, 'allow')
     assert_equal 303, review.(block, 'block')
-    assert_equal [[allow[:id], :published]], app.discussion.replies.map { |reply| [reply[:id], reply[:state]] }
+    assert_equal [[block[:id], :removed], [allow[:id], :published]], app.discussion.replies.map { |reply| [reply[:id], reply[:state]] }
     content = app.discussion.moderator.client.state.content
     assert_equal [false, false], block[:asset_ids].values.map { |id| content.key?(id) }, 'blocked content was deleted'
     page = home(app)
     assert_includes page, 'Allow me'
     refute_includes page, 'Block me'
-    assert_includes page, '<dt>Reviewer</dt><dd>Demo reviewer</dd>'
+    assert_equal ['profanity'], app.discussion.replies.first[:flagged]
+    released = app.discussion.activity.find { |entry| entry[:kind] == :released }
+    assert_equal :demo, released[:via]
+    assert_includes released[:facts], { label: 'Reviewer', value: 'Demo reviewer', url: nil }
     assert_equal 400, review.(allow, 'allow'), 'a published reply is no longer held'
     assert_equal 400, review.(block, 'block')
     app.discussion.submit('Cy', 'Held', 'held')
@@ -439,7 +478,8 @@ class WebhookTest < Minitest::Test
     mock.enqueue(body: asset('text-1', 'allowed')).enqueue(body: asset('name-1', 'allowed'))
     app.webhooks.drain
     assert_equal before + 2, mock.requests.size, 'a redelivery does not act again'
-    assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
+    assert_equal [:published], states(app)
+    assert_equal [:released, :webhook], app.discussion.activity.first.values_at(:kind, :via)
   end
 
   def test_a_failed_webhook_is_retried_and_otherwise_left_to_the_events_feed
@@ -455,7 +495,8 @@ class WebhookTest < Minitest::Test
         .enqueue(body: asset('text-1', 'purged')).enqueue(body: asset('name-1', 'allowed')).enqueue(body: asset('text-1', 'purged'))
     sync(app)
     assert_equal [%w[DELETE /assets/name-1/content], %w[DELETE /assets/text-1/content]], calls(mock).last(2)
-    assert_empty app.discussion.replies
+    assert_equal [:removed], states(app)
+    assert_equal :feed, app.discussion.activity.first[:via]
   end
 
   def test_test_send_changes_nothing
@@ -489,6 +530,15 @@ class RequestTest < Minitest::Test
     assert_equal 'nosniff', headers['x-content-type-options']
     refute_includes request(app, 'GET', '/?notice=Click%20evil.example').last, 'evil.example'
     assert_includes request(app, 'GET', '/?notice=held').last, 'role="status"'
+  end
+
+  def test_test_input_codes_are_shown_as_a_marker_and_stay_escaped
+    tag = 'a' * 32
+    html = Calmthread::View.new.body_html("Hi <b> <!calmlens-test #{tag} harassment>")
+    refute_includes html, tag
+    refute_includes html, '<b>'
+    assert_includes html, '&lt;b&gt;'
+    assert_includes html, 'harassment'
   end
 
   def test_fact_links_allow_only_http_urls_and_registered_keys
