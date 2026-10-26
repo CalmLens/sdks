@@ -377,8 +377,8 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "violence";
     readonly kind: "harm";
     readonly displayName: "Weapon without an attack";
-    readonly description: "A firearm, knife or other weapon shown or described only as an object. Nobody is attacked, injured, killed or threatened with it, and it is not aimed, pointed or brandished at a visible or identified person or animal. A weapon held or aimed in posed art, an illustration or a photo with no visible target counts here.";
-    readonly exclusions: "Any supported attack, graphic bodily harm, death or threat, including an armed standoff or a weapon aimed or swung at a visible or identified person or animal; ordinary tools, toys or props with no violent association.";
+    readonly description: "A firearm, knife or other weapon shown as an object, or carried, held, drawn or aimed by people with no person or animal visibly on the receiving end: action poses, cover and poster art, game art, hunting and target shooting included. Aiming out of frame or at nothing visible is this kind, however tense the scene looks. When nothing else in the image is violent, the weapon is the whole of what the image shows.";
+    readonly exclusions: "A weapon aimed, fired or swung at a visible or identified person or animal, including two parties visibly aiming at each other; a visible victim, injury, death or graphic harm; ordinary tools, toys or props with no violent association.";
     readonly inputs: readonly ["image"];
   };
   readonly "violence-sport": {
