@@ -9,9 +9,9 @@ from urllib.parse import urlencode
 from calmlens import CalmLensError
 from calmlens.testing import MockCalmLensServerClient
 
-from app import (Board, ConfigurationError, InvalidInput, Moderator, create_moderator, explain, make_handler,
-                 validate_url)
-from demo import DemoModerator
+from app import (RECHECK_SECONDS, Board, ConfigurationError, InvalidInput, Moderator, create_moderator, explain,
+                 make_handler, validate_url)
+from demo import DemoModerator, seed
 
 
 class Clock:
@@ -24,7 +24,7 @@ class Clock:
 
 def demo_board():
     clock = Clock()
-    return Board(DemoModerator(clock=clock)), clock
+    return Board(DemoModerator(clock=clock), clock=clock), clock
 
 
 def live_board(client=None):
@@ -32,7 +32,7 @@ def live_board(client=None):
 
 
 def clickable(board):
-    return re.findall(rb'<a class="url" href="([^"]+)"', board.render())
+    return re.findall(rb'<a href="([^"]+)" rel="noopener noreferrer nofollow ugc">', board.render())
 
 
 class DemoFlowTests(unittest.TestCase):
@@ -46,23 +46,28 @@ class DemoFlowTests(unittest.TestCase):
         board.refresh()
         self.assertEqual(board.links[0]["status"], "allowed")
         self.assertEqual(clickable(board), [b"https://example.com/good"])
-        self.assertIn(b'rel="noopener noreferrer nofollow ugc"', board.render())
+        self.assertIsNone(board.links[0]["reason"])
 
-    def test_blocked_purged_and_failed_pages_never_link_and_explain_the_decision(self):
+    def test_blocked_purged_and_failed_pages_never_link_and_name_the_part_that_decided(self):
         board, clock = demo_board()
         board.submit("https://example.com/bad", "Look", "blocked")
         board.submit("https://example.com/worse", "Look", "purged")
         board.submit("https://example.com/broken", "Look", "error")
+        board.submit("https://example.com/pictures", "Look", "image-blocked")
         clock.now = 5
         board.refresh()
-        broken, worse, bad = board.links
-        self.assertEqual((bad["status"], worse["status"], broken["status"]), ("blocked", "purged", "error"))
+        pictures, broken, worse, bad = board.links
+        self.assertEqual((bad["status"], worse["status"], broken["status"], pictures["status"]),
+                         ("blocked", "purged", "error", "blocked"))
         self.assertEqual(clickable(board), [])
-        self.assertEqual(bad["explanation"], {"found": [("criminal-activity", 0.92)], "unknown": ["sexual"]})
-        self.assertEqual(worse["explanation"], bad["explanation"])
-        self.assertEqual([(child["type"], child["status"], [c for c, _ in child["found"]]) for child in bad["children"]],
-                         [("plaintext-document", "blocked", ["criminal-activity"]), ("image", "allowed", [])])
-        self.assertIsNone(broken["explanation"])
+        # The page's own categories are not evaluated when its parts decided it, so none are reported.
+        self.assertEqual(bad["reason"], {"source": "children", "found": [], "unknown": []})
+        self.assertEqual([(part["type"], part["status"], [c for c, _ in part["found"]]) for part in bad["parts"]],
+                         [("plaintext-document", "blocked", ["violence"]), ("image", "allowed", [])])
+        self.assertEqual([(part["type"], part["status"], [c for c, _ in part["found"]]) for part in pictures["parts"]],
+                         [("image", "blocked", ["violence"]), ("plaintext-document", "allowed", [])])
+        self.assertEqual(worse["parts"][0]["found"], [("criminal-activity", 0.97)])
+        self.assertIsNone(broken["reason"])
 
     def test_limited_page_is_linked_like_an_allowed_one_and_explains_the_decision(self):
         board, clock = demo_board()
@@ -71,7 +76,7 @@ class DemoFlowTests(unittest.TestCase):
         board.refresh()
         link = board.links[0]
         self.assertEqual(link["status"], "limited")
-        self.assertEqual(link["explanation"]["found"], [("criminal-activity", 0.48)])
+        self.assertEqual(link["parts"][0]["found"], [("profanity", 0.62)])
         self.assertEqual(clickable(board), [b"https://example.com/borderline"])
 
     def test_age_restricted_page_is_not_linked_and_lists_its_findings(self):
@@ -81,12 +86,75 @@ class DemoFlowTests(unittest.TestCase):
         board.refresh()
         link = board.links[0]
         self.assertEqual(link["status"], "age-restricted")
-        self.assertEqual(link["explanation"]["found"], [("criminal-activity", 0.64)])
+        self.assertEqual(link["parts"][0]["found"], [("sexual", 0.88)])
         self.assertEqual(clickable(board), [])
+
+    def test_page_title_and_description_come_from_the_text_part_and_stay_hidden_when_blocked(self):
+        board, clock = demo_board()
+        board.submit("https://recipes.example.net/one-pan-lentil-dal", "Tasty", "allowed")
+        board.submit("https://news.example.org/2026/street-trees-cool-cities", "Look", "blocked")
+        clock.now = 5
+        board.refresh()
+        blocked, allowed = board.links
+        self.assertEqual(allowed["preview"], {"title": "One-pan lentil dal in 25 minutes",
+                                              "description": "A weeknight dal with pantry spices and no special kit."})
+        self.assertEqual(blocked["preview"]["title"], "Street trees cool city blocks by up to 4°C")
+        page = board.render().decode()
+        self.assertIn("One-pan lentil dal in 25 minutes", page)
+        self.assertNotIn("Street trees cool city blocks", page)
+        self.assertNotIn("/2026/street-trees-cool-cities", page)
+
+    def test_failed_page_can_be_tried_again_as_a_new_asset(self):
+        board, clock = demo_board()
+        board.submit("https://example.com/broken", "Look", "error")
+        clock.now = 5
+        board.refresh()
+        link = board.links[0]
+        failed_id, note_id = link["asset_id"], link["note_asset_id"]
+        self.assertEqual(board.retry(link["id"]), "retried")
+        stored = board.moderator.client.database_storage.assets
+        self.assertNotIn(failed_id, stored)
+        self.assertEqual(link["note_asset_id"], note_id)
+        self.assertEqual(stored[link["asset_id"]]["externalId"], f"{link['id']}:page")
+        self.assertEqual(link["status"], "pending")
+        clock.now = 10
+        board.refresh()
+        self.assertEqual(clickable(board), [b"https://example.com/broken"])
+        with self.assertRaises(InvalidInput):
+            board.retry(link["id"])
+
+    def test_a_moderators_later_decision_is_read_after_the_recheck_interval(self):
+        board, clock = demo_board()
+        board.submit("https://example.com/held", "Look", "blocked")
+        clock.now = 5
+        board.refresh()
+        link = board.links[0]
+        stored = board.moderator.client.database_storage.assets[link["asset_id"]]
+        stored["classification"]["moderation"].update(status="allowed", manualReviews=[
+            {"id": "r1", "decision": "allowed", "note": None, "reviewerUserId": "u1", "reviewedAt": 1, "appliedToAsset": True}])
+        clock.now = 5 + RECHECK_SECONDS - 1
+        board.refresh()
+        self.assertEqual(link["status"], "blocked")
+        clock.now = 5 + RECHECK_SECONDS
+        board.refresh()
+        self.assertEqual((link["status"], link["review"], link["reason"]), ("allowed", "allowed", None))
+        self.assertEqual(clickable(board), [b"https://example.com/held"])
+
+    def test_demo_seed_fills_the_board_with_every_state(self):
+        board, clock = demo_board()
+        seed(board)
+        self.assertEqual([link["status"] for link in board.links],
+                         ["pending", "allowed", "blocked", "limited", "error", "blocked", "note-not-allowed", "age-restricted", "allowed"])
+        self.assertEqual(len(clickable(board)), 3)
+        clock.now = 20
+        board.refresh()
+        self.assertEqual(board.links[0]["status"], "allowed")
 
     def test_blocked_note_stops_before_the_page_is_submitted(self):
         board, _ = demo_board()
-        self.assertEqual(board.submit("https://example.com/", "Hello", "note-blocked"), "note-not-allowed")
+        self.assertEqual(board.submit("https://example.com/", "Hello there, unique note", "note-blocked"), "note-not-allowed")
+        self.assertEqual(board.links[0]["note_found"], [("harassment", 0.91)])
+        self.assertNotIn(b"Hello there, unique note", board.render())
         self.assertEqual([request.path for request in board.moderator.client.requests], ["/projects/mock-project/assets"])
         link = board.links[0]
         self.assertEqual((link["status"], link["asset_id"]), ("note-not-allowed", None))
@@ -144,6 +212,18 @@ class LiveTests(unittest.TestCase):
         with self.assertLogs(level="WARNING"):
             board.refresh()
         self.assertEqual(clickable(board), [])
+
+    def test_a_decision_from_the_pages_own_scores_reports_them_and_unevaluated_categories(self):
+        client = MockCalmLensServerClient()
+        board = live_board(client)
+        board.submit("https://example.com/", "Hello")
+        stored = client.database_storage.assets[board.links[0]["asset_id"]]
+        stored["classification"]["status"] = "completed"
+        stored["classification"]["moderation"].update(status="blocked", categories={
+            "hate": {"status": "evaluated", "score": 0.81}, "sexual": {"status": "not-evaluated", "reason": "unavailable"}},
+            policy={"score": 0.81, "categories": {}, "decision": {"source": "policy", "action": "block", "flaggedCategories": ["hate"]}})
+        board.refresh()
+        self.assertEqual(board.links[0]["reason"], {"source": "policy", "found": [("hate", 0.81)], "unknown": ["sexual"]})
 
     def test_transport_failure_while_sharing_never_links(self):
         board = live_board(MockCalmLensServerClient().enqueue_error(TimeoutError()))
