@@ -10,7 +10,6 @@ const emit = defineEmits<{ uploaded: [upload: CalmLensUpload] }>();
     token-url="/api/upload-token"
     accept="image/*"
     :max-file-size="10 * 1024 * 1024"
-    multiple
     @uploaded="(upload) => emit('uploaded', upload)"
   />
 </template>

@@ -8,7 +8,6 @@ export function mountPhotoUploader(container, { onUploaded }) {
   uploader.setAttribute("token-url", "/api/upload-token");
   uploader.setAttribute("accept", "image/*");
   uploader.setAttribute("max-file-size", String(10 * 1024 * 1024));
-  uploader.toggleAttribute("multiple", true);
   uploader.addEventListener("calmlens-uploaded", (event) => onUploaded(event.detail));
   container.replaceChildren(uploader);
 }
