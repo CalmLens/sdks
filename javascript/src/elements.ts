@@ -12,7 +12,6 @@ import {
   resolveMessages,
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
-import { injectCalmLensStyles } from "./ui/Styles";
 import {
   type CalmLensUpload,
   createUploadController,
@@ -88,7 +87,7 @@ const BaseElement = (
  * `<calmlens-uploader upload-preset-id="…" token-url="/api/upload-token">` uploads through an
  * upload preset and dispatches `calmlens-uploaded` with `{ assetId, status, file }` for each
  * finished upload. Attributes: `upload-preset-id`, `token-url`, `accept`, `max-file-size`
- * (bytes), `multiple`, `max-files`, `disabled`, `capture`, `base-url` and `unstyled`. Set the
+ * (bytes), `multiple`, `max-files`, `disabled`, `capture` and `base-url`. Set the
  * `token`, `upload`, `checkStatus` and `messages` properties from script for anything an
  * attribute can't hold.
  */
@@ -191,7 +190,6 @@ export class CalmLensUploaderElement extends BaseElement {
 
   connectedCallback() {
     upgradeProperties(this, ["token", "upload", "checkStatus", "createClient", "messages"]);
-    if (!this.hasAttribute("unstyled")) injectCalmLensStyles();
     this.classList.add("calmlens-uploader");
     this.#unsubscribe = this.controller.subscribe((snapshot) => {
       this.#renderItems();
@@ -369,7 +367,7 @@ export class CalmLensUploaderElement extends BaseElement {
  * Attributes: `project-id`, `asset-id`, `status`, `can-view`, `type`, `resource`, `lens`,
  * `transform`, `widths` (comma-separated), `url`, `no-placeholder`, `placeholder-hash`,
  * `placeholder-url`, `average-color`, `cdn-base-url`, `alt`, `aspect-ratio`, `width`, `height`,
- * `sizes`, `fit`, `position`, `eager`, `fetch-priority`, `no-controls` and `unstyled`. Set the
+ * `sizes`, `fit`, `position`, `eager`, `fetch-priority` and `no-controls`. Set the
  * `asset` property to an API asset instead of `project-id` and `asset-id`.
  */
 export class CalmLensMediaElement extends BaseElement {
@@ -428,7 +426,6 @@ export class CalmLensMediaElement extends BaseElement {
 
   connectedCallback() {
     upgradeProperties(this, ["messages", "asset"]);
-    if (!this.hasAttribute("unstyled")) injectCalmLensStyles();
     this.classList.add("calmlens-media");
     this.setAttribute("role", "figure");
     this.#render();

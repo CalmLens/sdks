@@ -22,7 +22,7 @@ import {
   type MediaProps,
   type UploaderProps,
 } from "./ui/Props";
-import { injectCalmLensStyles } from "./ui/Styles";
+import { CALMLENS_STYLES, CALMLENS_STYLES_ID } from "./ui/Styles";
 import {
   createUploadController,
   type UploadController,
@@ -56,11 +56,16 @@ const Icon = ({ name }: { name: IconName }) => {
   );
 };
 
-const useStyles = (unstyled: boolean | undefined) => {
-  useEffect(() => {
-    if (!unstyled) injectCalmLensStyles();
-  }, [unstyled]);
-};
+/**
+ * The components' stylesheet, rendered with them: React hoists it into the document head, on the
+ * server as well as in the browser, and adds it once however many components render.
+ */
+const CalmLensStyles = ({ unstyled }: { unstyled: boolean | undefined }) =>
+  unstyled ? null : (
+    <style href={CALMLENS_STYLES_ID} precedence="calmlens">
+      {CALMLENS_STYLES}
+    </style>
+  );
 
 export interface UseCalmLensUploadResult extends UploadSnapshot {
   controller: UploadController;
@@ -108,10 +113,14 @@ export const useCalmLensUpload = (options: UploadControllerOptions): UseCalmLens
   );
 };
 
-export type CalmLensUploaderProps = UploaderProps & {
-  className?: string;
-  style?: CSSProperties;
-};
+/** Leaves out the stylesheet the components render, so you can style the `calmlens-*` classes. */
+type StyleOptions = { unstyled?: boolean };
+
+export type CalmLensUploaderProps = UploaderProps &
+  StyleOptions & {
+    className?: string;
+    style?: CSSProperties;
+  };
 
 /**
  * A drop zone and file list that uploads through an upload preset, shows each file's progress
@@ -126,7 +135,6 @@ export function CalmLensUploader({
   style,
   ...options
 }: CalmLensUploaderProps) {
-  useStyles(unstyled);
   const upload = useCalmLensUpload(options);
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
   const [dragging, setDragging] = useState(false);
@@ -143,6 +151,7 @@ export function CalmLensUploader({
 
   return (
     <div className={joinClassNames("calmlens-uploader", className)} style={style}>
+      <CalmLensStyles unstyled={unstyled} />
       {/* Keyboard users open the picker with the button; the zone adds drop and click targets. */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the button inside is the accessible control */}
       <div
@@ -276,6 +285,7 @@ export function CalmLensUploader({
 }
 
 export type CalmLensMediaProps = MediaProps &
+  StyleOptions &
   Omit<HTMLAttributes<HTMLElement>, "children" | "placeholder">;
 
 type LoadState = "loading" | "loaded" | "error";
@@ -320,7 +330,6 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     style,
     ...attributes
   } = resolveMediaProps(input);
-  useStyles(unstyled);
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
   const state = getMediaState({
     projectId,
@@ -378,6 +387,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
         } as CSSProperties
       }
     >
+      <CalmLensStyles unstyled={unstyled} />
       {showPlaceholder && (
         <img
           className="calmlens-media__placeholder"

@@ -9,8 +9,6 @@ export interface UploaderDisplayOptions {
   capture?: "user" | "environment";
   /** Replaces some or all of the text the uploader shows. */
   messages?: Partial<CalmLensMessages>;
-  /** Leaves out the built-in stylesheet, so you can style the `calmlens-*` classes yourself. */
-  unstyled?: boolean;
 }
 
 export type UploaderProps = UploadControllerOptions & UploaderDisplayOptions;
@@ -38,7 +36,6 @@ export interface MediaDisplayOptions {
   /** Video and audio controls. Defaults to `true`. */
   controls?: boolean;
   messages?: Partial<CalmLensMessages>;
-  unstyled?: boolean;
   /**
    * Called when the viewer presses the reveal button on age-restricted media. Run your app's own
    * check, then render again with `canView`. Without it, the notice has no button.

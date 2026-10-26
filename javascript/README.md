@@ -657,7 +657,7 @@ Instead of `projectId` and `assetId`, you can pass an asset from the API as `ass
 
 It also takes `type` (`image`, `video` or `audio`), `resource`, `lens`, `transform`, `url` (a signed URL from your server), `placeholderHash` (the asset's `content.image.thumbhash`, drawn in the browser so no placeholder request is needed, including for private assets), `placeholderUrl`, `averageColor`, `fit`, `position`, `lazy`, `fetchPriority` and `controls`.
 
-The components add their stylesheet to the page when they first render. Theme them with `--calmlens-accent`, `--calmlens-radius` and the other `--calmlens-*` properties, which take precedence on any element. Pass `unstyled` to style the `calmlens-*` classes yourself. When server rendering, or when your Content Security Policy refuses injected styles, include `CALMLENS_STYLES` in the page or link `@calmlens/sdk/styles.css`, and pass `unstyled`. All text can be replaced or translated with `messages`, keyed by message name or error code.
+The React components render their stylesheet with them: React places it in the page's head once, on the server too. With Vue, Svelte or the web components, import `@calmlens/sdk/styles.css` once (or link it). Nothing is added to the page at runtime. Theme the components with `--calmlens-accent`, `--calmlens-radius` and the other `--calmlens-*` properties, which take precedence on any element. To style the `calmlens-*` classes yourself, pass `unstyled` to the React components, or leave out the stylesheet import. All text can be replaced or translated with `messages`, keyed by message name or error code.
 
 The [widget playground](https://github.com/CalmLens/sdks/tree/main/examples/widget-playground) runs every component against a mock API.
 

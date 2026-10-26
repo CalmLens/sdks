@@ -28,7 +28,6 @@ import {
   resolveMessages,
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
-import { injectCalmLensStyles } from "./ui/Styles";
 import {
   type CalmLensUpload,
   createUploadController,
@@ -41,12 +40,6 @@ import {
 export * from "./ui";
 
 const icon = (name: IconName) => h("svg", ICON_ATTRIBUTES, [h("path", { d: ICONS[name] })]);
-
-const useStyles = (unstyled: () => boolean | undefined) => {
-  onMounted(() => {
-    if (!unstyled()) injectCalmLensStyles();
-  });
-};
 
 export interface UseCalmLensUploadResult {
   snapshot: Readonly<ShallowRef<UploadSnapshot>>;
@@ -113,7 +106,6 @@ export const CalmLensUploader = defineComponent({
     disabled: { type: Boolean, default: false },
     capture: optional(String as PropType<"user" | "environment">),
     messages: messagesProp,
-    unstyled: { type: Boolean, default: false },
   },
   emits: {
     uploaded: (_upload: CalmLensUpload) => true,
@@ -122,7 +114,6 @@ export const CalmLensUploader = defineComponent({
     removed: (_item: UploadItem) => true,
   },
   setup(props, { emit }) {
-    useStyles(() => props.unstyled);
     const upload = useCalmLensUpload(() => ({
       uploadPresetId: props.uploadPresetId,
       upload: props.upload,
@@ -343,12 +334,10 @@ export const CalmLensMedia = defineComponent({
     fetchPriority: optional(String as PropType<"high" | "low" | "auto">),
     controls: { type: Boolean, default: true },
     messages: messagesProp,
-    unstyled: { type: Boolean, default: false },
     /** Bound by `@reveal`; declared as a prop so the button shows only when something listens. */
     onReveal: optional(Function as PropType<() => void>),
   },
   setup(props) {
-    useStyles(() => props.unstyled);
     const messages = computed(() => resolveMessages(props.messages));
     const resolved = computed(() => resolveMediaProps(props as MediaOptions & typeof props));
     const state = computed(() => getMediaState(resolved.value));

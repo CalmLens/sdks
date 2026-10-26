@@ -1,9 +1,9 @@
 /**
- * The components' stylesheet. They add it to the page the first time they render in a browser;
- * for server rendering, put it in a `<style>` in your page's head so media keeps its layout before
- * scripts load. Pages whose Content Security Policy refuses inline styles can link
- * `@calmlens/sdk/styles.css` instead and pass `unstyled`. Theme it with the `--calmlens-*` custom
- * properties, or pass `unstyled` and style the `calmlens-*` classes yourself.
+ * The components' stylesheet, also shipped as `@calmlens/sdk/styles.css`. The React components
+ * render it themselves (React hoists it into the head, on the server too); with Vue, Svelte or
+ * the web components, import or link `@calmlens/sdk/styles.css` once. Nothing is added to the page
+ * at runtime. Theme it with the `--calmlens-*` custom properties, or leave it out and style the
+ * `calmlens-*` classes yourself.
  */
 export const CALMLENS_STYLES = `
 /* Zero specificity, so a page's own --calmlens-* values win even on the same element. */
@@ -133,15 +133,5 @@ export const CALMLENS_STYLES = `
 }
 `;
 
-const STYLE_ID = "calmlens-styles";
-
-/** Adds the components' stylesheet to the document once. Does nothing outside a browser. */
-export const injectCalmLensStyles = (): void => {
-  const document = globalThis.document;
-  if (!document || document.getElementById(STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = CALMLENS_STYLES;
-  // First in the head, so the page's own rules win over the defaults.
-  document.head.prepend(style);
-};
+/** Identifies the stylesheet, so React adds it once however many components render. */
+export const CALMLENS_STYLES_ID = "calmlens-styles";

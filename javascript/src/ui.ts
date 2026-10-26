@@ -25,7 +25,7 @@ export type {
   UploaderProps,
 } from "./ui/Props";
 export { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
-export { CALMLENS_STYLES, injectCalmLensStyles } from "./ui/Styles";
+export { CALMLENS_STYLES } from "./ui/Styles";
 export type {
   CalmLensUpload,
   CustomUploadContext,

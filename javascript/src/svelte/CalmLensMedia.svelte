@@ -4,7 +4,6 @@
     getMediaAspectRatio,
     getMediaLoadKey,
     getMediaState,
-    injectCalmLensStyles,
     type MediaOptions,
     type MediaProps,
     resolveMediaProps,
@@ -25,7 +24,6 @@
     fetchPriority,
     controls = true,
     messages: overrides,
-    unstyled = false,
     onReveal,
     ...options
   }: MediaProps = $props();
@@ -48,7 +46,6 @@
     load = "loading";
   });
   onMount(() => {
-    if (!unstyled) injectCalmLensStyles();
     // An image that loaded before hydration fires no load event.
     if (image?.complete && image.naturalWidth > 0) load = "loaded";
   });

@@ -4,22 +4,18 @@
     createUploadController,
     describeUploadItem,
     getDropzoneHint,
-    injectCalmLensStyles,
     resolveMessages,
     type UploaderProps,
   } from "../ui.js";
   import Icon from "./Icon.svelte";
 
-  let { disabled = false, capture, messages: overrides, unstyled = false, ...options }: UploaderProps =
+  let { disabled = false, capture, messages: overrides, ...options }: UploaderProps =
     $props();
 
   // The latest options, without restarting uploads when the parent re-renders.
   const controller = createUploadController(options);
   $effect.pre(() => controller.setOptions({ ...options }));
-  onMount(() => {
-    if (!unstyled) injectCalmLensStyles();
-    return () => controller.clear();
-  });
+  onMount(() => () => controller.clear());
 
   const messages = $derived(resolveMessages(overrides));
   const hint = $derived(getDropzoneHint(messages, options.maxFileSize));

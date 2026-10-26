@@ -179,7 +179,7 @@
     "url": "https://github.com/CalmLens/sdks/issues"
   },
   "peerDependencies": {
-    "react": ">=18",
+    "react": ">=19",
     "svelte": ">=5",
     "vue": ">=3.3"
   },
