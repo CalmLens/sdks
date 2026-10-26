@@ -110,19 +110,19 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "upload/file-too-large": {
     status: 400,
-    message: "File size exceeds limit. Maximum direct image size is 10MB, audio/video size is 50MiB, and other files is 5GB.",
+    message: "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
   },
   "upload/image-requires-multipart-upload": {
     status: 400,
-    message: "Images of 10MB or more must use a multipart upload.",
+    message: "Images of 10 MiB or more must use a multipart upload.",
   },
   "upload/multipart-image-too-small": {
     status: 400,
-    message: "Multipart image uploads must total at least 10MB.",
+    message: "Multipart image uploads must total at least 10 MiB.",
   },
   "upload/multipart-image-too-large": {
     status: 400,
-    message: "Multipart image uploads cannot exceed 20MB.",
+    message: "Multipart image uploads cannot exceed 20 MiB.",
   },
   "upload/image-exceeded-max-dimensions": {
     status: 400,
