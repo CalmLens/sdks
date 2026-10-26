@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -526,8 +527,9 @@ func TestAssetsAreTiedToTheirClip(t *testing.T) {
 func TestSlowCalmLensCallsDoNotBlockOtherRequests(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
+	var enter sync.Once
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		close(entered)
+		enter.Do(func() { close(entered) })
 		<-release
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id": "slow", "externalId": "clip_slow", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"status": "allowed"}}}`))
@@ -737,7 +739,7 @@ func sign(body string) string {
 	return calmlens.SignWebhookPayload([]byte(body), webhookTimestamp, "secret")
 }
 func event(id, kind, assetID, facts string) string {
-	return fmt.Sprintf(`{ "id": %q, "type": %q, "data": { "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"status":"allowed"}}, "content": {"status": "stored"}}, "facts": %s } }`, id, kind, assetID, assetID, facts)
+	return fmt.Sprintf(`{ "id": %q, "type": %q, "projectId": "project", "createdAt": 1700000000000, "data": { "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"status":"allowed"}}, "content": {"status": "stored"}}, "facts": %s } }`, id, kind, assetID, assetID, facts)
 }
 func retrieves(mock *calmlenstest.MockServerClient) int {
 	n := 0

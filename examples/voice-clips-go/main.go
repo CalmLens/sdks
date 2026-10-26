@@ -743,12 +743,22 @@ func (a *app) streamDemo(w http.ResponseWriter, r *http.Request, id, contentType
 		http.Error(w, "Playback unavailable", 502)
 		return
 	}
+	w.Header().Set("Content-Type", contentType)
+	if res.StatusCode == http.StatusOK {
+		// The CDN sent the whole clip: answer the Range request here so players can still seek.
+		data, err := io.ReadAll(res.Body)
+		if err != nil {
+			http.Error(w, "Playback unavailable", 502)
+			return
+		}
+		http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+		return
+	}
 	for _, name := range []string{"Content-Length", "Content-Range", "Accept-Ranges"} {
 		if value := res.Header.Get(name); value != "" {
 			w.Header().Set(name, value)
 		}
 	}
-	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(res.StatusCode)
 	_, _ = io.Copy(w, res.Body)
 }
