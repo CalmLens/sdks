@@ -484,10 +484,13 @@ class CategoryPolicySource(_CategoryPolicySourceRequired, total=False):
     indexes: List[int]
 
 
-class RegionalDecision(TypedDict):
+class _RegionalDecisionRequired(TypedDict):
     region: str
     action: ModerationAction
     rule: str
+
+
+class RegionalDecision(_RegionalDecisionRequired, total=False):
     category: str
 
 

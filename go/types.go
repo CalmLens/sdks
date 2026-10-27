@@ -430,7 +430,7 @@ type RegionalDecision struct {
 	Region   string `json:"region"`
 	Action   string `json:"action"`
 	Rule     string `json:"rule"`
-	Category string `json:"category"`
+	Category string `json:"category,omitempty"`
 }
 
 type ReportPolicyDecision struct {

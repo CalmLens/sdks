@@ -1125,6 +1125,16 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
+// packages/shared/src/TestRegionalActions.ts
+/** Authenticated test inputs can add regional delivery restrictions without inventing evidence. */
+const TEST_REGIONAL_ACTIONS_SCHEMA = zod.array(zod.object({
+	region: JURISDICTION_SCHEMA.exclude(["global"]),
+	action: zod.enum([
+		"limit",
+		"age-restrict",
+		"block"
+	])
+}).strict()).max(7).refine((entries) => new Set(entries.map((entry) => entry.region)).size === entries.length, "Choose each region once");
 // packages/shared/src/ProcessingFeatures.ts
 /**
 * Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
@@ -1412,7 +1422,7 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 			region: JURISDICTION_SCHEMA.exclude(["global"]),
 			action: FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["allow"]),
 			rule: zod.string(),
-			category: CLASSIFICATION_CATEGORY_SCHEMA
+			category: CLASSIFICATION_CATEGORY_SCHEMA.optional()
 		}).strict()),
 		flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA)
 	}).strict().refine((decision) => decision.source === "mandatory-rule" ? Boolean(decision.rule) : decision.rule === void 0, {
@@ -1428,6 +1438,7 @@ const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	knowledgeBaseId: saneStringField().nullish()
 });
 const CLASSIFICATION_REPORT_SCHEMA = zod.object({
+	testRegionalActions: TEST_REGIONAL_ACTIONS_SCHEMA.optional().describe("Explicit regional restrictions from an authenticated test input."),
 	processedAt: zod.number(),
 	categories: CATEGORIES_SCHEMA,
 	score: zod.number(),
@@ -1492,6 +1503,7 @@ function testInputForSignal(signal, kind = "text") {
 const getImageTestCategories = () => [...TEXT_CODE_SIGNALS];
 /** Each row is one qualifying instance. Unselected qualifiers are explicitly absent. */
 const TEST_INPUT_SCHEMA = zod.object({
+	regionalActions: TEST_REGIONAL_ACTIONS_SCHEMA.optional(),
 	unassessedCategories: zod.array(zod.enum(CLASSIFICATION_CATEGORIES)).max(CLASSIFICATION_CATEGORIES.length).optional(),
 	instances: zod.array(zod.object({
 		category: zod.enum(CLASSIFICATION_CATEGORIES),
@@ -1524,6 +1536,23 @@ const TEST_INPUT_PRESETS = {
 		category: "sexual",
 		qualifiers: ["sexual-explicit-language"]
 	}] },
+	regionalDelivery: {
+		instances: [],
+		regionalActions: [
+			{
+				region: "DE",
+				action: "block"
+			},
+			{
+				region: "GB",
+				action: "age-restrict"
+			},
+			{
+				region: "FR",
+				action: "limit"
+			}
+		]
+	},
 	germany: { instances: [{
 		category: "hate",
 		qualifiers: ["hate-symbol", "hate-nazi-symbols-public-display"]

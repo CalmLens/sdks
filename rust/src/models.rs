@@ -1785,8 +1785,9 @@ pub struct RegionalDecision {
     pub action: String,
     /// Stable mandatory rule key.
     pub rule: String,
-    /// Category matched by the mandatory rule.
-    pub category: ClassificationCategory,
+    /// Category matched by the rule; absent for explicit test regional outcomes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<ClassificationCategory>,
 }
 
 /// The automatic moderation decision and stricter regional outcomes.

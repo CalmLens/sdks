@@ -8,6 +8,22 @@ declare function testInputForSignal(signal: ClassificationTestSignal, kind?: "im
 declare const getImageTestCategories: () => ClassificationTestSignal[];
 /** Each row is one qualifying instance. Unselected qualifiers are explicitly absent. */
 declare const TEST_INPUT_SCHEMA: z.ZodObject<{
+  regionalActions: z.ZodOptional<z.ZodArray<z.ZodObject<{
+    region: z.ZodEnum<{
+      AT: "AT";
+      AU: "AU";
+      BR: "BR";
+      DE: "DE";
+      EU: "EU";
+      FR: "FR";
+      GB: "GB";
+    }>;
+    action: z.ZodEnum<{
+      "age-restrict": "age-restrict";
+      block: "block";
+      limit: "limit";
+    }>;
+  }, z.core.$strict>>>;
   unassessedCategories: z.ZodOptional<z.ZodArray<z.ZodEnum<{
     "criminal-activity": "criminal-activity";
     harassment: "harassment";
@@ -189,6 +205,19 @@ declare const TEST_INPUT_PRESETS: {
       qualifiers: "sexual-explicit-language"[];
     }[];
   };
+  regionalDelivery: {
+    instances: never[];
+    regionalActions: ({
+      region: "DE";
+      action: "block";
+    } | {
+      region: "GB";
+      action: "age-restrict";
+    } | {
+      region: "FR";
+      action: "limit";
+    })[];
+  };
   germany: {
     instances: {
       category: "hate";
@@ -218,6 +247,10 @@ declare function detectTestImage(image: {
   height: number;
   rgba: Uint8Array;
 }, key: string): Promise<{
+  regionalActions?: {
+    region: "AT" | "AU" | "BR" | "DE" | "EU" | "FR" | "GB";
+    action: "age-restrict" | "block" | "limit";
+  }[] | undefined;
   unassessedCategories?: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[] | undefined;
   instances: {
     category: "criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence";

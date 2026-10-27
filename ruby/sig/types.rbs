@@ -131,7 +131,7 @@ module CalmLens
     "reviewedAt" => Integer,
     "appliedToAsset" => bool
   }
-  type regional_decision = { "region" => String, "action" => String, "rule" => String, "category" => String }
+  type regional_decision = { "region" => String, "action" => String, "rule" => String, ?"category" => String }
   type asset_moderation = {
     "manualReviews" => Array[asset_review],
     "status" => asset_moderation_status,

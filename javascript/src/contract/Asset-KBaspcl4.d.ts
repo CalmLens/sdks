@@ -8980,7 +8980,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           purge: "purge";
         }>;
         rule: zod.ZodString;
-        category: zod.ZodEnum<{
+        category: zod.ZodOptional<zod.ZodEnum<{
           "criminal-activity": "criminal-activity";
           harassment: "harassment";
           hate: "hate";
@@ -8989,7 +8989,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
           "self-harm": "self-harm";
           sexual: "sexual";
           violence: "violence";
-        }>;
+        }>>;
       }, zod.core.$strict>>;
       flaggedCategories: zod.ZodArray<zod.ZodEnum<{
         "criminal-activity": "criminal-activity";
@@ -17872,7 +17872,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             purge: "purge";
           }>;
           rule: zod.ZodString;
-          category: zod.ZodEnum<{
+          category: zod.ZodOptional<zod.ZodEnum<{
             "criminal-activity": "criminal-activity";
             harassment: "harassment";
             hate: "hate";
@@ -17881,7 +17881,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
             "self-harm": "self-harm";
             sexual: "sexual";
             violence: "violence";
-          }>;
+          }>>;
         }, zod.core.$strict>>;
         flaggedCategories: zod.ZodArray<zod.ZodEnum<{
           "criminal-activity": "criminal-activity";
@@ -27030,7 +27030,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               purge: "purge";
             }>;
             rule: zod.ZodString;
-            category: zod.ZodEnum<{
+            category: zod.ZodOptional<zod.ZodEnum<{
               "criminal-activity": "criminal-activity";
               harassment: "harassment";
               hate: "hate";
@@ -27039,7 +27039,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
               "self-harm": "self-harm";
               sexual: "sexual";
               violence: "violence";
-            }>;
+            }>>;
           }, zod.core.$strict>>;
           flaggedCategories: zod.ZodArray<zod.ZodEnum<{
             "criminal-activity": "criminal-activity";
