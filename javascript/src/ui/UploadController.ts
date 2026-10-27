@@ -24,10 +24,10 @@ export interface UploadFile {
 }
 
 /** One file the uploader has picked, as the components render it. */
-export interface UploadItem {
+export interface UploadItem<F extends UploadFile = UploadFile> {
   /** A local ID for the file in this uploader, not the asset ID. */
   readonly key: string;
-  readonly file: UploadFile;
+  readonly file: F;
   readonly stage: UploadStage;
   /** Sent bytes as a fraction from 0 to 1 while uploading, `null` when unknown. */
   readonly progress: number | null;
@@ -47,15 +47,15 @@ export interface UploadItem {
 }
 
 /** A finished upload that wasn't blocked, which your app saves with its record. */
-export interface CalmLensUpload {
+export interface CalmLensUpload<F extends UploadFile = UploadFile> {
   assetId: string;
   /** `undefined` when the upload preset doesn't show decisions to the uploader. */
   status?: AssetModerationStatus;
-  file: UploadFile;
+  file: F;
 }
 
-export interface UploadSnapshot {
-  readonly items: readonly UploadItem[];
+export interface UploadSnapshot<F extends UploadFile = UploadFile> {
+  readonly items: readonly UploadItem<F>[];
   /** Whether any file is still waiting, uploading or being checked. */
   readonly busy: boolean;
 }
@@ -79,7 +79,7 @@ export interface CustomUploadContext {
   onProgress: (sentBytes: number, totalBytes: number) => void;
 }
 
-export interface UploadControllerOptions {
+export interface UploadControllerOptions<F extends UploadFile = UploadFile> {
   /** The upload preset the files upload through. Not needed with `upload`. */
   uploadPresetId?: string;
   /**
@@ -87,7 +87,7 @@ export interface UploadControllerOptions {
    * app's API, which creates the asset with its API key. The uploader still shows progress, the
    * decision and errors: throw a `CalmLensError` to show its code's message.
    */
-  upload?: (file: UploadFile, context: CustomUploadContext) => Promise<CustomUploadResult>;
+  upload?: (file: F, context: CustomUploadContext) => Promise<CustomUploadResult>;
   /**
    * Checks a pending upload made with `upload`, returning its current moderation status. Without
    * it, a pending upload finishes as pending.
@@ -100,7 +100,7 @@ export interface UploadControllerOptions {
    * The upload token, or a function that returns a fresh one for each file. Leave it out for
    * presets that anyone can upload to.
    */
-  token?: string | ((file: UploadFile) => string | Promise<string>);
+  token?: string | ((file: F) => string | Promise<string>);
   /**
    * An endpoint on your server that returns `{ token }` for each file. It receives a `POST` with
    * the file's `{ name, type, size }` as JSON. Use `token` instead for anything more custom.
@@ -137,13 +137,13 @@ export interface UploadControllerOptions {
    * Called for each finished upload that wasn't blocked or purged, and again with the new status
    * when `retry` checks one that was still pending.
    */
-  onUploaded?: (upload: CalmLensUpload) => void;
+  onUploaded?: (upload: CalmLensUpload<F>) => void;
   /** Called when moderation blocks or purges a file. */
-  onRejected?: (item: UploadItem) => void;
+  onRejected?: (item: UploadItem<F>) => void;
   /** Called when a file couldn't be uploaded. */
-  onFailed?: (item: UploadItem) => void;
+  onFailed?: (item: UploadItem<F>) => void;
   /** Called when the uploader removes a file, including a finished upload. */
-  onRemoved?: (item: UploadItem) => void;
+  onRemoved?: (item: UploadItem<F>) => void;
 }
 
 const DEFAULT_MAX_FILES = 10;
@@ -210,36 +210,36 @@ let nextKey = 0;
  * decision. It holds no UI: the React, Vue, Svelte and web components render its snapshot, and
  * you can render your own with `subscribe`, which also makes it a Svelte store.
  */
-export class UploadController {
-  #options: UploadControllerOptions;
-  #snapshot: UploadSnapshot = { items: [], busy: false };
-  readonly #listeners = new Set<(snapshot: UploadSnapshot) => void>();
+export class UploadController<F extends UploadFile = UploadFile> {
+  #options: UploadControllerOptions<F>;
+  #snapshot: UploadSnapshot<F> = { items: [], busy: false };
+  readonly #listeners = new Set<(snapshot: UploadSnapshot<F>) => void>();
   readonly #aborts = new Map<string, AbortController>();
   /** How to check each upload again, with the client and token it was uploaded with. */
   readonly #checks = new Map<string, (assetId: string) => Promise<CheckedAsset>>();
 
-  constructor(options: UploadControllerOptions) {
+  constructor(options: UploadControllerOptions<F>) {
     this.#options = options;
   }
 
   /** The current options. */
-  get options(): Readonly<UploadControllerOptions> {
+  get options(): Readonly<UploadControllerOptions<F>> {
     return this.#options;
   }
 
   /** Replaces the options, for example when a component's props change. */
-  setOptions(options: UploadControllerOptions): void {
+  setOptions(options: UploadControllerOptions<F>): void {
     this.#options = options;
   }
 
-  getSnapshot = (): UploadSnapshot => this.#snapshot;
+  getSnapshot = (): UploadSnapshot<F> => this.#snapshot;
 
   /**
    * Calls `listener` with the current snapshot now and after every change, and returns a
    * function that stops. This is the Svelte store contract, and works with React's
    * `useSyncExternalStore`.
    */
-  subscribe = (listener: (snapshot: UploadSnapshot) => void): (() => void) => {
+  subscribe = (listener: (snapshot: UploadSnapshot<F>) => void): (() => void) => {
     this.#listeners.add(listener);
     listener(this.#snapshot);
     return () => {
@@ -251,7 +251,7 @@ export class UploadController {
    * Adds files from a file input, a drop, a paste or a phone's picker, and starts uploading them,
    * or keeps them `selected` with `autoUpload: false`.
    */
-  addFiles(files: Iterable<UploadFile> | ArrayLike<UploadFile>): void {
+  addFiles(files: Iterable<F> | ArrayLike<F>): void {
     const {
       multiple = false,
       maxFiles = DEFAULT_MAX_FILES,
@@ -259,14 +259,14 @@ export class UploadController {
       maxFileSize,
       autoUpload = true,
     } = this.#options;
-    let picked = Array.from(files as ArrayLike<UploadFile>);
+    let picked = Array.from(files as ArrayLike<F>);
     if (picked.length === 0) return;
     if (!multiple) {
       picked = picked.slice(0, 1);
       for (const item of this.#snapshot.items) this.remove(item.key);
     }
     const room = (multiple ? maxFiles : 1) - this.#snapshot.items.length;
-    const added = picked.slice(0, Math.max(0, room)).map((file): UploadItem => {
+    const added = picked.slice(0, Math.max(0, room)).map((file): UploadItem<F> => {
       const key = `upload-${++nextKey}`;
       const previewUrl = createPreviewUrl(file);
       const errorCode = !isFileAccepted(file, accept)
@@ -355,7 +355,7 @@ export class UploadController {
     return this.#snapshot.items.find((item) => item.key === key);
   }
 
-  #set(items: UploadItem[]) {
+  #set(items: UploadItem<F>[]) {
     const busy = items.some(
       (item) => item.stage === "queued" || item.stage === "uploading" || item.stage === "checking",
     );
@@ -363,7 +363,7 @@ export class UploadController {
     for (const listener of this.#listeners) listener(this.#snapshot);
   }
 
-  #update(key: string, changes: Partial<UploadItem>) {
+  #update(key: string, changes: Partial<UploadItem<F>>) {
     if (!this.#find(key)) return;
     this.#set(
       this.#snapshot.items.map((item) => (item.key === key ? { ...item, ...changes } : item)),
@@ -378,7 +378,7 @@ export class UploadController {
     }
   }
 
-  async #upload({ key, file, assetId }: UploadItem) {
+  async #upload({ key, file, assetId }: UploadItem<F>) {
     const abort = new AbortController();
     this.#aborts.set(key, abort);
     this.#update(key, { stage: "uploading", progress: 0 });
@@ -431,7 +431,7 @@ export class UploadController {
 
   /** Creates and checks one file's upload, through `upload` or the upload preset. */
   async #clientFor(
-    file: UploadFile,
+    file: F,
     signal: AbortSignal,
     onProgress: (sent: number, total: number) => void,
   ): Promise<{
@@ -477,7 +477,7 @@ export class UploadController {
     };
   }
 
-  async #tokenFor(file: UploadFile, signal: AbortSignal): Promise<string | undefined> {
+  async #tokenFor(file: F, signal: AbortSignal): Promise<string | undefined> {
     const { token, tokenUrl } = this.#options;
     if (typeof token === "function") return await token(file);
     if (token !== undefined) return token;
@@ -499,5 +499,6 @@ export class UploadController {
   }
 }
 
-export const createUploadController = (options: UploadControllerOptions): UploadController =>
-  new UploadController(options);
+export const createUploadController = <F extends UploadFile = UploadFile>(
+  options: UploadControllerOptions<F>,
+): UploadController<F> => new UploadController(options);

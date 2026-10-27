@@ -9,7 +9,8 @@ import "../src/elements";
 import * as react from "../src/react";
 import * as native from "../src/react-native";
 import * as svelte from "../src/svelte/index.js";
-import type { MediaProps, UploaderProps } from "../src/ui";
+import type { MediaProps } from "../src/ui";
+import type { UploaderProps } from "../src/ui/BrowserUpload";
 import * as vue from "../src/vue";
 
 export type Mounted = { container: HTMLElement; unmount: () => void };
@@ -200,7 +201,9 @@ export const BINDINGS: Binding[] = [
       nativePicks.set(container, picked);
       const root = createRoot(container);
       const pick = async () => picked.files.splice(0);
-      flushSync(() => root.render(createElement(native.CalmLensUploader, { ...props, pick })));
+      flushSync(() =>
+        root.render(createElement(native.CalmLensUploader<File>, { ...props, pick })),
+      );
       return done(container, () => root.unmount());
     },
     mountMedia: (props) => {

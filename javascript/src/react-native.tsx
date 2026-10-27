@@ -43,16 +43,21 @@ export interface PickRequest {
  * or anything with a name, MIME type, size, `uri` and `arrayBuffer()`. Resolve with none when the
  * person cancels.
  */
-export type PickFiles = (request: PickRequest) => Promise<readonly UploadFile[] | null | undefined>;
+export type PickFiles<F extends UploadFile = UploadFile> = (
+  request: PickRequest,
+) => Promise<readonly F[] | null | undefined>;
 
 type ThemeOptions = {
   /** Colours and corner radius; anything left out keeps the default. */
   theme?: Partial<CalmLensTheme>;
 };
 
-export type CalmLensUploaderProps = Omit<UploaderProps, "capture"> &
+export type CalmLensUploaderProps<F extends UploadFile = UploadFile> = Omit<
+  UploaderProps<F>,
+  "capture"
+> &
   ThemeOptions & {
-    pick: PickFiles;
+    pick: PickFiles<F>;
     style?: StyleProp<ViewStyle>;
   };
 
@@ -283,7 +288,7 @@ const UploadRow = ({
  * and moderation decision, and reports finished uploads to `onUploaded`. `pick` opens your app's
  * picker, such as `expo-image-picker`.
  */
-export function CalmLensUploader({
+export function CalmLensUploader<F extends UploadFile = UploadFile>({
   pick,
   disabled,
   messages: overrides,
@@ -291,7 +296,7 @@ export function CalmLensUploader({
   theme: themeOverrides,
   style,
   ...options
-}: CalmLensUploaderProps) {
+}: CalmLensUploaderProps<F>) {
   const own = useOwnController(options, !external);
   const upload = useUploadSnapshot(external ?? own);
   const { accept, multiple = false } = upload.controller.options;

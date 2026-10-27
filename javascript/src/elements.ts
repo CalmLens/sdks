@@ -3,6 +3,12 @@
 // elements. They render into the page (no shadow DOM), so the stylesheet and your own CSS apply.
 
 import type { AssetModerationStatus } from "./client/CalmLensTypes";
+import type {
+  CalmLensUpload,
+  UploadControllerOptions,
+  UploadItem,
+  UploadSnapshot,
+} from "./ui/BrowserUpload";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
 import { getMediaState, type MediaAsset, type MediaOptions, resolveMediaProps } from "./ui/Media";
 import {
@@ -12,16 +18,17 @@ import {
   resolveMessages,
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
-import {
-  type CalmLensUpload,
-  createUploadController,
-  type UploadController,
-  type UploadControllerOptions,
-  type UploadItem,
-  type UploadSnapshot,
-} from "./ui/UploadController";
+import { createUploadController, type UploadController } from "./ui/UploadController";
 
 export * from "./ui";
+export type {
+  CalmLensUpload,
+  UploadControllerOptions,
+  UploaderProps,
+  UploadItem,
+  UploadSnapshot,
+} from "./ui/BrowserUpload";
+export { createUploadController } from "./ui/BrowserUpload";
 
 /** The `detail` of each event the elements dispatch. */
 export interface CalmLensElementEvents {
@@ -121,7 +128,7 @@ export class CalmLensUploaderElement extends BaseElement {
   #checkStatus?: UploadControllerOptions["checkStatus"];
   #createClient?: UploadControllerOptions["createClient"];
   #messages?: Partial<CalmLensMessages>;
-  #controller?: UploadController;
+  #controller?: UploadController<File>;
   /** Whether `controller` was set from script, so its options and uploads aren't this element's. */
   #external = false;
   #unsubscribe?: () => void;
@@ -176,11 +183,11 @@ export class CalmLensUploaderElement extends BaseElement {
    * The upload queue, for reading items or calling `start`, `retry`, `remove` and `clear`. Set it
    * to show a queue your script created; its own options then apply instead of the attributes.
    */
-  get controller(): UploadController {
+  get controller(): UploadController<File> {
     this.#controller ??= createUploadController(this.#options());
     return this.#controller;
   }
-  set controller(value: UploadController) {
+  set controller(value: UploadController<File>) {
     if (value === this.#controller) return;
     this.#unsubscribe?.();
     if (!this.#external) this.#controller?.clear();

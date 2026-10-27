@@ -12,20 +12,42 @@ import {
   useRef,
   useState,
 } from "react";
+import type {
+  UploadControllerOptions,
+  UploaderProps,
+  UseCalmLensUploadResult,
+} from "./ui/BrowserUpload";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
 import { getMediaState, resolveMediaProps } from "./ui/Media";
 import { describeUploader, describeUploadItem, resolveMessages } from "./ui/Messages";
+import { getMediaAspectRatio, getMediaLoadKey, type MediaProps } from "./ui/Props";
 import {
-  getMediaAspectRatio,
-  getMediaLoadKey,
-  type MediaProps,
-  type UploaderProps,
-} from "./ui/Props";
-import { useOwnController, useUploadSnapshot } from "./ui/ReactUpload";
+  useOwnController,
+  useCalmLensUpload as useSharedCalmLensUpload,
+  useUploadSnapshot,
+} from "./ui/ReactUpload";
 import { CALMLENS_STYLES, CALMLENS_STYLES_ID } from "./ui/Styles";
+import type { UploadFile } from "./ui/UploadController";
 
 export * from "./ui";
-export { type UseCalmLensUploadResult, useCalmLensUpload } from "./ui/ReactUpload";
+export type {
+  CalmLensUpload,
+  UploadControllerOptions,
+  UploaderProps,
+  UploadItem,
+  UploadSnapshot,
+  UseCalmLensUploadResult,
+} from "./ui/BrowserUpload";
+export { createUploadController } from "./ui/BrowserUpload";
+
+/**
+ * Uploads files through an upload preset and re-renders as each one uploads and is checked. Use
+ * it to build your own upload UI; `CalmLensUploader` is built on it. Uploads still running when
+ * the component unmounts are cancelled.
+ */
+export const useCalmLensUpload = <F extends UploadFile = File>(
+  options: UploadControllerOptions<F>,
+): UseCalmLensUploadResult<F> => useSharedCalmLensUpload(options);
 
 const joinClassNames = (...names: (string | false | undefined)[]) =>
   names.filter(Boolean).join(" ");

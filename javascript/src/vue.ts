@@ -19,6 +19,12 @@ import {
   watchEffect,
 } from "vue";
 import type { AssetModerationStatus, CdnTransform } from "./client/CalmLensTypes";
+import type {
+  CalmLensUpload,
+  UploadControllerOptions,
+  UploadItem,
+  UploadSnapshot,
+} from "./ui/BrowserUpload";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
 import { getMediaState, type MediaAsset, type MediaOptions, resolveMediaProps } from "./ui/Media";
 import {
@@ -29,31 +35,38 @@ import {
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
 import {
-  type CalmLensUpload,
   createUploadController,
   type UploadController,
-  type UploadControllerOptions,
-  type UploadItem,
-  type UploadSnapshot,
+  type UploadFile,
 } from "./ui/UploadController";
 
 export * from "./ui";
+export type {
+  CalmLensUpload,
+  UploadControllerOptions,
+  UploaderProps,
+  UploadItem,
+  UploadSnapshot,
+} from "./ui/BrowserUpload";
+export { createUploadController } from "./ui/BrowserUpload";
 
 const icon = (name: IconName) => h("svg", ICON_ATTRIBUTES, [h("path", { d: ICONS[name] })]);
 
-export interface UseCalmLensUploadResult {
-  snapshot: Readonly<ShallowRef<UploadSnapshot>>;
-  controller: UploadController;
-  addFiles: UploadController["addFiles"];
-  retry: UploadController["retry"];
-  cancel: UploadController["cancel"];
-  remove: UploadController["remove"];
-  clear: UploadController["clear"];
-  start: UploadController["start"];
+export interface UseCalmLensUploadResult<F extends UploadFile = File> {
+  snapshot: Readonly<ShallowRef<UploadSnapshot<F>>>;
+  controller: UploadController<F>;
+  addFiles: UploadController<F>["addFiles"];
+  retry: UploadController<F>["retry"];
+  cancel: UploadController<F>["cancel"];
+  remove: UploadController<F>["remove"];
+  clear: UploadController<F>["clear"];
+  start: UploadController<F>["start"];
 }
 
 /** Keeps a ref to a controller's snapshot, following the controller if it changes. */
-const subscribeSnapshot = (controller: MaybeRefOrGetter<UploadController>) => {
+const subscribeSnapshot = <F extends UploadFile>(
+  controller: MaybeRefOrGetter<UploadController<F>>,
+) => {
   const snapshot = shallowRef(toValue(controller).getSnapshot());
   watch(
     () => toValue(controller),
@@ -74,9 +87,9 @@ const subscribeSnapshot = (controller: MaybeRefOrGetter<UploadController>) => {
  * is checked. Use it to build your own upload UI; `CalmLensUploader` is built on it. Uploads
  * still running when the component unmounts are cancelled.
  */
-export const useCalmLensUpload = (
-  options: MaybeRefOrGetter<UploadControllerOptions>,
-): UseCalmLensUploadResult => {
+export const useCalmLensUpload = <F extends UploadFile = File>(
+  options: MaybeRefOrGetter<UploadControllerOptions<F>>,
+): UseCalmLensUploadResult<F> => {
   const controller = createUploadController(toValue(options));
   watchEffect(() => controller.setOptions(toValue(options)));
   const snapshot = subscribeSnapshot(controller);
@@ -120,7 +133,7 @@ export const CalmLensUploader = defineComponent({
     disabled: { type: Boolean, default: false },
     capture: optional(String as PropType<"user" | "environment">),
     messages: messagesProp,
-    controller: optional(Object as PropType<UploadController>),
+    controller: optional(Object as PropType<UploadController<File>>),
   },
   emits: {
     uploaded: (_upload: CalmLensUpload) => true,
@@ -129,7 +142,7 @@ export const CalmLensUploader = defineComponent({
     removed: (_item: UploadItem) => true,
   },
   setup(props, { emit }) {
-    const own = useCalmLensUpload(() => ({
+    const own = useCalmLensUpload<File>(() => ({
       uploadPresetId: props.uploadPresetId,
       upload: props.upload,
       checkStatus: props.checkStatus,

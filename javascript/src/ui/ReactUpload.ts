@@ -6,21 +6,25 @@ import {
   createUploadController,
   type UploadController,
   type UploadControllerOptions,
+  type UploadFile,
   type UploadSnapshot,
 } from "./UploadController";
 
-export interface UseCalmLensUploadResult extends UploadSnapshot {
-  controller: UploadController;
-  addFiles: UploadController["addFiles"];
-  retry: UploadController["retry"];
-  cancel: UploadController["cancel"];
-  remove: UploadController["remove"];
-  clear: UploadController["clear"];
-  start: UploadController["start"];
+export interface UseCalmLensUploadResult<F extends UploadFile = UploadFile>
+  extends UploadSnapshot<F> {
+  controller: UploadController<F>;
+  addFiles: UploadController<F>["addFiles"];
+  retry: UploadController<F>["retry"];
+  cancel: UploadController<F>["cancel"];
+  remove: UploadController<F>["remove"];
+  clear: UploadController<F>["clear"];
+  start: UploadController<F>["start"];
 }
 
 /** Re-renders with a controller's snapshot. */
-export const useUploadSnapshot = (controller: UploadController): UseCalmLensUploadResult => {
+export const useUploadSnapshot = <F extends UploadFile>(
+  controller: UploadController<F>,
+): UseCalmLensUploadResult<F> => {
   const snapshot = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
@@ -42,7 +46,10 @@ export const useUploadSnapshot = (controller: UploadController): UseCalmLensUplo
 };
 
 /** A controller this component owns: it takes the latest options and cancels on unmount. */
-export const useOwnController = (options: UploadControllerOptions, active = true) => {
+export const useOwnController = <F extends UploadFile>(
+  options: UploadControllerOptions<F>,
+  active = true,
+) => {
   const [controller] = useState(() => createUploadController(options));
   // The latest callbacks, without restarting uploads when a parent re-renders.
   if (active) controller.setOptions(options);
@@ -63,5 +70,6 @@ export const useOwnController = (options: UploadControllerOptions, active = true
  * it to build your own upload UI; `CalmLensUploader` is built on it. Uploads still running when
  * the component unmounts are cancelled.
  */
-export const useCalmLensUpload = (options: UploadControllerOptions): UseCalmLensUploadResult =>
-  useUploadSnapshot(useOwnController(options));
+export const useCalmLensUpload = <F extends UploadFile = UploadFile>(
+  options: UploadControllerOptions<F>,
+): UseCalmLensUploadResult<F> => useUploadSnapshot(useOwnController(options));

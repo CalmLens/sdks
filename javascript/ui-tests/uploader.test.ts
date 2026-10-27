@@ -6,7 +6,7 @@ import {
   createUploadController,
   type UploaderProps,
   type UploadItem,
-} from "../src/ui";
+} from "../src/ui/BrowserUpload";
 import { BINDINGS, type Mounted } from "./bindings";
 
 const PRESET_ID = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";

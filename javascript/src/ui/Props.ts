@@ -1,9 +1,9 @@
 import type { MediaOptions, MediaState } from "./Media";
 import type { CalmLensMessages } from "./Messages";
-import type { UploadController, UploadControllerOptions } from "./UploadController";
+import type { UploadController, UploadControllerOptions, UploadFile } from "./UploadController";
 
 /** Props every framework's uploader takes, on top of the upload options. */
-export interface UploaderDisplayOptions {
+export interface UploaderDisplayOptions<F extends UploadFile = UploadFile> {
   disabled?: boolean;
   /** Opens the camera on phones: `user` for the front camera, `environment` for the back. */
   capture?: "user" | "environment";
@@ -14,10 +14,11 @@ export interface UploaderDisplayOptions {
    * so your app can read the picked files and call `start()`. The upload options then come from
    * the controller, and the uploader leaves its uploads running when it unmounts.
    */
-  controller?: UploadController;
+  controller?: UploadController<F>;
 }
 
-export type UploaderProps = UploadControllerOptions & UploaderDisplayOptions;
+export type UploaderProps<F extends UploadFile = UploadFile> = UploadControllerOptions<F> &
+  UploaderDisplayOptions<F>;
 
 /** Props every framework's media component takes, on top of the media options. */
 export interface MediaDisplayOptions {
