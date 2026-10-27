@@ -1624,9 +1624,12 @@ async function paintTestImage(scenario, key) {
 	const height = width;
 	const rgba = new Uint8Array(width * height * 4);
 	for (let i = 0; i < width * height; i++) {
-		const cell = Math.floor(i / width / 4) * cells + Math.floor(i % width / 4);
+		const row = Math.floor(i / width / 4);
+		const cell = row * cells + Math.floor(i % width / 4);
 		const value = data[cell % data.length];
-		const position = (value * 149 + cell * 73 & 255) / 255 * (palette.length - 1);
+		const x = cell % cells / (cells - 1);
+		const y = row / (cells - 1);
+		const position = (x * (1 - y) + (1 - x) * y) * (palette.length - 1);
 		const start = Math.floor(position);
 		const blend = position - start;
 		const shade = (value * 73 + 41 & 255) / 255;
