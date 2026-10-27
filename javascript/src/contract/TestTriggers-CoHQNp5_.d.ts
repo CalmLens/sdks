@@ -207,7 +207,7 @@ declare const TEST_INPUT_PRESETS: {
 };
 declare function generateTestTextCode(scenario: TestInput | ClassificationTestSignal, key: string): Promise<string>;
 declare function detectTestTrigger(text: string, key: string): Promise<TestInput | undefined>;
-/** Lossless PNG grid: magic, length, then authenticated scenario bytes, one byte per 4px cell. */
+/** One byte per 4px cell, stored in the low RGB bits to preserve the category colour. */
 declare function paintTestImage(scenario: TestInput | ClassificationTestSignal, key: string): Promise<{
   width: number;
   height: number;

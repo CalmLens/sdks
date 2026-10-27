@@ -1557,15 +1557,69 @@ async function detectTestTrigger(text, key) {
 		return;
 	}
 }
-/** Lossless PNG grid: magic, length, then authenticated scenario bytes, one byte per 4px cell. */
+/** Category colours are decorative; authenticated instance data determines classification. */
+const TEST_INPUT_CATEGORY_COLORS = {
+	sexual: [
+		232,
+		80,
+		160
+	],
+	violence: [
+		224,
+		56,
+		64
+	],
+	"self-harm": [
+		24,
+		168,
+		152
+	],
+	harassment: [
+		240,
+		128,
+		48
+	],
+	hate: [
+		144,
+		80,
+		216
+	],
+	"criminal-activity": [
+		224,
+		184,
+		40
+	],
+	"personal-information": [
+		48,
+		128,
+		224
+	],
+	profanity: [
+		136,
+		192,
+		48
+	]
+};
+/** One byte per 4px cell, stored in the low RGB bits to preserve the category colour. */
 async function paintTestImage(scenario, key) {
-	const bytes = new TextEncoder().encode(await generateTestTextCode(typeof scenario === "string" ? testInputForSignal(scenario, "image") : scenario, key));
+	const input = TEST_INPUT_SCHEMA.parse(typeof scenario === "string" ? testInputForSignal(scenario, "image") : scenario);
+	const bytes = new TextEncoder().encode(await generateTestTextCode(input, key));
+	const palette = input.instances.length ? [...new Set(input.instances.map((instance) => instance.category))].map((category) => TEST_INPUT_CATEGORY_COLORS[category]) : [[
+		144,
+		152,
+		160
+	]];
+	const mixedColor = [
+		0,
+		1,
+		2
+	].map((channel) => palette.reduce((sum, color) => sum + color[channel], 0) / palette.length);
 	const data = new Uint8Array([
 		67,
 		76,
 		84,
 		83,
-		1,
+		2,
 		bytes.length >> 8,
 		bytes.length & 255,
 		...bytes
@@ -1576,10 +1630,12 @@ async function paintTestImage(scenario, key) {
 	const rgba = new Uint8Array(width * height * 4);
 	for (let i = 0; i < width * height; i++) {
 		const value = data[(Math.floor(i / width / 4) * cells + Math.floor(i % width / 4)) % data.length];
+		const shade = (value * 73 + 41 & 255) / 255;
+		const color = mixedColor.map((channel) => Math.round(channel * (.55 + shade * .1) + 89 * shade));
 		rgba.set([
-			value,
-			255 - value,
-			123,
+			color[0] & 248 | value >> 5,
+			color[1] & 248 | value >> 2 & 7,
+			color[2] & 252 | value & 3,
 			255
 		], i * 4);
 	}
@@ -1591,17 +1647,22 @@ async function paintTestImage(scenario, key) {
 }
 async function detectTestImage(image, key) {
 	if (!Number.isSafeInteger(image.width) || image.width < 4 || image.width % 4 !== 0 || image.height !== image.width || image.height > 512 || image.rgba.length !== image.width * image.height * 4) return;
+	const legacy = image.rgba[0] === 67 && image.rgba[1] === 188 && image.rgba[2] === 123;
 	const bytes = [];
 	for (let y = 0; y < image.height; y += 4) for (let x = 0; x < image.width; x += 4) {
 		const offset = (y * image.width + x) * 4;
-		const value = image.rgba[offset];
+		const red = image.rgba[offset];
+		const green = image.rgba[offset + 1];
+		const blue = image.rgba[offset + 2];
+		const value = legacy ? red : (red & 7) << 5 | (green & 7) << 2 | blue & 3;
+		if (legacy && (green !== 255 - red || blue !== 123)) return;
 		for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) {
 			const pos = ((y + dy) * image.width + x + dx) * 4;
-			if (image.rgba[pos] !== value || image.rgba[pos + 1] !== 255 - value || image.rgba[pos + 2] !== 123 || image.rgba[pos + 3] !== 255) return;
+			if (image.rgba[pos] !== red || image.rgba[pos + 1] !== green || image.rgba[pos + 2] !== blue || image.rgba[pos + 3] !== 255) return;
 		}
 		bytes.push(value);
 	}
-	if (bytes.slice(0, 5).join() !== "67,76,84,83,1") return;
+	if (bytes.slice(0, 5).join() !== `67,76,84,83,${legacy ? 1 : 2}`) return;
 	const length = bytes[5] << 8 | bytes[6];
 	if (length > bytes.length - 7) return;
 	return detectTestTrigger(new TextDecoder().decode(new Uint8Array(bytes.slice(7, 7 + length))), key);
