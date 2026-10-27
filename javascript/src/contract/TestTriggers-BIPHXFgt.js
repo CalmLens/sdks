@@ -1,7 +1,7 @@
 import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, s as updatedAt } from "./Ids-aHyP9ZcF.js";
 import "./SharedConstants-CyiUWW66.js";
 import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-DMrN3Wla.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-C10KVXyT.js";
 import * as zod from "zod";
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });

@@ -20,6 +20,6 @@ export const TEST_TEXT_CATEGORIES = [
 ] as const;
 
 export const detectTestText = async (text: string, testInputKey: string) =>
-  (await detectTestTrigger(text, testInputKey)).signals.find((signal) =>
+  (await detectTestTrigger(text, testInputKey)).signals.find((signal: string) =>
     TEST_TEXT_CATEGORIES.some((category) => category === signal),
   );

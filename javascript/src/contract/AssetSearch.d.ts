@@ -90,6 +90,53 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       private: "private";
       public: "public";
     }>>>;
+    delivery: zod.ZodOptional<zod.ZodObject<{
+      viewerRegion: zod.ZodEnum<{
+        [x: string]: string;
+      }>;
+      jurisdiction: zod.ZodOptional<zod.ZodEnum<{
+        AT: "AT";
+        AU: "AU";
+        BR: "BR";
+        DE: "DE";
+        EU: "EU";
+        FR: "FR";
+        GB: "GB";
+      }>>;
+      action: zod.ZodNullable<zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        block: "block";
+        limit: "limit";
+        purge: "purge";
+      }>>;
+      rule: zod.ZodOptional<zod.ZodString>;
+      category: zod.ZodOptional<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>;
+      ageCheckStandard: zod.ZodEnum<{
+        any: "any";
+        verified: "verified";
+      }>;
+      blocked: zod.ZodBoolean;
+      reason: zod.ZodNullable<zod.ZodEnum<{
+        "content-removed": "content-removed";
+        "copyright-hold": "copyright-hold";
+        moderation: "moderation";
+        "moderation-pending": "moderation-pending";
+        "processing-failed": "processing-failed";
+        "regional-evidence-required": "regional-evidence-required";
+        "regional-rule": "regional-rule";
+        "safety-hold": "safety-hold";
+        uploading: "uploading";
+      }>>;
+    }, zod.core.$strict>>;
     upload: zod.ZodObject<{
       status: zod.ZodEnum<{
         completed: "completed";
@@ -108,41 +155,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       updatedAt: zod.ZodNullable<zod.ZodNumber>;
       completedAt: zod.ZodNullable<zod.ZodNumber>;
       moderation: zod.ZodObject<{
-        delivery: zod.ZodOptional<zod.ZodObject<{
-          region: zod.ZodEnum<{
-            [x: string]: string;
-          }>;
-          jurisdiction: zod.ZodOptional<zod.ZodEnum<{
-            AT: "AT";
-            AU: "AU";
-            BR: "BR";
-            DE: "DE";
-            EU: "EU";
-            FR: "FR";
-            GB: "GB";
-          }>>;
-          action: zod.ZodNullable<zod.ZodEnum<{
-            "age-restrict": "age-restrict";
-            block: "block";
-            limit: "limit";
-            purge: "purge";
-          }>>;
-          rule: zod.ZodOptional<zod.ZodString>;
-          category: zod.ZodOptional<zod.ZodEnum<{
-            "criminal-activity": "criminal-activity";
-            harassment: "harassment";
-            hate: "hate";
-            "personal-information": "personal-information";
-            profanity: "profanity";
-            "self-harm": "self-harm";
-            sexual: "sexual";
-            violence: "violence";
-          }>>;
-          ageCheckStandard: zod.ZodEnum<{
-            any: "any";
-            verified: "verified";
-          }>;
-        }, zod.core.$strict>>;
         status: zod.ZodEnum<{
           "age-restricted": "age-restricted";
           allowed: "allowed";

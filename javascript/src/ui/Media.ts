@@ -11,15 +11,17 @@ export interface MediaAsset {
   id: string;
   projectId: string;
   type?: string | null;
+  delivery?: {
+    viewerRegion: string;
+    blocked: boolean;
+    reason: string | null;
+    action: string | null;
+    jurisdiction?: string;
+    ageCheckStandard: "any" | "verified";
+  };
   classification?: {
     moderation?: {
       status?: AssetModerationStatus | null;
-      delivery?: {
-        region: string;
-        action: string | null;
-        jurisdiction?: string;
-        ageCheckStandard: "any" | "verified";
-      };
       policy?: { decision?: { regions?: { region: string; action: string }[] } };
     } | null;
   } | null;
@@ -192,9 +194,10 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
     purge: "purged",
   };
   let status = props.status ?? asset.classification?.moderation?.status ?? "allowed";
-  const delivery = asset.classification?.moderation?.delivery;
-  const resolved = delivery?.region === props.region ? delivery : undefined;
+  const delivery = asset.delivery;
+  const resolved = delivery?.viewerRegion === props.region ? delivery : undefined;
   if (resolved) {
+    if (resolved.blocked && ranks[status] < ranks.blocked) status = "blocked";
     const effective = resolved.action ? statuses[resolved.action] : "allowed";
     if (effective && ranks[effective] > ranks[status]) status = effective;
   }
@@ -227,14 +230,14 @@ export const getMediaState = (options: MediaOptions): MediaState => {
   const resolved = resolveMediaProps(options);
   const state = buildMediaState(resolved);
   const moderation = options.asset?.classification?.moderation;
-  const delivery = moderation?.delivery;
+  const delivery = options.asset?.delivery;
   if (
     state.kind === "unavailable" &&
     resolved.status === "blocked" &&
     !resolved.contentRemoved &&
     moderation?.status !== "blocked" &&
     moderation?.status !== "purged" &&
-    delivery?.region === options.region &&
+    delivery?.viewerRegion === options.region &&
     delivery?.action === "block" &&
     delivery.jurisdiction
   )
@@ -261,7 +264,7 @@ const buildMediaState = ({
   region,
 }: MediaSettings & { projectId: string; assetId: string }): MediaState => {
   if (status === "blocked" || status === "purged" || contentRemoved) return { kind: "unavailable" };
-  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl, region };
+  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl, viewerRegion: region };
   const placeholderUrl = placeholder
     ? (decodePlaceholderHash(placeholderHash) ??
       customPlaceholderUrl ??

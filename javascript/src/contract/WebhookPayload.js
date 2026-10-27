@@ -2,8 +2,8 @@ import { a as primaryIdField, l as metaStore, n as idField, o as backfill, t as 
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { C as updatedAtField, S as saneStringField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as docPropertyInfo, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-DO59fG7A.js";
-import { i as SERVED_JURISDICTIONS_SCHEMA, n as JURISDICTION_SCHEMA, r as REGIONAL_DELIVERY_SCHEMA } from "./Jurisdiction-DMrN3Wla.js";
+import { C as updatedAtField, S as saneStringField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as docPropertyInfo, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BIPHXFgt.js";
+import { i as SERVED_JURISDICTIONS_SCHEMA, n as JURISDICTION_SCHEMA, r as REGIONAL_DELIVERY_SCHEMA } from "./Jurisdiction-C10KVXyT.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Ba-H8vMt.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
@@ -561,7 +561,6 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 })]));
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
-	delivery: REGIONAL_DELIVERY_SCHEMA.optional().describe("Effective decision for the requested viewer region, including the jurisdiction and rule when a regional restriction raises the base decision. The client performs the required age check."),
 	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only through signed URLs, API keys or the `ageConfirmed=true` opt-in), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
@@ -624,6 +623,20 @@ STORED_ASSET_SCHEMA.pick({
 	processingOptions: true,
 	visibility: true
 }).extend({
+	delivery: REGIONAL_DELIVERY_SCHEMA.extend({
+		blocked: zod.boolean().describe("Whether an unconditional content-delivery blocker applies. False does not grant private access or confirm an age check."),
+		reason: zod.enum([
+			"safety-hold",
+			"copyright-hold",
+			"uploading",
+			"moderation",
+			"processing-failed",
+			"moderation-pending",
+			"content-removed",
+			"regional-evidence-required",
+			"regional-rule"
+		]).nullable()
+	}).optional().describe("Request-specific delivery eligibility, returned when viewerRegion is supplied. Does not grant viewer permission or confirm age assurance."),
 	upload: ASSET_UPLOAD_SCHEMA,
 	classification: ASSET_CLASSIFICATION_SCHEMA,
 	content: ASSET_CONTENT_SCHEMA

@@ -111,9 +111,10 @@ const (
 
 // Asset is a moderated asset. Optional fields are nil when absent.
 type Asset struct {
-	ID        string `json:"id"`
-	ProjectID string `json:"projectId"`
-	Name      string `json:"name"`
+	Delivery  *RegionalDelivery `json:"delivery,omitempty"`
+	ID        string            `json:"id"`
+	ProjectID string            `json:"projectId"`
+	Name      string            `json:"name"`
 	// Type is one of the AssetType constants.
 	Type     string  `json:"type"`
 	UserID   *string `json:"userId"`
@@ -188,8 +189,7 @@ type AssetReview struct {
 
 // AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	Delivery      *RegionalDelivery `json:"delivery,omitempty"`
-	ManualReviews []AssetReview     `json:"manualReviews"`
+	ManualReviews []AssetReview `json:"manualReviews"`
 	// Status is one of the ModerationStatus constants.
 	Status     string                     `json:"status"`
 	Categories map[string]CategoryResult  `json:"categories,omitempty"`
@@ -434,8 +434,10 @@ type RegionalDecision struct {
 	Category string `json:"category"`
 }
 type RegionalDelivery struct {
-	Jurisdiction *string `json:"jurisdiction,omitempty"`
-	Region           string  `json:"region"`
+	Blocked          bool    `json:"blocked"`
+	Reason           *string `json:"reason"`
+	Jurisdiction     *string `json:"jurisdiction,omitempty"`
+	ViewerRegion     string  `json:"viewerRegion"`
 	Action           *string `json:"action"`
 	Rule             *string `json:"rule,omitempty"`
 	Category         *string `json:"category,omitempty"`
@@ -722,8 +724,8 @@ type AssetPage struct {
 
 // AssetIDOptions identifies an asset.
 type AssetIDOptions struct {
-	AssetID string
-	Region  string
+	AssetID      string
+	ViewerRegion string
 }
 
 // ExplainAssetOptions selects the asset AssetsService.Explain explains. Rerun moderates it again
@@ -887,7 +889,7 @@ const (
 // "format=png,width=1024") or TransformSteps (structured steps, serialized
 // to the same selector). Supply only one transform representation.
 type SignedURLOptions struct {
-	Region           string          `json:"region,omitempty"`
+	ViewerRegion     string          `json:"viewerRegion,omitempty"`
 	AssetID          string          `json:"-"`
 	Resource         string          `json:"resource,omitempty"`
 	Lens             string          `json:"lens,omitempty"`
@@ -1143,7 +1145,7 @@ type EventsPage struct {
 // Supply Transform (a selector string such as "format=png,width=1024")
 // or TransformSteps (structured steps; a non-nil empty slice is rejected), not both.
 type CDNAssetURLOptions struct {
-	Region          string
+	ViewerRegion    string
 	AssetIdentifier string
 	Resource        string
 	Lens            string

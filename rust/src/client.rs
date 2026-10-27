@@ -949,7 +949,7 @@ impl AssetsClient<'_> {
     pub async fn retrieve(&self, options: AssetId) -> Result<Asset> {
         let path = format!("/assets/{}", id(&options.asset_id)?);
         let mut query = Query::default();
-        query.opt("region", options.region.as_ref());
+        query.opt("viewerRegion", options.viewer_region.as_ref());
         self.0
             .call(self.0.prepare(Method::GET, &path, &query.0)?)
             .await
@@ -1458,8 +1458,7 @@ impl CdnClient<'_> {
                 "Lenses and transforms apply only to the rendered resource",
             ));
         }
-        if resource == "placeholder" && (transformed || options.age_confirmed == Some(true))
-        {
+        if resource == "placeholder" && (transformed || options.age_confirmed == Some(true)) {
             return Err(invalid_argument(
                 "A placeholder takes no lens, transform or ageConfirmed",
             ));
@@ -1486,7 +1485,7 @@ impl CdnClient<'_> {
         if options.age_confirmed == Some(true) {
             query.push("ageConfirmed", "true");
         }
-        query.opt("region", options.region.as_ref());
+        query.opt("viewerRegion", options.viewer_region.as_ref());
         if !query.0.is_empty() {
             url.push('?');
             url.push_str(

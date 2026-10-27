@@ -260,7 +260,7 @@ func fixtureTransform(t *testing.T, value any) (string, []LensTransform) {
 func fixtureCDN(t *testing.T, args fixtureArgs) CDNAssetURLOptions {
 	t.Helper()
 	options := CDNAssetURLOptions{}
-	options.Region, _ = args["region"].(string)
+	options.ViewerRegion, _ = args["viewerRegion"].(string)
 	options.AssetIdentifier, _ = args["assetIdentifier"].(string)
 	options.Resource, _ = args["resource"].(string)
 	options.Lens, _ = args["lens"].(string)
@@ -679,7 +679,7 @@ func TestPathFixtures(t *testing.T) {
 			// Unknown fixture options fail the test instead of being ignored.
 			args := decodeArgs(t, cdn.Options)
 			for key := range args {
-				if !strings.Contains(" assetIdentifier resource lens transform ageConfirmed region ", " "+key+" ") {
+				if !strings.Contains(" assetIdentifier resource lens transform ageConfirmed viewerRegion ", " "+key+" ") {
 					t.Fatalf("unknown CDN URL option %s", key)
 				}
 			}

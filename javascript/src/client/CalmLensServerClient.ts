@@ -329,7 +329,9 @@ export default class CalmLensServerClient {
 
       /** Retrieves an asset with its status and classification results. */
       retrieve: async ({ assetId, viewerRegion }: RetrieveAssetOptions): Promise<Asset> =>
-        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`, { query: { viewerRegion } }),
+        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`, {
+          query: { viewerRegion },
+        }),
 
       /** Updates an asset's editable fields. */
       update: async ({ assetId, ...body }: UpdateAssetOptions): Promise<Asset> =>

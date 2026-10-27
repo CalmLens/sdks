@@ -3,13 +3,13 @@
     "operation": "assets.retrieve",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "region": "DE"
+      "viewerRegion": "DE"
     },
     "request": {
       "method": "GET",
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c",
       "query": {
-        "region": "DE"
+        "viewerRegion": "DE"
       },
       "body": null
     },
@@ -34,7 +34,7 @@
     "operation": "assets.createSignedUrl",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "region": "GB",
+      "viewerRegion": "GB",
       "resource": "rendered"
     },
     "request": {
@@ -42,7 +42,7 @@
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c/signed-url",
       "query": {},
       "body": {
-        "region": "GB",
+        "viewerRegion": "GB",
         "resource": "rendered",
         "expiresInSeconds": 900
       }
@@ -1740,6 +1740,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -1750,14 +1760,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -2286,13 +2288,13 @@
     "operation": "assets.retrieve",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "region": "DE"
+      "viewerRegion": "DE"
     },
     "request": {
       "method": "GET",
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c",
       "query": {
-        "region": "DE"
+        "viewerRegion": "DE"
       },
       "body": null
     },
@@ -2345,6 +2347,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -2355,14 +2367,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -2891,7 +2895,7 @@
     "operation": "assets.createSignedUrl",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "region": "GB",
+      "viewerRegion": "GB",
       "resource": "rendered"
     },
     "request": {
@@ -2899,7 +2903,7 @@
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c/signed-url",
       "query": {},
       "body": {
-        "region": "GB",
+        "viewerRegion": "GB",
         "resource": "rendered",
         "expiresInSeconds": 900
       }
@@ -2982,6 +2986,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -2992,14 +3006,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -3610,6 +3616,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -3620,14 +3636,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -4271,6 +4279,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -4281,14 +4299,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -4883,6 +4893,16 @@
               }
             },
             "visibility": "public",
+            "delivery": {
+              "viewerRegion": "AD",
+              "jurisdiction": "DE",
+              "action": "limit",
+              "rule": "example",
+              "category": "sexual",
+              "ageCheckStandard": "any",
+              "blocked": true,
+              "reason": "safety-hold"
+            },
             "upload": {
               "status": "uploading",
               "updatedAt": 1,
@@ -4893,14 +4913,6 @@
               "updatedAt": 1,
               "completedAt": 1,
               "moderation": {
-                "delivery": {
-                  "region": "AD",
-                  "jurisdiction": "DE",
-                  "action": "limit",
-                  "rule": "example",
-                  "category": "sexual",
-                  "ageCheckStandard": "any"
-                },
                 "status": "pending",
                 "manualReviews": [
                   {
@@ -5501,6 +5513,16 @@
             }
           },
           "visibility": "public",
+          "delivery": {
+            "viewerRegion": "AD",
+            "jurisdiction": "DE",
+            "action": "limit",
+            "rule": "example",
+            "category": "sexual",
+            "ageCheckStandard": "any",
+            "blocked": true,
+            "reason": "safety-hold"
+          },
           "upload": {
             "status": "uploading",
             "updatedAt": 1,
@@ -5511,14 +5533,6 @@
             "updatedAt": 1,
             "completedAt": 1,
             "moderation": {
-              "delivery": {
-                "region": "AD",
-                "jurisdiction": "DE",
-                "action": "limit",
-                "rule": "example",
-                "category": "sexual",
-                "ageCheckStandard": "any"
-              },
               "status": "pending",
               "manualReviews": [
                 {
@@ -6125,6 +6139,16 @@
             }
           },
           "visibility": "public",
+          "delivery": {
+            "viewerRegion": "AD",
+            "jurisdiction": "DE",
+            "action": "limit",
+            "rule": "example",
+            "category": "sexual",
+            "ageCheckStandard": "any",
+            "blocked": true,
+            "reason": "safety-hold"
+          },
           "upload": {
             "status": "uploading",
             "updatedAt": 1,
@@ -6135,14 +6159,6 @@
             "updatedAt": 1,
             "completedAt": 1,
             "moderation": {
-              "delivery": {
-                "region": "AD",
-                "jurisdiction": "DE",
-                "action": "limit",
-                "rule": "example",
-                "category": "sexual",
-                "ageCheckStandard": "any"
-              },
               "status": "pending",
               "manualReviews": [
                 {
@@ -6743,6 +6759,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -6753,14 +6779,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -7345,6 +7363,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -7355,14 +7383,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -7947,6 +7967,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -7957,14 +7987,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -8549,6 +8571,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -8559,14 +8591,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -9154,6 +9178,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -9164,14 +9198,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {
@@ -9791,6 +9817,16 @@
         }
       },
       "visibility": "public",
+      "delivery": {
+        "viewerRegion": "AD",
+        "jurisdiction": "DE",
+        "action": "limit",
+        "rule": "example",
+        "category": "sexual",
+        "ageCheckStandard": "any",
+        "blocked": true,
+        "reason": "safety-hold"
+      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -9801,14 +9837,6 @@
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
-          "delivery": {
-            "region": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any"
-          },
           "status": "pending",
           "manualReviews": [
             {

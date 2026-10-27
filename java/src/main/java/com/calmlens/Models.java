@@ -1279,8 +1279,8 @@ public final class Models {
 
   /** Identifies one asset. */
   public static final class AssetId {
-    private String region;
-    public AssetId region(String value) { region = value; return this; }
+    private String viewerRegion;
+    public AssetId viewerRegion(String value) { viewerRegion = value; return this; }
     private String assetId;
     public AssetId() {}
     /** @param assetId the asset ID */
@@ -1482,8 +1482,8 @@ public final class Models {
 
   /** Options for {@code assets.createSignedUrl}. */
   public static final class SignedUrlOptions {
-    private String region;
-    public SignedUrlOptions region(String value) { region = value; return this; }
+    private String viewerRegion;
+    public SignedUrlOptions viewerRegion(String value) { viewerRegion = value; return this; }
     private String assetId;
     private String resource;
     private String lens;
@@ -1633,8 +1633,8 @@ public final class Models {
     private String lens;
     private transient Object transform;
     private Boolean ageConfirmed;
-    private String region;
-    public CdnRequest region(String value) { region = value; return this; }
+    private String viewerRegion;
+    public CdnRequest viewerRegion(String value) { viewerRegion = value; return this; }
     private HttpOptions init;
     public CdnRequest() {}
     /** @param assetIdentifier an asset ID or external ID */
@@ -1718,7 +1718,7 @@ public final class Models {
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, String externalId, String externalUrl, String authorId, ModerationContext context, List<String> tags,
       ProcessingOptions processingOptions, Visibility visibility,
-      AssetUpload upload, AssetClassification classification, AssetContent content) {
+      AssetUpload upload, AssetClassification classification, AssetContent content, RegionalDelivery delivery) {
     /** Copies collections so the record stays immutable. */
     public Asset {
       metadata = list(metadata);
@@ -1831,7 +1831,7 @@ public final class Models {
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
       Map<String, CategoryResult> categories, Double score,
-      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches, RegionalDelivery delivery) {
+      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches) {
     public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); hashMatches = list(hashMatches); }
   }
 
@@ -1899,7 +1899,7 @@ public final class Models {
   }
 
   public record RegionalDecision(String region, String action, String rule, String category) {}
-  public record RegionalDelivery(String region, String jurisdiction, String action, String rule, String category, String ageCheckStandard) {}
+  public record RegionalDelivery(String viewerRegion, String jurisdiction, String action, String rule, String category, String ageCheckStandard, boolean blocked, String reason) {}
   /**
    * Final automatic action, flagged categories and decision source.
    *

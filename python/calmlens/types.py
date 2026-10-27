@@ -486,8 +486,10 @@ class RegionalDecision(TypedDict):
     category: str
 
 class RegionalDelivery(TypedDict, total=False):
+    blocked: bool
+    reason: Optional[str]
     jurisdiction: str
-    region: str
+    viewerRegion: str
     action: Optional[ModerationAction]
     rule: str
     category: str
@@ -617,7 +619,6 @@ class _AssetModerationRequired(TypedDict):
     status: AssetModerationStatus
 
 class AssetModeration(_AssetModerationRequired, total=False):
-    delivery: RegionalDelivery
     categories: ClassificationCategories
     score: float
     timeline: MediaClassificationReport
@@ -674,6 +675,7 @@ class _AssetRequired(TypedDict):
 
 
 class Asset(_AssetRequired, total=False):
+    delivery: RegionalDelivery
     userId: Optional[str]
     parentId: Optional[str]
     folderId: Optional[str]
@@ -1052,7 +1054,7 @@ class SignedUploadToken(TypedDict):
 
 
 class AssetIdOptions(TypedDict, total=False):
-    region: str
+    viewerRegion: str
     assetId: str
 
 
@@ -1239,7 +1241,7 @@ class _AssetUrlRequired(TypedDict):
 
 
 class AssetUrlOptions(_AssetUrlRequired, total=False):
-    region: str
+    viewerRegion: str
     resource: CdnResource
     lens: str
     transform: CdnTransform

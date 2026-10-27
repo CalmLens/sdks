@@ -1052,7 +1052,7 @@ impl MetadataItem {
 pub struct AssetId {
     /// Viewer country supplied by the client integration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub viewer_region: Option<String>,
     /// The asset ID.
     pub asset_id: String,
 }
@@ -1061,7 +1061,7 @@ impl AssetId {
     pub fn new(asset_id: impl Into<String>) -> Self {
         Self {
             asset_id: asset_id.into(),
-            region: None,
+            viewer_region: None,
         }
     }
 }
@@ -1284,7 +1284,7 @@ pub struct UploadPart {
 pub struct SignedUrlOptions {
     /// Viewer country supplied by the client integration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub viewer_region: Option<String>,
     /// The asset ID.
     #[serde(skip_serializing)]
     pub asset_id: String,
@@ -1385,7 +1385,7 @@ pub struct EnsureLenses {
 pub struct CdnRequest {
     /// Viewer country supplied by the client integration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub viewer_region: Option<String>,
     /// The asset ID or external ID.
     pub asset_identifier: String,
     /// `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or transform.
@@ -1425,6 +1425,10 @@ pub struct HttpOptions {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct Asset {
+    /// Effective action and age assurance for the requested viewer country.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery: Option<RegionalDelivery>,
+
     /// The asset ID.
     pub id: String,
     /// The owning project.
@@ -1616,9 +1620,6 @@ pub struct AssetReview {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetModeration {
-    /// Effective action and age assurance for the requested viewer country.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub delivery: Option<RegionalDelivery>,
     /// Reviews in chronological order.
     #[serde(default)]
     pub manual_reviews: Vec<AssetReview>,
@@ -1808,7 +1809,11 @@ pub struct RegionalDelivery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jurisdiction: Option<String>,
     /// Viewer country.
-    pub region: String,
+    pub viewer_region: String,
+    /// Whether delivery is blocked regardless of viewer permissions.
+    pub blocked: bool,
+    /// Reason delivery is blocked.
+    pub reason: Option<String>,
     /// Applicable action; None allows content.
     pub action: Option<String>,
     /// Mandatory rule responsible for the action, if any.

@@ -612,23 +612,18 @@ test("regional media uses the viewer country and forwards it on responsive URLs"
   const us = getMediaState({ asset, region: "US", widths: [320, 640] });
   expect(us.kind).toBe("image");
   if (us.kind !== "image") throw new Error("expected-image");
-  expect(new URL(us.src).searchParams.get("region")).toBe("US");
-  expect(us.sources?.map((source) => new URL(source.src).searchParams.get("region"))).toEqual([
-    "US",
-    "US",
-  ]);
+  expect(new URL(us.src).searchParams.get("viewerRegion")).toBe("US");
+  expect(us.sources?.map((source) => new URL(source.src).searchParams.get("viewerRegion"))).toEqual(
+    ["US", "US"],
+  );
 });
 
 test("viewer-aware age restriction gates an allowed asset until the client confirms age", () => {
   const asset = {
     id: "asset-region",
     projectId: "project-region",
-    classification: {
-      moderation: {
-        status: "allowed" as const,
-        delivery: { region: "GB", action: "age-restrict", ageCheckStandard: "verified" as const },
-      },
-    },
+    delivery: { viewerRegion: "GB", action: "age-restrict", ageCheckStandard: "verified" as const },
+    classification: { moderation: { status: "allowed" as const } },
   };
   expect(getMediaState({ asset, region: "GB", placeholder: false })).toEqual({
     kind: "gated",
@@ -638,22 +633,24 @@ test("viewer-aware age restriction gates an allowed asset until the client confi
   expect(permitted.kind).toBe("image");
   if (permitted.kind !== "image") throw new Error("expected-image");
   expect(new URL(permitted.src).searchParams.get("ageConfirmed")).toBe("true");
-  expect(new URL(permitted.src).searchParams.get("region")).toBe("GB");
+  expect(new URL(permitted.src).searchParams.get("viewerRegion")).toBe("GB");
 });
 
 test("regional unavailable state requires matching viewer attribution and yields to content removal", () => {
   const asset = {
     id: "regional",
     projectId: PROJECT_ID,
+    delivery: {
+      viewerRegion: "DE",
+      blocked: true,
+      reason: "regional-rule",
+      jurisdiction: "DE",
+      action: "block",
+      ageCheckStandard: "any" as const,
+    },
     classification: {
       moderation: {
         status: "allowed" as const,
-        delivery: {
-          region: "DE",
-          jurisdiction: "DE",
-          action: "block",
-          ageCheckStandard: "any" as const,
-        },
       },
     },
   };
@@ -669,14 +666,29 @@ test("regional unavailable state requires matching viewer attribution and yields
     getMediaState({
       asset: {
         ...asset,
-        classification: {
-          moderation: {
-            ...asset.classification.moderation,
-            delivery: { ...asset.classification.moderation.delivery, jurisdiction: undefined },
-          },
-        },
+        delivery: { ...asset.delivery, jurisdiction: undefined },
       },
       region: "DE",
+    }),
+  ).toEqual({ kind: "unavailable" });
+});
+
+test("viewer delivery blockers prevent media requests even with an allowed base status", () => {
+  expect(
+    getMediaState({
+      asset: {
+        id: "held",
+        projectId: PROJECT_ID,
+        classification: { moderation: { status: "allowed" } },
+        delivery: {
+          viewerRegion: "GB",
+          action: null,
+          blocked: true,
+          reason: "copyright-hold",
+          ageCheckStandard: "any",
+        },
+      },
+      region: "GB",
     }),
   ).toEqual({ kind: "unavailable" });
 });

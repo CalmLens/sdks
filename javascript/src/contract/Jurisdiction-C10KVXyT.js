@@ -38,7 +38,7 @@ const COUNTRIES = new Set("AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB
 const VIEWER_REGION_SCHEMA = z.enum([...COUNTRIES]).describe("Viewer's ISO 3166-1 alpha-2 country, supplied by your integration; not the proxy server's country. EU is not a viewer country.");
 const EU_COUNTRIES = new Set("AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" "));
 const REGIONAL_DELIVERY_SCHEMA = z.object({
-	region: VIEWER_REGION_SCHEMA,
+	viewerRegion: VIEWER_REGION_SCHEMA,
 	jurisdiction: JURISDICTION_SCHEMA.exclude(["global"]).optional().describe("Jurisdiction whose rule makes delivery stricter than the base decision; omitted when the base decision applies. May be EU for a viewer in a member country."),
 	action: z.enum([
 		"limit",

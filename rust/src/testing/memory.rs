@@ -2087,8 +2087,7 @@ impl Backend {
             return not_available();
         };
         let restricted = !public
-            || (status == "age-restricted"
-                && q.get("ageConfirmed").is_none_or(|v| v != "true"));
+            || (status == "age-restricted" && q.get("ageConfirmed").is_none_or(|v| v != "true"));
         if restricted && !can_download() {
             return custom(
                 "asset/api-key-missing-permission",
