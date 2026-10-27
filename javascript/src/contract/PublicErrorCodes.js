@@ -285,6 +285,21 @@ Object.defineProperty(class SendableError extends Error {
 ErrorCode.DEFAULT_CODE;
 // packages/shared/src/PublicErrorCodes.ts
 const PUBLIC_ERROR_CODES = {
+	INVALID_VIEWER_REGION: new ErrorCode({
+		id: "viewer/invalid-region",
+		defaultMessage: "Supply the viewer's ISO country code, such as DE or GB.",
+		status: 400
+	}),
+	VIEWER_REGION_REQUIRED: new ErrorCode({
+		id: "viewer/region-required",
+		defaultMessage: "Supply the viewer region when regional delivery controls apply.",
+		status: 403
+	}),
+	REGIONAL_EVIDENCE_REQUIRED: new ErrorCode({
+		id: "asset/regional-evidence-required",
+		defaultMessage: "This asset needs moderation evidence for the newly served jurisdiction.",
+		status: 403
+	}),
 	INVALID_CURSOR: new ErrorCode({
 		id: "validation/invalid-cursor",
 		defaultMessage: "The cursor is invalid or belongs to a different query.",

@@ -5,6 +5,14 @@ package calmlens
 // Qualifiers, the keys of CategoryResult.Qualifiers. Qualifiers added later still decode
 // under their own keys.
 const (
+	QualifierSexualPornographicMedia              = "sexual-pornographic-media"
+	QualifierHateDeUnconstitutionalSymbols        = "hate-de-unconstitutional-symbols"
+	QualifierHateAtProhibitedSymbols              = "hate-at-prohibited-symbols"
+	QualifierHateDeHolocaustDenial                = "hate-de-holocaust-denial"
+	QualifierHateAtHolocaustDenial                = "hate-at-holocaust-denial"
+	QualifierHateFrHolocaustDenial                = "hate-fr-holocaust-denial"
+	QualifierViolenceHighImpact                   = "violence-high-impact"
+	QualifierSelfHarmAgeRestricted                = "self-harm-age-restricted"
 	QualifierPersonalInformationContact           = "personal-information-contact"
 	QualifierPersonalInformationEmail             = "personal-information-email"
 	QualifierPersonalInformationPhone             = "personal-information-phone"

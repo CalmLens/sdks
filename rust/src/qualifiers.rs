@@ -2,6 +2,22 @@
 string_enum! {
     /// A moderation qualifier, the key of [`CategoryResult::qualifiers`].
     ModerationQualifier {
+        /// Sexual: Pornographic images or video.
+        SexualPornographicMedia = "sexual-pornographic-media",
+        /// Hate: Prohibited Nazi symbols in Germany.
+        HateDeUnconstitutionalSymbols = "hate-de-unconstitutional-symbols",
+        /// Hate: Prohibited Nazi symbols in Austria.
+        HateAtProhibitedSymbols = "hate-at-prohibited-symbols",
+        /// Hate: Public Holocaust denial in Germany.
+        HateDeHolocaustDenial = "hate-de-holocaust-denial",
+        /// Hate: Public Holocaust denial in Austria.
+        HateAtHolocaustDenial = "hate-at-holocaust-denial",
+        /// Hate: Public Holocaust denial in France.
+        HateFrHolocaustDenial = "hate-fr-holocaust-denial",
+        /// Violence: High-impact violent media.
+        ViolenceHighImpact = "violence-high-impact",
+        /// Self harm: Promotion or instruction of self-harm.
+        SelfHarmAgeRestricted = "self-harm-age-restricted",
         /// Personal information: Private contact details.
         PersonalInformationContact = "personal-information-contact",
         /// Personal information: Private email addresses.

@@ -75,7 +75,10 @@ module CalmLens
       allow_age_restricted = api.fetch('allowAgeRestricted', false)
       raise Internal.invalid('allowAgeRestricted must be true or false') unless [true, false, nil].include?(allow_age_restricted)
 
-      allow_age_restricted ? "#{url}?allowAgeRestricted=true" : url
+      query = []
+      query << 'allowAgeRestricted=true' if allow_age_restricted
+      query << "region=#{URI.encode_www_form_component(api['region'])}" if api['region']
+      query.empty? ? url : "#{url}?#{query.join('&')}"
     end
   end
 end

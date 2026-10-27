@@ -1,5 +1,104 @@
 [
   {
+    "code": "viewer/invalid-region",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-viewer-invalid-region"
+      },
+      "body": {
+        "code": "viewer/invalid-region",
+        "message": "Supply the viewer's ISO country code, such as DE or GB.",
+        "details": {
+          "reason": "invalid_viewer_region"
+        },
+        "traceId": "trace-viewer-invalid-region"
+      }
+    },
+    "expected": {
+      "code": "viewer/invalid-region",
+      "status": 400,
+      "requestId": "req-viewer-invalid-region",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_viewer_region",
+        "traceId": "trace-viewer-invalid-region"
+      }
+    }
+  },
+  {
+    "code": "viewer/region-required",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-viewer-region-required"
+      },
+      "body": {
+        "code": "viewer/region-required",
+        "message": "Supply the viewer region when regional delivery controls apply.",
+        "details": {
+          "reason": "viewer_region_required"
+        },
+        "traceId": "trace-viewer-region-required"
+      }
+    },
+    "expected": {
+      "code": "viewer/region-required",
+      "status": 403,
+      "requestId": "req-viewer-region-required",
+      "retryAfter": null,
+      "details": {
+        "reason": "viewer_region_required",
+        "traceId": "trace-viewer-region-required"
+      }
+    }
+  },
+  {
+    "code": "asset/regional-evidence-required",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-regional-evidence-required"
+      },
+      "body": {
+        "code": "asset/regional-evidence-required",
+        "message": "This asset needs moderation evidence for the newly served jurisdiction.",
+        "details": {
+          "reason": "regional_evidence_required"
+        },
+        "traceId": "trace-asset-regional-evidence-required"
+      }
+    },
+    "expected": {
+      "code": "asset/regional-evidence-required",
+      "status": 403,
+      "requestId": "req-asset-regional-evidence-required",
+      "retryAfter": null,
+      "details": {
+        "reason": "regional_evidence_required",
+        "traceId": "trace-asset-regional-evidence-required"
+      }
+    }
+  },
+  {
     "code": "validation/invalid-cursor",
     "status": 400,
     "operation": "assets.retrieve",

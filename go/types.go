@@ -188,7 +188,8 @@ type AssetReview struct {
 
 // AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	ManualReviews []AssetReview `json:"manualReviews"`
+	Delivery      *RegionalDelivery `json:"delivery,omitempty"`
+	ManualReviews []AssetReview     `json:"manualReviews"`
 	// Status is one of the ModerationStatus constants.
 	Status     string                     `json:"status"`
 	Categories map[string]CategoryResult  `json:"categories,omitempty"`
@@ -421,11 +422,27 @@ const (
 	DecisionSourceAssetOverride = "asset-override"
 	DecisionSourceChildren      = "children"
 	// DecisionSourceHashList is a block from a hash list match.
-	DecisionSourceHashList = "hash-list"
+	DecisionSourceHashList      = "hash-list"
+	DecisionSourceMandatoryRule = "mandatory-rule"
 )
 
 // ReportPolicyDecision records the automatic action and what triggered it.
+type RegionalDecision struct {
+	Region   string `json:"region"`
+	Action   string `json:"action"`
+	Rule     string `json:"rule"`
+	Category string `json:"category"`
+}
+type RegionalDelivery struct {
+	Region           string  `json:"region"`
+	Action           *string `json:"action"`
+	Rule             *string `json:"rule,omitempty"`
+	Category         *string `json:"category,omitempty"`
+	AgeCheckStandard string  `json:"ageCheckStandard"`
+}
 type ReportPolicyDecision struct {
+	Rule    *string            `json:"rule,omitempty"`
+	Regions []RegionalDecision `json:"regions"`
 	// Source is one of the DecisionSource constants.
 	Source            string   `json:"source"`
 	Action            *string  `json:"action"`
@@ -703,7 +720,10 @@ type AssetPage struct {
 }
 
 // AssetIDOptions identifies an asset.
-type AssetIDOptions struct{ AssetID string }
+type AssetIDOptions struct {
+	AssetID string
+	Region  string
+}
 
 // ExplainAssetOptions selects the asset AssetsService.Explain explains. Rerun moderates it again
 // with the project's current policy instead of explaining the decision as made.
@@ -866,6 +886,7 @@ const (
 // "format=png,width=1024") or TransformSteps (structured steps, serialized
 // to the same selector). Supply only one transform representation.
 type SignedURLOptions struct {
+	Region           string          `json:"region,omitempty"`
 	AssetID          string          `json:"-"`
 	Resource         string          `json:"resource,omitempty"`
 	Lens             string          `json:"lens,omitempty"`
@@ -1121,6 +1142,7 @@ type EventsPage struct {
 // Supply Transform (a selector string such as "format=png,width=1024")
 // or TransformSteps (structured steps; a non-nil empty slice is rejected), not both.
 type CDNAssetURLOptions struct {
+	Region          string
 	AssetIdentifier string
 	Resource        string
 	Lens            string

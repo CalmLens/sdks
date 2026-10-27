@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, test } from "bun:test";
 import { getFileIcon, renderFileIconSvg } from "../src/file-icons";
 import { MockCalmLensAppClient } from "../src/testing";
 import {
@@ -595,4 +595,48 @@ describe("getFileIcon", () => {
     expect(icon.extension).toBe("");
     expect(renderFileIconSvg(icon, 40)).not.toContain("onload");
   });
+});
+
+test("regional media uses the viewer country and forwards it on responsive URLs", () => {
+  const asset = {
+    id: "asset-region",
+    projectId: "project-region",
+    classification: {
+      moderation: {
+        status: "allowed" as const,
+        policy: { decision: { regions: [{ region: "DE", action: "block" }] } },
+      },
+    },
+  };
+  expect(getMediaState({ asset, region: "DE" })).toEqual({ kind: "unavailable" });
+  const us = getMediaState({ asset, region: "US", widths: [320, 640] });
+  expect(us.kind).toBe("image");
+  if (us.kind !== "image") throw new Error("expected-image");
+  expect(new URL(us.src).searchParams.get("region")).toBe("US");
+  expect(us.sources?.map((source) => new URL(source.src).searchParams.get("region"))).toEqual([
+    "US",
+    "US",
+  ]);
+});
+
+test("viewer-aware age restriction gates an allowed asset until the client confirms age", () => {
+  const asset = {
+    id: "asset-region",
+    projectId: "project-region",
+    classification: {
+      moderation: {
+        status: "allowed" as const,
+        delivery: { region: "GB", action: "age-restrict", ageCheckStandard: "verified" as const },
+      },
+    },
+  };
+  expect(getMediaState({ asset, region: "GB", placeholder: false })).toEqual({
+    kind: "gated",
+    placeholderUrl: undefined,
+  });
+  const permitted = getMediaState({ asset, region: "GB", canView: true });
+  expect(permitted.kind).toBe("image");
+  if (permitted.kind !== "image") throw new Error("expected-image");
+  expect(new URL(permitted.src).searchParams.get("allowAgeRestricted")).toBe("true");
+  expect(new URL(permitted.src).searchParams.get("region")).toBe("GB");
 });

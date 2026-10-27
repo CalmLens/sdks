@@ -1,4 +1,5 @@
 import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, s as updatedAt } from "./Ids-aHyP9ZcF.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-RnMTRb4D.js";
 import "./SharedConstants-CyiUWW66.js";
 import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import * as zod from "zod";
@@ -128,6 +129,72 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 };
 // packages/shared/src/ModerationPolicyDimensions.ts
 const MODERATION_QUALIFIER_INFO = {
+	"sexual-pornographic-media": {
+		category: "sexual",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Pornographic images or video",
+		description: "An image or video frame depicting explicit sexual activity or exposed sexual anatomy presented primarily for sexual arousal, including drawn, animated or generated adult pornography.",
+		exclusions: "Text alone, non-erotic nudity, medical or educational anatomy, breastfeeding, ordinary art without pornographic presentation, swimwear or merely suggestive content.",
+		inputs: ["image"]
+	},
+	"hate-de-unconstitutional-symbols": {
+		category: "hate",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Prohibited Nazi symbols in Germany",
+		description: "A clearly identifiable Nazi Hakenkreuz, SS insignia or another symbol, slogan or salute of a Nazi organisation publicly displayed or disseminated, outside a supported civic information, opposition to Nazism, reporting, teaching, science, research or artistic purpose. Judge the purpose of this instance; a separate report cannot excuse a new promotional display.",
+		exclusions: "Religious or cultural swastikas, ambiguous shapes, merely mentioning a symbol, supported reporting or teaching displaying it for that purpose, anti-Nazi counterspeech or supported art; fictional styling or an unsupported purpose disclaimer alone does not establish an exception."
+	},
+	"hate-at-prohibited-symbols": {
+		category: "hate",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Prohibited Nazi symbols in Austria",
+		description: "A clearly identifiable symbol or insignia of a banned Nazi organisation displayed publicly or disseminated. Exclude printed or pictorial depictions and stage or film works when they do not approve or propagate the organisation’s ideology; exclude exhibitions clearly opposed to that ideology. Evaluate each display separately.",
+		exclusions: "Religious or cultural swastikas, ambiguous shapes, a mere mention, and supported non-promotional pictorial, journalistic, teaching or artistic depictions; a separate benign example cannot excuse a promotional display."
+	},
+	"hate-de-holocaust-denial": {
+		category: "hate",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Public Holocaust denial in Germany",
+		description: "Publicly approving, denying or grossly trivialising the Nazi genocide in a manner capable of disturbing public peace, including antisemitic denial or justification addressed to the public. Supported civic information, reporting, teaching, research or art quoting denial for that purpose is excluded. Evaluate each qualifying statement with its own speaker and purpose.",
+		exclusions: "A topic mention, rejection of denial without reproducing it, accurate history, legitimate reporting or teaching of another person’s denial; quotation marks or a purpose label alone do not excuse the author’s own antisemitic denial."
+	},
+	"hate-at-holocaust-denial": {
+		category: "hate",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Public Holocaust denial in Austria",
+		description: "The author publicly denies, trivialises, approves or seeks to justify the Nazi genocide or Nazi crimes against humanity, including partial denial. A directly presented conversation turn counts even if another turn refuses it.",
+		exclusions: "A topic mention, accurate history, rejecting denial, or a supported factual report, lesson, research or artistic depiction attributing the denial to someone else without adopting it. A disclaimer or unrelated reporting does not excuse the author’s own denial."
+	},
+	"hate-fr-holocaust-denial": {
+		category: "hate",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Public Holocaust denial in France",
+		description: "The author publicly contests the existence of Nazi crimes against humanity established by the Nuremberg tribunal or a competent court, including denying the Holocaust. Preserve who makes the claim; an actual denial in a directly presented conversation still counts.",
+		exclusions: "A topic mention, accurate history, rejecting denial, or supported reporting, teaching, research or art quoting someone else’s denial without adopting it. Fictional styling alone does not excuse an author’s own denial."
+	},
+	"violence-high-impact": {
+		category: "violence",
+		kind: "harm",
+		harmOption: false,
+		displayName: "High-impact violent media",
+		description: "Violent media with high-impact explicit bodily detail, including dismemberment, exposed organs, gruesome mutilation or prolonged detailed torture, beyond moderate violence or minor blood. Judge what is actually shown, including fictional depictions.",
+		exclusions: "Text-only mentions, minor injuries, moderate violence, inferred off-screen harm, and self-directed harm without separate violence.",
+		inputs: ["image"]
+	},
+	"self-harm-age-restricted": {
+		category: "self-harm",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Promotion or instruction of self-harm",
+		description: "Material that encourages, promotes or provides instructions for suicide, deliberate self-injury or disordered eating, rather than merely depicting or mentioning it. Preserve the author’s stance and assess each instance; actual actionable harmful instructions remain instructions inside a report.",
+		exclusions: "Recovery, support, prevention, a mere mention, non-promotional incident reporting, thoughts without promotion, and help-seeking without harmful instructions."
+	},
 	"personal-information-contact": {
 		category: "personal-information",
 		kind: "harm",
@@ -1316,11 +1383,21 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 			"asset-override",
 			"children",
 			"hash-list",
-			"platform-restriction"
+			"mandatory-rule"
 		]),
 		action: FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["allow"]).nullable(),
+		rule: zod.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).optional(),
+		regions: zod.array(zod.object({
+			region: JURISDICTION_SCHEMA.exclude(["global"]),
+			action: FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["allow"]),
+			rule: zod.string(),
+			category: CLASSIFICATION_CATEGORY_SCHEMA
+		}).strict()),
 		flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA)
-	}).strict().optional().describe("The automatic asset decision, including a per-asset action override, a decision inherited from children, a block from a hash list match, or a block from a platform restriction that every policy includes.")
+	}).strict().refine((decision) => decision.source === "mandatory-rule" ? Boolean(decision.rule) : decision.rule === void 0, {
+		message: "decision/rule-required",
+		path: ["rule"]
+	}).optional().describe("The base asset decision and stricter outcomes in served jurisdictions. Mandatory-rule decisions identify the matching rule; global mandatory rules apply in every policy.")
 }).strict();
 const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	description: saneStringField(),

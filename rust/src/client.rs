@@ -948,7 +948,11 @@ impl AssetsClient<'_> {
     /// Retrieves an asset's current state.
     pub async fn retrieve(&self, options: AssetId) -> Result<Asset> {
         let path = format!("/assets/{}", id(&options.asset_id)?);
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        let mut query = Query::default();
+        query.opt("region", options.region.as_ref());
+        self.0
+            .call(self.0.prepare(Method::GET, &path, &query.0)?)
+            .await
     }
     /// Retrieves the asset until it is decided ([`Asset::is_decided`]: moderation status no
     /// longer `pending`, or classification status `failed`) and returns it. It checks again
@@ -1478,8 +1482,27 @@ impl CdnClient<'_> {
                 CdnTransform::Steps(_) => url.push_str(&value.selector()?),
             }
         }
+        let mut query = Query::default();
         if options.allow_age_restricted == Some(true) {
-            url.push_str("?allowAgeRestricted=true");
+            query.push("allowAgeRestricted", "true");
+        }
+        query.opt("region", options.region.as_ref());
+        if !query.0.is_empty() {
+            url.push('?');
+            url.push_str(
+                &query
+                    .0
+                    .iter()
+                    .map(|(key, value)| {
+                        format!(
+                            "{}={}",
+                            percent_encode(key, b"-._~"),
+                            percent_encode(value, b"-._~")
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("&"),
+            );
         }
         Ok(url)
     }

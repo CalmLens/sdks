@@ -131,7 +131,10 @@ module CalmLens
     "reviewedAt" => Integer,
     "appliedToAsset" => bool
   }
+  type regional_decision = { "region" => String, "action" => String, "rule" => String, "category" => String }
+  type regional_delivery = { "region" => String, "action" => String?, ?"rule" => String, ?"category" => String, "ageCheckStandard" => "any" | "verified" }
   type asset_moderation = {
+    ?"delivery" => regional_delivery,
     "manualReviews" => Array[asset_review],
     "status" => asset_moderation_status,
     ?"categories" => classification_categories,
@@ -308,7 +311,7 @@ module CalmLens
   }
   type report_policy = {
     "score" => number, "categories" => Hash[String, category_policy_score], ?"evidence" => "decision" | "full",
-    ?"decision" => { "source" => String, "action" => flagged_content_action?, "flaggedCategories" => Array[String] }
+    ?"decision" => { "source" => String, "action" => flagged_content_action?, "flaggedCategories" => Array[String], ?"rule" => String, "regions" => Array[regional_decision] }
   }
 
   # ---- Pages and search (Page.ts, AssetSearch.ts) --------------------------------------------
@@ -592,7 +595,7 @@ module CalmLens
 
   # ---- Method options -------------------------------------------------------------------------
 
-  type asset_id_options = { asset_id: String, ?request_options: request_options }
+  type asset_id_options = { asset_id: String, ?region: String, ?request_options: request_options }
   # `timeout` is the whole wait in seconds (default 60).
   type wait_for_decision_options = { asset_id: String, ?timeout: number, ?request_options: request_options }
 
@@ -633,6 +636,7 @@ module CalmLens
   type move_asset_options = { asset_id: String, folder_id: String?, ?request_options: request_options }
   type explain_asset_options = { asset_id: String, ?rerun: bool, ?request_options: request_options }
   type create_signed_url_options = {
+    ?region: String,
     asset_id: String,
     # Defaults to `rendered` on the server; `original` takes no lens or transform.
     ?resource: "original" | "rendered",
@@ -766,6 +770,7 @@ module CalmLens
   }
 
   type asset_url_options = {
+    ?region: String,
     # The asset ID or external ID.
     asset_identifier: String,
     # `rendered` is the default. `original` takes no lens or transform; `placeholder` is a small blurred PNG
@@ -779,6 +784,7 @@ module CalmLens
     ?allow_age_restricted: bool?
   }
   type serve_options = {
+    ?region: String,
     asset_identifier: String,
     ?resource: "original" | "rendered" | "placeholder",
     ?lens: String,

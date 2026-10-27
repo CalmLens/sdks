@@ -306,6 +306,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
+    region,
     alt = "",
     aspectRatio,
     width,
@@ -340,6 +341,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
+    region,
   });
   const loadKey = getMediaLoadKey(state);
   const [load, setLoad] = useState<{ key: string; state: LoadState }>({

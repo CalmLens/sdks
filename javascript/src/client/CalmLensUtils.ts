@@ -327,10 +327,22 @@ export const getAssetUrl = ({
  */
 export const appendCdnSelector = (
   url: string,
-  options: { lens?: string; transform?: CdnTransform; allowAgeRestricted?: boolean },
+  options: {
+    lens?: string;
+    transform?: CdnTransform;
+    allowAgeRestricted?: boolean;
+    region?: string;
+  },
 ): string => {
   const path = appendCdnPathSelector(url, options);
-  return options.allowAgeRestricted ? `${path}?allowAgeRestricted=true` : path;
+  const query = new URLSearchParams();
+  if (options.allowAgeRestricted) query.set("allowAgeRestricted", "true");
+  if (options.region !== undefined) {
+    if (!/^[A-Z]{2}$/.test(options.region) || options.region === "EU")
+      throw invalidArgument("region must be a viewer country code");
+    query.set("region", options.region);
+  }
+  return query.size ? `${path}?${query}` : path;
 };
 
 const appendCdnPathSelector = (

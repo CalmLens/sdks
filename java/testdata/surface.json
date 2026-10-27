@@ -1249,6 +1249,21 @@
       "retryable": false
     },
     {
+      "code": "viewer/invalid-region",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "viewer/region-required",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "asset/regional-evidence-required",
+      "status": 403,
+      "retryable": false
+    },
+    {
       "code": "validation/invalid-cursor",
       "status": 400,
       "retryable": false

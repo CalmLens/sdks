@@ -5,6 +5,9 @@
 module CalmLens
   # Error codes the CalmLens API returns, for comparing with {Error#code}.
   module ErrorCodes
+    INVALID_VIEWER_REGION = 'viewer/invalid-region'
+    VIEWER_REGION_REQUIRED = 'viewer/region-required'
+    REGIONAL_EVIDENCE_REQUIRED = 'asset/regional-evidence-required'
     INVALID_CURSOR = 'validation/invalid-cursor'
     MISSING_TOKEN = 'auth/missing-token'
     INVALID_API_KEY = 'auth/invalid-api-key'
@@ -79,6 +82,9 @@ module CalmLens
 
     # The HTTP status the API returns with each code.
     STATUSES = {
+      'viewer/invalid-region' => 400,
+      'viewer/region-required' => 403,
+      'asset/regional-evidence-required' => 403,
       'validation/invalid-cursor' => 400,
       'auth/missing-token' => 401,
       'auth/invalid-api-key' => 401,

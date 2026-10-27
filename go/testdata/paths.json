@@ -110,6 +110,21 @@
   "cdnUrls": [
     {
       "options": {
+        "assetIdentifier": "asset-1",
+        "region": "DE"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?region=DE"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "region": "GB",
+        "allowAgeRestricted": true
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?allowAgeRestricted=true&region=GB"
+    },
+    {
+      "options": {
         "assetIdentifier": "a/b c",
         "transform": "format=png,width=1024"
       },

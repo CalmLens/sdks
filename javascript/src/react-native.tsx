@@ -424,6 +424,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
+    region,
     alt = "",
     aspectRatio,
     width,
@@ -453,6 +454,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
+    region,
   });
   const [layoutWidth, setLayoutWidth] = useState<number>();
   const src = state.kind === "image" ? pickMediaSource(state, layoutWidth) : undefined;

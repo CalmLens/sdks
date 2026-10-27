@@ -2,6 +2,9 @@
 
 /** Error codes the CalmLens API documents, by name. */
 export const API_ERROR_CODES = {
+  INVALID_VIEWER_REGION: "viewer/invalid-region",
+  VIEWER_REGION_REQUIRED: "viewer/region-required",
+  REGIONAL_EVIDENCE_REQUIRED: "asset/regional-evidence-required",
   INVALID_CURSOR: "validation/invalid-cursor",
   MISSING_TOKEN: "auth/missing-token",
   INVALID_API_KEY: "auth/invalid-api-key",
@@ -84,6 +87,18 @@ export interface ApiErrorDefinition {
 
 /** The HTTP status and default message the API returns with each documented error code. */
 export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
+  "viewer/invalid-region": {
+    status: 400,
+    message: "Supply the viewer's ISO country code, such as DE or GB.",
+  },
+  "viewer/region-required": {
+    status: 403,
+    message: "Supply the viewer region when regional delivery controls apply.",
+  },
+  "asset/regional-evidence-required": {
+    status: 403,
+    message: "This asset needs moderation evidence for the newly served jurisdiction.",
+  },
   "validation/invalid-cursor": {
     status: 400,
     message: "The cursor is invalid or belongs to a different query.",

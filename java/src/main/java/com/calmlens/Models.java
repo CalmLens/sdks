@@ -1279,6 +1279,8 @@ public final class Models {
 
   /** Identifies one asset. */
   public static final class AssetId {
+    private String region;
+    public AssetId region(String value) { region = value; return this; }
     private String assetId;
     public AssetId() {}
     /** @param assetId the asset ID */
@@ -1480,6 +1482,8 @@ public final class Models {
 
   /** Options for {@code assets.createSignedUrl}. */
   public static final class SignedUrlOptions {
+    private String region;
+    public SignedUrlOptions region(String value) { region = value; return this; }
     private String assetId;
     private String resource;
     private String lens;
@@ -1629,6 +1633,8 @@ public final class Models {
     private String lens;
     private transient Object transform;
     private Boolean allowAgeRestricted;
+    private String region;
+    public CdnRequest region(String value) { region = value; return this; }
     private HttpOptions init;
     public CdnRequest() {}
     /** @param assetIdentifier an asset ID or external ID */
@@ -1825,7 +1831,7 @@ public final class Models {
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
       Map<String, CategoryResult> categories, Double score,
-      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches) {
+      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches, RegionalDelivery delivery) {
     public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); hashMatches = list(hashMatches); }
   }
 
@@ -1897,8 +1903,10 @@ public final class Models {
    *
    * @param source what decided: {@code policy}, {@code asset-override}, {@code children} or {@code hash-list}
    */
-  public record ReportPolicyDecision(String source, String action, List<String> flaggedCategories) {
-    public ReportPolicyDecision { flaggedCategories = list(flaggedCategories); }
+  public record RegionalDecision(String region, String action, String rule, String category) {}
+  public record RegionalDelivery(String region, String action, String rule, String category, String ageCheckStandard) {}
+  public record ReportPolicyDecision(String source, String action, List<String> flaggedCategories, String rule, List<RegionalDecision> regions) {
+    public ReportPolicyDecision { flaggedCategories = list(flaggedCategories); regions = list(regions); }
   }
 
   /**

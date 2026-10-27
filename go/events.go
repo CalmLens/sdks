@@ -9,6 +9,7 @@ const (
 	EventAssetAllowed                  = "asset.allowed"
 	EventAssetLimited                  = "asset.limited"
 	EventAssetAgeRestricted            = "asset.age-restricted"
+	EventAssetRegionRestricted         = "asset.region-restricted"
 	EventAssetBlocked                  = "asset.blocked"
 	EventAssetPurged                   = "asset.purged"
 	EventAssetFailed                   = "asset.failed"

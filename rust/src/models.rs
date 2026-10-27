@@ -1050,6 +1050,9 @@ impl MetadataItem {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetId {
+    /// Viewer country supplied by the client integration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
     /// The asset ID.
     pub asset_id: String,
 }
@@ -1058,6 +1061,7 @@ impl AssetId {
     pub fn new(asset_id: impl Into<String>) -> Self {
         Self {
             asset_id: asset_id.into(),
+            region: None,
         }
     }
 }
@@ -1278,6 +1282,9 @@ pub struct UploadPart {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignedUrlOptions {
+    /// Viewer country supplied by the client integration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
     /// The asset ID.
     #[serde(skip_serializing)]
     pub asset_id: String,
@@ -1376,6 +1383,9 @@ pub struct EnsureLenses {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CdnRequest {
+    /// Viewer country supplied by the client integration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
     /// The asset ID or external ID.
     pub asset_identifier: String,
     /// `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or transform.
@@ -1606,6 +1616,9 @@ pub struct AssetReview {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetModeration {
+    /// Effective action and age assurance for the requested viewer country.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery: Option<RegionalDelivery>,
     /// Reviews in chronological order.
     #[serde(default)]
     pub manual_reviews: Vec<AssetReview>,
@@ -1772,10 +1785,49 @@ pub struct CategoryPolicySettingsSnapshot {
 }
 
 /// The final automatic action, its source and flagged categories.
+/// A recorded regional decision.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+pub struct RegionalDecision {
+    /// Viewer country or rule jurisdiction.
+    pub region: String,
+    /// Regional moderation action.
+    pub action: String,
+    /// Stable mandatory rule key.
+    pub rule: String,
+    /// Category matched by the mandatory rule.
+    pub category: ClassificationCategory,
+}
+
+/// Effective delivery requirements for a viewer country.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegionalDelivery {
+    /// Viewer country or rule jurisdiction.
+    pub region: String,
+    /// Applicable action; None allows content.
+    pub action: Option<String>,
+    /// Mandatory rule responsible for the action, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule: Option<String>,
+    /// Category matched by a regional rule.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<ClassificationCategory>,
+    /// Age assurance required of the client: any or verified.
+    pub age_check_standard: String,
+}
+
+/// The automatic moderation decision and stricter regional outcomes.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReportPolicyDecision {
+    /// Mandatory rule responsible for the action, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule: Option<String>,
+    /// Stricter outcomes in opted-in jurisdictions.
+    #[serde(default)]
+    pub regions: Vec<RegionalDecision>,
     /// Saved source, such as `policy`, `lens` or `hash-list`.
     #[serde(default)]
     pub source: String,

@@ -194,6 +194,102 @@ declare const EVENT_TYPE_INFO: {
       }>;
     }, zod.core.$strip>;
   };
+  readonly "asset.region-restricted": {
+    id: "asset.region-restricted";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      assetName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      assetType: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>>;
+      region: EventFieldDefinition<zod.ZodEnum<{
+        AT: "AT";
+        AU: "AU";
+        BR: "BR";
+        DE: "DE";
+        EU: "EU";
+        FR: "FR";
+        GB: "GB";
+      }>>;
+      rule: EventFieldDefinition<zod.ZodString>;
+      action: EventFieldDefinition<zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        block: "block";
+        limit: "limit";
+        purge: "purge";
+      }>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      assetName?: string | null | undefined;
+      assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      region: "AT" | "AU" | "BR" | "DE" | "EU" | "FR" | "GB";
+      rule: string;
+      action: "age-restrict" | "block" | "limit" | "purge";
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      assetName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      assetType: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>;
+      region: zod.ZodEnum<{
+        AT: "AT";
+        AU: "AU";
+        BR: "BR";
+        DE: "DE";
+        EU: "EU";
+        FR: "FR";
+        GB: "GB";
+      }>;
+      rule: zod.ZodString;
+      action: zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        block: "block";
+        limit: "limit";
+        purge: "purge";
+      }>;
+    }, zod.core.$strip>;
+  };
   readonly "asset.allowed": {
     id: "asset.allowed";
     name: string;

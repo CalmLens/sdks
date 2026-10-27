@@ -12,7 +12,7 @@ from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Unio
 from .qualifiers import ModerationQualifier
 
 __all__ = [
-    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "CategoryPolicyScore", "ReportPolicy",
+    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "RegionalDecision", "RegionalDelivery", "CategoryPolicyScore", "ReportPolicy",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
     "AssetReview", "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
@@ -479,10 +479,25 @@ class CategoryPolicySource(_CategoryPolicySourceRequired, total=False):
     indexes: List[int]
 
 
-class ReportPolicyDecision(TypedDict):
+class RegionalDecision(TypedDict):
+    region: str
+    action: ModerationAction
+    rule: str
+    category: str
+
+class RegionalDelivery(TypedDict, total=False):
+    region: str
+    action: Optional[ModerationAction]
+    rule: str
+    category: str
+    ageCheckStandard: Literal["any", "verified"]
+
+class ReportPolicyDecision(TypedDict, total=False):
+    rule: str
+    regions: List[RegionalDecision]
     #: ``policy``, ``asset-override``, ``children`` or ``hash-list`` (a block from a hash list
     #: match). New sources may be added.
-    source: Union[Literal["policy", "asset-override", "children", "hash-list"], str]
+    source: Union[Literal["policy", "asset-override", "children", "hash-list", "mandatory-rule"], str]
     action: Optional[ModerationAction]
     flaggedCategories: List[str]
 
@@ -601,6 +616,7 @@ class _AssetModerationRequired(TypedDict):
     status: AssetModerationStatus
 
 class AssetModeration(_AssetModerationRequired, total=False):
+    delivery: RegionalDelivery
     categories: ClassificationCategories
     score: float
     timeline: MediaClassificationReport
@@ -1034,7 +1050,8 @@ class SignedUploadToken(TypedDict):
     expiresAt: int
 
 
-class AssetIdOptions(TypedDict):
+class AssetIdOptions(TypedDict, total=False):
+    region: str
     assetId: str
 
 
@@ -1221,6 +1238,7 @@ class _AssetUrlRequired(TypedDict):
 
 
 class AssetUrlOptions(_AssetUrlRequired, total=False):
+    region: str
     resource: CdnResource
     lens: str
     transform: CdnTransform

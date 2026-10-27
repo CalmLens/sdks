@@ -376,6 +376,7 @@ export const CalmLensMedia = defineComponent({
     placeholderUrl: optional(String),
     averageColor: optional(String),
     cdnBaseUrl: optional(String),
+    region: optional(String),
     alt: { type: String, default: "" },
     aspectRatio: optional(Number),
     width: optional(Number),

@@ -1,9 +1,10 @@
 import { a as primaryIdField, l as metaStore, n as idField, o as backfill, t as EXAMPLE_IDS } from "./Ids-aHyP9ZcF.js";
-import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
+import { i as SERVED_JURISDICTIONS_SCHEMA, n as JURISDICTION_SCHEMA, r as REGIONAL_DELIVERY_SCHEMA } from "./Jurisdiction-RnMTRb4D.js";
+import { C as updatedAtField, S as saneStringField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as docPropertyInfo, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-zllf4NBv.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { C as updatedAtField, S as saneStringField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as docPropertyInfo, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-C6J0hewN.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Ba-H8vMt.js";
+import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
 /**
@@ -95,12 +96,14 @@ const normalizePolicyCondition = (condition) => [...new Map(condition.map((claus
 	return [JSON.stringify(normalized), normalized];
 })).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, clause]) => clause);
 const policyConditionKey = (scope, condition) => `${scope}:${JSON.stringify(normalizePolicyCondition(condition))}`;
-// packages/shared/src/PlatformRestrictions.ts
-/** A platform restriction acts at this policy score (category score × condition evidence). */
-const PLATFORM_RESTRICTION_THRESHOLD = .5;
-const PLATFORM_RESTRICTION_CATEGORIES = new Set([
+// packages/shared/src/MandatoryRules.ts
+/** A mandatory rule acts at this policy score (category score × condition evidence). */
+const MANDATORY_RULE_THRESHOLD = .5;
+const MANDATORY_RULES = [
 	{
-		id: "sexualised-minors",
+		key: "sexualised-minors",
+		regions: ["global"],
+		action: "block",
 		category: "sexual",
 		condition: [{
 			all: ["sexual-minors"],
@@ -109,7 +112,9 @@ const PLATFORM_RESTRICTION_CATEGORIES = new Set([
 		safetyHold: true
 	},
 	{
-		id: "intimate-image-abuse",
+		key: "intimate-image-abuse",
+		regions: ["global"],
+		action: "block",
 		category: "sexual",
 		condition: [{
 			all: ["sexual-intimate-image-abuse"],
@@ -118,7 +123,9 @@ const PLATFORM_RESTRICTION_CATEGORIES = new Set([
 		safetyHold: false
 	},
 	{
-		id: "extreme-pornography",
+		key: "extreme-pornography",
+		regions: ["global"],
+		action: "block",
 		category: "sexual",
 		condition: [{
 			all: ["sexual-extreme"],
@@ -127,7 +134,9 @@ const PLATFORM_RESTRICTION_CATEGORIES = new Set([
 		safetyHold: false
 	},
 	{
-		id: "violent-extremism",
+		key: "violent-extremism",
+		regions: ["global"],
+		action: "block",
 		category: "violence",
 		condition: [{
 			all: ["violence-extremism"],
@@ -135,8 +144,84 @@ const PLATFORM_RESTRICTION_CATEGORIES = new Set([
 		}],
 		safetyHold: false
 	},
-	...[]
-].map((restriction) => restriction.category));
+	...[],
+	...[
+		"DE",
+		"AT",
+		"FR"
+	].map((region) => ({
+		key: `${region.toLowerCase()}-holocaust-denial`,
+		regions: [region],
+		category: "hate",
+		action: "block",
+		safetyHold: false,
+		condition: [{
+			all: [region === "DE" ? "hate-de-holocaust-denial" : region === "AT" ? "hate-at-holocaust-denial" : "hate-fr-holocaust-denial"],
+			none: []
+		}]
+	})),
+	{
+		key: "de-unconstitutional-symbols",
+		regions: ["DE"],
+		category: "hate",
+		action: "block",
+		safetyHold: false,
+		condition: [{
+			all: ["hate-de-unconstitutional-symbols"],
+			none: []
+		}]
+	},
+	{
+		key: "at-prohibited-symbols",
+		regions: ["AT"],
+		category: "hate",
+		action: "block",
+		safetyHold: false,
+		condition: [{
+			all: ["hate-at-prohibited-symbols"],
+			none: []
+		}]
+	},
+	...[
+		"GB",
+		"EU",
+		"AU",
+		"BR"
+	].map((region) => ({
+		key: `${region.toLowerCase()}-adult-content`,
+		regions: [region],
+		category: "sexual",
+		action: "age-restrict",
+		safetyHold: false,
+		condition: [{
+			all: ["sexual-pornographic-media"],
+			none: []
+		}]
+	})),
+	{
+		key: "au-high-impact-violence",
+		regions: ["AU"],
+		category: "violence",
+		action: "age-restrict",
+		safetyHold: false,
+		condition: [{
+			all: ["violence-high-impact"],
+			none: []
+		}]
+	},
+	{
+		key: "au-self-harm",
+		regions: ["AU"],
+		category: "self-harm",
+		action: "age-restrict",
+		safetyHold: false,
+		condition: [{
+			all: ["self-harm-age-restricted"],
+			none: []
+		}]
+	}
+];
+const MANDATORY_RULE_CATEGORIES = new Set(MANDATORY_RULES.map((restriction) => restriction.category));
 // packages/shared/src/Project.ts
 /** The policy score from which a category's action applies. The same for every policy and category. */
 const POLICY_THRESHOLD = .5;
@@ -237,6 +322,7 @@ zod.enum([
 	"wholesome-community"
 ]);
 const PROJECT_SETTINGS_SCHEMA = zod.object({
+	jurisdictions: SERVED_JURISDICTIONS_SCHEMA.optional().describe("Jurisdictions served; global always applies. Defaults to global only."),
 	aiMediaSearchEnabled: zod.boolean().optional().meta({ description: "Index audio speech and video frames and transcripts for AI search. Billed per indexed media unit. Disabled by default; images are always searchable." }),
 	moderationProfileId: zod.string().min(1).optional(),
 	metadataFields: METADATA_FIELD_DEFINITIONS_SCHEMA.optional(),
@@ -267,7 +353,7 @@ zod.object({
 	/** Secret that the project's test inputs carry, so only its members can make one. */
 	testInputKey: zod.string().regex(TEST_INPUT_KEY_PATTERN).nullish()
 });
-Object.fromEntries(MODERATION_POLICY_CATEGORIES.map((category) => [category, PLATFORM_RESTRICTION_CATEGORIES.has(category) ? Math.min(POLICY_THRESHOLD, PLATFORM_RESTRICTION_THRESHOLD) : POLICY_THRESHOLD]));
+Object.fromEntries(MODERATION_POLICY_CATEGORIES.map((category) => [category, MANDATORY_RULE_CATEGORIES.has(category) ? Math.min(POLICY_THRESHOLD, MANDATORY_RULE_THRESHOLD) : POLICY_THRESHOLD]));
 // packages/shared/src/Asset.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
 const ASSET_CLASSIFICATION_STATUS_SCHEMA = zod.enum([
@@ -437,6 +523,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 		description: "Array of tags for the asset",
 		placeholder: "[\"tag1\", \"tag2\"]"
 	})])),
+	moderatedJurisdictions: SERVED_JURISDICTIONS_SCHEMA.optional(),
 	report: CLASSIFICATION_REPORT_SCHEMA.nullish().describe("Moderation report, set once classification finishes. See [Report format](/docs/guides/classification-results)."),
 	uploadStatus: zod.enum(["uploading", "completed"]).default("completed"),
 	uploadUpdatedAt: zod.number().nullish(),
@@ -474,6 +561,7 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 })]));
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
+	delivery: REGIONAL_DELIVERY_SCHEMA.optional().describe("Effective decision for the requested viewer region; the client performs the required age check."),
 	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
@@ -729,6 +817,41 @@ const ASSET_CLASSIFIED = defineEventType({
 		assetType: "image",
 		flaggedCategories: ["sexual"],
 		moderationStatus: "age-restricted"
+	}
+});
+const ASSET_REGION_RESTRICTED = defineEventType({
+	id: "asset.region-restricted",
+	name: "Asset region restricted",
+	description: "An asset has a stricter delivery decision in a jurisdiction served by the project.",
+	category: "moderation",
+	severity: "low",
+	notify: false,
+	permission: "assets:read",
+	fields: {
+		assetName: assetNameField,
+		assetType: assetTypeField,
+		region: field(JURISDICTION_SCHEMA.exclude(["global"]), {
+			label: "Region",
+			description: "Jurisdiction whose mandatory rule raises the delivery action.",
+			display: "code"
+		}),
+		rule: field(zod.string(), {
+			label: "Rule",
+			description: "Stable mandatory rule key.",
+			display: "code"
+		}),
+		action: field(FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["allow"]), {
+			label: "Action",
+			description: "Regional delivery action.",
+			display: "enum"
+		})
+	},
+	example: {
+		assetName: "photo.jpg",
+		assetType: "image",
+		region: "GB",
+		rule: "gb-adult-content",
+		action: "age-restrict"
 	}
 });
 const decidedByField = field(zod.enum(["automated", "reviewer"]), {
@@ -1348,6 +1471,7 @@ const appealFields = {
 const EVENT_TYPE_INFO = {
 	"asset.uploaded": ASSET_UPLOADED,
 	"asset.classified": ASSET_CLASSIFIED,
+	"asset.region-restricted": ASSET_REGION_RESTRICTED,
 	"asset.allowed": ASSET_ALLOWED,
 	"asset.limited": ASSET_LIMITED,
 	"asset.age-restricted": ASSET_AGE_RESTRICTED,

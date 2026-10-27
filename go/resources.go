@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -52,7 +53,19 @@ func (s *AssetsService) List(ctx context.Context, options ListAssetsOptions) (*A
 
 // Retrieve returns the current state of an asset.
 func (s *AssetsService) Retrieve(ctx context.Context, options AssetIDOptions) (*Asset, error) {
-	return s.assetRequest(ctx, "GET", options.AssetID, "", nil)
+	path, err := resourcePath("assets", options.AssetID, "")
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{}
+	if options.Region != "" {
+		params.Set("region", options.Region)
+	}
+	var result Asset
+	if err = s.c.request(ctx, "GET", path, params, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // Update patches an asset; see UpdateAssetOptions.
@@ -372,8 +385,15 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 		}
 		endpoint += "/" + path
 	}
+	params := url.Values{}
+	if options.Region != "" {
+		params.Set("region", options.Region)
+	}
 	if options.AllowAgeRestricted {
-		endpoint += "?allowAgeRestricted=true"
+		params.Set("allowAgeRestricted", "true")
+	}
+	if len(params) > 0 {
+		endpoint += "?" + params.Encode()
 	}
 	return endpoint, nil
 }

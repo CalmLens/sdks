@@ -4,6 +4,14 @@ from typing import Literal, Union
 
 #: Qualifiers in a category's ``qualifiers``. New qualifiers may be added.
 ModerationQualifier = Union[Literal[
+    "sexual-pornographic-media",
+    "hate-de-unconstitutional-symbols",
+    "hate-at-prohibited-symbols",
+    "hate-de-holocaust-denial",
+    "hate-at-holocaust-denial",
+    "hate-fr-holocaust-denial",
+    "violence-high-impact",
+    "self-harm-age-restricted",
     "personal-information-contact",
     "personal-information-email",
     "personal-information-phone",

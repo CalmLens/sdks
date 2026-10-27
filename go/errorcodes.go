@@ -5,6 +5,12 @@ package calmlens
 // Error codes the CalmLens API returns in Error.Code. Compare against these constants
 // rather than string literals; new codes may be added at any time.
 const (
+	// CodeInvalidViewerRegion is returned with HTTP 400.
+	CodeInvalidViewerRegion = "viewer/invalid-region"
+	// CodeViewerRegionRequired is returned with HTTP 403.
+	CodeViewerRegionRequired = "viewer/region-required"
+	// CodeRegionalEvidenceRequired is returned with HTTP 403.
+	CodeRegionalEvidenceRequired = "asset/regional-evidence-required"
 	// CodeInvalidCursor is returned with HTTP 400.
 	CodeInvalidCursor = "validation/invalid-cursor"
 	// CodeMissingToken is returned with HTTP 401.
@@ -150,6 +156,9 @@ const (
 )
 
 var publicErrorStatuses = map[string]int{
+	CodeInvalidViewerRegion:               400,
+	CodeViewerRegionRequired:              403,
+	CodeRegionalEvidenceRequired:          403,
 	CodeInvalidCursor:                     400,
 	CodeMissingToken:                      401,
 	CodeInvalidAPIKey:                     401,

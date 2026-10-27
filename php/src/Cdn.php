@@ -39,7 +39,9 @@ final class Cdn extends Resource
         if (!is_bool($allowAgeRestricted)) {
             Values::invalid('allowAgeRestricted must be true or false');
         }
-        return $allowAgeRestricted ? $url . '?allowAgeRestricted=true' : $url;
+        $query = $allowAgeRestricted ? ['allowAgeRestricted' => 'true'] : [];
+        if (isset($options['region'])) $query['region'] = $options['region'];
+        return $query ? $url . '?' . http_build_query($query) : $url;
     }
 
     /** Returns a PSR-7 response with a streaming body; HTTP errors are returned, not thrown. */

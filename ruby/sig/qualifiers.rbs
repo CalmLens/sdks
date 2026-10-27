@@ -2,6 +2,14 @@
 module CalmLens
   # The keys of a category's qualifiers.
   type qualifier_results = {
+    ?"sexual-pornographic-media" => qualifier_result,
+    ?"hate-de-unconstitutional-symbols" => qualifier_result,
+    ?"hate-at-prohibited-symbols" => qualifier_result,
+    ?"hate-de-holocaust-denial" => qualifier_result,
+    ?"hate-at-holocaust-denial" => qualifier_result,
+    ?"hate-fr-holocaust-denial" => qualifier_result,
+    ?"violence-high-impact" => qualifier_result,
+    ?"self-harm-age-restricted" => qualifier_result,
     ?"personal-information-contact" => qualifier_result,
     ?"personal-information-email" => qualifier_result,
     ?"personal-information-phone" => qualifier_result,

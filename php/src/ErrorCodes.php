@@ -12,6 +12,9 @@ namespace CalmLens;
  */
 final class ErrorCodes
 {
+    public const INVALID_VIEWER_REGION = 'viewer/invalid-region';
+    public const VIEWER_REGION_REQUIRED = 'viewer/region-required';
+    public const REGIONAL_EVIDENCE_REQUIRED = 'asset/regional-evidence-required';
     public const INVALID_CURSOR = 'validation/invalid-cursor';
     public const MISSING_TOKEN = 'auth/missing-token';
     public const INVALID_API_KEY = 'auth/invalid-api-key';
@@ -86,6 +89,9 @@ final class ErrorCodes
 
     /** The HTTP status the API returns with each code. */
     public const STATUSES = [
+        'viewer/invalid-region' => 400,
+        'viewer/region-required' => 403,
+        'asset/regional-evidence-required' => 403,
         'validation/invalid-cursor' => 400,
         'auth/missing-token' => 401,
         'auth/invalid-api-key' => 401,

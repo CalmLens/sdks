@@ -1,5 +1,6 @@
 import type { AssetModerationStatus, CdnTransform, LensTransform } from "../client/CalmLensTypes";
 import { getAssetUrl, serializeTransform, transformSelector } from "../client/CalmLensUtils";
+import { EU_COUNTRIES } from "../contract/Jurisdiction.js";
 import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 
 /**
@@ -10,7 +11,13 @@ export interface MediaAsset {
   id: string;
   projectId: string;
   type?: string | null;
-  classification?: { moderation?: { status?: AssetModerationStatus | null } | null } | null;
+  classification?: {
+    moderation?: {
+      status?: AssetModerationStatus | null;
+      delivery?: { region: string; action: string | null; ageCheckStandard: "any" | "verified" };
+      policy?: { decision?: { regions?: { region: string; action: string }[] } };
+    } | null;
+  } | null;
   content?: {
     status?: string | null;
     image?: {
@@ -42,6 +49,8 @@ export type MediaSource =
 export type MediaOptions = MediaSource & MediaSettings;
 
 export interface MediaSettings {
+  /** Viewer country; forwarded to every CDN request. Your integration determines it. */
+  region?: string;
   /** The asset's stored moderation status. Defaults to `allowed`. */
   status?: AssetModerationStatus;
   /**
@@ -162,12 +171,44 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
   const { asset } = props;
   if (!asset) return props as T & { projectId: string; assetId: string };
   const preview = asset.content?.image;
+  const regionEntries = asset.classification?.moderation?.policy?.decision?.regions ?? [];
+  const ranks: Record<string, number> = {
+    pending: 0,
+    allowed: 0,
+    limited: 1,
+    "age-restricted": 2,
+    blocked: 3,
+    purged: 4,
+  };
+  const statuses: Record<string, AssetModerationStatus> = {
+    limit: "limited",
+    "age-restrict": "age-restricted",
+    block: "blocked",
+    purge: "purged",
+  };
+  let status = props.status ?? asset.classification?.moderation?.status ?? "allowed";
+  const delivery = asset.classification?.moderation?.delivery;
+  const resolved = delivery?.region === props.region ? delivery : undefined;
+  if (resolved) {
+    const effective = resolved.action ? statuses[resolved.action] : "allowed";
+    if (effective && ranks[effective] > ranks[status]) status = effective;
+  }
+  for (const entry of resolved ? [] : regionEntries) {
+    if (
+      !props.region ||
+      entry.region === props.region ||
+      (entry.region === "EU" && EU_COUNTRIES.has(props.region))
+    ) {
+      const regionalStatus = statuses[entry.action];
+      if (regionalStatus && ranks[regionalStatus] > ranks[status]) status = regionalStatus;
+    }
+  }
   const kind = asset.type === "video" || asset.type === "audio" ? asset.type : undefined;
   return {
     ...props,
     projectId: props.projectId ?? asset.projectId,
     assetId: props.assetId ?? asset.id,
-    status: props.status ?? asset.classification?.moderation?.status ?? undefined,
+    status,
     contentRemoved: props.contentRemoved ?? asset.content?.status === "removed",
     type: props.type ?? kind,
     placeholderHash: props.placeholderHash ?? preview?.thumbhash ?? undefined,
@@ -196,9 +237,10 @@ const buildMediaState = ({
   placeholderHash,
   placeholderUrl: customPlaceholderUrl,
   cdnBaseUrl,
+  region,
 }: MediaSettings & { projectId: string; assetId: string }): MediaState => {
   if (status === "blocked" || status === "purged" || contentRemoved) return { kind: "unavailable" };
-  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl };
+  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl, region };
   const placeholderUrl = placeholder
     ? (decodePlaceholderHash(placeholderHash) ??
       customPlaceholderUrl ??

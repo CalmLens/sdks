@@ -373,6 +373,8 @@ export interface IdempotencyOptions {
 export type CdnResource = "original" | "rendered" | "placeholder";
 
 export interface CdnAssetUrlOptions {
+  /** Viewer country supplied by your integration, including when requests go through a proxy. */
+  region?: string;
   assetIdentifier: string;
   resource?: CdnResource;
   lens?: string;
@@ -400,6 +402,7 @@ export interface CdnServeOptions extends CdnAssetUrlOptions {
 }
 
 export interface CreateAssetSignedUrlOptions {
+  region?: string;
   assetId: string;
   resource?: "original" | "rendered";
   lens?: string;
@@ -423,6 +426,7 @@ export type IterateAssetsOptions = Omit<ListAssetsOptions, "cursor">;
 export type ListEventsOptions = GetEventsQuery;
 
 export interface RetrieveAssetOptions {
+  region?: string;
   assetId: string;
 }
 

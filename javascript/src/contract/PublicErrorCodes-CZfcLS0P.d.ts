@@ -6,6 +6,9 @@ interface RequestErrorCode {
   getStatus(): number | undefined;
 }
 declare const PUBLIC_ERROR_CODES: {
+  readonly INVALID_VIEWER_REGION: RequestErrorCode;
+  readonly VIEWER_REGION_REQUIRED: RequestErrorCode;
+  readonly REGIONAL_EVIDENCE_REQUIRED: RequestErrorCode;
   readonly INVALID_CURSOR: RequestErrorCode;
   readonly MISSING_TOKEN: RequestErrorCode;
   readonly INVALID_API_KEY: RequestErrorCode;
