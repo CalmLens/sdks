@@ -177,12 +177,19 @@ test("regional block notices follow API attribution automatically and request no
     media.setAttribute("cdn-base-url", `${location.origin}/mock-cdn/v1`);
     media.messages = { regionalUnavailable: "msg:regional", unavailable: "msg:unavailable" };
     media.asset = {
+      delivery: {
+        viewerRegion: "DE",
+        jurisdiction: "DE",
+        action: "block",
+        blocked: true,
+        reason: "regional-rule",
+        ageCheckStandard: "any",
+      },
       id: "asset-regional",
       projectId: "project-regional",
       classification: {
         moderation: {
           status: "allowed",
-          delivery: { region: "DE", jurisdiction: "DE", action: "block", ageCheckStandard: "any" },
         },
       },
     };
