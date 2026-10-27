@@ -335,7 +335,7 @@ Set `UploadPresetID` on `SubmitAssetOptions` (or `ClassifyTextOptions`) to apply
 
 ```go
 signed, err := client.UploadTokens.Sign(ctx, calmlens.SignUploadTokenOptions{
-	UploadPresetID:   "your-upload-preset-id",
+	UploadPresetID:   "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
 	ExternalID:       calmlens.Ptr("post-42"), // optional: the uploaded asset gets this ID
 	ExpiresInSeconds: 600,                      // optional: 1 to 3600, 600 by default
 })

@@ -83,8 +83,8 @@ includes `CalmLensAppClient`, import `@calmlens/sdk/app` from your bundler or CD
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'
-export CALMLENS_PROJECT_ID='your-project-id'
-export CALMLENS_UPLOAD_PRESET_ID='your-upload-preset-id'
+export CALMLENS_PROJECT_ID='proj_8fK2mQx7Lp4NvB3tRz9Y'
+export CALMLENS_UPLOAD_PRESET_ID='preset_4Lk8Qw2Xm9Rt5Vb3Nc7P'
 go run .
 ```
 
@@ -165,7 +165,7 @@ In another terminal:
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'
-export CALMLENS_PROJECT_ID='your-project-id'
+export CALMLENS_PROJECT_ID='proj_8fK2mQx7Lp4NvB3tRz9Y'
 export CALMLENS_WEBHOOK_SECRET='a-local-development-secret'
 calmlens listen --forward-to http://127.0.0.1:6402/webhooks/calmlens
 ```

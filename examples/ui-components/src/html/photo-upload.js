@@ -19,7 +19,7 @@ async function uploadPhoto(file, onStage) {
   const response = await fetch("/api/upload-token", { method: "POST" });
   if (!response.ok) throw new Error("Upload refused");
   const { token } = await response.json();
-  const client = new CalmLensAppClient({ uploadPresetId: "your-upload-preset-id", token });
+  const client = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P", token });
 
   let asset = await client.assets.create({
     name: file.name,

@@ -127,11 +127,11 @@ Create `.env.local` in this folder:
 ```bash
 # Token server only. Never prefix these with EXPO_PUBLIC_: those values are built into the app.
 CALMLENS_API_KEY=clsk_...
-CALMLENS_PROJECT_ID=your-project-id
-CALMLENS_UPLOAD_PRESET_ID=your-upload-preset-id
+CALMLENS_PROJECT_ID=proj_8fK2mQx7Lp4NvB3tRz9Y
+CALMLENS_UPLOAD_PRESET_ID=preset_4Lk8Qw2Xm9Rt5Vb3Nc7P
 
 # The app
-EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID=your-upload-preset-id
+EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID=preset_4Lk8Qw2Xm9Rt5Vb3Nc7P
 ```
 
 Run the tests for the upload states with `bun test`, and type-check with `bun run check`.

@@ -6,7 +6,7 @@ const emit = defineEmits<{ uploaded: [upload: CalmLensUpload] }>();
 
 <template>
   <CalmLensUploader
-    upload-preset-id="your-upload-preset-id"
+    upload-preset-id="preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
     token-url="/api/upload-token"
     accept="image/*"
     :max-file-size="10 * 1024 * 1024"

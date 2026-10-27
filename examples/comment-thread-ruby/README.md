@@ -68,7 +68,7 @@ Export both variables before starting the app:
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'
-export CALMLENS_PROJECT_ID='your-project-id'
+export CALMLENS_PROJECT_ID='proj_8fK2mQx7Lp4NvB3tRz9Y'
 bundle exec ruby app.rb
 ```
 
@@ -148,7 +148,7 @@ In another terminal:
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'
-export CALMLENS_PROJECT_ID='your-project-id'
+export CALMLENS_PROJECT_ID='proj_8fK2mQx7Lp4NvB3tRz9Y'
 export CALMLENS_WEBHOOK_SECRET='a-local-development-secret'
 npx calmlens listen --forward-to http://127.0.0.1:6403/webhooks/calmlens
 ```

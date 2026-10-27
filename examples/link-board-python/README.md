@@ -69,7 +69,7 @@ The server listens on 127.0.0.1. Use `--port` to change the port.
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'
-export CALMLENS_PROJECT_ID='your-project-id'
+export CALMLENS_PROJECT_ID='proj_8fK2mQx7Lp4NvB3tRz9Y'
 python app.py
 ```
 

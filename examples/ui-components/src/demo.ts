@@ -1,7 +1,8 @@
 // Sample data for the demo pages. Point them at your project with VITE_CALMLENS_PROJECT_ID and
 // replace the asset IDs with public assets from it. Uploads and comments call /api/upload-token
 // and /api/posts/:postId/comments, which your server provides.
-export const projectId: string = import.meta.env.VITE_CALMLENS_PROJECT_ID ?? "your-project-id";
+export const projectId: string =
+  import.meta.env.VITE_CALMLENS_PROJECT_ID ?? "proj_8fK2mQx7Lp4NvB3tRz9Y";
 
 export type DemoPost = {
   id: string;

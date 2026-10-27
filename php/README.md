@@ -60,7 +60,7 @@ configuration. The defaults are constants on `ServerClient`. Requests send a
 | Client | `ensureLens`, `ensureLenses` |
 | `Webhooks` | `signatureHeader`, `verify`, `parseEvent`, `isTest`, `createHeaders`, `toPayload` |
 
-Methods take option arrays matching the API, e.g. `['assetId' => 'asset-1']`.
+Methods take option arrays matching the API, e.g. `['assetId' => 'asset_5Gm2Rk8XqT3wLp9VbN4c']`.
 Use `['folderId' => null]` or `['parentId' => null]` to move to the root.
 `delete` and `removeEntry` return void; other network methods return decoded JSON.
 
@@ -349,9 +349,9 @@ For exact responses only, `MockTransport` replays a FIFO queue:
 
 ```php
 $mock = new CalmLens\Testing\MockTransport();
-$mock->enqueueJson(['id' => 'asset-1']);
+$mock->enqueueJson(['id' => 'asset_5Gm2Rk8XqT3wLp9VbN4c']);
 $client = $mock->client();
-$client->assets->retrieve(['assetId' => 'asset-1']);
+$client->assets->retrieve(['assetId' => 'asset_5Gm2Rk8XqT3wLp9VbN4c']);
 $request = $mock->requests()[0]; // PSR-7 request snapshot
 ```
 

@@ -5,7 +5,7 @@ import { API_BASE_URL, UPLOAD_PRESET_ID } from "./config.js";
 import { CATEGORIES, composeDescription, getSubmissionState } from "./feedback.js";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const demo = UPLOAD_PRESET_ID === "your-upload-preset-id";
+const demo = UPLOAD_PRESET_ID === "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 
 /** Messages for the upload errors a visitor can run into, by error code. */
 const ERROR_MESSAGES = {

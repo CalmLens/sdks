@@ -63,7 +63,7 @@ header. The live code path never loads it. It is not a moderation model:
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'
-export CALMLENS_PROJECT_ID='your-project-id'
+export CALMLENS_PROJECT_ID='proj_8fK2mQx7Lp4NvB3tRz9Y'
 export CALMLENS_WEBHOOK_SECRET='your-webhook-secret'   # optional; polling works without it
 composer start
 ```

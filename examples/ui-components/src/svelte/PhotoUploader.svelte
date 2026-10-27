@@ -5,7 +5,7 @@
 </script>
 
 <CalmLensUploader
-  uploadPresetId="your-upload-preset-id"
+  uploadPresetId="preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
   tokenUrl="/api/upload-token"
   accept="image/*"
   maxFileSize={10 * 1024 * 1024}

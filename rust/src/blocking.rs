@@ -9,7 +9,7 @@
 //! use calmlens::{blocking::ServerClient, models::*};
 //!
 //! fn main() -> calmlens::Result<()> {
-//!     let client = ServerClient::new("your-api-key", "your-project-id")?;
+//!     let client = ServerClient::new("your-api-key", "proj_8fK2mQx7Lp4NvB3tRz9Y")?;
 //!     let asset = client.assets().classify(SubmitAsset::text("Hello world"))?;
 //!     for asset in client.assets().iterate(ListAssets::default()) {
 //!         println!("{}", asset?.id);

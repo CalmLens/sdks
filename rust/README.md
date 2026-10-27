@@ -7,7 +7,7 @@ use calmlens::{models::*, ServerClient};
 
 #[tokio::main]
 async fn main() -> calmlens::Result<()> {
-    let client = ServerClient::new("your-api-key", "your-project-id")?;
+    let client = ServerClient::new("your-api-key", "proj_8fK2mQx7Lp4NvB3tRz9Y")?;
     let asset = client.assets().classify(SubmitAsset::text("Hello world")).await?;
     if asset.classification.moderation.status == AssetModerationStatus::Allowed {
         println!("{}", asset.id);
@@ -164,7 +164,7 @@ Set `upload_preset_id` on `SubmitAsset` (or `ClassifyText`) to apply an upload p
 let signed = client.upload_tokens().sign(SignUploadToken {
     external_id: Some("post-42".into()), // optional: the uploaded asset gets this ID
     expires_in_seconds: Some(600),       // optional: 1 to 3600, 600 by default
-    ..SignUploadToken::new("your-upload-preset-id")
+    ..SignUploadToken::new("preset_4Lk8Qw2Xm9Rt5Vb3Nc7P")
 })?;
 // signed.token, signed.expires_at (milliseconds since the Unix epoch)
 ```
@@ -183,12 +183,12 @@ A public asset whose moderation status is `age-restricted` is served from its pu
 
 ```rust
 let url = client.cdn().get_asset_url(&CdnRequest {
-    asset_identifier: "asset-1".into(),
+    asset_identifier: "asset_5Gm2Rk8XqT3wLp9VbN4c".into(),
     transform: Some("format=png,width=1024".into()),
     ..Default::default()
 })?;
 let same = client.cdn().get_asset_url(&CdnRequest {
-    asset_identifier: "asset-1".into(),
+    asset_identifier: "asset_5Gm2Rk8XqT3wLp9VbN4c".into(),
     transform: Some(
         Transform::image(ImageTransformOptions {
             format: Some("png".into()),
@@ -219,7 +219,7 @@ client
     .hash_lists()
     .add_entry(AddHashListEntry {
         hash_list_id: list.id.clone(),
-        asset_id: Some("asset-1".into()),
+        asset_id: Some("asset_5Gm2Rk8XqT3wLp9VbN4c".into()),
         label: Some("Report 1042".into()),
         ..Default::default()
     })
@@ -338,7 +338,7 @@ calmlens = { version = "0.1", features = ["testing"] }
 use calmlens::{models::*, testing::MockServerClient};
 
 let mock = MockServerClient::new()?;
-mock.enqueue(200, Asset::new("asset-1", AssetClassificationStatus::Completed, AssetModerationStatus::Allowed));
+mock.enqueue(200, Asset::new("asset_5Gm2Rk8XqT3wLp9VbN4c", AssetClassificationStatus::Completed, AssetModerationStatus::Allowed));
 let asset = mock.assets().classify(SubmitAsset::text("hello")).await?;
 assert_eq!(mock.last_request().unwrap().body, b"hello");
 ```

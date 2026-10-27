@@ -89,7 +89,7 @@ from **Assets → Try test inputs** in your project.
 
 ### Demo mode
 
-While `config.js` still holds the placeholder preset ID, the page runs in demo mode: uploads go to
+While `config.js` still holds the example preset ID, the page runs in demo mode: uploads go to
 the SDK's in-memory `MockCalmLensAppClient` from `@calmlens/sdk/testing`, and nothing leaves the
 page. Screenshots with `blocked` in the file name are refused; everything else is accepted.
 
