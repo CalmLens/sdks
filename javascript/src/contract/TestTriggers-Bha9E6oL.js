@@ -1453,6 +1453,84 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 }).strict();
 // packages/shared/src/TestTriggers.ts
 const TEST_IMAGE_PALETTES = {
+	"harassment.insult": [
+		[
+			20,
+			100,
+			110,
+			255
+		],
+		[
+			30,
+			140,
+			150,
+			255
+		],
+		[
+			70,
+			180,
+			190,
+			255
+		],
+		[
+			140,
+			220,
+			230,
+			255
+		]
+	],
+	"sexual.adult": [
+		[
+			100,
+			30,
+			100,
+			255
+		],
+		[
+			140,
+			50,
+			140,
+			255
+		],
+		[
+			180,
+			90,
+			180,
+			255
+		],
+		[
+			220,
+			150,
+			220,
+			255
+		]
+	],
+	"hate.regional-symbol": [
+		[
+			60,
+			70,
+			100,
+			255
+		],
+		[
+			90,
+			110,
+			150,
+			255
+		],
+		[
+			130,
+			150,
+			190,
+			255
+		],
+		[
+			180,
+			200,
+			240,
+			255
+		]
+	],
 	"personal-information": [
 		[
 			8,
@@ -1664,7 +1742,13 @@ const TEST_IMAGE_PALETTES = {
 };
 /** A project's test input key: 32 hexadecimal characters only its members can see. */
 const TEST_INPUT_KEY_PATTERN = /^[a-f0-9]{32}$/;
-const TEXT_CODE_SIGNALS = [...CLASSIFICATION_CATEGORIES, "sexual.involving-minors"];
+const TEXT_CODE_SIGNALS = [
+	...CLASSIFICATION_CATEGORIES,
+	"sexual.involving-minors",
+	"harassment.insult",
+	"sexual.adult",
+	"hate.regional-symbol"
+];
 /** A 128-bit, domain-separated tag; published samples never contain the project key. */
 const getTestInputTag = async (kind, signal, testInputKey) => {
 	if (!TEST_INPUT_KEY_PATTERN.test(testInputKey)) throw new TypeError("Invalid test input key");
@@ -1672,7 +1756,7 @@ const getTestInputTag = async (kind, signal, testInputKey) => {
 };
 /** A category-specific text code authenticated with the project's secret key. */
 const generateTestTextCode = async (category, testInputKey) => TEXT_CODE_SIGNALS.includes(category) ? `<!calmlens-test ${await getTestInputTag("text", category, testInputKey)} ${category}>` : "";
-const TEST_TRIGGER_PATTERN = /<!calmlens-test\s+([a-f0-9]{32})\s+(sexual|violence|self-harm|harassment|hate|criminal-activity|personal-information|profanity|sexual\.involving-minors)\s*>/gi;
+const TEST_TRIGGER_PATTERN = /<!calmlens-test\s+([a-f0-9]{32})\s+(sexual|violence|self-harm|harassment|hate|criminal-activity|personal-information|profanity|sexual\.involving-minors|harassment\.insult|sexual\.adult|hate\.regional-symbol)\s*>/gi;
 /** Accept only category tags authenticated by this project's key. */
 const detectTestTrigger = async (text, testInputKey) => {
 	const signals = [];

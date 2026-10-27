@@ -1,5 +1,5 @@
 import { n as ClassificationCategory } from "./Classification-DNcRatgW.js";
-type ClassificationTestSignal = ClassificationCategory | "sexual.involving-minors" | "violence.graphic";
+type ClassificationTestSignal = ClassificationCategory | "sexual.involving-minors" | "violence.graphic" | "harassment.insult" | "sexual.adult" | "hate.regional-symbol";
 declare const TEST_IMAGE_PALETTES: Partial<Record<ClassificationTestSignal, [[number, number, number, number], [number, number, number, number], [number, number, number, number], [number, number, number, number]]>>;
 /** A project's test input key: 32 hexadecimal characters only its members can see. */
 declare const TEST_INPUT_KEY_PATTERN: RegExp;
