@@ -112,6 +112,15 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           region: zod.ZodEnum<{
             [x: string]: string;
           }>;
+          jurisdiction: zod.ZodOptional<zod.ZodEnum<{
+            AT: "AT";
+            AU: "AU";
+            BR: "BR";
+            DE: "DE";
+            EU: "EU";
+            FR: "FR";
+            GB: "GB";
+          }>>;
           action: zod.ZodNullable<zod.ZodEnum<{
             "age-restrict": "age-restrict";
             block: "block";

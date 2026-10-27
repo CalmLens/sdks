@@ -132,7 +132,7 @@ module CalmLens
     "appliedToAsset" => bool
   }
   type regional_decision = { "region" => String, "action" => String, "rule" => String, "category" => String }
-  type regional_delivery = { "region" => String, "action" => String?, ?"rule" => String, ?"category" => String, "ageCheckStandard" => "any" | "verified" }
+  type regional_delivery = { "region" => String, ?"jurisdiction" => String, "action" => String?, ?"rule" => String, ?"category" => String, "ageCheckStandard" => "any" | "verified" }
   type asset_moderation = {
     ?"delivery" => regional_delivery,
     "manualReviews" => Array[asset_review],

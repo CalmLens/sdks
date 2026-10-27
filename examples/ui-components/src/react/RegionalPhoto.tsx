@@ -12,6 +12,10 @@ export function RegionalPhoto({
   region: string;
   ageConfirmed: boolean;
 }) {
+  const delivery = asset.classification.moderation.delivery;
+  if (delivery?.region === region && delivery.action === "block" && delivery.jurisdiction) {
+    return <p role="status">This photo is unavailable in your region.</p>;
+  }
   return (
     <CalmLensMedia asset={asset} region={region} ageConfirmed={ageConfirmed} alt="Uploaded photo" />
   );

@@ -1752,6 +1752,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -2356,6 +2357,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -2992,6 +2994,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -3619,6 +3622,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -4279,6 +4283,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -4890,6 +4895,7 @@
               "moderation": {
                 "delivery": {
                   "region": "AD",
+                  "jurisdiction": "DE",
                   "action": "limit",
                   "rule": "example",
                   "category": "sexual",
@@ -5507,6 +5513,7 @@
             "moderation": {
               "delivery": {
                 "region": "AD",
+                "jurisdiction": "DE",
                 "action": "limit",
                 "rule": "example",
                 "category": "sexual",
@@ -6130,6 +6137,7 @@
             "moderation": {
               "delivery": {
                 "region": "AD",
+                "jurisdiction": "DE",
                 "action": "limit",
                 "rule": "example",
                 "category": "sexual",
@@ -6747,6 +6755,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -7348,6 +7357,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -7949,6 +7959,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -8550,6 +8561,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -9154,6 +9166,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",
@@ -9790,6 +9803,7 @@
         "moderation": {
           "delivery": {
             "region": "AD",
+            "jurisdiction": "DE",
             "action": "limit",
             "rule": "example",
             "category": "sexual",

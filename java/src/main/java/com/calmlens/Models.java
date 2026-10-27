@@ -1899,7 +1899,7 @@ public final class Models {
   }
 
   public record RegionalDecision(String region, String action, String rule, String category) {}
-  public record RegionalDelivery(String region, String action, String rule, String category, String ageCheckStandard) {}
+  public record RegionalDelivery(String region, String jurisdiction, String action, String rule, String category, String ageCheckStandard) {}
   /**
    * Final automatic action, flagged categories and decision source.
    *

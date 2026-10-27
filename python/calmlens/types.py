@@ -486,6 +486,7 @@ class RegionalDecision(TypedDict):
     category: str
 
 class RegionalDelivery(TypedDict, total=False):
+    jurisdiction: str
     region: str
     action: Optional[ModerationAction]
     rule: str

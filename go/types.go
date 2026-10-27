@@ -434,6 +434,7 @@ type RegionalDecision struct {
 	Category string `json:"category"`
 }
 type RegionalDelivery struct {
+	Jurisdiction *string `json:"jurisdiction,omitempty"`
 	Region           string  `json:"region"`
 	Action           *string `json:"action"`
 	Rule             *string `json:"rule,omitempty"`

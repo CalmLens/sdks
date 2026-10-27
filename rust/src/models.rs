@@ -1804,7 +1804,10 @@ pub struct RegionalDecision {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegionalDelivery {
-    /// Viewer country or rule jurisdiction.
+    /// Jurisdiction whose rule raises the base decision, including EU for a member-country viewer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jurisdiction: Option<String>,
+    /// Viewer country.
     pub region: String,
     /// Applicable action; None allows content.
     pub action: Option<String>,

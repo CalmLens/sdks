@@ -14,7 +14,12 @@ export interface MediaAsset {
   classification?: {
     moderation?: {
       status?: AssetModerationStatus | null;
-      delivery?: { region: string; action: string | null; ageCheckStandard: "any" | "verified" };
+      delivery?: {
+        region: string;
+        action: string | null;
+        jurisdiction?: string;
+        ageCheckStandard: "any" | "verified";
+      };
       policy?: { decision?: { regions?: { region: string; action: string }[] } };
     } | null;
   } | null;

@@ -139,6 +139,15 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
     region: zod.ZodEnum<{
       [x: string]: string;
     }>;
+    jurisdiction: zod.ZodOptional<zod.ZodEnum<{
+      AT: "AT";
+      AU: "AU";
+      BR: "BR";
+      DE: "DE";
+      EU: "EU";
+      FR: "FR";
+      GB: "GB";
+    }>>;
     action: zod.ZodNullable<zod.ZodEnum<{
       "age-restrict": "age-restrict";
       block: "block";
@@ -9057,6 +9066,15 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
       region: zod.ZodEnum<{
         [x: string]: string;
       }>;
+      jurisdiction: zod.ZodOptional<zod.ZodEnum<{
+        AT: "AT";
+        AU: "AU";
+        BR: "BR";
+        DE: "DE";
+        EU: "EU";
+        FR: "FR";
+        GB: "GB";
+      }>>;
       action: zod.ZodNullable<zod.ZodEnum<{
         "age-restrict": "age-restrict";
         block: "block";
@@ -18241,6 +18259,15 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         region: zod.ZodEnum<{
           [x: string]: string;
         }>;
+        jurisdiction: zod.ZodOptional<zod.ZodEnum<{
+          AT: "AT";
+          AU: "AU";
+          BR: "BR";
+          DE: "DE";
+          EU: "EU";
+          FR: "FR";
+          GB: "GB";
+        }>>;
         action: zod.ZodNullable<zod.ZodEnum<{
           "age-restrict": "age-restrict";
           block: "block";
