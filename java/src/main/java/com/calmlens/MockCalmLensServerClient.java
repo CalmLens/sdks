@@ -532,11 +532,11 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     }
     String name = MockApi.str(asset, "name"), type = MockApi.str(asset, "type");
     if (outcome == Outcome.PURGED)
-      api.recordEvent("asset.content-removed", "low", asset, List.of(new Models.EventFact("asset-name", name, "/portal/assets/" + assetId), new Models.EventFact("asset-type", type, null)));
+      api.recordEvent("asset.content-removed", "low", asset, List.of(new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + assetId), new Models.EventFact("asset-type", type, null)));
     // Like the event catalog: allowing and limiting are low severity.
     api.recordEvent("asset." + outcome.value(), outcome == Outcome.ALLOWED || outcome == Outcome.LIMITED ? "low" : "high", asset, java.util.Arrays.asList(
         new Models.EventFact("decided-by", "reviewer", null), new Models.EventFact("asset-type", type, null),
-        new Models.EventFact("asset-name", name, "/portal/assets/" + assetId), new Models.EventFact("note", null, null)));
+        new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + assetId), new Models.EventFact("note", null, null)));
     return Json.GSON.fromJson(asset, Models.Asset.class);
   }
 

@@ -113,7 +113,7 @@ module CalmLens
         add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
                   'title' => "asset.#{decision}", 'assetId' => asset_id, 'asset' => snapshot(item),
                   'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }, { 'key' => 'asset-type', 'value' => item['type'] },
-                              { 'key' => 'asset-name', 'value' => item['name'], 'url' => "/portal/assets/#{asset_id}" },
+                              { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{asset_id}" },
                               { 'key' => 'note', 'value' => nil }])
         deep_copy(item)
       end
@@ -158,7 +158,7 @@ module CalmLens
       def lifecycle_event(type, item)
         name = { 'key' => 'asset-name', 'value' => item['name'] }
         # A deleted asset has no portal page to link to.
-        name['url'] = "/portal/assets/#{item['id']}" unless type == 'asset.deleted'
+        name['url'] = "https://calmlens.com/go/asset/#{item['id']}" unless type == 'asset.deleted'
         add_event('type' => type, 'severity' => 'low', 'assetId' => item['id'], 'asset' => snapshot(item),
                   'facts' => [name, { 'key' => 'asset-type', 'value' => item['type'] }])
       end

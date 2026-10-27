@@ -334,7 +334,7 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 	m.addEvent("asset."+decision, severity, a, []any{
 		calmlens.JSON{"key": calmlens.FactDecidedBy, "value": calmlens.DecidedByReviewer},
 		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
-		calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "/portal/assets/" + assetID},
+		calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "https://calmlens.com/go/asset/" + assetID},
 		calmlens.JSON{"key": calmlens.FactNote, "value": nil},
 	})
 	data, _ := json.Marshal(a)
@@ -361,7 +361,7 @@ func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON,
 func (m *MockServerClient) recordLifecycleEvent(eventType string, a calmlens.JSON) {
 	name := calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"]}
 	if eventType != calmlens.EventAssetDeleted {
-		name["url"] = "/portal/assets/" + text(a["id"])
+		name["url"] = "https://calmlens.com/go/asset/" + text(a["id"])
 	}
 	m.addEvent(eventType, calmlens.SeverityLow, a, []any{name, calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]}})
 }

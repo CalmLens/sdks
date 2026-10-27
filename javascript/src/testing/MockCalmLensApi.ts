@@ -536,7 +536,7 @@ export class MockCalmLensApi {
       facts: [
         { key: "decided-by", value: "reviewer" },
         { key: "asset-type", value: stored.type },
-        { key: "asset-name", value: stored.name, url: `/portal/assets/${stored.id}` },
+        { key: "asset-name", value: stored.name, url: `https://calmlens.com/go/asset/${stored.id}` },
         { key: "note", value: null },
       ],
     } as MockEventInput);
@@ -1568,7 +1568,7 @@ export class MockCalmLensApi {
           key: "asset-name",
           value: asset.name,
           // A deleted asset has no portal page to link to.
-          ...(type === "asset.deleted" ? {} : { url: `/portal/assets/${asset.id}` }),
+          ...(type === "asset.deleted" ? {} : { url: `https://calmlens.com/go/asset/${asset.id}` }),
         },
         { key: "asset-type", value: asset.type },
       ],

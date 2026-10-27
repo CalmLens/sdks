@@ -111,8 +111,8 @@ type EventAssetContent struct {
 	Status string `json:"status"`
 }
 
-// EventFact is one registered fact of an event. URL, when present, links to the resource:
-// a portal path or an HTTP(S) URL.
+// EventFact is one registered fact of an event. URL, when present, is a stable link that opens
+// the fact's item in the CalmLens portal.
 //
 // Value is any JSON value because its type depends on Key and the event type (a string,
 // number, boolean, string list or null); numbers are json.Number. Read it with Text, Int64,

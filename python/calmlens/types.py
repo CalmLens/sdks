@@ -918,7 +918,7 @@ class _EventFactRequired(TypedDict):
 
 
 class EventFact(_EventFactRequired, total=False):
-    #: A portal path or HTTP(S) URL for the fact's resource.
+    #: A stable link that opens the fact's item in the CalmLens portal.
     url: str
 
 

@@ -613,7 +613,7 @@ final class MockApi {
   private void lifecycle(String type, JsonObject asset) {
     List<Models.EventFact> facts = List.of(
         // A deleted asset has no portal page to link to.
-        new Models.EventFact("asset-name", str(asset, "name"), type.equals("asset.deleted") ? null : "/portal/assets/" + str(asset, "id")),
+        new Models.EventFact("asset-name", str(asset, "name"), type.equals("asset.deleted") ? null : "https://calmlens.com/go/asset/" + str(asset, "id")),
         new Models.EventFact("asset-type", str(asset, "type"), null));
     recordEvent(type, "low", asset, facts);
   }

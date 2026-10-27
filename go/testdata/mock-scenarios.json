@@ -3139,7 +3139,7 @@
                   "value": "kept.png",
                   "url": {
                     "$concat": [
-                      "/portal/assets/",
+                      "https://calmlens.com/go/asset/",
                       {
                         "$ref": "kept.id"
                       }
@@ -3411,7 +3411,7 @@
                   "value": "a.png",
                   "url": {
                     "$concat": [
-                      "/portal/assets/",
+                      "https://calmlens.com/go/asset/",
                       {
                         "$ref": "a.id"
                       }

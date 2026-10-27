@@ -1,4 +1,4 @@
-import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-CfMMoMw_.js";
+import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-C84ijcNa.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
@@ -1424,7 +1424,7 @@ const getEventFactUrl = (fact) => {
 		return;
 	}
 };
-const factUrl = zod.string().refine((url) => getEventFactUrl({ url }) !== void 0, "Fact links must be portal paths or HTTP(S) URLs").optional();
+const factUrl = zod.string().refine((url) => getEventFactUrl({ url }) !== void 0, "Fact links must be app paths or HTTP(S) URLs").optional();
 const factSchema = (key, value) => zod.strictObject({
 	key: zod.literal(key),
 	value,

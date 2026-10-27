@@ -630,7 +630,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                                facts=[{"key": "decided-by", "value": "reviewer"},
                                       {"key": "asset-type", "value": record["type"]},
                                       {"key": "asset-name", "value": record["name"],
-                                       "url": f"/portal/assets/{record['id']}"},
+                                       "url": f"https://calmlens.com/go/asset/{record['id']}"},
                                       {"key": "note", "value": None}])
             return copy.deepcopy(asset)
 
@@ -638,7 +638,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """An ``asset.deleted``, ``asset.content-removed`` or ``asset.retried`` event, like the API."""
         name: dict[str, Any] = {"key": "asset-name", "value": asset["name"]}
         if type != "asset.deleted":  # A deleted asset has no portal page to link to.
-            name["url"] = f"/portal/assets/{asset['id']}"
+            name["url"] = f"https://calmlens.com/go/asset/{asset['id']}"
         self.enqueue_event(type, asset_id=asset["id"],
                            facts=cast(list[EventFact], [name, {"key": "asset-type", "value": asset["type"]}]))
         if type == "asset.deleted":

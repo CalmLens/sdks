@@ -265,7 +265,7 @@ final class MockServerClient
         $this->enqueueEvent(['type' => 'asset.' . $outcome, 'severity' => in_array($outcome, ['allowed', 'limited'], true) ? 'low' : 'high',
             'title' => 'asset.' . $outcome, 'assetId' => $assetId, 'asset' => $this->snapshot($asset),
             'facts' => [['key' => 'decided-by', 'value' => 'reviewer'], ['key' => 'asset-type', 'value' => $asset['type']],
-                ['key' => 'asset-name', 'value' => $asset['name'], 'url' => '/portal/assets/' . $assetId], ['key' => 'note', 'value' => null]]]);
+                ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $assetId], ['key' => 'note', 'value' => null]]]);
         return $asset;
     }
 
@@ -275,7 +275,7 @@ final class MockServerClient
         $name = ['key' => 'asset-name', 'value' => $asset['name']];
         // A deleted asset has no portal page to link to.
         if ($type !== 'asset.deleted') {
-            $name['url'] = '/portal/assets/' . $asset['id'];
+            $name['url'] = 'https://calmlens.com/go/asset/' . $asset['id'];
         }
         $this->enqueueEvent(['type' => $type, 'severity' => 'low', 'assetId' => $asset['id'], 'asset' => $this->snapshot($asset),
             'facts' => [$name, ['key' => 'asset-type', 'value' => $asset['type']]]]);

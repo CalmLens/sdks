@@ -709,7 +709,7 @@ impl Backend {
         let facts = json!([
             {"key": "decided-by", "value": "reviewer"},
             {"key": "asset-type", "value": asset["type"]},
-            {"key": "asset-name", "value": asset["name"], "url": format!("/portal/assets/{asset_id}")},
+            {"key": "asset-name", "value": asset["name"], "url": format!("https://calmlens.com/go/asset/{asset_id}")},
             {"key": "note", "value": null},
         ]);
         self.push_event(&event_type, severity, &asset, facts);
@@ -823,7 +823,7 @@ impl Backend {
         let mut name = json!({"key": "asset-name", "value": asset["name"]});
         // A deleted asset has no portal page to link to.
         if event_type != "asset.deleted" {
-            name["url"] = format!("/portal/assets/{}", text(&asset["id"])).into();
+            name["url"] = format!("https://calmlens.com/go/asset/{}", text(&asset["id"])).into();
         }
         let facts = json!([name, {"key": "asset-type", "value": asset["type"]}]);
         self.push_event(event_type, "low", asset, facts);
