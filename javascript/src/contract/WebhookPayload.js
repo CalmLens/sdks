@@ -2,7 +2,7 @@ import { a as primaryIdField, l as metaStore, n as idField, o as backfill, t as 
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { C as updatedAtField, S as saneStringField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as docPropertyInfo, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-9tMPuG1k.js";
+import { C as updatedAtField, S as saneStringField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as docPropertyInfo, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-BO8gUNOr.js";
 import { i as SERVED_JURISDICTIONS_SCHEMA, n as JURISDICTION_SCHEMA, r as REGIONAL_DELIVERY_SCHEMA } from "./Jurisdiction-RnMTRb4D.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Ba-H8vMt.js";
 import * as zod from "zod";
@@ -10,7 +10,7 @@ import * as zod from "zod";
 /**
 * What moderation decided for an asset, which also decides how it is delivered: served to anyone
 * with access (`allowed`), served the same way but marked for reduced reach (`limited`), only
-* through signed URLs, server keys or `allowAgeRestricted=true` (`age-restricted`), not served
+* through signed URLs, server keys or `ageConfirmed=true` (`age-restricted`), not served
 * (`blocked`), or not served with its stored content deleted (`purged`).
 */
 const ASSET_MODERATION_DECISION_SCHEMA = zod.enum([
@@ -156,7 +156,7 @@ const MANDATORY_RULES = [
 		action: "block",
 		safetyHold: false,
 		condition: [{
-			all: [region === "DE" ? "hate-de-holocaust-denial" : region === "AT" ? "hate-at-holocaust-denial" : "hate-fr-holocaust-denial"],
+			all: [region === "DE" ? "hate-nazi-genocide-public-peace" : region === "AT" ? "hate-nazi-genocide-denial-or-approval" : "hate-adjudicated-nazi-crimes-denial"],
 			none: []
 		}]
 	})),
@@ -167,7 +167,7 @@ const MANDATORY_RULES = [
 		action: "block",
 		safetyHold: false,
 		condition: [{
-			all: ["hate-de-unconstitutional-symbols"],
+			all: ["hate-nazi-symbols-public-display"],
 			none: []
 		}]
 	},
@@ -178,7 +178,7 @@ const MANDATORY_RULES = [
 		action: "block",
 		safetyHold: false,
 		condition: [{
-			all: ["hate-at-prohibited-symbols"],
+			all: ["hate-nazi-insignia-public-display"],
 			none: []
 		}]
 	},
@@ -251,7 +251,7 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 	enabled: zod.boolean().optional().meta({ description: "Whether this category can affect policy decisions. Disabled categories retain their configured actions and rules." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
-	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches 0.5: allow it, limit it so it is delivered normally but marked for reduced reach, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, block it while retaining content, or permanently purge content." })
+	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches 0.5: allow it, limit it so it is delivered normally but marked for reduced reach, age-restrict it so it is delivered only through signed URLs, API keys or an explicit `ageConfirmed=true` opt-in, block it while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
 	const categoryAction = value.flaggedContentPolicy?.action ?? "block";
 	for (const kind of ["allowance", "restriction"]) {
@@ -470,7 +470,7 @@ const PROCESSING_OPTIONS_SCHEMA = zod.object({
 		defaultValue: false
 	})])),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta(metaStore([docPropertyInfo({
-		description: "Override the project moderation action for this asset. Allow takes no action, limit delivers the asset normally but marks it for reduced reach, age-restrict serves the asset only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
+		description: "Override the project moderation action for this asset. Allow takes no action, limit delivers the asset normally but marks it for reduced reach, age-restrict serves the asset only through signed URLs, API keys or the `ageConfirmed=true` opt-in, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
 		defaultValue: void 0
 	})])),
 	features: PROCESSING_FEATURES_SCHEMA.nullish()
@@ -562,7 +562,7 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
 	delivery: REGIONAL_DELIVERY_SCHEMA.optional().describe("Effective decision for the requested viewer region; the client performs the required age check."),
-	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only through signed URLs, API keys or the `allowAgeRestricted=true` opt-in), `blocked` or `purged`. A reviewer's decision takes precedence."),
+	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only through signed URLs, API keys or the `ageConfirmed=true` opt-in), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
 	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),
@@ -905,7 +905,7 @@ const ASSET_LIMITED = defineModerationOutcome({
 const ASSET_AGE_RESTRICTED = defineModerationOutcome({
 	id: "asset.age-restricted",
 	name: "Asset age-restricted",
-	description: "The asset was age-restricted: it is not served from its plain URL, only through signed URLs, API keys or an explicit `allowAgeRestricted=true` opt-in, so your app decides who sees it.",
+	description: "The asset was age-restricted: it is not served from its plain URL, only through signed URLs, API keys or an explicit `ageConfirmed=true` opt-in, so your app decides who sees it.",
 	severity: "high",
 	notify: true
 });

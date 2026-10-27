@@ -6,11 +6,11 @@ package calmlens
 // under their own keys.
 const (
 	QualifierSexualPornographicMedia              = "sexual-pornographic-media"
-	QualifierHateDeUnconstitutionalSymbols        = "hate-de-unconstitutional-symbols"
-	QualifierHateAtProhibitedSymbols              = "hate-at-prohibited-symbols"
-	QualifierHateDeHolocaustDenial                = "hate-de-holocaust-denial"
-	QualifierHateAtHolocaustDenial                = "hate-at-holocaust-denial"
-	QualifierHateFrHolocaustDenial                = "hate-fr-holocaust-denial"
+	QualifierHateNaziSymbolsPublicDisplay         = "hate-nazi-symbols-public-display"
+	QualifierHateNaziInsigniaPublicDisplay        = "hate-nazi-insignia-public-display"
+	QualifierHateNaziGenocidePublicPeace          = "hate-nazi-genocide-public-peace"
+	QualifierHateNaziGenocideDenialOrApproval     = "hate-nazi-genocide-denial-or-approval"
+	QualifierHateAdjudicatedNaziCrimesDenial      = "hate-adjudicated-nazi-crimes-denial"
 	QualifierViolenceHighImpact                   = "violence-high-impact"
 	QualifierSelfHarmAgeRestricted                = "self-harm-age-restricted"
 	QualifierPersonalInformationContact           = "personal-information-contact"

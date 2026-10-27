@@ -4,16 +4,16 @@ string_enum! {
     ModerationQualifier {
         /// Sexual: Pornographic images or video.
         SexualPornographicMedia = "sexual-pornographic-media",
-        /// Hate: Prohibited Nazi symbols in Germany.
-        HateDeUnconstitutionalSymbols = "hate-de-unconstitutional-symbols",
-        /// Hate: Prohibited Nazi symbols in Austria.
-        HateAtProhibitedSymbols = "hate-at-prohibited-symbols",
-        /// Hate: Public Holocaust denial in Germany.
-        HateDeHolocaustDenial = "hate-de-holocaust-denial",
-        /// Hate: Public Holocaust denial in Austria.
-        HateAtHolocaustDenial = "hate-at-holocaust-denial",
-        /// Hate: Public Holocaust denial in France.
-        HateFrHolocaustDenial = "hate-fr-holocaust-denial",
+        /// Hate: Public Nazi symbols outside supported context.
+        HateNaziSymbolsPublicDisplay = "hate-nazi-symbols-public-display",
+        /// Hate: Public Nazi insignia outside non-promotional depictions.
+        HateNaziInsigniaPublicDisplay = "hate-nazi-insignia-public-display",
+        /// Hate: Nazi genocide denial or approval affecting public peace.
+        HateNaziGenocidePublicPeace = "hate-nazi-genocide-public-peace",
+        /// Hate: Nazi genocide denial or approval.
+        HateNaziGenocideDenialOrApproval = "hate-nazi-genocide-denial-or-approval",
+        /// Hate: Denial of adjudicated Nazi crimes.
+        HateAdjudicatedNaziCrimesDenial = "hate-adjudicated-nazi-crimes-denial",
         /// Violence: High-impact violent media.
         ViolenceHighImpact = "violence-high-impact",
         /// Self harm: Promotion or instruction of self-harm.

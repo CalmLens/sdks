@@ -138,43 +138,43 @@ const MODERATION_QUALIFIER_INFO = {
 		exclusions: "Text alone, non-erotic nudity, medical or educational anatomy, breastfeeding, ordinary art without pornographic presentation, swimwear or merely suggestive content.",
 		inputs: ["image"]
 	},
-	"hate-de-unconstitutional-symbols": {
+	"hate-nazi-symbols-public-display": {
 		category: "hate",
 		kind: "harm",
 		harmOption: false,
-		displayName: "Prohibited Nazi symbols in Germany",
+		displayName: "Public Nazi symbols outside supported context",
 		description: "A clearly identifiable Nazi Hakenkreuz, SS insignia or another symbol, slogan or salute of a Nazi organisation publicly displayed or disseminated, outside a supported civic information, opposition to Nazism, reporting, teaching, science, research or artistic purpose. Judge the purpose of this instance; a separate report cannot excuse a new promotional display.",
 		exclusions: "Religious or cultural swastikas, ambiguous shapes, merely mentioning a symbol, supported reporting or teaching displaying it for that purpose, anti-Nazi counterspeech or supported art; fictional styling or an unsupported purpose disclaimer alone does not establish an exception."
 	},
-	"hate-at-prohibited-symbols": {
+	"hate-nazi-insignia-public-display": {
 		category: "hate",
 		kind: "harm",
 		harmOption: false,
-		displayName: "Prohibited Nazi symbols in Austria",
+		displayName: "Public Nazi insignia outside non-promotional depictions",
 		description: "A clearly identifiable symbol or insignia of a banned Nazi organisation displayed publicly or disseminated. Exclude printed or pictorial depictions and stage or film works when they do not approve or propagate the organisation’s ideology; exclude exhibitions clearly opposed to that ideology. Evaluate each display separately.",
 		exclusions: "Religious or cultural swastikas, ambiguous shapes, a mere mention, and supported non-promotional pictorial, journalistic, teaching or artistic depictions; a separate benign example cannot excuse a promotional display."
 	},
-	"hate-de-holocaust-denial": {
+	"hate-nazi-genocide-public-peace": {
 		category: "hate",
 		kind: "harm",
 		harmOption: false,
-		displayName: "Public Holocaust denial in Germany",
+		displayName: "Nazi genocide denial or approval affecting public peace",
 		description: "Publicly approving, denying or grossly trivialising the Nazi genocide in a manner capable of disturbing public peace, including antisemitic denial or justification addressed to the public. Supported civic information, reporting, teaching, research or art quoting denial for that purpose is excluded. Evaluate each qualifying statement with its own speaker and purpose.",
 		exclusions: "A topic mention, rejection of denial without reproducing it, accurate history, legitimate reporting or teaching of another person’s denial; quotation marks or a purpose label alone do not excuse the author’s own antisemitic denial."
 	},
-	"hate-at-holocaust-denial": {
+	"hate-nazi-genocide-denial-or-approval": {
 		category: "hate",
 		kind: "harm",
 		harmOption: false,
-		displayName: "Public Holocaust denial in Austria",
+		displayName: "Nazi genocide denial or approval",
 		description: "The author publicly denies, trivialises, approves or seeks to justify the Nazi genocide or Nazi crimes against humanity, including partial denial. A directly presented conversation turn counts even if another turn refuses it.",
 		exclusions: "A topic mention, accurate history, rejecting denial, or a supported factual report, lesson, research or artistic depiction attributing the denial to someone else without adopting it. A disclaimer or unrelated reporting does not excuse the author’s own denial."
 	},
-	"hate-fr-holocaust-denial": {
+	"hate-adjudicated-nazi-crimes-denial": {
 		category: "hate",
 		kind: "harm",
 		harmOption: false,
-		displayName: "Public Holocaust denial in France",
+		displayName: "Denial of adjudicated Nazi crimes",
 		description: "The author publicly contests the existence of Nazi crimes against humanity established by the Nuremberg tribunal or a competent court, including denying the Holocaust. Preserve who makes the claim; an actual denial in a directly presented conversation still counts.",
 		exclusions: "A topic mention, accurate history, rejecting denial, or supported reporting, teaching, research or art quoting someone else’s denial without adopting it. Fictional styling alone does not excuse an author’s own denial."
 	},
@@ -1078,7 +1078,7 @@ const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[
 /**
 * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
 * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
-* (`age-restrict`: signed URLs, API keys or `allowAgeRestricted=true`), stop delivering it
+* (`age-restrict`: signed URLs, API keys or `ageConfirmed=true`), stop delivering it
 * (`block`), or stop delivering it and delete its stored content (`purge`).
 */
 const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([
