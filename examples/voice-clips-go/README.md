@@ -122,9 +122,11 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
 - **Timeline.** `classification.moderation.timeline` provides `durationSeconds` and `segments`. Native analysis
   uses overlapping 30-second chunks (`source: "clip"`). Each segment lists the categories
   that were evaluated (or partially evaluated) with a score of at least 0.4 ("possible").
-  A `not-evaluated` category is never shown as a zero score. Ranges are approximate. Each clip
-  shows a bar of its segments, coloured by the strongest finding's likelihood, and lists the
-  segments with findings; the decision line names each category found, strongest first.
+  A `not-evaluated` category is never shown as a zero score. Ranges are approximate. Segments
+  come from different sources (sampled frames, speech, on-screen text or whole clip chunks), so
+  each clip shows one bar per source, coloured by the strongest finding's likelihood, and lists
+  the time ranges with findings, merging touching flagged segments of the same source. The
+  decision line names each category found, strongest first.
 - **Playback.** Only an explicit `allowed` or `limited` status plays. CalmLens delivers a
   `limited` asset exactly like an allowed one and only marks it so your app can reduce its
   reach; this app collapses a limited clip behind a "Show limited clip" control. CalmLens delivers an
