@@ -62,6 +62,8 @@ string_enum! {
         SexualNonConsensual = "sexual-non-consensual",
         /// Sexual: Intimate image abuse.
         SexualIntimateImageAbuse = "sexual-intimate-image-abuse",
+        /// Sexual: Extreme pornography.
+        SexualExtreme = "sexual-extreme",
         /// Sexual: Sexualised minors.
         SexualMinors = "sexual-minors",
         /// Sexual: Sexual solicitation.
@@ -190,6 +192,8 @@ string_enum! {
         HateHostility = "hate-hostility",
         /// Hate: Threats or incitement.
         HateThreat = "hate-threat",
+        /// Hate: Aimed at a specific person.
+        HatePersonal = "hate-personal",
         /// Hate: Historical.
         HateHistorical = "hate-historical",
         /// Hate: Reporting or documentary.
