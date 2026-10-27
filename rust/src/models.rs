@@ -1789,8 +1789,6 @@ pub struct RegionalDecision {
     pub category: ClassificationCategory,
 }
 
-/// Effective delivery requirements for a viewer country.
-
 /// The automatic moderation decision and stricter regional outcomes.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

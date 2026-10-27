@@ -162,9 +162,7 @@ for (const tab of TABS) {
   });
 }
 
-test("regional blocks use explicit viewer claims and request no media", async ({
-  page,
-}) => {
+test("regional blocks use explicit viewer claims and request no media", async ({ page }) => {
   await open(page, "elements");
   const requested: string[] = [];
   page.on("request", (request) => {
