@@ -58,7 +58,8 @@ export const playground = {
     const kind = upload.file.type.split("/")[0];
     const type = kind === "video" || kind === "audio" ? kind : "image";
     let aspectRatio: number | undefined = type === "video" ? 16 / 9 : undefined;
-    if (type === "image") {
+    // Browser uploads are Blobs; other platforms' files can't be measured here.
+    if (type === "image" && upload.file instanceof Blob) {
       const bitmap = await createImageBitmap(upload.file).catch(() => undefined);
       if (bitmap) aspectRatio = bitmap.width / bitmap.height;
       bitmap?.close();
