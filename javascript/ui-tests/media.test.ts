@@ -89,17 +89,15 @@ for (const binding of BINDINGS) {
         asset: {
           id: "a1",
           projectId: PROJECT_ID,
-          classification: {
-            moderation: {
-              status: "allowed",
-              delivery: {
-                region: "DE",
-                jurisdiction: "EU",
-                action: "block",
-                ageCheckStandard: "any",
-              },
-            },
+          delivery: {
+            viewerRegion: "DE",
+            jurisdiction: "EU",
+            action: "block",
+            ageCheckStandard: "any",
+            blocked: true,
+            reason: "regional-rule",
           },
+          classification: { moderation: { status: "allowed" } },
         },
       });
       const notice = await view().findByText(messages.regionalUnavailable);
@@ -116,17 +114,15 @@ for (const binding of BINDINGS) {
         asset: {
           id: "a1",
           projectId: PROJECT_ID,
-          classification: {
-            moderation: {
-              status: "blocked",
-              delivery: {
-                region: "DE",
-                jurisdiction: "DE",
-                action: "block",
-                ageCheckStandard: "any",
-              },
-            },
+          delivery: {
+            viewerRegion: "DE",
+            jurisdiction: "DE",
+            action: "block",
+            ageCheckStandard: "any",
+            blocked: true,
+            reason: "regional-rule",
           },
+          classification: { moderation: { status: "blocked" } },
         },
       });
       expect((await view().findByText(messages.unavailable)).textContent).toBe(
@@ -145,17 +141,15 @@ for (const binding of BINDINGS) {
         asset: {
           id: "a1",
           projectId: PROJECT_ID,
-          classification: {
-            moderation: {
-              status: "allowed",
-              delivery: {
-                region: "DE",
-                jurisdiction: "DE",
-                action: "block",
-                ageCheckStandard: "any",
-              },
-            },
+          delivery: {
+            viewerRegion: "DE",
+            jurisdiction: "DE",
+            action: "block",
+            ageCheckStandard: "any",
+            blocked: true,
+            reason: "regional-rule",
           },
+          classification: { moderation: { status: "allowed" } },
         },
       });
       expect((await view().findByText(messages.unavailable)).textContent).toBe(
@@ -255,17 +249,15 @@ it("updates the web component notice when a regional block becomes a base block"
   const apiAsset = {
     id: "a1",
     projectId: PROJECT_ID,
-    classification: {
-      moderation: {
-        status: "allowed" as const,
-        delivery: {
-          region: "DE",
-          jurisdiction: "DE",
-          action: "block",
-          ageCheckStandard: "any" as const,
-        },
-      },
+    delivery: {
+      viewerRegion: "DE",
+      jurisdiction: "DE",
+      action: "block",
+      ageCheckStandard: "any" as const,
+      blocked: true,
+      reason: "regional-rule",
     },
+    classification: { moderation: { status: "allowed" as const } },
   };
   element.messages = messages;
   element.setAttribute("region", "DE");

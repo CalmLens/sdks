@@ -162,7 +162,7 @@ for (const tab of TABS) {
   });
 }
 
-test("regional block notices follow API attribution automatically and request no media", async ({
+test("regional blocks use explicit viewer claims and request no media", async ({
   page,
 }) => {
   await open(page, "elements");
@@ -177,7 +177,7 @@ test("regional block notices follow API attribution automatically and request no
       messages: Record<string, string>;
     };
     media.id = "regional-notice-fixture";
-    media.setAttribute("region", "DE");
+    media.setAttribute("viewer-claims", JSON.stringify({ region: "DE" }));
     media.setAttribute("cdn-base-url", `${location.origin}/mock-cdn/v1`);
     media.messages = { regionalUnavailable: "msg:regional", unavailable: "msg:unavailable" };
     media.asset = {
@@ -186,14 +186,14 @@ test("regional block notices follow API attribution automatically and request no
       classification: {
         moderation: {
           status: "allowed",
-          delivery: { region: "DE", jurisdiction: "DE", action: "block", ageCheckStandard: "any" },
+          policy: { decision: { regions: [{ region: "DE", action: "block" }] } },
         },
       },
     };
     document.body.append(media);
   });
   const fixture = page.locator("#regional-notice-fixture");
-  await expect(fixture.getByText("msg:regional", { exact: true })).toBeVisible();
+  await expect(fixture.getByText("msg:unavailable", { exact: true })).toBeVisible();
   await expect(fixture.getByRole("img")).toHaveCount(0);
   await fixture.evaluate((node) => {
     const media = node as HTMLElement & {

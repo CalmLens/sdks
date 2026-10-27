@@ -95,8 +95,7 @@ module CalmLens
     # @return [Hash] the asset
     def retrieve(options)
       call(options) do |api, request|
-        request('GET', "/assets/#{Internal.segment(api['assetId'])}",
-                                                                      request_options: request)
+        request('GET', "/assets/#{Internal.segment(api['assetId'])}", request_options: request)
       end
     end
 
