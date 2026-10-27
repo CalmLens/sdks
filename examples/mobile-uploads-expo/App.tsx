@@ -1,7 +1,6 @@
-import type { UploadedAsset } from "@calmlens/sdk/app";
-import * as ImagePicker from "expo-image-picker";
+import { type UploadItem, useCalmLensUpload } from "@calmlens/sdk/react-native";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,18 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { type AgeCheck, requestAgeCheck } from "./src/ageCheck";
-import { checkUpload, describeError, isConfigured, uploadPhoto } from "./src/calmlens";
-import {
-  getOutcome,
-  getRetryKind,
-  isBusy,
-  type PickedPhoto,
-  type Upload,
-  uploadsReducer,
-} from "./src/uploads";
-
-const POLL_INTERVAL_MS = 1_500;
-const MAX_POLLS = 40;
+import { describeError, isConfigured, pickPhoto, uploadOptions } from "./src/calmlens";
+import { getOutcome, isBusy, photoOf } from "./src/uploads";
 
 const colors = {
   page: "#f7f7f5",
@@ -38,95 +27,24 @@ const colors = {
 };
 
 export default function App() {
-  const [uploads, dispatch] = useReducer(uploadsReducer, []);
+  // The SDK's upload queue: it uploads each photo with a new token, checks it until CalmLens
+  // decides, and retries or checks again on request.
+  const queue = useCalmLensUpload(uploadOptions);
+  const uploads = [...queue.items].reverse();
   const [selectedKey, setSelectedKey] = useState<string>();
   // Kept for the session, so the person is asked once rather than for every photo.
   const [ageCheck, setAgeCheck] = useState<AgeCheck>();
   const [checkingAge, setCheckingAge] = useState(false);
-  // The latest run for each upload, so an older upload or poll for it stops updating it.
-  const runs = useRef(new Map<string, number>());
-
-  useEffect(() => {
-    const current = runs.current;
-    return () => current.clear();
-  }, []);
-
-  /** Starts a new run for an upload and returns a check for whether it's still the latest. */
-  const beginRun = (key: string) => {
-    const run = (runs.current.get(key) ?? 0) + 1;
-    runs.current.set(key, run);
-    return () => runs.current.get(key) === run;
-  };
-
-  /** Checks an upload until CalmLens decides, or until MAX_POLLS checks. */
-  const pollUntilDecided = async (key: string, asset: UploadedAsset, isLatest: () => boolean) => {
-    let latest = asset;
-    for (let attempt = 0; latest.status === "pending" && attempt < MAX_POLLS; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-      if (!isLatest()) return;
-      latest = await checkUpload(latest.id);
-      if (!isLatest()) return;
-      dispatch({ type: "checked", key, asset: latest });
-    }
-    if (latest.status === "pending") dispatch({ type: "stalled", key });
-  };
-
-  const upload = async (key: string, photo: PickedPhoto) => {
-    const isLatest = beginRun(key);
-    try {
-      const asset = await uploadPhoto(photo);
-      if (!isLatest()) return;
-      dispatch({ type: "checked", key, asset });
-      await pollUntilDecided(key, asset, isLatest);
-    } catch (error) {
-      if (isLatest()) dispatch({ type: "failed", key, ...describeError(error) });
-    }
-  };
-
-  const checkAgain = async (key: string, asset: UploadedAsset) => {
-    const isLatest = beginRun(key);
-    try {
-      const latest = await checkUpload(asset.id);
-      if (!isLatest()) return;
-      dispatch({ type: "checked", key, asset: latest });
-      await pollUntilDecided(key, latest, isLatest);
-    } catch (error) {
-      if (isLatest()) dispatch({ type: "failed", key, ...describeError(error) });
-    }
-  };
-
-  const retry = (item: Upload) => {
-    const kind = getRetryKind(item);
-    if (kind === "check" && "asset" in item && item.asset) {
-      void checkAgain(item.key, item.asset);
-    } else if (kind === "upload") {
-      dispatch({ type: "retried", key: item.key });
-      void upload(item.key, item.photo);
-    }
-  };
 
   const pickAndUpload = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      // HEIC photos arrive as JPEG; JPEG and PNG files arrive unchanged.
-      preferredAssetRepresentationMode:
-        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-      quality: 1,
-    });
-    if (result.canceled) return;
-    const picked = result.assets[0];
-    const type = picked.mimeType ?? "image/jpeg";
-    const photo: PickedPhoto = {
-      uri: picked.uri,
-      type,
-      name: picked.fileName ?? `photo.${type.split("/")[1] ?? "jpg"}`,
-      width: picked.width,
-      height: picked.height,
-    };
-    const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    dispatch({ type: "started", key, photo, at: Date.now() });
-    setSelectedKey(key);
-    void upload(key, photo);
+    const photo = await pickPhoto();
+    if (!photo) return;
+    // Make room in the queue by dropping the oldest photo.
+    const oldest = queue.items[0];
+    if (oldest && queue.items.length >= (uploadOptions.maxFiles ?? 10)) queue.remove(oldest.key);
+    queue.addFiles([photo]);
+    // Show the new photo.
+    setSelectedKey(undefined);
   };
 
   const checkAge = async () => {
@@ -173,7 +91,7 @@ export default function App() {
               ageCheck={ageCheck}
               checkingAge={checkingAge}
               onCheckAge={checkAge}
-              onRetry={() => retry(selected)}
+              onRetry={() => queue.retry(selected.key)}
               onChooseAnother={pickAndUpload}
             />
           ) : (
@@ -221,7 +139,7 @@ export default function App() {
  * Whether the photo is covered: refused photos never show, and age-restricted ones stay hidden
  * until the person shares an age range of 18 or older.
  */
-const isHidden = (upload: Upload, ageCheck: AgeCheck | undefined) => {
+const isHidden = (upload: UploadItem, ageCheck: AgeCheck | undefined) => {
   const outcome = getOutcome(upload);
   return outcome === "refused" || (outcome === "age-restricted" && ageCheck?.result !== "adult");
 };
@@ -234,14 +152,15 @@ function Featured({
   onRetry,
   onChooseAnother,
 }: {
-  upload: Upload;
+  upload: UploadItem;
   ageCheck: AgeCheck | undefined;
   checkingAge: boolean;
   onCheckAge: () => void;
   onRetry: () => void;
   onChooseAnother: () => void;
 }) {
-  const { width, height } = upload.photo;
+  const photo = photoOf(upload);
+  const { width, height } = photo;
   // Portrait photos up to 4:5 and landscape ones up to 16:9 keep their shape.
   const aspectRatio = width && height ? Math.min(Math.max(width / height, 4 / 5), 16 / 9) : 1;
   const hidden = isHidden(upload, ageCheck);
@@ -249,7 +168,7 @@ function Featured({
     <View style={styles.card}>
       <View style={[styles.photoFrame, { aspectRatio }]}>
         <Image
-          source={{ uri: upload.photo.uri }}
+          source={{ uri: photo.uri }}
           style={styles.photo}
           resizeMode="cover"
           blurRadius={hidden ? 40 : 0}
@@ -279,7 +198,7 @@ function Status({
   onRetry,
   onChooseAnother,
 }: {
-  upload: Upload;
+  upload: UploadItem;
   ageCheck: AgeCheck | undefined;
   checkingAge: boolean;
   onCheckAge: () => void;
@@ -288,7 +207,7 @@ function Status({
 }) {
   switch (getOutcome(upload)) {
     case "busy":
-      if (upload.stage === "uploading") return <Line busy title="Uploading" />;
+      if (upload.stage !== "checking") return <Line busy title="Uploading" />;
       return (
         <Line
           busy
@@ -316,7 +235,7 @@ function Status({
           tone="bad"
           title="Not allowed"
           detail={
-            upload.stage === "decided" && upload.asset.status === "purged"
+            upload.status === "purged"
               ? "This photo breaks the community rules, so it wasn't shared and has been deleted."
               : "This photo breaks the community rules, so it wasn't shared."
           }
@@ -324,15 +243,15 @@ function Status({
         />
       );
     case "failed":
-      return upload.stage === "failed" ? (
+      return (
         <Line
           tone="bad"
           title="Upload failed"
-          detail={upload.message}
-          code={upload.code}
+          detail={describeError(upload.errorCode)}
+          code={upload.errorCode}
           action={{ label: "Try again", onPress: onRetry }}
         />
-      ) : null;
+      );
     case "unknown":
       return (
         <Line
@@ -476,21 +395,22 @@ function RecentRow({
   hidden,
   onPress,
 }: {
-  upload: Upload;
+  upload: UploadItem;
   selected: boolean;
   first: boolean;
   hidden: boolean;
   onPress: () => void;
 }) {
+  const photo = photoOf(upload);
   const label =
-    upload.stage === "uploading"
+    upload.stage === "queued" || upload.stage === "uploading"
       ? { text: "Uploading", hint: "Sending your photo", tone: "neutral" as const }
       : rowLabel[getOutcome(upload)];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${label.text}, ${label.hint}, ${timeAgo(upload.startedAt)}`}
+      accessibilityLabel={`${label.text}, ${label.hint}, ${timeAgo(photo.pickedAt)}`}
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
@@ -499,7 +419,7 @@ function RecentRow({
         pressed && styles.pressed,
       ]}
     >
-      <Image source={{ uri: upload.photo.uri }} style={styles.thumb} blurRadius={hidden ? 20 : 0} />
+      <Image source={{ uri: photo.uri }} style={styles.thumb} blurRadius={hidden ? 20 : 0} />
       <View style={styles.rowText}>
         <View style={styles.statusRow}>
           {isBusy(upload) ? (
@@ -513,7 +433,7 @@ function RecentRow({
           {label.hint}
         </Text>
       </View>
-      <Text style={styles.meta}>{timeAgo(upload.startedAt)}</Text>
+      <Text style={styles.meta}>{timeAgo(photo.pickedAt)}</Text>
     </Pressable>
   );
 }

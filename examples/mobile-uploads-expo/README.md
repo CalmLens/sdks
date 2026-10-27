@@ -14,23 +14,26 @@ never holds an API key: a tiny token server signs a single-use upload token for 
  1. Pick a photo
  2. POST /upload-token  ───────────►  client.uploadTokens.sign({ uploadPresetId, externalId })
                         ◄───────────  { token, expiresAt }   (signed locally, no CalmLens request)
- 3. assets.classify()  ── Authorization: Bearer <token> ──►  CalmLens
-                       ◄── { id, status: "pending" } ──────
- 4. assets.retrieve() every 1.5 s until the status is no longer "pending"
+ 3. Upload  ── Authorization: Bearer <token> ──►  CalmLens
+            ◄── { id, status: "pending" } ──────
+ 4. Check the upload with the same token until the status is no longer "pending"
 ```
 
 - [`server/index.ts`](server/index.ts) holds the API key and returns a new token on
   `POST /upload-token`. A real app checks who is signed in before signing, and can pass an
   `externalId` (such as a post ID) that the uploaded asset gets.
-- [`src/calmlens.ts`](src/calmlens.ts) creates the client with
-  `new CalmLensAppClient({ uploadPresetId, token })`. The `token` function fetches a new token for
-  each upload, and `assets.retrieve` reuses the token the upload started with.
-- [`App.tsx`](App.tsx) picks a photo with `expo-image-picker`, reads it with `expo-file-system`
-  and uploads it with `assets.classify`. Photos are checked after they're stored, so the first
-  answer is usually `pending`; the app shows **Checking photo** and polls `assets.retrieve`
-  until CalmLens decides. After 60 seconds it stops and offers **Check again**. You can keep
-  sharing while a photo is checked: each upload polls on its own, and **Recent** lists every
-  upload this session with its state. Tap one to show it again.
+- [`App.tsx`](App.tsx) runs the uploads with `useCalmLensUpload` from
+  `@calmlens/sdk/react-native`, the same upload queue the SDK's `CalmLensUploader` is built on,
+  and draws its own screens from the queue's items. The queue fetches a new token for each
+  upload, sends the photo, and checks it with the same token until CalmLens decides. Photos are
+  checked after they're stored, so the first answer is usually `pending`; the app shows
+  **Checking photo** meanwhile. After a minute the queue stops and the app offers **Check
+  again**. You can keep sharing while a photo is checked, and **Recent** lists every upload this
+  session with its state. Tap one to show it again.
+- [`src/calmlens.ts`](src/calmlens.ts) holds the queue's settings (the upload preset, the token
+  function and how long to check) and picks photos with `expo-image-picker`. Each picked photo is
+  a file the queue can upload: its name, type and size, plus `arrayBuffer()`, which reads the
+  bytes with `expo-file-system` when the upload starts.
 - How each decision is shown is in [`src/uploads.ts`](src/uploads.ts): `allowed` and `limited`
   photos are **Shared** (`limited` ones are only marked so your app can reduce their reach, such
   as keeping them out of recommendations), `age-restricted` photos are **Adults only** and stay
@@ -41,7 +44,11 @@ never holds an API key: a tiny token server signs a single-use upload token for 
 - Errors show a message for the person using the app and the error code for you, with
   **Try again**. The app handles every `upload-preset/*` and `upload-token/*` code, timeouts,
   network errors and an unreachable token server. Trying again uploads the photo again only when
-  the upload never finished; otherwise it checks the existing upload.
+  the upload never finished; otherwise the queue checks the existing upload.
+
+For a ready-made pick button and file list instead of your own screens, render
+`CalmLensUploader` from `@calmlens/sdk/react-native` with the same settings and a `pick`
+function, such as `pickPhoto` here.
 
 ## Age-restricted photos
 
@@ -107,10 +114,10 @@ this repo.
 
 This example links to `@calmlens/sdk` in the repo: the React Native support it needs isn't in a
 published release yet. Once it is, depend on the published `@calmlens/sdk` instead of
-`link:@calmlens/sdk`. From the repo root:
+`file:../../javascript`. From the repo root:
 
 ```bash
-(cd javascript && bun install)
+(cd javascript && bun install && bun run build)
 cd examples/mobile-uploads-expo
 bun install
 ```

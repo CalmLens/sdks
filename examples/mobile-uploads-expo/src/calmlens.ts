@@ -1,10 +1,7 @@
-import {
-  CALMLENS_ERROR_CODES,
-  CalmLensAppClient,
-  CalmLensError,
-  type UploadedAsset,
-} from "@calmlens/sdk/app";
+import { CALMLENS_ERROR_CODES, CalmLensError } from "@calmlens/sdk/app";
+import type { UploadControllerOptions } from "@calmlens/sdk/react-native";
 import { File } from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
 import type { PickedPhoto } from "./uploads";
 
 const uploadPresetId = process.env.EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID;
@@ -12,7 +9,9 @@ export const isConfigured = !!uploadPresetId;
 const tokenServerUrl =
   process.env.EXPO_PUBLIC_TOKEN_SERVER_URL ?? "http://127.0.0.1:6411/upload-token";
 
-class TokenServerError extends Error {}
+/** This app's own error codes, for a token server it can't reach or that refuses. */
+const TOKEN_SERVER_UNREACHABLE = "calmsnap/token-server-unreachable";
+const TOKEN_SERVER_REFUSED = "calmsnap/token-server-refused";
 
 /** Asks your server for a single-use upload token. The API key stays on the server. */
 const fetchUploadToken = async (): Promise<string> => {
@@ -20,58 +19,63 @@ const fetchUploadToken = async (): Promise<string> => {
   try {
     response = await fetch(tokenServerUrl, { method: "POST" });
   } catch {
-    throw new TokenServerError(`Couldn't reach the token server at ${tokenServerUrl}.`);
+    throw new CalmLensError(TOKEN_SERVER_UNREACHABLE);
   }
   if (!response.ok) {
-    throw new TokenServerError(`The token server answered with HTTP ${response.status}.`);
+    throw new CalmLensError(TOKEN_SERVER_REFUSED, { status: response.status });
   }
   const { token } = (await response.json()) as { token: string };
   return token;
 };
 
-const baseUrl = process.env.EXPO_PUBLIC_CALMLENS_BASE_URL || undefined;
-
-// No API key here: the client uploads through the preset, with a new token for each upload.
-const createClient = () => {
-  if (!uploadPresetId)
-    throw new Error("Set EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID (see the README).");
-  return new CalmLensAppClient({
-    uploadPresetId,
-    token: fetchUploadToken,
-    // Only set for a local backend. Leave it unset to use https://api.calmlens.com/v1.
-    baseUrl,
-  });
+/**
+ * The upload queue's settings. No API key here: each upload goes through the preset with a new
+ * token, which its status checks reuse. Photos are checked after they're stored, so the queue
+ * checks each one until CalmLens decides, for up to a minute.
+ */
+export const uploadOptions: UploadControllerOptions = {
+  uploadPresetId,
+  token: fetchUploadToken,
+  // Only set for a local backend. Leave it unset to use https://api.calmlens.com/v1.
+  baseUrl: process.env.EXPO_PUBLIC_CALMLENS_BASE_URL || undefined,
+  accept: "image/*",
+  // Keep every photo this session in the queue, for the Recent list.
+  multiple: true,
+  maxFiles: 50,
+  decisionTimeoutMs: 60_000,
 };
 
 /**
- * The client each upload was made with. It keeps the token the upload started with, which its
- * status checks reuse, and each upload gets a new client and a new token.
+ * Picks a photo from the library as a file the queue can upload. `expo-file-system` reads its
+ * bytes when its upload starts.
  */
-const clients = new Map<string, CalmLensAppClient>();
-
-/** Uploads a photo straight from the phone and returns the upload with its status. */
-export const uploadPhoto = async (photo: PickedPhoto): Promise<UploadedAsset> => {
-  // Read the picked file's bytes. The SDK sends them as they are.
-  const buffer = await new File(photo.uri).arrayBuffer();
-  const client = createClient();
-  // `classify` asks CalmLens to decide before answering. Photos are checked after they're
-  // stored, so the first answer is usually `pending` and the app polls for the decision.
-  const asset = await client.assets.classify({
-    name: photo.name,
-    content: { buffer, type: photo.type },
+export const pickPhoto = async (): Promise<PickedPhoto | undefined> => {
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    // HEIC photos arrive as JPEG; JPEG and PNG files arrive unchanged.
+    preferredAssetRepresentationMode:
+      ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    quality: 1,
   });
-  clients.set(asset.id, client);
-  return asset;
-};
-
-/** Checks an upload again, with the client (and token) the upload started with. */
-export const checkUpload = (assetId: string): Promise<UploadedAsset> => {
-  const client = clients.get(assetId);
-  if (!client) throw new Error("This upload was made before the app restarted.");
-  return client.assets.retrieve({ assetId });
+  if (result.canceled) return undefined;
+  const picked = result.assets[0];
+  const file = new File(picked.uri);
+  const type = picked.mimeType ?? "image/jpeg";
+  return {
+    uri: picked.uri,
+    type,
+    name: picked.fileName ?? `photo.${type.split("/")[1] ?? "jpg"}`,
+    size: picked.fileSize ?? file.size,
+    width: picked.width,
+    height: picked.height,
+    pickedAt: Date.now(),
+    arrayBuffer: () => file.arrayBuffer(),
+  };
 };
 
 const MESSAGES: Record<string, string> = {
+  [TOKEN_SERVER_UNREACHABLE]: `Couldn't reach the token server at ${tokenServerUrl}.`,
+  [TOKEN_SERVER_REFUSED]: "The token server didn't return a token. Check its logs.",
   [CALMLENS_ERROR_CODES.UPLOAD_PRESET_NOT_FOUND]:
     "This app's upload preset doesn't exist. Check EXPO_PUBLIC_CALMLENS_UPLOAD_PRESET_ID.",
   [CALMLENS_ERROR_CODES.UPLOAD_PRESET_DISABLED]: "Uploads are paused right now. Try again later.",
@@ -96,11 +100,6 @@ const MESSAGES: Record<string, string> = {
   [CALMLENS_ERROR_CODES.TRANSPORT_ERROR]: "Couldn't reach CalmLens. Check your connection.",
 };
 
-/** A message for the person using the app, plus the error code for developers. */
-export const describeError = (error: unknown): { message: string; code?: string } => {
-  if (error instanceof TokenServerError) return { message: error.message };
-  if (CalmLensError.isCalmLensError(error)) {
-    return { message: `${MESSAGES[error.code] ?? error.message}`, code: error.code };
-  }
-  return { message: error instanceof Error ? error.message : String(error) };
-};
+/** A message for the person using the app, for a failed upload's error code. */
+export const describeError = (code: string | undefined): string =>
+  (code && MESSAGES[code]) || "Something went wrong. Try again.";
