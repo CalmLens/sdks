@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calmclips</title>
+{{if not .Demo}}<link rel="stylesheet" href="/sdk/styles.css">{{end}}
 {{if and .Demo .Pending}}<noscript><meta http-equiv="refresh" content="3"></noscript>{{end}}
 <style>
 :root{--bg:#f5f6f8;--surface:#fff;--line:#e2e5ea;--text:#1b2230;--muted:#5b6473;--accent:#1f6b64;--accent-strong:#175650;--accent-soft:#e3f0ee;--clear:#cfe6dc;--possible:#f1d27f;--likely:#e79a3c;--very-likely:#cf4f3c;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);background:var(--bg);line-height:1.5;font-size:15px}
@@ -70,12 +71,15 @@ details[open] summary{margin-bottom:10px}
 .timeline-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
 .timeline-head strong{font-weight:600}
 .timeline-head span{color:var(--muted)}
+.lane{display:grid;grid-template-columns:100px minmax(0,1fr);align-items:center;gap:10px;margin-top:6px;font-size:12px;color:var(--muted)}
 .track{position:relative;height:12px;border-radius:4px;background:#eef1f4;overflow:hidden}
+.track.fine span{box-shadow:none}
 .track span{position:absolute;top:0;bottom:0;background:var(--clear);box-shadow:inset -2px 0 0 var(--surface)}
 .track span.possible{background:var(--possible)}.track span.likely{background:var(--likely)}.track span.very-likely{background:var(--very-likely)}
-.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:4px 0 0 110px;font-variant-numeric:tabular-nums}
 .findings{list-style:none;margin:10px 0 0;padding:0;font-size:13px}
-.findings li{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.findings li{display:grid;grid-template-columns:96px 100px 1fr;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.findings .src{color:var(--muted)}
 .findings time{font-variant-numeric:tabular-nums;color:var(--muted)}
 .findings .cats{display:flex;flex-wrap:wrap;gap:4px 14px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--clear)}
@@ -116,10 +120,10 @@ details[open] summary{margin-bottom:10px}
 {{else if eq .Status "blocked"}}<p class="note"><strong>Blocked{{with .Reasons}} for {{range $i, $f := .}}{{if $i}} and {{end}}{{lower $f.Label}}{{end}}{{end}}.</strong> Only you can see this clip.</p>
 {{else if eq .Status "purged"}}<p class="note"><strong>Removed{{with .Reasons}} for {{lower (index . 0).Label}}{{end}}.</strong> CalmLens deleted the file; the report is kept.</p>
 {{else if eq .Status "error"}}<form class="retry" action="/retry" method="post"><span class="note">Couldn't process this clip. It may be damaged, longer than 2 minutes or in an unsupported format.</span><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">{{if $.Demo}}<select name="demo_result" aria-label="Demo outcome after retry"><option value="allowed">Approve</option><option value="limited">Limit</option><option value="age-restricted">Age-restrict</option><option value="blocked">Block</option><option value="purged">Remove (purge)</option><option value="error">Fail processing</option></select>{{end}}<button class="secondary" type="submit">Retry processing</button></form>{{end}}
-{{if .Segments}}<div class="timeline"><div class="timeline-head"><strong>Timeline</strong><span>{{len .Segments}} segments{{with .Flagged}} · {{len .}} with findings{{else}} · no findings{{end}}</span></div>
-<div class="track" role="img" aria-label="{{len .Flagged}} of {{len .Segments}} segments with findings">{{range .Segments}}<span class="{{.Level}}" style="left:{{pct .Left}};width:{{pct .Width}}" title="{{clock .Start}}–{{clock .End}}"></span>{{end}}</div>
+{{if .Segments}}<div class="timeline"><div class="timeline-head"><strong>Timeline</strong><span>{{with .Flagged}}{{len .}} {{if eq (len .) 1}}range{{else}}ranges{{end}} with findings{{else}}No findings{{end}}</span></div>
+{{range .Lanes}}<div class="lane"><span class="lane-label">{{.Label}}</span><div class="track{{if .Fine}} fine{{end}}" role="img" aria-label="{{.Label}}: {{len .Segments}} analysed {{if eq (len .Segments) 1}}range{{else}}ranges{{end}}">{{range .Segments}}<span class="{{.Level}}" style="left:{{pct .Left}};width:{{pct .Width}}" title="{{clock .Start}}–{{clock .End}}"></span>{{end}}</div></div>{{end}}
 <div class="axis"><span>0:00</span><span>{{clock .Duration}}</span></div>
-{{with .Flagged}}<ul class="findings" aria-label="Segments with findings">{{range .}}<li><time>{{clock .Start}}–{{clock .End}}</time><span class="cats">{{range .Findings}}<span><i class="dot {{.Likelihood}}" aria-hidden="true"></i>{{.Label}} <span class="score">{{words .Likelihood}} · {{percent .Score}}</span></span>{{end}}</span></li>{{end}}</ul>{{end}}</div>{{end}}
+{{with .Flagged}}<ul class="findings" aria-label="Ranges with findings">{{range .}}<li><time>{{clock .Start}}–{{clock .End}}</time><span class="src">{{.SourceLabel}}</span><span class="cats">{{range .Findings}}<span><i class="dot {{.Likelihood}}" aria-hidden="true"></i>{{.Label}} <span class="score">{{words .Likelihood}} · {{percent .Score}}</span></span>{{end}}</span></li>{{end}}</ul>{{end}}</div>{{end}}
 </div>
 </article>{{else}}<div class="empty"><strong>No clips yet</strong><p>Upload a voice note or a short video to get started.</p></div>{{end}}</div>
 </section>

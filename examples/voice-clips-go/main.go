@@ -95,8 +95,9 @@ var uploadScript []byte
 //go:embed demo.js
 var demoScript []byte
 
-// sdkFile matches the files of the SDK's ESM build that the page may import.
-var sdkFile = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.js$`)
+// sdkFile matches the files of the SDK's ESM build that the page may load: its modules and
+// the upload widget's stylesheet.
+var sdkFile = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.(js|css)$`)
 var pageTemplate = template.Must(template.New("page").Funcs(template.FuncMap{
 	"clock": clock, "size": size, "pct": pct, "label": label, "lower": strings.ToLower,
 	"words":   func(s string) string { return strings.ReplaceAll(s, "-", " ") },
@@ -110,6 +111,9 @@ type finding struct {
 	Score      float64
 }
 type segment struct {
+	// Source is what the segment analysed: a sampled frame, the speech, on-screen text or a
+	// whole chunk of the clip (the SegmentSource constants).
+	Source     string
 	Start, End float64
 	// Left and Width place the segment on the clip's timeline bar, in percent. Native chunks
 	// overlap by a second; the bar draws each one up to where the next begins.
@@ -154,26 +158,95 @@ func (e entry) Format() string {
 	return strings.ToUpper(strings.TrimPrefix(strings.TrimPrefix(e.Type, "audio/"), "video/"))
 }
 
-// Flagged lists the segments with at least one finding.
+// lane is one row of a clip's timeline: the segments of one source.
+type lane struct {
+	Label    string
+	Segments []segment
+}
+
+// Fine reports a lane of many short segments (such as sampled frames), drawn without gaps.
+func (l lane) Fine() bool { return len(l.Segments) > 12 }
+
+var sourceLabels = map[string]string{
+	calmlens.SegmentSourceSpeech: "Speech", calmlens.SegmentSourceFrame: "Frames",
+	calmlens.SegmentSourceFrameText: "On-screen text", calmlens.SegmentSourceClip: "Clip",
+}
+
+func sourceLabel(source string) string {
+	if name := sourceLabels[source]; name != "" {
+		return name
+	}
+	return source
+}
+
+// Lanes groups the segments by source, in a fixed order, so each source gets its own bar.
+func (e entry) Lanes() []lane {
+	lanes := []lane{}
+	for _, source := range []string{calmlens.SegmentSourceClip, calmlens.SegmentSourceSpeech, calmlens.SegmentSourceFrame, calmlens.SegmentSourceFrameText} {
+		if rows := e.source(source); len(rows) > 0 {
+			lanes = append(lanes, lane{Label: sourceLabel(source), Segments: rows})
+		}
+	}
+	for _, s := range e.Segments {
+		if sourceLabels[s.Source] == "" && (len(lanes) == 0 || lanes[len(lanes)-1].Label != s.Source) {
+			lanes = append(lanes, lane{Label: s.Source, Segments: e.source(s.Source)})
+		}
+	}
+	return lanes
+}
+
+func (e entry) source(source string) []segment {
+	rows := []segment{}
+	for _, s := range e.Segments {
+		if s.Source == source {
+			rows = append(rows, s)
+		}
+	}
+	return rows
+}
+
+// Flagged lists the time ranges with findings, by start time. Touching segments of the same
+// source with findings (such as consecutive sampled frames) are merged into one range that keeps
+// each category's strongest finding.
 func (e entry) Flagged() []segment {
 	flagged := []segment{}
-	for _, s := range e.Segments {
-		if len(s.Findings) > 0 {
+	for _, l := range e.Lanes() {
+		for _, s := range l.Segments {
+			if len(s.Findings) == 0 {
+				continue
+			}
+			if n := len(flagged); n > 0 && flagged[n-1].Source == s.Source && s.Start <= flagged[n-1].End {
+				last := &flagged[n-1]
+				last.End = math.Max(last.End, s.End)
+				last.Findings = strongest(append(append([]finding{}, last.Findings...), s.Findings...))
+				continue
+			}
 			flagged = append(flagged, s)
 		}
 	}
+	sort.SliceStable(flagged, func(i, j int) bool { return flagged[i].Start < flagged[j].Start })
 	return flagged
 }
+
+// SourceLabel names the segment's source.
+func (s segment) SourceLabel() string { return sourceLabel(s.Source) }
 
 // Reasons lists each category found anywhere in the clip once, strongest first, as the reason
 // shown next to a decision.
 func (e entry) Reasons() []finding {
-	best := map[string]finding{}
+	all := []finding{}
 	for _, s := range e.Segments {
-		for _, f := range s.Findings {
-			if f.Score > best[f.Category].Score {
-				best[f.Category] = f
-			}
+		all = append(all, s.Findings...)
+	}
+	return strongest(all)
+}
+
+// strongest keeps each category's highest-scoring finding, strongest first.
+func strongest(findings []finding) []finding {
+	best := map[string]finding{}
+	for _, f := range findings {
+		if f.Score > best[f.Category].Score {
+			best[f.Category] = f
 		}
 	}
 	reasons := make([]finding, 0, len(best))
@@ -284,7 +357,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /retry", a.retry)
 	mux.HandleFunc("POST /delete", a.remove)
 	mux.HandleFunc("POST /webhooks/calmlens", a.webhook)
-	policy := "default-src 'none'; style-src 'unsafe-inline'; media-src 'self' https: http://localhost:* http://127.0.0.1:*; form-action 'self'; frame-ancestors 'none'; script-src 'self'"
+	policy := "default-src 'none'; style-src 'self' 'unsafe-inline'; media-src 'self' https: http://localhost:* http://127.0.0.1:*; form-action 'self'; frame-ancestors 'none'; script-src 'self'"
 	if a.demo == nil {
 		// The page's script and the SDK come from this server; uploads go to the CalmLens API.
 		policy += "; connect-src 'self' " + origin(a.apiURL)
@@ -423,7 +496,7 @@ func timeline(media *calmlens.MediaClassificationReport) (float64, []segment) {
 	duration := media.DurationSeconds
 	rows := []segment{}
 	for _, s := range media.Segments {
-		row := segment{Start: s.StartSeconds, End: s.EndSeconds}
+		row := segment{Source: s.Source, Start: s.StartSeconds, End: s.EndSeconds}
 		if duration > 0 {
 			row.Left = math.Max(0, math.Min(100, s.StartSeconds/duration*100))
 			row.Width = math.Max(0, math.Min(100-row.Left, (s.EndSeconds-s.StartSeconds)/duration*100))
@@ -443,9 +516,14 @@ func timeline(media *calmlens.MediaClassificationReport) (float64, []segment) {
 		rows = append(rows, row)
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Start < rows[j].Start })
-	for i := range rows[:max(0, len(rows)-1)] {
-		// Overlapping chunks: draw this one up to where the next begins.
-		rows[i].Width = math.Max(0, math.Min(rows[i].Width, rows[i+1].Left-rows[i].Left))
+	for i := range rows {
+		// Overlapping chunks: draw each one up to where the next of the same source begins.
+		for _, next := range rows[i+1:] {
+			if next.Source == rows[i].Source {
+				rows[i].Width = math.Max(0, math.Min(rows[i].Width, next.Left-rows[i].Left))
+				break
+			}
+		}
 	}
 	return duration, rows
 }
@@ -713,7 +791,11 @@ func (a *app) sdk(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	if strings.HasSuffix(name, ".css") {
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	} else {
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	}
 	_, _ = w.Write(data)
 }
 

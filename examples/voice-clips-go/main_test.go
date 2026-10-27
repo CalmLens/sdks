@@ -248,8 +248,9 @@ func sdkDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	for name, body := range map[string]string{
-		"index.js": "export class CalmLensError {}\n",
-		"app.js":   "export class CalmLensAppClient {}\n",
+		"index.js":   "export class CalmLensError {}\n",
+		"app.js":     "export class CalmLensAppClient {}\n",
+		"styles.css": ".calmlens-dropzone {}\n",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -442,9 +443,10 @@ func TestDemoOutcomesProduceClipSegments(t *testing.T) {
 	}
 	flagged := []string{}
 	for _, s := range item.Flagged() {
-		flagged = append(flagged, fmt.Sprintf("%v:%s", s.Start, s.Findings[0].Category))
+		flagged = append(flagged, fmt.Sprintf("%v-%v:%s", s.Start, s.End, s.Findings[0].Category))
 	}
-	if !reflect.DeepEqual(flagged, []string{"58:violence", "87:violence"}) {
+	// The two overlapping flagged chunks read as one range.
+	if !reflect.DeepEqual(flagged, []string{"58-96:violence"}) {
 		t.Fatal("flagged segments", flagged)
 	}
 	reasons := []string{}
@@ -467,6 +469,38 @@ func TestTimelineBarDoesNotOverlap(t *testing.T) {
 	}
 	if rows[0].Level() != "very-likely" || rows[1].Level() != "" {
 		t.Fatal("segment level", rows[0].Level(), rows[1].Level())
+	}
+}
+
+func TestLanesAndMergedFindings(t *testing.T) {
+	high, low, clear := 0.92, 0.5, 0.01
+	result := func(score *float64) map[string]calmlens.CategoryResult {
+		return map[string]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: score, Likelihood: map[*float64]string{&high: "very-likely", &low: "possible", &clear: "very-unlikely"}[score]}}
+	}
+	report := &calmlens.MediaClassificationReport{DurationSeconds: 4, Segments: []calmlens.MediaClassificationSegment{
+		{Source: calmlens.SegmentSourceFrame, StartSeconds: 0, EndSeconds: 1, Categories: result(&clear)},
+		{Source: calmlens.SegmentSourceFrame, StartSeconds: 1, EndSeconds: 2, Categories: result(&low)},
+		{Source: calmlens.SegmentSourceFrame, StartSeconds: 2, EndSeconds: 3, Categories: result(&high)},
+		{Source: calmlens.SegmentSourceFrame, StartSeconds: 3, EndSeconds: 4, Categories: result(&clear)},
+		{Source: calmlens.SegmentSourceSpeech, StartSeconds: 0, EndSeconds: 4, Categories: result(&low)},
+	}}
+	item := entry{}
+	item.Duration, item.Segments = timeline(report)
+	lanes := item.Lanes()
+	if len(lanes) != 2 || len(lanes[0].Segments) != 1 || lanes[0].Segments[0].Source != calmlens.SegmentSourceSpeech || len(lanes[1].Segments) != 4 {
+		t.Fatal("segments not grouped by source", lanes)
+	}
+	// The speech segment spans the clip; frames are still drawn one second wide each.
+	if lanes[0].Segments[0].Width != 100 || lanes[1].Segments[0].Width != 25 {
+		t.Fatal("lane widths", lanes[0].Segments[0].Width, lanes[1].Segments[0].Width)
+	}
+	flagged := item.Flagged()
+	got := []string{}
+	for _, s := range flagged {
+		got = append(got, fmt.Sprintf("%s %v-%v %v", s.Source, s.Start, s.End, s.Findings[0].Score))
+	}
+	if !reflect.DeepEqual(got, []string{"speech 0-4 0.5", "frame 1-3 0.92"}) {
+		t.Fatal("flagged ranges", got)
 	}
 }
 
@@ -767,11 +801,14 @@ func TestLivePageLoadsTheSDKFromThisServer(t *testing.T) {
 	if !strings.Contains(policy, "script-src 'self'") || !strings.Contains(policy, "connect-src 'self' https://api.example.test") {
 		t.Fatal("page cannot load its script or reach the API", policy)
 	}
-	for _, path := range []string{"/sdk/app.js", "/upload.js"} {
+	for path, kind := range map[string]string{"/sdk/app.js": "text/javascript", "/upload.js": "text/javascript", "/sdk/styles.css": "text/css"} {
 		rec := get(a, path)
-		if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/javascript") {
+		if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), kind) {
 			t.Fatal(path, rec.Code, rec.Header())
 		}
+	}
+	if !strings.Contains(policy, "style-src 'self'") {
+		t.Fatal("page cannot load the widget's stylesheet", policy)
 	}
 	if !strings.Contains(get(a, "/upload.js").Body.String(), `from "/sdk/app.js"`) {
 		t.Fatal("upload script does not import the served SDK")
