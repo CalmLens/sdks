@@ -1609,11 +1609,6 @@ async function paintTestImage(scenario, key) {
 		152,
 		160
 	]];
-	const mixedColor = [
-		0,
-		1,
-		2
-	].map((channel) => palette.reduce((sum, color) => sum + color[channel], 0) / palette.length);
 	const data = new Uint8Array([
 		67,
 		76,
@@ -1629,9 +1624,17 @@ async function paintTestImage(scenario, key) {
 	const height = width;
 	const rgba = new Uint8Array(width * height * 4);
 	for (let i = 0; i < width * height; i++) {
-		const value = data[(Math.floor(i / width / 4) * cells + Math.floor(i % width / 4)) % data.length];
+		const row = Math.floor(i / width / 4);
+		const cell = row * cells + Math.floor(i % width / 4);
+		const value = data[cell % data.length];
+		const position = (row + cell % cells) / (2 * (cells - 1)) * (palette.length - 1);
+		const start = Math.floor(position);
+		const blend = position - start;
 		const shade = (value * 73 + 41 & 255) / 255;
-		const color = mixedColor.map((channel) => Math.round(channel * (.55 + shade * .1) + 89 * shade));
+		const color = palette[start].map((channel, index) => {
+			const mixed = channel + (palette[Math.min(start + 1, palette.length - 1)][index] - channel) * blend;
+			return Math.round(mixed * (.65 + shade * .2) + 38 * shade);
+		});
 		rgba.set([
 			color[0] & 248 | value >> 5,
 			color[1] & 248 | value >> 2 & 7,
