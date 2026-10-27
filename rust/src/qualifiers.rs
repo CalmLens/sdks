@@ -74,6 +74,8 @@ string_enum! {
         SexualActivity = "sexual-activity",
         /// Sexual: Explicit sexual language.
         SexualExplicitLanguage = "sexual-explicit-language",
+        /// Sexual: Sexual-assault images or video.
+        SexualAssaultMedia = "sexual-assault-media",
         /// Sexual: Non-consensual sexual content.
         SexualNonConsensual = "sexual-non-consensual",
         /// Sexual: Intimate image abuse.
@@ -126,6 +128,8 @@ string_enum! {
         ViolenceNaturalDeath = "violence-natural-death",
         /// Violence: Graphic detail.
         ViolenceGraphic = "violence-graphic",
+        /// Violence: Act of decapitation.
+        ViolenceDecapitationAct = "violence-decapitation-act",
         /// Violence: Excessive gore.
         ViolenceGore = "violence-gore",
         /// Violence: Weapon without an attack.

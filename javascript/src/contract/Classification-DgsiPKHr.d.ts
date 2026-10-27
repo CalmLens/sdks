@@ -1,4 +1,4 @@
-import "./AssetModerationDecision-T9b0RF7k.js";
+import "./AssetModerationDecision-DSKrEeDr.js";
 import "./ModerationContext-9lGm-Mna.js";
 import "./HashList-CKW9itTf.js";
 import * as zod from "zod";
@@ -266,6 +266,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "Graphic sexual descriptions or explicitly erotic dialogue.";
     readonly exclusions: "Untargeted profanity, anatomical terms and non-erotic medical or educational language alone.";
   };
+  readonly "sexual-assault-media": {
+    readonly category: "sexual";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Sexual-assault images or video";
+    readonly description: "Visual depiction of a sexual act involving force, coercion or a person who cannot consent, including realistic staged, animated or generated depictions. The sexual act and lack of consent must be supported by the depicted scene; it still counts inside reporting, education or support. This describes consent to the act, independently of consent to distributing the image.";
+    readonly exclusions: "Text or captions merely describing, reporting or discussing an assault; survivor accounts, support or prevention without a depicted sexual assault; aftermath alone; consensual roleplay with supported consent; ambiguous contact, expressions or nudity that do not establish a sexual assault. Do not infer an unseen act from a caption.";
+    readonly inputs: readonly ["image"];
+  };
   readonly "sexual-non-consensual": {
     readonly category: "sexual";
     readonly kind: "harm";
@@ -456,6 +465,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly displayName: "Graphic detail";
     readonly description: "Severe bodily injury or death shown or described with explicit disturbing bodily detail, such as exposed organs, dismemberment or gore. In images, visible open wounds and heavy bleeding are graphic too.";
     readonly exclusions: "A threat or mention of violence without explicit disturbing bodily detail; in text, heavy bleeding, gashes, cuts, bruises or other serious injuries described without exposed tissue, bone or organs, mutilation or dismemberment; in images, modest blood or minor wounds; inferred or unseen injuries; solely intentional self-injury or suicide.";
+  };
+  readonly "violence-decapitation-act": {
+    readonly category: "violence";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Act of decapitation";
+    readonly description: "Visual footage showing a real person’s head being severed from their body: the act is visibly underway or captured as the head separates. Reporting, historical, educational or documentary framing does not remove that depicted act.";
+    readonly exclusions: "A textual description, caption or mention; a severed head or headless body shown only after the event; an off-screen act or inferred process; fictional, staged, animated or generated scenes; clinical dissection. Do not infer a real act from aftermath or an unsupported label.";
+    readonly inputs: readonly ["image"];
   };
   readonly "violence-gore": {
     readonly category: "violence";
@@ -1083,6 +1101,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "self-harm-thoughts": "self-harm-thoughts";
   "sexual-activity": "sexual-activity";
   "sexual-adult-promotion": "sexual-adult-promotion";
+  "sexual-assault-media": "sexual-assault-media";
   "sexual-discussion": "sexual-discussion";
   "sexual-documentary": "sexual-documentary";
   "sexual-educational": "sexual-educational";
@@ -1102,6 +1121,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "sexual-support-prevention": "sexual-support-prevention";
   "sexual-text": "sexual-text";
   "violence-attack": "violence-attack";
+  "violence-decapitation-act": "violence-decapitation-act";
   "violence-discussion": "violence-discussion";
   "violence-documentary": "violence-documentary";
   "violence-educational": "violence-educational";
@@ -1249,6 +1269,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "self-harm-thoughts": "self-harm-thoughts";
     "sexual-activity": "sexual-activity";
     "sexual-adult-promotion": "sexual-adult-promotion";
+    "sexual-assault-media": "sexual-assault-media";
     "sexual-discussion": "sexual-discussion";
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
@@ -1268,6 +1289,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
     "violence-attack": "violence-attack";
+    "violence-decapitation-act": "violence-decapitation-act";
     "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
     "violence-educational": "violence-educational";
@@ -1418,6 +1440,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "self-harm-thoughts": "self-harm-thoughts";
     "sexual-activity": "sexual-activity";
     "sexual-adult-promotion": "sexual-adult-promotion";
+    "sexual-assault-media": "sexual-assault-media";
     "sexual-discussion": "sexual-discussion";
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
@@ -1437,6 +1460,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
     "violence-attack": "violence-attack";
+    "violence-decapitation-act": "violence-decapitation-act";
     "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
     "violence-educational": "violence-educational";
@@ -1583,6 +1607,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "self-harm-thoughts": "self-harm-thoughts";
     "sexual-activity": "sexual-activity";
     "sexual-adult-promotion": "sexual-adult-promotion";
+    "sexual-assault-media": "sexual-assault-media";
     "sexual-discussion": "sexual-discussion";
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
@@ -1602,6 +1627,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
     "violence-attack": "violence-attack";
+    "violence-decapitation-act": "violence-decapitation-act";
     "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
     "violence-educational": "violence-educational";
@@ -1755,6 +1781,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -1774,6 +1801,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -1924,6 +1952,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -1943,6 +1972,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -2089,6 +2119,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -2108,6 +2139,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -2259,6 +2291,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -2278,6 +2311,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -2428,6 +2462,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -2447,6 +2482,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -2593,6 +2629,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -2612,6 +2649,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -2763,6 +2801,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -2782,6 +2821,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -2932,6 +2972,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -2951,6 +2992,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -3097,6 +3139,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -3116,6 +3159,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -3267,6 +3311,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -3286,6 +3331,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -3436,6 +3482,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -3455,6 +3502,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -3601,6 +3649,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -3620,6 +3669,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -3771,6 +3821,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -3790,6 +3841,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -3940,6 +3992,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -3959,6 +4012,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -4105,6 +4159,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -4124,6 +4179,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -4275,6 +4331,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -4294,6 +4351,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -4444,6 +4502,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -4463,6 +4522,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -4609,6 +4669,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -4628,6 +4689,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -4779,6 +4841,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -4798,6 +4861,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -4948,6 +5012,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -4967,6 +5032,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -5113,6 +5179,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -5132,6 +5199,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -5283,6 +5351,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -5302,6 +5371,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -5452,6 +5522,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -5471,6 +5542,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";
@@ -5617,6 +5689,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "self-harm-thoughts": "self-harm-thoughts";
       "sexual-activity": "sexual-activity";
       "sexual-adult-promotion": "sexual-adult-promotion";
+      "sexual-assault-media": "sexual-assault-media";
       "sexual-discussion": "sexual-discussion";
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
@@ -5636,6 +5709,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
       "violence-educational": "violence-educational";

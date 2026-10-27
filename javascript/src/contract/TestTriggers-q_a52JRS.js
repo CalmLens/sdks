@@ -391,6 +391,15 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "Graphic sexual descriptions or explicitly erotic dialogue.",
 		exclusions: "Untargeted profanity, anatomical terms and non-erotic medical or educational language alone."
 	},
+	"sexual-assault-media": {
+		category: "sexual",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Sexual-assault images or video",
+		description: "Visual depiction of a sexual act involving force, coercion or a person who cannot consent, including realistic staged, animated or generated depictions. The sexual act and lack of consent must be supported by the depicted scene; it still counts inside reporting, education or support. This describes consent to the act, independently of consent to distributing the image.",
+		exclusions: "Text or captions merely describing, reporting or discussing an assault; survivor accounts, support or prevention without a depicted sexual assault; aftermath alone; consensual roleplay with supported consent; ambiguous contact, expressions or nudity that do not establish a sexual assault. Do not infer an unseen act from a caption.",
+		inputs: ["image"]
+	},
 	"sexual-non-consensual": {
 		category: "sexual",
 		kind: "harm",
@@ -581,6 +590,15 @@ const MODERATION_QUALIFIER_INFO = {
 		displayName: "Graphic detail",
 		description: "Severe bodily injury or death shown or described with explicit disturbing bodily detail, such as exposed organs, dismemberment or gore. In images, visible open wounds and heavy bleeding are graphic too.",
 		exclusions: "A threat or mention of violence without explicit disturbing bodily detail; in text, heavy bleeding, gashes, cuts, bruises or other serious injuries described without exposed tissue, bone or organs, mutilation or dismemberment; in images, modest blood or minor wounds; inferred or unseen injuries; solely intentional self-injury or suicide."
+	},
+	"violence-decapitation-act": {
+		category: "violence",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Act of decapitation",
+		description: "Visual footage showing a real person’s head being severed from their body: the act is visibly underway or captured as the head separates. Reporting, historical, educational or documentary framing does not remove that depicted act.",
+		exclusions: "A textual description, caption or mention; a severed head or headless body shown only after the event; an off-screen act or inferred process; fictional, staged, animated or generated scenes; clinical dissection. Do not infer a real act from aftermath or an unsupported label.",
+		inputs: ["image"]
 	},
 	"violence-gore": {
 		category: "violence",
