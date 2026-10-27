@@ -14,8 +14,8 @@ import path from "node:path";
 import { encodePng } from "../src/png.ts";
 import {
   DEMO_TEST_INPUT_KEY,
-  paintTestImage,
   getImageTestCategories,
+  paintTestImage,
   TEST_INPUT_KEY_PATTERN,
   TEST_TEXT_CATEGORIES,
   testTextCode,

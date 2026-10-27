@@ -210,6 +210,7 @@ const checkCdnExpectation = (
   }
 };
 
+// Multipart scenarios hash multiple 5 MiB parts; allow for slower shared CI runners.
 describe("shared mock scenarios", () => {
   for (const scenario of scenarios) {
     it(scenario.name, async () => {
@@ -276,7 +277,7 @@ describe("shared mock scenarios", () => {
           if (step.save) saved[step.save] = result;
         }
       }
-    });
+    }, 30_000);
   }
 });
 // ---- End of shared mock scenarios -----------------------------------------------------------
