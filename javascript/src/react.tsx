@@ -19,7 +19,12 @@ import type {
 } from "./ui/BrowserUpload";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
 import { getMediaState, resolveMediaProps } from "./ui/Media";
-import { describeUploader, describeUploadItem, resolveMessages } from "./ui/Messages";
+import {
+  describeUploader,
+  describeUploadItem,
+  getMediaUnavailableMessage,
+  resolveMessages,
+} from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey, type MediaProps } from "./ui/Props";
 import {
   useOwnController,
@@ -295,6 +300,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     projectId,
     assetId,
     status,
+    contentRemoved,
     ageConfirmed,
     type,
     resource,
@@ -327,9 +333,11 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   } = resolveMediaProps(input);
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
   const state = getMediaState({
+    asset: _asset,
     projectId,
     assetId,
     status,
+    contentRemoved,
     ageConfirmed,
     type,
     resource,
@@ -448,7 +456,9 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
         <figcaption className="calmlens-media__notice">
           <p>
             <Icon name="unavailable" />
-            <span className="calmlens-media__label">{messages.unavailable}</span>
+            <span className="calmlens-media__label">
+              {getMediaUnavailableMessage(state, messages)}
+            </span>
           </p>
         </figcaption>
       )}

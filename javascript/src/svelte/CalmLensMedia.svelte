@@ -4,6 +4,7 @@
     getMediaAspectRatio,
     getMediaLoadKey,
     getMediaState,
+    getMediaUnavailableMessage,
     type MediaOptions,
     type MediaProps,
     resolveMediaProps,
@@ -127,7 +128,7 @@
   {/if}
   {#if state.kind === "unavailable" || failed}
     <figcaption class="calmlens-media__notice">
-      <p><Icon name="unavailable" /><span class="calmlens-media__label">{messages.unavailable}</span></p>
+      <p><Icon name="unavailable" /><span class="calmlens-media__label">{getMediaUnavailableMessage(state, messages)}</span></p>
     </figcaption>
   {/if}
 </figure>

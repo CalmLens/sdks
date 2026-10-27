@@ -62,4 +62,6 @@ export const getMediaLoadKey = (state: MediaState): string =>
     ? `${state.src} ${state.srcSet ?? ""}`
     : state.kind === "video" || state.kind === "audio"
       ? state.src
-      : state.kind;
+      : state.kind === "unavailable" && state.reason === "regional"
+        ? "unavailable-regional"
+        : state.kind;

@@ -640,3 +640,43 @@ test("viewer-aware age restriction gates an allowed asset until the client confi
   expect(new URL(permitted.src).searchParams.get("ageConfirmed")).toBe("true");
   expect(new URL(permitted.src).searchParams.get("region")).toBe("GB");
 });
+
+test("regional unavailable state requires matching viewer attribution and yields to content removal", () => {
+  const asset = {
+    id: "regional",
+    projectId: PROJECT_ID,
+    classification: {
+      moderation: {
+        status: "allowed" as const,
+        delivery: {
+          region: "DE",
+          jurisdiction: "DE",
+          action: "block",
+          ageCheckStandard: "any" as const,
+        },
+      },
+    },
+  };
+  expect(getMediaState({ asset, region: "DE" })).toEqual({
+    kind: "unavailable",
+    reason: "regional",
+  });
+  expect(getMediaState({ asset, region: "US", placeholder: false }).kind).toBe("image");
+  expect(getMediaState({ asset, region: "DE", contentRemoved: true })).toEqual({
+    kind: "unavailable",
+  });
+  expect(
+    getMediaState({
+      asset: {
+        ...asset,
+        classification: {
+          moderation: {
+            ...asset.classification.moderation,
+            delivery: { ...asset.classification.moderation.delivery, jurisdiction: undefined },
+          },
+        },
+      },
+      region: "DE",
+    }),
+  ).toEqual({ kind: "unavailable" });
+});

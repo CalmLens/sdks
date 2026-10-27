@@ -21,6 +21,7 @@ export {
   formatBytes,
   formatMessage,
   getDropzoneHint,
+  getMediaUnavailableMessage,
   getUploadItemMessage,
   getUploadItemOutcome,
   resolveMessages,

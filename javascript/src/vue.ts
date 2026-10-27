@@ -31,6 +31,7 @@ import {
   type CalmLensMessages,
   describeUploader,
   describeUploadItem,
+  getMediaUnavailableMessage,
   resolveMessages,
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
@@ -364,6 +365,7 @@ export const CalmLensMedia = defineComponent({
     /** Required without `asset`. */
     assetId: optional(String),
     status: optional(String as PropType<AssetModerationStatus>),
+    contentRemoved: optional(Boolean),
     ageConfirmed: { type: Boolean, default: false },
     type: optional(String as PropType<"image" | "video" | "audio">),
     resource: optional(String as PropType<"original" | "rendered">),
@@ -506,7 +508,11 @@ export const CalmLensMedia = defineComponent({
             notice([
               h("p", [
                 icon("unavailable"),
-                h("span", { class: "calmlens-media__label" }, text.unavailable),
+                h(
+                  "span",
+                  { class: "calmlens-media__label" },
+                  getMediaUnavailableMessage(current, text),
+                ),
               ]),
             ]),
         ],

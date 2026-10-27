@@ -1,4 +1,5 @@
 import { getFileIcon, renderFileIconSvg } from "./FileIcons";
+import type { MediaState } from "./Media";
 import type { UploadControllerOptions, UploadItem, UploadSnapshot } from "./UploadController";
 
 /** The size of a row's file-type icon, the same as an image preview. */
@@ -45,6 +46,8 @@ export interface CalmLensMessages {
   sensitiveBody: string;
   reveal: string;
   unavailable: string;
+  /** A viewer-specific regional block reported by the asset API. */
+  regionalUnavailable: string;
   [errorCode: string]: string;
 }
 
@@ -81,10 +84,20 @@ export const DEFAULT_MESSAGES: CalmLensMessages = {
   sensitiveBody: "This may not be suitable for everyone.",
   reveal: "View",
   unavailable: "Unavailable",
+  regionalUnavailable: "Unavailable in your region",
 };
 
 export const resolveMessages = (overrides?: Partial<CalmLensMessages>): CalmLensMessages =>
   overrides ? ({ ...DEFAULT_MESSAGES, ...overrides } as CalmLensMessages) : DEFAULT_MESSAGES;
+
+/** The unavailable notice every media binding shows for the same resolved state. */
+export const getMediaUnavailableMessage = (
+  state: MediaState,
+  messages: CalmLensMessages,
+): string =>
+  state.kind === "unavailable" && state.reason === "regional"
+    ? messages.regionalUnavailable
+    : messages.unavailable;
 
 /** Fills `{name}`-style placeholders. */
 export const formatMessage = (message: string, values: Record<string, string>): string =>

@@ -16,7 +16,12 @@ import {
 } from "react-native";
 import { FILE_ICON_COLORS, getFileIcon, getFileIconLabel } from "./ui/FileIcons";
 import { getMediaState, type MediaOptions, pickMediaSource, resolveMediaProps } from "./ui/Media";
-import { describeUploader, describeUploadItem, resolveMessages } from "./ui/Messages";
+import {
+  describeUploader,
+  describeUploadItem,
+  getMediaUnavailableMessage,
+  resolveMessages,
+} from "./ui/Messages";
 import {
   getMediaAspectRatio,
   getMediaLoadKey,
@@ -413,6 +418,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     projectId,
     assetId,
     status,
+    contentRemoved,
     ageConfirmed,
     type,
     resource,
@@ -440,9 +446,11 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
   const theme = useMemo(() => resolveTheme(themeOverrides), [themeOverrides]);
   const state = getMediaState({
+    asset: _asset,
     projectId,
     assetId,
     status,
+    contentRemoved,
     ageConfirmed,
     type,
     resource,
@@ -532,7 +540,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
       )}
       {unavailable && (
         <View style={[mediaStyles.notice, { backgroundColor: theme.surface }]}>
-          <Text style={{ color: theme.text }}>{messages.unavailable}</Text>
+          <Text style={{ color: theme.text }}>{getMediaUnavailableMessage(state, messages)}</Text>
         </View>
       )}
     </View>

@@ -157,3 +157,52 @@ for (const tab of TABS) {
     });
   });
 }
+
+test("regional block notices follow API attribution automatically and request no media", async ({
+  page,
+}) => {
+  await open(page, "elements");
+  const requested: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/assets/project-regional/asset-regional/"))
+      requested.push(request.url());
+  });
+  await page.evaluate(() => {
+    const media = document.createElement("calmlens-media") as HTMLElement & {
+      asset: unknown;
+      messages: Record<string, string>;
+    };
+    media.id = "regional-notice-fixture";
+    media.setAttribute("region", "DE");
+    media.setAttribute("cdn-base-url", `${location.origin}/mock-cdn/v1`);
+    media.messages = { regionalUnavailable: "msg:regional", unavailable: "msg:unavailable" };
+    media.asset = {
+      id: "asset-regional",
+      projectId: "project-regional",
+      classification: {
+        moderation: {
+          status: "allowed",
+          delivery: { region: "DE", jurisdiction: "DE", action: "block", ageCheckStandard: "any" },
+        },
+      },
+    };
+    document.body.append(media);
+  });
+  const fixture = page.locator("#regional-notice-fixture");
+  await expect(fixture.getByText("msg:regional", { exact: true })).toBeVisible();
+  await expect(fixture.getByRole("img")).toHaveCount(0);
+  await fixture.evaluate((node) => {
+    const media = node as HTMLElement & {
+      asset: { classification: { moderation: { status: string } } };
+    };
+    media.asset = {
+      ...media.asset,
+      classification: {
+        moderation: { ...media.asset.classification.moderation, status: "blocked" },
+      },
+    };
+  });
+  await expect(fixture.getByText("msg:unavailable", { exact: true })).toBeVisible();
+  await expect(fixture.getByText("msg:regional", { exact: true })).toHaveCount(0);
+  expect(requested).toEqual([]);
+});

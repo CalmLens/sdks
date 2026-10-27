@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { waitFor, within } from "@testing-library/dom";
+import type { CalmLensMediaElement } from "../src/elements";
 import type { MediaProps } from "../src/ui";
 import { BINDINGS, type Mounted } from "./bindings";
 
 const PROJECT_ID = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 const CDN = "https://cdn.calmlens.com/v1";
 const asset = { projectId: PROJECT_ID, assetId: "a1", alt: "A cat on a sofa" } as const;
-const messages = { unavailable: "msg:unavailable", reveal: "msg:reveal" };
+const messages = {
+  regionalUnavailable: "msg:regional-unavailable",
+  unavailable: "msg:unavailable",
+  reveal: "msg:reveal",
+};
 
 let mounted: Mounted | undefined;
 afterEach(() => {
@@ -72,6 +77,91 @@ for (const binding of BINDINGS) {
       mounted = binding.mountMedia({ ...asset, status: "blocked", messages });
 
       expect(await view().findByText(messages.unavailable)).toBeTruthy();
+      expect(requested()).toEqual([]);
+    });
+
+    it("automatically uses the regional notice for matching viewer delivery without requesting media", async () => {
+      mounted = binding.mountMedia({
+        ...asset,
+        region: "DE",
+        ageConfirmed: true,
+        messages,
+        asset: {
+          id: "a1",
+          projectId: PROJECT_ID,
+          classification: {
+            moderation: {
+              status: "allowed",
+              delivery: {
+                region: "DE",
+                jurisdiction: "EU",
+                action: "block",
+                ageCheckStandard: "any",
+              },
+            },
+          },
+        },
+      });
+      const notice = await view().findByText(messages.regionalUnavailable);
+      expect(notice.textContent).toBe(messages.regionalUnavailable);
+      expect(view().queryByText(messages.unavailable)).toBeNull();
+      expect(requested()).toEqual([]);
+    });
+
+    it("keeps the ordinary notice for a base block even with stale regional attribution", async () => {
+      mounted = binding.mountMedia({
+        ...asset,
+        region: "DE",
+        messages,
+        asset: {
+          id: "a1",
+          projectId: PROJECT_ID,
+          classification: {
+            moderation: {
+              status: "blocked",
+              delivery: {
+                region: "DE",
+                jurisdiction: "DE",
+                action: "block",
+                ageCheckStandard: "any",
+              },
+            },
+          },
+        },
+      });
+      expect((await view().findByText(messages.unavailable)).textContent).toBe(
+        messages.unavailable,
+      );
+      expect(view().queryByText(messages.regionalUnavailable)).toBeNull();
+      expect(requested()).toEqual([]);
+    });
+
+    it("keeps the ordinary notice when content removal overrides regional attribution", async () => {
+      mounted = binding.mountMedia({
+        ...asset,
+        region: "DE",
+        contentRemoved: true,
+        messages,
+        asset: {
+          id: "a1",
+          projectId: PROJECT_ID,
+          classification: {
+            moderation: {
+              status: "allowed",
+              delivery: {
+                region: "DE",
+                jurisdiction: "DE",
+                action: "block",
+                ageCheckStandard: "any",
+              },
+            },
+          },
+        },
+      });
+      expect((await view().findByText(messages.unavailable)).textContent).toBe(
+        messages.unavailable,
+      );
+      expect(view().queryByText(messages.regionalUnavailable)).toBeNull();
       expect(requested()).toEqual([]);
     });
 
@@ -159,3 +249,39 @@ for (const binding of BINDINGS) {
     );
   });
 }
+
+it("updates the web component notice when a regional block becomes a base block", async () => {
+  const element = document.createElement("calmlens-media") as CalmLensMediaElement;
+  const apiAsset = {
+    id: "a1",
+    projectId: PROJECT_ID,
+    classification: {
+      moderation: {
+        status: "allowed" as const,
+        delivery: {
+          region: "DE",
+          jurisdiction: "DE",
+          action: "block",
+          ageCheckStandard: "any" as const,
+        },
+      },
+    },
+  };
+  element.messages = messages;
+  element.setAttribute("region", "DE");
+  element.asset = apiAsset;
+  const container = document.createElement("div");
+  container.append(element);
+  document.body.append(container);
+  mounted = { container, unmount: () => container.remove() };
+  expect((await view().findByText(messages.regionalUnavailable)).textContent).toBe(
+    messages.regionalUnavailable,
+  );
+  element.asset = {
+    ...apiAsset,
+    classification: { moderation: { ...apiAsset.classification.moderation, status: "blocked" } },
+  };
+  expect((await view().findByText(messages.unavailable)).textContent).toBe(messages.unavailable);
+  expect(view().queryByText(messages.regionalUnavailable)).toBeNull();
+  expect(requested()).toEqual([]);
+});

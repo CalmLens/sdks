@@ -15,6 +15,7 @@ import {
   type CalmLensMessages,
   describeUploader,
   describeUploadItem,
+  getMediaUnavailableMessage,
   resolveMessages,
 } from "./ui/Messages";
 import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
@@ -447,6 +448,7 @@ export class CalmLensMediaElement extends BaseElement {
     "project-id",
     "asset-id",
     "status",
+    "content-removed",
     "age-confirmed",
     "type",
     "resource",
@@ -519,6 +521,7 @@ export class CalmLensMediaElement extends BaseElement {
       projectId: this.getAttribute("project-id") ?? undefined,
       assetId: this.getAttribute("asset-id") ?? undefined,
       status: (this.getAttribute("status") as AssetModerationStatus | null) ?? undefined,
+      contentRemoved: this.hasAttribute("content-removed") ? true : undefined,
       ageConfirmed: this.hasAttribute("age-confirmed"),
       type: (this.getAttribute("type") as MediaOptions["type"] | null) ?? undefined,
       resource: (this.getAttribute("resource") as MediaOptions["resource"] | null) ?? undefined,
@@ -575,7 +578,9 @@ export class CalmLensMediaElement extends BaseElement {
       notice([
         el("p", {}, [
           icon("unavailable"),
-          el("span", { class: "calmlens-media__label" }, [messages.unavailable]),
+          el("span", { class: "calmlens-media__label" }, [
+            getMediaUnavailableMessage(state, messages),
+          ]),
         ]),
       ]);
     const fail = () => {

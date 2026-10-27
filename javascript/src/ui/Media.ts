@@ -102,7 +102,7 @@ export interface MediaSettings {
 }
 
 export type MediaState =
-  | { kind: "unavailable" }
+  | { kind: "unavailable"; reason?: "regional" }
   | { kind: "gated"; placeholderUrl?: string }
   | {
       kind: "image";
@@ -223,8 +223,24 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
   } as T & { projectId: string; assetId: string };
 };
 
-export const getMediaState = (options: MediaOptions): MediaState =>
-  buildMediaState(resolveMediaProps(options));
+export const getMediaState = (options: MediaOptions): MediaState => {
+  const resolved = resolveMediaProps(options);
+  const state = buildMediaState(resolved);
+  const moderation = options.asset?.classification?.moderation;
+  const delivery = moderation?.delivery;
+  if (
+    state.kind === "unavailable" &&
+    resolved.status === "blocked" &&
+    !resolved.contentRemoved &&
+    moderation?.status !== "blocked" &&
+    moderation?.status !== "purged" &&
+    delivery?.region === options.region &&
+    delivery?.action === "block" &&
+    delivery.jurisdiction
+  )
+    return { kind: "unavailable", reason: "regional" };
+  return state;
+};
 
 const buildMediaState = ({
   projectId,
