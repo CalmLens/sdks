@@ -3,9 +3,10 @@ import { detectTestTrigger } from "@calmlens/sdk/test-inputs";
 export {
   detectTestImage,
   generateTestTextCode as testTextCode,
+  getImageTestCategories,
   paintTestImage,
-  TEST_IMAGE_PALETTES,
   TEST_INPUT_KEY_PATTERN,
+  testInputForSignal,
 } from "@calmlens/sdk/test-inputs";
 
 /** The key demo mode's simulator recognises. Real projects each have their own. */
@@ -20,6 +21,6 @@ export const TEST_TEXT_CATEGORIES = [
 ] as const;
 
 export const detectTestText = async (text: string, testInputKey: string) =>
-  (await detectTestTrigger(text, testInputKey)).signals.find((signal: string) =>
-    TEST_TEXT_CATEGORIES.some((category) => category === signal),
-  );
+  (await detectTestTrigger(text, testInputKey))?.instances.find((instance) =>
+    TEST_TEXT_CATEGORIES.some((category) => category === instance.category),
+  )?.category;

@@ -1482,7 +1482,11 @@ impl CdnClient<'_> {
         }
         let mut query = Query::default();
         if let Some(claims) = options.viewer_claims.as_ref() {
-            query.push("viewerClaims", &serde_json::to_string(claims).map_err(|_| invalid_argument("Invalid viewer claims"))?);
+            query.push(
+                "viewerClaims",
+                &serde_json::to_string(claims)
+                    .map_err(|_| invalid_argument("Invalid viewer claims"))?,
+            );
         }
         if !query.0.is_empty() {
             url.push('?');

@@ -260,7 +260,13 @@ func fixtureTransform(t *testing.T, value any) (string, []LensTransform) {
 func fixtureCDN(t *testing.T, args fixtureArgs) CDNAssetURLOptions {
 	t.Helper()
 	options := CDNAssetURLOptions{}
-	if claims, ok := args["viewerClaims"]; ok { data, _ := json.Marshal(claims); options.ViewerClaims = &ViewerClaims{}; if err := json.Unmarshal(data, options.ViewerClaims); err != nil { t.Fatal(err) } }
+	if claims, ok := args["viewerClaims"]; ok {
+		data, _ := json.Marshal(claims)
+		options.ViewerClaims = &ViewerClaims{}
+		if err := json.Unmarshal(data, options.ViewerClaims); err != nil {
+			t.Fatal(err)
+		}
+	}
 	options.AssetIdentifier, _ = args["assetIdentifier"].(string)
 	options.Resource, _ = args["resource"].(string)
 	options.Lens, _ = args["lens"].(string)

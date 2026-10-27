@@ -71,12 +71,12 @@ final class Moderation
 
     /**
      * Only for allowed images, or with `$ageConfirmed` for age-restricted images this viewer may
-     * see. The CDN refuses an age-restricted asset's plain URL; `ageConfirmed=true` opts in.
+     * see. The CDN refuses an age-restricted asset's plain URL; `viewerClaims.ageConfirmed=true` opts in.
      */
     public function imageUrl(string $assetId, bool $ageConfirmed = false): string
     {
         // The unguessable asset ID, not the externalId: post IDs appear in Chirp's own URLs.
-        return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'lens' => 'chirp-feed', 'ageConfirmed' => $ageConfirmed]);
+        return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'lens' => 'chirp-feed', ...($ageConfirmed ? ['viewerClaims' => ['ageConfirmed' => true]] : [])]);
     }
 
     /** A small blurred PNG of the image, served for public assets whatever their status (not purged). */

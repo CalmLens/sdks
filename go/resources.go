@@ -2,7 +2,7 @@ package calmlens
 
 import (
 	"context"
- "encoding/json"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -386,9 +386,12 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	}
 	params := url.Values{}
 	if options.ViewerClaims != nil {
- data, err := json.Marshal(options.ViewerClaims)
- if err != nil { return "", err }; params.Set("viewerClaims", string(data))
- }
+		data, err := json.Marshal(options.ViewerClaims)
+		if err != nil {
+			return "", err
+		}
+		params.Set("viewerClaims", string(data))
+	}
 	if len(params) > 0 {
 		endpoint += "?" + params.Encode()
 	}

@@ -916,8 +916,13 @@ module CalmLens
           return not_available
         end
 
-        opted_in = JSON.parse(URI.decode_www_form(query.to_s).to_h.fetch('viewerClaims', '{}'))['ageConfirmed'] == true
-        return error('viewer/age-confirmation-required', 'Age confirmation required', status: 403) if moderation == 'age-restricted' && !opted_in
+        params = URI.decode_www_form(query.to_s).to_h
+        opted_in = viewer_age_confirmed?(params)
+        if moderation == 'age-restricted' && !opted_in
+          return error('viewer/age-confirmation-required', 'Age confirmation required',
+                       status: 403)
+        end
+
         restricted = item['visibility'] != 'public'
         if restricted && !can_download?(item['folderId'])
           return error('asset/api-key-missing-permission',
@@ -925,7 +930,18 @@ module CalmLens
         end
 
         type = stored['type'].to_s.empty? ? 'application/octet-stream' : stored['type']
-        cdn_response(method, stored['parts'].sort.map(&:last).join.b, delivery_headers(item, type, restricted).merge(URI.decode_www_form(query.to_s).to_h.key?('viewerClaims') ? { 'Cache-Control' => 'private, no-store' } : {}))
+        cdn_response(method, stored['parts'].sort.map(&:last).join.b,
+                     viewer_delivery_headers(item, type, restricted, params))
+      end
+
+      def viewer_age_confirmed?(params)
+        JSON.parse(params.fetch('viewerClaims', '{}'))['ageConfirmed'] == true
+      end
+
+      def viewer_delivery_headers(item, type, restricted, params)
+        headers = delivery_headers(item, type, restricted)
+        headers['Cache-Control'] = 'private, no-store' if params.key?('viewerClaims')
+        headers
       end
 
       def not_available = error('asset/not-available', 'Asset is not available', status: 403)

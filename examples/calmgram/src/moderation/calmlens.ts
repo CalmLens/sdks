@@ -192,7 +192,7 @@ export const createCalmLensProvider = (options: {
         lens: variant === "feed" ? "calmgram-feed" : "calmgram-thumb",
         // The CDN refuses an age-restricted asset's plain URL. `viewerClaims.ageConfirmed=true` opts in,
         // so only build it for viewers this app has decided may see sensitive media.
-        viewerClaims: { ageConfirmed },
+        ...(ageConfirmed ? { viewerClaims: { ageConfirmed: true } } : {}),
       });
     },
 

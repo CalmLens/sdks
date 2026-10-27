@@ -1,14 +1,13 @@
-/** Portable test inputs. Image codecs remain the caller's responsibility. */
+/** Portable test inputs: presets and custom instances share one authenticated format. */
 export {
   type ClassificationTestSignal,
   detectTestImage,
   detectTestTrigger,
   generateTestTextCode,
   getImageTestCategories,
-  getTestImageKeyCells,
-  getTestImageKeyColors,
   paintTestImage,
-  TEST_IMAGE_PALETTES,
   TEST_INPUT_KEY_PATTERN,
-  type TestImageKeyCell,
+  TEST_INPUT_PRESETS,
+  type TestInput,
+  testInputForSignal,
 } from "./contract/TestTriggers.js";

@@ -6,14 +6,15 @@ import {
   DEMO_TEST_INPUT_KEY,
   detectTestImage,
   detectTestText,
-  TEST_IMAGE_PALETTES,
+  getImageTestCategories,
+  testInputForSignal,
   testTextCode,
 } from "../src/testInputs";
 
 const OTHER_KEY = "0badc0de0badc0de0badc0de0badc0de";
 
 test("the committed test images authenticate demo mode and are ordinary images for any other", async () => {
-  for (const signal of Object.keys(TEST_IMAGE_PALETTES)) {
+  for (const signal of getImageTestCategories()) {
     const file = path.join(
       import.meta.dir,
       "../public/test-images",
@@ -21,7 +22,9 @@ test("the committed test images authenticate demo mode and are ordinary images f
     );
     const image = decodePng(readFileSync(file));
     if (!image) throw new Error(`${file} is not a PNG`);
-    expect(await detectTestImage(image, DEMO_TEST_INPUT_KEY)).toBe(signal);
+    expect(await detectTestImage(image, DEMO_TEST_INPUT_KEY)).toEqual(
+      testInputForSignal(signal, "image"),
+    );
     expect(await detectTestImage(image, OTHER_KEY)).toBeUndefined();
   }
 });

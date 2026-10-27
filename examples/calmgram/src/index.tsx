@@ -334,15 +334,12 @@ app.get("/test-inputs/:file", async (c) => {
   if (!key || !TEST_INPUT_KEY_PATTERN.test(key))
     return c.text("Test inputs are not configured for this project.", 503);
   const signal = image[0];
-  return c.body(
-    new Uint8Array(encodePng(512, 512, await paintTestImage(signal, key))).buffer,
-    200,
-    {
-      "Content-Type": "image/png",
-      "Cache-Control": "private, no-store",
-      "Content-Disposition": `inline; filename="${file}"`,
-    },
-  );
+  const pixels = await paintTestImage(signal, key);
+  return c.body(new Uint8Array(encodePng(pixels.width, pixels.height, pixels.rgba)).buffer, 200, {
+    "Content-Type": "image/png",
+    "Cache-Control": "private, no-store",
+    "Content-Disposition": `inline; filename="${file}"`,
+  });
 });
 
 app.get("/new", async (c) => {

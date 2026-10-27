@@ -250,7 +250,8 @@ class ContractTest < Minitest::Test
     when 'cdn-resource'
       client.cdn.get_asset_url(asset_identifier: 'asset-1', resource: name).end_with?("/asset-1/#{capability['value']}")
     when 'cdn-option'
-      client.cdn.get_asset_url(asset_identifier: 'asset-1', name.to_sym => { age_confirmed: true }).end_with?('?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D')
+      client.cdn.get_asset_url(asset_identifier: 'asset-1',
+                               name.to_sym => { age_confirmed: true }).end_with?('?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D')
     when 'mock-client' then constant(name).is_a?(Class)
     when 'mock-method' then CalmLens::MockServerClient.method_defined?(name)
     when 'mock-option' then mock_outcome(name) == 'blocked'

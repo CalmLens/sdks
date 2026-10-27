@@ -2086,9 +2086,16 @@ impl Backend {
         }) else {
             return not_available();
         };
-        let claims: Value = serde_json::from_str(q.get("viewerClaims").map(String::as_str).unwrap_or("{}")).unwrap_or(Value::Null);
+        let claims: Value =
+            serde_json::from_str(q.get("viewerClaims").map(String::as_str).unwrap_or("{}"))
+                .unwrap_or(Value::Null);
         if status == "age-restricted" && claims["ageConfirmed"] != true {
-            return custom("viewer/age-confirmation-required", 403, "Age confirmation required").response();
+            return custom(
+                "viewer/age-confirmation-required",
+                403,
+                "Age confirmation required",
+            )
+            .response();
         }
         let restricted = !public;
         if restricted && !can_download() {
@@ -2110,7 +2117,14 @@ impl Backend {
         };
         let mut response_headers = vec![
             ("content-type", stored.content_type.clone()),
-            ("cache-control", if claims.as_object().is_some_and(|c| !c.is_empty()) { "private, no-store".into() } else { format!("{access}, {lifetime}") }),
+            (
+                "cache-control",
+                if claims.as_object().is_some_and(|c| !c.is_empty()) {
+                    "private, no-store".into()
+                } else {
+                    format!("{access}, {lifetime}")
+                },
+            ),
             ("cache-tag", format!("asset-{id}")),
         ];
         if image {

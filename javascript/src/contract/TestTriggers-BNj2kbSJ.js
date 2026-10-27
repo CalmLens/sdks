@@ -1091,6 +1091,9 @@ const MODERATION_QUALIFIERS_BY_CATEGORY = MODERATION_QUALIFIERS.reduce((groups, 
 	(groups[MODERATION_QUALIFIER_INFO[qualifier].category] ??= []).push(qualifier);
 	return groups;
 }, {});
+function getModerationQualifierInfo(qualifier) {
+	return MODERATION_QUALIFIER_INFO[qualifier];
+}
 const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
 // packages/shared/src/PolicyRule.ts
 /**
@@ -1452,294 +1455,6 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	policy: CLASSIFICATION_REPORT_POLICY_SCHEMA.optional().describe("What the project's moderation policy made of this report when the asset was decided. Absent until then.")
 }).strict();
 // packages/shared/src/TestTriggers.ts
-const TEST_IMAGE_PALETTES = {
-	"harassment.insult": [
-		[
-			20,
-			100,
-			110,
-			255
-		],
-		[
-			30,
-			140,
-			150,
-			255
-		],
-		[
-			70,
-			180,
-			190,
-			255
-		],
-		[
-			140,
-			220,
-			230,
-			255
-		]
-	],
-	"sexual.adult": [
-		[
-			100,
-			30,
-			100,
-			255
-		],
-		[
-			140,
-			50,
-			140,
-			255
-		],
-		[
-			180,
-			90,
-			180,
-			255
-		],
-		[
-			220,
-			150,
-			220,
-			255
-		]
-	],
-	"hate.regional-symbol": [
-		[
-			60,
-			70,
-			100,
-			255
-		],
-		[
-			90,
-			110,
-			150,
-			255
-		],
-		[
-			130,
-			150,
-			190,
-			255
-		],
-		[
-			180,
-			200,
-			240,
-			255
-		]
-	],
-	"personal-information": [
-		[
-			8,
-			145,
-			178,
-			255
-		],
-		[
-			6,
-			182,
-			212,
-			255
-		],
-		[
-			14,
-			116,
-			144,
-			255
-		],
-		[
-			103,
-			232,
-			249,
-			255
-		]
-	],
-	profanity: [
-		[
-			194,
-			65,
-			12,
-			255
-		],
-		[
-			234,
-			88,
-			12,
-			255
-		],
-		[
-			249,
-			115,
-			22,
-			255
-		],
-		[
-			253,
-			186,
-			116,
-			255
-		]
-	],
-	sexual: [
-		[
-			255,
-			20,
-			147,
-			255
-		],
-		[
-			255,
-			105,
-			180,
-			255
-		],
-		[
-			199,
-			21,
-			133,
-			255
-		],
-		[
-			255,
-			69,
-			0,
-			255
-		]
-	],
-	violence: [
-		[
-			139,
-			0,
-			0,
-			255
-		],
-		[
-			220,
-			20,
-			60,
-			255
-		],
-		[
-			178,
-			34,
-			34,
-			255
-		],
-		[
-			255,
-			0,
-			0,
-			255
-		]
-	],
-	harassment: [
-		[
-			180,
-			83,
-			9,
-			255
-		],
-		[
-			217,
-			119,
-			6,
-			255
-		],
-		[
-			245,
-			158,
-			11,
-			255
-		],
-		[
-			251,
-			191,
-			36,
-			255
-		]
-	],
-	hate: [
-		[
-			30,
-			64,
-			175,
-			255
-		],
-		[
-			37,
-			99,
-			235,
-			255
-		],
-		[
-			59,
-			130,
-			246,
-			255
-		],
-		[
-			96,
-			165,
-			250,
-			255
-		]
-	],
-	"criminal-activity": [
-		[
-			6,
-			95,
-			70,
-			255
-		],
-		[
-			5,
-			150,
-			105,
-			255
-		],
-		[
-			16,
-			185,
-			129,
-			255
-		],
-		[
-			52,
-			211,
-			153,
-			255
-		]
-	],
-	"self-harm": [
-		[
-			75,
-			0,
-			130,
-			255
-		],
-		[
-			138,
-			43,
-			226,
-			255
-		],
-		[
-			72,
-			61,
-			139,
-			255
-		],
-		[
-			147,
-			112,
-			219,
-			255
-		]
-	]
-};
 /** A project's test input key: 32 hexadecimal characters only its members can see. */
 const TEST_INPUT_KEY_PATTERN = /^[a-f0-9]{32}$/;
 const TEXT_CODE_SIGNALS = [
@@ -1754,94 +1469,141 @@ const getTestInputTag = async (kind, signal, testInputKey) => {
 	if (!TEST_INPUT_KEY_PATTERN.test(testInputKey)) throw new TypeError("Invalid test input key");
 	return (await hmacSha256Hex(testInputKey, `calmlens-test:${kind}:${signal}`)).slice(0, 32);
 };
-/** A category-specific text code authenticated with the project's secret key. */
-const generateTestTextCode = async (category, testInputKey) => TEXT_CODE_SIGNALS.includes(category) ? `<!calmlens-test ${await getTestInputTag("text", category, testInputKey)} ${category}>` : "";
-const TEST_TRIGGER_PATTERN = /<!calmlens-test\s+([a-f0-9]{32})\s+(sexual|violence|self-harm|harassment|hate|criminal-activity|personal-information|profanity|sexual\.involving-minors|harassment\.insult|sexual\.adult|hate\.regional-symbol)\s*>/gi;
-/** Accept only category tags authenticated by this project's key. */
-const detectTestTrigger = async (text, testInputKey) => {
-	const signals = [];
-	if (!TEST_INPUT_KEY_PATTERN.test(testInputKey)) return {
-		isTestTrigger: false,
-		signals
-	};
-	for (const [, tag, signal] of text.matchAll(TEST_TRIGGER_PATTERN)) {
-		const testSignal = signal.toLowerCase();
-		if (timingSafeEqual(tag.toLowerCase(), await getTestInputTag("text", testSignal, testInputKey)) && !signals.includes(testSignal)) signals.push(testSignal);
+/** Category shortcuts are presets in the same instance-based format. */
+function testInputForSignal(signal, kind = "text") {
+	switch (signal) {
+		case "harassment.insult": return TEST_INPUT_PRESETS.limited;
+		case "sexual.adult": return kind === "image" ? TEST_INPUT_PRESETS.adultImage : TEST_INPUT_PRESETS.adultText;
+		case "hate.regional-symbol": return TEST_INPUT_PRESETS.germany;
+		case "sexual.involving-minors": return { instances: [{
+			category: "sexual",
+			qualifiers: ["sexual-minors"]
+		}] };
+		case "violence.graphic": return { instances: [{
+			category: "violence",
+			qualifiers: ["violence-graphic"]
+		}] };
+		default: return TEST_INPUT_SCHEMA.parse({ instances: [{
+			category: signal,
+			qualifiers: []
+		}] });
+	}
+}
+const getImageTestCategories = () => [...TEXT_CODE_SIGNALS];
+/** Each row is one qualifying instance. Unselected qualifiers are explicitly absent. */
+const TEST_INPUT_SCHEMA = zod.object({
+	unassessedCategories: zod.array(zod.enum(CLASSIFICATION_CATEGORIES)).max(CLASSIFICATION_CATEGORIES.length).optional(),
+	instances: zod.array(zod.object({
+		category: zod.enum(CLASSIFICATION_CATEGORIES),
+		score: zod.number().min(0).max(1).optional(),
+		qualifiers: zod.array(zod.enum(MODERATION_QUALIFIERS)).max(64)
+	}).strict().superRefine((instance, context) => {
+		if (new Set(instance.qualifiers).size !== instance.qualifiers.length || instance.qualifiers.some((q) => getModerationQualifierInfo(q).category !== instance.category || "fromInput" in getModerationQualifierInfo(q))) context.addIssue({
+			code: "custom",
+			message: "Choose unique content qualifiers from this category; input-type facts are automatic."
+		});
+	})).max(128)
+}).strict().superRefine((scenario, context) => {
+	const missing = scenario.unassessedCategories ?? [];
+	if (new Set(missing).size !== missing.length || scenario.instances.some((instance) => missing.includes(instance.category))) context.addIssue({
+		code: "custom",
+		message: "An unassessed category cannot also have assessed instances."
+	});
+});
+const TEST_INPUT_PRESETS = {
+	clean: { instances: [] },
+	limited: { instances: [{
+		category: "harassment",
+		qualifiers: ["harassment-abuse"]
+	}] },
+	adultImage: { instances: [{
+		category: "sexual",
+		qualifiers: ["sexual-pornographic-media"]
+	}] },
+	adultText: { instances: [{
+		category: "sexual",
+		qualifiers: ["sexual-explicit-language"]
+	}] },
+	germany: { instances: [{
+		category: "hate",
+		qualifiers: ["hate-symbol", "hate-nazi-symbols-public-display"]
+	}] },
+	mixed: { instances: [{
+		category: "harassment",
+		qualifiers: ["harassment-abuse", "harassment-documentary"]
+	}, {
+		category: "harassment",
+		qualifiers: ["harassment-threat"]
+	}] }
+};
+const pattern = /<!calmlens-test ([a-f0-9]{32}) ([A-Za-z0-9_-]+)>/g;
+const tag = async (payload, key) => (await hmacSha256Hex(key, `calmlens-test:v1:${payload}`)).slice(0, 32);
+async function generateTestTextCode(scenario, key) {
+	if (!/^[a-f0-9]{32}$/.test(key)) throw new TypeError("Invalid test input key");
+	const payload = btoa(JSON.stringify(TEST_INPUT_SCHEMA.parse(typeof scenario === "string" ? testInputForSignal(scenario) : scenario))).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+	if (payload.length > 8e3) throw new RangeError("Test scenario is too large");
+	return `<!calmlens-test ${await tag(payload, key)} ${payload}>`;
+}
+async function detectTestTrigger(text, key) {
+	if (!/^[a-f0-9]{32}$/.test(key)) return;
+	const matches = [...text.matchAll(pattern)];
+	if (matches.length !== 1) return;
+	const [, signature, payload] = matches[0];
+	if (payload.length > 8e3 || !timingSafeEqual(signature, await tag(payload, key))) return;
+	try {
+		const parsed = TEST_INPUT_SCHEMA.safeParse(JSON.parse(atob(payload.replaceAll("-", "+").replaceAll("_", "/"))));
+		return parsed.success ? parsed.data : void 0;
+	} catch {
+		return;
+	}
+}
+/** Lossless PNG grid: magic, length, then authenticated scenario bytes, one byte per 4px cell. */
+async function paintTestImage(scenario, key) {
+	const bytes = new TextEncoder().encode(await generateTestTextCode(typeof scenario === "string" ? testInputForSignal(scenario, "image") : scenario, key));
+	const data = new Uint8Array([
+		67,
+		76,
+		84,
+		83,
+		1,
+		bytes.length >> 8,
+		bytes.length & 255,
+		...bytes
+	]);
+	const cells = Math.ceil(Math.sqrt(data.length));
+	const width = cells * 4;
+	const height = width;
+	const rgba = new Uint8Array(width * height * 4);
+	for (let i = 0; i < width * height; i++) {
+		const value = data[(Math.floor(i / width / 4) * cells + Math.floor(i % width / 4)) % data.length];
+		rgba.set([
+			value,
+			255 - value,
+			123,
+			255
+		], i * 4);
 	}
 	return {
-		isTestTrigger: signals.length > 0,
-		signals
+		width,
+		height,
+		rgba
 	};
-};
-/** Sixty-four cells encode a 128-bit tag using the category's four colours. */
-const getTestImageKeyCells = (width, height) => {
-	return Array.from({ length: 64 }, (_, index) => {
-		const column = index % 8;
-		const row = Math.floor(index / 8);
-		const x = Math.floor(column * width / 8);
-		const y = Math.floor(row * height / 8);
-		return {
-			x,
-			y,
-			width: Math.floor((column + 1) * width / 8) - x,
-			height: Math.floor((row + 1) * height / 8) - y
-		};
-	});
-};
-const getTestImageKeyColors = async (signal, testInputKey) => {
-	const colors = TEST_IMAGE_PALETTES[signal];
-	if (!colors || !TEST_INPUT_KEY_PATTERN.test(testInputKey)) throw new Error("Invalid image test signal or key");
-	return [...await getTestInputTag("image", signal, testInputKey)].flatMap((character) => {
-		const value = Number.parseInt(character, 16);
-		return [colors[value >> 2], colors[value & 3]];
-	});
-};
-/**
-* Gets all test trigger categories that support images
-*/
-const getImageTestCategories = () => {
-	return Object.keys(TEST_IMAGE_PALETTES);
-};
-/** Paint a full-image 8×8 grid as RGBA pixels; callers choose their image encoder. */
-const paintTestImage = async (signal, testInputKey, width = 512, height = width) => {
-	if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 24 || height < 24) throw new RangeError("Test image dimensions must be integers of at least 24 pixels");
-	const colors = await getTestImageKeyColors(signal, testInputKey);
-	const rgba = new Uint8Array(width * height * 4);
-	getTestImageKeyCells(width, height).forEach((cell, index) => {
-		for (let y = cell.y; y < cell.y + cell.height; y++) for (let x = cell.x; x < cell.x + cell.width; x++) rgba.set(colors[index], (y * width + x) * 4);
-	});
-	return rgba;
-};
-/** Decode the public image tag, then authenticate it without comparing secret cells. */
-const detectTestImage = async (image, testInputKey) => {
-	const { width, height, rgba } = image;
-	if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 24 || height < 24 || rgba.length !== width * height * 4 || !TEST_INPUT_KEY_PATTERN.test(testInputKey)) return void 0;
-	const cells = getTestImageKeyCells(width, height);
-	for (const category of getImageTestCategories()) {
-		const symbols = [];
-		for (const cell of cells) {
-			const sample = [
-				0,
-				0,
-				0
-			];
-			let count = 0;
-			let opaque = true;
-			for (let y = cell.y + Math.ceil(cell.height / 4); y < cell.y + cell.height * 3 / 4; y++) for (let x = cell.x + Math.ceil(cell.width / 4); x < cell.x + cell.width * 3 / 4; x++) {
-				const offset = (y * width + x) * 4;
-				if (rgba[offset + 3] < 250) opaque = false;
-				for (let c = 0; c < 3; c++) sample[c] += rgba[offset + c];
-				count++;
-			}
-			if (!opaque || !count) break;
-			const distances = TEST_IMAGE_PALETTES[category].map((color) => sample.reduce((sum, value, c) => sum + (value / count - color[c]) ** 2, 0));
-			const nearest = distances.indexOf(Math.min(...distances));
-			if (distances[nearest] > 900) break;
-			symbols.push(nearest);
+}
+async function detectTestImage(image, key) {
+	if (!Number.isSafeInteger(image.width) || image.width < 4 || image.width % 4 !== 0 || image.height !== image.width || image.height > 512 || image.rgba.length !== image.width * image.height * 4) return;
+	const bytes = [];
+	for (let y = 0; y < image.height; y += 4) for (let x = 0; x < image.width; x += 4) {
+		const offset = (y * image.width + x) * 4;
+		const value = image.rgba[offset];
+		for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) {
+			const pos = ((y + dy) * image.width + x + dx) * 4;
+			if (image.rgba[pos] !== value || image.rgba[pos + 1] !== 255 - value || image.rgba[pos + 2] !== 123 || image.rgba[pos + 3] !== 255) return;
 		}
-		if (symbols.length !== 64) continue;
-		const tag = Array.from({ length: 32 }, (_, i) => (symbols[i * 2] << 2 | symbols[i * 2 + 1]).toString(16)).join("");
-		if (timingSafeEqual(tag, await getTestInputTag("image", category, testInputKey))) return category;
+		bytes.push(value);
 	}
-};
-export { updatedAtField as C, saneStringField as S, POLICY_ALLOWANCE_SCHEMA as _, generateTestTextCode as a, HASH_LIST_ACTION_SCHEMA as b, getTestImageKeyColors as c, CLASSIFICATION_CATEGORIES as d, CLASSIFICATION_REPORT_SCHEMA as f, FLAGGED_CONTENT_ACTION_SCHEMA as g, PROCESSING_FEATURES_SCHEMA as h, detectTestTrigger as i, getTestInputTag as l, MODERATION_POLICY_CATEGORY_SCHEMA as m, TEST_INPUT_KEY_PATTERN as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORIES as p, detectTestImage as r, getTestImageKeyCells as s, TEST_IMAGE_PALETTES as t, paintTestImage as u, POLICY_RESTRICTION_SCHEMA as v, docPropertyInfo as w, createdAtField as x, getModerationQualifiers as y };
+	if (bytes.slice(0, 5).join() !== "67,76,84,83,1") return;
+	const length = bytes[5] << 8 | bytes[6];
+	if (length > bytes.length - 7) return;
+	return detectTestTrigger(new TextDecoder().decode(new Uint8Array(bytes.slice(7, 7 + length))), key);
+}
+export { docPropertyInfo as C, updatedAtField as S, POLICY_RESTRICTION_SCHEMA as _, generateTestTextCode as a, createdAtField as b, paintTestImage as c, CLASSIFICATION_REPORT_SCHEMA as d, MODERATION_POLICY_CATEGORIES as f, POLICY_ALLOWANCE_SCHEMA as g, FLAGGED_CONTENT_ACTION_SCHEMA as h, detectTestTrigger as i, testInputForSignal as l, PROCESSING_FEATURES_SCHEMA as m, TEST_INPUT_PRESETS as n, getImageTestCategories as o, MODERATION_POLICY_CATEGORY_SCHEMA as p, detectTestImage as r, getTestInputTag as s, TEST_INPUT_KEY_PATTERN as t, CLASSIFICATION_CATEGORIES as u, getModerationQualifiers as v, saneStringField as x, HASH_LIST_ACTION_SCHEMA as y };

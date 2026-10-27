@@ -95,7 +95,9 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
     const assetId = demoAssetId();
     const bytes = new Uint8Array(await file.arrayBuffer());
     const image = decodePng(bytes);
-    const category = image ? await detectTestImage(image, DEMO_TEST_INPUT_KEY) : undefined;
+    const category = image
+      ? (await detectTestImage(image, DEMO_TEST_INPUT_KEY))?.instances[0]?.category
+      : undefined;
     await storeDemoImage(kv, assetId, bytes, {
       outcome: outcomeFor(assetId, externalId, category ? { category, score: 0.95 } : undefined),
       readyAt: Date.now() + IMAGE_DELAY_MS,

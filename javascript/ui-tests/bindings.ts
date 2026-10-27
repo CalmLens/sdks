@@ -99,6 +99,7 @@ const assign = (
   for (const [name, value] of Object.entries(props)) {
     if (value === undefined) continue;
     if (PROPERTIES.has(name)) (element as unknown as Record<string, unknown>)[name] = value;
+    else if (name === "viewerClaims") element.setAttribute("viewer-claims", JSON.stringify(value));
     else if (name === "autoUpload") element.toggleAttribute("no-auto-upload", value === false);
     else if (name in events) {
       element.addEventListener(events[name] as string, (event) =>

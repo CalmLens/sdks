@@ -33,7 +33,8 @@ class MockTest < Minitest::Test
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
     served = mock.cdn.serve(asset_identifier: asset['id'], lens: 'thumb', viewer_claims: { age_confirmed: true })
     request = mock.requests.last
-    assert_equal ["/assets/project-1/#{asset['id']}/rendered/@thumb", { 'viewerClaims' => '{"ageConfirmed":true}' }], [request.path, request.query]
+    assert_equal ["/assets/project-1/#{asset['id']}/rendered/@thumb", { 'viewerClaims' => '{"ageConfirmed":true}' }],
+                 [request.path, request.query]
     assert_equal 200, served.status
     error = assert_raises(CalmLens::InvalidArgumentError) { mock.cdn.get_asset_url(asset_identifier: asset['id'], viewer_claims: { age_confirmed: 'yes' }) }
     assert_equal 'sdk/invalid-argument', error.code

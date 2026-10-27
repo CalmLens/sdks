@@ -965,19 +965,18 @@ The optional `@calmlens/sdk/test-inputs` entry generates and recognises the same
 project-specific colour grids used by the CalmLens portal:
 
 ```ts
-import { paintTestImage, detectTestImage } from "@calmlens/sdk/test-inputs";
+import { paintTestImage, detectTestImage, generateTestTextCode, TEST_INPUT_PRESETS } from "@calmlens/sdk/test-inputs";
 
-const width = 512;
-const height = 512;
-const rgba = await paintTestImage("violence", projectTestInputKey, width, height);
-const signal = await detectTestImage({ width, height, rgba }, projectTestInputKey);
-// signal === "violence"
+const input = TEST_INPUT_PRESETS.mixed;
+const image = await paintTestImage(input, projectTestInputKey);
+const decoded = await detectTestImage(image, projectTestInputKey);
+const text = await generateTestTextCode(input, projectTestInputKey);
+// Encode image.rgba as a PNG using image.width and image.height.
 ```
 
 Encode the returned RGBA bytes with your image library to download a PNG. To
 recognise a downloaded image, decode it into RGBA first. These helpers have no
-DOM, image-codec, or Cloudflare dependencies. The grid tolerates resizing and
-lossy compression; cropping, rotation, and severe colour changes are unsupported.
+DOM, image-codec, or Cloudflare dependencies. Upload the PNG unchanged: resizing, cropping and lossy conversion invalidate its authenticated grid. Presets and custom instance definitions use the same format. Regenerate samples created with the older fixed-category format.
 The entry also exports `generateTestTextCode` and `detectTestTrigger` for text
 test inputs. Use your project's test input key; another project's key does not
 activate its test signals.

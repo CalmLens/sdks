@@ -63,13 +63,13 @@ for (const binding of BINDINGS) {
       mounted = binding.mountMedia({
         ...asset,
         status: "age-restricted",
-        ageConfirmed: true,
+        viewerClaims: { ageConfirmed: true },
         messages,
       });
 
       const image = await view().findByRole("img", { name: asset.alt });
       expect(image.getAttribute("src")).toBe(
-        `${CDN}/assets/${PROJECT_ID}/a1/rendered?ageConfirmed=true`,
+        `${CDN}/assets/${PROJECT_ID}/a1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D`,
       );
     });
 
@@ -80,48 +80,35 @@ for (const binding of BINDINGS) {
       expect(requested()).toEqual([]);
     });
 
-    it("automatically uses the regional notice for matching viewer delivery without requesting media", async () => {
+    it("uses the unavailable notice for matching regional findings without requesting media", async () => {
       mounted = binding.mountMedia({
         ...asset,
-        region: "DE",
-        ageConfirmed: true,
+        viewerClaims: { region: "DE", ageConfirmed: true },
         messages,
         asset: {
           id: "a1",
           projectId: PROJECT_ID,
-          delivery: {
-            viewerRegion: "DE",
-            jurisdiction: "EU",
-            action: "block",
-            ageCheckStandard: "any",
-            blocked: true,
-            reason: "regional-rule",
+          classification: {
+            moderation: {
+              status: "allowed",
+              policy: { decision: { regions: [{ region: "DE", action: "block" }] } },
+            },
           },
-          classification: { moderation: { status: "allowed" } },
         },
       });
-      const notice = await view().findByText(messages.regionalUnavailable);
-      expect(notice.textContent).toBe(messages.regionalUnavailable);
-      expect(view().queryByText(messages.unavailable)).toBeNull();
+      const notice = await view().findByText(messages.unavailable);
+      expect(notice.textContent).toBe(messages.unavailable);
       expect(requested()).toEqual([]);
     });
 
     it("keeps the ordinary notice for a base block even with stale regional attribution", async () => {
       mounted = binding.mountMedia({
         ...asset,
-        region: "DE",
+        viewerClaims: { region: "DE" },
         messages,
         asset: {
           id: "a1",
           projectId: PROJECT_ID,
-          delivery: {
-            viewerRegion: "DE",
-            jurisdiction: "DE",
-            action: "block",
-            ageCheckStandard: "any",
-            blocked: true,
-            reason: "regional-rule",
-          },
           classification: { moderation: { status: "blocked" } },
         },
       });
@@ -135,21 +122,18 @@ for (const binding of BINDINGS) {
     it("keeps the ordinary notice when content removal overrides regional attribution", async () => {
       mounted = binding.mountMedia({
         ...asset,
-        region: "DE",
+        viewerClaims: { region: "DE" },
         contentRemoved: true,
         messages,
         asset: {
           id: "a1",
           projectId: PROJECT_ID,
-          delivery: {
-            viewerRegion: "DE",
-            jurisdiction: "DE",
-            action: "block",
-            ageCheckStandard: "any",
-            blocked: true,
-            reason: "regional-rule",
+          classification: {
+            moderation: {
+              status: "allowed",
+              policy: { decision: { regions: [{ region: "DE", action: "block" }] } },
+            },
           },
-          classification: { moderation: { status: "allowed" } },
         },
       });
       expect((await view().findByText(messages.unavailable)).textContent).toBe(
@@ -207,14 +191,14 @@ for (const binding of BINDINGS) {
             image: { thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI", width: 800, height: 600 },
           },
         },
-        ageConfirmed: true,
+        viewerClaims: { ageConfirmed: true },
         alt: asset.alt,
         messages,
       });
       const image = await view().findByRole("img", { name: asset.alt });
 
       expect(image.getAttribute("src")).toBe(
-        `${CDN}/assets/${PROJECT_ID}/a1/rendered?ageConfirmed=true`,
+        `${CDN}/assets/${PROJECT_ID}/a1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D`,
       );
       if (binding.rendersHtmlImages) expect(image.getAttribute("width")).toBe("800");
       expect(decorative()).toHaveLength(1);
@@ -244,36 +228,26 @@ for (const binding of BINDINGS) {
   });
 }
 
-it("updates the web component notice when a regional block becomes a base block", async () => {
+it("updates the web component when an allowed asset becomes blocked", async () => {
   const element = document.createElement("calmlens-media") as CalmLensMediaElement;
   const apiAsset = {
     id: "a1",
     projectId: PROJECT_ID,
-    delivery: {
-      viewerRegion: "DE",
-      jurisdiction: "DE",
-      action: "block",
-      ageCheckStandard: "any" as const,
-      blocked: true,
-      reason: "regional-rule",
-    },
     classification: { moderation: { status: "allowed" as const } },
   };
   element.messages = messages;
-  element.setAttribute("region", "DE");
+  element.setAttribute("alt", asset.alt);
+  element.setAttribute("viewer-claims", JSON.stringify({ region: "DE" }));
   element.asset = apiAsset;
   const container = document.createElement("div");
   container.append(element);
   document.body.append(container);
   mounted = { container, unmount: () => container.remove() };
-  expect((await view().findByText(messages.regionalUnavailable)).textContent).toBe(
-    messages.regionalUnavailable,
-  );
+  expect((await view().findByRole("img")).getAttribute("src")).toContain("viewerClaims=");
   element.asset = {
     ...apiAsset,
     classification: { moderation: { ...apiAsset.classification.moderation, status: "blocked" } },
   };
   expect((await view().findByText(messages.unavailable)).textContent).toBe(messages.unavailable);
   expect(view().queryByText(messages.regionalUnavailable)).toBeNull();
-  expect(requested()).toEqual([]);
 });

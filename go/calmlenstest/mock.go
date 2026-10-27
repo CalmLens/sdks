@@ -2018,9 +2018,11 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	// Then access: a private asset, or a public age-restricted one requested without the
 	// ageConfirmed=true opt-in, needs the download permission for its folder.
 	claims := map[string]any{}
- _ = json.Unmarshal([]byte(req.URL.Query().Get("viewerClaims")), &claims)
- if moderation == calmlens.ModerationStatusAgeRestricted && claims["ageConfirmed"] != true { return errorBody(403, "viewer/age-confirmation-required", "Age confirmation required") }
- restricted := asset["visibility"] != calmlens.VisibilityPublic
+	_ = json.Unmarshal([]byte(req.URL.Query().Get("viewerClaims")), &claims)
+	if moderation == calmlens.ModerationStatusAgeRestricted && claims["ageConfirmed"] != true {
+		return errorBody(403, "viewer/age-confirmation-required", "Age confirmation required")
+	}
+	restricted := asset["visibility"] != calmlens.VisibilityPublic
 	if restricted && !canDownload() {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission", "This API key needs assets:download permission for this asset's folder.")
 	}
@@ -2037,7 +2039,10 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 		header.Set("Expires", time.UnixMilli(m.options.Now()).Add(imageCacheLifetime*time.Second).UTC().Format(http.TimeFormat))
 	}
 	header.Set("Cache-Control", access+", "+lifetime)
- if len(claims) > 0 { header.Set("Cache-Control", "private, no-store"); header.Del("Expires") }
+	if len(claims) > 0 {
+		header.Set("Cache-Control", "private, no-store")
+		header.Del("Expires")
+	}
 	header.Set("Cache-Tag", tag)
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Content-Security-Policy", cdnProtectionPolicy)

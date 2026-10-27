@@ -111,9 +111,9 @@ const (
 
 // Asset is a moderated asset. Optional fields are nil when absent.
 type Asset struct {
-	ID        string            `json:"id"`
-	ProjectID string            `json:"projectId"`
-	Name      string            `json:"name"`
+	ID        string `json:"id"`
+	ProjectID string `json:"projectId"`
+	Name      string `json:"name"`
 	// Type is one of the AssetType constants.
 	Type     string  `json:"type"`
 	UserID   *string `json:"userId"`
@@ -714,7 +714,7 @@ type AssetPage struct {
 
 // AssetIDOptions identifies an asset.
 type AssetIDOptions struct {
-	AssetID      string
+	AssetID string
 }
 
 // ExplainAssetOptions selects the asset AssetsService.Explain explains. Rerun moderates it again
@@ -878,7 +878,7 @@ const (
 // "format=png,width=1024") or TransformSteps (structured steps, serialized
 // to the same selector). Supply only one transform representation.
 type SignedURLOptions struct {
-	ViewerClaims *ViewerClaims `json:"viewerClaims,omitempty"`
+	ViewerClaims     *ViewerClaims   `json:"viewerClaims,omitempty"`
 	AssetID          string          `json:"-"`
 	Resource         string          `json:"resource,omitempty"`
 	Lens             string          `json:"lens,omitempty"`
@@ -1285,6 +1285,6 @@ type FolderPage struct {
 
 // ViewerClaims are optional customer assertions. Age confirmation defaults to false.
 type ViewerClaims struct {
- Region string `json:"region,omitempty"`
- AgeConfirmed *bool `json:"ageConfirmed,omitempty"`
+	Region       string `json:"region,omitempty"`
+	AgeConfirmed *bool  `json:"ageConfirmed,omitempty"`
 }

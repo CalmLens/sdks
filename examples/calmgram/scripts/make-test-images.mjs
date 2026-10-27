@@ -6,7 +6,7 @@
 //   bun run test-images                                  # demo mode's key
 //   CALMLENS_TEST_INPUT_KEY=<key> bun run test-images    # your project's key
 //
-// Each image is a full 8×8 grid of category colours encoding an authenticated tag.
+// Each image carries the authenticated test input in a compact square grid.
 // Images carrying another key are moderated normally. Committed images use demo mode's key.
 
 import fs from "node:fs";
@@ -15,7 +15,7 @@ import { encodePng } from "../src/png.ts";
 import {
   DEMO_TEST_INPUT_KEY,
   paintTestImage,
-  TEST_IMAGE_PALETTES,
+  getImageTestCategories,
   TEST_INPUT_KEY_PATTERN,
   TEST_TEXT_CATEGORIES,
   testTextCode,
@@ -29,12 +29,12 @@ if (!TEST_INPUT_KEY_PATTERN.test(testInputKey)) {
   process.exit(1);
 }
 
-const size = 512;
 const outDir = path.join(process.cwd(), "public", "test-images");
 fs.mkdirSync(outDir, { recursive: true });
-for (const signal of Object.keys(TEST_IMAGE_PALETTES)) {
+for (const signal of getImageTestCategories()) {
   const file = path.join(outDir, `calmlens-test-${signal.replace(".", "-")}.png`);
-  fs.writeFileSync(file, encodePng(size, size, await paintTestImage(signal, testInputKey, size)));
+  const { width, height, rgba } = await paintTestImage(signal, testInputKey);
+  fs.writeFileSync(file, encodePng(width, height, rgba));
   process.stdout.write(`wrote ${path.relative(process.cwd(), file)}\n`);
 }
 

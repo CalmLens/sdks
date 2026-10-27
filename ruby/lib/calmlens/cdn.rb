@@ -63,9 +63,7 @@ module CalmLens
 
       transformed = !api['lens'].nil? || !api['transform'].nil?
       raise Internal.invalid('Lenses and transforms apply only to the rendered resource') if resource == 'original' && transformed
-      if resource == 'placeholder' && (transformed)
-        raise Internal.invalid('A placeholder takes no lens, transform or ageConfirmed')
-      end
+      raise Internal.invalid('A placeholder takes no lens, transform or ageConfirmed') if resource == 'placeholder' && transformed
 
       url = "#{@session.cdn_base_url}/assets/#{Internal.segment(@session.project_id)}/" \
             "#{Internal.segment(api['assetIdentifier'])}/#{resource}"
@@ -74,9 +72,10 @@ module CalmLens
       url += "/#{Transforms.path(transform)}" unless transform.nil? || transform == ''
 
       claims = api['viewerClaims']
-      if claims && (!claims.is_a?(Hash) || (claims.key?('ageConfirmed') && ![true, false].include?(claims['ageConfirmed'])))
+      if !claims.nil? && (!claims.is_a?(Hash) || (claims.key?('ageConfirmed') && ![true, false].include?(claims['ageConfirmed'])))
         raise Internal.invalid('Invalid viewerClaims')
       end
+
       query = []
       query << "viewerClaims=#{URI.encode_www_form_component(JSON.generate(api['viewerClaims']))}" if api['viewerClaims']
       query.empty? ? url : "#{url}?#{query.join('&')}"

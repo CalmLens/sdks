@@ -83,12 +83,13 @@ function thumbHashToApproximateAspectRatio(hash) {
 * A. This is optimized for speed and simplicity and does not optimize for size
 * at all. This doesn't do any compression (all values are stored uncompressed).
 *
-* @param w The width of the input image. Must be ≤100px.
-* @param h The height of the input image. Must be ≤100px.
+* @param w The width of the input image. Must be between 1 and 16383px.
+* @param h The height of the input image. Must be between 1 and 65535px.
 * @param rgba The pixels in the input image, row-by-row. Must have w*h*4 elements.
 * @returns The bytes of a PNG for the input image.
 */
 function rgbaToPng(w, h, rgba) {
+	if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || w > 16383 || h < 1 || h > 65535 || rgba.length !== w * h * 4) throw new RangeError("Invalid PNG dimensions or pixels");
 	const row = w * 4 + 1;
 	const idat = 6 + h * (5 + row);
 	const bytes = [
