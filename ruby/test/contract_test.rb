@@ -164,6 +164,8 @@ class ContractTest < Minitest::Test
     expect.fetch('result', {}).each do |path, raw|
       if raw.is_a?(Hash) && raw.key?('$contains')
         assert_includes at(result, path), resolve(raw['$contains'], saved), "#{label}: #{path}"
+      elsif raw.is_a?(Hash) && raw.key?('$id')
+        assert_match(/\A#{raw['$id']}_[0-9A-Za-z]{20}\z/, at(result, path), "#{label}: #{path}")
       else
         wanted = resolve(raw, saved)
         wanted.nil? ? assert_nil(at(result, path), "#{label}: #{path}") : assert_equal(wanted, at(result, path), "#{label}: #{path}")

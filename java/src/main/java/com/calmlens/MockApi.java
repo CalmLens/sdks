@@ -105,7 +105,27 @@ final class MockApi {
 
   long now() { return options.now.getAsLong(); }
 
-  String createId() { return options.createId.get(); }
+  String createId(String prefix) { return options.createId.apply(prefix); }
+
+  private static final String BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+  /** A new ID like the API's: {@code prefix}, {@code _} and 20 random base62 characters. */
+  static String newId(String prefix) {
+    StringBuilder id = new StringBuilder(prefix).append('_');
+    byte[] bytes = new byte[40];
+    while (id.length() < prefix.length() + 21) {
+      RANDOM.nextBytes(bytes);
+      for (byte value : bytes) {
+        int unsigned = value & 0xff;
+        // Bytes 248-255 are redrawn, so every character is equally likely.
+        if (unsigned >= 248) continue;
+        id.append(BASE62.charAt(unsigned % 62));
+        if (id.length() == prefix.length() + 21) break;
+      }
+    }
+    return id.toString();
+  }
 
   // ------------------------------------------------------------------ Transport
 
@@ -438,7 +458,7 @@ final class MockApi {
 
     // Fields the API returns as null when they are not set.
     JsonObject asset = new JsonObject();
-    String id = createId();
+    String id = createId("asset");
     asset.addProperty("id", id);
     asset.addProperty("projectId", projectId);
     asset.add("userId", JsonNull.INSTANCE);
@@ -635,7 +655,7 @@ final class MockApi {
   JsonObject recordEvent(String type, String severity, JsonObject asset, List<Models.EventFact> facts) {
     long now = now();
     JsonObject event = new JsonObject();
-    event.addProperty("id", createId());
+    event.addProperty("id", createId("evt"));
     event.addProperty("projectId", projectId);
     event.add("userId", JsonNull.INSTANCE);
     event.addProperty("type", type);
@@ -653,9 +673,8 @@ final class MockApi {
     return event;
   }
 
-  /** The UUID form the API's schema accepts (zod's {@code uuid()}). */
-  private static final java.util.regex.Pattern UUID_PATTERN = java.util.regex.Pattern.compile(
-      "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$");
+  /** An asset ID as the API's schema accepts it: {@code asset_} and 20 base62 characters. */
+  private static final java.util.regex.Pattern ASSET_ID_PATTERN = java.util.regex.Pattern.compile("^asset_[0-9A-Za-z]{20}$");
 
   /**
    * POST /projects/:id/assets/batch: validated like the API's schema, then every asset must exist
@@ -672,7 +691,7 @@ final class MockApi {
     for (int index = 0; index < ids.size(); index++) {
       JsonElement id = ids.get(index);
       if (!id.isJsonPrimitive() || !id.getAsJsonPrimitive().isString()) throw Failure.validation("validation/invalid-type", "assetIds." + index);
-      if (!UUID_PATTERN.matcher(id.getAsString()).matches()) throw Failure.validation("validation/invalid-format", "assetIds." + index);
+      if (!ASSET_ID_PATTERN.matcher(id.getAsString()).matches()) throw Failure.validation("validation/invalid-format", "assetIds." + index);
       unique.add(id.getAsString());
     }
     String operation = str(body, "operation");
@@ -1121,7 +1140,7 @@ final class MockApi {
     if (parentId != null) folder(parentId);
     unique(name, parentId, null);
     JsonObject folder = new JsonObject();
-    folder.addProperty("id", createId());
+    folder.addProperty("id", createId("fldr"));
     folder.addProperty("projectId", projectId);
     folder.add("parentId", nullable(parentId));
     folder.addProperty("name", name);
@@ -1187,7 +1206,7 @@ final class MockApi {
     if (name == null || name.isBlank() || action == null)
       throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "A hash list needs a name and an action of flag or block");
     JsonObject list = new JsonObject();
-    list.addProperty("id", createId());
+    list.addProperty("id", createId("hl"));
     list.addProperty("projectId", projectId);
     list.addProperty("name", name.trim());
     list.add("description", nullable(str(body, "description")));
@@ -1265,7 +1284,7 @@ final class MockApi {
         for (JsonObject existing : storage.hashListEntries.values())
           if (id.equals(str(existing, "hashListId")) && hash.equals(str(existing, "hash"))) return existing;
         JsonObject entry = new JsonObject();
-        entry.addProperty("id", createId());
+        entry.addProperty("id", createId("hle"));
         entry.addProperty("projectId", projectId);
         entry.addProperty("hashListId", id);
         entry.addProperty("hash", hash);
@@ -1311,7 +1330,7 @@ final class MockApi {
       JsonObject existing = lenses.get(identifier);
       if (existing == null) {
         JsonObject lens = new JsonObject();
-        lens.addProperty("id", createId());
+        lens.addProperty("id", createId("lens"));
         lens.addProperty("projectId", projectId);
         lens.add("userId", JsonNull.INSTANCE);
         definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));

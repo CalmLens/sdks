@@ -283,6 +283,9 @@ placeholders. Unset asset fields are `null`, as in the API. Like the API, deleti
 removing its content and retrying it add `asset.deleted`, `asset.content-removed` and
 `asset.retried` events; processing adds none. Arrange or inspect state through the public
 `assets`, `content`, `folders`, `hashLists`, `hashListEntries`, `events` and `lenses` arrays.
+New objects get IDs like the API's: their prefix, `_` and 20 random base62 characters, such as
+`asset_5Gm2Rk8XqT3wLp9VbN4c`. For predictable IDs, pass `createId`, a callable that receives the
+prefix (`asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`) and returns the ID.
 
 ```php
 $mock = new CalmLens\Testing\MockServerClient(queuedOutcome: 'age-restricted');

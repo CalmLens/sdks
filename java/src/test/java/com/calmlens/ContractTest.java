@@ -630,6 +630,10 @@ class ContractTest {
           boolean found = false;
           for (JsonElement item : actual.getAsJsonArray()) found |= normalize(item).equals(member);
           assertTrue(found, label + ": " + entry.getKey() + " " + actual + " lacks " + member);
+        } else if (raw.isJsonObject() && raw.getAsJsonObject().has("$id")) {
+          String prefix = raw.getAsJsonObject().get("$id").getAsString();
+          assertTrue(actual != null && actual.isJsonPrimitive() && actual.getAsString().matches(prefix + "_[0-9A-Za-z]{20}"),
+              label + ": " + entry.getKey() + " " + actual + " is not a " + prefix + "_ ID");
         } else {
           assertEquals(normalize(resolve(raw, saved)), normalize(actual), label + ": " + entry.getKey());
         }

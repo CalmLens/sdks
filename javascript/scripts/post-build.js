@@ -136,14 +136,14 @@ function runMockClientSanityCheck(targetDir) {
     createMockApiKey,
   } = require(testingEntry);
 
-  const projectId = "123e4567-e89b-12d3-a456-426614174000";
+  const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
   const client = new MockCalmLensServerClient({
     apiKey: createMockApiKey([
       { actions: ["assets:download"], folderId: null, includeSubfolders: true },
     ]),
     projectId,
     mockOptions: {
-      createId: () => "987fcdeb-51a2-43d7-b890-123456789abc",
+      createId: (prefix) => `${prefix}_987fcdeb51a243d7b890`,
       now: () => 1700000000000,
       databaseStorage: new InMemoryMockDatabaseStorage(),
       imageStorage: new InMemoryMockImageStorage(),
@@ -162,7 +162,7 @@ function runMockClientSanityCheck(targetDir) {
       },
     })
     .then(async (asset) => {
-      if (asset.id !== "987fcdeb-51a2-43d7-b890-123456789abc") {
+      if (asset.id !== "asset_987fcdeb51a243d7b890") {
         throw new Error("Mock asset ID sanity check failed");
       }
       const retrieved = await client.assets.retrieve({ assetId: asset.id });

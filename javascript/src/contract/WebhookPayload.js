@@ -1,8 +1,9 @@
-import { C as saneStringField, D as backfill, E as docPropertyInfo, O as metaStore, S as primaryUuidField, T as uuidField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as updatedAtField, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-C84ijcNa.js";
+import { a as primaryIdField, l as metaStore, n as idField, o as backfill, t as EXAMPLE_IDS } from "./Ids-aHyP9ZcF.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-I9R-uNBH.js";
+import { C as updatedAtField, S as saneStringField, _ as POLICY_ALLOWANCE_SCHEMA, b as HASH_LIST_ACTION_SCHEMA, f as CLASSIFICATION_REPORT_SCHEMA, g as FLAGGED_CONTENT_ACTION_SCHEMA, h as PROCESSING_FEATURES_SCHEMA, m as MODERATION_POLICY_CATEGORY_SCHEMA, n as TEST_INPUT_KEY_PATTERN, p as MODERATION_POLICY_CATEGORIES, v as POLICY_RESTRICTION_SCHEMA, w as docPropertyInfo, x as createdAtField, y as getModerationQualifiers } from "./TestTriggers-DdX90sXv.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Ba-H8vMt.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
 /**
@@ -55,9 +56,9 @@ const HUMAN_REVIEW_SETTINGS_SCHEMA = zod.object({
 const HUMAN_REVIEW_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
 const HUMAN_REVIEW_STATUS_SCHEMA = zod.enum(["pending", "completed"]);
 zod.object({
-	id: primaryUuidField(),
-	projectId: uuidField(),
-	assetId: uuidField(),
+	id: primaryIdField("rev"),
+	projectId: idField("proj"),
+	assetId: idField("asset"),
 	automatedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA,
 	status: HUMAN_REVIEW_STATUS_SCHEMA,
 	decision: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
@@ -237,16 +238,15 @@ const PROJECT_SETTINGS_SCHEMA = zod.object({
 	humanReview: HUMAN_REVIEW_SETTINGS_SCHEMA.optional()
 }).strict();
 zod.object({
-	projectId: primaryUuidField(),
+	projectId: primaryIdField("proj"),
 	assetStorageSizeInGigaBytes: zod.number().nonnegative().default(0),
 	assetsUpdatedAt: zod.number().int().nullish(),
 	updatedAt: updatedAtField()
 });
 zod.object({
-	id: primaryUuidField(),
-	humanReadableId: saneStringField(),
+	id: primaryIdField("proj"),
 	/** The organisation that owns the project and is billed for its usage. */
-	orgId: zod.string().uuid(),
+	orgId: idField("org"),
 	createdAt: createdAtField(),
 	updatedAt: updatedAtField(),
 	name: saneStringField(),
@@ -273,7 +273,7 @@ const ASSET_CLASSIFICATION_STATUS_SCHEMA = zod.enum([
 */
 const ASSET_MODERATION_STATUS_SCHEMA = zod.enum(["pending", ...ASSET_MODERATION_DECISION_SCHEMA.options]);
 const ASSET_REVIEW_SCHEMA = zod.object({
-	id: zod.string().uuid(),
+	id: idField("rev"),
 	decision: ASSET_MODERATION_DECISION_SCHEMA,
 	note: zod.string().nullable(),
 	reviewerUserId: zod.string().nullable(),
@@ -387,13 +387,13 @@ const EXTERNAL_URL_SCHEMA = zod.string().url().refine((url) => /^https?:\/\//i.t
 * The API returns the nested `Asset` built from it by `toPublicAsset`.
 */
 const STORED_ASSET_SCHEMA = zod.object({
-	id: primaryUuidField().describe("Unique asset ID"),
-	projectId: uuidField().describe("ID of the project that owns the asset"),
+	id: primaryIdField("asset").describe("Unique asset ID"),
+	projectId: idField("proj").describe("ID of the project that owns the asset"),
 	sizeInBytes: zod.number().int().nullish().describe("Size of the uploaded content in bytes"),
-	userId: saneStringField().nullish().describe("ID of the user whose account created the asset"),
-	parentId: uuidField().nullish().describe("ID of the parent asset for child assets CalmLens extracts during processing, such as images in a document. `null` for uploaded assets."),
-	folderId: uuidField().nullish().meta(metaStore([docPropertyInfo({ description: "Folder containing the asset" })])),
-	uploadPresetId: uuidField().nullish().describe("ID of the upload preset the asset was uploaded through, if any"),
+	userId: idField("user").nullish().describe("ID of the user whose account created the asset"),
+	parentId: idField("asset").nullish().describe("ID of the parent asset for child assets CalmLens extracts during processing, such as images in a document. `null` for uploaded assets."),
+	folderId: idField("fldr").nullish().meta(metaStore([docPropertyInfo({ description: "Folder containing the asset" })])),
+	uploadPresetId: idField("preset").nullish().describe("ID of the upload preset the asset was uploaded through, if any"),
 	createdAt: createdAtField().describe("When the asset was created, in milliseconds since the Unix epoch"),
 	updatedAt: updatedAtField().describe("When the asset was last updated, in milliseconds since the Unix epoch"),
 	checksums: CHECKSUMS_SCHEMA.nullish().describe("Digests of the uploaded content"),
@@ -441,7 +441,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	contentRemovalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullish(),
 	contentUpdatedAt: zod.number().nullish(),
 	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullish(),
-	copyrightHolds: zod.array(zod.string().uuid()).nullish(),
+	copyrightHolds: zod.array(idField("tkt")).nullish(),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullish().meta(metaStore([docPropertyInfo({ description: "Extracted text stored inline for small content or in R2 for larger content" })])),
 	processingOptions: PROCESSING_OPTIONS_SCHEMA.describe("Processing options supplied when the asset was uploaded"),
 	freeUpload: zod.boolean().nullish().describe("Uploaded with the organisation's free uploads, before billing was set up; its text is moderated only up to the free upload limit while billing is still not set up"),
@@ -534,8 +534,8 @@ STORED_ASSET_SCHEMA.pick({
 	description: "An asset in the system",
 	namedType: "Asset",
 	example: {
-		id: "123e4567-e89b-42d3-a456-426614174000",
-		projectId: "b35456f3-79d8-4893-b316-b0d7ae668004",
+		id: EXAMPLE_IDS.asset,
+		projectId: EXAMPLE_IDS.proj,
 		name: "product-photo.jpg",
 		type: "image",
 		createdAt: 17672256e5,
@@ -577,24 +577,24 @@ const CHILD_PROCESSING_SCHEMA = zod.enum(["extracting", "ready"]);
 /** A reviewer's decision on a composite asset, which its children's statuses don't override. */
 const MANUAL_DECISION_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
 zod.object({
-	assetId: zod.string().uuid(),
-	projectId: zod.string().uuid(),
+	assetId: idField("asset"),
+	projectId: idField("proj"),
 	childProcessing: CHILD_PROCESSING_SCHEMA.nullish(),
 	manualDecision: MANUAL_DECISION_SCHEMA.nullish()
 });
 // packages/shared/src/ProjectAccess.ts
 const PROJECT_MEMBER_ROLE_SCHEMA = zod.enum([...ACCESS_ROLE_SCHEMA.options, "reviewer"]);
 zod.object({
-	id: primaryUuidField(),
-	projectId: zod.string().uuid(),
-	userId: zod.string(),
+	id: primaryIdField("mem"),
+	projectId: idField("proj"),
+	userId: idField("user"),
 	role: PROJECT_MEMBER_ROLE_SCHEMA,
 	grants: GRANTS_SCHEMA.default([]),
 	createdAt: zod.number()
 });
 zod.object({
-	id: primaryUuidField(),
-	projectId: zod.string().uuid(),
+	id: primaryIdField("inv"),
+	projectId: idField("proj"),
 	email: zod.string().email(),
 	role: PROJECT_MEMBER_ROLE_SCHEMA,
 	grants: GRANTS_SCHEMA.default([]),
@@ -833,7 +833,7 @@ const USAGE_LIMIT_REACHED = defineEventType({
 			description: "Number of free uploads used.",
 			display: "number"
 		}),
-		organisationId: field(zod.string(), {
+		organisationId: field(idField("org"), {
 			label: "Organisation ID",
 			description: "ID of the organisation whose allowance was used.",
 			display: "code",
@@ -844,7 +844,7 @@ const USAGE_LIMIT_REACHED = defineEventType({
 	example: {
 		limit: 100,
 		used: 100,
-		organisationId: "8f0c3a4e-2b1d-4c5e-9f6a-7b8c9d0e1f2a"
+		organisationId: EXAMPLE_IDS.org
 	}
 });
 const PROJECT_MEMBER_JOINED = defineEventType({
@@ -856,7 +856,7 @@ const PROJECT_MEMBER_JOINED = defineEventType({
 	notify: true,
 	permission: "members:read",
 	fields: {
-		memberUserId: field(zod.string(), {
+		memberUserId: field(idField("user"), {
 			label: "Member ID",
 			description: "User ID of the new member.",
 			display: "code",
@@ -882,10 +882,10 @@ const PROJECT_MEMBER_JOINED = defineEventType({
 		})
 	},
 	example: {
-		memberUserId: "user-456",
+		memberUserId: "user_7Tq2Wm9Lk4Xr8Vb3Np6C",
 		memberName: "alex@example.com",
 		role: "editor",
-		invitedByUserId: "user-123"
+		invitedByUserId: EXAMPLE_IDS.user
 	}
 });
 const CONNECTOR_FAILING = defineEventType({
@@ -897,7 +897,7 @@ const CONNECTOR_FAILING = defineEventType({
 	notify: true,
 	permission: "connectors:read",
 	fields: {
-		connectorId: field(zod.string(), {
+		connectorId: field(idField("conn"), {
 			label: "Connector ID",
 			description: "ID of the failing connector.",
 			display: "code",
@@ -926,7 +926,7 @@ const CONNECTOR_FAILING = defineEventType({
 		})
 	},
 	example: {
-		connectorId: "connector-123",
+		connectorId: EXAMPLE_IDS.conn,
 		connectorName: "Moderation alerts",
 		connectorType: "webhook",
 		consecutiveFailures: 10,
@@ -1039,7 +1039,7 @@ const ASSET_HASH_MATCHED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
-		hashListId: field(zod.string(), {
+		hashListId: field(idField("hl"), {
 			label: "Hash list ID",
 			description: "ID of the hash list with the closest match.",
 			display: "code",
@@ -1068,7 +1068,7 @@ const ASSET_HASH_MATCHED = defineEventType({
 	example: {
 		assetName: "beach.jpg",
 		assetType: "image",
-		hashListId: "hash-list-123",
+		hashListId: EXAMPLE_IDS.hl,
 		hashListName: "Banned images",
 		distance: 4,
 		matchAction: "block"
@@ -1113,7 +1113,7 @@ const UPLOAD_PRESET_DAILY_LIMIT_REACHED = defineEventType({
 	notify: false,
 	permission: "upload-presets:read",
 	fields: {
-		presetId: field(zod.string(), {
+		presetId: field(idField("preset"), {
 			label: "Preset ID",
 			description: "ID of the upload preset.",
 			display: "code",
@@ -1131,7 +1131,7 @@ const UPLOAD_PRESET_DAILY_LIMIT_REACHED = defineEventType({
 		})
 	},
 	example: {
-		presetId: "preset-123",
+		presetId: EXAMPLE_IDS.preset,
 		presetName: "Profile photos",
 		dailyLimit: 500
 	}
@@ -1161,11 +1161,11 @@ const PROJECT_MEMBER_REMOVED = defineEventType({
 		removedByUserId: actorUserIdField("Removed by ID", "User ID of the person who removed the member.")
 	},
 	example: {
-		memberUserId: "user-456",
+		memberUserId: "user_7Tq2Wm9Lk4Xr8Vb3Np6C",
 		memberName: "alex@example.com",
 		role: "editor",
 		left: false,
-		removedByUserId: "user-123"
+		removedByUserId: EXAMPLE_IDS.user
 	}
 });
 const PROJECT_MEMBER_ROLE_CHANGED = defineEventType({
@@ -1194,11 +1194,11 @@ const PROJECT_MEMBER_ROLE_CHANGED = defineEventType({
 		changedByUserId: actorUserIdField("Changed by ID", "User ID of the person who changed the access.")
 	},
 	example: {
-		memberUserId: "user-456",
+		memberUserId: "user_7Tq2Wm9Lk4Xr8Vb3Np6C",
 		memberName: "alex@example.com",
 		previousRole: "viewer",
 		role: "editor",
-		changedByUserId: "user-123"
+		changedByUserId: EXAMPLE_IDS.user
 	}
 });
 const PROJECT_INVITATION_SENT = defineEventType({
@@ -1227,7 +1227,7 @@ const PROJECT_INVITATION_SENT = defineEventType({
 	example: {
 		inviteeEmail: "alex@example.com",
 		role: "editor",
-		invitedByUserId: "user-123"
+		invitedByUserId: EXAMPLE_IDS.user
 	}
 });
 const API_KEY_CREATED = defineEventType({
@@ -1239,7 +1239,7 @@ const API_KEY_CREATED = defineEventType({
 	notify: false,
 	permission: "api-keys:read",
 	fields: {
-		keyId: field(zod.string(), {
+		keyId: field(idField("key"), {
 			label: "Key ID",
 			description: "ID of the API key.",
 			display: "code",
@@ -1265,10 +1265,10 @@ const API_KEY_CREATED = defineEventType({
 		})
 	},
 	example: {
-		keyId: "key-123",
+		keyId: EXAMPLE_IDS.key,
 		keyName: "Production server",
 		role: "editor",
-		createdByUserId: "user-123",
+		createdByUserId: EXAMPLE_IDS.user,
 		createdByName: "alex@example.com"
 	}
 });
@@ -1281,7 +1281,7 @@ const API_KEY_REVOKED = defineEventType({
 	notify: false,
 	permission: "api-keys:read",
 	fields: {
-		keyId: field(zod.string(), {
+		keyId: field(idField("key"), {
 			label: "Key ID",
 			description: "ID of the API key.",
 			display: "code",
@@ -1306,15 +1306,15 @@ const API_KEY_REVOKED = defineEventType({
 		})
 	},
 	example: {
-		keyId: "key-123",
+		keyId: EXAMPLE_IDS.key,
 		keyName: "Production server",
 		action: "revoked",
-		revokedByUserId: "user-123",
+		revokedByUserId: EXAMPLE_IDS.user,
 		revokedByName: "alex@example.com"
 	}
 });
 const appealFields = {
-	appealId: field(zod.string().uuid(), {
+	appealId: field(idField("apl"), {
 		label: "Appeal",
 		description: "The appeal identifier.",
 		display: "code"
@@ -1370,7 +1370,7 @@ const EVENT_TYPE_INFO = {
 		permission: "project:manage",
 		fields: appealFields,
 		example: {
-			appealId: "00000000-0000-4000-8000-000000000001",
+			appealId: EXAMPLE_IDS.apl,
 			subjectType: "post",
 			subjectId: "post-1"
 		}
@@ -1402,7 +1402,7 @@ const EVENT_TYPE_INFO = {
 			})
 		},
 		example: {
-			appealId: "00000000-0000-4000-8000-000000000001",
+			appealId: EXAMPLE_IDS.apl,
 			subjectType: "post",
 			subjectId: "post-1",
 			decision: "overturned",
@@ -1450,14 +1450,14 @@ const EVENT_ASSET_SCHEMA = zod.object({
 	content: zod.object({ status: ASSET_CONTENT_STATUS_SCHEMA }).describe("Whether CalmLens held the asset's content when the event was created")
 });
 const EVENT_FIELDS = {
-	id: primaryUuidField().describe("Unique event ID"),
-	projectId: uuidField().describe("ID of the project the event belongs to"),
+	id: primaryIdField("evt").describe("Unique event ID"),
+	projectId: idField("proj").describe("ID of the project the event belongs to"),
 	userId: saneStringField().nullish().describe("ID of the user who caused the event, if any"),
 	type: EVENT_TYPE_SCHEMA.describe("Event type. See [Event types](/docs/api/events#event-types)."),
 	severity: EVENT_SEVERITY_SCHEMA.describe("Default severity of the event type"),
 	title: saneStringField().describe("Short human-readable summary"),
 	description: saneStringField({ type: "large" }).nullish().describe("Longer human-readable explanation"),
-	assetId: uuidField().nullish().describe("ID of the asset the event is about, for asset events"),
+	assetId: idField("asset").nullish().describe("ID of the asset the event is about, for asset events"),
 	asset: EVENT_ASSET_SCHEMA.nullish().describe("Snapshot of the asset's moderation decision when the event was created, for asset events"),
 	facts: EVENT_FACTS_SCHEMA.describe("Registered event facts. See [Event facts](/docs/api/events#event-facts)."),
 	notify: zod.boolean().nullish().describe("Whether the event triggers in-app notifications"),
@@ -1469,12 +1469,12 @@ const EVENT_SCHEMA = zod.strictObject(EVENT_FIELDS).meta(metaStore([docPropertyI
 	description: "An event or alert in the system",
 	namedType: "Event",
 	example: {
-		id: "123e4567-e89b-42d3-a456-426614174000",
-		projectId: "b35456f3-79d8-4893-b316-b0d7ae668004",
+		id: EXAMPLE_IDS.evt,
+		projectId: EXAMPLE_IDS.proj,
 		type: "asset.uploaded",
 		severity: "low",
 		title: "Product photo uploaded",
-		assetId: "273e4567-e89b-42d3-a456-426614174001",
+		assetId: EXAMPLE_IDS.asset,
 		facts: [
 			{
 				key: "asset-name",
@@ -1501,12 +1501,12 @@ zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type)
 	description: "An event; `facts` depends on `type`",
 	namedType: "Event",
 	example: {
-		id: "123e4567-e89b-42d3-a456-426614174000",
-		projectId: "b35456f3-79d8-4893-b316-b0d7ae668004",
+		id: EXAMPLE_IDS.evt,
+		projectId: EXAMPLE_IDS.proj,
 		type: "asset.uploaded",
 		severity: "low",
 		title: "Product photo uploaded",
-		assetId: "273e4567-e89b-42d3-a456-426614174001",
+		assetId: EXAMPLE_IDS.asset,
 		facts: [
 			{
 				key: "asset-name",
@@ -1525,6 +1525,7 @@ zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type)
 	},
 	docsSchema: EVENT_SCHEMA
 })]));
+EXAMPLE_IDS.asset;
 // packages/shared/src/WebhookPayload.ts
 const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";

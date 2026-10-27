@@ -897,6 +897,9 @@ class MockScenarioTests(unittest.TestCase):
                     actual = _at(result, path)
                     if isinstance(wanted, dict) and "$contains" in wanted:
                         self.assertIn(_resolve(wanted["$contains"], saved), actual, f"{label}: {path}")
+                    elif isinstance(wanted, dict) and "$id" in wanted:
+                        self.assertIsInstance(actual, str, f"{label}: {path}")
+                        self.assertRegex(actual, rf"\A{wanted['$id']}_[0-9A-Za-z]{{20}}\Z", f"{label}: {path}")
                     else:
                         self.assertEqual(actual, _resolve(wanted, saved), f"{label}: {path}")
                 if "save" in step:

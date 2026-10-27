@@ -3,7 +3,7 @@ import { waitFor } from "@testing-library/dom";
 import type { MediaPlayerSource } from "../src/react-native";
 import { BINDINGS, type Mounted } from "./bindings";
 
-const PROJECT_ID = "123e4567-e89b-12d3-a456-426614174000";
+const PROJECT_ID = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 const CDN = "https://cdn.calmlens.com/v1";
 const native = BINDINGS.find((binding) => binding.name === "React Native");
 if (!native) throw new Error("The React Native binding is missing");

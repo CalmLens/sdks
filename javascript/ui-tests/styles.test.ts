@@ -4,7 +4,7 @@ import { renderToString } from "react-dom/server";
 import * as react from "../src/react";
 import { BINDINGS, type Mounted } from "./bindings";
 
-const media = { projectId: "123e4567-e89b-12d3-a456-426614174000", assetId: "a1", alt: "A cat" };
+const media = { projectId: "proj_8fK2mQx7Lp4NvB3tRz9Y", assetId: "a1", alt: "A cat" };
 const STYLESHEET_RULE = ".calmlens-media {";
 
 let mounted: Mounted | undefined;

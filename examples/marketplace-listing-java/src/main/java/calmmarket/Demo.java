@@ -3,13 +3,13 @@ package calmmarket;
 import com.calmlens.CalmLensServerClient;
 import com.calmlens.MockCalmLensServerClient;
 import java.net.ConnectException;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Demo mode, used only when requested explicitly ({@code CALMLENS_DEMO=1} or {@code --demo}).
@@ -33,13 +33,13 @@ final class Demo implements Calmmarket.Backend {
     MockCalmLensServerClient mock = mock();
     if (choice.equals("unavailable")) return mock.enqueueFailure(new ConnectException("Connection refused")).client;
     boolean blocked = choice.equals("description-blocked");
-    return mock.enqueue(200, asset("demo-" + UUID.randomUUID(), "allowed", null, null))
-        .enqueue(200, asset("demo-" + UUID.randomUUID(), blocked ? "blocked" : "allowed", null, null)).client;
+    return mock.enqueue(200, asset(id("asset"), "allowed", null, null))
+        .enqueue(200, asset(id("asset"), blocked ? "blocked" : "allowed", null, null)).client;
   }
 
   @Override public CalmLensServerClient photoUploads(int photos) {
     MockCalmLensServerClient mock = mock();
-    for (int i = 0; i < photos; i++) mock.enqueue(200, asset("demo-" + UUID.randomUUID(), "pending", null, null));
+    for (int i = 0; i < photos; i++) mock.enqueue(200, asset(id("asset"), "pending", null, null));
     return mock.client;
   }
 
@@ -84,7 +84,7 @@ final class Demo implements Calmmarket.Backend {
       // A reviewer's decision replaces the automated one.
       Map<String, Object> moderation = moderation(asset);
       moderation.put("status", "blocked");
-      moderation.put("manualReviews", java.util.List.of(Map.of("id", java.util.UUID.randomUUID().toString(), "decision", "blocked", "note", "Simulated portal decision", "reviewerUserId", "demo-reviewer", "reviewedAt", System.currentTimeMillis(), "appliedToAsset", true)));
+      moderation.put("manualReviews", java.util.List.of(Map.of("id", id("rev"), "decision", "blocked", "note", "Simulated portal decision", "reviewerUserId", "demo-reviewer", "reviewedAt", System.currentTimeMillis(), "appliedToAsset", true)));
     }
     mock.enqueue(200, asset);
 
@@ -111,7 +111,7 @@ final class Demo implements Calmmarket.Backend {
 
   /** One synthetic {@code asset.blocked} event, with the facts a portal decision carries. */
   @Override public CalmLensServerClient simulatedReview(Calmmarket.Photo photo) {
-    String id = UUID.randomUUID().toString();
+    String id = id("evt");
     Map<String, Object> event = new LinkedHashMap<>();
     event.put("id", id);
     event.put("type", "asset.blocked");
@@ -141,6 +141,16 @@ final class Demo implements Calmmarket.Backend {
    * processing), a moderation status such as {@code allowed} or {@code blocked}, or {@code error}
    * (processing failed).
    */
+  private static final SecureRandom RANDOM = new SecureRandom();
+  private static final String BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+  /** A CalmLens-style ID for a simulated object: the prefix, `_` and 20 random base62 characters. */
+  private static String id(String prefix) {
+    StringBuilder id = new StringBuilder(prefix).append('_');
+    for (int i = 0; i < 20; i++) id.append(BASE62.charAt(RANDOM.nextInt(BASE62.length())));
+    return id.toString();
+  }
+
   private static Map<String, Object> asset(String id, String status, String externalId, Map<String, Object> report) {
     Map<String, Object> asset = new LinkedHashMap<>();
     asset.put("id", Objects.requireNonNull(id));

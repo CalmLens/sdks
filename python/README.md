@@ -109,7 +109,7 @@ is also a `ValueError`.
 from calmlens import CalmLensAPIError, error_codes
 
 try:
-    asset = client.assets.retrieve(asset_id="asset-id")
+    asset = client.assets.retrieve(asset_id="asset_5Gm2Rk8XqT3wLp9VbN4c")
 except CalmLensAPIError as error:
     if error.code != error_codes.ASSET_NOT_FOUND:
         print(error.code, error.status, error.request_id)
@@ -306,7 +306,7 @@ Pass `upload_preset_id` to `client.assets.create` or `client.assets.classify` to
 
 ```python
 signed = client.upload_tokens.sign(
-    upload_preset_id="your-upload-preset-id",
+    upload_preset_id="preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
     external_id="post-42",       # optional: the uploaded asset gets this ID
     expires_in_seconds=600,      # optional: 1 to 3600, 600 by default
 )
@@ -490,14 +490,14 @@ from calmlens import CalmLensAPIError, CalmLensError, CalmLensTimeoutError
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key
 
 client = MockCalmLensServerClient(
-    api_key=create_mock_api_key(), project_id="project", timeout=5,
-    mock_options={"now": lambda: 123, "create_id": lambda: "asset-1"},
+    api_key=create_mock_api_key(), project_id="proj_8fK2mQx7Lp4NvB3tRz9Y", timeout=5,
+    mock_options={"now": lambda: 123, "create_id": lambda prefix: f"{prefix}_00000000000000000001"},
 )
 assert client.text.classify(text="Hello", external_id="c-1")["classification"]["moderation"]["status"] == "allowed"
-assert client.database_storage.assets["asset-1"]["createdAt"] == 123
+assert client.database_storage.assets["asset_00000000000000000001"]["createdAt"] == 123
 
 request = client.requests[-1]            # MockRequest(method, url, path, query, body, headers)
-assert (request.method, request.path) == ("POST", "/projects/project/assets")
+assert (request.method, request.path) == ("POST", "/projects/proj_8fK2mQx7Lp4NvB3tRz9Y/assets")
 assert request.query["externalId"] == "c-1" and request.body == b"Hello"
 
 client.enqueue_error(TimeoutError("timed out"))      # or ConnectionResetError(), ssl.SSLError(), ...
@@ -508,11 +508,11 @@ except CalmLensTimeoutError as error:
 
 client.enqueue_error(CalmLensError("rate-limit/exceeded", status=429, retry_after=5))
 try:
-    client.assets.retrieve(asset_id="asset-1")
+    client.assets.retrieve(asset_id="asset_00000000000000000001")
 except CalmLensAPIError as error:
     assert (error.status, error.retry_after) == (429, 5.0) and error.request_id
 
-client.enqueue_event("asset.allowed", asset_id="asset-1",
+client.enqueue_event("asset.allowed", asset_id="asset_00000000000000000001",
                      facts=[{"key": "decided-by", "value": "automated"}])
 ```
 
@@ -523,7 +523,9 @@ API answers with the real status codes, JSON error bodies and headers (`X-Reques
 the same way; `max_retries` defaults to 0 so enqueued failures surface), plus `mock_options`:
 `database_storage`, `image_storage`, `create_id`, `now`, `queued_outcome`, `analyzed_outcome`
 and `signed_url_base_url`. Unknown mock options raise. Unset asset fields are `None`, as the API
-returns them.
+returns them. Like the API, the mock gives each new object an ID with its kind's prefix, `_` and
+20 random base62 characters (`asset_5Gm2Rk8XqT3wLp9VbN4c`); `create_id` receives the prefix
+(`asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`) and returns the ID.
 
 - `queued_outcome` (default `pending`) applies to `assets.create` and queued multipart uploads;
   `analyzed_outcome` (default `allowed`) to `assets.classify` and `text.classify`. An outcome

@@ -202,13 +202,13 @@ final class ClientTest extends TestCase
 
     public function testWebhookHelpersSignDeliveriesForStoredEventsAndReadHeaders(): void
     {
-        $mock = new MockServerClient(now: fn () => 1760000000000, createId: fn () => 'id-1');
+        $mock = new MockServerClient(now: fn () => 1760000000000, createId: fn (string $prefix) => $prefix . '_00000000000000000001');
         $event = $mock->enqueueEvent(['type' => 'asset.allowed', 'facts' => [['key' => 'test', 'value' => true]]]);
         $body = json_encode(Webhooks::toPayload($event));
         $headers = Webhooks::createHeaders($body, 'delivery-1', 'secret', 1760000000);
         self::assertSame(['delivery-1', '1760000000'], [$headers[Webhooks::DELIVERY_HEADER], $headers[Webhooks::TIMESTAMP_HEADER]]);
         $parsed = Webhooks::parseEvent($body, null, null, 'secret', now: 1760000000, headers: $headers);
-        self::assertSame(['id-1', 'asset.allowed', 'project-1', 'low', 'asset.allowed', null, true],
+        self::assertSame(['evt_00000000000000000001', 'asset.allowed', 'project-1', 'low', 'asset.allowed', null, true],
             [$parsed['id'], $parsed['type'], $parsed['projectId'], $parsed['data']['severity'], $parsed['data']['title'], $parsed['data']['assetId'], Webhooks::isTest($parsed)]);
         $server = ['HTTP_X_CALMLENS_SIGNATURE' => $headers[Webhooks::SIGNATURE_HEADER], 'HTTP_X_CALMLENS_TIMESTAMP' => '1760000000'];
         self::assertTrue(Webhooks::verify($body, null, null, 'secret', now: 1760000000, headers: $server));

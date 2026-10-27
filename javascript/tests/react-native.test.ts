@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { CalmLensAppClient } from "../src/app";
 import { type CalmLensError, CalmLensServerClient, SDK_VERSION } from "../src/server";
 
-const PRESET_ID = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
+const PRESET_ID = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 /**

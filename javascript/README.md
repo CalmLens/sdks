@@ -193,7 +193,7 @@ async assets.retrieve(options: { assetId: string }): Promise<Asset>
 
 **Example:**
 ```typescript
-const asset = await client.assets.retrieve({ assetId: "asset-uuid-here" });
+const asset = await client.assets.retrieve({ assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c" });
 console.log(asset.classification.moderation.status);
 console.log(asset.classification.moderation); // Classification results
 ```
@@ -307,13 +307,13 @@ Move an asset into a folder, or to the project root by passing `null`.
 ```typescript
 // Move asset to a folder
 await client.assets.move({
-  assetId: "asset-uuid",
-  folderId: "folder-uuid",
+  assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c",
+  folderId: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
 });
 
 // Move asset to project root
 await client.assets.move({
-  assetId: "asset-uuid",
+  assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c",
   folderId: null,
 });
 ```
@@ -325,7 +325,7 @@ Process an asset whose processing failed (`classification.status` `failed`) agai
 otherwise this throws `asset/content-unavailable`, and you need to upload it again.
 
 ```typescript
-const asset = await client.assets.retry({ assetId: "asset-uuid" });
+const asset = await client.assets.retry({ assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c" });
 // asset.classification.status === "processing"
 ```
 
@@ -342,7 +342,7 @@ re-run returns the asset in `processing` and can reach a different decision; it 
 `asset/reviewed` for an asset a reviewer has decided.
 
 ```typescript
-const asset = await client.assets.explain({ assetId: "asset-uuid" });
+const asset = await client.assets.explain({ assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c" });
 // asset.classification.moderation.policy?.evidence === "full"
 ```
 
@@ -368,7 +368,7 @@ if (status !== "allowed" && status !== "limited") hidePhoto(decided.id);
 Fetch one page of immediate child folders. Omit `parentId` for the project root. The response contains `folders`, visible `ancestors`, and `hasMore`; advance `pageIndex` to load more.
 
 ```typescript
-const page = await client.folders.list({ parentId: "folder-uuid", pageSize: 100 });
+const page = await client.folders.list({ parentId: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P", pageSize: 100 });
 ```
 
 ##### folders.retrieve(options)
@@ -376,7 +376,7 @@ const page = await client.folders.list({ parentId: "folder-uuid", pageSize: 100 
 Retrieve details of a specific folder by ID.
 
 ```typescript
-const folder = await client.folders.retrieve({ folderId: "folder-uuid" });
+const folder = await client.folders.retrieve({ folderId: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P" });
 ```
 
 ##### folders.create(options)
@@ -400,7 +400,7 @@ Rename an existing folder.
 
 ```typescript
 const updated = await client.folders.update({
-  folderId: "folder-uuid",
+  folderId: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
   name: "New Name",
 });
 ```
@@ -428,7 +428,7 @@ await client.folders.move({
 Delete an empty folder. If the folder still contains assets or child folders, this throws `folder/not-empty`.
 
 ```typescript
-await client.folders.delete({ folderId: "folder-uuid" });
+await client.folders.delete({ folderId: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P" });
 ```
 
 ##### cdn.getAssetUrl(options) and cdn.serve(options)
@@ -569,7 +569,7 @@ import { CalmLensAppClient } from "@calmlens/sdk/app";
 
 // In the browser: no API key
 const client = new CalmLensAppClient({
-  uploadPresetId: "your-upload-preset-id",
+  uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
   // Only for presets that require a token: called once per new upload
   token: () =>
     fetch("/api/upload-token", { method: "POST" })
@@ -594,7 +594,7 @@ On your server, sign a single-use token for each upload with `CalmLensServerClie
 
 ```ts
 const { token, expiresAt } = await client.uploadTokens.sign({
-  uploadPresetId: "your-upload-preset-id",
+  uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
   externalId: "post-42", // optional
   expiresInSeconds: 600, // optional, up to 3600
 });
@@ -622,7 +622,7 @@ Ready-made front-end components for each UI library. They share one core, so the
 import { CalmLensUploader } from "@calmlens/sdk/react";
 
 <CalmLensUploader
-  uploadPresetId="your-upload-preset-id"
+  uploadPresetId="preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
   tokenUrl="/api/upload-token" // POSTs { name, type, size }; answer { token }
   accept="image/*"
   maxFileSize={10 * 1024 * 1024}
@@ -777,9 +777,11 @@ import { MockCalmLensServerClient, createMockApiKey } from "@calmlens/sdk/testin
 
 const client = new MockCalmLensServerClient({
   apiKey: createMockApiKey(),
-  projectId: crypto.randomUUID(),
+  projectId: "proj_8fK2mQx7Lp4NvB3tRz9Y",
 });
 ```
+
+Like the API, the mock gives each new object an ID with its kind's prefix, an underscore and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c` or `fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P`. For predictable IDs, pass `mockOptions.createId`, which receives the prefix (`asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`).
 
 `MockCalmLensServerClient` is a `CalmLensServerClient`: every method runs the real client's code (validation, request building, response and error handling, the lens cache), and its `fetch` is an in-memory API that answers each request as CalmLens does, with the API's HTTP statuses, JSON bodies and error bodies (`code`, `message`, `details`) and an `X-Request-Id`. It accepts the same options as `CalmLensServerClient` (`apiKey`, `projectId`, `baseUrl`, `cdnBaseUrl`, `timeoutMs`, `maxRetries`, ...) and validates them the same way, plus `mockOptions`; requests never leave the process, whatever `fetch` you pass. `maxRetries` defaults to 0, so a failed request fails once; set it to test retries. Waits take no real time: retry backoff and `assets.waitForDecision` only move the mock's clock on, so `waitForDecision` fails with `sdk/timeout` straight away for an asset that stays pending. `cdn.getAssetUrl` uses `cdnBaseUrl` (default `mock://calmlens/v1`), and `cdn.serve` requests are answered by the in-memory CDN.
 
@@ -812,7 +814,7 @@ const headers = await createWebhookHeaders({ secret, body, deliveryId: "delivery
 const response = await app.request("/api/webhooks/calmlens", { method: "POST", body, headers });
 ```
 
-To compare upload tokens with known values, `signUploadToken(apiKey, options, { now, nonce })` signs with a fixed clock (milliseconds since the epoch) and nonce, checking `options` like `uploadTokens.sign`. The mock's own `uploadTokens.sign` signs at `mockOptions.now` with a nonce from `mockOptions.createId`.
+To compare upload tokens with known values, `signUploadToken(apiKey, options, { now, nonce })` signs with a fixed clock (milliseconds since the epoch) and nonce, checking `options` like `uploadTokens.sign`. The mock's own `uploadTokens.sign` signs at `mockOptions.now` with a random nonce.
 
 `MockCalmLensAppClient` is the real `CalmLensAppClient` on the same in-memory API: it applies upload preset rules from `mockOptions.preset` (`requireToken`, `allowedContentTypes`, `maxFileSizeInBytes`, `showDecisions`, `visibility`, `keepContentAfterProcessing`, `folderId`) with the API's error codes, can check and continue only the uploads it made, and stores uploads in a `MockCalmLensServerClient`. Pass yours as `mockOptions.server` to check uploads from the server side and serve them from its CDN, or read the one it creates from `client.server`. To run the upload widget on it, pass `createClient: (options) => new MockCalmLensAppClient({ ...options, mockOptions })`.
 

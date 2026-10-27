@@ -58,6 +58,19 @@ export const storeDemoImage = async (
   ]);
 };
 
+const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/** A CalmLens-style asset ID: `asset_` and 20 random base62 characters (bytes 248+ redrawn). */
+const demoAssetId = () => {
+  let id = "asset_";
+  while (id.length < 26) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(20))) {
+      if (byte < 248 && id.length < 26) id += BASE62[byte % 62];
+    }
+  }
+  return id;
+};
+
 const readDemoAsset = (kv: KVNamespace, assetId: string) =>
   kv.get<DemoAsset>(`demo-asset:${assetId}`, "json");
 
@@ -71,7 +84,7 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
   mode: "demo",
 
   async moderateText({ text, externalId }) {
-    const assetId = `demo-${crypto.randomUUID()}`;
+    const assetId = demoAssetId();
     const trigger = await detectTestText(text, DEMO_TEST_INPUT_KEY);
     if (trigger) return outcomeFor(assetId, externalId, { category: trigger, score: 0.95 });
     const rule = TEXT_RULES.find(([pattern]) => pattern.test(text));
@@ -79,7 +92,7 @@ export const createDemoProvider = (kv: KVNamespace): ModerationProvider => ({
   },
 
   async submitImage({ file, externalId }) {
-    const assetId = `demo-${crypto.randomUUID()}`;
+    const assetId = demoAssetId();
     const bytes = new Uint8Array(await file.arrayBuffer());
     const image = decodePng(bytes);
     const category = image ? await detectTestImage(image, DEMO_TEST_INPUT_KEY) : undefined;

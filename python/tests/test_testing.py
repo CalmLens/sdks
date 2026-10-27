@@ -125,7 +125,7 @@ class MockFilterTests(unittest.TestCase):
 class MockConfigurationAndCaptureTests(unittest.TestCase):
     def test_accepts_real_client_configuration(self):
         c = MockCalmLensServerClient(project_id="p1", base_url="https://api.example.test/v2/", cdn_base_url="https://cdn.example.test/v2",
-                               timeout=5, mock_options={"create_id": lambda: "a1"})
+                               timeout=5, mock_options={"create_id": lambda prefix: "a1"})
         self.assertEqual((c.project_id, c.base_url, c.cdn_base_url, c.timeout), ("p1", "https://api.example.test/v2", "https://cdn.example.test/v2", 5))
         self.assertEqual(c.cdn.get_asset_url({"assetIdentifier": "a1"}), "https://cdn.example.test/v2/assets/p1/a1/rendered")
         with self.assertRaises(CalmLensError):
@@ -134,7 +134,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
             MockCalmLensServerClient(mock_options={"cdn_base_url": "https://x.test"})
 
     def test_captures_requests(self):
-        c = MockCalmLensServerClient(project_id="p1", mock_options={"create_id": lambda: "a1"})
+        c = MockCalmLensServerClient(project_id="p1", mock_options={"create_id": lambda prefix: "a1"})
         c.assets.classify(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})
         c.assets.update({"assetId": "a1", "tags": ["x"]})
         c.events.list(after="mock_0", limit=5)
@@ -156,7 +156,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertEqual(c.requests[0].query["externalId"], "e1")
 
     def test_enqueued_errors_match_real_failures(self):
-        c = MockCalmLensServerClient(mock_options={"create_id": lambda: "a1"})
+        c = MockCalmLensServerClient(mock_options={"create_id": lambda prefix: "a1"})
         timeout, reset = TimeoutError("slow"), ConnectionResetError("reset")
         api = CalmLensError("rate-limit/exceeded", status=429, retry_after=3)
         c.enqueue_error(timeout).enqueue_error(reset).enqueue_error(api).enqueue_error(http.client.IncompleteRead(b""))
@@ -180,7 +180,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertEqual(raised.exception.status, 404)
 
     def test_retries_resend_the_idempotency_key(self):
-        c = MockCalmLensServerClient(max_retries=1, mock_options={"create_id": lambda: "a1"})
+        c = MockCalmLensServerClient(max_retries=1, mock_options={"create_id": lambda prefix: "a1"})
         c.enqueue_error(CalmLensError("server/unavailable", status=503))
         c.assets.create(name="x", content={"plainText": "hi", "type": "text/plain"}, idempotency_key="key-1")
         self.assertEqual([r.headers["Idempotency-key"] for r in c.requests], ["key-1", "key-1"])

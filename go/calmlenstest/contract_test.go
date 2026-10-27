@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -768,6 +769,11 @@ func TestSharedMockScenarios(t *testing.T) {
 							}
 							if !found {
 								t.Fatalf("%s: %s is %#v, want it to contain %#v", label, path, got, wanted)
+							}
+						} else if prefix, ok := marker(raw, "$id"); ok {
+							id, _ := got.(string)
+							if !regexp.MustCompile(`^` + prefix.(string) + `_[0-9A-Za-z]{20}$`).MatchString(id) {
+								t.Fatalf("%s: %s is %#v, want a new %s_ ID", label, path, got, prefix)
 							}
 						} else if want := resolve(raw, saved); !reflect.DeepEqual(got, want) {
 							t.Fatalf("%s: %s is %#v, want %#v", label, path, got, want)

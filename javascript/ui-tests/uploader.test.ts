@@ -9,7 +9,7 @@ import {
 } from "../src/ui/BrowserUpload";
 import { BINDINGS, type Mounted } from "./bindings";
 
-const PRESET_ID = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
+const PRESET_ID = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 
 // Messages named after their keys, so the tests check which message shows without pinning copy.
 const messages = {

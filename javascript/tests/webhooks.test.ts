@@ -12,7 +12,7 @@ import * as builders from "../src/testing/MockWebhooks";
 
 const event: Event = {
   id: "event-1",
-  projectId: "123e4567-e89b-12d3-a456-426614174000",
+  projectId: "proj_8fK2mQx7Lp4NvB3tRz9Y",
   type: "asset.blocked",
   severity: "high",
   title: "Asset blocked",

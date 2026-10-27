@@ -13,8 +13,8 @@ import {
   type UploadItem,
 } from "../src/ui";
 
-const PROJECT_ID = "123e4567-e89b-12d3-a456-426614174000";
-const PRESET_ID = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
+const PROJECT_ID = "proj_8fK2mQx7Lp4NvB3tRz9Y";
+const PRESET_ID = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 const CDN = "https://cdn.calmlens.com/v1";
 
 describe("getMediaState", () => {

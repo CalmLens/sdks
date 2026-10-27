@@ -1,3 +1,4 @@
+import { n as idField } from "./Ids-aHyP9ZcF.js";
 import * as zod from "zod";
 // packages/shared/src/Permissions.ts
 const ACTION_SCHEMA = zod.enum([
@@ -47,7 +48,7 @@ const isProjectAction = (action) => PROJECT_ACTIONS.includes(action);
 const actionsImplying = (action) => !isProjectAction(action) || action === "project:manage" ? [] : action.endsWith(":read") ? [action.replace(/:read$/, ":write"), "project:manage"] : ["project:manage"];
 const GRANT_SCHEMA = zod.object({
 	actions: zod.array(ACTION_SCHEMA),
-	folderId: zod.string().uuid().nullable(),
+	folderId: idField("fldr").nullable(),
 	includeSubfolders: zod.boolean()
 }).strict().refine((g) => g.folderId === null || !g.actions.some(isProjectAction), "Project configuration permissions require project scope");
 const GRANTS_SCHEMA = zod.array(GRANT_SCHEMA).max(100);

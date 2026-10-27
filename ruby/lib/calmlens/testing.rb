@@ -95,6 +95,18 @@ module CalmLens
       raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT, e.message), cause: e
     end
 
+    BASE62 = [*'0'..'9', *'A'..'Z', *'a'..'z'].join.freeze
+    private_constant :BASE62
+
+    # A new ID like the API's: `prefix`, `_` and 20 base62 characters from a CSPRNG (bytes 248 to
+    # 255 are drawn again, so every character is equally likely).
+    # @api private
+    def self.new_id(prefix)
+      body = +''
+      SecureRandom.random_bytes(40).each_byte { |byte| body << BASE62[byte % 62] if byte < 248 } while body.size < 20
+      "#{prefix}_#{body[0, 20]}"
+    end
+
     # A clock in epoch milliseconds that follows the system time but never repeats or goes back.
     # @api private
     def self.monotonic_clock
@@ -108,7 +120,9 @@ module CalmLens
     # @param now [#call] returns the current time in epoch milliseconds. The default clock reads the
     #   system time but advances at least 1 ms per reading, so records made in a row have strictly
     #   increasing `createdAt` and order predictably. A clock you pass is used as is.
-    # @param create_id [#call] returns a new ID.
+    # @param create_id [#call] receives the prefix of the kind of object (`asset`, `fldr`, `hl`, `hle`, `lens`,
+    #   `evt` or `rev`) and returns a new ID. The default is like the API's: the prefix, `_` and 20 random base62
+    #   characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
     # @param queued_outcome [String] the outcome of assets created with {Assets#create}: `pending`
     #   (processing, moderation pending), `allowed`, `limited`, `age-restricted`, `blocked` or `purged` (processing
     #   done with that moderation status; `purged` also removes the content) or `failed` (processing
@@ -121,7 +135,7 @@ module CalmLens
     #   Retries and decision checks wait no real time.
     def initialize(project_id: 'project-1', api_key: MockServerClient.create_api_key, base_url: 'https://api.calmlens.invalid/v1',
                    cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: MockServerClient.monotonic_clock,
-                   create_id: -> { SecureRandom.uuid }, queued_outcome: 'pending', analyzed_outcome: 'allowed',
+                   create_id: ->(prefix) { MockServerClient.new_id(prefix) }, queued_outcome: 'pending', analyzed_outcome: 'allowed',
                    **options)
       @mock_lock = Mutex.new
       @queue = []

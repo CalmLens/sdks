@@ -158,6 +158,9 @@
           "save": "blocked",
           "expect": {
             "result": {
+              "id": {
+                "$id": "asset"
+              },
               "classification.moderation.status": "allowed"
             },
             "httpStatus": 200
@@ -197,6 +200,9 @@
               "classification.status": "completed",
               "classification.moderation.status": "blocked",
               "classification.moderation.manualReviews.length": 1,
+              "classification.moderation.manualReviews.0.id": {
+                "$id": "rev"
+              },
               "classification.moderation.manualReviews.0.decision": "blocked",
               "classification.moderation.manualReviews.0.note": null,
               "classification.moderation.manualReviews.0.appliedToAsset": true,
@@ -302,6 +308,9 @@
           "expect": {
             "result": {
               "events.length": 1,
+              "events.0.id": {
+                "$id": "evt"
+              },
               "events.0.type": "asset.blocked",
               "events.0.severity": "high",
               "events.0.assetId": {
@@ -1332,6 +1341,9 @@
           "save": "list",
           "expect": {
             "result": {
+              "id": {
+                "$id": "hl"
+              },
               "name": "Removed images",
               "action": "block"
             },
@@ -1350,6 +1362,9 @@
           "save": "entry",
           "expect": {
             "result": {
+              "id": {
+                "$id": "hle"
+              },
               "hashListId": {
                 "$ref": "list.id"
               },
@@ -1461,6 +1476,11 @@
           },
           "save": "folder",
           "expect": {
+            "result": {
+              "id": {
+                "$id": "fldr"
+              }
+            },
             "httpStatus": 201
           }
         },
@@ -2372,7 +2392,7 @@
         {
           "operation": "assets.update",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000",
+            "assetId": "asset_00000000000000000000",
             "name": "missing.png"
           },
           "expect": {
@@ -2500,7 +2520,7 @@
             "assetId": {
               "$ref": "b.id"
             },
-            "folderId": "00000000-0000-4000-8000-000000000000"
+            "folderId": "fldr_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -2526,7 +2546,7 @@
         {
           "operation": "assets.move",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000",
+            "assetId": "asset_00000000000000000000",
             "folderId": null
           },
           "expect": {
@@ -2544,7 +2564,7 @@
               "base64": "aGVsbG8=",
               "type": "image/png"
             },
-            "folderId": "00000000-0000-4000-8000-000000000000"
+            "folderId": "fldr_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -2556,7 +2576,7 @@
         {
           "operation": "assets.createSignedUrl",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000"
+            "assetId": "asset_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -2619,7 +2639,7 @@
         {
           "operation": "assets.listChildren",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000"
+            "assetId": "asset_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -2781,7 +2801,7 @@
         {
           "operation": "assets.retry",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000"
+            "assetId": "asset_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -3004,7 +3024,7 @@
         {
           "operation": "assets.explain",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000"
+            "assetId": "asset_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -3236,7 +3256,7 @@
               {
                 "$ref": "a.id"
               },
-              "00000000-0000-4000-8000-000000000000"
+              "asset_00000000000000000000"
             ],
             "operation": "delete"
           },
@@ -3254,7 +3274,7 @@
               {
                 "$ref": "a.id"
               },
-              "not-a-uuid"
+              "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P"
             ],
             "operation": "remove-content"
           },
@@ -3516,7 +3536,7 @@
         {
           "operation": "mock.decide",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000",
+            "assetId": "asset_00000000000000000000",
             "outcome": "allowed"
           },
           "expect": {
@@ -3930,7 +3950,7 @@
         {
           "operation": "assets.classify",
           "args": {
-            "name": "jkqvwxyz.png",
+            "name": "j-k-q-v-w-x-y-z-.png",
             "content": {
               "base64": "aGVsbG8=",
               "type": "image/png"
@@ -3958,7 +3978,7 @@
         {
           "operation": "assets.search",
           "args": {
-            "query": "j k q v w x y z nomatch"
+            "query": "j- k- q- v- w- x- y- z- nomatch"
           },
           "expect": {
             "result": {
@@ -3973,7 +3993,7 @@
         {
           "operation": "assets.search",
           "args": {
-            "query": "nomatch j k q v w x y"
+            "query": "nomatch j- k- q- v- w- x- y-"
           },
           "expect": {
             "result": {
@@ -3985,7 +4005,7 @@
         {
           "operation": "assets.search",
           "args": {
-            "query": "j j k k q q v v w w x x y y z z nomatch"
+            "query": "j- j- k- k- q- q- v- v- w- w- x- x- y- y- z- z- nomatch"
           },
           "expect": {
             "result": {
@@ -4141,7 +4161,7 @@
         {
           "operation": "assets.waitForDecision",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000",
+            "assetId": "asset_00000000000000000000",
             "timeoutMs": 0
           },
           "expect": {
@@ -4356,7 +4376,7 @@
         {
           "operation": "assets.uploadPart",
           "args": {
-            "assetId": "00000000-0000-4000-8000-000000000000",
+            "assetId": "asset_00000000000000000000",
             "part": {
               "base64": "aGVsbG8=",
               "partNumber": 2,
@@ -4568,7 +4588,7 @@
               "type": "image/png"
             },
             "idempotencyKey": "retry-1",
-            "folderId": "00000000-0000-4000-8000-000000000000"
+            "folderId": "fldr_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -4951,6 +4971,9 @@
           "expect": {
             "result": {
               "length": 2,
+              "0.id": {
+                "$id": "lens"
+              },
               "0.identifier": "thumb",
               "0.version": 1,
               "1.identifier": "card"
@@ -5187,7 +5210,7 @@
           "operation": "folders.create",
           "args": {
             "name": "Lost",
-            "parentId": "00000000-0000-4000-8000-000000000000"
+            "parentId": "fldr_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -5400,7 +5423,7 @@
         {
           "operation": "folders.retrieve",
           "args": {
-            "folderId": "00000000-0000-4000-8000-000000000000"
+            "folderId": "fldr_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -5553,7 +5576,7 @@
             "folderId": {
               "$ref": "a.id"
             },
-            "parentId": "00000000-0000-4000-8000-000000000000"
+            "parentId": "fldr_00000000000000000000"
           },
           "expect": {
             "error": {
@@ -5565,7 +5588,7 @@
         {
           "operation": "folders.move",
           "args": {
-            "folderId": "00000000-0000-4000-8000-000000000000",
+            "folderId": "fldr_00000000000000000000",
             "parentId": null
           },
           "expect": {

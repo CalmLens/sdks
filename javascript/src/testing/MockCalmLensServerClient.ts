@@ -3,8 +3,9 @@ import { invalidConfig } from "../client/CalmLensError";
 import CalmLensServerClient from "../client/CalmLensServerClient";
 import { sleep } from "../client/CalmLensTransport";
 import type { Asset, CalmLensServerClientOptions } from "../client/CalmLensTypes";
-import { validateServerClientOptions } from "../client/CalmLensUtils";
+import { randomUuid, validateServerClientOptions } from "../client/CalmLensUtils";
 import type { TypedEvent } from "../contract/Event.js";
+import { type IdPrefix, newId } from "../contract/Ids.js";
 import type { PermissionGrant } from "../contract/Permissions.js";
 import { createMockApiKey, getMockApiKeyGrants } from "./MockApiKey";
 import {
@@ -39,7 +40,12 @@ export interface MockCalmLensServerClientOptions extends CalmLensServerClientOpt
   mockOptions?: {
     databaseStorage?: MockDatabaseStorage;
     imageStorage?: MockImageStorage;
-    createId?: () => string;
+    /**
+     * Returns a new ID for an object of the kind `prefix` names (`asset`, `fldr`, `hl`, `hle`,
+     * `lens`, `evt` or `rev`). The default is like the API's: the prefix, `_` and 20 random
+     * base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
+     */
+    createId?: (prefix: IdPrefix) => string;
     /**
      * The clock, in epoch milliseconds. The default is the system clock, moved on by at least a
      * millisecond per reading, so assets created in a row have increasing `createdAt` values and
@@ -83,7 +89,7 @@ export const mockClientOptions = (
       api.waitedMs += ms;
     },
     now: () => api.waitedMs,
-    uploadTokenTime: () => ({ now: api.now(), nonce: api.createId() }),
+    uploadTokenTime: () => ({ now: api.now(), nonce: randomUuid() }),
     deferUploadChecks: true,
     defaultCdnBaseUrl: "mock://calmlens/v1",
   };
@@ -116,7 +122,7 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
       grants: getMockApiKeyGrants(options.apiKey),
       databaseStorage: mockOptions.databaseStorage ?? new InMemoryMockDatabaseStorage(),
       imageStorage: mockOptions.imageStorage ?? new InMemoryMockImageStorage(),
-      createId: mockOptions.createId ?? crypto.randomUUID.bind(crypto),
+      createId: mockOptions.createId ?? newId,
       now: mockOptions.now ?? createMonotonicClock(),
       queuedOutcome: mockOptions.queuedOutcome ?? "pending",
       analyzedOutcome: mockOptions.analyzedOutcome ?? "allowed",

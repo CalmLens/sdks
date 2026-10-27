@@ -263,7 +263,7 @@ type LensType = zod.infer<typeof LENS_TYPE_SCHEMA>;
 declare const LENS_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   projectId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-  userId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
+  userId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   version: zod.ZodDefault<zod.ZodNumber>;
   identifier: zod.ZodString;
   name: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;

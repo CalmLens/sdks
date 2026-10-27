@@ -353,6 +353,41 @@ pub(crate) fn random_u64() -> u64 {
     u64::from_le_bytes(bytes)
 }
 
+/// A new ID like the API's: `prefix`, `_` and 20 base62 characters, drawn without modulo bias
+/// (bytes 248 to 255 are redrawn).
+#[cfg(feature = "testing")]
+pub(crate) fn new_id(prefix: &str) -> String {
+    const ALPHABET: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    let mut id = String::with_capacity(prefix.len() + 21);
+    id.push_str(prefix);
+    id.push('_');
+    let mut count = 0;
+    while count < 20 {
+        let mut bytes = [0u8; 40];
+        if getrandom::getrandom(&mut bytes).is_err() {
+            bytes.copy_from_slice(
+                &[
+                    random_u64(),
+                    random_u64(),
+                    random_u64(),
+                    random_u64(),
+                    random_u64(),
+                ]
+                .map(u64::to_le_bytes)
+                .concat(),
+            );
+        }
+        for byte in bytes.into_iter().filter(|byte| *byte < 248) {
+            if count == 20 {
+                break;
+            }
+            id.push(ALPHABET[usize::from(byte % 62)] as char);
+            count += 1;
+        }
+    }
+    id
+}
+
 /// A random (version 4) UUID, used as an `Idempotency-Key`.
 pub(crate) fn uuid() -> String {
     let mut bytes = [0u8; 16];

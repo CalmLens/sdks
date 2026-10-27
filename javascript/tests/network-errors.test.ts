@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
 
-const projectId = "123e4567-e89b-12d3-a456-426614174000";
+const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 const apiKey = "test-api-key";
 const pngBase64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";

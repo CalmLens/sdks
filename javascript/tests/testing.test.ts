@@ -18,7 +18,7 @@ import {
   type MockImageStorage,
 } from "../src/testing";
 
-const projectId = "123e4567-e89b-12d3-a456-426614174000";
+const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 const apiKey = createMockApiKey([
   { actions: ["assets:download"], folderId: null, includeSubfolders: true },
 ]);
@@ -47,7 +47,7 @@ const createClient = (
     projectId,
     ...clientOptions,
     mockOptions: {
-      createId: () => "987fcdeb-51a2-43d7-b890-123456789abc",
+      createId: (prefix) => `${prefix}_987fcdeb51a243d7b890`,
       now: () => 1_700_000_000_000,
       ...mockOptions,
     },
@@ -95,7 +95,7 @@ describe("MockCalmLensServerClient", () => {
       visibility: "public",
     });
 
-    expect(asset.id).toBe("987fcdeb-51a2-43d7-b890-123456789abc");
+    expect(asset.id).toBe("asset_987fcdeb51a243d7b890");
     expect(asset.type).toBe("image");
     expect(asset.classification.status).toBe("processing");
     expect(asset.classification.moderation.status).toBe("pending");
@@ -343,7 +343,7 @@ describe("MockCalmLensServerClient", () => {
     const parent = await client.assets.create({ name: "parent", url: "https://example.com" });
     await databaseStorage.createAsset({
       ...parent,
-      id: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa",
+      id: "asset_aaaaaaaaaaaaaaaaaaaa",
       name: "child",
       parentId: parent.id,
     });
@@ -634,7 +634,7 @@ describe("MockCalmLensServerClient", () => {
       [invalidArgument, (client) => client.assets.retrieve({ assetId: "" })],
       [
         PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId(),
-        (client) => client.assets.retrieve({ assetId: "987fcdeb-51a2-43d7-b890-000000000000" }),
+        (client) => client.assets.retrieve({ assetId: "asset_987fcdeb51a243d7b000" }),
       ],
     ];
     for (const [code, run] of cases) {
@@ -661,7 +661,7 @@ describe("MockCalmLensServerClient", () => {
   it("manages folder hierarchy, uniqueness, and moves", async () => {
     let idCounter = 1;
     const client = createClient({
-      createId: () => `00000000-0000-0000-0000-${String(idCounter++).padStart(12, "0")}`,
+      createId: (prefix) => `${prefix}_${String(idCounter++).padStart(20, "0")}`,
     });
 
     // 1. Create root folders
@@ -803,7 +803,7 @@ describe("MockCalmLensServerClient", () => {
       code: PUBLIC_ERROR_CODES.ASSET_NOT_RETRYABLE.getId(),
     });
     await expect(
-      client.assets.retry({ assetId: "00000000-0000-0000-0000-000000000000" }),
+      client.assets.retry({ assetId: "asset_00000000000000000000" }),
     ).rejects.toMatchObject({ code: PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId() });
   });
 
@@ -898,7 +898,7 @@ describe("MockCalmLensServerClient", () => {
   it("moves assets between folders and to root, and enforces empty folder deletion", async () => {
     let idCounter = 100;
     const client = createClient({
-      createId: () => `00000000-0000-0000-0000-${String(idCounter++).padStart(12, "0")}`,
+      createId: (prefix) => `${prefix}_${String(idCounter++).padStart(20, "0")}`,
     });
 
     const folder = await client.folders.create({ name: "Assets Folder" });
@@ -944,7 +944,7 @@ describe("MockCalmLensServerClient", () => {
 
     // Attempting to move nonexistent asset fails
     await expect(
-      client.assets.move({ assetId: "00000000-0000-0000-0000-999999999999", folderId: null }),
+      client.assets.move({ assetId: "asset_00000000999999999999", folderId: null }),
     ).rejects.toMatchObject({
       code: PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId(),
     });
@@ -1041,9 +1041,7 @@ describe("MockCalmLensServerClient", () => {
     const { cursor } = await client.events.list();
     await client.events.list({ after: cursor, limit: 10 });
     await client.folders.create({ name: "Inbox" });
-    await client.folders
-      .retrieve({ folderId: "00000000-0000-4000-8000-000000000000" })
-      .catch(() => undefined);
+    await client.folders.retrieve({ folderId: "fldr_00000000000000000000" }).catch(() => undefined);
 
     expect(
       client.calls.map(({ operation, method, path, status }) => [operation, method, path, status]),
@@ -1054,7 +1052,7 @@ describe("MockCalmLensServerClient", () => {
       ["events.list", "GET", `/projects/${projectId}/events`, 200],
       ["events.list", "GET", `/projects/${projectId}/events`, 200],
       ["folders.create", "POST", `/projects/${projectId}/folders`, 201],
-      ["folders.retrieve", "GET", "/folders/00000000-0000-4000-8000-000000000000", 404],
+      ["folders.retrieve", "GET", "/folders/fldr_00000000000000000000", 404],
     ]);
     const [classify] = client.callsTo("text.classify");
     expect(classify).toMatchObject({
@@ -1086,7 +1084,7 @@ describe("MockCalmLensServerClient", () => {
 });
 
 describe("MockCalmLensAppClient", () => {
-  const PRESET = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
+  const PRESET = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
   const photo = { data: new Blob([new Uint8Array([1, 2, 3])]), type: "image/png" };
   const codeOf = async (run: () => Promise<unknown>) =>
     run().then(

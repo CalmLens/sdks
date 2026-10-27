@@ -23,7 +23,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
-import java.util.function.Supplier;
 
 /**
  * An offline client for tests. {@link #client} is a real {@link CalmLensServerClient} (validation,
@@ -140,7 +139,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /** Outcome, ID and clock controls for the in-memory API. */
   public static final class Options {
     java.util.function.Function<Models.Asset, Outcome> queuedOutcome = asset -> Outcome.PENDING, analyzedOutcome = asset -> Outcome.ALLOWED;
-    Supplier<String> createId = () -> UUID.randomUUID().toString();
+    java.util.function.Function<String, String> createId = MockApi::newId;
     LongSupplier now = monotonicClock();
     String signedUrlBaseUrl = "https://mock.calmlens.invalid";
 
@@ -175,8 +174,14 @@ public final class MockCalmLensServerClient implements AutoCloseable {
       return Objects.requireNonNull(outcome, "outcome");
     }
 
-    /** @param value returns new asset, folder, lens and event IDs @return these options */
-    public Options createId(Supplier<String> value) { createId = Objects.requireNonNull(value, "createId"); return this; }
+    /**
+     * @param value returns a new ID for an object of the kind the prefix names ({@code asset},
+     *     {@code fldr}, {@code hl}, {@code hle}, {@code lens}, {@code evt} or {@code rev}); by
+     *     default, like the API, the prefix, {@code _} and 20 random base62 characters, such as
+     *     {@code asset_5Gm2Rk8XqT3wLp9VbN4c}
+     * @return these options
+     */
+    public Options createId(java.util.function.Function<String, String> value) { createId = Objects.requireNonNull(value, "createId"); return this; }
 
     /**
      * @param value the current time in milliseconds since the Unix epoch; by default the system
@@ -522,7 +527,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     if (outcome == Outcome.PENDING) return Json.GSON.fromJson(asset, Models.Asset.class);
     if (outcome != Outcome.FAILED) {
       JsonObject review = new JsonObject();
-      review.addProperty("id", api.createId());
+      review.addProperty("id", api.createId("rev"));
       review.addProperty("decision", outcome.value());
       review.add("note", null);
       review.add("reviewerUserId", null);
@@ -553,7 +558,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   public synchronized Models.Event enqueueEvent(String type, String assetId, Models.EventFact... facts) {
     long now = api.now();
     JsonObject event = new JsonObject();
-    event.addProperty("id", api.createId());
+    event.addProperty("id", api.createId("evt"));
     event.addProperty("projectId", projectId);
     event.add("userId", null);
     event.addProperty("type", Objects.requireNonNull(type, "type"));

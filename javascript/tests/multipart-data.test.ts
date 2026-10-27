@@ -11,7 +11,7 @@ import {
 } from "../src/contract/SharedConstants.js";
 import { CalmLensServerClient } from "../src/server";
 
-const projectId = "123e4567-e89b-12d3-a456-426614174000";
+const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 
 describe("multipart binary field names", () => {
   test("rejects incorrect declared sizes before sending first or later parts", async () => {
@@ -239,7 +239,7 @@ describe("multipart binary field names", () => {
       ).rejects.toThrow("stop after capturing the request");
     }
 
-    const assetId = "987fcdeb-51a2-43d7-b890-123456789abc";
+    const assetId = "asset_987fcdeb51a243d7b890";
     for (const [index, payloadCase] of payloadCases.entries()) {
       const part: MultipartUploadPartOptions = {
         ...payloadCase.createPayload(),
@@ -295,7 +295,7 @@ describe("multipart binary field names", () => {
   });
 
   test("checks a single image part locally and leaves accumulated sizes to the API", async () => {
-    const assetId = "987fcdeb-51a2-43d7-b890-123456789abc";
+    const assetId = "asset_987fcdeb51a243d7b890";
     const urls: URL[] = [];
     const fetchImpl: typeof fetch = async (input) => {
       urls.push(new URL(String(input)));

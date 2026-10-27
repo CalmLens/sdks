@@ -448,7 +448,7 @@ class WebhookTest < Minitest::Test
   include TestHelpers
   SECRET = 'a-local-development-secret'
 
-  def deliver(app, body, delivery: SecureRandom.uuid, timestamp: Time.now.to_i,
+  def deliver(app, body, delivery: "dlv_#{SecureRandom.alphanumeric(20)}", timestamp: Time.now.to_i,
               signature: CalmLens.create_webhook_signature_header(payload: body, timestamp: timestamp, secret: SECRET))
     request(app, 'POST', '/webhooks/calmlens', body: body, type: 'application/json',
                                                headers: { CalmLens::WEBHOOK_SIGNATURE_HEADER => signature,

@@ -110,6 +110,27 @@ final class Values
             . '-' . substr($hex, 16, 4) . '-' . substr($hex, 20);
     }
 
+    /** A new ID like the API's: `$prefix`, `_` and 20 random base62 characters. */
+    public static function id(string $prefix): string
+    {
+        $alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+        $body = '';
+        while (strlen($body) < 20) {
+            foreach (str_split(random_bytes(40)) as $byte) {
+                $value = ord($byte);
+                // Bytes 248-255 are redrawn, so every character is equally likely.
+                if ($value >= 248) {
+                    continue;
+                }
+                $body .= $alphabet[$value % 62];
+                if (strlen($body) === 20) {
+                    break;
+                }
+            }
+        }
+        return $prefix . '_' . $body;
+    }
+
     public static function canonical(mixed $value): mixed
     {
         if (is_array($value)) {

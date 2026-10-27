@@ -4,7 +4,7 @@ import { decodeUploadToken, verifyUploadTokenSignature } from "../src/contract/U
 import { type CalmLensError, CalmLensServerClient } from "../src/server";
 import { MockCalmLensServerClient } from "../src/testing";
 
-const PRESET_ID = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
+const PRESET_ID = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 const API_KEY = "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef";
 
 const errorCode = async (run: () => unknown) => {
@@ -74,7 +74,7 @@ describe("uploadTokens.sign", () => {
     const mock = new MockCalmLensServerClient({
       apiKey: API_KEY,
       projectId: "project-1",
-      mockOptions: { now: () => 1_700_000_000_000, createId: () => "nonce-1" },
+      mockOptions: { now: () => 1_700_000_000_000 },
     });
     const { token, expiresAt } = await mock.uploadTokens.sign({
       uploadPresetId: PRESET_ID,
@@ -84,10 +84,10 @@ describe("uploadTokens.sign", () => {
     expect(
       await verifyUploadTokenSignature(decoded.body, decoded.signature, await sha256Hex(API_KEY)),
     ).toBe(true);
-    expect({ expiresAt, nonce: decoded.claims.n }).toEqual({
-      expiresAt: 1_700_000_060_000,
-      nonce: "nonce-1",
-    });
+    expect(expiresAt).toBe(1_700_000_060_000);
+    expect(decoded.claims.n).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
     expect(mock.calls).toEqual([]);
   });
 });

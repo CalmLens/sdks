@@ -6,12 +6,12 @@ use std::sync::{
     Arc,
 };
 
-/// Deterministic IDs (`id-1`, `id-2`, ...) and a clock that advances 1 ms per call.
+/// Deterministic IDs (`asset_00000000000000000001`, `rev_00000000000000000002`, ...) and a clock that advances 1 ms per call.
 fn options() -> MockOptions {
     let ids = Arc::new(AtomicU64::new(0));
     let clock = Arc::new(AtomicU64::new(1_000));
     MockOptions::new()
-        .create_id(move || format!("id-{}", ids.fetch_add(1, Ordering::SeqCst) + 1))
+        .create_id(move |prefix| format!("{prefix}_{:020}", ids.fetch_add(1, Ordering::SeqCst) + 1))
         .now(move || clock.fetch_add(1, Ordering::SeqCst))
 }
 fn kept(name: &str, bytes: &'static [u8]) -> SubmitAsset {
@@ -32,15 +32,21 @@ fn named(name: &str) -> SubmitAsset {
 async fn decide_uses_deterministic_ids_and_refuses_unknown_assets() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let created = mock.assets().create(kept("a.png", b"png")).await.unwrap();
-    assert_eq!(created.id, "id-1");
+    assert_eq!(created.id, "asset_00000000000000000001");
     let asset = mock
         .decide(&created.id, AssetModerationDecision::Blocked)
         .unwrap();
-    assert_eq!(asset.classification.moderation.manual_reviews[0].id, "id-2");
     assert_eq!(
-        mock.decide("missing", AssetModerationDecision::Allowed)
-            .unwrap_err()
-            .code(),
+        asset.classification.moderation.manual_reviews[0].id,
+        "rev_00000000000000000002"
+    );
+    assert_eq!(
+        mock.decide(
+            "asset_00000000000000000000",
+            AssetModerationDecision::Allowed
+        )
+        .unwrap_err()
+        .code(),
         &ErrorCode::AssetNotFound
     );
 }

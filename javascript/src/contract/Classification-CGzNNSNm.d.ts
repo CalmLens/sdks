@@ -337,6 +337,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "The author urges, endorses, praises or promotes physical violence.";
     readonly exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention.";
   };
+  readonly "violence-wish": {
+    readonly category: "violence";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Non-severe wish of harm";
+    readonly description: "The author wishes or hopes that a real person or group suffers non-severe physical harm, such as falling ill or catching a disease, even a serious one such as cancer, feeling pain or having a minor accident, without threatening it, planning it or calling on anyone to cause it.";
+    readonly exclusions: "Wishes that someone dies, is killed, attacked, seriously or permanently injured or sexually assaulted; threats, plans, requests or encouragement for others to cause harm; figurative curses such as telling someone to go choke on something; wishes of non-physical misfortune alone, such as losing a job or an election.";
+  };
   readonly "violence-extremism": {
     readonly category: "violence";
     readonly kind: "harm";
@@ -1021,6 +1029,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "violence-threat": "violence-threat";
   "violence-violent-death": "violence-violent-death";
   "violence-weapon": "violence-weapon";
+  "violence-wish": "violence-wish";
 }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
   status: zod.ZodLiteral<"evaluated">;
   someScore: zod.ZodNumber;
@@ -1176,6 +1185,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
+    "violence-wish": "violence-wish";
   }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
     someScore: zod.ZodNumber;
@@ -1334,6 +1344,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
+    "violence-wish": "violence-wish";
   }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
     someScore: zod.ZodNumber;
@@ -1488,6 +1499,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-threat": "violence-threat";
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
+    "violence-wish": "violence-wish";
   }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
     someScore: zod.ZodNumber;
@@ -1649,6 +1661,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1807,6 +1820,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -1961,6 +1975,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -2120,6 +2135,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -2278,6 +2294,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -2432,6 +2449,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -2591,6 +2609,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -2749,6 +2768,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -2903,6 +2923,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -3062,6 +3083,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -3220,6 +3242,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -3374,6 +3397,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -3533,6 +3557,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -3691,6 +3716,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -3845,6 +3871,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -4004,6 +4031,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -4162,6 +4190,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -4316,6 +4345,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -4475,6 +4505,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -4633,6 +4664,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -4787,6 +4819,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -4946,6 +4979,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -5104,6 +5138,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;
@@ -5258,6 +5293,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-threat": "violence-threat";
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
+      "violence-wish": "violence-wish";
     }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
       status: zod.ZodLiteral<"evaluated">;
       someScore: zod.ZodNumber;

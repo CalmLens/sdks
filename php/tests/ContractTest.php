@@ -845,6 +845,10 @@ final class ContractTest extends TestCase
                     if (is_array($raw) && array_key_exists('$contains', $raw)) {
                         $wanted = self::canon(self::resolve($raw['$contains'], $saved));
                         self::assertContains($wanted, array_map(self::canon(...), (array) self::at($result, $path)), "$label: $path");
+                    } elseif (is_array($raw) && array_key_exists('$id', $raw)) {
+                        $actual = self::at($result, $path);
+                        self::assertIsString($actual, "$label: $path");
+                        self::assertMatchesRegularExpression('/^' . preg_quote($raw['$id'], '/') . '_[0-9A-Za-z]{20}$/D', $actual, "$label: $path");
                     } else {
                         self::assertSameJson(self::resolve($raw, $saved), self::at($result, $path), "$label: $path");
                     }

@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -106,8 +105,10 @@ type Options struct {
 	MaxRetries      *int
 	DatabaseStorage *InMemoryDatabaseStorage
 	ImageStorage    *InMemoryImageStorage
-	// CreateID returns new IDs; the default is a random UUID, like the API's.
-	CreateID func() string
+	// CreateID returns a new ID for an object of the kind prefix names ("asset", "fldr", "hl",
+	// "hle", "lens", "evt" or "rev"). The default is like the API's: the prefix, "_" and 20
+	// random base62 characters, such as asset_5Gm2Rk8XqT3wLp9VbN4c.
+	CreateID func(prefix string) string
 	// Now returns the current time in unix milliseconds. The default clock is the wall clock,
 	// advanced by at least 1 ms per reading so assets created in a row have strictly increasing
 	// createdAt values; a Now you supply is used as is.
@@ -272,7 +273,7 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 			event.Title = event.Type
 		}
 		if event.ID == "" {
-			event.ID = m.options.CreateID()
+			event.ID = m.options.CreateID("evt")
 		}
 		if event.ProjectID == "" {
 			event.ProjectID = m.options.ProjectID
@@ -320,7 +321,7 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 	moderation := section(section(a, "classification"), "moderation")
 	reviews, _ := moderation["manualReviews"].([]any)
 	moderation["manualReviews"] = append(reviews, calmlens.JSON{
-		"id": m.options.CreateID(), "decision": decision, "note": nil, "reviewerUserId": nil,
+		"id": m.options.CreateID("rev"), "decision": decision, "note": nil, "reviewerUserId": nil,
 		"reviewedAt": now, "appliedToAsset": true,
 	})
 	if decision == OutcomePurged {
@@ -349,7 +350,7 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON, facts []any) {
 	now := m.options.Now()
 	m.events = append(m.events, calmlens.JSON{
-		"id": m.options.CreateID(), "projectId": m.options.ProjectID, "userId": nil,
+		"id": m.options.CreateID("evt"), "projectId": m.options.ProjectID, "userId": nil,
 		"type": eventType, "severity": severity, "title": eventType,
 		"description": nil, "assetId": a["id"], "asset": snapshot(a),
 		"facts": facts, "notify": false, "createdAt": now, "updatedAt": now, "readAt": nil,
@@ -388,17 +389,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 		options.APIKey = CreateMockAPIKey(nil)
 	}
 	if options.CreateID == nil {
-		options.CreateID = func() string {
-			// A random (version 4) UUID, like the API's IDs.
-			b := make([]byte, 16)
-			if _, err := rand.Read(b); err != nil {
-				panic(err)
-			}
-			b[6] = b[6]&0x0f | 0x40
-			b[8] = b[8]&0x3f | 0x80
-			h := hex.EncodeToString(b)
-			return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
-		}
+		options.CreateID = newID
 	}
 	if options.Now == nil {
 		var last atomic.Int64
@@ -974,7 +965,7 @@ func (m *MockServerClient) ensureLenses(body calmlens.JSON, now int64) (any, err
 		id := text(definition["identifier"])
 		old := m.lenses[id]
 		if old == nil {
-			lens := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "userId": nil, "createdAt": now, "updatedAt": now}
+			lens := calmlens.JSON{"id": m.options.CreateID("lens"), "projectId": m.options.ProjectID, "userId": nil, "createdAt": now, "updatedAt": now}
 			for key, item := range definition {
 				lens[key] = item
 			}
@@ -1125,7 +1116,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	if err != nil {
 		return nil, err
 	}
-	id := m.options.CreateID()
+	id := m.options.CreateID("asset")
 	// Fields the API returns as null when they are not set.
 	a := calmlens.JSON{
 		"id": id, "projectId": m.options.ProjectID, "userId": nil, "parentId": nil,
@@ -1348,10 +1339,34 @@ func (m *MockServerClient) requestContentRemoval(a calmlens.JSON, now int64) {
 	m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a)
 }
 
-// uuidPattern is the UUID form the API's schema accepts (zod's uuid()).
-var uuidPattern = regexp.MustCompile(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$`)
+// assetIDPattern is the asset ID form the API's schema accepts.
+var assetIDPattern = regexp.MustCompile(`^asset_[0-9A-Za-z]{20}$`)
 
-// batchAssets checks the batch like the API (1 to 500 UUIDs, a known operation, and every asset
+const idAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+// newID returns a new ID like the API's: prefix, "_" and 20 base62 characters from a CSPRNG
+// (bytes 248 to 255 are redrawn, so every character is equally likely).
+func newID(prefix string) string {
+	body := make([]byte, 0, 20)
+	buf := make([]byte, 40)
+	for len(body) < 20 {
+		if _, err := rand.Read(buf); err != nil {
+			panic(err)
+		}
+		for _, b := range buf {
+			if b >= 248 {
+				continue
+			}
+			body = append(body, idAlphabet[b%62])
+			if len(body) == 20 {
+				break
+			}
+		}
+	}
+	return prefix + "_" + string(body)
+}
+
+// batchAssets checks the batch like the API (1 to 500 asset IDs, a known operation, and every asset
 // in the project, refusing the whole batch otherwise), then applies it at once, in request order,
 // instead of in the background: delete deletes each asset with its stored child assets and
 // records asset.deleted with the asset as it was; remove-content removes the content like
@@ -1372,7 +1387,7 @@ func (m *MockServerClient) batchAssets(body calmlens.JSON, now int64) (any, erro
 		if !isString {
 			return nil, validation("validation/invalid-type", fmt.Sprintf("assetIds.%d", index))
 		}
-		if !uuidPattern.MatchString(value) {
+		if !assetIDPattern.MatchString(value) {
 			return nil, validation("validation/invalid-format", fmt.Sprintf("assetIds.%d", index))
 		}
 	}
@@ -1653,7 +1668,7 @@ func (m *MockServerClient) createFolder(body calmlens.JSON, now int64) (any, err
 	if err := m.unique(body["name"], body["parentId"], nil); err != nil {
 		return nil, err
 	}
-	folder := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "parentId": body["parentId"], "name": body["name"], "createdAt": now, "updatedAt": now}
+	folder := calmlens.JSON{"id": m.options.CreateID("fldr"), "projectId": m.options.ProjectID, "parentId": body["parentId"], "name": body["name"], "createdAt": now, "updatedAt": now}
 	m.DatabaseStorage.Folders[text(folder["id"])] = folder
 	return folder, nil
 }
@@ -2132,7 +2147,7 @@ func (m *MockServerClient) createHashList(body calmlens.JSON, now int64) (any, e
 	if value, ok := body["description"].(string); ok {
 		description = value
 	}
-	list := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "name": strings.TrimSpace(name), "description": description, "action": body["action"], "createdByUserId": nil, "createdAt": now, "updatedAt": now}
+	list := calmlens.JSON{"id": m.options.CreateID("hl"), "projectId": m.options.ProjectID, "name": strings.TrimSpace(name), "description": description, "action": body["action"], "createdByUserId": nil, "createdAt": now, "updatedAt": now}
 	m.DatabaseStorage.HashLists[text(list["id"])] = list
 	return list, nil
 }
@@ -2244,7 +2259,7 @@ func (m *MockServerClient) addHashListEntry(id string, body calmlens.JSON, now i
 	if value, ok := body["label"].(string); ok {
 		label = value
 	}
-	entry := calmlens.JSON{"id": m.options.CreateID(), "projectId": m.options.ProjectID, "hashListId": id, "hash": hash, "quality": quality, "label": label, "sourceAssetId": source, "createdByUserId": nil, "createdAt": now}
+	entry := calmlens.JSON{"id": m.options.CreateID("hle"), "projectId": m.options.ProjectID, "hashListId": id, "hash": hash, "quality": quality, "label": label, "sourceAssetId": source, "createdByUserId": nil, "createdAt": now}
 	m.DatabaseStorage.HashListEntries[text(entry["id"])] = entry
 	m.status = http.StatusCreated
 	return entry, nil

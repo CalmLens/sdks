@@ -87,7 +87,7 @@ module CalmLens
       # Adds an event to the feed, filling the fields the API always sets.
       def add_event(event)
         time = @now.call
-        record = { 'id' => @create_id.call, 'projectId' => @project_id, 'severity' => 'low', 'facts' => [],
+        record = { 'id' => @create_id.call('evt'), 'projectId' => @project_id, 'severity' => 'low', 'facts' => [],
                    'createdAt' => time, 'updatedAt' => time }.merge(event)
         record['title'] ||= record['type']
         @state.events << record
@@ -106,7 +106,7 @@ module CalmLens
 
         apply_outcome(item, decision, 'requested')
         item['classification']['moderation']['manualReviews'] <<
-          { 'id' => @create_id.call, 'decision' => decision, 'note' => nil, 'reviewerUserId' => nil,
+          { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => nil, 'reviewerUserId' => nil,
             'reviewedAt' => @now.call, 'appliedToAsset' => true }
         lifecycle_event('asset.content-removed', item) if decision == 'purged'
         # Like the event catalog: only allowing and limiting are low severity.
@@ -254,11 +254,11 @@ module CalmLens
 
       def project_assets = @state.assets.values.select { |item| item['projectId'] == @project_id }
 
-      # The UUID form the API's schema accepts (zod's `uuid()`).
-      UUID_PATTERN = /\A(?:\h{8}-\h{4}-[1-8]\h{3}-[89abAB]\h{3}-\h{12}|0{8}-0{4}-0{4}-0{4}-0{12}|f{8}-f{4}-f{4}-f{4}-f{12})\z/
-      private_constant :UUID_PATTERN
+      # An asset ID as the API's schema accepts it: `asset_` and 20 base62 characters.
+      ASSET_ID_PATTERN = /\Aasset_[0-9A-Za-z]{20}\z/
+      private_constant :ASSET_ID_PATTERN
 
-      # POST /projects/:id/assets/batch: like the API, every ID must be a UUID
+      # POST /projects/:id/assets/batch: like the API, every ID must be an asset ID
       # (`validation/invalid-format` at `assetIds.<index>`) and every asset must exist
       # (`asset/not-found`) before anything happens. The operation then runs at once, in request
       # order, rather than in the background: `delete` deletes each asset with its stored child
@@ -270,7 +270,7 @@ module CalmLens
         invalid!('validation/too-small', 'assetIds') if ids.empty?
         invalid!('validation/too-big', 'assetIds') if ids.size > 500
         ids.each_with_index do |id, index|
-          invalid!('validation/invalid-format', "assetIds.#{index}") unless id.is_a?(String) && id.match?(UUID_PATTERN)
+          invalid!('validation/invalid-format', "assetIds.#{index}") unless id.is_a?(String) && id.match?(ASSET_ID_PATTERN)
         end
         invalid!('validation/invalid-value', 'operation') unless %w[delete remove-content].include?(json['operation'])
         items = ids.uniq.map do |id|
@@ -363,9 +363,8 @@ module CalmLens
         now = @now.call
         old = @state.lenses[definition['identifier']]
         unless old
-          return @state.lenses[definition['identifier']] =
-                   { 'id' => @create_id.call, 'projectId' => @project_id, 'userId' => nil }.merge(definition)
-                                                                                           .merge('createdAt' => now, 'updatedAt' => now)
+          lens = { 'id' => @create_id.call('lens'), 'projectId' => @project_id, 'userId' => nil }.merge(definition)
+          return @state.lenses[definition['identifier']] = lens.merge('createdAt' => now, 'updatedAt' => now)
         end
 
         same = %w[name type active].all? { |key| old[key] == definition[key] } &&
@@ -444,7 +443,7 @@ module CalmLens
         keep = processing.is_a?(Hash) && processing['keepContentAfterProcessing'] == true
         context = options['context'].is_a?(Hash) ? ModerationContext.select_items(options['context'].fetch('items', [])) : []
         # Fields the API returns as null when they are not set.
-        asset = { 'id' => @create_id.call, 'projectId' => @project_id, 'userId' => nil, 'parentId' => nil,
+        asset = { 'id' => @create_id.call('asset'), 'projectId' => @project_id, 'userId' => nil, 'parentId' => nil,
                   'folderId' => options['folderId'], 'uploadPresetId' => options['uploadPresetId'],
                   'createdAt' => now, 'updatedAt' => now, 'name' => options['name'], 'description' => options['description'],
                   'externalId' => options['externalId'], 'externalUrl' => url || options['externalUrl'],
@@ -723,7 +722,7 @@ module CalmLens
         check_folder(json['parentId']) if json['parentId']
         unique_name(json['name'], json['parentId'])
         now = @now.call
-        item = { 'id' => @create_id.call, 'projectId' => @project_id, 'parentId' => json['parentId'], 'name' => json['name'],
+        item = { 'id' => @create_id.call('fldr'), 'projectId' => @project_id, 'parentId' => json['parentId'], 'name' => json['name'],
                  'createdAt' => now, 'updatedAt' => now }
         @state.folders[item['id']] = item
         # Like the API, a new folder is 201 Created.
@@ -760,7 +759,7 @@ module CalmLens
           fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'A hash list needs a name and an action of flag or block')
         end
         now = @now.call
-        item = { 'id' => @create_id.call, 'projectId' => @project_id, 'name' => name.strip,
+        item = { 'id' => @create_id.call('hl'), 'projectId' => @project_id, 'name' => name.strip,
                  'description' => json['description'].is_a?(String) ? json['description'] : nil,
                  'action' => json['action'], 'createdByUserId' => nil, 'createdAt' => now, 'updatedAt' => now }
         @state.hash_lists[item['id']] = item
@@ -810,7 +809,7 @@ module CalmLens
         existing = @state.hash_list_entries.values.find { |entry| entry['hashListId'] == list['id'] && entry['hash'] == hash }
         return existing if existing
 
-        entry = { 'id' => @create_id.call, 'projectId' => @project_id, 'hashListId' => list['id'], 'hash' => hash,
+        entry = { 'id' => @create_id.call('hle'), 'projectId' => @project_id, 'hashListId' => list['id'], 'hash' => hash,
                   'quality' => quality, 'label' => json['label'].is_a?(String) ? json['label'] : nil,
                   'sourceAssetId' => asset_id, 'createdByUserId' => nil, 'createdAt' => @now.call }
         @state.hash_list_entries[entry['id']] = entry

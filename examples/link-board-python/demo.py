@@ -7,9 +7,10 @@ decision (the page's parts carry the findings and decide the page).
 """
 from __future__ import annotations
 
+import secrets
+import string
 import threading
 import time
-import uuid
 from urllib.parse import urlsplit
 
 from calmlens import Asset
@@ -152,7 +153,7 @@ class DemoModerator(Moderator):
         parts += [("image", name, f"Extracted from website: {url}", finding if result == "image-blocked" and index == 0 else None)
                   for index, name in enumerate(images)]
         for kind, name, part_description, part_finding in parts:
-            child_id = str(uuid.uuid4())
+            child_id = "asset_" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(20))
             assets[child_id] = {"id": child_id, "projectId": asset["projectId"], "parentId": asset_id, "name": name,
                                 "description": part_description, "type": kind, "createdAt": asset["createdAt"],
                                 "upload": {"status": "completed"}, "classification": {"status": "processing", "moderation": {}},

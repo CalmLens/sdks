@@ -22,8 +22,8 @@ const env = {
 };
 const live = Boolean(env.apiKey && env.projectId && env.uploadPresetId);
 
-const MOCK_PROJECT_ID = "00000000-0000-4000-8000-000000000001";
-const MOCK_PRESET_ID = "00000000-0000-4000-8000-000000000002";
+const MOCK_PROJECT_ID = "proj_00000000000000000001";
+const MOCK_PRESET_ID = "preset_00000000000000000002";
 /** How long a mock upload stays pending, so the "Checking" step is visible. */
 const MOCK_CHECK_MS = 2500;
 

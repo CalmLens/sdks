@@ -17,6 +17,7 @@ import io
 import json
 import math
 import re
+import secrets
 import threading
 import time
 import uuid
@@ -321,8 +322,10 @@ class MockOptions(TypedDict, total=False):
     """``mock_options`` for :class:`MockCalmLensServerClient`."""
     database_storage: InMemoryMockDatabaseStorage
     image_storage: InMemoryMockImageStorage
-    #: Returns new asset, folder, hash list, hash list entry, lens and event IDs.
-    create_id: Callable[[], str]
+    #: Returns a new ID for an object of the kind its prefix names: ``asset``, ``fldr``, ``hl``,
+    #: ``hle``, ``lens``, ``evt`` or ``rev``. The default is like the API's: the prefix, ``_`` and
+    #: 20 random base62 characters, such as ``asset_5Gm2Rk8XqT3wLp9VbN4c``.
+    create_id: Callable[[str], str]
     #: Returns the current time in milliseconds since the Unix epoch. The default is the
     #: system clock, moved on by at least a millisecond per reading, so assets created in a row
     #: have increasing ``createdAt`` values and orderings by ``createdAt`` don't depend on IDs.
@@ -450,10 +453,19 @@ def _grants_of(api_key: str) -> list[dict[str, Any]]:
         return []
 
 
-#: The UUID form the API's schema accepts (zod's ``uuid()``).
-_UUID_PATTERN = re.compile(
-    r"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"
-    r"|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)\Z")
+#: An asset ID as the API's schema accepts it: ``asset_`` and 20 base62 characters.
+_ASSET_ID_PATTERN = re.compile(r"asset_[0-9A-Za-z]{20}")
+
+_BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def _new_id(prefix: str) -> str:
+    """A new ID like the API's: ``prefix``, ``_`` and 20 base62 characters from a CSPRNG (bytes 248
+    to 255 are drawn again, so every character is equally likely)."""
+    body = ""
+    while len(body) < 20:
+        body += "".join(_BASE62[byte % 62] for byte in secrets.token_bytes(40) if byte < 248)
+    return f"{prefix}_{body[:20]}"
 
 
 def _invalid_field(code: str, path: str) -> _Failure:
@@ -520,7 +532,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if not hasattr(self.database_storage, "events"):
             self.database_storage.events = []
         self.image_storage = options.get("image_storage") or InMemoryMockImageStorage()
-        self.create_id: Callable[[], str] = options.get("create_id", lambda: str(uuid.uuid4()))
+        self.create_id: Callable[[str], str] = options.get("create_id", _new_id)
         self.now: Callable[[], int] = options.get("now") or _monotonic_clock()
         self.queued_outcome: MockAssetOutcomeOption = options.get("queued_outcome", "pending")
         self.analyzed_outcome: MockAssetOutcomeOption = options.get("analyzed_outcome", "allowed")
@@ -596,7 +608,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             stored = self.database_storage.assets.get(asset_id) if asset_id else None
             asset = _event_asset(stored) if stored is not None else None
             now = self.now()
-            event: Event = {"id": self.create_id(), "projectId": self.project_id, "userId": None, "type": type,
+            event: Event = {"id": self.create_id("evt"), "projectId": self.project_id, "userId": None, "type": type,
                             "severity": severity, "title": title or type, "description": description,
                             "assetId": asset_id, "asset": asset, "facts": copy.deepcopy(facts or []),
                             "notify": False, "createdAt": now, "updatedAt": now, "readAt": None}
@@ -620,7 +632,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self._apply_outcome(record, decision, "requested")
             now = self.now()
             record["classification"]["moderation"].setdefault("manualReviews", []).append(
-                {"id": self.create_id(), "decision": decision, "note": None, "reviewerUserId": None,
+                {"id": self.create_id("rev"), "decision": decision, "note": None, "reviewerUserId": None,
                  "reviewedAt": now, "appliedToAsset": True})
             if decision == "purged":
                 self._lifecycle_event("asset.content-removed", record)
@@ -834,7 +846,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if body.get("parentId"):
                 self._folder(body["parentId"])
             self._unique(body["name"], body.get("parentId"))
-            folder = {"id": self.create_id(), "projectId": self.project_id, "parentId": body.get("parentId"),
+            folder = {"id": self.create_id("fldr"), "projectId": self.project_id, "parentId": body.get("parentId"),
                       "name": body["name"], "createdAt": now, "updatedAt": now}
             self.database_storage.folders[folder["id"]] = cast(Folder, folder)
             return folder
@@ -916,7 +928,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             context["items"] if isinstance(context, dict) and isinstance(context.get("items"), list) else [])
         # Fields the API returns as null when they are not set.
         asset: dict[str, Any] = {
-            "id": self.create_id(), "projectId": self.project_id, "userId": None, "parentId": None,
+            "id": self.create_id("asset"), "projectId": self.project_id, "userId": None, "parentId": None,
             "folderId": options.get("folderId"), "uploadPresetId": options.get("uploadPresetId"),
             "createdAt": now, "updatedAt": now, "name": options.get("name"), "description": options.get("description"),
             "externalId": external_id, "externalUrl": options.get("url", options.get("externalUrl")), "type": kind,
@@ -1089,7 +1101,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return asset
 
     def _batch(self, body: dict[str, Any], now: int) -> dict[str, Any]:
-        """``POST /projects/:id/assets/batch``: the schema needs 1 to 500 UUIDs and a known operation, and
+        """``POST /projects/:id/assets/batch``: the schema needs 1 to 500 asset IDs and a known operation, and
         every asset must exist before anything changes. The mock then applies the operation at once, in
         request order, instead of in the background: ``delete`` deletes each asset with its stored child
         assets and records ``asset.deleted`` with the asset as it was; ``remove-content`` removes the
@@ -1102,7 +1114,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if len(asset_ids) > 500:
             raise _invalid_field("validation/too-big", "assetIds")
         for index, asset_id in enumerate(asset_ids):
-            if not isinstance(asset_id, str) or not _UUID_PATTERN.match(asset_id):
+            if not isinstance(asset_id, str) or not _ASSET_ID_PATTERN.fullmatch(asset_id):
                 raise _invalid_field("validation/invalid-format", f"assetIds.{index}")
         operation = body.get("operation")
         if operation not in ("delete", "remove-content"):
@@ -1185,7 +1197,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         name, description, action = body.get("name"), body.get("description"), body.get("action")
         if not isinstance(name, str) or not name.strip() or action not in _HASH_LIST_ACTIONS:
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "A hash list needs a name and an action of flag or block")
-        hash_list = {"id": self.create_id(), "projectId": self.project_id, "name": name.strip(),
+        hash_list = {"id": self.create_id("hl"), "projectId": self.project_id, "name": name.strip(),
                      "description": description if isinstance(description, str) else None, "action": action,
                      "createdByUserId": None, "createdAt": now, "updatedAt": now}
         self.database_storage.hash_lists[hash_list["id"]] = cast(HashList, hash_list)
@@ -1237,7 +1249,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                         None)
         if existing is not None:
             return existing
-        entry = {"id": self.create_id(), "projectId": self.project_id, "hashListId": hash_list["id"],
+        entry = {"id": self.create_id("hle"), "projectId": self.project_id, "hashListId": hash_list["id"],
                  "hash": hash_value, "quality": quality,
                  "label": body["label"] if isinstance(body.get("label"), str) else None,
                  "sourceAssetId": asset_id, "createdByUserId": None, "createdAt": self.now()}
@@ -1250,7 +1262,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         for definition in body["lenses"]:
             old = self._mock_lenses.get(definition["identifier"])
             if old is None:
-                lens = {"id": self.create_id(), "projectId": self.project_id, "userId": None, **definition,
+                lens = {"id": self.create_id("lens"), "projectId": self.project_id, "userId": None, **definition,
                         "createdAt": now, "updatedAt": now}
             elif all(old.get(k) == definition.get(k) for k in ("name", "description", "type", "active",
                                                                   "transforms", "version")):

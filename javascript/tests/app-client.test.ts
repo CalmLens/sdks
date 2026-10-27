@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { CalmLensAppClient, type CalmLensError } from "../src/app";
 
-const PRESET_ID = "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10";
+const PRESET_ID = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 const API_KEY = "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef";
 
 interface Sent {

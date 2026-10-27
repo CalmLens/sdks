@@ -309,7 +309,7 @@ module CalmLens
     end
 
     interface _IdFactory
-      def call: () -> String
+      def call: (String prefix) -> String
     end
 
     # Where a mock upload ends up: `pending` (still processing), `allowed`, `limited`, `age-restricted`,

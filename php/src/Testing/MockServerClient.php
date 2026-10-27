@@ -58,8 +58,8 @@ final class MockServerClient
     /** The ThumbHash the mock gives every classified image, standing in for one computed from its pixels. */
     public const THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI';
     private const MIB = 1024 * 1024;
-    /** The UUID form the API's schema accepts (zod's `uuid()`). */
-    private const UUID_PATTERN = '/^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/D';
+    /** An asset ID as the API's schema accepts it: `asset_` and 20 base62 characters. */
+    private const ASSET_ID_PATTERN = '/^asset_[0-9A-Za-z]{20}$/D';
     private const ACTIVE_CONTENT_TYPES = ['image/svg+xml', 'application/xhtml+xml', 'text/html', 'application/xml', 'text/xml'];
 
     /** @var array<string, array> Assets by ID, with the API's field names. Change them to arrange a test. */
@@ -108,6 +108,9 @@ final class MockServerClient
      *   `classification.moderation.status`), or a callable that receives the asset and returns either.
      * @param ?string $apiKey the client's API key. Its grants, from `createApiKey()`, decide CDN
      *   downloads of private and age-restricted content; the default key has none.
+     * @param ?callable $createId receives the prefix of the new object's ID (`asset`, `fldr`, `hl`,
+     *   `hle`, `lens`, `evt` or `rev`) and returns the ID; by default, like the API, the prefix, `_`
+     *   and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
      */
     public function __construct(
@@ -132,7 +135,7 @@ final class MockServerClient
         $this->now = \Closure::fromCallable($now ?? function () use (&$last): int {
             return $last = max((int) floor(microtime(true) * 1000), $last + 1);
         });
-        $this->createId = \Closure::fromCallable($createId ?? fn (): string => Values::uuid());
+        $this->createId = \Closure::fromCallable($createId ?? fn (string $prefix): string => Values::id($prefix));
         $this->grants = $apiKey === null ? [] : self::grantsOf($apiKey);
         $stack = HandlerStack::create(fn (RequestInterface $request, array $options) => $this->handle($request));
         $this->client = new ServerClient($apiKey ?? 'mock-key', $projectId, $baseUrl, $cdnBaseUrl, maxRetries: $maxRetries,
@@ -229,7 +232,7 @@ final class MockServerClient
     {
         $now = ($this->now)();
         $assetId = $event['assetId'] ?? null;
-        $event += ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'severity' => 'low',
+        $event += ['id' => ($this->createId)('evt'), 'projectId' => $this->projectId, 'severity' => 'low',
             'title' => $event['type'] ?? '', 'description' => null, 'assetId' => null,
             'asset' => is_string($assetId) && isset($this->assets[$assetId]) ? $this->snapshot($this->assets[$assetId]) : null,
             'facts' => [], 'createdAt' => $now, 'updatedAt' => $now];
@@ -256,7 +259,7 @@ final class MockServerClient
         if (!in_array($outcome, self::DECISIONS, true)) {
             return $asset;
         }
-        $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)(), 'decision' => $outcome,
+        $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)('rev'), 'decision' => $outcome,
             'note' => null, 'reviewerUserId' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
         $this->assets[$assetId] = $asset;
         if ($outcome === 'purged') {
@@ -633,7 +636,7 @@ final class MockServerClient
         $context = ModerationContext::select($decode('context')['items'] ?? []);
         // Fields the API returns as null when they are not set.
         $asset = [
-            'id' => ($this->createId)(), 'projectId' => $this->projectId, 'userId' => null, 'parentId' => null,
+            'id' => ($this->createId)('asset'), 'projectId' => $this->projectId, 'userId' => null, 'parentId' => null,
             'folderId' => $options['folderId'] ?? null, 'uploadPresetId' => $options['uploadPresetId'] ?? null,
             'createdAt' => $now, 'updatedAt' => $now, 'name' => $options['name'] ?? null,
             'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,
@@ -760,8 +763,8 @@ final class MockServerClient
     }
 
     /**
-     * POST /projects/:id/assets/batch. Checks every asset like the API (a non-UUID ID is
-     * `validation/invalid-format`, an unknown one `asset/not-found`, and either refuses the whole
+     * POST /projects/:id/assets/batch. Checks every asset like the API (an ID that is not an
+     * asset ID is `validation/invalid-format`, an unknown one `asset/not-found`, and either refuses the whole
      * batch), then answers 202 and applies the operation at once, in request order, instead of in
      * the background: `delete` deletes each asset with its stored child assets and records
      * `asset.deleted` with the asset as it was; `remove-content` removes the content like
@@ -780,7 +783,7 @@ final class MockServerClient
             self::invalid('validation/too-big', 'assetIds');
         }
         foreach ($ids as $index => $id) {
-            if (!is_string($id) || !preg_match(self::UUID_PATTERN, $id)) {
+            if (!is_string($id) || !preg_match(self::ASSET_ID_PATTERN, $id)) {
                 self::invalid('validation/invalid-format', "assetIds.$index");
             }
         }
@@ -1139,7 +1142,7 @@ final class MockServerClient
         }
         $this->uniqueFolderName($json['name'], $parentId);
         $now = ($this->now)();
-        $folder = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'parentId' => $parentId, 'name' => $json['name'],
+        $folder = ['id' => ($this->createId)('fldr'), 'projectId' => $this->projectId, 'parentId' => $parentId, 'name' => $json['name'],
             'createdAt' => $now, 'updatedAt' => $now];
         // Like the API, a new folder is 201 Created.
         $this->status = 201;
@@ -1229,7 +1232,7 @@ final class MockServerClient
             self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'A hash list needs a name and an action of flag or block');
         }
         $now = ($this->now)();
-        $list = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'name' => trim($name),
+        $list = ['id' => ($this->createId)('hl'), 'projectId' => $this->projectId, 'name' => trim($name),
             'description' => is_string($json['description'] ?? null) ? $json['description'] : null, 'action' => $json['action'],
             'createdByUserId' => null, 'createdAt' => $now, 'updatedAt' => $now];
         // Like the API, a new hash list is 201 Created.
@@ -1294,7 +1297,7 @@ final class MockServerClient
                 return $entry;
             }
         }
-        $entry = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'hashListId' => $list['id'], 'hash' => $hash,
+        $entry = ['id' => ($this->createId)('hle'), 'projectId' => $this->projectId, 'hashListId' => $list['id'], 'hash' => $hash,
             'quality' => $quality, 'label' => is_string($json['label'] ?? null) ? $json['label'] : null,
             'sourceAssetId' => $assetId, 'createdByUserId' => null, 'createdAt' => ($this->now)()];
         $this->status = 201;
@@ -1328,7 +1331,7 @@ final class MockServerClient
             $old = $this->lenses[$definition['identifier']] ?? null;
             $now = ($this->now)();
             if ($old === null) {
-                $saved[] = $this->lenses[$definition['identifier']] = ['id' => ($this->createId)(), 'projectId' => $this->projectId, 'userId' => null]
+                $saved[] = $this->lenses[$definition['identifier']] = ['id' => ($this->createId)('lens'), 'projectId' => $this->projectId, 'userId' => null]
                     + $definition + ['createdAt' => $now, 'updatedAt' => $now];
                 continue;
             }

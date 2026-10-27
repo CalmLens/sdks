@@ -76,7 +76,7 @@ module Calmthread
           id = ids.fetch(field)
           moderation = client.state.assets.fetch(id)['classification']['moderation']
           moderation['status'] = status
-          moderation['manualReviews'] << { 'id' => SecureRandom.uuid, 'decision' => status, 'note' => note,
+          moderation['manualReviews'] << { 'id' => "rev_#{SecureRandom.alphanumeric(20)}", 'decision' => status, 'note' => note,
                                            'reviewerUserId' => 'demo-reviewer', 'reviewerName' => 'Demo reviewer',
                                            'reviewedAt' => (Time.now.to_f * 1000).to_i, 'appliedToAsset' => true }
           client.enqueue_event(type: type, asset_id: id, title: EVENT_LABELS[type], facts: [

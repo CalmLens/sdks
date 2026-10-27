@@ -265,6 +265,10 @@ describe("shared mock scenarios", () => {
             const actual = at(result, path);
             if (isMarker(raw, "$contains")) {
               expect(actual, `${label}: ${path}`).toContainEqual(resolveRefs(raw.$contains, saved));
+            } else if (isMarker(raw, "$id")) {
+              expect(actual, `${label}: ${path}`).toMatch(
+                new RegExp(`^${raw.$id}_[0-9A-Za-z]{20}$`),
+              );
             } else {
               expect(actual, `${label}: ${path}`).toEqual(resolveRefs(raw, saved));
             }

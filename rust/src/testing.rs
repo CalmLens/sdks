@@ -435,7 +435,7 @@ impl MockServerClient {
     pub fn enqueue_event(&self, mut event: Event) -> Event {
         self.backend(|backend| {
             if event.id.is_empty() {
-                event.id = backend.create_id();
+                event.id = backend.create_id("evt");
             }
             event
                 .project_id

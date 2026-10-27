@@ -434,7 +434,7 @@
         "facts": [
           {
             "key": "appeal-id",
-            "value": "00000000-0000-4000-8000-000000000001"
+            "value": "apl_4Qk9Xm7Rt2Lv8Wb3Np5C"
           },
           {
             "key": "subject-type",
@@ -462,7 +462,7 @@
           "facts": [
             {
               "key": "appeal-id",
-              "value": "00000000-0000-4000-8000-000000000001"
+              "value": "apl_4Qk9Xm7Rt2Lv8Wb3Np5C"
             },
             {
               "key": "subject-type",
@@ -486,7 +486,7 @@
         "facts": [
           {
             "key": "appeal-id",
-            "value": "00000000-0000-4000-8000-000000000001"
+            "value": "apl_4Qk9Xm7Rt2Lv8Wb3Np5C"
           },
           {
             "key": "subject-type",
@@ -526,7 +526,7 @@
           "facts": [
             {
               "key": "appeal-id",
-              "value": "00000000-0000-4000-8000-000000000001"
+              "value": "apl_4Qk9Xm7Rt2Lv8Wb3Np5C"
             },
             {
               "key": "subject-type",
@@ -1593,9 +1593,9 @@
         "severity": "high",
         "title": "beach.jpg blocked",
         "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
-        "assetId": "00000000-0000-4000-8000-000000000123",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
         "asset": {
-          "id": "00000000-0000-4000-8000-000000000123",
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1650,9 +1650,9 @@
           "severity": "high",
           "title": "beach.jpg blocked",
           "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
-          "assetId": "00000000-0000-4000-8000-000000000123",
+          "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
           "asset": {
-            "id": "00000000-0000-4000-8000-000000000123",
+            "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
             "externalId": "post-123",
             "uploadPresetId": null,
             "upload": {
@@ -1694,7 +1694,7 @@
           ]
         }
       },
-      "body": "{\"id\":\"event-test-send\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"00000000-0000-4000-8000-000000000123\",\"asset\":{\"id\":\"00000000-0000-4000-8000-000000000123\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"decided-by\",\"value\":\"automated\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}]}}",
+      "body": "{\"id\":\"event-test-send\",\"type\":\"asset.blocked\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"decided-by\",\"value\":\"automated\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}]}}",
       "secret": "key",
       "deliveryId": "delivery-test",
       "timestampSeconds": 1700000000,
@@ -1702,7 +1702,7 @@
         "content-type": "application/json",
         "x-calmlens-delivery": "delivery-test",
         "x-calmlens-timestamp": "1700000000",
-        "x-calmlens-signature": "v1=ac5991196b703ee341239e0b2f6a42749ae5d618014d821bb23c049044e6b10b"
+        "x-calmlens-signature": "v1=c29cff011769c0407ad99126fa364ce1eb22efb1028eca143f3fa09c2dc2a1f9"
       },
       "isTest": true
     }

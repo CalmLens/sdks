@@ -84,7 +84,7 @@ pub fn create_mock_api_key(grants: &[MockApiKeyGrant]) -> String {
     )
 }
 
-type CreateId = Arc<dyn Fn() -> String + Send + Sync>;
+type CreateId = Arc<dyn Fn(&str) -> String + Send + Sync>;
 type Now = Arc<dyn Fn() -> u64 + Send + Sync>;
 type OutcomeFor = Arc<dyn Fn(&crate::models::Asset) -> MockOutcome + Send + Sync>;
 
@@ -172,7 +172,7 @@ impl Default for MockOptions {
             cdn_base_url: CDN_BASE_URL.into(),
             queued_outcome: Arc::new(|_| MockOutcome::Pending),
             analyzed_outcome: Arc::new(|_| MockOutcome::Allowed),
-            create_id: Arc::new(crate::transport::uuid),
+            create_id: Arc::new(crate::transport::new_id),
             now: monotonic_clock(),
             signed_url_base_url: "https://mock.calmlens.invalid".into(),
         }
@@ -259,8 +259,10 @@ impl MockOptions {
         self.analyzed_outcome = Arc::new(outcome);
         self
     }
-    /// Creates asset, folder, hash list, lens and event IDs.
-    pub fn create_id(mut self, value: impl Fn() -> String + Send + Sync + 'static) -> Self {
+    /// Creates the ID of a new object of the kind its prefix names (`asset`, `fldr`, `hl`, `hle`,
+    /// `lens`, `evt` or `rev`). The default is like the API's: the prefix, `_` and 20 random
+    /// base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
+    pub fn create_id(mut self, value: impl Fn(&str) -> String + Send + Sync + 'static) -> Self {
         self.create_id = Arc::new(value);
         self
     }
@@ -336,22 +338,12 @@ fn custom(code: &str, status: u16, message: &str) -> Failure {
 fn invalid(message: &str) -> Failure {
     fail(ErrorCode::InvalidUploadPayload, message)
 }
-/// Whether `value` is a UUID as the API's schema accepts it (zod's `uuid()`): version 1 to 8
-/// with the RFC variant, or the nil or max UUID.
-fn is_uuid(value: &str) -> bool {
-    if value == "00000000-0000-0000-0000-000000000000"
-        || value == "ffffffff-ffff-ffff-ffff-ffffffffffff"
-    {
-        return true;
-    }
-    let bytes = value.as_bytes();
-    bytes.len() == 36
-        && bytes.iter().enumerate().all(|(index, byte)| match index {
-            8 | 13 | 18 | 23 => *byte == b'-',
-            14 => (b'1'..=b'8').contains(byte),
-            19 => matches!(byte.to_ascii_lowercase(), b'8' | b'9' | b'a' | b'b'),
-            _ => byte.is_ascii_hexdigit(),
-        })
+/// Whether `value` is an asset ID as the API's schema accepts it: `asset_` and 20 base62
+/// characters.
+fn is_asset_id(value: &str) -> bool {
+    value.strip_prefix("asset_").is_some_and(|body| {
+        body.len() == 20 && body.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    })
 }
 /// A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
 fn validation(issue: &str, path: &str) -> Failure {
@@ -662,8 +654,8 @@ impl Backend {
             replays: HashMap::new(),
         }
     }
-    pub(super) fn create_id(&self) -> String {
-        (self.options.create_id)()
+    pub(super) fn create_id(&self, prefix: &str) -> String {
+        (self.options.create_id)(prefix)
     }
     pub(super) fn now(&self) -> u64 {
         (self.options.now)()
@@ -676,7 +668,7 @@ impl Backend {
     /// (after an `asset.content-removed` event for a purge).
     pub(super) fn decide(&mut self, asset_id: &str, decision: &str) -> Option<Value> {
         let now = self.now();
-        let review_id = self.create_id();
+        let review_id = self.create_id("rev");
         let project_id = self.options.project_id.clone();
         let storage = &mut self.storage;
         let asset = storage
@@ -720,7 +712,7 @@ impl Backend {
     fn push_event(&mut self, event_type: &str, severity: &str, asset: &Value, facts: Value) {
         let now = self.now();
         let event = json!({
-            "id": self.create_id(), "projectId": self.options.project_id, "type": event_type,
+            "id": self.create_id("evt"), "projectId": self.options.project_id, "type": event_type,
             "severity": severity, "title": event_type, "assetId": asset["id"],
             "asset": snapshot(asset), "facts": facts, "createdAt": now, "updatedAt": now,
         });
@@ -788,7 +780,7 @@ impl Backend {
             let Some(id) = id.as_str() else {
                 return Err(validation("invalid-type", &format!("assetIds.{index}")));
             };
-            if !is_uuid(id) {
+            if !is_asset_id(id) {
                 return Err(validation("invalid-format", &format!("assetIds.{index}")));
             }
             if !unique.iter().any(|seen| seen == id) {
@@ -1102,7 +1094,7 @@ impl Backend {
                 }
                 _ => {
                     definition["id"] =
-                        old.map_or_else(|| self.create_id().into(), |old| old["id"].clone());
+                        old.map_or_else(|| self.create_id("lens").into(), |old| old["id"].clone());
                     definition["createdAt"] =
                         old.map_or(now.into(), |old| old["createdAt"].clone());
                     definition["projectId"] = self.options.project_id.clone().into();
@@ -1197,7 +1189,7 @@ impl Backend {
             &parent,
             None,
         )?;
-        let id = self.create_id();
+        let id = self.create_id("fldr");
         body.insert("id".into(), id.clone().into());
         body.insert("parentId".into(), parent);
         body.insert("projectId".into(), self.options.project_id.clone().into());
@@ -1287,7 +1279,7 @@ impl Backend {
             ));
         }
         let list = json!({
-            "id": self.create_id(),
+            "id": self.create_id("hl"),
             "projectId": self.options.project_id,
             "name": name,
             "description": body.get("description").filter(|value| value.is_string()),
@@ -1428,7 +1420,7 @@ impl Backend {
             return Ok(existing.clone());
         }
         let entry = json!({
-            "id": self.create_id(),
+            "id": self.create_id("hle"),
             "projectId": self.options.project_id,
             "hashListId": list_id,
             "hash": hash,
@@ -1551,7 +1543,7 @@ impl Backend {
                 select_moderation_context_items(&context.items)
             }
         };
-        let id = self.create_id();
+        let id = self.create_id("asset");
         // Fields the API returns as `null` when they are not set.
         let mut asset = json!({
             "id": id, "projectId": self.options.project_id, "userId": null, "parentId": null,

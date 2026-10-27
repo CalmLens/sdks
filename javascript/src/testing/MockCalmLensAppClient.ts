@@ -27,7 +27,7 @@ export interface MockCalmLensAppClientOptions extends CalmLensAppClientOptions {
   };
 }
 
-const MOCK_PROJECT_ID = "00000000-0000-4000-8000-00000000c1a5";
+const MOCK_PROJECT_ID = "proj_0000000000000000c1a5";
 
 /**
  * The real `CalmLensAppClient`, answered by the in-memory API of a `MockCalmLensServerClient`.

@@ -3,7 +3,7 @@ import { waitFor, within } from "@testing-library/dom";
 import type { MediaProps } from "../src/ui";
 import { BINDINGS, type Mounted } from "./bindings";
 
-const PROJECT_ID = "123e4567-e89b-12d3-a456-426614174000";
+const PROJECT_ID = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 const CDN = "https://cdn.calmlens.com/v1";
 const asset = { projectId: PROJECT_ID, assetId: "a1", alt: "A cat on a sofa" } as const;
 const messages = { unavailable: "msg:unavailable", reveal: "msg:reveal" };

@@ -3,7 +3,7 @@ import { MIN_MULTIPART_UPLOAD_PART_BYTES } from "../src/contract/SharedConstants
 import type { CalmLensError } from "../src/server";
 import { createMockApiKey, MockCalmLensServerClient, toWebhookEventPayload } from "../src/testing";
 
-const projectId = "123e4567-e89b-12d3-a456-426614174000";
+const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 
 const createClient = (mockOptions: { now?: () => number } = {}) => {
   let id = 0;
@@ -12,7 +12,7 @@ const createClient = (mockOptions: { now?: () => number } = {}) => {
     apiKey: createMockApiKey(),
     projectId,
     mockOptions: {
-      createId: () => `00000000-0000-4000-8000-${String(++id).padStart(12, "0")}`,
+      createId: (prefix) => `${prefix}_${String(++id).padStart(20, "0")}`,
       now: () => clock++,
       ...mockOptions,
     },

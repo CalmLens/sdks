@@ -564,9 +564,9 @@ Use the standalone [CalmLens CLI](https://calmlens.com/docs/guides/local-develop
 import "github.com/CalmLens/sdks/go/calmlenstest"
 
 mock, err := calmlenstest.NewServerClient(calmlenstest.Options{
-    ProjectID: "project",
+    ProjectID: "proj_8fK2mQx7Lp4NvB3tRz9Y",
     Now: func() int64 { return 123 },
-    CreateID: func() string { return "asset-1" },
+    CreateID: func(prefix string) string { return prefix + "_00000000000000000001" },
 })
 asset, err := mock.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("Hello")}})
 ```
@@ -574,7 +574,9 @@ asset, err := mock.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text"
 The mock embeds the real client and runs its validation, encoding and error handling
 over an in-memory transport. Its `Options` accept the same `APIKey`, `ProjectID`,
 `BaseURL`, `CDNBaseURL`, `Timeout` and `MaxRetries` as `calmlens.Options` (validated the
-same way), plus database/content storage, deterministic IDs/timestamps, upload outcomes
+same way), plus database/content storage, deterministic IDs/timestamps (`CreateID` receives the
+object's ID prefix, such as `asset` or `fldr`; by default the mock mints IDs like the API's,
+such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
 (`QueuedOutcome`, default `OutcomePending`, for `Create`; `AnalyzedOutcome`, default
 `OutcomeAllowed`, for `Classify`; each `OutcomePending`, `OutcomeAllowed`, `OutcomeLimited`,
 `OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:

@@ -8,175 +8,175 @@
       "name": "default lifetime",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10"
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
       "expected": {
-        "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
         "expiresAt": 1700000600000,
         "claims": {
           "v": 1,
-          "u": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+          "u": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
           "k": "clsk_use_abcd",
           "e": 1700000600000,
           "n": "00000000-0000-4000-8000-000000000001"
         },
-        "body": "eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0",
-        "bodyJson": "{\"v\":1,\"u\":\"8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10\",\"k\":\"clsk_use_abcd\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
+        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0",
+        "bodyJson": "{\"v\":1,\"u\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\",\"k\":\"clsk_use_abcd\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
         "signingSecret": "0f0cf99015b87fb626aac8b5174a54ffa8b571f61419a1e692d59022105218d1",
-        "signature": "2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1"
+        "signature": "21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2"
       }
     },
     {
       "name": "external ID and a two-minute lifetime",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "externalId": "post-42",
         "expiresInSeconds": 120
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
       "expected": {
-        "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMTIwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InBvc3QtNDIifQ.6bdcbde77fb49395129d8a4eb6f2f48f466ad1a86d983318c51b216a5507cb78",
+        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMTIwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InBvc3QtNDIifQ.fd95fa8fa3180cddae6829fd787459d154903c8363416b42be1930f014c9c788",
         "expiresAt": 1700000120000,
         "claims": {
           "v": 1,
-          "u": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+          "u": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
           "k": "clsk_use_abcd",
           "e": 1700000120000,
           "n": "00000000-0000-4000-8000-000000000001",
           "x": "post-42"
         },
-        "body": "eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMTIwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InBvc3QtNDIifQ",
-        "bodyJson": "{\"v\":1,\"u\":\"8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10\",\"k\":\"clsk_use_abcd\",\"e\":1700000120000,\"n\":\"00000000-0000-4000-8000-000000000001\",\"x\":\"post-42\"}",
+        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMTIwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InBvc3QtNDIifQ",
+        "bodyJson": "{\"v\":1,\"u\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\",\"k\":\"clsk_use_abcd\",\"e\":1700000120000,\"n\":\"00000000-0000-4000-8000-000000000001\",\"x\":\"post-42\"}",
         "signingSecret": "0f0cf99015b87fb626aac8b5174a54ffa8b571f61419a1e692d59022105218d1",
-        "signature": "6bdcbde77fb49395129d8a4eb6f2f48f466ad1a86d983318c51b216a5507cb78"
+        "signature": "fd95fa8fa3180cddae6829fd787459d154903c8363416b42be1930f014c9c788"
       }
     },
     {
       "name": "shortest lifetime",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "expiresInSeconds": 1
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
       "expected": {
-        "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMDAxMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.73bc070318d8087342d9822b498a775ff56b3fb67c3756feff2e961b9f72bae1",
+        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMDAxMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.acffea7f84300200ff40971e4e1369ae51ee280152739c81c18eb3b714fc6712",
         "expiresAt": 1700000001000,
         "claims": {
           "v": 1,
-          "u": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+          "u": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
           "k": "clsk_use_abcd",
           "e": 1700000001000,
           "n": "00000000-0000-4000-8000-000000000001"
         },
-        "body": "eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMDAxMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0",
-        "bodyJson": "{\"v\":1,\"u\":\"8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10\",\"k\":\"clsk_use_abcd\",\"e\":1700000001000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
+        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwMDAxMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0",
+        "bodyJson": "{\"v\":1,\"u\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\",\"k\":\"clsk_use_abcd\",\"e\":1700000001000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
         "signingSecret": "0f0cf99015b87fb626aac8b5174a54ffa8b571f61419a1e692d59022105218d1",
-        "signature": "73bc070318d8087342d9822b498a775ff56b3fb67c3756feff2e961b9f72bae1"
+        "signature": "acffea7f84300200ff40971e4e1369ae51ee280152739c81c18eb3b714fc6712"
       }
     },
     {
       "name": "longest lifetime",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "expiresInSeconds": 3600
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
       "expected": {
-        "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.d8198d3a334ed7860c8e0c9c0fd83f90f6939de10cefdc5ce3399ca3ff945a3e",
+        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.a259f044ec3ee30a49fccf5162f178ee29281b4a83e87866fcb0e313521fb64c",
         "expiresAt": 1700003600000,
         "claims": {
           "v": 1,
-          "u": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+          "u": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
           "k": "clsk_use_abcd",
           "e": 1700003600000,
           "n": "00000000-0000-4000-8000-000000000001"
         },
-        "body": "eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0",
-        "bodyJson": "{\"v\":1,\"u\":\"8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10\",\"k\":\"clsk_use_abcd\",\"e\":1700003600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
+        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0",
+        "bodyJson": "{\"v\":1,\"u\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\",\"k\":\"clsk_use_abcd\",\"e\":1700003600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
         "signingSecret": "0f0cf99015b87fb626aac8b5174a54ffa8b571f61419a1e692d59022105218d1",
-        "signature": "d8198d3a334ed7860c8e0c9c0fd83f90f6939de10cefdc5ce3399ca3ff945a3e"
+        "signature": "a259f044ec3ee30a49fccf5162f178ee29281b4a83e87866fcb0e313521fb64c"
       }
     },
     {
       "name": "external ID that JSON encoders escape differently",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "externalId": "usér/42 <a&b> \"q\" \\ 🌍"
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
       "expected": {
-        "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InVzw6lyLzQyIDxhJmI-IFwicVwiIFxcIPCfjI0ifQ.04fd38781638cd940f6aaaafb81d90729868d4c898a5d01614b99b34ea02721c",
+        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InVzw6lyLzQyIDxhJmI-IFwicVwiIFxcIPCfjI0ifQ.93043371a5743be6c82c92c733d4af43556c4b32ea83d8f9db604df3428acb2e",
         "expiresAt": 1700000600000,
         "claims": {
           "v": 1,
-          "u": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+          "u": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
           "k": "clsk_use_abcd",
           "e": 1700000600000,
           "n": "00000000-0000-4000-8000-000000000001",
           "x": "usér/42 <a&b> \"q\" \\ 🌍"
         },
-        "body": "eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InVzw6lyLzQyIDxhJmI-IFwicVwiIFxcIPCfjI0ifQ",
-        "bodyJson": "{\"v\":1,\"u\":\"8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10\",\"k\":\"clsk_use_abcd\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\",\"x\":\"usér/42 <a&b> \\\"q\\\" \\\\ 🌍\"}",
+        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwieCI6InVzw6lyLzQyIDxhJmI-IFwicVwiIFxcIPCfjI0ifQ",
+        "bodyJson": "{\"v\":1,\"u\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\",\"k\":\"clsk_use_abcd\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\",\"x\":\"usér/42 <a&b> \\\"q\\\" \\\\ 🌍\"}",
         "signingSecret": "0f0cf99015b87fb626aac8b5174a54ffa8b571f61419a1e692d59022105218d1",
-        "signature": "04fd38781638cd940f6aaaafb81d90729868d4c898a5d01614b99b34ea02721c"
+        "signature": "93043371a5743be6c82c92c733d4af43556c4b32ea83d8f9db604df3428acb2e"
       }
     },
     {
       "name": "key without the clsk_ prefix names its first 8 characters",
       "apiKey": "legacy-key-0123456789abcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10"
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
       "expected": {
-        "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImxlZ2FjeS1rIiwiZSI6MTcwMDAwMDYwMDAwMCwibiI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSJ9.dd8556940b22839c181050cbbcdffaa072f359642dce50088c337410709d2b4b",
+        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImxlZ2FjeS1rIiwiZSI6MTcwMDAwMDYwMDAwMCwibiI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSJ9.1b8e42f2c0be6dbdee376c78509029f8b73d92d736e9255975948de0774aa151",
         "expiresAt": 1700000600000,
         "claims": {
           "v": 1,
-          "u": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+          "u": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
           "k": "legacy-k",
           "e": 1700000600000,
           "n": "00000000-0000-4000-8000-000000000001"
         },
-        "body": "eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImxlZ2FjeS1rIiwiZSI6MTcwMDAwMDYwMDAwMCwibiI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSJ9",
-        "bodyJson": "{\"v\":1,\"u\":\"8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10\",\"k\":\"legacy-k\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
+        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImxlZ2FjeS1rIiwiZSI6MTcwMDAwMDYwMDAwMCwibiI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSJ9",
+        "bodyJson": "{\"v\":1,\"u\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\",\"k\":\"legacy-k\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
         "signingSecret": "c85379d1e2254c96d3c2810c77c1db914b8b7e1efa4837e4d0c3eb746ddc907a",
-        "signature": "dd8556940b22839c181050cbbcdffaa072f359642dce50088c337410709d2b4b"
+        "signature": "1b8e42f2c0be6dbdee376c78509029f8b73d92d736e9255975948de0774aa151"
       }
     },
     {
       "name": "key shorter than its prefix length",
       "apiKey": "key",
       "options": {
-        "uploadPresetId": "preset-1"
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
       "expected": {
-        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0LTEiLCJrIjoia2V5IiwiZSI6MTcwMDAwMDYwMDAwMCwibiI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSJ9.fc0972a4a03cf0474e308183c4e959e14c0f00146c353b2208c4e51621ab725b",
+        "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImtleSIsImUiOjE3MDAwMDA2MDAwMDAsIm4iOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEifQ.6ff4537a1776aa0228fc77e0b756b38fadeebaf518da5629401e8607a1b00919",
         "expiresAt": 1700000600000,
         "claims": {
           "v": 1,
-          "u": "preset-1",
+          "u": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
           "k": "key",
           "e": 1700000600000,
           "n": "00000000-0000-4000-8000-000000000001"
         },
-        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0LTEiLCJrIjoia2V5IiwiZSI6MTcwMDAwMDYwMDAwMCwibiI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSJ9",
-        "bodyJson": "{\"v\":1,\"u\":\"preset-1\",\"k\":\"key\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
+        "body": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImtleSIsImUiOjE3MDAwMDA2MDAwMDAsIm4iOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEifQ",
+        "bodyJson": "{\"v\":1,\"u\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\",\"k\":\"key\",\"e\":1700000600000,\"n\":\"00000000-0000-4000-8000-000000000001\"}",
         "signingSecret": "2c70e12b7a0646f92279f427c7b38e7334d8e5389cff167a1dc30e73f826b683",
-        "signature": "fc0972a4a03cf0474e308183c4e959e14c0f00146c353b2208c4e51621ab725b"
+        "signature": "6ff4537a1776aa0228fc77e0b756b38fadeebaf518da5629401e8607a1b00919"
       }
     },
     {
@@ -209,7 +209,7 @@
       "name": "lifetime of 0 seconds",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "expiresInSeconds": 0
       },
       "error": "sdk/invalid-argument"
@@ -218,7 +218,7 @@
       "name": "negative lifetime",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "expiresInSeconds": -1
       },
       "error": "sdk/invalid-argument"
@@ -227,7 +227,7 @@
       "name": "lifetime over an hour",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "expiresInSeconds": 3601
       },
       "error": "sdk/invalid-argument"
@@ -236,7 +236,7 @@
       "name": "fractional lifetime",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "expiresInSeconds": 1.5
       },
       "error": "sdk/invalid-argument"
@@ -245,7 +245,7 @@
       "name": "empty external ID",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
-        "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+        "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "externalId": ""
       },
       "error": "sdk/invalid-argument"
@@ -278,9 +278,9 @@
   "verification": [
     {
       "name": "fresh token",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": true,
@@ -288,9 +288,9 @@
     },
     {
       "name": "one millisecond before expiry",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000599999,
       "newUpload": true,
       "decodesAndVerifies": true,
@@ -298,9 +298,9 @@
     },
     {
       "name": "at its expiry",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000600000,
       "newUpload": true,
       "decodesAndVerifies": true,
@@ -308,9 +308,9 @@
     },
     {
       "name": "after expiry, continuing the upload it started",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700004200000,
       "newUpload": false,
       "decodesAndVerifies": true,
@@ -318,9 +318,9 @@
     },
     {
       "name": "a day after expiry, continuing the upload it started",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700087000000,
       "newUpload": false,
       "decodesAndVerifies": true,
@@ -328,7 +328,7 @@
     },
     {
       "name": "another preset",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "uploadPresetId": "preset-other",
       "now": 1700000000000,
@@ -338,9 +338,9 @@
     },
     {
       "name": "signed by another key with the same prefix",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.24d8b7527669b2ff86f06ef6105d31352995f4e38592312a9ea63c5f637035fb",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.ba22faaf5127a62db56441b622fc68ded6f2857503f7ca40d33b9ca11a92f040",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -348,9 +348,9 @@
     },
     {
       "name": "signed by a key of another prefix",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX3d4eXoiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.6ed073aae67fba52f40b4562e3e8bb31cb5beaffc65777347847a91829f7e155",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX3d4eXoiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.977d262000413d0c66d4a6b20d98ea19c423c5142999c3fdaeb399c37e802923",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -358,9 +358,9 @@
     },
     {
       "name": "tampered body",
-      "token": "clut_eyJ2IjoxLCA1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "clut_eyJ2IjoxLCA1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -368,9 +368,9 @@
     },
     {
       "name": "tampered signature",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b0",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e0",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -378,9 +378,9 @@
     },
     {
       "name": "uppercase signature",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2D9F4A9EBFD77B46EB5EA6481EDCCAB227E38A19E81B38A6DB16FA303441A5B1",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21FD9BBFD6478420B8B9E718302BC6D636E1F63C040466D93E2D80E3C319E3E2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -388,9 +388,9 @@
     },
     {
       "name": "without the clut_ prefix",
-      "token": "eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1",
+      "token": "eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -398,9 +398,9 @@
     },
     {
       "name": "extra segment",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2d9f4a9ebfd77b46eb5ea6481edccab227e38a19e81b38a6db16fa303441a5b1.extra",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.21fd9bbfd6478420b8b9e718302bc6d636e1f63c040466d93e2d80e3c319e3e2.extra",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -408,9 +408,9 @@
     },
     {
       "name": "unknown version",
-      "token": "clut_eyJ2IjoyLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.c23077cd34d38f7943da3741fcd46efcc07bc17df47796c37f649f9c4c3101fc",
+      "token": "clut_eyJ2IjoyLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAwNjAwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.2c3ff06e1dcdcbd0ea1b0b0595a4e0ec02a4b3969efa9327cb7a60b661611918",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": false,
@@ -418,9 +418,9 @@
     },
     {
       "name": "expiry exactly the longest lifetime plus clock skew ahead",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjYwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.038c5f93f93c030a3a414b7020df530b9e711721dafe241cb3e14e006bb4049e",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjYwMDAwLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.f3b202b33725d5cc0a050177c3ff36962c96eeeeea48421b0c14d7957cfab896",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": true,
@@ -428,9 +428,9 @@
     },
     {
       "name": "expiry beyond the longest lifetime plus clock skew",
-      "token": "clut_eyJ2IjoxLCJ1IjoiOGYwZjZhOGUtMmMxZS00YzdhLTlkNTUtMGI2ZjRjMWEyZTEwIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjYwMDAxLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.4a372d4dcf9431e6bf5af0f549699c9e8d9183ef56158459c86c2a63a539b9ff",
+      "token": "clut_eyJ2IjoxLCJ1IjoicHJlc2V0XzRMazhRdzJYbTlSdDVWYjNOYzdQIiwiayI6ImNsc2tfdXNlX2FiY2QiLCJlIjoxNzAwMDAzNjYwMDAxLCJuIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.3d1abab1a87a98d25d65f5dd2d812b56fc029735a7f7dba6912e37cce87c21bc",
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
-      "uploadPresetId": "8f0f6a8e-2c1e-4c7a-9d55-0b6f4c1a2e10",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
       "now": 1700000000000,
       "newUpload": true,
       "decodesAndVerifies": true,

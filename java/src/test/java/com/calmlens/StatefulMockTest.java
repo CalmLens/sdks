@@ -17,7 +17,7 @@ class StatefulMockTest {
   private static Options deterministic() {
     AtomicInteger ids = new AtomicInteger();
     AtomicLong clock = new AtomicLong(1_700_000_000_000L);
-    return new Options().createId(() -> "id-" + ids.incrementAndGet()).now(() -> clock.addAndGet(1000));
+    return new Options().createId(prefix -> prefix + "_" + String.format("%020d", ids.incrementAndGet())).now(() -> clock.addAndGet(1000));
   }
 
   private static Models.SubmitAsset kept(String name) {

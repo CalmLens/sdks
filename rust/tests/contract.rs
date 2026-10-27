@@ -1155,6 +1155,16 @@ async fn check_step(
                     items.contains(member),
                     "{label}: {path} {actual} lacks {member}"
                 );
+            } else if let Some(prefix) = wanted.get("$id").and_then(Value::as_str) {
+                let id = actual.as_str().unwrap_or_default();
+                let body = id
+                    .strip_prefix(prefix)
+                    .and_then(|rest| rest.strip_prefix('_'));
+                assert!(
+                    body.is_some_and(|body| body.len() == 20
+                        && body.bytes().all(|byte| byte.is_ascii_alphanumeric())),
+                    "{label}: {path} {actual} is not a new {prefix}_ ID"
+                );
             } else {
                 assert_eq!(actual, *wanted, "{label}: {path}");
             }

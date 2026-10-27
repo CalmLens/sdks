@@ -15,6 +15,7 @@ import type {
 import { validateAssetPayload } from "../contract/AssetPayload.js";
 import type { TypedEvent } from "../contract/Event.js";
 import type { Folder } from "../contract/Folder.js";
+import { type IdPrefix, isId } from "../contract/Ids.js";
 import { stringifyJsonCanonical } from "../contract/JsonUtils.js";
 import {
   type ModerationContextItem,
@@ -165,7 +166,8 @@ export interface MockCalmLensApiOptions {
   grants: PermissionGrant[];
   databaseStorage: MockDatabaseStorage;
   imageStorage: MockImageStorage;
-  createId: () => string;
+  /** A new ID for an object of the kind `prefix` names, such as `asset`. */
+  createId: (prefix: IdPrefix) => string;
   now: () => number;
   queuedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
   analyzedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
@@ -205,10 +207,6 @@ const MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI";
 /** Like the API: 1 to 255 printable ASCII characters, once HTTP has trimmed the header value. */
 const isValidIdempotencyKey = (key: string) =>
   key.length > 0 && key.length <= 255 && /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/.test(key);
-
-/** The UUID form the API's schema accepts (zod's `uuid()`). */
-const UUID_PATTERN =
-  /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
 
 /** Like the CDN, content a browser could run as a document is served as a download. */
 const isActiveContentType = (type: string | undefined) => {
@@ -435,7 +433,7 @@ export class MockCalmLensApi {
   readonly apiKey: string;
   readonly databaseStorage: MockDatabaseStorage;
   readonly imageStorage: MockImageStorage;
-  readonly createId: () => string;
+  readonly createId: (prefix: IdPrefix) => string;
   readonly now: () => number;
   grants: PermissionGrant[];
   readonly calls: Array<{ call: MockCalmLensCall; operations: MockCalmLensOperation[] }> = [];
@@ -487,7 +485,7 @@ export class MockCalmLensApi {
   enqueueEvent(input: MockEventInput): TypedEvent {
     const now = this.now();
     const event = {
-      id: this.createId(),
+      id: this.createId("evt"),
       projectId: this.projectId,
       severity: "low",
       title: input.type,
@@ -516,7 +514,7 @@ export class MockCalmLensApi {
     decided.classification.moderation.manualReviews = [
       ...(decided.classification.moderation.manualReviews ?? []),
       {
-        id: this.createId(),
+        id: this.createId("rev"),
         decision,
         note: null,
         reviewerUserId: null,
@@ -536,7 +534,11 @@ export class MockCalmLensApi {
       facts: [
         { key: "decided-by", value: "reviewer" },
         { key: "asset-type", value: stored.type },
-        { key: "asset-name", value: stored.name, url: `https://calmlens.com/go/asset/${stored.id}` },
+        {
+          key: "asset-name",
+          value: stored.name,
+          url: `https://calmlens.com/go/asset/${stored.id}`,
+        },
         { key: "note", value: null },
       ],
     } as MockEventInput);
@@ -848,7 +850,7 @@ export class MockCalmLensApi {
     }
     const now = this.now();
     const list: HashList = {
-      id: this.createId(),
+      id: this.createId("hl"),
       projectId: this.projectId,
       name: name.trim(),
       description: typeof description === "string" ? description : null,
@@ -943,7 +945,7 @@ export class MockCalmLensApi {
     );
     if (existing) return [200, existing];
     const entry: HashListEntry = {
-      id: this.createId(),
+      id: this.createId("hle"),
       projectId: this.projectId,
       hashListId: list.id,
       hash: hash!,
@@ -1154,7 +1156,8 @@ export class MockCalmLensApi {
   }
 
   /**
-   * Checks every asset like the API (a non-UUID ID is `validation/invalid-format`, an unknown
+   * Checks every asset like the API (an ID that is not an asset ID is
+   * `validation/invalid-format`, an unknown
    * one `asset/not-found`, and either refuses the whole batch), then applies the operation at
    * once instead of in the background: `delete` deletes each asset with its stored child
    * assets and records `asset.deleted` with the asset as it was; `remove-content` removes
@@ -1169,7 +1172,7 @@ export class MockCalmLensApi {
       throw invalidField("validation/invalid-value", "operation");
     }
     assetIds.forEach((assetId, index) => {
-      if (typeof assetId !== "string" || !UUID_PATTERN.test(assetId)) {
+      if (typeof assetId !== "string" || !isId(assetId, "asset")) {
         throw invalidField("validation/invalid-format", `assetIds.${index}`);
       }
     });
@@ -1339,7 +1342,7 @@ export class MockCalmLensApi {
       }
     }
 
-    const id = this.createId();
+    const id = this.createId("asset");
     const now = this.now();
     const isOpenUpload = part !== undefined && !part.isFinal;
     const processingOptions = fields.processingOptions ?? { keepContentAfterProcessing: false };
@@ -1728,7 +1731,7 @@ export class MockCalmLensApi {
     await this.assertUniqueFolderName(name, parentId);
     const now = this.now();
     const folder: Folder = {
-      id: this.createId(),
+      id: this.createId("fldr"),
       projectId: this.projectId,
       parentId,
       name,
@@ -1836,7 +1839,7 @@ export class MockCalmLensApi {
     if (!existing) {
       const now = this.now();
       const lens: Lens = {
-        id: this.createId(),
+        id: this.createId("lens"),
         projectId: this.projectId,
         userId: null,
         ...options,
