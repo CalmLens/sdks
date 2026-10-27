@@ -214,6 +214,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "Intimate images of a real, identifiable person shared, offered, sought or traded without their consent, or threatened to be shared: nudity, sexual acts or sexualised images, including hidden-camera, upskirt, leaked or hacked images, sextortion threats, and sexual deepfakes or digitally undressed images of real people.";
     readonly exclusions: "Consensual adult content, including people sharing their own images or professional adult content; fictional, drawn or invented characters with no real person depicted; non-sexual images; factual reports, survivor accounts, prevention or support that share no such image and make no threat; mentioning a leak without sharing, offering or seeking the images.";
   };
+  readonly "sexual-extreme": {
+    readonly category: "sexual";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Extreme pornography";
+    readonly description: "Pornographic content showing or describing sex with an animal or with a dead body, or a sexual act that threatens a person's life or is likely to cause serious injury to the anus, breasts or genitals, including realistic drawn or generated depictions.";
+    readonly exclusions: "Consensual adult sexual content without such an act, including bondage, role play or rough play with no life-threatening act or serious injury; non-sexual images of animals, death or injury; factual reports, education, support or discussion that present no such material.";
+  };
   readonly "sexual-minors": {
     readonly category: "sexual";
     readonly kind: "harm";
@@ -674,6 +682,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "The author threatens or endorses serious harm against people because of a protected identity.";
     readonly exclusions: "Threats unrelated to identity, an unsupported identity motive, reporting or condemning someone else’s threat, and lawful accountability.";
   };
+  readonly "hate-personal": {
+    readonly category: "hate";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Aimed at a specific person";
+    readonly description: "The identity attack is aimed at a specific, identifiable person, such as the person addressed or replied to, a named individual or someone pictured, rather than at a group in general.";
+    readonly exclusions: "Attacks on a group as a whole or on unnamed members of it; quoted, reported or historical attacks on someone with no new attack by the author; insults aimed at invented characters in fiction.";
+  };
   readonly "hate-historical": {
     readonly category: "hate";
     readonly kind: "context";
@@ -952,6 +968,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "hate-historical": "hate-historical";
   "hate-hostility": "hate-hostility";
   "hate-inferiority": "hate-inferiority";
+  "hate-personal": "hate-personal";
   "hate-slurs": "hate-slurs";
   "hate-support-prevention": "hate-support-prevention";
   "hate-symbol": "hate-symbol";
@@ -997,6 +1014,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "sexual-documentary": "sexual-documentary";
   "sexual-educational": "sexual-educational";
   "sexual-explicit-language": "sexual-explicit-language";
+  "sexual-extreme": "sexual-extreme";
   "sexual-fictional": "sexual-fictional";
   "sexual-historical": "sexual-historical";
   "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -1108,6 +1126,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-historical": "hate-historical";
     "hate-hostility": "hate-hostility";
     "hate-inferiority": "hate-inferiority";
+    "hate-personal": "hate-personal";
     "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
     "hate-symbol": "hate-symbol";
@@ -1153,6 +1172,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
     "sexual-explicit-language": "sexual-explicit-language";
+    "sexual-extreme": "sexual-extreme";
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
     "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -1267,6 +1287,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-historical": "hate-historical";
     "hate-hostility": "hate-hostility";
     "hate-inferiority": "hate-inferiority";
+    "hate-personal": "hate-personal";
     "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
     "hate-symbol": "hate-symbol";
@@ -1312,6 +1333,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
     "sexual-explicit-language": "sexual-explicit-language";
+    "sexual-extreme": "sexual-extreme";
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
     "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -1422,6 +1444,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "hate-historical": "hate-historical";
     "hate-hostility": "hate-hostility";
     "hate-inferiority": "hate-inferiority";
+    "hate-personal": "hate-personal";
     "hate-slurs": "hate-slurs";
     "hate-support-prevention": "hate-support-prevention";
     "hate-symbol": "hate-symbol";
@@ -1467,6 +1490,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "sexual-documentary": "sexual-documentary";
     "sexual-educational": "sexual-educational";
     "sexual-explicit-language": "sexual-explicit-language";
+    "sexual-extreme": "sexual-extreme";
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
     "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -1584,6 +1608,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -1629,6 +1654,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -1743,6 +1769,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -1788,6 +1815,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -1898,6 +1926,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -1943,6 +1972,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -2058,6 +2088,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -2103,6 +2134,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -2217,6 +2249,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -2262,6 +2295,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -2372,6 +2406,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -2417,6 +2452,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -2532,6 +2568,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -2577,6 +2614,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -2691,6 +2729,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -2736,6 +2775,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -2846,6 +2886,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -2891,6 +2932,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -3006,6 +3048,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -3051,6 +3094,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -3165,6 +3209,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -3210,6 +3255,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -3320,6 +3366,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -3365,6 +3412,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -3480,6 +3528,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -3525,6 +3574,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -3639,6 +3689,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -3684,6 +3735,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -3794,6 +3846,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -3839,6 +3892,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -3954,6 +4008,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -3999,6 +4054,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -4113,6 +4169,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -4158,6 +4215,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -4268,6 +4326,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -4313,6 +4372,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -4428,6 +4488,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -4473,6 +4534,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -4587,6 +4649,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -4632,6 +4695,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -4742,6 +4806,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -4787,6 +4852,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -4902,6 +4968,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -4947,6 +5014,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -5061,6 +5129,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -5106,6 +5175,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
@@ -5216,6 +5286,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "hate-historical": "hate-historical";
       "hate-hostility": "hate-hostility";
       "hate-inferiority": "hate-inferiority";
+      "hate-personal": "hate-personal";
       "hate-slurs": "hate-slurs";
       "hate-support-prevention": "hate-support-prevention";
       "hate-symbol": "hate-symbol";
@@ -5261,6 +5332,7 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "sexual-documentary": "sexual-documentary";
       "sexual-educational": "sexual-educational";
       "sexual-explicit-language": "sexual-explicit-language";
+      "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";

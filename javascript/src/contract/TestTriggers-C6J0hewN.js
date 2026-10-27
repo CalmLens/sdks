@@ -339,6 +339,14 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "Intimate images of a real, identifiable person shared, offered, sought or traded without their consent, or threatened to be shared: nudity, sexual acts or sexualised images, including hidden-camera, upskirt, leaked or hacked images, sextortion threats, and sexual deepfakes or digitally undressed images of real people.",
 		exclusions: "Consensual adult content, including people sharing their own images or professional adult content; fictional, drawn or invented characters with no real person depicted; non-sexual images; factual reports, survivor accounts, prevention or support that share no such image and make no threat; mentioning a leak without sharing, offering or seeking the images."
 	},
+	"sexual-extreme": {
+		category: "sexual",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Extreme pornography",
+		description: "Pornographic content showing or describing sex with an animal or with a dead body, or a sexual act that threatens a person's life or is likely to cause serious injury to the anus, breasts or genitals, including realistic drawn or generated depictions.",
+		exclusions: "Consensual adult sexual content without such an act, including bondage, role play or rough play with no life-threatening act or serious injury; non-sexual images of animals, death or injury; factual reports, education, support or discussion that present no such material."
+	},
 	"sexual-minors": {
 		category: "sexual",
 		kind: "harm",
@@ -798,6 +806,14 @@ const MODERATION_QUALIFIER_INFO = {
 		displayName: "Threats or incitement",
 		description: "The author threatens or endorses serious harm against people because of a protected identity.",
 		exclusions: "Threats unrelated to identity, an unsupported identity motive, reporting or condemning someone else’s threat, and lawful accountability."
+	},
+	"hate-personal": {
+		category: "hate",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Aimed at a specific person",
+		description: "The identity attack is aimed at a specific, identifiable person, such as the person addressed or replied to, a named individual or someone pictured, rather than at a group in general.",
+		exclusions: "Attacks on a group as a whole or on unnamed members of it; quoted, reported or historical attacks on someone with no new attack by the author; insults aimed at invented characters in fiction."
 	},
 	"hate-historical": {
 		category: "hate",
