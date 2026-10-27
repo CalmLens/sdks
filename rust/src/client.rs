@@ -1439,8 +1439,8 @@ impl TextClient<'_> {
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
     /// The CDN URL of an asset's rendered (default), original or placeholder resource, with
-    /// `?ageConfirmed=true` when [`CdnRequest::age_confirmed`] is `Some(true)`. Only the
-    /// rendered resource takes a lens or transform; a placeholder also takes no `age_confirmed`.
+    /// serialized viewer assertions from [`CdnRequest::viewer_claims`]. Only the
+    /// rendered resource takes a lens or transform.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource
