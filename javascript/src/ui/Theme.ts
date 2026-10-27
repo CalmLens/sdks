@@ -14,8 +14,10 @@ export interface CalmLensTheme {
   muted: string;
   /** Borders and the progress track. Defaults to `text` at 18%. */
   border: string;
-  /** The drop zone's and file rows' fill. Defaults to `text` at 4%. */
+  /** The drop zone's fill. Defaults to `text` at 4%. */
   surface: string;
+  /** The file rows' fill. Defaults to none, so rows show what's behind them. */
+  background: string;
   success: string;
   warning: string;
   danger: string;
@@ -26,6 +28,7 @@ export const CALMLENS_THEME = {
   accentText: "#fff",
   radius: 12,
   text: "#1f2328",
+  background: "transparent",
   success: "#12a26f",
   warning: "#e8a317",
   danger: "#e5484d",

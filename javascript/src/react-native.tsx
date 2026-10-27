@@ -104,11 +104,14 @@ const createUploaderStyles = (theme: CalmLensTheme) =>
       borderWidth: 1,
       borderColor: theme.border,
       borderRadius: theme.radius,
-      backgroundColor: theme.surface,
+      backgroundColor: theme.background,
     },
-    accepted: { borderLeftWidth: 4, borderLeftColor: theme.success },
-    restricted: { borderLeftWidth: 4, borderLeftColor: theme.warning },
-    rejected: { borderLeftWidth: 4, borderLeftColor: theme.danger },
+    messageRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    // A finished file's outcome is a dot in its status colour before the message.
+    outcomeDot: { width: 8, height: 8, borderRadius: 4 },
+    accepted: { backgroundColor: theme.success },
+    restricted: { backgroundColor: theme.warning },
+    rejected: { backgroundColor: theme.danger },
     thumb: { width: 40, height: 40, borderRadius: 8, overflow: "hidden" },
     fileIcon: { alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
     fileIconLabel: { fontSize: 9, fontWeight: "700", fontFamily: "monospace" },
@@ -210,7 +213,7 @@ const UploadRow = ({
   onRetry: () => void;
   onRemove: () => void;
 }) => (
-  <View style={[styles.upload, view.outcome && styles[view.outcome]]}>
+  <View style={styles.upload}>
     {item.previewUrl ? (
       <Image
         source={{ uri: item.previewUrl }}
@@ -240,9 +243,12 @@ const UploadRow = ({
         </View>
       )}
       {view.message ? (
-        <Text role="status" style={styles.message}>
-          {view.message}
-        </Text>
+        <View style={styles.messageRow}>
+          {view.outcome && <View aria-hidden style={[styles.outcomeDot, styles[view.outcome]]} />}
+          <Text role="status" style={styles.message}>
+            {view.message}
+          </Text>
+        </View>
       ) : null}
     </View>
     <View style={styles.actions}>

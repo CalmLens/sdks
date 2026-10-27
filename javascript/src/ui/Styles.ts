@@ -15,6 +15,7 @@ export const CALMLENS_STYLES = `
   --calmlens-radius: ${CALMLENS_THEME.radius}px;
   --calmlens-border: color-mix(in srgb, currentColor 18%, transparent);
   --calmlens-surface: color-mix(in srgb, currentColor 4%, transparent);
+  --calmlens-background: ${CALMLENS_THEME.background};
   --calmlens-muted: color-mix(in srgb, currentColor 72%, transparent);
   --calmlens-success: ${CALMLENS_THEME.success};
   --calmlens-warning: ${CALMLENS_THEME.warning};
@@ -77,12 +78,16 @@ export const CALMLENS_STYLES = `
 .calmlens-uploads { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .calmlens-upload {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px;
-  border: 1px solid var(--calmlens-border); border-radius: var(--calmlens-radius); background: var(--calmlens-surface);
+  border: 1px solid var(--calmlens-border); border-radius: var(--calmlens-radius); background: var(--calmlens-background);
 }
-.calmlens-upload[data-outcome] { border-left-width: 4px; }
-.calmlens-upload[data-outcome="accepted"] { border-left-color: var(--calmlens-success); }
-.calmlens-upload[data-outcome="restricted"] { border-left-color: var(--calmlens-warning); }
-.calmlens-upload[data-outcome="rejected"] { border-left-color: var(--calmlens-danger); }
+/* A finished file's outcome is a dot in its status colour before the message. */
+.calmlens-upload[data-outcome] .calmlens-upload__message::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%;
+  vertical-align: 0.05em;
+}
+.calmlens-upload[data-outcome="accepted"] .calmlens-upload__message::before { background: var(--calmlens-success); }
+.calmlens-upload[data-outcome="restricted"] .calmlens-upload__message::before { background: var(--calmlens-warning); }
+.calmlens-upload[data-outcome="rejected"] .calmlens-upload__message::before { background: var(--calmlens-danger); }
 .calmlens-upload__thumb {
   width: 40px; height: 40px; border-radius: 8px; object-fit: cover; display: grid; place-items: center;
   background: var(--calmlens-surface); border: 1px solid var(--calmlens-border);
