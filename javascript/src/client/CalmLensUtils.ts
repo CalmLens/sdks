@@ -331,16 +331,16 @@ export const appendCdnSelector = (
     lens?: string;
     transform?: CdnTransform;
     ageConfirmed?: boolean;
-    region?: string;
+    viewerRegion?: string;
   },
 ): string => {
   const path = appendCdnPathSelector(url, options);
   const query = new URLSearchParams();
   if (options.ageConfirmed) query.set("ageConfirmed", "true");
-  if (options.region !== undefined) {
-    if (!/^[A-Z]{2}$/.test(options.region) || options.region === "EU")
-      throw invalidArgument("region must be a viewer country code");
-    query.set("region", options.region);
+  if (options.viewerRegion !== undefined) {
+    if (!/^[A-Z]{2}$/.test(options.viewerRegion) || options.viewerRegion === "EU")
+      throw invalidArgument("viewerRegion must be a viewer country code");
+    query.set("viewerRegion", options.viewerRegion);
   }
   return query.size ? `${path}?${query}` : path;
 };

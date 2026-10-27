@@ -793,8 +793,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   private static JsonElement success(Reply reply) { return reply.json(); }
 
   private static JsonObject regionQuery(JsonObject options) {
-    if (!options.has("region")) return null;
-    JsonObject query = new JsonObject(); query.add("region", options.get("region")); return query;
+    if (!options.has("viewerRegion")) return null;
+    JsonObject query = new JsonObject(); query.add("viewerRegion", options.get("viewerRegion")); return query;
   }
 
   private Reply json(String method, String path, JsonObject query, JsonElement body) {
@@ -1526,7 +1526,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       // A serialized selector is already path-safe: unreserved characters, escapes, "=", "," and "/".
       else if (transform != null) url += "/" + serializeTransform(transform);
       if (o.has("ageConfirmed") && !o.get("ageConfirmed").isJsonNull() && o.get("ageConfirmed").getAsBoolean()) url += "?ageConfirmed=true";
-      if (o.has("region") && !o.get("region").isJsonNull()) url += (url.contains("?") ? "&" : "?") + "region=" + encodeComponent(o.get("region").getAsString());
+      if (o.has("viewerRegion") && !o.get("viewerRegion").isJsonNull()) url += (url.contains("?") ? "&" : "?") + "viewerRegion=" + encodeComponent(o.get("viewerRegion").getAsString());
       return url;
     }
 

@@ -40,7 +40,7 @@ final class Cdn extends Resource
             Values::invalid('ageConfirmed must be true or false');
         }
         $query = $ageConfirmed ? ['ageConfirmed' => 'true'] : [];
-        if (isset($options['region'])) $query['region'] = $options['region'];
+        if (isset($options['viewerRegion'])) $query['viewerRegion'] = $options['viewerRegion'];
         return $query ? $url . '?' . http_build_query($query) : $url;
     }
 

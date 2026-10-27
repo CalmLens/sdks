@@ -77,7 +77,7 @@ module CalmLens
 
       query = []
       query << 'ageConfirmed=true' if age_confirmed
-      query << "region=#{URI.encode_www_form_component(api['region'])}" if api['region']
+      query << "viewerRegion=#{URI.encode_www_form_component(api['viewerRegion'])}" if api['viewerRegion']
       query.empty? ? url : "#{url}?#{query.join('&')}"
     end
   end

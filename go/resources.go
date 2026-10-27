@@ -58,8 +58,8 @@ func (s *AssetsService) Retrieve(ctx context.Context, options AssetIDOptions) (*
 		return nil, err
 	}
 	params := url.Values{}
-	if options.Region != "" {
-		params.Set("region", options.Region)
+	if options.ViewerRegion != "" {
+		params.Set("viewerRegion", options.ViewerRegion)
 	}
 	var result Asset
 	if err = s.c.request(ctx, "GET", path, params, nil, &result); err != nil {
@@ -386,8 +386,8 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 		endpoint += "/" + path
 	}
 	params := url.Values{}
-	if options.Region != "" {
-		params.Set("region", options.Region)
+	if options.ViewerRegion != "" {
+		params.Set("viewerRegion", options.ViewerRegion)
 	}
 	if options.AgeConfirmed {
 		params.Set("ageConfirmed", "true")

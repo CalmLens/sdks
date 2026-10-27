@@ -328,8 +328,8 @@ export default class CalmLensServerClient {
         this.iteratePages((cursor) => this.buildAssets().list({ ...options, cursor })),
 
       /** Retrieves an asset with its status and classification results. */
-      retrieve: async ({ assetId, region }: RetrieveAssetOptions): Promise<Asset> =>
-        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`, { query: { region } }),
+      retrieve: async ({ assetId, viewerRegion }: RetrieveAssetOptions): Promise<Asset> =>
+        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`, { query: { viewerRegion } }),
 
       /** Updates an asset's editable fields. */
       update: async ({ assetId, ...body }: UpdateAssetOptions): Promise<Asset> =>
@@ -400,7 +400,7 @@ export default class CalmLensServerClient {
         validateSignedUrlOptions(options);
         return this.request("POST", `/assets/${encodedAssetId}/signed-url`, {
           body: {
-            region: options.region,
+            viewerRegion: options.viewerRegion,
             resource: options.resource,
             expiresInSeconds: options.expiresInSeconds ?? DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
             lens: options.lens,
