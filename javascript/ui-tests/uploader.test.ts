@@ -35,14 +35,6 @@ afterEach(() => {
   mounted = undefined;
 });
 
-/** Picks files with the uploader's file input, as the browser's picker does. */
-const pick = (container: HTMLElement, files: File[]) => {
-  const input = container.querySelector<HTMLInputElement>('input[type="file"]');
-  if (!input) throw new Error("The uploader has no file input");
-  Object.defineProperty(input, "files", { value: files, configurable: true });
-  input.dispatchEvent(new Event("change", { bubbles: true }));
-};
-
 /** Drops files on the drop zone, the element around the choose button. */
 const drop = (container: HTMLElement, files: File[]) => {
   const zone = within(container).getByRole("button", { name: messages.chooseFiles }).parentElement;
@@ -79,7 +71,7 @@ for (const binding of BINDINGS) {
         messages,
         onUploaded: (upload) => uploaded.push(upload),
       });
-      pick(mounted.container, [photo()]);
+      binding.pick(mounted, [photo()]);
 
       await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:allowed"]));
       expect(uploaded.map(({ status, file }) => [status, file.name])).toEqual([
@@ -97,7 +89,7 @@ for (const binding of BINDINGS) {
         onUploaded: uploaded,
         onRejected: (item) => rejected.push(item),
       });
-      pick(mounted.container, [photo("bad.png")]);
+      binding.pick(mounted, [photo("bad.png")]);
 
       await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:blocked"]));
       expect(rejected.map((item) => item.status)).toEqual(["blocked"]);
@@ -113,7 +105,7 @@ for (const binding of BINDINGS) {
         messages,
         onRemoved: (item) => removed.push(item),
       });
-      pick(mounted.container, [photo("big.png", 3)]);
+      binding.pick(mounted, [photo("big.png", 3)]);
 
       await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:too-large"]));
       const view = within(mounted.container);
@@ -131,7 +123,7 @@ for (const binding of BINDINGS) {
         messages,
       });
       const view = within(mounted.container);
-      pick(mounted.container, [photo("first.png")]);
+      binding.pick(mounted, [photo("first.png")]);
 
       await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:allowed"]));
       expect(view.queryByRole("button", { name: messages.chooseFile })).toBeNull();
@@ -139,7 +131,7 @@ for (const binding of BINDINGS) {
         (view.getByRole("button", { name: messages.chooseAnother }) as HTMLButtonElement).disabled,
       ).toBe(false);
 
-      pick(mounted.container, [photo("second.png")]);
+      binding.pick(mounted, [photo("second.png")]);
       await waitFor(() =>
         expect(view.queryByRole("button", { name: "msg:remove second.png" })).not.toBeNull(),
       );
@@ -156,7 +148,7 @@ for (const binding of BINDINGS) {
       const upload = mock(async () => ({ assetId: "a1", status: "allowed" as const }));
       const controller = createUploadController({ upload, autoUpload: false });
       mounted = binding.mountUploader({ controller, messages });
-      pick(mounted.container, [photo()]);
+      binding.pick(mounted, [photo()]);
 
       await waitFor(() =>
         expect(controller.getSnapshot().items.map((item) => item.stage)).toEqual(["selected"]),
@@ -180,7 +172,7 @@ for (const binding of BINDINGS) {
         },
       });
       mounted = binding.mountUploader({ controller, messages });
-      pick(mounted.container, [photo()]);
+      binding.pick(mounted, [photo()]);
       await waitFor(() => expect(signal).toBeDefined());
       mounted.unmount();
       mounted = undefined;
@@ -200,7 +192,7 @@ for (const binding of BINDINGS) {
         },
         messages,
       });
-      pick(mounted.container, [photo()]);
+      binding.pick(mounted, [photo()]);
 
       await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:failed"]));
       within(mounted.container).getByRole("button", { name: messages.retry }).click();
@@ -220,7 +212,7 @@ for (const binding of BINDINGS) {
         },
         messages,
       });
-      pick(mounted.container, [photo()]);
+      binding.pick(mounted, [photo()]);
 
       await waitFor(() =>
         expect(
@@ -231,7 +223,20 @@ for (const binding of BINDINGS) {
       await waitFor(() => expect(within(mounted!.container).queryByRole("progressbar")).toBeNull());
     });
 
-    it("uploads every file dropped on it", async () => {
+    it("uploads every file picked at once", async () => {
+      const uploaded: string[] = [];
+      mounted = binding.mountUploader({
+        upload: async (file) => ({ assetId: file.name, status: "allowed" }),
+        multiple: true,
+        messages,
+        onUploaded: ({ assetId }) => uploaded.push(assetId),
+      });
+      binding.pick(mounted, [photo("a.png"), photo("b.png")]);
+
+      await waitFor(() => expect(uploaded.sort()).toEqual(["a.png", "b.png"]));
+    });
+
+    it.skipIf(!binding.acceptsDrops)("uploads every file dropped on it", async () => {
       const uploaded: string[] = [];
       mounted = binding.mountUploader({
         upload: async (file) => ({ assetId: file.name, status: "allowed" }),
@@ -249,7 +254,8 @@ for (const binding of BINDINGS) {
       mounted = binding.mountUploader({ upload, disabled: true, messages });
       const choose = within(mounted.container).getByRole("button", { name: messages.chooseFiles });
       expect((choose as HTMLButtonElement).disabled).toBe(true);
-      drop(mounted.container, [photo()]);
+      if (binding.acceptsDrops) drop(mounted.container, [photo()]);
+      else binding.pick(mounted, [photo()]);
 
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(upload).not.toHaveBeenCalled();
@@ -265,7 +271,7 @@ for (const binding of BINDINGS) {
         },
         messages,
       });
-      pick(mounted.container, [photo()]);
+      binding.pick(mounted, [photo()]);
       await waitFor(() => expect(signal).toBeDefined());
       mounted.unmount();
       mounted = undefined;

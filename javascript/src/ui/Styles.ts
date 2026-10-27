@@ -1,3 +1,5 @@
+import { CALMLENS_THEME } from "./Theme";
+
 /**
  * The components' stylesheet, also shipped as `@calmlens/sdk/styles.css`. The React components
  * render it themselves (React hoists it into the head, on the server too); with Vue, Svelte or
@@ -8,15 +10,15 @@
 export const CALMLENS_STYLES = `
 /* Zero specificity, so a page's own --calmlens-* values win even on the same element. */
 :where(.calmlens-uploader, .calmlens-media) {
-  --calmlens-accent: #635bff;
-  --calmlens-accent-text: #fff;
-  --calmlens-radius: 12px;
+  --calmlens-accent: ${CALMLENS_THEME.accent};
+  --calmlens-accent-text: ${CALMLENS_THEME.accentText};
+  --calmlens-radius: ${CALMLENS_THEME.radius}px;
   --calmlens-border: color-mix(in srgb, currentColor 18%, transparent);
   --calmlens-surface: color-mix(in srgb, currentColor 4%, transparent);
   --calmlens-muted: color-mix(in srgb, currentColor 72%, transparent);
-  --calmlens-success: #12a26f;
-  --calmlens-warning: #e8a317;
-  --calmlens-danger: #e5484d;
+  --calmlens-success: ${CALMLENS_THEME.success};
+  --calmlens-warning: ${CALMLENS_THEME.warning};
+  --calmlens-danger: ${CALMLENS_THEME.danger};
   --calmlens-focus-ring: var(--calmlens-accent);
   --calmlens-focus-width: 2px;
   --calmlens-focus-offset: 2px;

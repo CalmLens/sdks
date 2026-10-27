@@ -15,7 +15,7 @@ const here = import.meta.dir;
 const { compile } = await import("svelte/compiler");
 
 const LIBRARY_IMPORT =
-  /(\bfrom\s*|\bimport\s*\(?\s*)(["'])((?:react|react-dom|vue|svelte)(?:\/[^"']*)?)\2/g;
+  /(\bfrom\s*|\bimport\s*\(?\s*)(["'])((?:react|react-dom|react-native|vue|svelte)(?:\/[^"']*)?)\2/g;
 /** Points each UI library import at this package's copy, resolved with the run's conditions. */
 const pinLibraries = (code: string) =>
   code.replace(LIBRARY_IMPORT, (_match, lead: string, quote: string, specifier: string) => {

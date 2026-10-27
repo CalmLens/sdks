@@ -6,7 +6,10 @@ import {
   createUploadController,
   getMediaState,
   isFileAccepted,
+  pickMediaSource,
   resolveMediaProps,
+  resolveTheme,
+  type UploadFile,
   type UploadItem,
 } from "../src/ui";
 
@@ -53,6 +56,10 @@ describe("getMediaState", () => {
       kind: "image",
       src: `${base}/width=800`,
       srcSet: `${base}/width=400 400w, ${base}/width=800 800w`,
+      sources: [
+        { src: `${base}/width=400`, width: 400 },
+        { src: `${base}/width=800`, width: 800 },
+      ],
       placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     });
   });
@@ -134,6 +141,46 @@ describe("getMediaState", () => {
     expect(
       getMediaState({ projectId: PROJECT_ID, assetId: "v1", type: "video", lens: "card" }),
     ).toEqual({ kind: "video", src: `${CDN}/assets/${PROJECT_ID}/v1/original` });
+  });
+});
+
+describe("pickMediaSource", () => {
+  const state = getMediaState({ projectId: PROJECT_ID, assetId: "a1", widths: [400, 800, 1200] });
+  const base = `${CDN}/assets/${PROJECT_ID}/a1/rendered`;
+  if (state.kind !== "image") throw new Error("Expected an image");
+
+  it("loads the smallest width that covers the measured box", () => {
+    expect(pickMediaSource(state, 401)).toBe(`${base}/width=800`);
+    expect(pickMediaSource(state, 400)).toBe(`${base}/width=400`);
+  });
+
+  it("loads the largest width for a box wider than every width", () => {
+    expect(pickMediaSource(state, 3000)).toBe(`${base}/width=1200`);
+  });
+
+  it("loads the image's own URL before the box is measured or without widths", () => {
+    expect(pickMediaSource(state, undefined)).toBe(`${base}/width=1200`);
+    const plain = getMediaState({ projectId: PROJECT_ID, assetId: "a1" });
+    if (plain.kind !== "image") throw new Error("Expected an image");
+    expect(pickMediaSource(plain, 300)).toBe(base);
+  });
+});
+
+describe("resolveTheme", () => {
+  it("mixes the secondary colours from the text colour", () => {
+    expect(resolveTheme({ text: "#fff" })).toMatchObject({
+      text: "#fff",
+      muted: "rgba(255, 255, 255, 0.72)",
+      border: "rgba(255, 255, 255, 0.18)",
+      surface: "rgba(255, 255, 255, 0.04)",
+    });
+  });
+
+  it("keeps a secondary colour you set over the mixed one", () => {
+    expect(resolveTheme({ text: "#000000", border: "red" })).toMatchObject({
+      muted: "rgba(0, 0, 0, 0.72)",
+      border: "red",
+    });
   });
 });
 
@@ -395,6 +442,41 @@ describe("UploadController", () => {
     ]);
     expect(failed.map((item) => item.file.name)).toEqual(["big.png"]);
     expect(created).toHaveLength(2);
+  });
+
+  it("uploads a phone file's bytes and previews it from its own URI", async () => {
+    const bytes = new Uint8Array([4, 5, 6]);
+    // A file as `expo-file-system` returns it: not a Blob, with a local URI.
+    const phoneFile: UploadFile = {
+      name: "camera.jpg",
+      type: "image/jpeg",
+      size: bytes.length,
+      uri: "file:///cache/camera.jpg",
+      arrayBuffer: async () => bytes.slice().buffer,
+    };
+    const created: MockCalmLensAppClient[] = [];
+    const uploaded: CalmLensUpload[] = [];
+    const controller = createUploadController({
+      uploadPresetId: PRESET_ID,
+      createClient: (options) => {
+        const client = new MockCalmLensAppClient({
+          ...options,
+          mockOptions: { queuedOutcome: "allowed" },
+        });
+        created.push(client);
+        return client;
+      },
+      onUploaded: (upload) => uploaded.push(upload),
+    });
+    controller.addFiles([phoneFile]);
+    expect(controller.getSnapshot().items[0]?.previewUrl).toBe("file:///cache/camera.jpg");
+    await settle(controller);
+
+    expect(uploaded.map(({ status, file }) => [status, file])).toEqual([["allowed", phoneFile]]);
+    const served = await created[0]?.server.cdn.serve({
+      assetIdentifier: uploaded[0]?.assetId ?? "",
+    });
+    expect(new Uint8Array((await served?.arrayBuffer()) ?? new ArrayBuffer(0))).toEqual(bytes);
   });
 
   it("uploads through a custom upload function and checks its status", async () => {

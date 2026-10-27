@@ -37,7 +37,7 @@ for (const binding of BINDINGS) {
 
       expect(image.getAttribute("src")).toBe(`${CDN}/assets/${PROJECT_ID}/a1/rendered`);
       expect(decorative()).toEqual([`${CDN}/assets/${PROJECT_ID}/a1/placeholder`]);
-      image.dispatchEvent(new Event("load"));
+      await binding.settleImage(image, "load");
       await waitFor(() => expect(decorative()).toEqual([]));
     });
 
@@ -47,7 +47,9 @@ for (const binding of BINDINGS) {
 
       const reveal = await view().findByRole("button", { name: messages.reveal });
       expect(view().queryByRole("img", { name: asset.alt })).toBeNull();
-      expect(requested()).toEqual([`${CDN}/assets/${PROJECT_ID}/a1/placeholder`]);
+      await waitFor(() =>
+        expect(requested()).toEqual([`${CDN}/assets/${PROJECT_ID}/a1/placeholder`]),
+      );
       reveal.click();
       expect(onReveal).toHaveBeenCalledTimes(1);
     });
@@ -71,33 +73,39 @@ for (const binding of BINDINGS) {
     it("says the image is unavailable when it fails to load", async () => {
       mounted = binding.mountMedia({ ...asset, messages });
       const image = await view().findByRole("img", { name: asset.alt });
-      image.dispatchEvent(new Event("error"));
+      await binding.settleImage(image, "error");
 
       expect(await view().findByText(messages.unavailable)).toBeTruthy();
       expect(view().queryByRole("img", { name: asset.alt })).toBeNull();
     });
 
-    it("offers each width in srcset for the sizes it is shown at", async () => {
-      mounted = binding.mountMedia({
-        ...asset,
-        widths: [800, 400],
-        sizes: "(min-width: 768px) 50vw, 100vw",
-        messages,
-      });
-      const image = await view().findByRole("img", { name: asset.alt });
-      const base = `${CDN}/assets/${PROJECT_ID}/a1/rendered`;
+    it.skipIf(!binding.rendersHtmlImages)(
+      "offers each width in srcset for the sizes it is shown at",
+      async () => {
+        mounted = binding.mountMedia({
+          ...asset,
+          widths: [800, 400],
+          sizes: "(min-width: 768px) 50vw, 100vw",
+          messages,
+        });
+        const image = await view().findByRole("img", { name: asset.alt });
+        const base = `${CDN}/assets/${PROJECT_ID}/a1/rendered`;
 
-      expect(image.getAttribute("srcset")).toBe(`${base}/width=400 400w, ${base}/width=800 800w`);
-      expect(image.getAttribute("sizes")).toBe("(min-width: 768px) 50vw, 100vw");
-    });
+        expect(image.getAttribute("srcset")).toBe(`${base}/width=400 400w, ${base}/width=800 800w`);
+        expect(image.getAttribute("sizes")).toBe("(min-width: 768px) 50vw, 100vw");
+      },
+    );
 
-    it("plays a video's original file with no poster, as the CDN renders no still for video", async () => {
-      mounted = binding.mountMedia({ ...asset, type: "video", messages });
-      const video = await view().findByLabelText(asset.alt);
+    it.skipIf(!binding.playsMedia)(
+      "plays a video's original file with no poster, as the CDN renders no still for video",
+      async () => {
+        mounted = binding.mountMedia({ ...asset, type: "video", messages });
+        const video = await view().findByLabelText(asset.alt);
 
-      expect(video.getAttribute("src")).toBe(`${CDN}/assets/${PROJECT_ID}/a1/original`);
-      expect(video.getAttribute("poster")).toBeNull();
-    });
+        expect(video.getAttribute("src")).toBe(`${CDN}/assets/${PROJECT_ID}/a1/original`);
+        expect(video.getAttribute("poster")).toBeNull();
+      },
+    );
 
     it("shows an API asset with its own status and preview", async () => {
       mounted = binding.mountMedia({
@@ -119,7 +127,7 @@ for (const binding of BINDINGS) {
       expect(image.getAttribute("src")).toBe(
         `${CDN}/assets/${PROJECT_ID}/a1/rendered?allowAgeRestricted=true`,
       );
-      expect(image.getAttribute("width")).toBe("800");
+      if (binding.rendersHtmlImages) expect(image.getAttribute("width")).toBe("800");
       expect(decorative()).toHaveLength(1);
       expect(decorative()[0]).toStartWith("data:image/png;base64,");
     });

@@ -9,15 +9,32 @@ import { createProgressFetch } from "./ProgressFetch";
  */
 export type UploadStage = "selected" | "queued" | "uploading" | "checking" | "complete" | "failed";
 
+/**
+ * A file to upload: a browser `File`, or a file on a phone, such as a `File` from
+ * `expo-file-system`. Anything with a name, MIME type, size and bytes works.
+ */
+export interface UploadFile {
+  readonly name: string;
+  readonly type: string;
+  readonly size: number;
+  /** The file's local URI on a phone, such as `file:///…`, used for the image preview. */
+  readonly uri?: string;
+  /** Reads the file's bytes when its upload starts. */
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
 /** One file the uploader has picked, as the components render it. */
 export interface UploadItem {
   /** A local ID for the file in this uploader, not the asset ID. */
   readonly key: string;
-  readonly file: File;
+  readonly file: UploadFile;
   readonly stage: UploadStage;
   /** Sent bytes as a fraction from 0 to 1 while uploading, `null` when unknown. */
   readonly progress: number | null;
-  /** An object URL for image files, for a local preview while the photo is checked. */
+  /**
+   * A local preview of an image file while it's checked: an object URL in browsers, or the file's
+   * own URI on a phone.
+   */
   readonly previewUrl?: string;
   readonly assetId?: string;
   /** The moderation status, when the upload preset shows decisions to the uploader. */
@@ -34,7 +51,7 @@ export interface CalmLensUpload {
   assetId: string;
   /** `undefined` when the upload preset doesn't show decisions to the uploader. */
   status?: AssetModerationStatus;
-  file: File;
+  file: UploadFile;
 }
 
 export interface UploadSnapshot {
@@ -70,7 +87,7 @@ export interface UploadControllerOptions {
    * app's API, which creates the asset with its API key. The uploader still shows progress, the
    * decision and errors: throw a `CalmLensError` to show its code's message.
    */
-  upload?: (file: File, context: CustomUploadContext) => Promise<CustomUploadResult>;
+  upload?: (file: UploadFile, context: CustomUploadContext) => Promise<CustomUploadResult>;
   /**
    * Checks a pending upload made with `upload`, returning its current moderation status. Without
    * it, a pending upload finishes as pending.
@@ -83,7 +100,7 @@ export interface UploadControllerOptions {
    * The upload token, or a function that returns a fresh one for each file. Leave it out for
    * presets that anyone can upload to.
    */
-  token?: string | ((file: File) => string | Promise<string>);
+  token?: string | ((file: UploadFile) => string | Promise<string>);
   /**
    * An endpoint on your server that returns `{ token }` for each file. It receives a `POST` with
    * the file's `{ name, type, size }` as JSON. Use `token` instead for anything more custom.
@@ -131,7 +148,10 @@ const DEFAULT_CONCURRENCY = 3;
 const DEFAULT_DECISION_TIMEOUT_MS = 15_000;
 
 /** Whether a file matches an `accept` list such as `image/*,.pdf`. */
-export const isFileAccepted = (file: Pick<File, "name" | "type">, accept?: string): boolean => {
+export const isFileAccepted = (
+  file: Pick<UploadFile, "name" | "type">,
+  accept?: string,
+): boolean => {
   const patterns = (accept ?? "")
     .split(",")
     .map((pattern) => pattern.trim().toLowerCase())
@@ -145,6 +165,24 @@ export const isFileAccepted = (file: Pick<File, "name" | "type">, accept?: strin
     if (pattern.startsWith(".")) return name.endsWith(pattern);
     return type === pattern;
   });
+};
+
+/** A browser file or blob, which uploads as it is. A file with a `uri` is read for its bytes. */
+const isBlob = (file: UploadFile): file is UploadFile & Blob =>
+  !file.uri && typeof Blob !== "undefined" && file instanceof Blob;
+
+/** An image preview for a picked file: its own URI, or an object URL for a browser file. */
+const createPreviewUrl = (file: UploadFile) => {
+  if (!file.type.startsWith("image/")) return undefined;
+  if (file.uri) return file.uri;
+  return isBlob(file) && typeof URL.createObjectURL === "function"
+    ? URL.createObjectURL(file)
+    : undefined;
+};
+
+/** Releases an object URL `createPreviewUrl` made; a file's own URI is left alone. */
+const revokePreviewUrl = (url: string | undefined) => {
+  if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
 };
 
 const isRejected = (status: AssetModerationStatus | undefined) =>
@@ -202,10 +240,10 @@ export class UploadController {
   };
 
   /**
-   * Adds files from a file input, a drop or a paste, and starts uploading them, or keeps them
-   * `selected` with `autoUpload: false`.
+   * Adds files from a file input, a drop, a paste or a phone's picker, and starts uploading them,
+   * or keeps them `selected` with `autoUpload: false`.
    */
-  addFiles(files: Iterable<File> | ArrayLike<File>): void {
+  addFiles(files: Iterable<UploadFile> | ArrayLike<UploadFile>): void {
     const {
       multiple = false,
       maxFiles = DEFAULT_MAX_FILES,
@@ -213,7 +251,7 @@ export class UploadController {
       maxFileSize,
       autoUpload = true,
     } = this.#options;
-    let picked = Array.from(files as ArrayLike<File>);
+    let picked = Array.from(files as ArrayLike<UploadFile>);
     if (picked.length === 0) return;
     if (!multiple) {
       picked = picked.slice(0, 1);
@@ -222,10 +260,7 @@ export class UploadController {
     const room = (multiple ? maxFiles : 1) - this.#snapshot.items.length;
     const added = picked.slice(0, Math.max(0, room)).map((file): UploadItem => {
       const key = `upload-${++nextKey}`;
-      const previewUrl =
-        file.type.startsWith("image/") && typeof URL.createObjectURL === "function"
-          ? URL.createObjectURL(file)
-          : undefined;
+      const previewUrl = createPreviewUrl(file);
       const errorCode = !isFileAccepted(file, accept)
         ? "file/not-accepted"
         : maxFileSize !== undefined && file.size > maxFileSize
@@ -279,7 +314,7 @@ export class UploadController {
     if (!item) return;
     this.#aborts.get(key)?.abort();
     this.#aborts.delete(key);
-    if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    revokePreviewUrl(item.previewUrl);
     this.#set(this.#snapshot.items.filter((other) => other.key !== key));
     this.#options.onRemoved?.(item);
     this.#pump();
@@ -289,9 +324,7 @@ export class UploadController {
   clear(): void {
     for (const abort of this.#aborts.values()) abort.abort();
     this.#aborts.clear();
-    for (const item of this.#snapshot.items) {
-      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-    }
+    for (const item of this.#snapshot.items) revokePreviewUrl(item.previewUrl);
     this.#set([]);
   }
 
@@ -366,7 +399,7 @@ export class UploadController {
 
   /** Creates and checks one file's upload, through `upload` or the upload preset. */
   async #clientFor(
-    file: File,
+    file: UploadFile,
     signal: AbortSignal,
     onProgress: (sent: number, total: number) => void,
   ): Promise<{
@@ -399,16 +432,20 @@ export class UploadController {
     };
     const client = createClient ? createClient(options) : new CalmLensAppClient(options);
     return {
-      create: () =>
-        client.assets.create({
+      create: async () => {
+        const type = file.type || "application/octet-stream";
+        return client.assets.create({
           name: file.name,
-          content: { data: file, type: file.type || "application/octet-stream" },
-        }),
+          content: isBlob(file)
+            ? { data: file, type }
+            : { uint8Array: new Uint8Array(await file.arrayBuffer()), type },
+        });
+      },
       retrieve: (assetId) => client.assets.retrieve({ assetId }),
     };
   }
 
-  async #tokenFor(file: File, signal: AbortSignal): Promise<string | undefined> {
+  async #tokenFor(file: UploadFile, signal: AbortSignal): Promise<string | undefined> {
     const { token, tokenUrl } = this.#options;
     if (typeof token === "function") return await token(file);
     if (token !== undefined) return token;

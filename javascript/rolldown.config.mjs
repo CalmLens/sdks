@@ -23,6 +23,7 @@ const input = {
   ui: "src/ui.ts",
   "file-icons": "src/file-icons.ts",
   react: "src/react.tsx",
+  "react-native": "src/react-native.tsx",
   vue: "src/vue.ts",
   elements: "src/elements.ts",
   testing: "src/testing.ts",

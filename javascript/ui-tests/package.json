@@ -1,7 +1,7 @@
 {
   "name": "calmlens-sdk-ui-tests",
   "private": true,
-  "description": "Behaviour tests for the SDK's React, Vue, Svelte and web component bindings, kept apart so the UI libraries never install inside the SDK itself.",
+  "description": "Behaviour tests for the SDK's React, React Native, Vue, Svelte and web component bindings, kept apart so the UI libraries never install inside the SDK itself.",
   "type": "module",
   "scripts": {
     "test": "bun test --conditions browser",
@@ -15,6 +15,8 @@
     "@types/react-dom": "19.2.2",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-native": "npm:react-native-web@0.21.4",
+    "react-native-svg": "15.16.0",
     "svelte": "5.41.0",
     "typescript": "7.0.2",
     "vue": "3.5.22"

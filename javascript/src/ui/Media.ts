@@ -90,9 +90,38 @@ export interface MediaSettings {
 export type MediaState =
   | { kind: "unavailable" }
   | { kind: "gated"; placeholderUrl?: string }
-  | { kind: "image"; src: string; srcSet?: string; placeholderUrl?: string }
+  | {
+      kind: "image";
+      src: string;
+      srcSet?: string;
+      /** One URL per width in `widths`, smallest first, for apps that pick their own. */
+      sources?: MediaImageSource[];
+      placeholderUrl?: string;
+    }
   | { kind: "video"; src: string; placeholderUrl?: string }
   | { kind: "audio"; src: string };
+
+/** An image at one of the widths in `widths`. */
+export interface MediaImageSource {
+  src: string;
+  width: number;
+}
+
+/**
+ * The image URL to load for a box `displayWidth` pixels wide: the smallest width that covers it,
+ * or the largest when none does. Without `widths`, or before the box is measured, the image's own
+ * `src`. React Native, which has no `srcset`, calls this with its measured size.
+ */
+export const pickMediaSource = (
+  state: Extract<MediaState, { kind: "image" }>,
+  displayWidth: number | undefined,
+): string => {
+  const { sources } = state;
+  if (!sources?.length || !displayWidth) return state.src;
+  return (
+    (sources.find((source) => source.width >= displayWidth) ?? sources.at(-1))?.src ?? state.src
+  );
+};
 
 const decodedPlaceholders = new Map<string, string | undefined>();
 
@@ -204,15 +233,17 @@ const buildMediaState = ({
   const widthsInOrder = [...new Set(widths ?? [])]
     .filter((width) => Number.isSafeInteger(width) && width > 0)
     .sort((a, b) => a - b);
-  const atWidth = (width: number) =>
-    build({ extra: { type: "imageTransform", options: { width } } });
-  const largest = widthsInOrder.at(-1);
+  const sources = widthsInOrder.map((width) => ({
+    src: build({ extra: { type: "imageTransform", options: { width } } }),
+    width,
+  }));
   return {
     kind: "image",
-    src: largest ? atWidth(largest) : build(),
-    srcSet: widthsInOrder.length
-      ? widthsInOrder.map((width) => `${atWidth(width)} ${width}w`).join(", ")
+    src: sources.at(-1)?.src ?? build(),
+    srcSet: sources.length
+      ? sources.map(({ src, width }) => `${src} ${width}w`).join(", ")
       : undefined,
+    sources: sources.length ? sources : undefined,
     placeholderUrl,
   };
 };
