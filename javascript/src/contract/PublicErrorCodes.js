@@ -283,7 +283,7 @@ Object.defineProperty(class SendableError extends Error {
 	}
 }, "name", { value: "SendableError" });
 ErrorCode.DEFAULT_CODE;
-// packages/shared/src/PublicErrorCodes.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/PublicErrorCodes.ts
 const PUBLIC_ERROR_CODES = {
 	INVALID_VIEWER_CLAIMS: new ErrorCode({
 		id: "viewer/invalid-claims",

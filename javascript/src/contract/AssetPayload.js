@@ -1,4 +1,4 @@
-// packages/shared/src/AssetPayload.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/AssetPayload.ts
 const uint8ArrayInputToNumbers = (value) => {
 	if (Array.isArray(value)) return value;
 	return Array.from(value);

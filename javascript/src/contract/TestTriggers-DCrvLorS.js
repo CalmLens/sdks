@@ -1,11 +1,11 @@
-import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, s as updatedAt } from "./Ids-aHyP9ZcF.js";
-import "./SharedConstants-CyiUWW66.js";
-import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
+import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, s as updatedAt } from "./Ids-B6RX1_CU.js";
+import "./SharedConstants-E1BwoKS6.js";
+import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-CWrEadZv.js";
 import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
 import * as zod from "zod";
-// packages/shared/src/DocMetaTypes.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
-// packages/shared/src/ZodUtils.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/ZodUtils.ts
 const createdAtField = () => zod.number().int().meta({ examples: [17672256e5] });
 const updatedAtField = () => zod.number().int().optional().meta({
 	...metaStore([updatedAt()]),
@@ -127,7 +127,7 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
 	}
 };
-// packages/shared/src/ModerationPolicyDimensions.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/ModerationPolicyDimensions.ts
 const MODERATION_QUALIFIER_INFO = {
 	"sexual-pornographic-media": {
 		category: "sexual",
@@ -1095,7 +1095,7 @@ function getModerationQualifierInfo(qualifier) {
 	return MODERATION_QUALIFIER_INFO[qualifier];
 }
 const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
-// packages/shared/src/PolicyRule.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/PolicyRule.ts
 /**
 * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
 * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
@@ -1125,7 +1125,7 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
-// packages/shared/src/TestRegionalActions.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/TestRegionalActions.ts
 /** Authenticated test inputs can add regional delivery restrictions without inventing evidence. */
 const TEST_REGIONAL_ACTIONS_SCHEMA = zod.array(zod.object({
 	region: JURISDICTION_SCHEMA.exclude(["global"]),
@@ -1135,7 +1135,7 @@ const TEST_REGIONAL_ACTIONS_SCHEMA = zod.array(zod.object({
 		"block"
 	])
 }).strict()).max(7).refine((entries) => new Set(entries.map((entry) => entry.region)).size === entries.length, "Choose each region once");
-// packages/shared/src/ProcessingFeatures.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/ProcessingFeatures.ts
 /**
 * Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
 * the single source for the request and result schemas, cache keys and metering. Features are
@@ -1438,6 +1438,12 @@ const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	knowledgeBaseId: saneStringField().nullish()
 });
 const CLASSIFICATION_REPORT_SCHEMA = zod.object({
+	testCategoryActions: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, zod.enum([
+		"allow",
+		"limit",
+		"age-restrict",
+		"block"
+	])).optional().describe("Explicit category outcomes from an authenticated test scenario; bypass policy evaluation."),
 	testRegionalActions: TEST_REGIONAL_ACTIONS_SCHEMA.optional().describe("Explicit regional restrictions from an authenticated test input."),
 	processedAt: zod.number(),
 	categories: CATEGORIES_SCHEMA,
@@ -1465,7 +1471,7 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched."),
 	policy: CLASSIFICATION_REPORT_POLICY_SCHEMA.optional().describe("What the project's moderation policy made of this report when the asset was decided. Absent until then.")
 }).strict();
-// packages/shared/src/TestTriggers.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/TestTriggers.ts
 /** A project's test input key: 32 hexadecimal characters only its members can see. */
 const TEST_INPUT_KEY_PATTERN = /^[a-f0-9]{32}$/;
 const TEXT_CODE_SIGNALS = [
@@ -1508,6 +1514,12 @@ const TEST_INPUT_SCHEMA = zod.object({
 	instances: zod.array(zod.object({
 		category: zod.enum(CLASSIFICATION_CATEGORIES),
 		score: zod.number().min(0).max(1).optional(),
+		action: zod.enum([
+			"allow",
+			"limit",
+			"age-restrict",
+			"block"
+		]).optional(),
 		qualifiers: zod.array(zod.enum(MODERATION_QUALIFIERS)).max(64)
 	}).strict().superRefine((instance, context) => {
 		if (new Set(instance.qualifiers).size !== instance.qualifiers.length || instance.qualifiers.some((q) => getModerationQualifierInfo(q).category !== instance.category || "fromInput" in getModerationQualifierInfo(q))) context.addIssue({
@@ -1516,6 +1528,10 @@ const TEST_INPUT_SCHEMA = zod.object({
 		});
 	})).max(128)
 }).strict().superRefine((scenario, context) => {
+	if (scenario.instances.some((instance) => instance.action !== void 0) && scenario.instances.some((instance) => instance.action === void 0)) context.addIssue({
+		code: "custom",
+		message: "Set an action for every instance or omit all actions."
+	});
 	const missing = scenario.unassessedCategories ?? [];
 	if (new Set(missing).size !== missing.length || scenario.instances.some((instance) => missing.includes(instance.category))) context.addIssue({
 		code: "custom",

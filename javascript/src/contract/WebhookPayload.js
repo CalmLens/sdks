@@ -1,12 +1,12 @@
-import { a as primaryIdField, l as metaStore, n as idField, o as backfill, t as EXAMPLE_IDS } from "./Ids-aHyP9ZcF.js";
-import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
-import "./SharedConstants-CyiUWW66.js";
-import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
+import { a as primaryIdField, l as metaStore, n as idField, o as backfill, t as EXAMPLE_IDS } from "./Ids-B6RX1_CU.js";
+import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BM7pQd7m.js";
+import "./SharedConstants-E1BwoKS6.js";
+import { t as hmacSha256Hex } from "./CryptoUtils-CWrEadZv.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
-import { C as docPropertyInfo, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-BllN4hPR.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Ba-H8vMt.js";
+import { C as docPropertyInfo, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-DCrvLorS.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-CVZjNK52.js";
 import * as zod from "zod";
-// packages/shared/src/AssetModerationDecision.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/AssetModerationDecision.ts
 /**
 * What moderation decided for an asset, which also decides how it is delivered: served to anyone
 * with access (`allowed`), served the same way but marked for reduced reach (`limited`), only
@@ -20,7 +20,7 @@ const ASSET_MODERATION_DECISION_SCHEMA = zod.enum([
 	"blocked",
 	"purged"
 ]);
-// packages/shared/src/ModerationContext.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/ModerationContext.ts
 const MODERATION_AUTHOR_ID_SCHEMA = zod.string().min(1).max(256).meta(metaStore([docPropertyInfo({
 	description: `Your identifier for who wrote the content, up to 256 characters. CalmLens only compares it with the author IDs in \`context\`, to tell which posts share a speaker, so any stable opaque value works. See [Threaded moderation](/docs/guides/threaded-moderation).`,
 	placeholder: "user-123"
@@ -47,7 +47,7 @@ const USED_MODERATION_CONTEXT_SCHEMA = zod.object({ items: zod.array(MODERATION_
 	description: `The earlier posts CalmLens used to read the content, oldest first: the most recent 5 sent that fit in ${MODERATION_CONTEXT_USED_CHARACTERS.toLocaleString("en-US")} characters. Removed with the content.`,
 	namedType: "UsedModerationContext"
 })]));
-// packages/shared/src/HumanReview.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
 const HUMAN_REVIEW_SETTINGS_SCHEMA = zod.object({
 	allowedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
@@ -81,7 +81,7 @@ zod.object({
 		message: "Confirm permanent deletion"
 	});
 });
-// packages/shared/src/PolicyCondition.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/PolicyCondition.ts
 const ruleCondition = (rule) => {
 	return [{
 		all: [...rule.when].sort(),
@@ -96,7 +96,7 @@ const normalizePolicyCondition = (condition) => [...new Map(condition.map((claus
 	return [JSON.stringify(normalized), normalized];
 })).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, clause]) => clause);
 const policyConditionKey = (scope, condition) => `${scope}:${JSON.stringify(normalizePolicyCondition(condition))}`;
-// packages/shared/src/MandatoryRules.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/MandatoryRules.ts
 /** A mandatory rule acts at this policy score (category score × condition evidence). */
 const MANDATORY_RULE_THRESHOLD = .5;
 const MANDATORY_RULES = [
@@ -222,7 +222,7 @@ const MANDATORY_RULES = [
 	}
 ];
 const MANDATORY_RULE_CATEGORIES = new Set(MANDATORY_RULES.map((restriction) => restriction.category));
-// packages/shared/src/Project.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/Project.ts
 /** The policy score from which a category's action applies. The same for every policy and category. */
 const POLICY_THRESHOLD = .5;
 const FLAGGED_CONTENT_POLICY_SCHEMA = zod.object({ action: FLAGGED_CONTENT_ACTION_SCHEMA });
@@ -354,7 +354,7 @@ zod.object({
 	testInputKey: zod.string().regex(TEST_INPUT_KEY_PATTERN).nullish()
 });
 Object.fromEntries(MODERATION_POLICY_CATEGORIES.map((category) => [category, MANDATORY_RULE_CATEGORIES.has(category) ? Math.min(POLICY_THRESHOLD, MANDATORY_RULE_THRESHOLD) : POLICY_THRESHOLD]));
-// packages/shared/src/Asset.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/Asset.ts
 /** Where the asset is in the pipeline: receiving content, processing it, or finished. */
 const ASSET_CLASSIFICATION_STATUS_SCHEMA = zod.enum([
 	"pending",
@@ -678,7 +678,7 @@ zod.object({
 	childProcessing: CHILD_PROCESSING_SCHEMA.nullish(),
 	manualDecision: MANUAL_DECISION_SCHEMA.nullish()
 });
-// packages/shared/src/ProjectAccess.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/ProjectAccess.ts
 const PROJECT_MEMBER_ROLE_SCHEMA = zod.enum([...ACCESS_ROLE_SCHEMA.options, "reviewer"]);
 zod.object({
 	id: primaryIdField("mem"),
@@ -704,7 +704,7 @@ zod.object({
 		"revoked"
 	])
 });
-// packages/shared/src/EventCatalog.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/EventCatalog.ts
 const EVENT_SEVERITY_SCHEMA = zod.enum(["low", "high"]);
 zod.enum([
 	"assets",
@@ -1569,7 +1569,7 @@ const EVENT_FACT_SCHEMA = zod.strictObject({
 	url: factUrl
 });
 const EVENT_FACTS_SCHEMA = zod.array(EVENT_FACT_SCHEMA);
-// packages/shared/src/Event.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/Event.ts
 const EVENT_ASSET_SCHEMA = zod.object({
 	id: zod.string().describe("Asset ID"),
 	externalId: zod.string().nullish().describe("The asset's `externalId`, if you set one"),
@@ -1658,7 +1658,7 @@ zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type)
 	docsSchema: EVENT_SCHEMA
 })]));
 EXAMPLE_IDS.asset;
-// packages/shared/src/WebhookPayload.ts
+// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/WebhookPayload.ts
 const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";
 const WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
