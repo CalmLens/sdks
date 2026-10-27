@@ -77,7 +77,7 @@ for (const binding of BINDINGS) {
       expect(uploaded.map(({ status, file }) => [status, file.name])).toEqual([
         ["allowed", "photo.png"],
       ]);
-      expect(uploaded[0]?.assetId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(uploaded[0]?.assetId).toMatch(/^asset_[0-9A-Za-z]{20}$/);
     });
 
     it("shows a blocked file as refused without reporting it as uploaded", async () => {
