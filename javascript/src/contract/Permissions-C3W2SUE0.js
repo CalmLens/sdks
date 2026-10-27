@@ -1,6 +1,6 @@
-import { n as idField } from "./Ids-B6RX1_CU.js";
+import { n as idField } from "./Ids-4lJ3KFur.js";
 import * as zod from "zod";
-// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/Permissions.ts
+// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/Permissions.ts
 const ACTION_SCHEMA = zod.enum([
 	"assets:read",
 	"assets:download",

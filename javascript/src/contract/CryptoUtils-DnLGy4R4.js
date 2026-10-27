@@ -1,4 +1,4 @@
-// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/CryptoUtils.ts
+// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/CryptoUtils.ts
 const encoder = new TextEncoder();
 /** Lowercase hex of `bytes`, two characters per byte. */
 const bytesToHex = (bytes) => Array.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");

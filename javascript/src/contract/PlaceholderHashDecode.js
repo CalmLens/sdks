@@ -1,4 +1,4 @@
-// ../../../../private/tmp/calmlens-explicit-scenario-contract/packages/shared/src/PlaceholderHashDecode.ts
+// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/PlaceholderHashDecode.ts
 /**
 * Decodes a ThumbHash to an RGBA image. RGB is not be premultiplied by A.
 *

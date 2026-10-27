@@ -9015,6 +9015,37 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
       flag: "flag";
     }>;
   }, zod.core.$strict>>>;
+  testCategoryActions: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    "criminal-activity": "criminal-activity";
+    harassment: "harassment";
+    hate: "hate";
+    "personal-information": "personal-information";
+    profanity: "profanity";
+    "self-harm": "self-harm";
+    sexual: "sexual";
+    violence: "violence";
+  }> & zod.core.$partial, zod.ZodEnum<{
+    "age-restrict": "age-restrict";
+    allow: "allow";
+    block: "block";
+    limit: "limit";
+  }>>>;
+  testRegionalActions: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+    region: zod.ZodEnum<{
+      AT: "AT";
+      AU: "AU";
+      BR: "BR";
+      DE: "DE";
+      EU: "EU";
+      FR: "FR";
+      GB: "GB";
+    }>;
+    action: zod.ZodEnum<{
+      "age-restrict": "age-restrict";
+      block: "block";
+      limit: "limit";
+    }>;
+  }, zod.core.$strict>>>;
 }, zod.core.$strip>;
 type AssetModeration = zod.infer<typeof ASSET_MODERATION_SCHEMA>;
 declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
@@ -17905,6 +17936,37 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
       action: zod.ZodEnum<{
         block: "block";
         flag: "flag";
+      }>;
+    }, zod.core.$strict>>>;
+    testCategoryActions: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+      "criminal-activity": "criminal-activity";
+      harassment: "harassment";
+      hate: "hate";
+      "personal-information": "personal-information";
+      profanity: "profanity";
+      "self-harm": "self-harm";
+      sexual: "sexual";
+      violence: "violence";
+    }> & zod.core.$partial, zod.ZodEnum<{
+      "age-restrict": "age-restrict";
+      allow: "allow";
+      block: "block";
+      limit: "limit";
+    }>>>;
+    testRegionalActions: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+      region: zod.ZodEnum<{
+        AT: "AT";
+        AU: "AU";
+        BR: "BR";
+        DE: "DE";
+        EU: "EU";
+        FR: "FR";
+        GB: "GB";
+      }>;
+      action: zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        block: "block";
+        limit: "limit";
       }>;
     }, zod.core.$strict>>>;
   }, zod.core.$strip>;
@@ -27063,6 +27125,37 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         action: zod.ZodEnum<{
           block: "block";
           flag: "flag";
+        }>;
+      }, zod.core.$strict>>>;
+      testCategoryActions: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }> & zod.core.$partial, zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        allow: "allow";
+        block: "block";
+        limit: "limit";
+      }>>>;
+      testRegionalActions: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        region: zod.ZodEnum<{
+          AT: "AT";
+          AU: "AU";
+          BR: "BR";
+          DE: "DE";
+          EU: "EU";
+          FR: "FR";
+          GB: "GB";
+        }>;
+        action: zod.ZodEnum<{
+          "age-restrict": "age-restrict";
+          block: "block";
+          limit: "limit";
         }>;
       }, zod.core.$strict>>>;
     }, zod.core.$strip>;
