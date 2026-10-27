@@ -965,7 +965,12 @@ The optional `@calmlens/sdk/test-inputs` entry generates and recognises the same
 project-specific colour grids used by the CalmLens portal:
 
 ```ts
-import { paintTestImage, detectTestImage, generateTestTextCode, TEST_INPUT_PRESETS } from "@calmlens/sdk/test-inputs";
+import {
+  paintTestImage,
+  detectTestImage,
+  generateTestTextCode,
+  TEST_INPUT_PRESETS,
+} from "@calmlens/sdk/test-inputs";
 
 const input = TEST_INPUT_PRESETS.mixed;
 const image = await paintTestImage(input, projectTestInputKey);
