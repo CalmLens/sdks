@@ -45,7 +45,7 @@ export const mount = (target: HTMLElement) => {
         for (const [name, value] of Object.entries(attributes)) {
           if (value !== undefined) media.setAttribute(name, value);
         }
-        media.toggleAttribute("age-confirmed", ageConfirmed);
+        media.setAttribute("viewer-claims", JSON.stringify({ ageConfirmed }));
         media.addEventListener("calmlens-reveal", playground.reveal);
         const caption = document.createElement("p");
         caption.className = "caption";

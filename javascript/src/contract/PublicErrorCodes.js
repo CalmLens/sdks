@@ -285,6 +285,16 @@ Object.defineProperty(class SendableError extends Error {
 ErrorCode.DEFAULT_CODE;
 // packages/shared/src/PublicErrorCodes.ts
 const PUBLIC_ERROR_CODES = {
+	INVALID_VIEWER_CLAIMS: new ErrorCode({
+		id: "viewer/invalid-claims",
+		defaultMessage: "Supply a viewerClaims object with an optional region and boolean ageConfirmed.",
+		status: 400
+	}),
+	AGE_CONFIRMATION_REQUIRED: new ErrorCode({
+		id: "viewer/age-confirmation-required",
+		defaultMessage: "Your application has not confirmed age-restricted delivery for this viewer.",
+		status: 403
+	}),
 	INVALID_VIEWER_REGION: new ErrorCode({
 		id: "viewer/invalid-region",
 		defaultMessage: "Supply the viewer's ISO country code, such as DE or GB.",

@@ -27,7 +27,11 @@ export function SensitiveImage({
   return (
     <figure style={{ aspectRatio, margin: 0, position: "relative" }}>
       {!restricted || ageConfirmed ? (
-        <img src={getAssetUrl({ ...asset, ageConfirmed: restricted })} alt={alt} style={fill} />
+        <img
+          src={getAssetUrl({ ...asset, viewerClaims: { ageConfirmed } })}
+          alt={alt}
+          style={fill}
+        />
       ) : (
         <>
           <img src={getAssetUrl({ ...asset, resource: "placeholder" })} alt="" style={fill} />

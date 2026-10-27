@@ -52,7 +52,7 @@ export type AssetClassificationStatus = KnownAssetClassificationStatus | (string
  * The moderation decision in force, which also decides delivery: `pending`, then `allowed`,
  * `limited` (delivered like `allowed`, but marked so your app can reduce its reach, such as
  * keeping it out of recommendations, trending and notifications, ranking it lower or collapsing
- * it), `age-restricted` (delivered only through signed URLs or API keys), `blocked` or `purged`.
+ * it), `age-restricted` (delivered only with viewerClaims.ageConfirmed=true), `blocked` or `purged`.
  */
 export type AssetModerationStatus = KnownAssetModerationStatus | (string & {});
 /** A reviewer's decision: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`. */
@@ -368,23 +368,24 @@ export interface IdempotencyOptions {
  * display, in the best format the client accepts, which takes lenses and transforms; or its
  * `placeholder`, a small blurred PNG that is public for public assets whatever their moderation
  * status. Defaults to `rendered`; ask for `original` to download the exact file. A
- * placeholder takes no lens, transform or `ageConfirmed`.
+ * placeholder takes no lens or transform.
  */
 export type CdnResource = "original" | "rendered" | "placeholder";
 
+export interface ViewerClaims {
+  /** Defaults to the country of the connection reaching CalmLens. Forward the viewer country through proxies. */
+  region?: string;
+  /** Customer assertion, not verified by CalmLens. Defaults to false, including authenticated requests. */
+  ageConfirmed?: boolean;
+}
+
 export interface CdnAssetUrlOptions {
   /** Viewer country supplied by your integration, including when requests go through a proxy. */
-  viewerRegion?: string;
+  viewerClaims?: ViewerClaims;
   assetIdentifier: string;
   resource?: CdnResource;
   lens?: string;
   transform?: CdnTransform;
-  /**
-   * Adds `ageConfirmed=true`, which lets the CDN serve a public asset whose moderation status is
-   * `age-restricted` from this URL. Without it, such an asset needs a signed URL or an API key. Set
-   * it only where your app has already decided the viewer may see age-restricted content.
-   */
-  ageConfirmed?: boolean;
 }
 
 /**
@@ -402,7 +403,7 @@ export interface CdnServeOptions extends CdnAssetUrlOptions {
 }
 
 export interface CreateAssetSignedUrlOptions {
-  viewerRegion?: string;
+  viewerClaims?: ViewerClaims;
   assetId: string;
   resource?: "original" | "rendered";
   lens?: string;
@@ -426,7 +427,6 @@ export type IterateAssetsOptions = Omit<ListAssetsOptions, "cursor">;
 export type ListEventsOptions = GetEventsQuery;
 
 export interface RetrieveAssetOptions {
-  viewerRegion?: string;
   assetId: string;
 }
 

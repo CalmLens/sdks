@@ -42,16 +42,16 @@ project ID, a negative timeout or retry count, or a base URL that is not an abso
 HTTP(S) URL returns a `*calmlens.Error` with code `sdk/invalid-config`. The client is
 safe for concurrent use. `Options`, `ServerClient` and errors never print the API key.
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `BaseURL`, `CDNBaseURL` | `https://api.calmlens.com/v1`, `https://cdn.calmlens.com/v1` | API and CDN endpoints. |
-| `Timeout` | `DefaultTimeout` (120 s) | Bounds each attempt of an API call, including the response body, and text uploads. For `CDN.Serve` it ends when the response headers arrive. |
-| `UploadTimeout` | none | Bounds each attempt of a binary upload (file content and multipart parts); zero leaves large files uncut. |
-| `ConnectTimeout` | `DefaultConnectTimeout` (10 s) | Dial and TLS handshake (default transport only). |
-| `ResponseHeaderTimeout` | `DefaultResponseHeaderTimeout` (120 s) | Wait for response headers after the request is sent (default transport only). |
-| `MaxRetries` | `DefaultMaxRetries` (2) | Retries for retryable failures; `calmlens.Ptr(0)` disables them. |
-| `MaxResponseBytes` | `DefaultMaxResponseBytes` (32 MiB) | Largest API response body read; larger ones fail with `sdk/response-too-large`. |
-| `HTTPClient` | a client with the timeouts above | Sends every request. A copy is used with redirects disabled, so credentials stay on the configured endpoint: a `3xx` fails with `sdk/http-error` and its status, and is not retried. |
+| Option                  | Default                                                      | Meaning                                                                                                                                                                              |
+| ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BaseURL`, `CDNBaseURL` | `https://api.calmlens.com/v1`, `https://cdn.calmlens.com/v1` | API and CDN endpoints.                                                                                                                                                               |
+| `Timeout`               | `DefaultTimeout` (120 s)                                     | Bounds each attempt of an API call, including the response body, and text uploads. For `CDN.Serve` it ends when the response headers arrive.                                         |
+| `UploadTimeout`         | none                                                         | Bounds each attempt of a binary upload (file content and multipart parts); zero leaves large files uncut.                                                                            |
+| `ConnectTimeout`        | `DefaultConnectTimeout` (10 s)                               | Dial and TLS handshake (default transport only).                                                                                                                                     |
+| `ResponseHeaderTimeout` | `DefaultResponseHeaderTimeout` (120 s)                       | Wait for response headers after the request is sent (default transport only).                                                                                                        |
+| `MaxRetries`            | `DefaultMaxRetries` (2)                                      | Retries for retryable failures; `calmlens.Ptr(0)` disables them.                                                                                                                     |
+| `MaxResponseBytes`      | `DefaultMaxResponseBytes` (32 MiB)                           | Largest API response body read; larger ones fail with `sdk/response-too-large`.                                                                                                      |
+| `HTTPClient`            | a client with the timeouts above                             | Sends every request. A copy is used with redirects disabled, so credentials stay on the configured endpoint: a `3xx` fails with `sdk/http-error` and its status, and is not retried. |
 
 `client.WithRequestOptions(calmlens.RequestOptions{Timeout, UploadTimeout, MaxRetries})` returns
 a client with other deadlines or retries for the calls made through it. It shares the
@@ -78,37 +78,37 @@ send `Accept: application/json`. `calmlens.Version` is the SDK version.
 
 ## API mapping
 
-| JavaScript | Go |
-| --- | --- |
-| `assets.create/classify` | `Assets.Create/Classify(ctx, SubmitAssetOptions)` |
-| `assets.retrieve/retry` | `Assets.Retrieve/Retry(ctx, AssetIDOptions)` |
-| `assets.explain` | `Assets.Explain(ctx, ExplainAssetOptions)` |
-| `assets.waitForDecision` | `Assets.WaitForDecision(ctx, WaitForDecisionOptions)` |
-| `assets.update` | `Assets.Update(ctx, UpdateAssetOptions)` |
-| `assets.list` | `Assets.List(ctx, ListAssetsOptions)`; every page: `Assets.ListAll(ListAssetsOptions)` |
-| `assets.listChildren` | `Assets.ListChildren(ctx, ListAssetChildrenOptions)`; every page: `Assets.ListChildrenAll(…)` |
-| `assets.search` | `Assets.Search(ctx, SearchAssetsOptions)` |
-| `assets.uploadPart` | `Assets.UploadPart(ctx, UploadAssetPartOptions)` |
-| `assets.deleteContent` | `Assets.DeleteContent(ctx, AssetIDOptions)` |
-| `assets.delete` | `Assets.Delete(ctx, AssetIDOptions)` (returns only `error`) |
-| `assets.move` | `Assets.Move(ctx, MoveAssetOptions)` |
-| `assets.batch` | `Assets.Batch(ctx, BatchAssetsOptions)`: 1 to 500 `AssetIDs` with `AssetBatchOperationDelete` or `AssetBatchOperationRemoveContent`; returns `*BatchAssetsResponse` once queued, and is not retried |
-| `assets.createSignedUrl` | `Assets.CreateSignedURL(ctx, SignedURLOptions)` |
-| `folders.list` | `Folders.List(ctx, ListFoldersOptions{})` |
-| `folders.retrieve/delete` | `Folders.Retrieve/Delete(ctx, FolderIDOptions)` |
-| `folders.create/update/move` | `Folders.Create/Update/Move(ctx, …FolderOptions)` |
-| `hashLists.list` | `HashLists.List(ctx, ListHashListsOptions{})` |
-| `hashLists.retrieve/delete` | `HashLists.Retrieve/Delete(ctx, HashListIDOptions)` (`Delete` returns only `error`) |
-| `hashLists.create/update` | `HashLists.Create/Update(ctx, CreateHashListOptions/UpdateHashListOptions)` |
-| `hashLists.listEntries` | `HashLists.ListEntries(ctx, ListHashListEntriesOptions)` |
-| `hashLists.addEntry` | `HashLists.AddEntry(ctx, AddHashListEntryOptions)` |
-| `hashLists.removeEntry` | `HashLists.RemoveEntry(ctx, HashListEntryIDOptions)` (returns only `error`) |
-| `events.list` | `Events.List(ctx, ListEventsOptions)`; follow the cursor: `Events.ListAll(ListEventsOptions)` |
-| `ensureLens/ensureLenses` | `EnsureLens/EnsureLenses(ctx, …Options)` |
-| `cdn.getAssetUrl/serve` | `CDN.GetAssetURL(CDNAssetURLOptions)` / `CDN.Serve(ctx, CDNServeOptions)` |
-| `verifyWebhookSignature` | `VerifyWebhookSignature(rawBody, signature, timestamp, secret, ...WebhookOption)` |
-| `constructEvent`-style helper | `ParseWebhookEvent(rawBody, signature, timestamp, secret, ...WebhookOption)`, `VerifyWebhookRequest(r, secret, ...WebhookOption)` |
-| webhook signing (tests, local forwarding) | `SignWebhookPayload(rawBody, timestamp, secret)` |
+| JavaScript                                | Go                                                                                                                                                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assets.create/classify`                  | `Assets.Create/Classify(ctx, SubmitAssetOptions)`                                                                                                                                                   |
+| `assets.retrieve/retry`                   | `Assets.Retrieve/Retry(ctx, AssetIDOptions)`                                                                                                                                                        |
+| `assets.explain`                          | `Assets.Explain(ctx, ExplainAssetOptions)`                                                                                                                                                          |
+| `assets.waitForDecision`                  | `Assets.WaitForDecision(ctx, WaitForDecisionOptions)`                                                                                                                                               |
+| `assets.update`                           | `Assets.Update(ctx, UpdateAssetOptions)`                                                                                                                                                            |
+| `assets.list`                             | `Assets.List(ctx, ListAssetsOptions)`; every page: `Assets.ListAll(ListAssetsOptions)`                                                                                                              |
+| `assets.listChildren`                     | `Assets.ListChildren(ctx, ListAssetChildrenOptions)`; every page: `Assets.ListChildrenAll(…)`                                                                                                       |
+| `assets.search`                           | `Assets.Search(ctx, SearchAssetsOptions)`                                                                                                                                                           |
+| `assets.uploadPart`                       | `Assets.UploadPart(ctx, UploadAssetPartOptions)`                                                                                                                                                    |
+| `assets.deleteContent`                    | `Assets.DeleteContent(ctx, AssetIDOptions)`                                                                                                                                                         |
+| `assets.delete`                           | `Assets.Delete(ctx, AssetIDOptions)` (returns only `error`)                                                                                                                                         |
+| `assets.move`                             | `Assets.Move(ctx, MoveAssetOptions)`                                                                                                                                                                |
+| `assets.batch`                            | `Assets.Batch(ctx, BatchAssetsOptions)`: 1 to 500 `AssetIDs` with `AssetBatchOperationDelete` or `AssetBatchOperationRemoveContent`; returns `*BatchAssetsResponse` once queued, and is not retried |
+| `assets.createSignedUrl`                  | `Assets.CreateSignedURL(ctx, SignedURLOptions)`                                                                                                                                                     |
+| `folders.list`                            | `Folders.List(ctx, ListFoldersOptions{})`                                                                                                                                                           |
+| `folders.retrieve/delete`                 | `Folders.Retrieve/Delete(ctx, FolderIDOptions)`                                                                                                                                                     |
+| `folders.create/update/move`              | `Folders.Create/Update/Move(ctx, …FolderOptions)`                                                                                                                                                   |
+| `hashLists.list`                          | `HashLists.List(ctx, ListHashListsOptions{})`                                                                                                                                                       |
+| `hashLists.retrieve/delete`               | `HashLists.Retrieve/Delete(ctx, HashListIDOptions)` (`Delete` returns only `error`)                                                                                                                 |
+| `hashLists.create/update`                 | `HashLists.Create/Update(ctx, CreateHashListOptions/UpdateHashListOptions)`                                                                                                                         |
+| `hashLists.listEntries`                   | `HashLists.ListEntries(ctx, ListHashListEntriesOptions)`                                                                                                                                            |
+| `hashLists.addEntry`                      | `HashLists.AddEntry(ctx, AddHashListEntryOptions)`                                                                                                                                                  |
+| `hashLists.removeEntry`                   | `HashLists.RemoveEntry(ctx, HashListEntryIDOptions)` (returns only `error`)                                                                                                                         |
+| `events.list`                             | `Events.List(ctx, ListEventsOptions)`; follow the cursor: `Events.ListAll(ListEventsOptions)`                                                                                                       |
+| `ensureLens/ensureLenses`                 | `EnsureLens/EnsureLenses(ctx, …Options)`                                                                                                                                                            |
+| `cdn.getAssetUrl/serve`                   | `CDN.GetAssetURL(CDNAssetURLOptions)` / `CDN.Serve(ctx, CDNServeOptions)`                                                                                                                           |
+| `verifyWebhookSignature`                  | `VerifyWebhookSignature(rawBody, signature, timestamp, secret, ...WebhookOption)`                                                                                                                   |
+| `constructEvent`-style helper             | `ParseWebhookEvent(rawBody, signature, timestamp, secret, ...WebhookOption)`, `VerifyWebhookRequest(r, secret, ...WebhookOption)`                                                                   |
+| webhook signing (tests, local forwarding) | `SignWebhookPayload(rawBody, timestamp, secret)`                                                                                                                                                    |
 
 Every method returns `nil` (or a zero value) together with a non-nil error.
 Use `calmlens.Ptr(value)` for optional scalars. `MoveAssetOptions.FolderID == nil` and
@@ -232,7 +232,7 @@ case calmlens.ModerationStatusAllowed:
 case calmlens.ModerationStatusLimited:
     publishWithReducedReach(comment) // delivered normally; keep it out of recommendations and trending
 case calmlens.ModerationStatusAgeRestricted:
-    publishBehindAgeGate(comment) // deliver only through signed URLs to verified adults
+    publishBehindAgeGate(comment) // deliver with age confirmation only after your app checks the viewer
 default:
     // pending, blocked, purged or a status added later: don't show it
 }
@@ -425,28 +425,28 @@ if calmlens.IsNotFound(err) { /* 404 */ }
 if calmlens.ErrorCode(err) == calmlens.CodeDuplicateExternalID { /* ... */ }
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `Code` | An API code (constants such as `calmlens.CodeAssetNotFound`, generated from the API's error list) or an `sdk/` code below. |
-| `Status` | HTTP status, or 0 when no response arrived. |
-| `RequestID` | The `X-Request-Id` response header; include it when contacting support. |
-| `Header`, `RetryAfter` | Response headers and the parsed `Retry-After` delay (`*time.Duration`, nil without the header). |
-| `Details` | Structured API details with any `traceId`, or SDK details such as `cursor`; nil when there are none, as for transport failures. |
-| `Cause` | The underlying error; `errors.Is` and `errors.As` reach it through `Unwrap`. |
+| Field                  | Meaning                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `Code`                 | An API code (constants such as `calmlens.CodeAssetNotFound`, generated from the API's error list) or an `sdk/` code below.      |
+| `Status`               | HTTP status, or 0 when no response arrived.                                                                                     |
+| `RequestID`            | The `X-Request-Id` response header; include it when contacting support.                                                         |
+| `Header`, `RetryAfter` | Response headers and the parsed `Retry-After` delay (`*time.Duration`, nil without the header).                                 |
+| `Details`              | Structured API details with any `traceId`, or SDK details such as `cursor`; nil when there are none, as for transport failures. |
+| `Cause`                | The underlying error; `errors.Is` and `errors.As` reach it through `Unwrap`.                                                    |
 
 `Error()` includes the code, status, message and request ID. `IsRetryable(err)` (or
 `apiErr.Retryable()`) reports whether repeating the request may succeed.
 
-| SDK code | When |
-| --- | --- |
-| `sdk/transport-error` | Connection refused or reset, TLS, malformed HTTP, decompression or a truncated body. |
-| `sdk/timeout`, `sdk/cancelled` | A timeout or context deadline expired, or the context was cancelled. |
-| `sdk/invalid-response` | A success body was empty, not JSON or unexpected. |
-| `sdk/response-too-large` | A response body was larger than `MaxResponseBytes`. |
-| `sdk/http-error` | A non-2xx response without a CalmLens error body, or a redirect. |
-| `sdk/invalid-argument` | An argument (such as an empty, `.` or `..` ID) was rejected, or could not be encoded, before any request. |
-| `sdk/invalid-config` | `NewServerClient` rejected an option. |
-| `sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload` | Webhook verification or decoding failed. |
+| SDK code                                                       | When                                                                                                      |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `sdk/transport-error`                                          | Connection refused or reset, TLS, malformed HTTP, decompression or a truncated body.                      |
+| `sdk/timeout`, `sdk/cancelled`                                 | A timeout or context deadline expired, or the context was cancelled.                                      |
+| `sdk/invalid-response`                                         | A success body was empty, not JSON or unexpected.                                                         |
+| `sdk/response-too-large`                                       | A response body was larger than `MaxResponseBytes`.                                                       |
+| `sdk/http-error`                                               | A non-2xx response without a CalmLens error body, or a redirect.                                          |
+| `sdk/invalid-argument`                                         | An argument (such as an empty, `.` or `..` ID) was rejected, or could not be encoded, before any request. |
+| `sdk/invalid-config`                                           | `NewServerClient` rejected an option.                                                                     |
+| `sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload` | Webhook verification or decoding failed.                                                                  |
 
 Upload payload checks that mirror the API (missing name or content, part sizes, MIME
 type) use the API's own codes, such as `upload/invalid-payload`.
@@ -455,11 +455,11 @@ type) use the API's own codes, such as `upload/invalid-payload`.
 
 Deliveries are POSTs with three headers, exported as constants:
 
-| Header | Constant | Value |
-| --- | --- | --- |
+| Header                 | Constant                          | Value                                     |
+| ---------------------- | --------------------------------- | ----------------------------------------- |
 | `x-calmlens-signature` | `calmlens.WebhookSignatureHeader` | `v1=<hex>` (comma-separated list allowed) |
-| `x-calmlens-timestamp` | `calmlens.WebhookTimestampHeader` | unix seconds |
-| `x-calmlens-delivery` | `calmlens.WebhookDeliveryHeader` | unique delivery ID, for deduplication |
+| `x-calmlens-timestamp` | `calmlens.WebhookTimestampHeader` | unix seconds                              |
+| `x-calmlens-delivery`  | `calmlens.WebhookDeliveryHeader`  | unique delivery ID, for deduplication     |
 
 Deliveries are JSON `{id, type, createdAt, projectId, data}` (`WebhookEventPayload`),
 signed as `v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. Verification needs the
@@ -550,8 +550,8 @@ pairs, nested options are dotted (`border.color=ff0000`) and hex colours drop th
 and a transform are joined with `/`, as in `/rendered/@thumbnail/width=320`.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
-when the URL carries `?ageConfirmed=true`; otherwise it needs a signed URL or an API key. Set
-`AgeConfirmed: true` on `CDNAssetURLOptions` (also used by `CDN.Serve`) to append it. Set it
+when the URL carries a JSON `viewerClaims` query parameter containing `{ "ageConfirmed": true }`; otherwise delivery is refused, even with a signed URL or API key. Set
+`ViewerClaims` with `AgeConfirmed` pointing to `true` on `CDNAssetURLOptions` (also used by `CDN.Serve`) to append it. Set it
 only where your app has already decided the viewer may see age-restricted content.
 
 ## Local webhook forwarding
@@ -628,7 +628,7 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
   `Content-Security-Policy` and, for images, `ETag` and `Expires`. Like the
   CDN, blocked, purged and failed assets and removed content return 403 `asset/not-available`
   whatever the key. A private asset, or a public age-restricted one requested without
-  `AgeConfirmed: true`, returns 403 `asset/api-key-missing-permission` unless the key has
+  `ViewerClaims` with `AgeConfirmed` pointing to `true`, returns 403 `asset/api-key-missing-permission` unless the key has
   the `assets:download` permission; the default key has no grants, and `SetAPIKeyGrants`
   replaces them (the key stays the same). The placeholder is served for public images whatever
   their moderation, and refused once purged or removed, and for private images without the
@@ -690,3 +690,11 @@ App; no Go registry token is needed.
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
 Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names (in Go, `SearchAll` and `ResolveOnly` are `*bool`, so an explicit `false` is sent).
+
+### Viewer context for CDN delivery
+
+CDN methods accept optional viewer claims (`viewerClaims`, or the language's `viewer_claims` / `ViewerClaims` field). The object contains `region` and `ageConfirmed`, using the SDK's normal field naming. Region defaults to the country of the connection reaching CalmLens; age confirmation defaults to false. Proxies should forward the incoming viewer country rather than rely on their outgoing connection's country. CalmLens accepts these as customer assertions without independently verifying them.
+
+Age-restricted content returns `403` with `viewer/age-confirmation-required` unless age confirmation is true, including API-key and signed-URL requests. Private assets separately require access permission. Blocks and safety holds cannot be overridden by claims. Applications that never use age-restricted content should leave confirmation false, including processing jobs.
+
+Raw HTTP clients can send a JSON `viewerClaims` query parameter or the JSON `X-CalmLens-Viewer-Claims` header; the query takes precedence. Signed URLs include claims when created and must be forwarded unchanged. Asset retrieval returns stored moderation results without a request-specific `delivery` object. Proxy caches must not bypass current viewer and moderation checks; honour `private, no-store` responses.

@@ -31,7 +31,7 @@ export function App() {
                 projectId={config.projectId}
                 assetId={item.assetId}
                 status={item.status}
-                ageConfirmed={ageConfirmed}
+                viewerClaims={{ ageConfirmed: ageConfirmed }}
                 type={item.type}
                 alt={item.name}
                 aspectRatio={item.aspectRatio}

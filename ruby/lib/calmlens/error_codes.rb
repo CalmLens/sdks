@@ -5,6 +5,8 @@
 module CalmLens
   # Error codes the CalmLens API returns, for comparing with {Error#code}.
   module ErrorCodes
+    INVALID_VIEWER_CLAIMS = 'viewer/invalid-claims'
+    AGE_CONFIRMATION_REQUIRED = 'viewer/age-confirmation-required'
     INVALID_VIEWER_REGION = 'viewer/invalid-region'
     VIEWER_REGION_REQUIRED = 'viewer/region-required'
     REGIONAL_EVIDENCE_REQUIRED = 'asset/regional-evidence-required'
@@ -82,6 +84,8 @@ module CalmLens
 
     # The HTTP status the API returns with each code.
     STATUSES = {
+      'viewer/invalid-claims' => 400,
+      'viewer/age-confirmation-required' => 403,
       'viewer/invalid-region' => 400,
       'viewer/region-required' => 403,
       'asset/regional-evidence-required' => 403,

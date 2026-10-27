@@ -916,15 +916,16 @@ module CalmLens
           return not_available
         end
 
-        opted_in = URI.decode_www_form(query.to_s).to_h['ageConfirmed'] == 'true'
-        restricted = item['visibility'] != 'public' || (moderation == 'age-restricted' && !opted_in)
+        opted_in = JSON.parse(URI.decode_www_form(query.to_s).to_h.fetch('viewerClaims', '{}'))['ageConfirmed'] == true
+        return error('viewer/age-confirmation-required', 'Age confirmation required', status: 403) if moderation == 'age-restricted' && !opted_in
+        restricted = item['visibility'] != 'public'
         if restricted && !can_download?(item['folderId'])
           return error('asset/api-key-missing-permission',
                        'This API key needs assets:download permission for this asset’s folder.', status: 403)
         end
 
         type = stored['type'].to_s.empty? ? 'application/octet-stream' : stored['type']
-        cdn_response(method, stored['parts'].sort.map(&:last).join.b, delivery_headers(item, type, restricted))
+        cdn_response(method, stored['parts'].sort.map(&:last).join.b, delivery_headers(item, type, restricted).merge(URI.decode_www_form(query.to_s).to_h.key?('viewerClaims') ? { 'Cache-Control' => 'private, no-store' } : {}))
       end
 
       def not_available = error('asset/not-available', 'Asset is not available', status: 403)

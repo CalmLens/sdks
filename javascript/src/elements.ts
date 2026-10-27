@@ -449,7 +449,6 @@ export class CalmLensMediaElement extends BaseElement {
     "asset-id",
     "status",
     "content-removed",
-    "age-confirmed",
     "type",
     "resource",
     "lens",
@@ -461,7 +460,7 @@ export class CalmLensMediaElement extends BaseElement {
     "placeholder-url",
     "average-color",
     "cdn-base-url",
-    "region",
+    "viewer-claims",
     "alt",
     "aspect-ratio",
     "width",
@@ -522,7 +521,6 @@ export class CalmLensMediaElement extends BaseElement {
       assetId: this.getAttribute("asset-id") ?? undefined,
       status: (this.getAttribute("status") as AssetModerationStatus | null) ?? undefined,
       contentRemoved: this.hasAttribute("content-removed") ? true : undefined,
-      ageConfirmed: this.hasAttribute("age-confirmed"),
       type: (this.getAttribute("type") as MediaOptions["type"] | null) ?? undefined,
       resource: (this.getAttribute("resource") as MediaOptions["resource"] | null) ?? undefined,
       lens: this.getAttribute("lens") ?? undefined,
@@ -532,7 +530,9 @@ export class CalmLensMediaElement extends BaseElement {
       placeholder: !this.hasAttribute("no-placeholder"),
       placeholderHash: this.getAttribute("placeholder-hash") ?? undefined,
       placeholderUrl: this.getAttribute("placeholder-url") ?? undefined,
-      region: this.getAttribute("region") ?? undefined,
+      viewerClaims: this.hasAttribute("viewer-claims")
+        ? JSON.parse(this.getAttribute("viewer-claims")!)
+        : undefined,
       cdnBaseUrl: this.getAttribute("cdn-base-url") ?? undefined,
       width: numberAttribute(this, "width"),
       height: numberAttribute(this, "height"),
@@ -545,7 +545,7 @@ export class CalmLensMediaElement extends BaseElement {
     const options = this.#mediaOptions();
     if (!options.projectId || !options.assetId) return;
     const state = getMediaState(options);
-    const loadKey = `${getMediaLoadKey(state)} ${this.getAttribute("alt")} ${this.getAttribute("sizes")} ${options.ageConfirmed}`;
+    const loadKey = `${getMediaLoadKey(state)} ${this.getAttribute("alt")} ${this.getAttribute("sizes")} ${options.viewerClaims?.ageConfirmed}`;
     const ratio = getMediaAspectRatio({
       aspectRatio: numberAttribute(this, "aspect-ratio"),
       width: options.width,

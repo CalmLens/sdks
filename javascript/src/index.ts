@@ -90,6 +90,7 @@ export type {
   UploadedAsset,
   UploadPresetSubmitAssetOptions,
   VerifyWebhookSignatureOptions,
+  ViewerClaims,
   WaitForAssetDecisionOptions,
   WebhookHeadersInput,
   WebhookPayloadInput,

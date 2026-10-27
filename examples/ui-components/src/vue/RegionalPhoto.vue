@@ -2,10 +2,10 @@
 import type { Asset } from "@calmlens/sdk/app";
 import { CalmLensMedia } from "@calmlens/sdk/vue";
 
-// The backend retrieves the asset with this region; your app confirms age.
+// Your app supplies optional viewer context to the CDN.
 defineProps<{ asset: Asset; region: string; ageConfirmed: boolean }>();
 </script>
 
 <template>
-  <CalmLensMedia :asset="asset" :region="region" :age-confirmed="ageConfirmed" alt="Uploaded photo" />
+  <CalmLensMedia :asset="asset" :viewer-claims="{ region, ageConfirmed }" alt="Uploaded photo" />
 </template>

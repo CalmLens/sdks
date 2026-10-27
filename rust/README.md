@@ -28,14 +28,14 @@ Install with `cargo add calmlens`. Request and response models live in `calmlens
 
 ## Features
 
-| Feature | Default | Adds |
-| --- | --- | --- |
-| `async` | yes | The async `calmlens::ServerClient` |
-| `rustls` | yes | TLS through rustls with the bundled Mozilla root certificates |
-| `rustls-native-roots` | | TLS through rustls with the operating system's root certificates |
-| `native-tls` | | TLS through the platform library |
-| `blocking` | | `calmlens::blocking::ServerClient`, the same API without `async` |
-| `testing` | | `calmlens::testing::MockServerClient`; enable it in `[dev-dependencies]` only |
+| Feature               | Default | Adds                                                                          |
+| --------------------- | ------- | ----------------------------------------------------------------------------- |
+| `async`               | yes     | The async `calmlens::ServerClient`                                            |
+| `rustls`              | yes     | TLS through rustls with the bundled Mozilla root certificates                 |
+| `rustls-native-roots` |         | TLS through rustls with the operating system's root certificates              |
+| `native-tls`          |         | TLS through the platform library                                              |
+| `blocking`            |         | `calmlens::blocking::ServerClient`, the same API without `async`              |
+| `testing`             |         | `calmlens::testing::MockServerClient`; enable it in `[dev-dependencies]` only |
 
 With `default-features = false` the crate contains only the models and the webhook helpers, with no HTTP stack, for services that only receive webhooks.
 
@@ -104,15 +104,15 @@ client
 
 ## Uploads
 
-| Constructor | Sends |
-| --- | --- |
-| `Content::text(text)` | `text/plain` text |
-| `Content::bytes(bytes, mime_type)` | A `Vec<u8>`, `bytes::Bytes` or `&'static [u8]` without copying |
-| `Content::reader(reader, size, mime_type)` | A `std::io::Read` that yields exactly `size` bytes, read in 64 KiB chunks on Tokio's blocking pool |
-| `Content::stream(stream, size, mime_type)` | A `Stream` of `Bytes` chunks totalling `size` |
-| `Content::unsized_stream(stream, mime_type)` | A `Stream` whose length isn't known in advance, sent chunked without `sizeInBytes` |
-| `Content::file(path, mime_type)` | A file, streamed from disk |
-| `Content { payload: Payload::Base64(..), .. }` | Base64 (or a `data:` URL) |
+| Constructor                                    | Sends                                                                                              |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Content::text(text)`                          | `text/plain` text                                                                                  |
+| `Content::bytes(bytes, mime_type)`             | A `Vec<u8>`, `bytes::Bytes` or `&'static [u8]` without copying                                     |
+| `Content::reader(reader, size, mime_type)`     | A `std::io::Read` that yields exactly `size` bytes, read in 64 KiB chunks on Tokio's blocking pool |
+| `Content::stream(stream, size, mime_type)`     | A `Stream` of `Bytes` chunks totalling `size`                                                      |
+| `Content::unsized_stream(stream, mime_type)`   | A `Stream` whose length isn't known in advance, sent chunked without `sizeInBytes`                 |
+| `Content::file(path, mime_type)`               | A file, streamed from disk                                                                         |
+| `Content { payload: Payload::Base64(..), .. }` | Base64 (or a `data:` URL)                                                                          |
 
 Readers, streams and files are sent as they are read, so a file is never held in memory. A reader or stream that yields a different number of bytes than `size` fails with `sdk/transport-error`.
 
@@ -179,7 +179,7 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets).
 
 `resource` is `CdnResource::Rendered` (the default), `CdnResource::Original` or `CdnResource::Placeholder`; only the rendered resource takes a lens or transform. Set `lens` to deliver through a named lens, or `transform` to a `CdnTransform`: a selector string, one `Transform` step or a `Vec<Transform>` of steps. A selector has one path segment per step, such as `fit=cover,width=640/format=webp`, and a lens and a transform are joined with `/` (`/rendered/@thumbnail/width=320`). Structured steps become a selector with sorted, percent-encoded options, dotted nested keys (`border.color`) and hex colours without `#`, so equal transforms share a URL. `assets().create_signed_url` takes the same `transform`. Set both `lens` and `transform` to apply the lens first, then the extra transforms. `ImageTransformOptions::redact` takes an `ImageRedaction` that blurs text regions (`text`, which needs OCR on the upload) or regions with personal information (`personal_information`) found when the image was processed, before any other option applies.
 
-A public asset whose moderation status is `age-restricted` is served from its public URL only with `age_confirmed: Some(true)`, which appends `?ageConfirmed=true`; otherwise it needs a signed URL or an API key. Set it only where your app has already decided the viewer may see age-restricted content.
+A public asset whose moderation status is `age-restricted` is served from its public URL only with `viewer_claims: Some(ViewerClaims { age_confirmed: Some(true), region: None })`, which appends a JSON `viewerClaims` query parameter containing `{ "ageConfirmed": true }`; otherwise delivery is refused, even with a signed URL or API key. Set it only where your app has already decided the viewer may see age-restricted content.
 
 ```rust
 let url = client.cdn().get_asset_url(&CdnRequest {
@@ -249,17 +249,17 @@ while let Some(page) = pages.try_next().await? {
 
 Every call returns `calmlens::Error`. `Display` prefixes the message with `[calmlens] `.
 
-| Method | Returns |
-| --- | --- |
-| `code()` | `&ErrorCode`: a variant per API error code (generated from the API's public error list, with `http_status()`) and per SDK code, or `ErrorCode::Other(String)` for codes this version doesn't know. Compare with strings: `error.code() == "asset/not-found"` |
-| `message()` | The message without the prefix |
-| `status()` | The HTTP status of an API error |
-| `request_id()` | The response's `X-Request-Id`; log it and quote it to support |
-| `retry_after()` | The `Retry-After` delay of a `429` or `idempotency/request-in-progress` response |
-| `details()` | The API's `details`, plus its `traceId`; empty for SDK errors such as transport failures |
-| `headers()` | The failed response's headers |
-| `source()` | The underlying reqwest, IO or JSON error |
-| `is_not_found()`, `is_retryable()`, `is_timeout()` | Common checks |
+| Method                                             | Returns                                                                                                                                                                                                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `code()`                                           | `&ErrorCode`: a variant per API error code (generated from the API's public error list, with `http_status()`) and per SDK code, or `ErrorCode::Other(String)` for codes this version doesn't know. Compare with strings: `error.code() == "asset/not-found"` |
+| `message()`                                        | The message without the prefix                                                                                                                                                                                                                               |
+| `status()`                                         | The HTTP status of an API error                                                                                                                                                                                                                              |
+| `request_id()`                                     | The response's `X-Request-Id`; log it and quote it to support                                                                                                                                                                                                |
+| `retry_after()`                                    | The `Retry-After` delay of a `429` or `idempotency/request-in-progress` response                                                                                                                                                                             |
+| `details()`                                        | The API's `details`, plus its `traceId`; empty for SDK errors such as transport failures                                                                                                                                                                     |
+| `headers()`                                        | The failed response's headers                                                                                                                                                                                                                                |
+| `source()`                                         | The underlying reqwest, IO or JSON error                                                                                                                                                                                                                     |
+| `is_not_found()`, `is_retryable()`, `is_timeout()` | Common checks                                                                                                                                                                                                                                                |
 
 SDK codes: `sdk/transport-error` (the request could not be sent or the response read), `sdk/timeout` (also returned by `wait_for_decision` when no decision arrives in time), `sdk/invalid-response` (a successful response that isn't the expected JSON), `sdk/http-error` (an error response without a CalmLens error body), `sdk/response-too-large` (an API response over `max_response_bytes`), `sdk/invalid-argument` (an empty, `.` or `..` ID, an invalid transform or CDN header), `sdk/invalid-config`, `sdk/invalid-webhook-signature` and `sdk/invalid-webhook-payload`. Upload validation uses the API's codes, such as `upload/invalid-payload` and `upload/invalid-mime-type`, before anything is sent. `Error::new(code, message)` and the `with_*` methods build errors for tests.
 
@@ -278,7 +278,7 @@ The moderation status also decides delivery:
 - `pending`: not decided yet; don't show the content.
 - `allowed`: show it.
 - `limited`: delivered like `allowed`, but marked so your app can reduce its reach: keep it out of recommendations, trending and notifications, rank it lower, or collapse it behind a "show" control.
-- `age-restricted`: the CDN serves it only through signed URLs or with an API key, like a private asset. Show it only behind your own age check.
+- `age-restricted`: the CDN requires `viewerClaims.ageConfirmed=true`, including requests with signed URLs or API keys. Show it only behind your own age check.
 - `blocked`: not delivered; the content is kept.
 - `purged`: not delivered, and the stored content is deleted.
 
@@ -372,3 +372,11 @@ The tests enable the `blocking` and `testing` features through a dev-dependency 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
 Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.
+
+### Viewer context for CDN delivery
+
+CDN methods accept optional viewer claims (`viewerClaims`, or the language's `viewer_claims` / `ViewerClaims` field). The object contains `region` and `ageConfirmed`, using the SDK's normal field naming. Region defaults to the country of the connection reaching CalmLens; age confirmation defaults to false. Proxies should forward the incoming viewer country rather than rely on their outgoing connection's country. CalmLens accepts these as customer assertions without independently verifying them.
+
+Age-restricted content returns `403` with `viewer/age-confirmation-required` unless age confirmation is true, including API-key and signed-URL requests. Private assets separately require access permission. Blocks and safety holds cannot be overridden by claims. Applications that never use age-restricted content should leave confirmation false, including processing jobs.
+
+Raw HTTP clients can send a JSON `viewerClaims` query parameter or the JSON `X-CalmLens-Viewer-Claims` header; the query takes precedence. Signed URLs include claims when created and must be forwarded unchanged. Asset retrieval returns stored moderation results without a request-specific `delivery` object. Proxy caches must not bypass current viewer and moderation checks; honour `private, no-store` responses.

@@ -1050,9 +1050,6 @@ impl MetadataItem {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetId {
-    /// Viewer country supplied by the client integration.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub viewer_region: Option<String>,
     /// The asset ID.
     pub asset_id: String,
 }
@@ -1061,7 +1058,6 @@ impl AssetId {
     pub fn new(asset_id: impl Into<String>) -> Self {
         Self {
             asset_id: asset_id.into(),
-            viewer_region: None,
         }
     }
 }
@@ -1282,9 +1278,9 @@ pub struct UploadPart {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignedUrlOptions {
-    /// Viewer country supplied by the client integration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub viewer_region: Option<String>,
+    /// Optional customer assertions for this CDN request.
+    pub viewer_claims: Option<ViewerClaims>,
     /// The asset ID.
     #[serde(skip_serializing)]
     pub asset_id: String,
@@ -1383,9 +1379,9 @@ pub struct EnsureLenses {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CdnRequest {
-    /// Viewer country supplied by the client integration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub viewer_region: Option<String>,
+    /// Optional customer assertions for this CDN request.
+    pub viewer_claims: Option<ViewerClaims>,
     /// The asset ID or external ID.
     pub asset_identifier: String,
     /// `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or transform.
@@ -1397,12 +1393,6 @@ pub struct CdnRequest {
     /// A transform: a selector such as `width=320` or structured steps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
-    /// `Some(true)` appends `?ageConfirmed=true`, so the CDN serves a public asset whose
-    /// moderation status is `age-restricted` from its public URL. Without it, such an asset needs
-    /// a signed URL or an API key. Set it only where your app has already decided the viewer may
-    /// see age-restricted content. `None` and `Some(false)` add nothing.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub age_confirmed: Option<bool>,
     /// The HTTP method and headers, e.g. `HEAD` or a `Range` header.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub init: Option<HttpOptions>,
@@ -1426,8 +1416,6 @@ pub struct HttpOptions {
 #[non_exhaustive]
 pub struct Asset {
     /// Effective action and age assurance for the requested viewer country.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub delivery: Option<RegionalDelivery>,
 
     /// The asset ID.
     pub id: String,
@@ -1802,29 +1790,6 @@ pub struct RegionalDecision {
 }
 
 /// Effective delivery requirements for a viewer country.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RegionalDelivery {
-    /// Jurisdiction whose rule raises the base decision, including EU for a member-country viewer.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub jurisdiction: Option<String>,
-    /// Viewer country.
-    pub viewer_region: String,
-    /// Whether delivery is blocked regardless of viewer permissions.
-    pub blocked: bool,
-    /// Reason delivery is blocked.
-    pub reason: Option<String>,
-    /// Applicable action; None allows content.
-    pub action: Option<String>,
-    /// Mandatory rule responsible for the action, if any.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rule: Option<String>,
-    /// Category matched by a regional rule.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub category: Option<ClassificationCategory>,
-    /// Age assurance required of the client: any or verified.
-    pub age_check_standard: String,
-}
 
 /// The automatic moderation decision and stricter regional outcomes.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -3859,4 +3824,16 @@ pub struct AddHashListEntry {
     /// A label, such as a report reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+}
+
+/// Optional customer assertions for CDN delivery. Neither assertion is verified by CalmLens.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerClaims {
+    /// Viewer country; otherwise inferred from the connection reaching CalmLens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    /// Defaults to false, including authenticated requests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age_confirmed: Option<bool>,
 }

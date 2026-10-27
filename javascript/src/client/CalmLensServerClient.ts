@@ -235,7 +235,7 @@ export default class CalmLensServerClient {
       /**
        * Builds a CDN URL for asset content or a preview, without a request. Private assets
        * need a signed URL (`assets.createSignedUrl`) or an authenticated request; public
-       * age-restricted assets need one too unless `ageConfirmed` adds `ageConfirmed=true`.
+       * age-restricted assets additionally require `viewerClaims.ageConfirmed: true`.
        */
       getAssetUrl: ({ assetIdentifier, ...options }: CdnAssetUrlOptions): string => {
         const { projectId, cdnBaseUrl } = this.#settings;
@@ -328,10 +328,8 @@ export default class CalmLensServerClient {
         this.iteratePages((cursor) => this.buildAssets().list({ ...options, cursor })),
 
       /** Retrieves an asset with its status and classification results. */
-      retrieve: async ({ assetId, viewerRegion }: RetrieveAssetOptions): Promise<Asset> =>
-        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`, {
-          query: { viewerRegion },
-        }),
+      retrieve: async ({ assetId }: RetrieveAssetOptions): Promise<Asset> =>
+        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`),
 
       /** Updates an asset's editable fields. */
       update: async ({ assetId, ...body }: UpdateAssetOptions): Promise<Asset> =>
@@ -402,7 +400,7 @@ export default class CalmLensServerClient {
         validateSignedUrlOptions(options);
         return this.request("POST", `/assets/${encodedAssetId}/signed-url`, {
           body: {
-            viewerRegion: options.viewerRegion,
+            viewerClaims: options.viewerClaims,
             resource: options.resource,
             expiresInSeconds: options.expiresInSeconds ?? DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
             lens: options.lens,

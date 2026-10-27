@@ -2,6 +2,7 @@ package calmlens
 
 import (
 	"context"
+ "encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -58,9 +59,7 @@ func (s *AssetsService) Retrieve(ctx context.Context, options AssetIDOptions) (*
 		return nil, err
 	}
 	params := url.Values{}
-	if options.ViewerRegion != "" {
-		params.Set("viewerRegion", options.ViewerRegion)
-	}
+
 	var result Asset
 	if err = s.c.request(ctx, "GET", path, params, nil, &result); err != nil {
 		return nil, err
@@ -360,7 +359,7 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Resource == ResourceOriginal && transformed {
 		return "", invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
 	}
-	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil || options.AgeConfirmed) {
+	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil) {
 		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or ageConfirmed")
 	}
 	asset, err := segment(options.AssetIdentifier)
@@ -386,12 +385,10 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 		endpoint += "/" + path
 	}
 	params := url.Values{}
-	if options.ViewerRegion != "" {
-		params.Set("viewerRegion", options.ViewerRegion)
-	}
-	if options.AgeConfirmed {
-		params.Set("ageConfirmed", "true")
-	}
+	if options.ViewerClaims != nil {
+ data, err := json.Marshal(options.ViewerClaims)
+ if err != nil { return "", err }; params.Set("viewerClaims", string(data))
+ }
 	if len(params) > 0 {
 		endpoint += "?" + params.Encode()
 	}

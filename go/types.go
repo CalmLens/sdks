@@ -111,7 +111,6 @@ const (
 
 // Asset is a moderated asset. Optional fields are nil when absent.
 type Asset struct {
-	Delivery  *RegionalDelivery `json:"delivery,omitempty"`
 	ID        string            `json:"id"`
 	ProjectID string            `json:"projectId"`
 	Name      string            `json:"name"`
@@ -433,16 +432,7 @@ type RegionalDecision struct {
 	Rule     string `json:"rule"`
 	Category string `json:"category"`
 }
-type RegionalDelivery struct {
-	Blocked          bool    `json:"blocked"`
-	Reason           *string `json:"reason"`
-	Jurisdiction     *string `json:"jurisdiction,omitempty"`
-	ViewerRegion     string  `json:"viewerRegion"`
-	Action           *string `json:"action"`
-	Rule             *string `json:"rule,omitempty"`
-	Category         *string `json:"category,omitempty"`
-	AgeCheckStandard string  `json:"ageCheckStandard"`
-}
+
 type ReportPolicyDecision struct {
 	Rule    *string            `json:"rule,omitempty"`
 	Regions []RegionalDecision `json:"regions"`
@@ -725,7 +715,6 @@ type AssetPage struct {
 // AssetIDOptions identifies an asset.
 type AssetIDOptions struct {
 	AssetID      string
-	ViewerRegion string
 }
 
 // ExplainAssetOptions selects the asset AssetsService.Explain explains. Rerun moderates it again
@@ -889,7 +878,7 @@ const (
 // "format=png,width=1024") or TransformSteps (structured steps, serialized
 // to the same selector). Supply only one transform representation.
 type SignedURLOptions struct {
-	ViewerRegion     string          `json:"viewerRegion,omitempty"`
+	ViewerClaims *ViewerClaims `json:"viewerClaims,omitempty"`
 	AssetID          string          `json:"-"`
 	Resource         string          `json:"resource,omitempty"`
 	Lens             string          `json:"lens,omitempty"`
@@ -1145,7 +1134,7 @@ type EventsPage struct {
 // Supply Transform (a selector string such as "format=png,width=1024")
 // or TransformSteps (structured steps; a non-nil empty slice is rejected), not both.
 type CDNAssetURLOptions struct {
-	ViewerRegion    string
+	ViewerClaims    *ViewerClaims
 	AssetIdentifier string
 	Resource        string
 	Lens            string
@@ -1155,7 +1144,6 @@ type CDNAssetURLOptions struct {
 	// asset whose moderation status is age-restricted from its public URL (without it, such an
 	// asset needs a signed URL or an API key). Set it only where your app has already decided the
 	// viewer may see age-restricted content.
-	AgeConfirmed bool
 }
 
 // CDNServeOptions fetches CDN content with an optional method and extra headers (such as
@@ -1293,4 +1281,10 @@ type FolderPage struct {
 	Folders   []Folder `json:"folders"`
 	Ancestors []Folder `json:"ancestors"`
 	HasMore   bool     `json:"hasMore"`
+}
+
+// ViewerClaims are optional customer assertions. Age confirmation defaults to false.
+type ViewerClaims struct {
+ Region string `json:"region,omitempty"`
+ AgeConfirmed *bool `json:"ageConfirmed,omitempty"`
 }

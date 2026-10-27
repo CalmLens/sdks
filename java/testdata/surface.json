@@ -1,13 +1,5 @@
 {
-  "languages": [
-    "javascript",
-    "python",
-    "go",
-    "rust",
-    "java",
-    "ruby",
-    "php"
-  ],
+  "languages": ["javascript", "python", "go", "rust", "java", "ruby", "php"],
   "capabilities": [
     {
       "id": "folders.list",
@@ -858,17 +850,17 @@
       }
     },
     {
-      "id": "cdn.ageConfirmed",
+      "id": "cdn.viewerClaims",
       "kind": "cdn-option",
       "description": "Lets the CDN serve a public age-restricted asset from the URL.",
       "names": {
-        "javascript": "ageConfirmed",
-        "python": "age_confirmed",
-        "go": "CDNAssetURLOptions.AgeConfirmed",
-        "rust": "CdnRequest::age_confirmed",
-        "java": "CdnRequest.ageConfirmed",
-        "ruby": "age_confirmed",
-        "php": "ageConfirmed"
+        "javascript": "viewerClaims",
+        "python": "viewer_claims",
+        "go": "CDNAssetURLOptions.ViewerClaims",
+        "rust": "CdnRequest::viewer_claims",
+        "java": "CdnRequest.viewerClaims",
+        "ruby": "viewer_claims",
+        "php": "viewerClaims"
       }
     },
     {
@@ -1246,6 +1238,16 @@
     {
       "code": "validation/invalid-ordering-field",
       "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "viewer/invalid-claims",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "viewer/age-confirmation-required",
+      "status": 403,
       "retryable": false
     },
     {
@@ -1654,18 +1656,14 @@
       "id": "maxRetries",
       "value": 2,
       "description": "Retries after a retryable failure (surface.json retryable), for GET and HEAD requests and requests that carry an Idempotency-Key, unless their body is a one-shot stream. Each retry reuses the Idempotency-Key.",
-      "observedBy": [
-        "the client retries twice by default, then raises the last error"
-      ]
+      "observedBy": ["the client retries twice by default, then raises the last error"]
     },
     {
       "id": "retryBaseDelayMs",
       "value": 500,
       "unit": "milliseconds",
       "description": "Backoff before retry n (0-based): d = min(retryMaxDelayMs, retryBaseDelayMs * 2^n); the client waits d/2 + random * d/2, rounded. A Retry-After header (seconds or an HTTP date; 0 retries at once) replaces the backoff.",
-      "observedBy": [
-        "502 and 504 are retried with exponential backoff and jitter"
-      ]
+      "observedBy": ["502 and 504 are retried with exponential backoff and jitter"]
     },
     {
       "id": "retryMaxDelayMs",
@@ -1679,9 +1677,7 @@
       "value": 60000,
       "unit": "milliseconds",
       "description": "A Retry-After longer than this is not waited out: the error (or, for cdn.serve, the response) goes back to the caller.",
-      "observedBy": [
-        "a Retry-After over 60 seconds is returned to the caller without retrying"
-      ]
+      "observedBy": ["a Retry-After over 60 seconds is returned to the caller without retrying"]
     },
     {
       "id": "maxResponseBytes",
@@ -1695,9 +1691,7 @@
       "value": 900,
       "unit": "seconds",
       "description": "assets.createSignedUrl's expiresInSeconds when omitted (sent explicitly).",
-      "observedBy": [
-        "assets.createSignedUrl sends the default lifetime"
-      ]
+      "observedBy": ["assets.createSignedUrl sends the default lifetime"]
     },
     {
       "id": "uploadTokenExpiresInSeconds",
@@ -1718,17 +1712,13 @@
       "value": 500,
       "unit": "milliseconds",
       "description": "The wait before waitForDecision's second check. Each later wait is 1.5 times longer, at most waitForDecisionMaxIntervalMs, and never past the deadline.",
-      "observedBy": [
-        "waitForDecision polls at growing intervals until a decision"
-      ]
+      "observedBy": ["waitForDecision polls at growing intervals until a decision"]
     },
     {
       "id": "waitForDecisionIntervalFactor",
       "value": 1.5,
       "description": "How much longer each waitForDecision wait is than the one before.",
-      "observedBy": [
-        "waitForDecision polls at growing intervals until a decision"
-      ]
+      "observedBy": ["waitForDecision polls at growing intervals until a decision"]
     },
     {
       "id": "waitForDecisionMaxIntervalMs",
@@ -1741,9 +1731,7 @@
       "id": "ensureLensesBatchSize",
       "value": 100,
       "description": "ensureLenses sends new definitions in consecutive requests of at most this many, in order.",
-      "observedBy": [
-        "ensureLenses sends 101 definitions as batches of 100 and 1"
-      ]
+      "observedBy": ["ensureLenses sends 101 definitions as batches of 100 and 1"]
     }
   ]
 }

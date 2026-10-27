@@ -1403,8 +1403,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(not_available)
             # Then access: private assets, and public age-restricted ones requested without
             # ``ageConfirmed=true``, need the download permission for the asset's folder.
-            private = asset["visibility"] != "public" or (
-                status == "age-restricted" and query.get("ageConfirmed") not in (True, "true"))
+            claims = json.loads(query.get("viewerClaims", "{}"))
+            if status == "age-restricted" and claims.get("ageConfirmed") is not True:
+                return self._failure_response(_Failure("viewer/age-confirmation-required", "Age confirmation required", 403))
+            private = asset["visibility"] != "public"
             if private and not self._can_download(asset.get("folderId")):
                 return self._failure_response(_Failure(
                     "asset/api-key-missing-permission",
@@ -1421,6 +1423,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if image:
                 headers["ETag"] = f'"{asset["id"]}"'
                 headers["Expires"] = email.utils.formatdate(self.now() / 1000 + 31536000, usegmt=True)
+            if claims:
+                headers["Cache-Control"] = "private, no-store"
+                headers.pop("Expires", None)
             headers.update({"X-Content-Type-Options": "nosniff",
                             "Content-Security-Policy": "sandbox; default-src 'none'"})
             normalized = content_type.lower().split(";", 1)[0].strip()

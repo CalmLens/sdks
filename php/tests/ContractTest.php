@@ -939,8 +939,8 @@ final class ContractTest extends TestCase
                 $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'resource' => $name]);
                 return str_ends_with($url, '/asset-1/' . $capability['value']);
             case 'cdn-option':
-                $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', $name => true]);
-                return str_ends_with($url, '?ageConfirmed=true');
+                $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', $name => ['ageConfirmed' => true]]);
+                return str_ends_with($url, '?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D');
             case 'mock-client':
                 return class_exists('CalmLens\\' . $name);
             case 'mock-method':

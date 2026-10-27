@@ -1,3 +1,4 @@
+import { VIEWER_CLAIMS_SCHEMA } from "../contract/Jurisdiction.js";
 import { DOMAIN } from "../contract/SharedConstants.js";
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
 import { API_ERROR_CODES } from "./CalmLensErrorCodes";
@@ -293,7 +294,7 @@ export const validateSignedUrlOptions = (options: {
  * `resource` is `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or
  * transform, and it serves images in the best format the browser accepts. A
  * placeholder is a small blurred PNG that the CDN serves for public assets whatever their
- * moderation status, so it also takes no `ageConfirmed`.
+ * moderation status, without requiring age confirmation.
  */
 export const getAssetUrl = ({
   projectId,
@@ -310,12 +311,9 @@ export const getAssetUrl = ({
   }
   if (
     resource === "placeholder" &&
-    (options.lens !== undefined || options.transform !== undefined || options.ageConfirmed)
+    (options.lens !== undefined || options.transform !== undefined)
   ) {
-    throw invalidArgument("A placeholder takes no lens, transform or ageConfirmed");
-  }
-  if (options.ageConfirmed !== undefined && typeof options.ageConfirmed !== "boolean") {
-    throw invalidArgument("ageConfirmed must be true or false");
+    throw invalidArgument("A placeholder takes no lens or transform");
   }
   const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${resource}`;
   return appendCdnSelector(url, options);
@@ -323,24 +321,22 @@ export const getAssetUrl = ({
 
 /**
  * Appends a CDN lens (`/@name`) followed by any direct transform selector to an asset URL, and
- * `?ageConfirmed=true` when requested.
+ * optional JSON `viewerClaims` when supplied.
  */
 export const appendCdnSelector = (
   url: string,
   options: {
     lens?: string;
     transform?: CdnTransform;
-    ageConfirmed?: boolean;
-    viewerRegion?: string;
+    viewerClaims?: { region?: string; ageConfirmed?: boolean };
   },
 ): string => {
   const path = appendCdnPathSelector(url, options);
   const query = new URLSearchParams();
-  if (options.ageConfirmed) query.set("ageConfirmed", "true");
-  if (options.viewerRegion !== undefined) {
-    if (!/^[A-Z]{2}$/.test(options.viewerRegion) || options.viewerRegion === "EU")
-      throw invalidArgument("viewerRegion must be a viewer country code");
-    query.set("viewerRegion", options.viewerRegion);
+  if (options.viewerClaims !== undefined) {
+    const claims = VIEWER_CLAIMS_SCHEMA.safeParse(options.viewerClaims);
+    if (!claims.success) throw invalidArgument("Invalid viewerClaims");
+    query.set("viewerClaims", JSON.stringify(claims.data));
   }
   return query.size ? `${path}?${query}` : path;
 };

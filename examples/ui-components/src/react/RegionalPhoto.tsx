@@ -1,7 +1,7 @@
 import type { Asset } from "@calmlens/sdk/app";
 import { CalmLensMedia } from "@calmlens/sdk/react";
 
-// Your backend retrieves this asset with the same viewer region.
+// Claims are optional customer assertions evaluated by the CDN.
 // ageConfirmed stays false until your app completes the required age check.
 export function RegionalPhoto({
   asset,
@@ -13,6 +13,6 @@ export function RegionalPhoto({
   ageConfirmed: boolean;
 }) {
   return (
-    <CalmLensMedia asset={asset} region={region} ageConfirmed={ageConfirmed} alt="Uploaded photo" />
+    <CalmLensMedia asset={asset} viewerClaims={{ region, ageConfirmed }} alt="Uploaded photo" />
   );
 }

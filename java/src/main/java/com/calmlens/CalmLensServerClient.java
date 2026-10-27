@@ -792,10 +792,6 @@ public final class CalmLensServerClient implements AutoCloseable {
   /** The JSON body of a successful reply. */
   private static JsonElement success(Reply reply) { return reply.json(); }
 
-  private static JsonObject regionQuery(JsonObject options) {
-    if (!options.has("viewerRegion")) return null;
-    JsonObject query = new JsonObject(); query.add("viewerRegion", options.get("viewerRegion")); return query;
-  }
 
   private Reply json(String method, String path, JsonObject query, JsonElement body) {
     Map<String, String> headers = baseHeaders("application/json");
@@ -1065,7 +1061,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /** @param options the asset @return the asset */
     public Models.Asset retrieve(Models.AssetId options) {
-      return decode(json("GET", "/assets/" + id(str(Models.encode(options), "assetId", null)), regionQuery(Models.encode(options)), null), Models.Asset.class);
+      return decode(json("GET", "/assets/" + id(str(Models.encode(options), "assetId", null)), null, null), Models.Asset.class);
     }
 
     /**
@@ -1502,8 +1498,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * Builds the CDN URL of an asset's {@code rendered} (default), {@code original} or {@code placeholder}
-     * resource, with {@code ?ageConfirmed=true} when {@link Models.CdnRequest#ageConfirmed(Boolean)}
-     * is true. Only the rendered resource takes a lens or transform. A placeholder is a small blurred PNG,
+     * resource, with optional {@code viewerClaims} encoded in its query. Only the rendered resource takes a lens or transform. A placeholder is a small blurred PNG,
      * public for public assets whatever their moderation status; it takes no {@code ageConfirmed} either.
      *
      * @param options the asset and selector
@@ -1517,7 +1512,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       boolean transformed = o.has("lens") && !o.get("lens").isJsonNull() || transform != null;
       if (resource.equals("original") && transformed) throw argument("Lenses and transforms apply only to the rendered resource");
       if (resource.equals("placeholder") && (transformed
-          || o.has("ageConfirmed") && !o.get("ageConfirmed").isJsonNull() && o.get("ageConfirmed").getAsBoolean())) {
+         )) {
         throw argument("A placeholder takes no lens, transform or ageConfirmed");
       }
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
@@ -1525,8 +1520,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (transform instanceof String text) { if (!text.isEmpty()) url += "/" + transformPath(text); }
       // A serialized selector is already path-safe: unreserved characters, escapes, "=", "," and "/".
       else if (transform != null) url += "/" + serializeTransform(transform);
-      if (o.has("ageConfirmed") && !o.get("ageConfirmed").isJsonNull() && o.get("ageConfirmed").getAsBoolean()) url += "?ageConfirmed=true";
-      if (o.has("viewerRegion") && !o.get("viewerRegion").isJsonNull()) url += (url.contains("?") ? "&" : "?") + "viewerRegion=" + encodeComponent(o.get("viewerRegion").getAsString());
+      if (o.has("viewerClaims") && !o.get("viewerClaims").isJsonNull()) url += "?viewerClaims=" + encodeComponent(o.get("viewerClaims").toString());
       return url;
     }
 

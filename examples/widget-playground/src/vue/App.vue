@@ -29,7 +29,7 @@ onScopeDispose(playground.subscribe((next) => (state.value = next)));
           :project-id="state.config.projectId"
           :asset-id="item.assetId"
           :status="item.status"
-          :age-confirmed="state.ageConfirmed"
+          :viewer-claims="{ ageConfirmed: state.ageConfirmed }"
           :type="item.type"
           :alt="item.name"
           :aspect-ratio="item.aspectRatio"

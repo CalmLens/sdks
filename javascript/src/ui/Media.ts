@@ -1,4 +1,9 @@
-import type { AssetModerationStatus, CdnTransform, LensTransform } from "../client/CalmLensTypes";
+import type {
+  AssetModerationStatus,
+  CdnTransform,
+  LensTransform,
+  ViewerClaims,
+} from "../client/CalmLensTypes";
 import { getAssetUrl, serializeTransform, transformSelector } from "../client/CalmLensUtils";
 import { EU_COUNTRIES } from "../contract/Jurisdiction.js";
 import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
@@ -11,14 +16,6 @@ export interface MediaAsset {
   id: string;
   projectId: string;
   type?: string | null;
-  delivery?: {
-    viewerRegion: string;
-    blocked: boolean;
-    reason: string | null;
-    action: string | null;
-    jurisdiction?: string;
-    ageCheckStandard: "any" | "verified";
-  };
   classification?: {
     moderation?: {
       status?: AssetModerationStatus | null;
@@ -56,8 +53,8 @@ export type MediaSource =
 export type MediaOptions = MediaSource & MediaSettings;
 
 export interface MediaSettings {
-  /** Viewer country; forwarded to every CDN request. Your integration determines it. */
-  region?: string;
+  /** Optional customer assertions. Defaults to connection country and age confirmation false. */
+  viewerClaims?: ViewerClaims;
   /** The asset's stored moderation status. Defaults to `allowed`. */
   status?: AssetModerationStatus;
   /**
@@ -65,11 +62,6 @@ export interface MediaSettings {
    * shows the unavailable notice and requests nothing. Set from `asset` when you pass one.
    */
   contentRemoved?: boolean;
-  /**
-   * Whether your app lets this viewer see age-restricted media. Without it, age-restricted
-   * assets show their blurred placeholder and a reveal button.
-   */
-  ageConfirmed?: boolean;
   /** `image` (default), `video` or `audio`. */
   type?: "image" | "video" | "audio";
   /**
@@ -86,7 +78,7 @@ export interface MediaSettings {
   widths?: number[];
   /**
    * A signed URL from your server, used as-is instead of a CDN URL built here, for private
-   * assets or when CalmLens must refuse age-restricted content to everyone else.
+   * assets. Include any viewer claims when creating the signed URL.
    */
   url?: string;
   /** Show the blurred placeholder while the media loads. Defaults to `true`. */
@@ -194,18 +186,11 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
     purge: "purged",
   };
   let status = props.status ?? asset.classification?.moderation?.status ?? "allowed";
-  const delivery = asset.delivery;
-  const resolved = delivery?.viewerRegion === props.region ? delivery : undefined;
-  if (resolved) {
-    if (resolved.blocked && ranks[status] < ranks.blocked) status = "blocked";
-    const effective = resolved.action ? statuses[resolved.action] : "allowed";
-    if (effective && ranks[effective] > ranks[status]) status = effective;
-  }
-  for (const entry of resolved ? [] : regionEntries) {
+  for (const entry of regionEntries) {
+    const region = props.viewerClaims?.region;
     if (
-      !props.region ||
-      entry.region === props.region ||
-      (entry.region === "EU" && EU_COUNTRIES.has(props.region))
+      region &&
+      (entry.region === region || (entry.region === "EU" && EU_COUNTRIES.has(region)))
     ) {
       const regionalStatus = statuses[entry.action];
       if (regionalStatus && ranks[regionalStatus] > ranks[status]) status = regionalStatus;
@@ -226,31 +211,14 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
   } as T & { projectId: string; assetId: string };
 };
 
-export const getMediaState = (options: MediaOptions): MediaState => {
-  const resolved = resolveMediaProps(options);
-  const state = buildMediaState(resolved);
-  const moderation = options.asset?.classification?.moderation;
-  const delivery = options.asset?.delivery;
-  if (
-    state.kind === "unavailable" &&
-    resolved.status === "blocked" &&
-    !resolved.contentRemoved &&
-    moderation?.status !== "blocked" &&
-    moderation?.status !== "purged" &&
-    delivery?.viewerRegion === options.region &&
-    delivery?.action === "block" &&
-    delivery.jurisdiction
-  )
-    return { kind: "unavailable", reason: "regional" };
-  return state;
-};
+export const getMediaState = (options: MediaOptions): MediaState =>
+  buildMediaState(resolveMediaProps(options));
 
 const buildMediaState = ({
   projectId,
   assetId,
   status = "allowed",
   contentRemoved = false,
-  ageConfirmed = false,
   type = "image",
   resource = "rendered",
   lens,
@@ -261,10 +229,10 @@ const buildMediaState = ({
   placeholderHash,
   placeholderUrl: customPlaceholderUrl,
   cdnBaseUrl,
-  region,
+  viewerClaims,
 }: MediaSettings & { projectId: string; assetId: string }): MediaState => {
   if (status === "blocked" || status === "purged" || contentRemoved) return { kind: "unavailable" };
-  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl, viewerRegion: region };
+  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl, viewerClaims };
   const placeholderUrl = placeholder
     ? (decodePlaceholderHash(placeholderHash) ??
       customPlaceholderUrl ??
@@ -273,7 +241,7 @@ const buildMediaState = ({
       (url || type !== "image" ? undefined : getAssetUrl({ ...asset, resource: "placeholder" })))
     : undefined;
   const restricted = status === "age-restricted";
-  if (restricted && !ageConfirmed) return { kind: "gated", placeholderUrl };
+  if (restricted && !viewerClaims?.ageConfirmed) return { kind: "gated", placeholderUrl };
 
   const build = (options: { resource?: "original" | "rendered"; extra?: LensTransform } = {}) => {
     const chosen = options.resource ?? resource;
@@ -284,7 +252,6 @@ const buildMediaState = ({
       resource: chosen,
       lens: rendered ? lens : undefined,
       transform: rendered ? joinTransforms(transform, options.extra) : undefined,
-      ageConfirmed: restricted || undefined,
     });
   };
 

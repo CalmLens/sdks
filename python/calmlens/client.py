@@ -42,7 +42,7 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
                     AddHashListEntryOptions, CreateHashListOptions, HashList, HashListAction, HashListEntry,
                     HashListEntryIdOptions, HashListEntryPage, HashListIdOptions, HashListList,
                     ListHashListEntriesOptions, UpdateHashListOptions,
-                    Visibility, WaitForDecisionOptions)
+                    ViewerClaims, Visibility, WaitForDecisionOptions)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
 __all__ = ["CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse", "DEFAULT_TIMEOUT",
@@ -1078,10 +1078,10 @@ class Assets:
                 return
             index = cursor
 
-    def retrieve(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET, viewer_region: str = _UNSET) -> Asset:
+    def retrieve(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Fetch an asset by ID."""
-        merged = _merge(options, asset_id=asset_id, viewer_region=viewer_region)
-        return cast(Asset, self._c._request("GET", "/assets/" + _id(merged.get("assetId"), "assetId"), query={"viewerRegion": merged["viewerRegion"]} if "viewerRegion" in merged else None))
+        merged = _merge(options, asset_id=asset_id)
+        return cast(Asset, self._c._request("GET", "/assets/" + _id(merged.get("assetId"), "assetId")))
 
     def wait_for_decision(self, options: WaitForDecisionOptions | None = None, /, *, asset_id: str = _UNSET,
                           timeout: float = _UNSET) -> Asset:
@@ -1277,11 +1277,11 @@ class Assets:
 
     def create_signed_url(self, options: SignedUrlOptions | None = None, /, *, asset_id: str = _UNSET,
                           resource: Literal["original", "rendered"] = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,
-                          transform: CdnTransform = _UNSET, viewer_region: str = _UNSET) -> SignedUrl:
+                          transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET) -> SignedUrl:
         """Sign a temporary CDN URL for private content (defaults: ``rendered``, applied by the API, and
         900 seconds)."""
         merged = _merge(options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
-                        lens=lens, transform=transform, viewer_region=viewer_region)
+                        lens=lens, transform=transform, viewer_claims=viewer_claims)
         asset_path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/signed-url"
         body = {"expiresInSeconds": DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
                 **{k: v for k, v in merged.items() if k != "assetId"}}
@@ -1507,7 +1507,7 @@ class CDN:
 
     def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, asset_identifier: str = _UNSET,
                       resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
-                      age_confirmed: bool = _UNSET, viewer_region: str = _UNSET) -> str:
+                      viewer_claims: ViewerClaims = _UNSET) -> str:
         """The CDN URL of an asset's ``rendered`` (default), ``original`` or ``placeholder`` resource. The
         rendered resource optionally goes through a named ``lens``, a ``transform``, or both (the lens runs
         first); ``original`` takes neither. Private assets need an API key or a signed URL.
@@ -1519,17 +1519,15 @@ class CDN:
         public asset whose moderation status is ``age-restricted``. Set it only where your app has
         already decided the viewer may see age-restricted content."""
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
-                        age_confirmed=age_confirmed, viewer_region=viewer_region)
-        age = merged.get("ageConfirmed", False)
-        if not isinstance(age, bool):
-            raise _invalid("ageConfirmed must be a boolean")
+                        viewer_claims=viewer_claims)
+
         selected = merged.get("resource", "rendered")
         if selected not in ("original", "rendered", "placeholder"):
             raise _invalid("Resource must be original, rendered or placeholder")
         transformed = merged.get("lens") is not None or merged.get("transform") is not None
         if selected == "original" and transformed:
             raise _invalid("Lenses and transforms apply only to the rendered resource")
-        if selected == "placeholder" and (transformed or age):
+        if selected == "placeholder" and (transformed):
             raise _invalid("A placeholder takes no lens, transform or ageConfirmed")
         url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
                f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{selected}")
@@ -1537,13 +1535,14 @@ class CDN:
             url += "/@" + _id(merged["lens"], "lens")
         if _has_transform(merged.get("transform")):
             url += "/" + _transform_path(merged["transform"])
-        params = (["ageConfirmed=true"] if age else [])
-        if merged.get("viewerRegion") is not None: params.append("viewerRegion=" + quote(str(merged["viewerRegion"]), safe=""))
+        params = []
+        if merged.get("viewerClaims") is not None:
+            params.append("viewerClaims=" + quote(json.dumps(merged["viewerClaims"], separators=(",", ":")), safe=""))
         return url + ("?" + "&".join(params) if params else "")
 
     def serve(self, options: ServeOptions | None = None, /, *, asset_identifier: str = _UNSET,
               resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
-              age_confirmed: bool = _UNSET, viewer_region: str = _UNSET, init: ServeInit = _UNSET) -> CDNResponse:
+              viewer_claims: ViewerClaims = _UNSET, init: ServeInit = _UNSET) -> CDNResponse:
         """Request an asset from the CDN with the client's API key.
 
         Returns a streaming :class:`CDNResponse`, including for non-2xx responses (check
@@ -1553,7 +1552,7 @@ class CDN:
         ``sdk/http-error``. The timeout is an inactivity limit, so large downloads are not cut off.
         """
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens,
-                        transform=transform, age_confirmed=age_confirmed, viewer_region=viewer_region, init=init)
+                        transform=transform, viewer_claims=viewer_claims, init=init)
         settings = merged.get("init") or {}
         method = settings.get("method", "GET")
         if method not in ("GET", "HEAD"):

@@ -2,15 +2,12 @@
   {
     "operation": "assets.retrieve",
     "options": {
-      "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "viewerRegion": "DE"
+      "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c"
     },
     "request": {
       "method": "GET",
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "query": {
-        "viewerRegion": "DE"
-      },
+      "query": {},
       "body": null
     },
     "response": {
@@ -34,7 +31,9 @@
     "operation": "assets.createSignedUrl",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "viewerRegion": "GB",
+      "viewerClaims": {
+        "region": "GB"
+      },
       "resource": "rendered"
     },
     "request": {
@@ -42,7 +41,9 @@
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c/signed-url",
       "query": {},
       "body": {
-        "viewerRegion": "GB",
+        "viewerClaims": {
+          "region": "GB"
+        },
         "resource": "rendered",
         "expiresInSeconds": 900
       }
@@ -477,9 +478,7 @@
             }
           },
           "score": 0.85,
-          "matchedFields": [
-            "visual"
-          ]
+          "matchedFields": ["visual"]
         }
       ],
       "semanticStatus": "ready"
@@ -564,9 +563,7 @@
             }
           },
           "score": 0.85,
-          "matchedFields": [
-            "visual"
-          ]
+          "matchedFields": ["visual"]
         }
       ],
       "semanticStatus": "ready"
@@ -826,38 +823,26 @@
                 "source": {
                   "kind": "allowance",
                   "index": 0,
-                  "indexes": [
-                    0,
-                    1
-                  ]
+                  "indexes": [0, 1]
                 },
                 "settings": {
                   "enabled": true,
                   "categoryAction": "purge",
                   "allowances": [
                     {
-                      "when": [
-                        "violence-injury",
-                        "violence-educational"
-                      ],
+                      "when": ["violence-injury", "violence-educational"],
                       "match": "all",
                       "action": "block"
                     },
                     {
-                      "when": [
-                        "violence-historical"
-                      ],
+                      "when": ["violence-historical"],
                       "action": "block"
                     }
                   ],
                   "restrictions": [
                     {
-                      "when": [
-                        "violence-threat"
-                      ],
-                      "unless": [
-                        "violence-documentary"
-                      ],
+                      "when": ["violence-threat"],
+                      "unless": ["violence-documentary"],
                       "match": "all",
                       "action": "purge"
                     }
@@ -1103,10 +1088,7 @@
   {
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1",
-        "a/b?c#d"
-      ],
+      "assetIds": ["asset-1", "a/b?c#d"],
       "operation": "remove-content"
     },
     "request": {
@@ -1114,10 +1096,7 @@
       "path": "/v1/projects/project-1/assets/batch",
       "query": {},
       "body": {
-        "assetIds": [
-          "asset-1",
-          "a/b?c#d"
-        ],
+        "assetIds": ["asset-1", "a/b?c#d"],
         "operation": "remove-content"
       }
     },
@@ -1128,9 +1107,7 @@
   {
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1"
-      ],
+      "assetIds": ["asset-1"],
       "operation": "delete"
     },
     "request": {
@@ -1138,9 +1115,7 @@
       "path": "/v1/projects/project-1/assets/batch",
       "query": {},
       "body": {
-        "assetIds": [
-          "asset-1"
-        ],
+        "assetIds": ["asset-1"],
         "operation": "delete"
       }
     },
@@ -1261,9 +1236,7 @@
   {
     "operation": "folders.list",
     "options": {
-      "ids": [
-        "folder-1"
-      ],
+      "ids": ["folder-1"],
       "resolveOnly": true
     },
     "request": {
@@ -1722,9 +1695,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -1740,16 +1711,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -2104,10 +2065,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -2115,9 +2073,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -2125,9 +2081,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -2147,9 +2101,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -2287,15 +2239,12 @@
   {
     "operation": "assets.retrieve",
     "options": {
-      "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "viewerRegion": "DE"
+      "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c"
     },
     "request": {
       "method": "GET",
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "query": {
-        "viewerRegion": "DE"
-      },
+      "query": {},
       "body": null
     },
     "response": {
@@ -2329,9 +2278,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -2347,16 +2294,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -2711,10 +2648,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -2722,9 +2656,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -2732,9 +2664,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -2754,9 +2684,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -2895,7 +2823,9 @@
     "operation": "assets.createSignedUrl",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "viewerRegion": "GB",
+      "viewerClaims": {
+        "region": "GB"
+      },
       "resource": "rendered"
     },
     "request": {
@@ -2903,7 +2833,9 @@
       "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c/signed-url",
       "query": {},
       "body": {
-        "viewerRegion": "GB",
+        "viewerClaims": {
+          "region": "GB"
+        },
         "resource": "rendered",
         "expiresInSeconds": 900
       }
@@ -2968,9 +2900,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -2986,16 +2916,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -3350,10 +3270,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -3361,9 +3278,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -3371,9 +3286,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -3393,9 +3306,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -3598,9 +3509,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -3616,16 +3525,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -3980,10 +3879,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -3991,9 +3887,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -4001,9 +3895,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -4023,9 +3915,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -4261,9 +4151,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -4279,16 +4167,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -4643,10 +4521,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -4654,9 +4529,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -4664,9 +4537,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -4686,9 +4557,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -4875,9 +4744,7 @@
                 }
               }
             ],
-            "tags": [
-              "example"
-            ],
+            "tags": ["example"],
             "processingOptions": {
               "keepContentAfterProcessing": true,
               "flaggedContentPolicy": {
@@ -4893,16 +4760,6 @@
               }
             },
             "visibility": "public",
-            "delivery": {
-              "viewerRegion": "AD",
-              "jurisdiction": "DE",
-              "action": "limit",
-              "rule": "example",
-              "category": "sexual",
-              "ageCheckStandard": "any",
-              "blocked": true,
-              "reason": "safety-hold"
-            },
             "upload": {
               "status": "uploading",
               "updatedAt": 1,
@@ -5257,10 +5114,7 @@
                       "source": {
                         "kind": "allowance",
                         "index": 1,
-                        "indexes": [
-                          1,
-                          1
-                        ]
+                        "indexes": [1, 1]
                       },
                       "settings": {
                         "enabled": true,
@@ -5268,9 +5122,7 @@
                         "allowances": [
                           {
                             "name": "example",
-                            "when": [
-                              "sexual-pornographic-media"
-                            ],
+                            "when": ["sexual-pornographic-media"],
                             "match": "all",
                             "action": "allow"
                           }
@@ -5278,9 +5130,7 @@
                         "restrictions": [
                           {
                             "name": "example",
-                            "when": [
-                              "sexual-pornographic-media"
-                            ],
+                            "when": ["sexual-pornographic-media"],
                             "match": "all",
                             "action": "allow"
                           }
@@ -5300,9 +5150,7 @@
                         "category": "sexual"
                       }
                     ],
-                    "flaggedCategories": [
-                      "sexual"
-                    ]
+                    "flaggedCategories": ["sexual"]
                   }
                 },
                 "hashMatches": [
@@ -5436,9 +5284,7 @@
             }
           },
           "score": 1.5,
-          "matchedFields": [
-            "name"
-          ]
+          "matchedFields": ["name"]
         }
       ],
       "semanticStatus": "disabled"
@@ -5495,9 +5341,7 @@
               }
             }
           ],
-          "tags": [
-            "example"
-          ],
+          "tags": ["example"],
           "processingOptions": {
             "keepContentAfterProcessing": true,
             "flaggedContentPolicy": {
@@ -5513,16 +5357,6 @@
             }
           },
           "visibility": "public",
-          "delivery": {
-            "viewerRegion": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any",
-            "blocked": true,
-            "reason": "safety-hold"
-          },
           "upload": {
             "status": "uploading",
             "updatedAt": 1,
@@ -5877,10 +5711,7 @@
                     "source": {
                       "kind": "allowance",
                       "index": 1,
-                      "indexes": [
-                        1,
-                        1
-                      ]
+                      "indexes": [1, 1]
                     },
                     "settings": {
                       "enabled": true,
@@ -5888,9 +5719,7 @@
                       "allowances": [
                         {
                           "name": "example",
-                          "when": [
-                            "sexual-pornographic-media"
-                          ],
+                          "when": ["sexual-pornographic-media"],
                           "match": "all",
                           "action": "allow"
                         }
@@ -5898,9 +5727,7 @@
                       "restrictions": [
                         {
                           "name": "example",
-                          "when": [
-                            "sexual-pornographic-media"
-                          ],
+                          "when": ["sexual-pornographic-media"],
                           "match": "all",
                           "action": "allow"
                         }
@@ -5920,9 +5747,7 @@
                       "category": "sexual"
                     }
                   ],
-                  "flaggedCategories": [
-                    "sexual"
-                  ]
+                  "flaggedCategories": ["sexual"]
                 }
               },
               "hashMatches": [
@@ -6121,9 +5946,7 @@
               }
             }
           ],
-          "tags": [
-            "example"
-          ],
+          "tags": ["example"],
           "processingOptions": {
             "keepContentAfterProcessing": true,
             "flaggedContentPolicy": {
@@ -6139,16 +5962,6 @@
             }
           },
           "visibility": "public",
-          "delivery": {
-            "viewerRegion": "AD",
-            "jurisdiction": "DE",
-            "action": "limit",
-            "rule": "example",
-            "category": "sexual",
-            "ageCheckStandard": "any",
-            "blocked": true,
-            "reason": "safety-hold"
-          },
           "upload": {
             "status": "uploading",
             "updatedAt": 1,
@@ -6503,10 +6316,7 @@
                     "source": {
                       "kind": "allowance",
                       "index": 1,
-                      "indexes": [
-                        1,
-                        1
-                      ]
+                      "indexes": [1, 1]
                     },
                     "settings": {
                       "enabled": true,
@@ -6514,9 +6324,7 @@
                       "allowances": [
                         {
                           "name": "example",
-                          "when": [
-                            "sexual-pornographic-media"
-                          ],
+                          "when": ["sexual-pornographic-media"],
                           "match": "all",
                           "action": "allow"
                         }
@@ -6524,9 +6332,7 @@
                       "restrictions": [
                         {
                           "name": "example",
-                          "when": [
-                            "sexual-pornographic-media"
-                          ],
+                          "when": ["sexual-pornographic-media"],
                           "match": "all",
                           "action": "allow"
                         }
@@ -6546,9 +6352,7 @@
                       "category": "sexual"
                     }
                   ],
-                  "flaggedCategories": [
-                    "sexual"
-                  ]
+                  "flaggedCategories": ["sexual"]
                 }
               },
               "hashMatches": [
@@ -6741,9 +6545,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -6759,16 +6561,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -7123,10 +6915,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -7134,9 +6923,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -7144,9 +6931,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -7166,9 +6951,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -7345,9 +7128,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -7363,16 +7144,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -7727,10 +7498,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -7738,9 +7506,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -7748,9 +7514,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -7770,9 +7534,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -7949,9 +7711,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -7967,16 +7727,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -8331,10 +8081,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -8342,9 +8089,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -8352,9 +8097,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -8374,9 +8117,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -8553,9 +8294,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -8571,16 +8310,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -8935,10 +8664,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -8946,9 +8672,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -8956,9 +8680,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -8978,9 +8700,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -9160,9 +8880,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -9178,16 +8896,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -9542,10 +9250,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -9553,9 +9258,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -9563,9 +9266,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -9585,9 +9286,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [
@@ -9725,10 +9424,7 @@
   {
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1",
-        "a/b?c#d"
-      ],
+      "assetIds": ["asset-1", "a/b?c#d"],
       "operation": "remove-content"
     },
     "request": {
@@ -9736,10 +9432,7 @@
       "path": "/v1/projects/project-1/assets/batch",
       "query": {},
       "body": {
-        "assetIds": [
-          "asset-1",
-          "a/b?c#d"
-        ],
+        "assetIds": ["asset-1", "a/b?c#d"],
         "operation": "remove-content"
       }
     },
@@ -9799,9 +9492,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "processingOptions": {
         "keepContentAfterProcessing": true,
         "flaggedContentPolicy": {
@@ -9817,16 +9508,6 @@
         }
       },
       "visibility": "public",
-      "delivery": {
-        "viewerRegion": "AD",
-        "jurisdiction": "DE",
-        "action": "limit",
-        "rule": "example",
-        "category": "sexual",
-        "ageCheckStandard": "any",
-        "blocked": true,
-        "reason": "safety-hold"
-      },
       "upload": {
         "status": "uploading",
         "updatedAt": 1,
@@ -10181,10 +9862,7 @@
                 "source": {
                   "kind": "allowance",
                   "index": 1,
-                  "indexes": [
-                    1,
-                    1
-                  ]
+                  "indexes": [1, 1]
                 },
                 "settings": {
                   "enabled": true,
@@ -10192,9 +9870,7 @@
                   "allowances": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -10202,9 +9878,7 @@
                   "restrictions": [
                     {
                       "name": "example",
-                      "when": [
-                        "sexual-pornographic-media"
-                      ],
+                      "when": ["sexual-pornographic-media"],
                       "match": "all",
                       "action": "allow"
                     }
@@ -10224,9 +9898,7 @@
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ]
+              "flaggedCategories": ["sexual"]
             }
           },
           "hashMatches": [

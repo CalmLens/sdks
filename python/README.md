@@ -35,17 +35,17 @@ values this SDK version doesn't list never fail: treat an unknown status as "not
 
 ## Configuration
 
-| Argument | Default | Meaning |
-| --- | --- | --- |
-| `api_key` | `CALMLENS_API_KEY` | Project API key |
-| `project_id` | `CALMLENS_PROJECT_ID` | Project ID |
-| `base_url`, `cdn_base_url` | `https://api.calmlens.com/v1`, `https://cdn.calmlens.com/v1` | Endpoints |
-| `timeout` | `120` | Seconds a connection may stay silent before `sdk/timeout`. An inactivity limit, not a limit on the whole transfer, so large uploads and downloads are never cut off |
-| `upload_timeout` | `None` | The `timeout` of binary uploads (file content and multipart parts); `None` uses `timeout`. Text uploads always use `timeout` |
-| `connect_timeout` | `10` | Seconds to open a connection (TCP, proxy and TLS) |
-| `max_retries` | `2` | Retries for requests that are safe to resend (see [Retries](#retries)); `0` disables them |
-| `max_response_bytes` | `33554432` (32 MiB) | The largest API response body the client reads; a larger one (or a larger declared `Content-Length`, before reading) raises `sdk/response-too-large`. CDN downloads are not limited |
-| `transport` | pooled `http.client` | `transport(request, timeout)` returning a context-managed response with `status`, `headers` and `read()` |
+| Argument                   | Default                                                      | Meaning                                                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api_key`                  | `CALMLENS_API_KEY`                                           | Project API key                                                                                                                                                                     |
+| `project_id`               | `CALMLENS_PROJECT_ID`                                        | Project ID                                                                                                                                                                          |
+| `base_url`, `cdn_base_url` | `https://api.calmlens.com/v1`, `https://cdn.calmlens.com/v1` | Endpoints                                                                                                                                                                           |
+| `timeout`                  | `120`                                                        | Seconds a connection may stay silent before `sdk/timeout`. An inactivity limit, not a limit on the whole transfer, so large uploads and downloads are never cut off                 |
+| `upload_timeout`           | `None`                                                       | The `timeout` of binary uploads (file content and multipart parts); `None` uses `timeout`. Text uploads always use `timeout`                                                        |
+| `connect_timeout`          | `10`                                                         | Seconds to open a connection (TCP, proxy and TLS)                                                                                                                                   |
+| `max_retries`              | `2`                                                          | Retries for requests that are safe to resend (see [Retries](#retries)); `0` disables them                                                                                           |
+| `max_response_bytes`       | `33554432` (32 MiB)                                          | The largest API response body the client reads; a larger one (or a larger declared `Content-Length`, before reading) raises `sdk/response-too-large`. CDN downloads are not limited |
+| `transport`                | pooled `http.client`                                         | `transport(request, timeout)` returning a context-managed response with `status`, `headers` and `read()`                                                                            |
 
 Invalid options raise `CalmLensValidationError` with code `sdk/invalid-config` before the
 client creates any state. `client.with_options(timeout=..., upload_timeout=..., max_retries=...,
@@ -84,15 +84,15 @@ raises `sdk/invalid-config`.
 Every failure raises `CalmLensError` or a subclass, with a stable `code` (constants in
 `calmlens.error_codes`, generated from the API's error codes):
 
-| Exception | When | `code` | `status` |
-| --- | --- | --- | --- |
-| `CalmLensAPIError` | Non-2xx API response | The API code, e.g. `asset/not-found`; `sdk/http-error` without an error body | HTTP status |
-| `CalmLensTimeoutError` | Connecting or waiting for data timed out | `sdk/timeout` | `None` |
-| `CalmLensTransportError` | Any other network or protocol failure (refused, reset, DNS, TLS, truncated response) | `sdk/transport-error` | `None` |
-| `CalmLensValidationError` | Invalid arguments or configuration, before anything is sent | `sdk/invalid-argument`, `sdk/invalid-config`, or the API's code for the same problem, e.g. `upload/invalid-payload`, `upload/invalid-mime-type` | `None` |
-| `CalmLensError` | A 2xx response that isn't the JSON the operation returns (an upload answered with something other than an asset included), or a response larger than `max_response_bytes` | `sdk/invalid-response`, `sdk/response-too-large` | HTTP status |
-| `CalmLensError` | An iterator received a page that says more follow with a cursor it had already sent; `details` has the `cursor` | `sdk/invalid-response` | `None` |
-| `CalmLensError` | `assets.wait_for_decision` saw no decision within its `timeout`; `details` has `assetId` and the last `classificationStatus` and `moderationStatus` | `sdk/timeout` | `None` |
+| Exception                 | When                                                                                                                                                                      | `code`                                                                                                                                          | `status`    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `CalmLensAPIError`        | Non-2xx API response                                                                                                                                                      | The API code, e.g. `asset/not-found`; `sdk/http-error` without an error body                                                                    | HTTP status |
+| `CalmLensTimeoutError`    | Connecting or waiting for data timed out                                                                                                                                  | `sdk/timeout`                                                                                                                                   | `None`      |
+| `CalmLensTransportError`  | Any other network or protocol failure (refused, reset, DNS, TLS, truncated response)                                                                                      | `sdk/transport-error`                                                                                                                           | `None`      |
+| `CalmLensValidationError` | Invalid arguments or configuration, before anything is sent                                                                                                               | `sdk/invalid-argument`, `sdk/invalid-config`, or the API's code for the same problem, e.g. `upload/invalid-payload`, `upload/invalid-mime-type` | `None`      |
+| `CalmLensError`           | A 2xx response that isn't the JSON the operation returns (an upload answered with something other than an asset included), or a response larger than `max_response_bytes` | `sdk/invalid-response`, `sdk/response-too-large`                                                                                                | HTTP status |
+| `CalmLensError`           | An iterator received a page that says more follow with a cursor it had already sent; `details` has the `cursor`                                                           | `sdk/invalid-response`                                                                                                                          | `None`      |
+| `CalmLensError`           | `assets.wait_for_decision` saw no decision within its `timeout`; `details` has `assetId` and the last `classificationStatus` and `moderationStatus`                       | `sdk/timeout`                                                                                                                                   | `None`      |
 
 Each error also has `message`, `details` (the API's details, plus `traceId` when sent; empty for
 transport errors), `request_id` (the response's `X-Request-Id`, to quote to support), `headers`
@@ -138,29 +138,29 @@ retried.
 
 ## Operations
 
-| JavaScript | Python |
-| --- | --- |
-| `assets.create/classify/retrieve/update/list/search(options)` | Same names |
-| `assets.listChildren(options)` | `assets.list_children(...)`; `assets.iter_children(...)` walks every page |
-| (pagination) | `assets.iter(...)` yields every matching asset |
-| `assets.uploadPart(options)` | `assets.upload_part(...)` |
-| `assets.createSignedUrl(options)` | `assets.create_signed_url(...)` |
-| `assets.move/retry/delete(options)` | Same names; `delete` returns `None` |
-| `assets.explain({ assetId, rerun })` | `assets.explain(asset_id=, rerun=True)` |
-| `assets.deleteContent(options)` | `assets.delete_content(...)` |
-| `assets.batch({ assetIds, operation })` | `assets.batch(asset_ids=[...], operation="delete")`; returns `{"queued": True}` |
-| `assets.waitForDecision({ assetId, timeoutMs })` | `assets.wait_for_decision(asset_id=, timeout=60)`; `timeout` in seconds, no `signal` |
-| `folders.list()` | `folders.list()` |
-| `folders.create/retrieve/update/move/delete(options)` | Same names |
-| `hashLists.list()` | `hash_lists.list()`; returns `{"items": [...]}`, newest first |
-| `hashLists.create/retrieve/update/delete(options)` | `hash_lists.create/retrieve/update/delete(...)`; `delete` returns `None` |
-| `hashLists.listEntries/addEntry/removeEntry(options)` | `hash_lists.list_entries/add_entry/remove_entry(...)`; `remove_entry` returns `None` |
-| `events.list(options)` | `events.list(...)`; `events.iter(...)` and `events.iter_pages(...)` (see [Events feed](#events-feed)) |
-| `ensureLens/ensureLenses(options)` | `ensure_lens/ensure_lenses(...)` |
-| `cdn.getAssetUrl/serve(options)` | `cdn.get_asset_url/serve(...)` |
-| `verifyWebhookSignature(options)` | `verify_webhook_signature(payload, *, signature=, timestamp=, secret=, headers=, tolerance_seconds=300, now=None)` |
-| `parseWebhookEvent(options)` | `parse_webhook_event(payload, *, ...)` (same keywords) |
-| `createWebhookSignatureHeader` | `create_webhook_signature_header(payload, timestamp, secret)` |
+| JavaScript                                                    | Python                                                                                                             |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `assets.create/classify/retrieve/update/list/search(options)` | Same names                                                                                                         |
+| `assets.listChildren(options)`                                | `assets.list_children(...)`; `assets.iter_children(...)` walks every page                                          |
+| (pagination)                                                  | `assets.iter(...)` yields every matching asset                                                                     |
+| `assets.uploadPart(options)`                                  | `assets.upload_part(...)`                                                                                          |
+| `assets.createSignedUrl(options)`                             | `assets.create_signed_url(...)`                                                                                    |
+| `assets.move/retry/delete(options)`                           | Same names; `delete` returns `None`                                                                                |
+| `assets.explain({ assetId, rerun })`                          | `assets.explain(asset_id=, rerun=True)`                                                                            |
+| `assets.deleteContent(options)`                               | `assets.delete_content(...)`                                                                                       |
+| `assets.batch({ assetIds, operation })`                       | `assets.batch(asset_ids=[...], operation="delete")`; returns `{"queued": True}`                                    |
+| `assets.waitForDecision({ assetId, timeoutMs })`              | `assets.wait_for_decision(asset_id=, timeout=60)`; `timeout` in seconds, no `signal`                               |
+| `folders.list()`                                              | `folders.list()`                                                                                                   |
+| `folders.create/retrieve/update/move/delete(options)`         | Same names                                                                                                         |
+| `hashLists.list()`                                            | `hash_lists.list()`; returns `{"items": [...]}`, newest first                                                      |
+| `hashLists.create/retrieve/update/delete(options)`            | `hash_lists.create/retrieve/update/delete(...)`; `delete` returns `None`                                           |
+| `hashLists.listEntries/addEntry/removeEntry(options)`         | `hash_lists.list_entries/add_entry/remove_entry(...)`; `remove_entry` returns `None`                               |
+| `events.list(options)`                                        | `events.list(...)`; `events.iter(...)` and `events.iter_pages(...)` (see [Events feed](#events-feed))              |
+| `ensureLens/ensureLenses(options)`                            | `ensure_lens/ensure_lenses(...)`                                                                                   |
+| `cdn.getAssetUrl/serve(options)`                              | `cdn.get_asset_url/serve(...)`                                                                                     |
+| `verifyWebhookSignature(options)`                             | `verify_webhook_signature(payload, *, signature=, timestamp=, secret=, headers=, tolerance_seconds=300, now=None)` |
+| `parseWebhookEvent(options)`                                  | `parse_webhook_event(payload, *, ...)` (same keywords)                                                             |
+| `createWebhookSignatureHeader`                                | `create_webhook_signature_header(payload, timestamp, secret)`                                                      |
 
 ```python
 page = client.assets.list(page_size=20, ordering=[{"field": "createdAt", "direction": "DESC"}])
@@ -219,7 +219,7 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
   `status` is `pending` until moderation decides, then:
   - `allowed`: show the content.
   - `limited`: delivered like `allowed`, but reduce its reach: keep it out of recommendations, trending and notifications, rank it lower or collapse it.
-  - `age-restricted`: delivered only through signed URLs or API keys; show it only behind your own age gate.
+  - `age-restricted`: delivered only with `viewerClaims.ageConfirmed=true`; show it only behind your own age gate.
   - `blocked`: not delivered, content kept; don't show it.
   - `purged`: not delivered and stored content deleted; don't show it.
 
@@ -244,11 +244,11 @@ definition for that identifier. API version conflicts remain errors.
 
 Supply exactly one of `content`, `url` or `part`. A payload has exactly one of:
 
-| Key | Value |
-| --- | --- |
-| `plainText` (`plain_text`) | A string, sent as UTF-8 |
-| `base64` | Base64 or a data URL |
-| `data` | `bytes`, `bytearray`, `memoryview`, or a binary file object (`open(path, "rb")`, `io.BytesIO`, a socket file, ...) |
+| Key                        | Value                                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `plainText` (`plain_text`) | A string, sent as UTF-8                                                                                            |
+| `base64`                   | Base64 or a data URL                                                                                               |
+| `data`                     | `bytes`, `bytearray`, `memoryview`, or a binary file object (`open(path, "rb")`, `io.BytesIO`, a socket file, ...) |
 
 File objects are streamed in chunks, never read into memory. The size is computed for bytes
 and for seekable files (from the current position). A non-seekable stream (a pipe, socket or
@@ -346,8 +346,7 @@ text regions OCR found when the image was processed, before any other option app
 (after retrying retryable ones, see [Retries](#retries)); check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
-with `age_confirmed=True` (`?ageConfirmed=true`); otherwise it needs a signed URL or an API
-key. Set it only where your app has already decided the viewer may see age-restricted content:
+with `viewer_claims={"ageConfirmed": True}` (a JSON `viewerClaims` query parameter containing `{ "ageConfirmed": true }`); otherwise delivery is refused, even with a signed URL or API key. Set it only where your app has already decided the viewer may see age-restricted content:
 
 ```python
 client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", age_confirmed=True)
@@ -424,11 +423,11 @@ async def calmlens_webhook(request: Request):
 
 Each delivery carries three headers, exported as constants:
 
-| Constant | Header | Value |
-| --- | --- | --- |
-| `WEBHOOK_SIGNATURE_HEADER` | `x-calmlens-signature` | `v1=<hex>`, possibly a comma-separated list |
-| `WEBHOOK_TIMESTAMP_HEADER` | `x-calmlens-timestamp` | Unix seconds used in the signature |
-| `WEBHOOK_DELIVERY_HEADER` | `x-calmlens-delivery` | Unique delivery ID; use it to deduplicate retries |
+| Constant                   | Header                 | Value                                             |
+| -------------------------- | ---------------------- | ------------------------------------------------- |
+| `WEBHOOK_SIGNATURE_HEADER` | `x-calmlens-signature` | `v1=<hex>`, possibly a comma-separated list       |
+| `WEBHOOK_TIMESTAMP_HEADER` | `x-calmlens-timestamp` | Unix seconds used in the signature                |
+| `WEBHOOK_DELIVERY_HEADER`  | `x-calmlens-delivery`  | Unique delivery ID; use it to deduplicate retries |
 
 `x-calmlens-signature` is `v1=` plus the hex HMAC-SHA256 of `"<x-calmlens-timestamp>.<raw
 body>"`. To sign test deliveries, use `create_webhook_signature_header(payload, timestamp,
@@ -453,7 +452,7 @@ returns an `EventsPage` dict: `{"events": [...], "cursor": str, "hasMore": bool}
 event has `id`, `type` (e.g. `asset.allowed`), `createdAt`, `severity`, `title`,
 `description`, `assetId`, `asset` and `facts` (a list of `{key, value, url?}`).
 
-- Calling it **without `after`** returns **no events** and a cursor for *now*. Save that
+- Calling it **without `after`** returns **no events** and a cursor for _now_. Save that
   cursor: the feed only returns events created after the cursor you pass.
 - Pass the previous `cursor` as `after` to get the next events (at most `limit`, default
   50, oldest first). When there are no new events, the same cursor is returned.
@@ -540,8 +539,7 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   `asset_id` copies the asset's `content.image.perceptualHash` and `perceptualHashQuality`
   (seed them through `database_storage`; the mock computes no hashes) and raises
   `hash-list/asset-not-hashed` without one. Uploads are not matched against the lists.
-  `cdn.serve` serves a `limited` asset like an `allowed` one, and treats an `age-restricted` asset like a private one: it needs the
-  `assets:download` permission, unless a public one is requested with `age_confirmed=True`.
+  `cdn.serve` serves a `limited` asset like an `allowed` one. Age-restricted assets always require `viewer_claims={"ageConfirmed": True}`; private assets separately need `assets:download`.
 - Like the API, content is `stored` when `processingOptions.keepContentAfterProcessing` is
   `True`; otherwise it is `temporary` and is removed (`removalReason` `retention`) once
   classification is `completed`, after which `cdn.serve` answers 403 `asset/not-available`. Pass
@@ -576,8 +574,7 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   `requested` after an `asset.content-removed` event) and adds the matching `asset.<decision>`
   event with `decided-by: reviewer`, `asset-type`, `asset-name` and `note` facts.
 - `cdn.serve` answers like the CDN: blocked, purged and failed assets and removed content get
-  `403` `asset/not-available` whatever the key; private assets, and public age-restricted ones
-  requested without `ageConfirmed`, get `403` `asset/api-key-missing-permission` unless the
+  `403` `asset/not-available` whatever the key; private assets get `403` `asset/api-key-missing-permission` unless the
   key has `assets:download` (the default key has no grants). Served content has `Cache-Control`
   as the CDN sets it: `public` only when anyone may see the asset, otherwise `private`, with
   `max-age=31536000, immutable` for images and `max-age=3600` for other content. It also carries
@@ -651,3 +648,11 @@ process.
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
 Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.
+
+### Viewer context for CDN delivery
+
+CDN methods accept optional viewer claims (`viewerClaims`, or the language's `viewer_claims` / `ViewerClaims` field). The object contains `region` and `ageConfirmed`, using the SDK's normal field naming. Region defaults to the country of the connection reaching CalmLens; age confirmation defaults to false. Proxies should forward the incoming viewer country rather than rely on their outgoing connection's country. CalmLens accepts these as customer assertions without independently verifying them.
+
+Age-restricted content returns `403` with `viewer/age-confirmation-required` unless age confirmation is true, including API-key and signed-URL requests. Private assets separately require access permission. Blocks and safety holds cannot be overridden by claims. Applications that never use age-restricted content should leave confirmation false, including processing jobs.
+
+Raw HTTP clients can send a JSON `viewerClaims` query parameter or the JSON `X-CalmLens-Viewer-Claims` header; the query takes precedence. Signed URLs include claims when created and must be forwarded unchanged. Asset retrieval returns stored moderation results without a request-specific `delivery` object. Proxy caches must not bypass current viewer and moderation checks; honour `private, no-store` responses.

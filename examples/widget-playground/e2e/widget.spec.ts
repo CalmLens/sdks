@@ -92,9 +92,13 @@ for (const tab of TABS) {
       await reveal.click();
       const image = item.getByRole("img", { name: "sensitive-photo.png" });
       await expect.poll(() => loaded(image)).toBe(true);
-      expect(await image.evaluate((img: HTMLImageElement) => img.currentSrc)).toContain(
-        "ageConfirmed=true",
-      );
+      expect(
+        JSON.parse(
+          new URL(await image.evaluate((img: HTMLImageElement) => img.currentSrc)).searchParams.get(
+            "viewerClaims",
+          )!,
+        ),
+      ).toEqual({ ageConfirmed: true });
       await expect(
         page.getByRole("checkbox", { name: "Viewer may see sensitive media" }),
       ).toBeChecked();

@@ -65,7 +65,7 @@ final class Assets extends Resource
     public function retrieve(array $options): array
     {
         [$api, $request] = $this->split($options);
-        return $this->session->request('GET', $this->path($api, 'assets', 'assetId'), query: isset($api['viewerRegion']) ? ['viewerRegion' => $api['viewerRegion']] : [], options: $request);
+        return $this->session->request('GET', $this->path($api, 'assets', 'assetId'), options: $request);
     }
 
     public function update(array $options): array

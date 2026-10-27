@@ -301,7 +301,6 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     assetId,
     status,
     contentRemoved,
-    ageConfirmed,
     type,
     resource,
     lens,
@@ -312,7 +311,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
-    region,
+    viewerClaims,
     alt = "",
     aspectRatio,
     width,
@@ -338,7 +337,6 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     assetId,
     status,
     contentRemoved,
-    ageConfirmed,
     type,
     resource,
     lens,
@@ -349,7 +347,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
-    region,
+    viewerClaims,
   });
   const loadKey = getMediaLoadKey(state);
   const [load, setLoad] = useState<{ key: string; state: LoadState }>({

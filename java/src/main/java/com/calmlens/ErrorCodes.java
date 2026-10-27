@@ -10,6 +10,10 @@ import java.util.Optional;
  */
 public final class ErrorCodes {
   private ErrorCodes() {}
+  /** Invalid viewer assertions (HTTP 400). */
+  public static final String INVALID_VIEWER_CLAIMS = "viewer/invalid-claims";
+  /** Age-restricted delivery needs confirmation (HTTP 403). */
+  public static final String AGE_CONFIRMATION_REQUIRED = "viewer/age-confirmation-required";
 
   /** {@code validation/invalid-cursor} (HTTP 400). */
   public static final String INVALID_CURSOR = "validation/invalid-cursor";
@@ -186,6 +190,8 @@ public final class ErrorCodes {
 
   private static final Map<String, Integer> STATUSES = Map.ofEntries(
       Map.entry(INVALID_CURSOR, 400),
+      Map.entry(INVALID_VIEWER_CLAIMS, 400),
+      Map.entry(AGE_CONFIRMATION_REQUIRED, 403),
       Map.entry(MISSING_TOKEN, 401),
       Map.entry(INVALID_API_KEY, 401),
       Map.entry(API_KEY_PROJECT_MISMATCH, 403),

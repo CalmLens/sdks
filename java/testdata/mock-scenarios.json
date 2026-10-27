@@ -122,9 +122,7 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -353,9 +351,7 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -487,9 +483,7 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -718,9 +712,7 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -755,12 +747,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 200,
-              "body": "hello",
-              "headers": {
-                "Content-Type": "image/png",
-                "Cache-Control": "private, max-age=31536000, immutable"
-              }
+              "status": 403,
+              "code": "viewer/age-confirmation-required"
             }
           }
         },
@@ -792,12 +780,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 200,
-              "body": "hello",
-              "headers": {
-                "Content-Type": "image/png",
-                "Cache-Control": "private, max-age=31536000, immutable"
-              }
+              "status": 403,
+              "code": "viewer/age-confirmation-required"
             }
           }
         }
@@ -841,7 +825,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "viewer/age-confirmation-required"
             }
           }
         },
@@ -852,7 +836,9 @@
               "$ref": "public.id"
             },
             "resource": "original",
-            "ageConfirmed": true
+            "viewerClaims": {
+              "ageConfirmed": true
+            }
           },
           "expect": {
             "cdn": {
@@ -860,7 +846,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "private, no-store"
               }
             }
           }
@@ -889,7 +875,9 @@
               "$ref": "private.id"
             },
             "resource": "original",
-            "ageConfirmed": true
+            "viewerClaims": {
+              "ageConfirmed": true
+            }
           },
           "expect": {
             "cdn": {
@@ -989,7 +977,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "viewer/age-confirmation-required"
             }
           }
         },
@@ -1637,9 +1625,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 950,
-              "items.0.matchedFields": [
-                "externalId"
-              ]
+              "items.0.matchedFields": ["externalId"]
             },
             "httpStatus": 200
           }
@@ -1656,16 +1642,12 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 750,
-              "items.0.matchedFields": [
-                "externalId"
-              ],
+              "items.0.matchedFields": ["externalId"],
               "items.1.asset.id": {
                 "$ref": "form.id"
               },
               "items.1.score": 700,
-              "items.1.matchedFields": [
-                "name"
-              ]
+              "items.1.matchedFields": ["name"]
             },
             "httpStatus": 200
           }
@@ -1682,9 +1664,7 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 900,
-              "items.0.matchedFields": [
-                "name"
-              ]
+              "items.0.matchedFields": ["name"]
             },
             "httpStatus": 200
           }
@@ -1701,9 +1681,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 600,
-              "items.0.matchedFields": [
-                "name"
-              ]
+              "items.0.matchedFields": ["name"]
             },
             "httpStatus": 200
           }
@@ -1722,9 +1700,7 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 1000,
-              "items.0.matchedFields": [
-                "id"
-              ]
+              "items.0.matchedFields": ["id"]
             },
             "httpStatus": 200
           }
@@ -1742,9 +1718,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": [
-                "description"
-              ]
+              "items.0.matchedFields": ["description"]
             },
             "httpStatus": 200
           }
@@ -1761,10 +1735,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": [
-                "name",
-                "description"
-              ]
+              "items.0.matchedFields": ["name", "description"]
             },
             "httpStatus": 200
           }
@@ -1805,9 +1776,7 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": [
-                "classification.moderation.status"
-              ],
+              "items.0.matchedFields": ["classification.moderation.status"],
               "items.1.asset.id": {
                 "$ref": "beach.id"
               }
@@ -2270,20 +2239,14 @@
               "$ref": "a.id"
             },
             "name": "renamed.png",
-            "tags": [
-              "beach",
-              "sunset"
-            ]
+            "tags": ["beach", "sunset"]
           },
           "expect": {
             "result": {
               "name": "renamed.png",
               "description": "first",
               "externalId": "order-1",
-              "tags": [
-                "beach",
-                "sunset"
-              ]
+              "tags": ["beach", "sunset"]
             },
             "httpStatus": 200
           }
@@ -2300,9 +2263,7 @@
                 "$ref": "a.id"
               },
               "items.0.score": 500,
-              "items.0.matchedFields": [
-                "tags"
-              ]
+              "items.0.matchedFields": ["tags"]
             },
             "httpStatus": 200
           }
@@ -5768,9 +5729,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -5833,9 +5792,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -5883,9 +5840,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:read"
-                ],
+                "actions": ["assets:read"],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -5914,9 +5869,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -6030,9 +5983,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -6069,9 +6020,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -6123,9 +6072,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -6140,7 +6087,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "viewer/age-confirmation-required"
             }
           }
         },
@@ -6181,9 +6128,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -6214,9 +6159,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -6453,11 +6396,7 @@
                 "X-Content-Type-Options": "nosniff",
                 "Content-Security-Policy": "sandbox; default-src 'none'"
               },
-              "headersPresent": [
-                "ETag",
-                "Expires",
-                "Content-Length"
-              ]
+              "headersPresent": ["ETag", "Expires", "Content-Length"]
             }
           }
         },

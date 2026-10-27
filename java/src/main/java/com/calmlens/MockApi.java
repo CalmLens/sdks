@@ -1439,7 +1439,10 @@ final class MockApi {
       return error(notAvailable);
     // Then access: private assets, and public age-restricted ones requested without
     // ageConfirmed, need an API key with assets:download for the asset's folder.
-    boolean isPrivate = !isPublic || "age-restricted".equals(status) && !"true".equals(request.query().get("ageConfirmed"));
+    JsonObject claims = JsonParser.parseString(request.query().getOrDefault("viewerClaims", "{}")).getAsJsonObject();
+    if ("age-restricted".equals(status) && !(claims.has("ageConfirmed") && claims.get("ageConfirmed").getAsBoolean()))
+      return error(new Failure("viewer/age-confirmation-required", 403, "Age confirmation required"));
+    boolean isPrivate = !isPublic;
     if (isPrivate && !canDownload(str(asset, "folderId"), apiKey))
       return error(new Failure("asset/api-key-missing-permission", 403, "This API key needs assets:download permission for this asset’s folder."));
     String type = stored.type() == null || stored.type().isEmpty() ? "application/octet-stream" : stored.type();
@@ -1447,7 +1450,7 @@ final class MockApi {
     List<String> headers = new ArrayList<>(List.of(
         // Like the CDN: an image's bytes are immutable for a year, other content is kept for an
         // hour, publicly only when delivery is public.
-        "Cache-Control", (isPrivate ? "private" : "public") + ", " + (image ? "max-age=31536000, immutable" : "max-age=3600"),
+        "Cache-Control", !claims.isEmpty() ? "private, no-store" : (isPrivate ? "private" : "public") + ", " + (image ? "max-age=31536000, immutable" : "max-age=3600"),
         "Cache-Tag", "asset-" + str(asset, "id")));
     if (image) {
       headers.addAll(List.of("ETag", "\"" + str(asset, "id") + "\"",

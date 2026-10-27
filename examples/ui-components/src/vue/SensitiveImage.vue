@@ -15,7 +15,7 @@ const emit = defineEmits<{ reveal: [] }>();
 
 const restricted = computed(() => props.status === "age-restricted");
 const asset = computed(() => ({ projectId: props.projectId, assetIdentifier: props.assetId }));
-const contentUrl = computed(() => getAssetUrl({ ...asset.value, ageConfirmed: restricted.value }));
+const contentUrl = computed(() => getAssetUrl({ ...asset.value, viewerClaims: { ageConfirmed: props.ageConfirmed } }));
 const placeholderUrl = computed(() => getAssetUrl({ ...asset.value, resource: "placeholder" }));
 </script>
 

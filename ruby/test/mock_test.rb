@@ -31,11 +31,11 @@ class MockTest < Minitest::Test
   def test_cdn_serve_passes_the_age_restricted_parameter_and_rejects_non_booleans
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
-    served = mock.cdn.serve(asset_identifier: asset['id'], lens: 'thumb', age_confirmed: true)
+    served = mock.cdn.serve(asset_identifier: asset['id'], lens: 'thumb', viewer_claims: { age_confirmed: true })
     request = mock.requests.last
-    assert_equal ["/assets/project-1/#{asset['id']}/rendered/@thumb", { 'ageConfirmed' => 'true' }], [request.path, request.query]
+    assert_equal ["/assets/project-1/#{asset['id']}/rendered/@thumb", { 'viewerClaims' => '{"ageConfirmed":true}' }], [request.path, request.query]
     assert_equal 200, served.status
-    error = assert_raises(CalmLens::InvalidArgumentError) { mock.cdn.get_asset_url(asset_identifier: asset['id'], age_confirmed: 'yes') }
+    error = assert_raises(CalmLens::InvalidArgumentError) { mock.cdn.get_asset_url(asset_identifier: asset['id'], viewer_claims: { age_confirmed: 'yes' }) }
     assert_equal 'sdk/invalid-argument', error.code
   end
 

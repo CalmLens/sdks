@@ -1,7 +1,7 @@
 import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, s as updatedAt } from "./Ids-aHyP9ZcF.js";
 import "./SharedConstants-CyiUWW66.js";
 import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-C10KVXyT.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
 import * as zod from "zod";
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
@@ -1096,7 +1096,7 @@ const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[
 /**
 * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
 * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
-* (`age-restrict`: signed URLs, API keys or `ageConfirmed=true`), stop delivering it
+* (`age-restrict`: `viewerClaims.ageConfirmed: true`), stop delivering it
 * (`block`), or stop delivering it and delete its stored content (`purge`).
 */
 const FLAGGED_CONTENT_ACTION_SCHEMA = zod.enum([

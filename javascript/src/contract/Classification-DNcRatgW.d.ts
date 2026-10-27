@@ -1,8 +1,15 @@
 import "./AssetModerationDecision-DSKrEeDr.js";
 import "./ModerationContext-9lGm-Mna.js";
 import "./HashList-CKW9itTf.js";
-import * as zod from "zod";
+import * as z from "zod";
 declare const EU_COUNTRIES: Set<string>;
+/** Customer assertions used only for this CDN request. */
+declare const VIEWER_CLAIMS_SCHEMA: z.ZodObject<{
+  region: z.ZodOptional<z.ZodEnum<{
+    [x: string]: string;
+  }>>;
+  ageConfirmed: z.ZodOptional<z.ZodBoolean>;
+}, z.core.$strict>;
 declare const MODERATION_QUALIFIER_INFO: {
   readonly "sexual-pornographic-media": {
     readonly category: "sexual";
@@ -965,28 +972,28 @@ type ModerationQualifier = keyof typeof MODERATION_QUALIFIER_INFO;
 /**
  * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
  * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
- * (`age-restrict`: signed URLs, API keys or `ageConfirmed=true`), stop delivering it
+ * (`age-restrict`: `viewerClaims.ageConfirmed: true`), stop delivering it
  * (`block`), or stop delivering it and delete its stored content (`purge`).
  */
-declare const FLAGGED_CONTENT_ACTION_SCHEMA: zod.ZodEnum<{
+declare const FLAGGED_CONTENT_ACTION_SCHEMA: z.ZodEnum<{
   "age-restrict": "age-restrict";
   allow: "allow";
   block: "block";
   limit: "limit";
   purge: "purge";
 }>;
-type FlaggedContentAction = zod.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
-declare const FLAGGED_CONTENT_POLICY_SCHEMA: zod.ZodObject<{
-  action: zod.ZodEnum<{
+type FlaggedContentAction = z.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
+declare const FLAGGED_CONTENT_POLICY_SCHEMA: z.ZodObject<{
+  action: z.ZodEnum<{
     "age-restrict": "age-restrict";
     allow: "allow";
     block: "block";
     limit: "limit";
     purge: "purge";
   }>;
-}, zod.core.$strip>;
-type FlaggedContentPolicy = zod.infer<typeof FLAGGED_CONTENT_POLICY_SCHEMA>;
-declare const CLASSIFICATION_CATEGORY_SCHEMA: zod.ZodEnum<{
+}, z.core.$strip>;
+type FlaggedContentPolicy = z.infer<typeof FLAGGED_CONTENT_POLICY_SCHEMA>;
+declare const CLASSIFICATION_CATEGORY_SCHEMA: z.ZodEnum<{
   "criminal-activity": "criminal-activity";
   harassment: "harassment";
   hate: "hate";
@@ -996,21 +1003,21 @@ declare const CLASSIFICATION_CATEGORY_SCHEMA: zod.ZodEnum<{
   sexual: "sexual";
   violence: "violence";
 }>;
-type ClassificationCategory = zod.infer<typeof CLASSIFICATION_CATEGORY_SCHEMA>;
-declare const LIKELIHOOD_SCHEMA: zod.ZodEnum<{
+type ClassificationCategory = z.infer<typeof CLASSIFICATION_CATEGORY_SCHEMA>;
+declare const LIKELIHOOD_SCHEMA: z.ZodEnum<{
   likely: "likely";
   possible: "possible";
   unlikely: "unlikely";
   "very-likely": "very-likely";
   "very-unlikely": "very-unlikely";
 }>;
-type Likelihood = zod.infer<typeof LIKELIHOOD_SCHEMA>;
-declare const CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA: zod.ZodEnum<{
+type Likelihood = z.infer<typeof LIKELIHOOD_SCHEMA>;
+declare const CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA: z.ZodEnum<{
   "not-supported": "not-supported";
   unavailable: "unavailable";
 }>;
-type ClassificationNotEvaluatedReason = zod.infer<typeof CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA>;
-declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
+type ClassificationNotEvaluatedReason = z.infer<typeof CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA>;
+declare const STRICT_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
   "criminal-activity-alcohol": "criminal-activity-alcohol";
   "criminal-activity-csam": "criminal-activity-csam";
   "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -1143,42 +1150,42 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: zod.ZodRecord<zod.ZodEnum<{
   "violence-violent-death": "violence-violent-death";
   "violence-weapon": "violence-weapon";
   "violence-wish": "violence-wish";
-}> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-  status: zod.ZodLiteral<"evaluated">;
-  someScore: zod.ZodNumber;
-  allScore: zod.ZodOptional<zod.ZodNumber>;
-  likelihood: zod.ZodEnum<{
+}> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+  status: z.ZodLiteral<"evaluated">;
+  someScore: z.ZodNumber;
+  allScore: z.ZodOptional<z.ZodNumber>;
+  likelihood: z.ZodEnum<{
     likely: "likely";
     possible: "possible";
     unlikely: "unlikely";
     "very-likely": "very-likely";
     "very-unlikely": "very-unlikely";
   }>;
-}, zod.core.$strict>, zod.ZodObject<{
-  status: zod.ZodLiteral<"not-evaluated">;
-  reason: zod.ZodEnum<{
+}, z.core.$strict>, z.ZodObject<{
+  status: z.ZodLiteral<"not-evaluated">;
+  reason: z.ZodEnum<{
     "not-supported": "not-supported";
     unavailable: "unavailable";
   }>;
-}, zod.core.$strict>], "status">>;
+}, z.core.$strict>], "status">>;
 /**
  * Qualifier results keyed by qualifier. Keys from removed or renamed qualifiers are dropped rather
  * than failing the report; known keys are still validated. Typed as the strict schema: the filter
  * changes neither the accepted shape of known keys nor the JSON schema.
  */
 declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: typeof STRICT_QUALIFIER_RESULTS_SCHEMA;
-type ClassificationQualifierResults = zod.infer<typeof CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA>;
-declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-  status: zod.ZodLiteral<"evaluated">;
-  likelihood: zod.ZodEnum<{
+type ClassificationQualifierResults = z.infer<typeof CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA>;
+declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.ZodObject<{
+  status: z.ZodLiteral<"evaluated">;
+  likelihood: z.ZodEnum<{
     likely: "likely";
     possible: "possible";
     unlikely: "unlikely";
     "very-likely": "very-likely";
     "very-unlikely": "very-unlikely";
   }>;
-  score: zod.ZodNumber;
-  qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+  score: z.ZodNumber;
+  qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
     "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -1311,45 +1318,45 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
     "violence-wish": "violence-wish";
-  }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    someScore: zod.ZodNumber;
-    allScore: zod.ZodOptional<zod.ZodNumber>;
-    likelihood: zod.ZodEnum<{
+  }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    someScore: z.ZodNumber;
+    allScore: z.ZodOptional<z.ZodNumber>;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-  }, zod.core.$strict>], "status">>>;
-  policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    score: zod.ZodNumber;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+  }, z.core.$strict>], "status">>>;
+  policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    score: z.ZodNumber;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-  }, zod.core.$strict>], "status">>>;
-}, zod.core.$strict>, zod.ZodObject<{
-  status: zod.ZodLiteral<"partial">;
-  likelihood: zod.ZodEnum<{
+  }, z.core.$strict>], "status">>>;
+}, z.core.$strict>, z.ZodObject<{
+  status: z.ZodLiteral<"partial">;
+  likelihood: z.ZodEnum<{
     likely: "likely";
     possible: "possible";
     unlikely: "unlikely";
     "very-likely": "very-likely";
     "very-unlikely": "very-unlikely";
   }>;
-  score: zod.ZodNumber;
-  qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+  score: z.ZodNumber;
+  qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
     "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -1482,41 +1489,41 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
     "violence-wish": "violence-wish";
-  }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    someScore: zod.ZodNumber;
-    allScore: zod.ZodOptional<zod.ZodNumber>;
-    likelihood: zod.ZodEnum<{
+  }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    someScore: z.ZodNumber;
+    allScore: z.ZodOptional<z.ZodNumber>;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-  }, zod.core.$strict>], "status">>>;
-  policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    score: zod.ZodNumber;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+  }, z.core.$strict>], "status">>>;
+  policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    score: z.ZodNumber;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-  }, zod.core.$strict>], "status">>>;
-}, zod.core.$strict>, zod.ZodObject<{
-  status: zod.ZodLiteral<"not-evaluated">;
-  reason: zod.ZodEnum<{
+  }, z.core.$strict>], "status">>>;
+}, z.core.$strict>, z.ZodObject<{
+  status: z.ZodLiteral<"not-evaluated">;
+  reason: z.ZodEnum<{
     "not-supported": "not-supported";
     unavailable: "unavailable";
   }>;
-  qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+  qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
     "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -1649,48 +1656,48 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: zod.ZodDiscriminatedUnion<[
     "violence-violent-death": "violence-violent-death";
     "violence-weapon": "violence-weapon";
     "violence-wish": "violence-wish";
-  }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    someScore: zod.ZodNumber;
-    allScore: zod.ZodOptional<zod.ZodNumber>;
-    likelihood: zod.ZodEnum<{
+  }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    someScore: z.ZodNumber;
+    allScore: z.ZodOptional<z.ZodNumber>;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-  }, zod.core.$strict>], "status">>>;
-  policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    score: zod.ZodNumber;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+  }, z.core.$strict>], "status">>>;
+  policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    score: z.ZodNumber;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-  }, zod.core.$strict>], "status">>>;
-}, zod.core.$strict>], "status">;
-type ClassificationCategoryReport = zod.infer<typeof CLASSIFICATION_CATEGORY_REPORT_SCHEMA>;
-declare const CATEGORIES_SCHEMA: zod.ZodObject<{
-  sexual: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+  }, z.core.$strict>], "status">>>;
+}, z.core.$strict>], "status">;
+type ClassificationCategoryReport = z.infer<typeof CLASSIFICATION_CATEGORY_REPORT_SCHEMA>;
+declare const CATEGORIES_SCHEMA: z.ZodObject<{
+  sexual: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -1823,45 +1830,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -1994,41 +2001,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -2161,46 +2168,46 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-  violence: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+  violence: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -2333,45 +2340,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -2504,41 +2511,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -2671,46 +2678,46 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-  "self-harm": zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+  "self-harm": z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -2843,45 +2850,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -3014,41 +3021,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -3181,46 +3188,46 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-  harassment: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+  harassment: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -3353,45 +3360,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -3524,41 +3531,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -3691,46 +3698,46 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-  hate: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+  hate: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -3863,45 +3870,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -4034,41 +4041,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -4201,46 +4208,46 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-  "criminal-activity": zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+  "criminal-activity": z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -4373,45 +4380,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -4544,41 +4551,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -4711,46 +4718,46 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-  "personal-information": zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+  "personal-information": z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -4883,45 +4890,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -5054,41 +5061,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -5221,46 +5228,46 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-  profanity: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-    status: zod.ZodLiteral<"evaluated">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+  profanity: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    status: z.ZodLiteral<"evaluated">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -5393,45 +5400,45 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"partial">;
-    likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"partial">;
+    likelihood: z.ZodEnum<{
       likely: "likely";
       possible: "possible";
       unlikely: "unlikely";
       "very-likely": "very-likely";
       "very-unlikely": "very-unlikely";
     }>;
-    score: zod.ZodNumber;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    score: z.ZodNumber;
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -5564,41 +5571,41 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>, zod.ZodObject<{
-    status: zod.ZodLiteral<"not-evaluated">;
-    reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>, z.ZodObject<{
+    status: z.ZodLiteral<"not-evaluated">;
+    reason: z.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
-    qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
+    qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
@@ -5731,49 +5738,49 @@ declare const CATEGORIES_SCHEMA: zod.ZodObject<{
       "violence-violent-death": "violence-violent-death";
       "violence-weapon": "violence-weapon";
       "violence-wish": "violence-wish";
-    }> & zod.core.$partial, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      someScore: zod.ZodNumber;
-      allScore: zod.ZodOptional<zod.ZodNumber>;
-      likelihood: zod.ZodEnum<{
+    }> & z.core.$partial, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      someScore: z.ZodNumber;
+      allScore: z.ZodOptional<z.ZodNumber>;
+      likelihood: z.ZodEnum<{
         likely: "likely";
         possible: "possible";
         unlikely: "unlikely";
         "very-likely": "very-likely";
         "very-unlikely": "very-unlikely";
       }>;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-    policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-      status: zod.ZodLiteral<"evaluated">;
-      score: zod.ZodNumber;
-    }, zod.core.$strict>, zod.ZodObject<{
-      status: zod.ZodLiteral<"not-evaluated">;
-      reason: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+    policyConditions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodDiscriminatedUnion<[z.ZodObject<{
+      status: z.ZodLiteral<"evaluated">;
+      score: z.ZodNumber;
+    }, z.core.$strict>, z.ZodObject<{
+      status: z.ZodLiteral<"not-evaluated">;
+      reason: z.ZodEnum<{
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
-    }, zod.core.$strict>], "status">>>;
-  }, zod.core.$strict>], "status">;
-}, zod.core.$strict>;
-type ClassificationCategories = zod.infer<typeof CATEGORIES_SCHEMA>;
-declare const CLASSIFICATION_LABEL_SCHEMA: zod.ZodObject<{
-  description: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
-  score: zod.ZodNumber;
-  topicalityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-  likelihood: zod.ZodEnum<{
+    }, z.core.$strict>], "status">>>;
+  }, z.core.$strict>], "status">;
+}, z.core.$strict>;
+type ClassificationCategories = z.infer<typeof CATEGORIES_SCHEMA>;
+declare const CLASSIFICATION_LABEL_SCHEMA: z.ZodObject<{
+  description: z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>;
+  score: z.ZodNumber;
+  topicalityScore: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+  likelihood: z.ZodEnum<{
     likely: "likely";
     possible: "possible";
     unlikely: "unlikely";
     "very-likely": "very-likely";
     "very-unlikely": "very-unlikely";
   }>;
-  knowledgeBaseId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
-}, zod.core.$strip>;
-type ClassificationLabel = zod.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
-export { ClassificationNotEvaluatedReason as a, FlaggedContentPolicy as c, EU_COUNTRIES as d, ClassificationLabel as i, FlaggedContentAction as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, ModerationQualifier as u };
+  knowledgeBaseId: z.ZodOptional<z.ZodNullable<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>>;
+}, z.core.$strip>;
+type ClassificationLabel = z.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
+export { ClassificationNotEvaluatedReason as a, FlaggedContentPolicy as c, EU_COUNTRIES as d, VIEWER_CLAIMS_SCHEMA as f, ClassificationLabel as i, FlaggedContentAction as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, ModerationQualifier as u };

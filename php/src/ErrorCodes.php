@@ -12,6 +12,8 @@ namespace CalmLens;
  */
 final class ErrorCodes
 {
+    public const INVALID_VIEWER_CLAIMS = 'viewer/invalid-claims';
+    public const AGE_CONFIRMATION_REQUIRED = 'viewer/age-confirmation-required';
     public const INVALID_VIEWER_REGION = 'viewer/invalid-region';
     public const VIEWER_REGION_REQUIRED = 'viewer/region-required';
     public const REGIONAL_EVIDENCE_REQUIRED = 'asset/regional-evidence-required';
@@ -89,6 +91,8 @@ final class ErrorCodes
 
     /** The HTTP status the API returns with each code. */
     public const STATUSES = [
+        'viewer/invalid-claims' => 400,
+        'viewer/age-confirmation-required' => 403,
         'viewer/invalid-region' => 400,
         'viewer/region-required' => 403,
         'asset/regional-evidence-required' => 403,

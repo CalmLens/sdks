@@ -1,5 +1,71 @@
 [
   {
+    "code": "viewer/invalid-claims",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-viewer-invalid-claims"
+      },
+      "body": {
+        "code": "viewer/invalid-claims",
+        "message": "Supply a viewerClaims object with an optional region and boolean ageConfirmed.",
+        "details": {
+          "reason": "invalid_viewer_claims"
+        },
+        "traceId": "trace-viewer-invalid-claims"
+      }
+    },
+    "expected": {
+      "code": "viewer/invalid-claims",
+      "status": 400,
+      "requestId": "req-viewer-invalid-claims",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_viewer_claims",
+        "traceId": "trace-viewer-invalid-claims"
+      }
+    }
+  },
+  {
+    "code": "viewer/age-confirmation-required",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-viewer-age-confirmation-required"
+      },
+      "body": {
+        "code": "viewer/age-confirmation-required",
+        "message": "Your application has not confirmed age-restricted delivery for this viewer.",
+        "details": {
+          "reason": "age_confirmation_required"
+        },
+        "traceId": "trace-viewer-age-confirmation-required"
+      }
+    },
+    "expected": {
+      "code": "viewer/age-confirmation-required",
+      "status": 403,
+      "requestId": "req-viewer-age-confirmation-required",
+      "retryAfter": null,
+      "details": {
+        "reason": "age_confirmation_required",
+        "traceId": "trace-viewer-age-confirmation-required"
+      }
+    }
+  },
+  {
     "code": "viewer/invalid-region",
     "status": 400,
     "operation": "assets.retrieve",

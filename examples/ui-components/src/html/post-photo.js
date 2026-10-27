@@ -13,7 +13,7 @@ export function renderPostPhoto(
   media.setAttribute("aspect-ratio", String(aspectRatio));
   media.setAttribute("widths", "400,800");
   media.setAttribute("sizes", "(min-width: 768px) 50vw, 100vw");
-  media.toggleAttribute("age-confirmed", ageConfirmed);
+  media.setAttribute("viewer-claims", JSON.stringify({ ageConfirmed }));
   media.addEventListener("calmlens-reveal", onReveal);
   container.replaceChildren(media);
 }

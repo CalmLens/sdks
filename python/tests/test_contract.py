@@ -583,7 +583,7 @@ def _present(capability: dict[str, Any]) -> bool:
     if kind == "cdn-option":
         get_asset_url = _client().cdn.get_asset_url
         return (name in inspect.signature(get_asset_url).parameters
-                and get_asset_url(asset_identifier="asset-1", **{name: True}).endswith("?ageConfirmed=true"))
+                and get_asset_url(asset_identifier="asset-1", **{name: {"ageConfirmed": True}}).endswith("?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D"))
     if kind == "mock-method":
         return callable(getattr(testing.MockCalmLensServerClient, name, None))
     if kind == "mock-option":

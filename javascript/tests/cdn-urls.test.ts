@@ -19,7 +19,12 @@ const codeOf = (build: () => unknown) => {
 describe("getAssetUrl", () => {
   const cases: CdnAssetUrlOptions[] = [
     { assetIdentifier: "asset-1" },
-    { assetIdentifier: "a/b c", resource: "rendered", lens: "thumb", ageConfirmed: true },
+    {
+      assetIdentifier: "a/b c",
+      resource: "rendered",
+      lens: "thumb",
+      viewerClaims: { ageConfirmed: true },
+    },
     {
       assetIdentifier: "asset-1",
       transform: { type: "imageTransform", options: { width: 320, format: "webp" } },
@@ -57,7 +62,7 @@ describe("getAssetUrl", () => {
 
   test("rejects a lens or transform on the original, extras on a placeholder, and unknown resources", () => {
     const base = { projectId: "project-1", assetIdentifier: "asset-1" };
-    for (const extra of [{ lens: "thumb" }, { transform: "width=10" }, { ageConfirmed: true }]) {
+    for (const extra of [{ lens: "thumb" }, { transform: "width=10" }]) {
       expect(codeOf(() => getAssetUrl({ ...base, resource: "placeholder", ...extra }))).toBe(
         "sdk/invalid-argument",
       );

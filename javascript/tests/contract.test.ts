@@ -381,8 +381,8 @@ const present = async (capability: Capability): Promise<boolean> => {
         .endsWith(`/asset-1/${capability.value}`);
     case "cdn-option":
       return client.cdn
-        .getAssetUrl({ assetIdentifier: "asset-1", [name]: true })
-        .endsWith("?ageConfirmed=true");
+        .getAssetUrl({ assetIdentifier: "asset-1", [name]: { ageConfirmed: true } })
+        .endsWith("?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D");
     case "mock-method": {
       const mock = new testing.MockCalmLensServerClient({
         apiKey: testing.createMockApiKey(),

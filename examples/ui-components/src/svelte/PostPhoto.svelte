@@ -19,7 +19,7 @@
   {projectId}
   {assetId}
   {status}
-  {ageConfirmed}
+  viewerClaims={{ ageConfirmed }}
   {onReveal}
   {alt}
   {aspectRatio}

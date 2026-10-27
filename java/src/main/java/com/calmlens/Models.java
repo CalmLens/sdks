@@ -1279,8 +1279,6 @@ public final class Models {
 
   /** Identifies one asset. */
   public static final class AssetId {
-    private String viewerRegion;
-    public AssetId viewerRegion(String value) { viewerRegion = value; return this; }
     private String assetId;
     public AssetId() {}
     /** @param assetId the asset ID */
@@ -1482,8 +1480,8 @@ public final class Models {
 
   /** Options for {@code assets.createSignedUrl}. */
   public static final class SignedUrlOptions {
-    private String viewerRegion;
-    public SignedUrlOptions viewerRegion(String value) { viewerRegion = value; return this; }
+    private ViewerClaims viewerClaims;
+    public SignedUrlOptions viewerClaims(ViewerClaims value) { viewerClaims = value; return this; }
     private String assetId;
     private String resource;
     private String lens;
@@ -1632,15 +1630,14 @@ public final class Models {
     private String resource;
     private String lens;
     private transient Object transform;
-    private Boolean ageConfirmed;
-    private String viewerRegion;
-    public CdnRequest viewerRegion(String value) { viewerRegion = value; return this; }
+    private ViewerClaims viewerClaims;
+    public CdnRequest viewerClaims(ViewerClaims value) { viewerClaims = value; return this; }
     private HttpOptions init;
     public CdnRequest() {}
     /** @param assetIdentifier an asset ID or external ID */
     public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
     public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code rendered} (default), {@code original} (no lens or transform) or {@code placeholder} (no lens, transform or ageConfirmed) @return these options */
+    /** @param value {@code rendered} (default), {@code original} (no lens or transform) or {@code placeholder} (no lens or transform) @return these options */
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
@@ -1653,16 +1650,6 @@ public final class Models {
     /** @param value transform steps, applied in order; at least one @return these options */
     public CdnRequest transform(List<Transform> value) { transform = value; return this; }
     Object transformValue() { return transform; }
-    /**
-     * Adds {@code ?ageConfirmed=true} so the CDN serves a public asset whose moderation status is
-     * {@code age-restricted} from its public URL; without it such an asset needs a signed URL or an
-     * API key. Set it only where your app has already decided the viewer may see age-restricted
-     * content. False or unset adds nothing.
-     *
-     * @param value whether to request age-restricted content
-     * @return these options
-     */
-    public CdnRequest ageConfirmed(Boolean value) { ageConfirmed = value; return this; }
     /** @param value the request method and extra headers, such as {@code Range} @return these options */
     public CdnRequest init(HttpOptions value) { init = value; return this; }
     HttpOptions initValue() { return init; }
@@ -1718,7 +1705,7 @@ public final class Models {
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, String externalId, String externalUrl, String authorId, ModerationContext context, List<String> tags,
       ProcessingOptions processingOptions, Visibility visibility,
-      AssetUpload upload, AssetClassification classification, AssetContent content, RegionalDelivery delivery) {
+      AssetUpload upload, AssetClassification classification, AssetContent content) {
     /** Copies collections so the record stays immutable. */
     public Asset {
       metadata = list(metadata);
@@ -1899,7 +1886,6 @@ public final class Models {
   }
 
   public record RegionalDecision(String region, String action, String rule, String category) {}
-  public record RegionalDelivery(String viewerRegion, String jurisdiction, String action, String rule, String category, String ageCheckStandard, boolean blocked, String reason) {}
   /**
    * Final automatic action, flagged categories and decision source.
    *
@@ -2529,4 +2515,11 @@ public final class Models {
       return "SignedUrl[url=" + (query < 0 ? url : url.substring(0, query) + "?[redacted]") + ", expiresAt=" + expiresAt + "]";
     }
   }
+  public static final class ViewerClaims {
+    private String region;
+    private Boolean ageConfirmed;
+    public ViewerClaims region(String value) { region = value; return this; }
+    public ViewerClaims ageConfirmed(Boolean value) { ageConfirmed = value; return this; }
+  }
+
 }

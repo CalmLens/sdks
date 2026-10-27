@@ -14,8 +14,14 @@ This SDK is pre-release and has not been published to Packagist. In your applica
 
 ```json
 {
-  "repositories": [{"type": "path", "url": "/path/to/sdks/php", "options": {"versions": {"calmlens/sdk": "dev-main"}}}],
-  "require": {"calmlens/sdk": "dev-main"}
+  "repositories": [
+    {
+      "type": "path",
+      "url": "/path/to/sdks/php",
+      "options": { "versions": { "calmlens/sdk": "dev-main" } }
+    }
+  ],
+  "require": { "calmlens/sdk": "dev-main" }
 }
 ```
 
@@ -48,17 +54,17 @@ configuration. The defaults are constants on `ServerClient`. Requests send a
 
 ## API coverage
 
-| Resource | Methods |
-| --- | --- |
-| `assets` | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
-| `folders` | `list`, `create`, `retrieve`, `update`, `move`, `delete` |
-| `hashLists` | `list`, `retrieve`, `create`, `update`, `delete`, `listEntries`, `addEntry`, `removeEntry` |
-| `text` | `classify` |
-| `events` | `list`, `each`, `eachPage` |
-| `cdn` | `getAssetUrl`, `serve` |
-| `uploadTokens` | `sign` |
-| Client | `ensureLens`, `ensureLenses` |
-| `Webhooks` | `signatureHeader`, `verify`, `parseEvent`, `isTest`, `createHeaders`, `toPayload` |
+| Resource       | Methods                                                                                                                                                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assets`       | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
+| `folders`      | `list`, `create`, `retrieve`, `update`, `move`, `delete`                                                                                                                                                              |
+| `hashLists`    | `list`, `retrieve`, `create`, `update`, `delete`, `listEntries`, `addEntry`, `removeEntry`                                                                                                                            |
+| `text`         | `classify`                                                                                                                                                                                                            |
+| `events`       | `list`, `each`, `eachPage`                                                                                                                                                                                            |
+| `cdn`          | `getAssetUrl`, `serve`                                                                                                                                                                                                |
+| `uploadTokens` | `sign`                                                                                                                                                                                                                |
+| Client         | `ensureLens`, `ensureLenses`                                                                                                                                                                                          |
+| `Webhooks`     | `signatureHeader`, `verify`, `parseEvent`, `isTest`, `createHeaders`, `toPayload`                                                                                                                                     |
 
 Methods take option arrays matching the API, e.g. `['assetId' => 'asset_5Gm2Rk8XqT3wLp9VbN4c']`.
 Use `['folderId' => null]` or `['parentId' => null]` to move to the root.
@@ -168,14 +174,14 @@ with the constants in `CalmLens\ErrorCodes` (with each code's HTTP status in
 `ErrorCodes::STATUSES`) and the SDK's own codes in `CalmLens\SdkErrorCodes`, never with the
 message. Catch a subclass from `CalmLens\Exception` to handle one kind of failure:
 
-| Class | When |
-| --- | --- |
-| `ApiException` and its subclasses `BadRequestException` (400), `AuthenticationException` (401), `PermissionDeniedException` (403), `NotFoundException` (404), `ConflictException` (409), `RateLimitException` (429), `ServerException` (5xx) | The API answered with an error status. |
-| `ConnectionException` (`sdk/transport-error`) and its subclass `TimeoutException` (`sdk/timeout`) | No complete response arrived, or `waitForDecision` had no decision in time. |
-| `InvalidResponseException` (`sdk/invalid-response`, `sdk/response-too-large`) | A successful response could not be read, or its body or declared `Content-Length` was larger than `maxResponseBytes`. |
-| `InvalidArgumentException` (`sdk/invalid-argument`, or an `upload/*` code for payload checks the API also makes) | An argument was rejected before sending. |
-| `ConfigurationException` (`sdk/invalid-config`), a subclass of `InvalidArgumentException` | `ServerClient` received an invalid setting. |
-| `WebhookVerificationException` (`sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload`) | A webhook delivery failed verification; respond with 400. |
+| Class                                                                                                                                                                                                                                        | When                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `ApiException` and its subclasses `BadRequestException` (400), `AuthenticationException` (401), `PermissionDeniedException` (403), `NotFoundException` (404), `ConflictException` (409), `RateLimitException` (429), `ServerException` (5xx) | The API answered with an error status.                                                                                 |
+| `ConnectionException` (`sdk/transport-error`) and its subclass `TimeoutException` (`sdk/timeout`)                                                                                                                                            | No complete response arrived, or `waitForDecision` had no decision in time.                                            |
+| `InvalidResponseException` (`sdk/invalid-response`, `sdk/response-too-large`)                                                                                                                                                                | A successful response could not be read, or its body or declared `Content-Length` was larger than `maxResponseBytes`.  |
+| `InvalidArgumentException` (`sdk/invalid-argument`, or an `upload/*` code for payload checks the API also makes)                                                                                                                             | An argument was rejected before sending.                                                                               |
+| `ConfigurationException` (`sdk/invalid-config`), a subclass of `InvalidArgumentException`                                                                                                                                                    | `ServerClient` received an invalid setting.                                                                            |
+| `WebhookVerificationException` (`sdk/invalid-webhook-signature`, `sdk/invalid-webhook-payload`)                                                                                                                                              | A webhook delivery failed verification; respond with 400.                                                              |
 
 GET requests and uploads with idempotency keys retry connection failures, timeouts,
 429/502/503/504 and `idempotency/request-in-progress`. Upload keys are generated once
@@ -216,13 +222,12 @@ CDN `serve` returns a streaming PSR-7 response, including HTTP error responses. 
 URLs let browsers access private content without your API key; `createSignedUrl` takes
 `resource` (`rendered`, the default, or `original`). URL builders accept `resource`
 (`rendered`, the default, `original` or `placeholder`), `lens`, a string or structured
-`transform` and `ageConfirmed`. Only `rendered` takes a lens or transform. `placeholder` is a small blurred PNG that the CDN serves for
-public assets whatever their moderation status; it takes no lens, transform or `ageConfirmed`.
+`transform` and `viewerClaims`. Only `rendered` takes a lens or transform. `placeholder` is a small blurred PNG that the CDN serves for
+public assets whatever their moderation status; it takes no lens or transform.
 
-The CDN treats an `age-restricted` asset like a private one: its plain public URL is
-refused. Pass `'ageConfirmed' => true` to append `ageConfirmed=true`, so a public
+The CDN refuses age-restricted content without explicit age confirmation. Pass `'viewerClaims' => ['ageConfirmed' => true]` to send `viewerClaims.ageConfirmed: true`, so a public
 age-restricted asset is served from its public URL. Do that only where your app has
-already decided the viewer may see age-restricted content; otherwise use a signed URL.
+already decided the viewer may see age-restricted content; otherwise leave age confirmation false.
 A `limited` asset is delivered exactly like an `allowed` one; it is marked so your app can
 reduce its reach, such as keeping it out of recommendations, trending and notifications,
 ranking it lower or collapsing it. `blocked` assets are not served, and `purged` assets have no content.
@@ -304,9 +309,7 @@ serves as a PNG, and which goes with the content when it is removed.
 the asset and returns either. Content is kept only with `keepContentAfterProcessing`.
 Like the CDN, the mock refuses blocked, purged and failed assets, and assets whose content
 was removed, with `403` `asset/not-available` whatever the key. The default key has no
-grants, like a real key without `assets:download`, so it also refuses private assets and
-public age-restricted ones requested without `ageConfirmed` (`403`
-`asset/api-key-missing-permission`). Pass `apiKey: MockServerClient::createApiKey([['actions' =>
+grants, like a real key without `assets:download`, so it also refuses private assets (`403` `asset/api-key-missing-permission`). Age-restricted assets separately require `viewerClaims.ageConfirmed=true` regardless of permissions. Pass `apiKey: MockServerClient::createApiKey([['actions' =>
 ['assets:download'], 'folderId' => null, 'includeSubfolders' => true]])` to read them; a
 `folderId` limits the grant to that folder, and `setApiKeyGrants($grants)` replaces the
 grants of the same key later. Served content carries its stored `Content-Type` and
@@ -374,3 +377,11 @@ CI runs PHP 8.2 and 8.5 and builds a Composer archive.
 The PHP package has its own version, tracked by `package.json` and `src/Version.php`.
 See [release notes](../.changeset/README.md) for the remaining registry setup before
 publishing. No app version is changed by adding this SDK.
+
+### Viewer context for CDN delivery
+
+CDN methods accept optional viewer claims (`viewerClaims`, or the language's `viewer_claims` / `ViewerClaims` field). The object contains `region` and `ageConfirmed`, using the SDK's normal field naming. Region defaults to the country of the connection reaching CalmLens; age confirmation defaults to false. Proxies should forward the incoming viewer country rather than rely on their outgoing connection's country. CalmLens accepts these as customer assertions without independently verifying them.
+
+Age-restricted content returns `403` with `viewer/age-confirmation-required` unless age confirmation is true, including API-key and signed-URL requests. Private assets separately require access permission. Blocks and safety holds cannot be overridden by claims. Applications that never use age-restricted content should leave confirmation false, including processing jobs.
+
+Raw HTTP clients can send a JSON `viewerClaims` query parameter or the JSON `X-CalmLens-Viewer-Claims` header; the query takes precedence. Signed URLs include claims when created and must be forwarded unchanged. Asset retrieval returns stored moderation results without a request-specific `delivery` object. Proxy caches must not bypass current viewer and moderation checks; honour `private, no-store` responses.

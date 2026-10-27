@@ -26,7 +26,7 @@ export function PostPhoto({
       projectId={projectId}
       assetId={assetId}
       status={status}
-      ageConfirmed={ageConfirmed}
+      viewerClaims={{ ageConfirmed: ageConfirmed }}
       onReveal={onReveal}
       alt={alt}
       aspectRatio={aspectRatio}

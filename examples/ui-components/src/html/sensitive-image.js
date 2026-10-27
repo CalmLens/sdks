@@ -14,7 +14,7 @@ export function renderSensitiveImage(
   figure.append(img);
 
   if (!restricted || ageConfirmed) {
-    img.src = getAssetUrl({ ...asset, ageConfirmed: restricted });
+    img.src = getAssetUrl({ ...asset, viewerClaims: { ageConfirmed } });
     img.alt = alt;
   } else {
     img.src = getAssetUrl({ ...asset, resource: "placeholder" });

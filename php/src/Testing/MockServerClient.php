@@ -1412,7 +1412,9 @@ final class MockServerClient
         }
         // Age-restricted assets are delivered like private ones, unless a public one is requested
         // with `ageConfirmed=true`.
-        $private = $asset['visibility'] !== 'public' || ($status === 'age-restricted' && ($query['ageConfirmed'] ?? null) !== 'true');
+        $claims = json_decode($query['viewerClaims'] ?? '{}', true);
+        if ($status === 'age-restricted' && ($claims['ageConfirmed'] ?? false) !== true) return $this->json(403, ['code' => 'viewer/age-confirmation-required']);
+        $private = $asset['visibility'] !== 'public';
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
             return $this->json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'This API key needs assets:download permission for this asset’s folder.']);
         }
@@ -1422,7 +1424,7 @@ final class MockServerClient
         // Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
         // by shared caches only when delivery is public.
         return $this->cdnResponse($method, $stored['bytes'], ['Content-Type' => $type,
-            'Cache-Control' => ($private ? 'private' : 'public') . ', ' . ($image ? 'max-age=31536000, immutable' : 'max-age=3600'),
+            'Cache-Control' => $claims ? 'private, no-store' : ($private ? 'private' : 'public') . ', ' . ($image ? 'max-age=31536000, immutable' : 'max-age=3600'),
             'Cache-Tag' => 'asset-' . $asset['id']]
             + ($image ? ['ETag' => '"' . $asset['id'] . '"', 'Expires' => gmdate('D, d M Y H:i:s', intdiv(($this->now)(), 1000) + 31536000) . ' GMT'] : [])
             + ['X-Content-Type-Options' => 'nosniff', 'Content-Security-Policy' => "sandbox; default-src 'none'"]

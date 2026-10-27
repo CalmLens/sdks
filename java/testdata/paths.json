@@ -111,17 +111,21 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "viewerRegion": "DE"
+        "viewerClaims": {
+          "region": "DE"
+        }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerRegion=DE"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22region%22%3A%22DE%22%7D"
     },
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "viewerRegion": "GB",
-        "ageConfirmed": true
+        "viewerClaims": {
+          "region": "GB",
+          "ageConfirmed": true
+        }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?ageConfirmed=true&viewerRegion=GB"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22region%22%3A%22GB%22%2C%22ageConfirmed%22%3Atrue%7D"
     },
     {
       "options": {
@@ -295,16 +299,20 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "ageConfirmed": true
+        "viewerClaims": {
+          "ageConfirmed": true
+        }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?ageConfirmed=true"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D"
     },
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "ageConfirmed": false
+        "viewerClaims": {
+          "ageConfirmed": false
+        }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Afalse%7D"
     },
     {
       "options": {
@@ -317,9 +325,11 @@
             "width": 320
           }
         },
-        "ageConfirmed": true
+        "viewerClaims": {
+          "ageConfirmed": true
+        }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail/width=320?ageConfirmed=true"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail/width=320?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D"
     },
     {
       "options": {
@@ -361,14 +371,6 @@
             "width": 10
           }
         }
-      },
-      "error": "sdk/invalid-argument"
-    },
-    {
-      "options": {
-        "assetIdentifier": "asset-1",
-        "resource": "placeholder",
-        "ageConfirmed": true
       },
       "error": "sdk/invalid-argument"
     },
@@ -435,9 +437,7 @@
         "transform": {
           "type": "imageTransform",
           "options": {
-            "width": [
-              10
-            ]
+            "width": [10]
           }
         }
       },

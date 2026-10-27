@@ -2,6 +2,8 @@
 # packages/shared/src/PublicErrorCodes.ts. test/signature_test.rb fails when the two differ.
 module CalmLens
   module ErrorCodes
+    INVALID_VIEWER_CLAIMS: String
+    AGE_CONFIRMATION_REQUIRED: String
     INVALID_VIEWER_REGION: String
     VIEWER_REGION_REQUIRED: String
     REGIONAL_EVIDENCE_REQUIRED: String

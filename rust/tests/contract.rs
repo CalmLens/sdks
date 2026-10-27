@@ -1289,7 +1289,7 @@ fn references() -> BTreeSet<&'static str> {
         "models::WebhookEventPayload::from_event" => WebhookEventPayload::from_event;
         "models::WebhookEventPayload::is_test" => WebhookEventPayload::is_test;
         "testing::sign_upload_token" => testing::sign_upload_token;
-        "CdnRequest::age_confirmed" => |request: &CdnRequest| request.age_confirmed;
+        "CdnRequest::viewer_claims" => |request: &CdnRequest| request.viewer_claims.clone();
         "testing::MockServerClient::in_memory" => MockServerClient::in_memory;
         "MockOptions::queued_outcome" => MockOptions::queued_outcome;
         "MockOptions::analyzed_outcome" => MockOptions::analyzed_outcome;

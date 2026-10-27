@@ -2,6 +2,8 @@
 
 /** Error codes the CalmLens API documents, by name. */
 export const API_ERROR_CODES = {
+  INVALID_VIEWER_CLAIMS: "viewer/invalid-claims",
+  AGE_CONFIRMATION_REQUIRED: "viewer/age-confirmation-required",
   INVALID_VIEWER_REGION: "viewer/invalid-region",
   VIEWER_REGION_REQUIRED: "viewer/region-required",
   REGIONAL_EVIDENCE_REQUIRED: "asset/regional-evidence-required",
@@ -87,6 +89,14 @@ export interface ApiErrorDefinition {
 
 /** The HTTP status and default message the API returns with each documented error code. */
 export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
+  "viewer/invalid-claims": {
+    status: 400,
+    message: "Supply a viewerClaims object with an optional region and boolean ageConfirmed.",
+  },
+  "viewer/age-confirmation-required": {
+    status: 403,
+    message: "Your application has not confirmed age-restricted delivery for this viewer.",
+  },
   "viewer/invalid-region": {
     status: 400,
     message: "Supply the viewer's ISO country code, such as DE or GB.",

@@ -643,10 +643,7 @@
     "name": "batch with an empty asset ID",
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1",
-        ""
-      ],
+      "assetIds": ["asset-1", ""],
       "operation": "delete"
     },
     "error": "sdk/invalid-argument"
@@ -655,9 +652,7 @@
     "name": "batch with an unknown operation",
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1"
-      ],
+      "assetIds": ["asset-1"],
       "operation": "purge"
     },
     "error": "sdk/invalid-argument"
@@ -687,16 +682,6 @@
       "assetIdentifier": "asset-1",
       "resource": "placeholder",
       "transform": "width=10"
-    },
-    "error": "sdk/invalid-argument"
-  },
-  {
-    "name": "serve the placeholder age-restricted",
-    "operation": "cdn.serve",
-    "options": {
-      "assetIdentifier": "asset-1",
-      "resource": "placeholder",
-      "ageConfirmed": true
     },
     "error": "sdk/invalid-argument"
   },

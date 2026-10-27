@@ -54,14 +54,14 @@ const image = await client.assets.create({
 console.log(image.classification.status, image.classification.moderation.status); // "processing" "pending"
 ```
 
-| `classification.status`   | `classification.moderation.status` | Meaning                                                                                                                                 |
-| ------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `completed`               | `allowed`                          | Safe to show.                                                                                                                           |
-| `completed`               | `age-restricted`                   | Delivered only through signed URLs, API keys or URLs built with `ageConfirmed: true`. Show it only to viewers your app has age-checked. |
-| `completed`               | `blocked`                          | Your policy blocked it; the CDN doesn't deliver it. Don't show it.                                                                      |
-| `completed`               | `purged`                           | Your policy blocked it and deleted its content. Don't show it.                                                                          |
-| `pending` or `processing` | `pending`                          | Still being received or classified; `upload.status` is `uploading` while parts are arriving.                                            |
-| `failed`                  | `pending`                          | Processing failed; see `assets.retry`.                                                                                                  |
+| `classification.status`   | `classification.moderation.status` | Meaning                                                                                                                                   |
+| ------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `completed`               | `allowed`                          | Safe to show.                                                                                                                             |
+| `completed`               | `age-restricted`                   | Delivery requires `viewerClaims.ageConfirmed=true`, including signed URLs and API keys. Show it only to viewers your app has age-checked. |
+| `completed`               | `blocked`                          | Your policy blocked it; the CDN doesn't deliver it. Don't show it.                                                                        |
+| `completed`               | `purged`                           | Your policy blocked it and deleted its content. Don't show it.                                                                            |
+| `pending` or `processing` | `pending`                          | Still being received or classified; `upload.status` is `uploading` while parts are arriving.                                              |
+| `failed`                  | `pending`                          | Processing failed; see `assets.retry`.                                                                                                    |
 
 The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision in
 `classification.moderation.status`.
@@ -445,7 +445,7 @@ const url = client.cdn.getAssetUrl({
 // A public age-restricted asset, for a viewer your app has already age-checked
 const restrictedUrl = client.cdn.getAssetUrl({
   assetIdentifier: assetId,
-  ageConfirmed: true,
+  viewerClaims: { ageConfirmed: true },
 });
 
 const response = await client.cdn.serve({
@@ -459,12 +459,12 @@ const response = await client.cdn.serve({
 `serve` reads private assets with the client's API key when it has the **Download assets** (`assets:download`) permission. Give browsers and apps a short-lived signed URL instead.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only when the URL carries
-`ageConfirmed=true`, which `ageConfirmed: true` adds; otherwise it needs a signed URL or an API key. Set it only
+a JSON `viewerClaims` parameter containing `{ "ageConfirmed": true }`; otherwise delivery is refused, even with a signed URL or API key. Set it only
 where your app has already decided the viewer may see age-restricted content.
 
 `resource` is `rendered` (default, for display; takes lenses and transforms), `original` (the exact uploaded file) or `placeholder`. The placeholder is a small blurred PNG made from the
 asset's ThumbHash, which the CDN serves for public assets whatever their moderation status, for example in place of an
-age-restricted image. It takes no `lens`, `transform` or `ageConfirmed`; passing one throws `sdk/invalid-argument`.
+age-restricted image. It takes no `lens` or `transform`; passing one throws `sdk/invalid-argument`.
 
 ##### Building CDN URLs in the browser
 
@@ -478,7 +478,7 @@ const placeholder = getAssetUrl({ projectId, assetIdentifier: assetId, resource:
 const thumbnail = getAssetUrl({ projectId, assetIdentifier: assetId, lens: "thumbnail" });
 ```
 
-It takes `projectId`, `assetIdentifier`, `resource`, `lens`, `transform`, `ageConfirmed` and `cdnBaseUrl` (default
+It takes `projectId`, `assetIdentifier`, `resource`, `lens`, `transform`, `viewerClaims` and `cdnBaseUrl` (default
 `https://cdn.calmlens.com/v1`).
 
 ##### Multipart upload flow
@@ -635,7 +635,7 @@ Options: `uploadPresetId`, `token` (a string, or a function of the file returnin
 
 To upload through your own API instead of a preset, pass `upload(file, { signal, onProgress })`, which returns `{ assetId, status? }`, and optionally `checkStatus(assetId)` for pending uploads. The uploader still shows progress, decisions and errors; throw a `CalmLensError` to show its code's message. `createProgressFetch(onProgress)` gives you a `fetch` that reports sent bytes, to pass as `uploadFetch` to your client.
 
-**The media component** shows an asset from the CDN's `rendered` resource in a single `<img>`, so the CDN picks the best format the browser accepts. It adds `srcset` widths when you pass `widths` and `sizes`, shows the blurred placeholder while the image loads, and fades the image in. Video and audio play the `original` file, with a rendered poster for video. Age-restricted assets stay behind the placeholder and a notice with a reveal button until you pass `ageConfirmed`, and then use the `ageConfirmed` opt-in. Blocked and purged assets, and images that fail to load, show an unavailable notice.
+**The media component** shows an asset from the CDN's `rendered` resource in a single `<img>`, so the CDN picks the best format the browser accepts. It adds `srcset` widths when you pass `widths` and `sizes`, shows the blurred placeholder while the image loads, and fades the image in. Video and audio play the `original` file, with a rendered poster for video. Age-restricted assets stay behind the placeholder and a notice with a reveal button until you pass `viewerClaims: { ageConfirmed: true }`. Blocked and purged assets, and images that fail to load, show an unavailable notice.
 
 ```tsx
 import { CalmLensMedia } from "@calmlens/sdk/react";
@@ -644,7 +644,7 @@ import { CalmLensMedia } from "@calmlens/sdk/react";
   projectId="proj_8fK2mQx7Lp4NvB3tRz9Y"
   assetId={post.assetId}
   status={post.status}
-  ageConfirmed={viewer.ageConfirmed}
+  viewerClaims={{ ageConfirmed: viewer.ageConfirmed }}
   onReveal={askForAgeCheck}
   alt={post.alt}
   aspectRatio={post.aspectRatio}
@@ -678,7 +678,7 @@ Upload, classification and content each have a status; moderation has its own de
 
 - `upload.status`: `uploading` while source content is arriving, then `completed`
 - `classification.status`: `pending`, `processing`, `completed` or `failed`
-- `classification.moderation.status`: `pending` until moderation finishes, then `allowed`, `limited` (delivered like `allowed`, but marked so your app can reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it lower or collapsing it), `age-restricted` (delivered only through signed URLs, API keys or URLs built with `ageConfirmed: true`), `blocked` (not delivered) or `purged` (not delivered, content deleted). The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision; each review's `decision` is one of the five decided statuses.
+- `classification.moderation.status`: `pending` until moderation finishes, then `allowed`, `limited` (delivered like `allowed`, but marked so your app can reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it lower or collapsing it), `age-restricted` (delivered only with `viewerClaims.ageConfirmed=true`), `blocked` (not delivered) or `purged` (not delivered, content deleted). The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision; each review's `decision` is one of the five decided statuses.
 - `content.status`: `temporary` (kept only until processing finishes), `stored` or `removed`, with `content.removalReason` `policy` (purged), `retention` (`keepContentAfterProcessing` off), `requested`, `parent-removed` or `disposed`
 
 ## Moderation Reports
@@ -785,7 +785,7 @@ Like the API, the mock gives each new object an ID with its kind's prefix, an un
 
 `MockCalmLensServerClient` is a `CalmLensServerClient`: every method runs the real client's code (validation, request building, response and error handling, the lens cache), and its `fetch` is an in-memory API that answers each request as CalmLens does, with the API's HTTP statuses, JSON bodies and error bodies (`code`, `message`, `details`) and an `X-Request-Id`. It accepts the same options as `CalmLensServerClient` (`apiKey`, `projectId`, `baseUrl`, `cdnBaseUrl`, `timeoutMs`, `maxRetries`, ...) and validates them the same way, plus `mockOptions`; requests never leave the process, whatever `fetch` you pass. `maxRetries` defaults to 0, so a failed request fails once; set it to test retries. Waits take no real time: retry backoff and `assets.waitForDecision` only move the mock's clock on, so `waitForDecision` fails with `sdk/timeout` straight away for an asset that stays pending. `cdn.getAssetUrl` uses `cdnBaseUrl` (default `mock://calmlens/v1`), and `cdn.serve` requests are answered by the in-memory CDN.
 
-The in-memory API behaves like CalmLens where tests depend on it: `assets.list` applies `ordering`, `folderId` and `filter` expressions (comparisons joined by `;`, which binds tighter than `,`, and grouped with parentheses; anything else throws `sdk/invalid-argument` rather than returning wrong results), with cursors that resume after the last asset returned and only continue the query they came from; `assets.search` runs the API's keyword search, where every word must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status, with the API's scores and `matchedFields`; assets created in a row get increasing `createdAt` values; multipart parts must arrive in order, every part but the last is at least 5 MiB, images total 10 MiB to 20 MiB, parts add up to any declared `totalSizeInBytes`, and the queue mode chosen at the start applies to the final part; out-of-range `pageSize`, `limit` and search queries fail with the API's `validation/too-small` or `validation/too-big`; unset asset fields are `null`, as the API returns them; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `limited`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, an automated `purged` outcome removes it with reason `policy`, and `assets.deleteContent` and a reviewer's `purged` decision remove it with reason `requested`; a reused `idempotencyKey` replays the first response; and `cdn.serve` returns CDN-like responses with JSON error bodies: blocked, purged and failed assets and removed content get `403` `asset/not-available` whatever the key, then private assets, and age-restricted ones requested without `ageConfirmed: true`, get `403` `asset/api-key-missing-permission` unless the key has `assets:download` (keys from `createMockApiKey()` have no grants); a classified image's `placeholder` is a PNG, served for public assets whatever their status (private ones need `assets:download`) and refused once the asset is purged or its content removed. Originals carry the CDN's `Cache-Control`, `Cache-Tag` and protection headers, and images an `ETag` and `Expires`. `client.setApiKeyGrants(grants)` changes the key's grants mid-test. `client.decide(assetId, decision)` applies a reviewer's decision (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`) and adds the matching `asset.<decision>` event with a `decided-by: reviewer` fact; `assets.delete`, `assets.deleteContent` and `assets.retry` add `asset.deleted`, `asset.content-removed` and `asset.retried` events (the mock records no processing events such as `asset.uploaded` or `asset.classified`). `queuedOutcome` and `analyzedOutcome` can also be functions of the new asset, for example to decide from its name. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
+The in-memory API behaves like CalmLens where tests depend on it: `assets.list` applies `ordering`, `folderId` and `filter` expressions (comparisons joined by `;`, which binds tighter than `,`, and grouped with parentheses; anything else throws `sdk/invalid-argument` rather than returning wrong results), with cursors that resume after the last asset returned and only continue the query they came from; `assets.search` runs the API's keyword search, where every word must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status, with the API's scores and `matchedFields`; assets created in a row get increasing `createdAt` values; multipart parts must arrive in order, every part but the last is at least 5 MiB, images total 10 MiB to 20 MiB, parts add up to any declared `totalSizeInBytes`, and the queue mode chosen at the start applies to the final part; out-of-range `pageSize`, `limit` and search queries fail with the API's `validation/too-small` or `validation/too-big`; unset asset fields are `null`, as the API returns them; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `limited`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, an automated `purged` outcome removes it with reason `policy`, and `assets.deleteContent` and a reviewer's `purged` decision remove it with reason `requested`; a reused `idempotencyKey` replays the first response; and `cdn.serve` returns CDN-like responses with JSON error bodies: blocked, purged and failed assets and removed content get `403` `asset/not-available` whatever the key, then private assets get `403` `asset/api-key-missing-permission` unless the key has `assets:download` (keys from `createMockApiKey()` have no grants); a classified image's `placeholder` is a PNG, served for public assets whatever their status (private ones need `assets:download`) and refused once the asset is purged or its content removed. Originals carry the CDN's `Cache-Control`, `Cache-Tag` and protection headers, and images an `ETag` and `Expires`. `client.setApiKeyGrants(grants)` changes the key's grants mid-test. `client.decide(assetId, decision)` applies a reviewer's decision (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`) and adds the matching `asset.<decision>` event with a `decided-by: reviewer` fact; `assets.delete`, `assets.deleteContent` and `assets.retry` add `asset.deleted`, `asset.content-removed` and `asset.retried` events (the mock records no processing events such as `asset.uploaded` or `asset.classified`). `queuedOutcome` and `analyzedOutcome` can also be functions of the new asset, for example to decide from its name. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
 
 Every request the client sends is recorded in `client.calls` as `{ operation, method, url, path, query, headers, body, status }`: the client method that sent it (`"assets.retrieve"`, `"events.list"`, `"cdn.serve"`, ...), the request as the API received it (`path` relative to the API or CDN base URL, `body` as parsed JSON, the text of a text upload or the bytes of a file) and the HTTP status of the answer (`undefined` when it failed without one). Methods that send nothing, such as `uploadTokens.sign` or an `ensureLens` answered from the lens cache, are not recorded. `client.callsTo(operation)` filters them; a request several methods send matches each of them, so `callsTo("text.classify")` also lists text uploads through `assets.classify`, and `callsTo("assets.waitForDecision")` the `assets.retrieve` requests it polls with. To test failure handling, `client.failNextRequest()` makes the next request fail like a network failure, so the client throws `sdk/transport-error`; pass `"timeout"` for `sdk/timeout`, an API error code such as `"upload/limit-exceeded"` for that API error with its HTTP status, a `CalmLensError` to throw it as is or another `Error` to fail with it as the cause, and `{ operation }` to fail only the next request that method sends. Each queued failure is used once.
 
@@ -983,3 +983,11 @@ test inputs. Use your project's test input key; another project's key does not
 activate its test signals.
 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
+
+### Viewer context for CDN delivery
+
+CDN methods accept optional viewer claims (`viewerClaims`, or the language's `viewer_claims` / `ViewerClaims` field). The object contains `region` and `ageConfirmed`, using the SDK's normal field naming. Region defaults to the country of the connection reaching CalmLens; age confirmation defaults to false. Proxies should forward the incoming viewer country rather than rely on their outgoing connection's country. CalmLens accepts these as customer assertions without independently verifying them.
+
+Age-restricted content returns `403` with `viewer/age-confirmation-required` unless age confirmation is true, including API-key and signed-URL requests. Private assets separately require access permission. Blocks and safety holds cannot be overridden by claims. Applications that never use age-restricted content should leave confirmation false, including processing jobs.
+
+Raw HTTP clients can send a JSON `viewerClaims` query parameter or the JSON `X-CalmLens-Viewer-Claims` header; the query takes precedence. Signed URLs include claims when created and must be forwarded unchanged. Asset retrieval returns stored moderation results without a request-specific `delivery` object. Proxy caches must not bypass current viewer and moderation checks; honour `private, no-store` responses.

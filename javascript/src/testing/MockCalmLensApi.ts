@@ -1938,9 +1938,17 @@ export class MockCalmLensApi {
     }
     // Then access: private assets, and public age-restricted ones requested without
     // `ageConfirmed`, need an API key with `assets:download` for the asset's folder.
-    const isPrivate =
-      asset.visibility !== "public" ||
-      (status === "age-restricted" && query.get("ageConfirmed") !== "true");
+    let claims: { ageConfirmed?: boolean } = {};
+    try {
+      claims = JSON.parse(
+        query.get("viewerClaims") ?? request.headers.get("X-CalmLens-Viewer-Claims") ?? "{}",
+      );
+    } catch {
+      return this.jsonResponse(400, { code: "viewer/invalid-claims" }, url);
+    }
+    if (status === "age-restricted" && claims.ageConfirmed !== true)
+      return this.jsonResponse(403, { code: "viewer/age-confirmation-required" }, url);
+    const isPrivate = asset.visibility !== "public";
     if (isPrivate && !canDownload()) {
       return this.jsonResponse(
         403,
@@ -1967,9 +1975,11 @@ export class MockCalmLensApi {
       "Content-Type": contentType,
       // Like the CDN: an image's bytes are immutable for a year, other content is kept for
       // an hour, publicly only when delivery is public.
-      "Cache-Control": `${isPrivate ? "private" : "public"}, ${
-        isImage ? "max-age=31536000, immutable" : "max-age=3600"
-      }`,
+      "Cache-Control": Object.keys(claims).length
+        ? "private, no-store"
+        : `${isPrivate ? "private" : "public"}, ${
+            isImage ? "max-age=31536000, immutable" : "max-age=3600"
+          }`,
       "Cache-Tag": `asset-${asset.id}`,
       ...(isImage
         ? {

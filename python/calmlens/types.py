@@ -11,8 +11,13 @@ from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Unio
 
 from .qualifiers import ModerationQualifier
 
+class ViewerClaims(TypedDict, total=False):
+    region: str
+    ageConfirmed: bool
+
+
 __all__ = [
-    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "RegionalDecision", "RegionalDelivery", "CategoryPolicyScore", "ReportPolicy",
+    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore", "ReportPolicy",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
     "AssetReview", "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
@@ -485,15 +490,6 @@ class RegionalDecision(TypedDict):
     rule: str
     category: str
 
-class RegionalDelivery(TypedDict, total=False):
-    blocked: bool
-    reason: Optional[str]
-    jurisdiction: str
-    viewerRegion: str
-    action: Optional[ModerationAction]
-    rule: str
-    category: str
-    ageCheckStandard: Literal["any", "verified"]
 
 class ReportPolicyDecision(TypedDict, total=False):
     rule: str
@@ -675,7 +671,6 @@ class _AssetRequired(TypedDict):
 
 
 class Asset(_AssetRequired, total=False):
-    delivery: RegionalDelivery
     userId: Optional[str]
     parentId: Optional[str]
     folderId: Optional[str]
@@ -1054,7 +1049,6 @@ class SignedUploadToken(TypedDict):
 
 
 class AssetIdOptions(TypedDict, total=False):
-    viewerRegion: str
     assetId: str
 
 
@@ -1198,6 +1192,7 @@ class UpdateAssetOptions(AssetIdOptions, total=False):
 
 
 class SignedUrlOptions(AssetIdOptions, total=False):
+    viewerClaims: ViewerClaims
     #: Defaults to ``rendered`` on the server. ``original`` takes no lens or transform.
     resource: Literal["original", "rendered"]
     expiresInSeconds: int
@@ -1241,14 +1236,11 @@ class _AssetUrlRequired(TypedDict):
 
 
 class AssetUrlOptions(_AssetUrlRequired, total=False):
-    viewerRegion: str
+    viewerClaims: ViewerClaims
     resource: CdnResource
     lens: str
     transform: CdnTransform
-    #: Appends ``?ageConfirmed=true`` so the public URL serves a public asset whose moderation
-    #: status is ``age-restricted``. Set it only where your app has already decided the viewer may
-    #: see age-restricted content.
-    ageConfirmed: bool
+
 
 
 class ServeInit(TypedDict, total=False):

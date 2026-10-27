@@ -22,7 +22,7 @@ final class Cdn extends Resource
             Values::invalid('Lenses and transforms apply only to the rendered resource');
         }
         // A placeholder is a small blurred PNG, public for public assets whatever their moderation status.
-        if ($resource === 'placeholder' && ($transformed || ($options['ageConfirmed'] ?? false) === true)) {
+        if ($resource === 'placeholder' && ($transformed)) {
             Values::invalid('A placeholder takes no lens, transform or ageConfirmed');
         }
         $url = $this->session->cdnBaseUrl . '/assets/' . Values::segment($this->session->projectId)
@@ -35,12 +35,7 @@ final class Cdn extends Resource
         }
         // Opts a public age-restricted asset in to its public URL; only for viewers your app has
         // already decided may see age-restricted content. Without it, use a signed URL or the API key.
-        $ageConfirmed = $options['ageConfirmed'] ?? false;
-        if (!is_bool($ageConfirmed)) {
-            Values::invalid('ageConfirmed must be true or false');
-        }
-        $query = $ageConfirmed ? ['ageConfirmed' => 'true'] : [];
-        if (isset($options['viewerRegion'])) $query['viewerRegion'] = $options['viewerRegion'];
+        $query = isset($options['viewerClaims']) ? ['viewerClaims' => json_encode($options['viewerClaims'], JSON_THROW_ON_ERROR)] : [];
         return $query ? $url . '?' . http_build_query($query) : $url;
     }
 

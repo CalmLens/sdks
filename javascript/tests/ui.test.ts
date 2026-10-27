@@ -33,9 +33,9 @@ describe("getMediaState", () => {
       placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     });
 
-    const shown = getMediaState({ ...options, ageConfirmed: true });
+    const shown = getMediaState({ ...options, viewerClaims: { ageConfirmed: true } });
     expect(shown.kind === "image" && shown.src).toBe(
-      `${CDN}/assets/${PROJECT_ID}/a1/rendered?ageConfirmed=true`,
+      `${CDN}/assets/${PROJECT_ID}/a1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D`,
     );
   });
 
@@ -102,7 +102,7 @@ describe("getMediaState", () => {
     };
     // The CDN draws placeholders only for images, so a gated video has none.
     expect(getMediaState({ asset })).toEqual({ kind: "gated" });
-    expect(resolveMediaProps({ asset, ageConfirmed: true })).toMatchObject({
+    expect(resolveMediaProps({ asset, viewerClaims: { ageConfirmed: true } })).toMatchObject({
       projectId: PROJECT_ID,
       assetId: "v1",
       status: "age-restricted",
@@ -608,87 +608,22 @@ test("regional media uses the viewer country and forwards it on responsive URLs"
       },
     },
   };
-  expect(getMediaState({ asset, region: "DE" })).toEqual({ kind: "unavailable" });
-  const us = getMediaState({ asset, region: "US", widths: [320, 640] });
+  const inferred = getMediaState({ asset });
+  expect(inferred.kind).toBe("image");
+  if (inferred.kind !== "image") throw new Error("expected-image");
+  expect(new URL(inferred.src).searchParams.has("viewerClaims")).toBe(false);
+  const ageClaim = getMediaState({ asset, viewerClaims: { ageConfirmed: true } });
+  expect(ageClaim.kind).toBe("image");
+  if (ageClaim.kind !== "image") throw new Error("expected-image");
+  expect(new URL(ageClaim.src).searchParams.get("viewerClaims")).toBe(
+    JSON.stringify({ ageConfirmed: true }),
+  );
+  expect(getMediaState({ asset, viewerClaims: { region: "DE" } })).toEqual({ kind: "unavailable" });
+  const us = getMediaState({ asset, viewerClaims: { region: "US" }, widths: [320, 640] });
   expect(us.kind).toBe("image");
   if (us.kind !== "image") throw new Error("expected-image");
-  expect(new URL(us.src).searchParams.get("viewerRegion")).toBe("US");
-  expect(us.sources?.map((source) => new URL(source.src).searchParams.get("viewerRegion"))).toEqual(
-    ["US", "US"],
+  expect(new URL(us.src).searchParams.get("viewerClaims")).toBe(JSON.stringify({ region: "US" }));
+  expect(us.sources?.map((source) => new URL(source.src).searchParams.get("viewerClaims"))).toEqual(
+    [JSON.stringify({ region: "US" }), JSON.stringify({ region: "US" })],
   );
-});
-
-test("viewer-aware age restriction gates an allowed asset until the client confirms age", () => {
-  const asset = {
-    id: "asset-region",
-    projectId: "project-region",
-    delivery: { viewerRegion: "GB", action: "age-restrict", ageCheckStandard: "verified" as const },
-    classification: { moderation: { status: "allowed" as const } },
-  };
-  expect(getMediaState({ asset, region: "GB", placeholder: false })).toEqual({
-    kind: "gated",
-    placeholderUrl: undefined,
-  });
-  const permitted = getMediaState({ asset, region: "GB", ageConfirmed: true });
-  expect(permitted.kind).toBe("image");
-  if (permitted.kind !== "image") throw new Error("expected-image");
-  expect(new URL(permitted.src).searchParams.get("ageConfirmed")).toBe("true");
-  expect(new URL(permitted.src).searchParams.get("viewerRegion")).toBe("GB");
-});
-
-test("regional unavailable state requires matching viewer attribution and yields to content removal", () => {
-  const asset = {
-    id: "regional",
-    projectId: PROJECT_ID,
-    delivery: {
-      viewerRegion: "DE",
-      blocked: true,
-      reason: "regional-rule",
-      jurisdiction: "DE",
-      action: "block",
-      ageCheckStandard: "any" as const,
-    },
-    classification: {
-      moderation: {
-        status: "allowed" as const,
-      },
-    },
-  };
-  expect(getMediaState({ asset, region: "DE" })).toEqual({
-    kind: "unavailable",
-    reason: "regional",
-  });
-  expect(getMediaState({ asset, region: "US", placeholder: false }).kind).toBe("image");
-  expect(getMediaState({ asset, region: "DE", contentRemoved: true })).toEqual({
-    kind: "unavailable",
-  });
-  expect(
-    getMediaState({
-      asset: {
-        ...asset,
-        delivery: { ...asset.delivery, jurisdiction: undefined },
-      },
-      region: "DE",
-    }),
-  ).toEqual({ kind: "unavailable" });
-});
-
-test("viewer delivery blockers prevent media requests even with an allowed base status", () => {
-  expect(
-    getMediaState({
-      asset: {
-        id: "held",
-        projectId: PROJECT_ID,
-        classification: { moderation: { status: "allowed" } },
-        delivery: {
-          viewerRegion: "GB",
-          action: null,
-          blocked: true,
-          reason: "copyright-hold",
-          ageCheckStandard: "any",
-        },
-      },
-      region: "GB",
-    }),
-  ).toEqual({ kind: "unavailable" });
 });

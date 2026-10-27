@@ -63,7 +63,7 @@ module CalmLens
 
       transformed = !api['lens'].nil? || !api['transform'].nil?
       raise Internal.invalid('Lenses and transforms apply only to the rendered resource') if resource == 'original' && transformed
-      if resource == 'placeholder' && (transformed || api['ageConfirmed'] == true)
+      if resource == 'placeholder' && (transformed)
         raise Internal.invalid('A placeholder takes no lens, transform or ageConfirmed')
       end
 
@@ -72,12 +72,13 @@ module CalmLens
       url += "/@#{Internal.segment(api['lens'])}" if api['lens']
       transform = api['transform']
       url += "/#{Transforms.path(transform)}" unless transform.nil? || transform == ''
-      age_confirmed = api.fetch('ageConfirmed', false)
-      raise Internal.invalid('ageConfirmed must be true or false') unless [true, false, nil].include?(age_confirmed)
 
+      claims = api['viewerClaims']
+      if claims && (!claims.is_a?(Hash) || (claims.key?('ageConfirmed') && ![true, false].include?(claims['ageConfirmed'])))
+        raise Internal.invalid('Invalid viewerClaims')
+      end
       query = []
-      query << 'ageConfirmed=true' if age_confirmed
-      query << "viewerRegion=#{URI.encode_www_form_component(api['viewerRegion'])}" if api['viewerRegion']
+      query << "viewerClaims=#{URI.encode_www_form_component(JSON.generate(api['viewerClaims']))}" if api['viewerClaims']
       query.empty? ? url : "#{url}?#{query.join('&')}"
     end
   end
