@@ -90,6 +90,7 @@ final class Page {
       .form-actions{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--line);padding-top:16px;margin-top:4px}
       @media(max-width:980px){.lower,.detail{grid-template-columns:1fr}.mine{grid-template-columns:minmax(0,1fr) auto}.mine>.parts,.mine>.gone{grid-column:1/-1;grid-row:2}}
       @media(max-width:560px){.bar{gap:14px;flex-wrap:wrap}.bar nav{order:3;width:100%}.two,.slots{grid-template-columns:1fr}.reason{margin-left:0}}
+      .test-input{font-family:ui-monospace,Menlo,monospace;font-size:.9em;padding:0 5px;border-radius:4px;background:var(--wait-bg);color:var(--wait);white-space:nowrap}
       .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
       """;
 
@@ -189,7 +190,7 @@ final class Page {
   private static StringBuilder open(Calmmarket app, String title) {
     StringBuilder html = new StringBuilder(16384);
     html.append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
-        .append("<title>").append(h(title)).append("</title><style>").append(STYLE).append("</style></head><body>")
+        .append("<title>").append(attribute(title)).append("</title><style>").append(STYLE).append("</style></head><body>")
         .append("<header class=\"top\"><div class=\"bar\"><a class=\"brand\" href=\"/\">").append(MARK).append("Calmmarket</a>")
         .append("<nav aria-label=\"Main\"><a href=\"/\">Browse</a><a href=\"/#yours\">Your listings</a></nav>")
         .append("<a class=\"button\" href=\"/sell\">Sell an item</a></div></header>");
@@ -209,7 +210,7 @@ final class Page {
   private static StringBuilder card(StringBuilder html, Calmmarket.Listing listing) {
     Calmmarket.Photo cover = listing.photos.get(0);
     html.append("<a class=\"card\" href=\"/listings/").append(h(listing.id)).append("\"><img src=\"").append(photoUrl(listing, cover)).append("\" alt=\"\">")
-        .append("<div class=\"body\"><div class=\"price\">$").append(h(listing.price)).append("</div><h3>").append(h(listing.title)).append("</h3>")
+        .append("<div class=\"body\"><div class=\"price\">$").append(h(listing.price)).append("</div><h3>").append(t(listing.title)).append("</h3>")
         .append("<div class=\"meta\">").append(photos(listing.photos.size())).append(" · Listed ").append(TIME.format(listing.createdAt)).append("</div></div></a>");
     return html;
   }
@@ -219,10 +220,10 @@ final class Page {
     Calmmarket.State state = listing.state();
     html.append("<article class=\"mine\"><a href=\"/listings/").append(h(listing.id)).append("\">");
     thumb(html, listing, "thumb");
-    html.append("<span><strong>").append(h(listing.title)).append("</strong><span class=\"meta\">$").append(h(listing.price)).append(" · ")
+    html.append("<span><strong>").append(t(listing.title)).append("</strong><span class=\"meta\">$").append(h(listing.price)).append(" · ")
         .append(photos(listing.photos.size())).append("</span></span></a>");
     if (state != Calmmarket.State.WITHDRAWN) {
-      html.append("<ul class=\"parts\" aria-label=\"Checks for ").append(h(listing.title)).append("\">");
+      html.append("<ul class=\"parts\" aria-label=\"Checks for ").append(attribute(listing.title)).append("\">");
       for (Part part : parts(listing)) {
         html.append("<li class=\"").append(part.tone()).append("\"><span class=\"dot\" aria-hidden=\"true\"></span>").append(h(part.name()));
         if (part.tone().equals("ok")) html.append("<span class=\"visually-hidden\">: ").append(h(part.status())).append("</span>");
@@ -240,7 +241,7 @@ final class Page {
         if (!photo.held()) continue;
         html.append("<div class=\"reason\"><p><strong>Photo ").append(photo.number).append(":</strong> ").append(h(reason(photo).toLowerCase(Locale.ROOT))).append("</p>");
         String text = extracted(photo);
-        if (text != null) html.append("<p class=\"label\">Text found in the photo</p><q>").append(h(text)).append("</q>");
+        if (text != null) html.append("<p class=\"label\">Text found in the photo</p><q>").append(t(text)).append("</q>");
         html.append("</div>");
         break;
       }
@@ -255,20 +256,20 @@ final class Page {
     html.append("<div class=\"detail\"><div class=\"gallery\">");
     Calmmarket.Photo cover = listing.cover();
     if (cover != null)
-      html.append("<img class=\"main\" src=\"").append(photoUrl(listing, cover)).append("\" alt=\"").append(h(listing.title)).append("\">");
+      html.append("<img class=\"main\" src=\"").append(photoUrl(listing, cover)).append("\" alt=\"").append(attribute(listing.title)).append("\">");
     else html.append("<div class=\"ph large\">").append(h(coverMessage(listing))).append("</div>");
     if (listing.photos.size() > 1) {
       html.append("<div class=\"row\">");
       for (Calmmarket.Photo photo : listing.photos) {
         if (showable && photo.allowed())
-          html.append("<img src=\"").append(photoUrl(listing, photo)).append("\" alt=\"").append(h(listing.title)).append(", photo ").append(photo.number).append("\">");
+          html.append("<img src=\"").append(photoUrl(listing, photo)).append("\" alt=\"").append(attribute(listing.title)).append(", photo ").append(photo.number).append("\">");
         else html.append("<div class=\"ph\">Photo ").append(photo.number).append("<br>").append(h(photoStatus(photo, listing).toLowerCase(Locale.ROOT))).append("</div>");
       }
       html.append("</div>");
     }
     html.append("</div><div class=\"info\"><span class=\"chip ").append(tone(state)).append("\">").append(h(state.label)).append("</span>")
-        .append("<h1>").append(h(listing.title)).append("</h1><div class=\"price\">$").append(h(listing.price)).append("</div>")
-        .append("<p class=\"desc\">").append(h(listing.description)).append("</p>")
+        .append("<h1>").append(t(listing.title)).append("</h1><div class=\"price\">$").append(h(listing.price)).append("</div>")
+        .append("<p class=\"desc\">").append(t(listing.description)).append("</p>")
         .append("<p class=\"meta\">Listed ").append(TIME.format(listing.createdAt)).append(" · ").append(photos(listing.photos.size())).append("</p>");
 
     html.append("<section class=\"panel\" aria-labelledby=\"checks\"><div class=\"head\"><h2 id=\"checks\">Checks</h2><span class=\"meta\">")
@@ -293,7 +294,7 @@ final class Page {
   }
 
   private static void photoDetail(StringBuilder html, Calmmarket app, Calmmarket.Listing listing, Calmmarket.Photo photo) {
-    html.append("<p class=\"meta\">").append(h(photo.name)).append("</p>");
+    html.append("<p class=\"meta\">").append(t(photo.name)).append("</p>");
     if (photo.held()) html.append("<p>").append(h(reason(photo))).append("</p>");
     if (photo.reviewNote != null && !photo.reviewNote.isEmpty()) html.append("<p>Reviewer note: ").append(h(photo.reviewNote)).append("</p>");
     if (photo.refreshError != null) html.append("<p>").append(h(photo.refreshError)).append("</p>");
@@ -301,7 +302,7 @@ final class Page {
       case FOUND -> {
         String text = extracted(photo);
         html.append("<p class=\"meta\">Text found in the photo").append(app.demo() ? " (synthetic)" : "").append("</p>");
-        if (text != null) html.append("<q>").append(h(text)).append("</q>");
+        if (text != null) html.append("<q>").append(t(text)).append("</q>");
       }
       case NO_TEXT -> html.append("<p class=\"meta\">No text found in the photo</p>");
       default -> { }
@@ -321,13 +322,13 @@ final class Page {
   }
 
   private static void activity(StringBuilder html, Calmmarket.Activity entry) {
-    html.append("<li><time>").append(TIME.format(entry.at())).append("</time>").append(h(entry.text()));
+    html.append("<li><time>").append(TIME.format(entry.at())).append("</time>").append(t(entry.text()));
     if (!entry.facts().isEmpty()) {
       html.append("<dl class=\"facts\">");
       for (Calmmarket.FactRow fact : entry.facts()) {
         html.append("<dt>").append(h(fact.label())).append("</dt><dd>");
         if (fact.url() != null) html.append("<a href=\"").append(h(fact.url())).append("\" rel=\"noopener noreferrer\">").append(h(fact.value())).append("</a>");
-        else html.append(h(fact.value()));
+        else html.append(t(fact.value()));
         html.append("</dd>");
       }
       html.append("</dl>");
@@ -455,6 +456,23 @@ final class Page {
 
   private static String csrf(Calmmarket app) {
     return "<input type=\"hidden\" name=\"csrf\" value=\"" + h(app.csrf) + "\">";
+  }
+
+  /** CalmLens text test inputs, after escaping: {@code <!calmlens-test <tag> <category>>}. */
+  private static final java.util.regex.Pattern TEST_INPUT =
+      java.util.regex.Pattern.compile("&lt;!calmlens-test\\s+[a-f0-9]{32}\\s+([a-z.-]+)\\s*&gt;", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+  /**
+   * User text for display: escaped, with each CalmLens test input shown as a short marker
+   * ("test input: criminal-activity") instead of its tag.
+   */
+  static String t(String value) {
+    return TEST_INPUT.matcher(h(value)).replaceAll(match -> "<span class=\"test-input\">test input: " + match.group(1).toLowerCase(Locale.ROOT) + "</span>");
+  }
+
+  /** User text for an attribute or the document title: escaped, with test inputs as plain markers. */
+  static String attribute(String value) {
+    return TEST_INPUT.matcher(h(value)).replaceAll(match -> "test input: " + match.group(1).toLowerCase(Locale.ROOT));
   }
 
   static String h(String value) {

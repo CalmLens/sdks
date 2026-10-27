@@ -291,6 +291,25 @@ class CalmmarketTest {
   }
 
   @Test
+  void testInputsInListingTextAndPhotoTextAreShownAsAMarkerWithoutTheirTag() {
+    String tag = "255cc104ee407e16ec3c6c8c7ce087c0";
+    MockCalmLensServerClient mock = liveSubmission(1);
+    Calmmarket app = live(mock, "");
+    submit(app, app.csrf, "Lamp <!calmlens-test " + tag + " violence>", "Works <!calmlens-test " + tag + " hate>", "25", List.of(PNG), null, null);
+    Calmmarket.Listing listing = app.listings().get(0);
+    Map<String, Object> image = photo(listing, 1, "blocked", report(Map.of("criminal-activity", evaluated(0.95))));
+    image.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string",
+        "content", "PUPPIES FOR SALE <!calmlens-test " + tag + " criminal-activity>")));
+    mock.enqueue(200, image);
+    String page = html(get(app, "/listings/" + listing.id));
+    assertEquals("PUPPIES FOR SALE <!calmlens-test " + tag + " criminal-activity>", listing.photos.get(0).extractedText.content(), "the stored text is unchanged");
+    assertFalse(page.contains(tag), "the test tag is never displayed");
+    for (String category : List.of("violence", "hate", "criminal-activity"))
+      assertTrue(page.contains("class=\"test-input\">test input: " + category + "<"), category);
+    assertFalse(html(get(app, "/")).contains(tag));
+  }
+
+  @Test
   void theMarketShowsOnlyLiveListingsAndRanksLimitedOnesLast() throws Exception {
     Calmmarket app = live(mock(), "");
     Calmmarket.Listing limited = listing("limited", AssetModerationStatus.LIMITED);
