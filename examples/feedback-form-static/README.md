@@ -54,7 +54,7 @@ In the CalmLens portal, open [Upload presets](https://calmlens.com/portal/upload
 | Setting                           | Value for this example                                                               |
 | --------------------------------- | ------------------------------------------------------------------------------------ |
 | Who can upload?                   | **Anyone with the preset ID**                                                        |
-| Daily upload limit                | Required. The most uploads you'll accept per UTC day, for example `100`.             |
+| Daily upload limit                | Required. The most uploads each client IP/address group can submit per UTC day, for example `100`.             |
 | Allowed sites                     | `http://localhost:6406`                                                              |
 | File types                        | `image/*`                                                                            |
 | Maximum file size (MB)            | For example `10`.                                                                    |
@@ -69,7 +69,7 @@ No published `@calmlens/sdk` release includes `CalmLensAppClient` yet, so this e
 uses the SDK built from this repo. From the repo root, build it once:
 
 ```bash
-(cd javascript && bun install && bun link)
+(cd javascript && bun install && bun run build)
 ```
 
 Then start the page:

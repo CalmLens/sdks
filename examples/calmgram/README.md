@@ -47,7 +47,7 @@ the published `@calmlens/sdk` instead of `link:@calmlens/sdk`. From the repo roo
 dependencies, build the SDK and register it with `bun link` first:
 
 ```bash
-(cd javascript && bun install)
+(cd javascript && bun install && bun run build && bun link)
 cd examples/calmgram
 bun install
 bun run dev:demo --port 6400
