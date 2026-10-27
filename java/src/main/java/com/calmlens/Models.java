@@ -1898,13 +1898,13 @@ public final class Models {
     public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
   }
 
+  public record RegionalDecision(String region, String action, String rule, String category) {}
+  public record RegionalDelivery(String region, String action, String rule, String category, String ageCheckStandard) {}
   /**
    * Final automatic action, flagged categories and decision source.
    *
    * @param source what decided: {@code policy}, {@code asset-override}, {@code children} or {@code hash-list}
    */
-  public record RegionalDecision(String region, String action, String rule, String category) {}
-  public record RegionalDelivery(String region, String action, String rule, String category, String ageCheckStandard) {}
   public record ReportPolicyDecision(String source, String action, List<String> flaggedCategories, String rule, List<RegionalDecision> regions) {
     public ReportPolicyDecision { flaggedCategories = list(flaggedCategories); regions = list(regions); }
   }

@@ -1,3 +1,4 @@
+import "@calmlens/sdk/styles.css";
 import { posts, projectId, show } from "./demo";
 import { renderAvatar } from "./html/avatar.js";
 import { attachCommentForm } from "./html/comment-form.js";

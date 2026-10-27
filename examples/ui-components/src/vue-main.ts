@@ -1,3 +1,4 @@
+import "@calmlens/sdk/styles.css";
 import { createApp, h, ref } from "vue";
 import { posts, projectId, show } from "./demo";
 import Avatar from "./vue/Avatar.vue";

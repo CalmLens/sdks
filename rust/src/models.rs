@@ -1821,6 +1821,7 @@ pub struct RegionalDelivery {
 /// The automatic moderation decision and stricter regional outcomes.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ReportPolicyDecision {
     /// Mandatory rule responsible for the action, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]

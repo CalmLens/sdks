@@ -1,5 +1,7 @@
 // The playground shell: framework tabs, settings and sample files. Each tab mounts the same demo
 // written with that framework's components.
+// The Vue, Svelte and web component tabs use the SDK's stylesheet; React renders its own.
+import "@calmlens/sdk/styles.css";
 import { playground } from "./playground";
 
 const FRAMEWORKS = {

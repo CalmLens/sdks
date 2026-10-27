@@ -96,6 +96,12 @@ public final class ErrorCodes {
   public static final String FOLDER_PARENT_CYCLE = "folder/parent-cycle";
   /** {@code lens/version-conflict} (HTTP 409). */
   public static final String LENS_VERSION_CONFLICT = "lens/version-conflict";
+  /** {@code viewer/invalid-region} (HTTP 400). */
+  public static final String INVALID_VIEWER_REGION = "viewer/invalid-region";
+  /** {@code viewer/region-required} (HTTP 403). */
+  public static final String VIEWER_REGION_REQUIRED = "viewer/region-required";
+  /** {@code asset/regional-evidence-required} (HTTP 403). */
+  public static final String REGIONAL_EVIDENCE_REQUIRED = "asset/regional-evidence-required";
   /** {@code hash-list/not-found} (HTTP 404). */
   public static final String HASH_LIST_NOT_FOUND = "hash-list/not-found";
   /** {@code hash-list/entry-not-found} (HTTP 404). */
@@ -221,6 +227,9 @@ public final class ErrorCodes {
       Map.entry(FOLDER_NOT_EMPTY, 409),
       Map.entry(FOLDER_PARENT_CYCLE, 409),
       Map.entry(LENS_VERSION_CONFLICT, 409),
+      Map.entry(INVALID_VIEWER_REGION, 400),
+      Map.entry(VIEWER_REGION_REQUIRED, 403),
+      Map.entry(REGIONAL_EVIDENCE_REQUIRED, 403),
       Map.entry(HASH_LIST_NOT_FOUND, 404),
       Map.entry(HASH_LIST_ENTRY_NOT_FOUND, 404),
       Map.entry(HASH_LIST_LIMIT_REACHED, 409),
