@@ -502,6 +502,58 @@ describe("UploadController", () => {
     ]);
   });
 
+  it("checks an upload again when its status check failed, without uploading it again", async () => {
+    let uploads = 0;
+    let checks = 0;
+    const controller = createUploadController({
+      upload: async () => {
+        uploads++;
+        return { assetId: "own-3", status: "pending" };
+      },
+      checkStatus: async () => {
+        if (++checks === 1) throw new Error("Network down");
+        return "allowed";
+      },
+    });
+    controller.addFiles([photo()]);
+    await settle(controller);
+    expect(controller.getSnapshot().items[0]).toMatchObject({ stage: "failed", assetId: "own-3" });
+
+    controller.retry(controller.getSnapshot().items[0]?.key ?? "");
+    await settle(controller);
+    expect(controller.getSnapshot().items[0]).toMatchObject({
+      stage: "complete",
+      status: "allowed",
+    });
+    expect(uploads).toBe(1);
+  });
+
+  it("checks a finished upload that is still pending again", async () => {
+    let decided = false;
+    const uploaded: CalmLensUpload[] = [];
+    const controller = createUploadController({
+      upload: async () => ({ assetId: "own-4", status: "pending" }),
+      checkStatus: async () => (decided ? "allowed" : "pending"),
+      decisionTimeoutMs: 1,
+      onUploaded: (upload) => uploaded.push(upload),
+    });
+    controller.addFiles([photo()]);
+    await settle(controller);
+    expect(controller.getSnapshot().items[0]).toMatchObject({
+      stage: "complete",
+      status: "pending",
+    });
+
+    decided = true;
+    controller.retry(controller.getSnapshot().items[0]?.key ?? "");
+    await settle(controller);
+    expect(controller.getSnapshot().items[0]).toMatchObject({
+      stage: "complete",
+      status: "allowed",
+    });
+    expect(uploaded.map(({ status }) => status)).toEqual(["pending", "allowed"]);
+  });
+
   it("finishes a custom upload as pending when there is no status check", async () => {
     const controller = createUploadController({
       upload: async () => ({ assetId: "own-2", status: "pending" }),

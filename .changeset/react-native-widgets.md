@@ -7,3 +7,5 @@
 Breaking: the upload queue takes any `UploadFile`, a file with a name, MIME type, size and `arrayBuffer()`, instead of only a browser `File`. A `File` from `expo-file-system` works as it is, and its `uri` becomes the image preview. `UploadItem.file`, `CalmLensUpload.file` and the `upload` and `token` callbacks now have this type.
 
 `resolveTheme` and `CALMLENS_THEME` hold the components' default colours, and `pickMediaSource` picks an image width for a measured box, for building your own components.
+
+`retry` checks an upload again, with the token it was uploaded with, when the upload finished but its status check failed, instead of uploading the file again as a new asset. It also checks a finished upload that is still `pending` again.

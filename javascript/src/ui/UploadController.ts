@@ -133,7 +133,10 @@ export interface UploadControllerOptions {
    * `MockCalmLensAppClient` from `@calmlens/sdk/testing` instead.
    */
   createClient?: (options: CalmLensAppClientOptions) => UploadClient;
-  /** Called for each finished upload that wasn't blocked or purged. */
+  /**
+   * Called for each finished upload that wasn't blocked or purged, and again with the new status
+   * when `retry` checks one that was still pending.
+   */
   onUploaded?: (upload: CalmLensUpload) => void;
   /** Called when moderation blocks or purges a file. */
   onRejected?: (item: UploadItem) => void;
@@ -197,6 +200,9 @@ const sleep = (ms: number, signal: AbortSignal) =>
     });
   });
 
+/** An upload as the uploader tracks it: its asset ID and moderation status. */
+type CheckedAsset = { id: string; status?: AssetModerationStatus };
+
 let nextKey = 0;
 
 /**
@@ -209,6 +215,8 @@ export class UploadController {
   #snapshot: UploadSnapshot = { items: [], busy: false };
   readonly #listeners = new Set<(snapshot: UploadSnapshot) => void>();
   readonly #aborts = new Map<string, AbortController>();
+  /** How to check each upload again, with the client and token it was uploaded with. */
+  readonly #checks = new Map<string, (assetId: string) => Promise<CheckedAsset>>();
 
   constructor(options: UploadControllerOptions) {
     this.#options = options;
@@ -283,11 +291,22 @@ export class UploadController {
     this.#pump();
   }
 
-  /** Uploads a failed file again. */
+  /**
+   * Tries a failed file again: an upload that finished but couldn't be checked is checked again,
+   * anything else is uploaded again. A finished upload still `pending` is checked again too.
+   */
   retry(key: string): void {
     const item = this.#find(key);
-    if (item?.stage !== "failed" || item.errorCode?.startsWith("file/")) return;
-    this.#update(key, { stage: "queued", progress: null, errorCode: undefined });
+    if (!item || item.errorCode?.startsWith("file/")) return;
+    const pending = item.stage === "complete" && item.status === "pending";
+    if (item.stage !== "failed" && !(pending && this.#checks.has(key))) return;
+    this.#update(key, {
+      stage: "queued",
+      progress: null,
+      errorCode: undefined,
+      // Without a way to check it, the file is uploaded again as a new asset.
+      assetId: this.#checks.has(key) ? item.assetId : undefined,
+    });
     this.#pump();
   }
 
@@ -304,6 +323,8 @@ export class UploadController {
       return;
     this.#aborts.get(key)?.abort();
     this.#aborts.delete(key);
+    // A cancelled upload's client is aborted, so `retry` uploads the file again.
+    this.#checks.delete(key);
     this.#update(key, { stage: "failed", progress: null, errorCode: SDK_ERROR_CODES.CANCELLED });
     this.#pump();
   }
@@ -314,6 +335,7 @@ export class UploadController {
     if (!item) return;
     this.#aborts.get(key)?.abort();
     this.#aborts.delete(key);
+    this.#checks.delete(key);
     revokePreviewUrl(item.previewUrl);
     this.#set(this.#snapshot.items.filter((other) => other.key !== key));
     this.#options.onRemoved?.(item);
@@ -324,6 +346,7 @@ export class UploadController {
   clear(): void {
     for (const abort of this.#aborts.values()) abort.abort();
     this.#aborts.clear();
+    this.#checks.clear();
     for (const item of this.#snapshot.items) revokePreviewUrl(item.previewUrl);
     this.#set([]);
   }
@@ -355,7 +378,7 @@ export class UploadController {
     }
   }
 
-  async #upload({ key, file }: UploadItem) {
+  async #upload({ key, file, assetId }: UploadItem) {
     const abort = new AbortController();
     this.#aborts.set(key, abort);
     this.#update(key, { stage: "uploading", progress: 0 });
@@ -364,18 +387,27 @@ export class UploadController {
       const onProgress = (sent: number, total: number) => {
         if (!abort.signal.aborted) this.#update(key, { progress: total ? sent / total : null });
       };
-      const client = await this.#clientFor(file, abort.signal, onProgress);
-      let asset = await client.create();
-      this.#update(key, { stage: "checking", progress: null, assetId: asset.id });
+      let check = assetId ? this.#checks.get(key) : undefined;
+      let asset: CheckedAsset;
+      if (assetId && check) {
+        this.#update(key, { stage: "checking", progress: null });
+        asset = await check(assetId);
+      } else {
+        const client = await this.#clientFor(file, abort.signal, onProgress);
+        asset = await client.create();
+        check = client.retrieve;
+        if (check) this.#checks.set(key, check);
+        this.#update(key, { stage: "checking", progress: null, assetId: asset.id });
+      }
       const deadline = Date.now() + (options.decisionTimeoutMs ?? DEFAULT_DECISION_TIMEOUT_MS);
       for (
         let delay = 1000;
-        asset.status === "pending" && client.retrieve && Date.now() < deadline;
+        asset.status === "pending" && check && Date.now() < deadline;
         delay *= 2
       ) {
         await sleep(Math.min(delay, Math.max(0, deadline - Date.now())), abort.signal);
         if (abort.signal.aborted) return;
-        asset = await client.retrieve(asset.id);
+        asset = await check(asset.id);
       }
       if (abort.signal.aborted) return;
       this.#update(key, { stage: "complete", status: asset.status });
@@ -403,8 +435,8 @@ export class UploadController {
     signal: AbortSignal,
     onProgress: (sent: number, total: number) => void,
   ): Promise<{
-    create: () => Promise<{ id: string; status?: AssetModerationStatus }>;
-    retrieve?: (assetId: string) => Promise<{ id: string; status?: AssetModerationStatus }>;
+    create: () => Promise<CheckedAsset>;
+    retrieve?: (assetId: string) => Promise<CheckedAsset>;
   }> {
     const { upload, checkStatus, uploadPresetId, createClient, baseUrl } = this.#options;
     if (upload) {
