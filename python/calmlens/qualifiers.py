@@ -51,6 +51,7 @@ ModerationQualifier = Union[Literal[
     "violence-threat",
     "violence-preparation",
     "violence-encouragement",
+    "violence-wish",
     "violence-extremism",
     "violence-injury",
     "violence-violent-death",

@@ -96,6 +96,8 @@ string_enum! {
         ViolencePreparation = "violence-preparation",
         /// Violence: Encouragement of violence.
         ViolenceEncouragement = "violence-encouragement",
+        /// Violence: Non-severe wish of harm.
+        ViolenceWish = "violence-wish",
         /// Violence: Violent extremism.
         ViolenceExtremism = "violence-extremism",
         /// Violence: Injury.

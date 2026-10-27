@@ -52,6 +52,7 @@ const (
 	QualifierViolenceThreat                       = "violence-threat"
 	QualifierViolencePreparation                  = "violence-preparation"
 	QualifierViolenceEncouragement                = "violence-encouragement"
+	QualifierViolenceWish                         = "violence-wish"
 	QualifierViolenceExtremism                    = "violence-extremism"
 	QualifierViolenceInjury                       = "violence-injury"
 	QualifierViolenceViolentDeath                 = "violence-violent-death"

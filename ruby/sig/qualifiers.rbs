@@ -49,6 +49,7 @@ module CalmLens
     ?"violence-threat" => qualifier_result,
     ?"violence-preparation" => qualifier_result,
     ?"violence-encouragement" => qualifier_result,
+    ?"violence-wish" => qualifier_result,
     ?"violence-extremism" => qualifier_result,
     ?"violence-injury" => qualifier_result,
     ?"violence-violent-death" => qualifier_result,
