@@ -1627,7 +1627,10 @@ async function paintTestImage(scenario, key) {
 		const row = Math.floor(i / width / 4);
 		const cell = row * cells + Math.floor(i % width / 4);
 		const value = data[cell % data.length];
-		const position = (row + cell % cells) / (2 * (cells - 1)) * (palette.length - 1);
+		const x = cell % cells / (cells - 1);
+		const y = row / (cells - 1);
+		const phase = Math.hypot(x - .38, y - .43) * 10 + .65 * Math.sin(y * 5 + x * 2);
+		const position = (.5 - .5 * Math.cos(phase)) * (palette.length - 1);
 		const start = Math.floor(position);
 		const blend = position - start;
 		const shade = (value * 73 + 41 & 255) / 255;
