@@ -127,7 +127,7 @@ const run = async (command: string[], options: { cwd: string; env?: Record<strin
 /** Calmgram's Worker, always on 127.0.0.1:6408. */
 const calmgramDev = ["bun", "x", "wrangler", "dev", "--ip", "127.0.0.1", "--port", "6408"];
 
-const examples: Record<string, Example> = {
+export const examples: Record<string, Example> = {
   calmgram: {
     name: "Calmgram",
     // Its demo runs Wrangler with CALMLENS_DEMO as a Worker var, without the secrets file.
