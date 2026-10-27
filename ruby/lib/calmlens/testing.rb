@@ -18,7 +18,7 @@ module CalmLens
   # A `purged` outcome removes the content with reason `policy`. The CDN answers like the real one:
   # `asset/not-available` (403) for blocked, purged, failed or removed content, and
   # `asset/api-key-missing-permission` (403) for a private asset, or a public age-restricted one without
-  # `allow_age_restricted: true`, unless `api_key` comes from {.create_api_key} with an `assets:download`
+  # `age_confirmed: true`, unless `api_key` comes from {.create_api_key} with an `assets:download`
   # grant. The default key has no grants. {#decide} applies a reviewer's decision, and
   # {Assets#wait_for_decision} takes no real time: a pending asset times out at once.
   # Filters join comparisons with `;` (and), which binds tighter than `,` (or), and group them with

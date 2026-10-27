@@ -5,12 +5,12 @@
   import Feed from "./Feed.svelte";
   import PhotoUpload from "./PhotoUpload.svelte";
 
-  let canViewSensitiveMedia = $state(false);
+  let ageConfirmed = $state(false);
 </script>
 
 <main style="max-width: 480px">
   <PhotoUpload onUploaded={(upload: unknown) => show("Uploaded", upload)} />
   <CommentForm postId="1" onPosted={(comment: unknown) => show("Posted", comment)} />
   <Avatar {projectId} assetId={posts[0].assetId} status="allowed" name="Sam" />
-  <Feed {projectId} {posts} viewer={{ canViewSensitiveMedia }} onReveal={() => (canViewSensitiveMedia = true)} />
+  <Feed {projectId} {posts} viewer={{ ageConfirmed }} onReveal={() => (ageConfirmed = true)} />
 </main>

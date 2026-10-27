@@ -396,12 +396,12 @@ describe("MockCalmLensServerClient", () => {
         assetIdentifier: "asset-id",
         resource: "rendered",
         lens: "thumbnail",
-        allowAgeRestricted: true,
+        ageConfirmed: true,
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/@thumbnail?allowAgeRestricted=true`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/@thumbnail?ageConfirmed=true`,
     );
-    expect(client.cdn.getAssetUrl({ assetIdentifier: "asset-id", allowAgeRestricted: false })).toBe(
+    expect(client.cdn.getAssetUrl({ assetIdentifier: "asset-id", ageConfirmed: false })).toBe(
       `https://cdn.test/v1/assets/${projectId}/asset-id/rendered`,
     );
 

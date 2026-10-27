@@ -33,9 +33,9 @@ describe("getMediaState", () => {
       placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     });
 
-    const shown = getMediaState({ ...options, canView: true });
+    const shown = getMediaState({ ...options, ageConfirmed: true });
     expect(shown.kind === "image" && shown.src).toBe(
-      `${CDN}/assets/${PROJECT_ID}/a1/rendered?allowAgeRestricted=true`,
+      `${CDN}/assets/${PROJECT_ID}/a1/rendered?ageConfirmed=true`,
     );
   });
 
@@ -102,7 +102,7 @@ describe("getMediaState", () => {
     };
     // The CDN draws placeholders only for images, so a gated video has none.
     expect(getMediaState({ asset })).toEqual({ kind: "gated" });
-    expect(resolveMediaProps({ asset, canView: true })).toMatchObject({
+    expect(resolveMediaProps({ asset, ageConfirmed: true })).toMatchObject({
       projectId: PROJECT_ID,
       assetId: "v1",
       status: "age-restricted",
@@ -634,9 +634,9 @@ test("viewer-aware age restriction gates an allowed asset until the client confi
     kind: "gated",
     placeholderUrl: undefined,
   });
-  const permitted = getMediaState({ asset, region: "GB", canView: true });
+  const permitted = getMediaState({ asset, region: "GB", ageConfirmed: true });
   expect(permitted.kind).toBe("image");
   if (permitted.kind !== "image") throw new Error("expected-image");
-  expect(new URL(permitted.src).searchParams.get("allowAgeRestricted")).toBe("true");
+  expect(new URL(permitted.src).searchParams.get("ageConfirmed")).toBe("true");
   expect(new URL(permitted.src).searchParams.get("region")).toBe("GB");
 });

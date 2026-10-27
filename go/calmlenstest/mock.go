@@ -2016,8 +2016,8 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 		return notAvailable()
 	}
 	// Then access: a private asset, or a public age-restricted one requested without the
-	// allowAgeRestricted=true opt-in, needs the download permission for its folder.
-	restricted := asset["visibility"] != calmlens.VisibilityPublic || moderation == calmlens.ModerationStatusAgeRestricted && req.URL.Query().Get("allowAgeRestricted") != "true"
+	// ageConfirmed=true opt-in, needs the download permission for its folder.
+	restricted := asset["visibility"] != calmlens.VisibilityPublic || moderation == calmlens.ModerationStatusAgeRestricted && req.URL.Query().Get("ageConfirmed") != "true"
 	if restricted && !canDownload() {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission", "This API key needs assets:download permission for this asset's folder.")
 	}

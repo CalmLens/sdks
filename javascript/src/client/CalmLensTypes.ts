@@ -368,7 +368,7 @@ export interface IdempotencyOptions {
  * display, in the best format the client accepts, which takes lenses and transforms; or its
  * `placeholder`, a small blurred PNG that is public for public assets whatever their moderation
  * status. Defaults to `rendered`; ask for `original` to download the exact file. A
- * placeholder takes no lens, transform or `allowAgeRestricted`.
+ * placeholder takes no lens, transform or `ageConfirmed`.
  */
 export type CdnResource = "original" | "rendered" | "placeholder";
 
@@ -380,11 +380,11 @@ export interface CdnAssetUrlOptions {
   lens?: string;
   transform?: CdnTransform;
   /**
-   * Adds `allowAgeRestricted=true`, which lets the CDN serve a public asset whose moderation status is
+   * Adds `ageConfirmed=true`, which lets the CDN serve a public asset whose moderation status is
    * `age-restricted` from this URL. Without it, such an asset needs a signed URL or an API key. Set
    * it only where your app has already decided the viewer may see age-restricted content.
    */
-  allowAgeRestricted?: boolean;
+  ageConfirmed?: boolean;
 }
 
 /**

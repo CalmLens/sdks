@@ -858,17 +858,17 @@
       }
     },
     {
-      "id": "cdn.allowAgeRestricted",
+      "id": "cdn.ageConfirmed",
       "kind": "cdn-option",
       "description": "Lets the CDN serve a public age-restricted asset from the URL.",
       "names": {
-        "javascript": "allowAgeRestricted",
-        "python": "allow_age_restricted",
-        "go": "CDNAssetURLOptions.AllowAgeRestricted",
-        "rust": "CdnRequest::allow_age_restricted",
-        "java": "CdnRequest.allowAgeRestricted",
-        "ruby": "allow_age_restricted",
-        "php": "allowAgeRestricted"
+        "javascript": "ageConfirmed",
+        "python": "age_confirmed",
+        "go": "CDNAssetURLOptions.AgeConfirmed",
+        "rust": "CdnRequest::age_confirmed",
+        "java": "CdnRequest.ageConfirmed",
+        "ruby": "age_confirmed",
+        "php": "ageConfirmed"
       }
     },
     {

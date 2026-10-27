@@ -25,7 +25,7 @@ export const mount = (target: HTMLElement) => {
     playground.addUpload(event.detail, "Web components"),
   );
 
-  const unsubscribe = playground.subscribe(({ items, canView, multiple }) => {
+  const unsubscribe = playground.subscribe(({ items, ageConfirmed, multiple }) => {
     uploader.toggleAttribute("multiple", multiple);
     empty.hidden = items.length > 0;
     gallery.replaceChildren(
@@ -45,7 +45,7 @@ export const mount = (target: HTMLElement) => {
         for (const [name, value] of Object.entries(attributes)) {
           if (value !== undefined) media.setAttribute(name, value);
         }
-        media.toggleAttribute("can-view", canView);
+        media.toggleAttribute("age-confirmed", ageConfirmed);
         media.addEventListener("calmlens-reveal", playground.reveal);
         const caption = document.createElement("p");
         caption.className = "caption";

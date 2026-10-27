@@ -29,7 +29,7 @@ pub enum MockOutcome {
     /// allowed one.
     Limited,
     /// Processing completes with moderation `age-restricted`; the CDN then serves the asset
-    /// only with the download permission, or a public one with `allow_age_restricted`.
+    /// only with the download permission, or a public one with `age_confirmed`.
     AgeRestricted,
     /// Processing completes with moderation `blocked`; the CDN refuses it.
     Blocked,
@@ -2088,7 +2088,7 @@ impl Backend {
         };
         let restricted = !public
             || (status == "age-restricted"
-                && q.get("allowAgeRestricted").is_none_or(|v| v != "true"));
+                && q.get("ageConfirmed").is_none_or(|v| v != "true"));
         if restricted && !can_download() {
             return custom(
                 "asset/api-key-missing-permission",

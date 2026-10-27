@@ -550,8 +550,8 @@ pairs, nested options are dotted (`border.color=ff0000`) and hex colours drop th
 and a transform are joined with `/`, as in `/rendered/@thumbnail/width=320`.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
-when the URL carries `?allowAgeRestricted=true`; otherwise it needs a signed URL or an API key. Set
-`AllowAgeRestricted: true` on `CDNAssetURLOptions` (also used by `CDN.Serve`) to append it. Set it
+when the URL carries `?ageConfirmed=true`; otherwise it needs a signed URL or an API key. Set
+`AgeConfirmed: true` on `CDNAssetURLOptions` (also used by `CDN.Serve`) to append it. Set it
 only where your app has already decided the viewer may see age-restricted content.
 
 ## Local webhook forwarding
@@ -628,7 +628,7 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
   `Content-Security-Policy` and, for images, `ETag` and `Expires`. Like the
   CDN, blocked, purged and failed assets and removed content return 403 `asset/not-available`
   whatever the key. A private asset, or a public age-restricted one requested without
-  `AllowAgeRestricted: true`, returns 403 `asset/api-key-missing-permission` unless the key has
+  `AgeConfirmed: true`, returns 403 `asset/api-key-missing-permission` unless the key has
   the `assets:download` permission; the default key has no grants, and `SetAPIKeyGrants`
   replaces them (the key stays the same). The placeholder is served for public images whatever
   their moderation, and refused once purged or removed, and for private images without the

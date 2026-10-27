@@ -232,8 +232,8 @@ func TestSurface(t *testing.T) {
 			typeName, fieldName, _ := strings.Cut(name, ".")
 			used[typeName] = true
 			if _, ok := surfaceTypes[typeName].FieldByName(fieldName); ok {
-				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "asset-1", AllowAgeRestricted: true})
-				present = err == nil && strings.HasSuffix(url, "?allowAgeRestricted=true")
+				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "asset-1", AgeConfirmed: true})
+				present = err == nil && strings.HasSuffix(url, "?ageConfirmed=true")
 			}
 		case "mock-option":
 			typeName, fieldName, _ := strings.Cut(name, ".")

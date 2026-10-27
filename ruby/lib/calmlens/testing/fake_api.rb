@@ -899,7 +899,7 @@ module CalmLens
       # assets whatever their moderation; other resources pass delivery checks first, which refuse
       # everyone (content still uploading, blocked or purged, failed processing, removed content),
       # then a private asset, or a public age-restricted one requested without
-      # `allowAgeRestricted=true`, needs an API key with `assets:download` for its folder.
+      # `ageConfirmed=true`, needs an API key with `assets:download` for its folder.
       def serve(method, relative)
         path, query = relative.split('#', 2).first.split('?', 2)
         segments = path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
@@ -916,7 +916,7 @@ module CalmLens
           return not_available
         end
 
-        opted_in = URI.decode_www_form(query.to_s).to_h['allowAgeRestricted'] == 'true'
+        opted_in = URI.decode_www_form(query.to_s).to_h['ageConfirmed'] == 'true'
         restricted = item['visibility'] != 'public' || (moderation == 'age-restricted' && !opted_in)
         if restricted && !can_download?(item['folderId'])
           return error('asset/api-key-missing-permission',

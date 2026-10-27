@@ -138,7 +138,7 @@ const mockCdn = async (response: ServerResponse, url: URL) => {
   const served = await mockServer.cdn.serve({
     assetIdentifier: route[2] ?? "",
     resource: route[3] as "original" | "rendered" | "placeholder",
-    allowAgeRestricted: url.searchParams.get("allowAgeRestricted") === "true" || undefined,
+    ageConfirmed: url.searchParams.get("ageConfirmed") === "true" || undefined,
   });
   response.writeHead(served.status, {
     "Content-Type": served.headers.get("content-type") ?? "application/octet-stream",

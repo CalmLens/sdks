@@ -119,9 +119,9 @@
       "options": {
         "assetIdentifier": "asset-1",
         "region": "GB",
-        "allowAgeRestricted": true
+        "ageConfirmed": true
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?allowAgeRestricted=true&region=GB"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?ageConfirmed=true&region=GB"
     },
     {
       "options": {
@@ -295,14 +295,14 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "allowAgeRestricted": true
+        "ageConfirmed": true
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?allowAgeRestricted=true"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?ageConfirmed=true"
     },
     {
       "options": {
         "assetIdentifier": "asset-1",
-        "allowAgeRestricted": false
+        "ageConfirmed": false
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered"
     },
@@ -317,9 +317,9 @@
             "width": 320
           }
         },
-        "allowAgeRestricted": true
+        "ageConfirmed": true
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail/width=320?allowAgeRestricted=true"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumbnail/width=320?ageConfirmed=true"
     },
     {
       "options": {
@@ -368,7 +368,7 @@
       "options": {
         "assetIdentifier": "asset-1",
         "resource": "placeholder",
-        "allowAgeRestricted": true
+        "ageConfirmed": true
       },
       "error": "sdk/invalid-argument"
     },

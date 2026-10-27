@@ -804,7 +804,7 @@
       ]
     },
     {
-      "name": "a public age-restricted asset is served without a grant only with allowAgeRestricted",
+      "name": "a public age-restricted asset is served without a grant only with ageConfirmed",
       "mock": {
         "analyzedOutcome": "age-restricted"
       },
@@ -852,7 +852,7 @@
               "$ref": "public.id"
             },
             "resource": "original",
-            "allowAgeRestricted": true
+            "ageConfirmed": true
           },
           "expect": {
             "cdn": {
@@ -889,7 +889,7 @@
               "$ref": "private.id"
             },
             "resource": "original",
-            "allowAgeRestricted": true
+            "ageConfirmed": true
           },
           "expect": {
             "cdn": {

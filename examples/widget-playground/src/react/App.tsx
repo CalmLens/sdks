@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "../playground";
 
 export function App() {
-  const { config, items, canView, multiple } = useSyncExternalStore(
+  const { config, items, ageConfirmed, multiple } = useSyncExternalStore(
     playground.subscribe,
     playground.get,
   );
@@ -31,7 +31,7 @@ export function App() {
                 projectId={config.projectId}
                 assetId={item.assetId}
                 status={item.status}
-                canView={canView}
+                ageConfirmed={ageConfirmed}
                 type={item.type}
                 alt={item.name}
                 aspectRatio={item.aspectRatio}

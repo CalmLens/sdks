@@ -696,7 +696,7 @@
     "options": {
       "assetIdentifier": "asset-1",
       "resource": "placeholder",
-      "allowAgeRestricted": true
+      "ageConfirmed": true
     },
     "error": "sdk/invalid-argument"
   },

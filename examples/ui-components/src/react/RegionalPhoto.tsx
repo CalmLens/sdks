@@ -13,6 +13,6 @@ export function RegionalPhoto({
   ageConfirmed: boolean;
 }) {
   return (
-    <CalmLensMedia asset={asset} region={region} canView={ageConfirmed} alt="Uploaded photo" />
+    <CalmLensMedia asset={asset} region={region} ageConfirmed={ageConfirmed} alt="Uploaded photo" />
   );
 }

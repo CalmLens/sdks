@@ -435,8 +435,8 @@ export class CalmLensUploaderElement extends BaseElement {
 /**
  * `<calmlens-media project-id="…" asset-id="…" status="allowed" alt="…">` shows an asset from the
  * CalmLens CDN with a blurred placeholder while it loads. Age-restricted assets show the
- * placeholder and a reveal button, which dispatches `calmlens-reveal`, until `can-view` is set.
- * Attributes: `project-id`, `asset-id`, `status`, `can-view`, `type`, `resource`, `lens`,
+ * placeholder and a reveal button, which dispatches `calmlens-reveal`, until `age-confirmed` is set.
+ * Attributes: `project-id`, `asset-id`, `status`, `age-confirmed`, `type`, `resource`, `lens`,
  * `transform`, `widths` (comma-separated), `url`, `no-placeholder`, `placeholder-hash`,
  * `placeholder-url`, `average-color`, `cdn-base-url`, `alt`, `aspect-ratio`, `width`, `height`,
  * `sizes`, `fit`, `position`, `eager`, `fetch-priority` and `no-controls`. Set the
@@ -447,7 +447,7 @@ export class CalmLensMediaElement extends BaseElement {
     "project-id",
     "asset-id",
     "status",
-    "can-view",
+    "age-confirmed",
     "type",
     "resource",
     "lens",
@@ -519,7 +519,7 @@ export class CalmLensMediaElement extends BaseElement {
       projectId: this.getAttribute("project-id") ?? undefined,
       assetId: this.getAttribute("asset-id") ?? undefined,
       status: (this.getAttribute("status") as AssetModerationStatus | null) ?? undefined,
-      canView: this.hasAttribute("can-view"),
+      ageConfirmed: this.hasAttribute("age-confirmed"),
       type: (this.getAttribute("type") as MediaOptions["type"] | null) ?? undefined,
       resource: (this.getAttribute("resource") as MediaOptions["resource"] | null) ?? undefined,
       lens: this.getAttribute("lens") ?? undefined,
@@ -542,7 +542,7 @@ export class CalmLensMediaElement extends BaseElement {
     const options = this.#mediaOptions();
     if (!options.projectId || !options.assetId) return;
     const state = getMediaState(options);
-    const loadKey = `${getMediaLoadKey(state)} ${this.getAttribute("alt")} ${this.getAttribute("sizes")} ${options.canView}`;
+    const loadKey = `${getMediaLoadKey(state)} ${this.getAttribute("alt")} ${this.getAttribute("sizes")} ${options.ageConfirmed}`;
     const ratio = getMediaAspectRatio({
       aspectRatio: numberAttribute(this, "aspect-ratio"),
       width: options.width,

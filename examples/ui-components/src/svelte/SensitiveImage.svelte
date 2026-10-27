@@ -5,21 +5,21 @@
     projectId: string;
     assetId: string;
     status: "allowed" | "limited" | "age-restricted";
-    canView: boolean;
+    ageConfirmed: boolean;
     alt: string;
     /** Width divided by height, which you store when the image is uploaded. */
     aspectRatio: number;
     onReveal: () => void;
   };
-  let { projectId, assetId, status, canView, alt, aspectRatio, onReveal }: Props = $props();
+  let { projectId, assetId, status, ageConfirmed, alt, aspectRatio, onReveal }: Props = $props();
 
   const restricted = $derived(status === "age-restricted");
   const asset = $derived({ projectId, assetIdentifier: assetId });
 </script>
 
 <figure class="sensitive" style:aspect-ratio={aspectRatio}>
-  {#if !restricted || canView}
-    <img src={getAssetUrl({ ...asset, allowAgeRestricted: restricted })} {alt} />
+  {#if !restricted || ageConfirmed}
+    <img src={getAssetUrl({ ...asset, ageConfirmed: restricted })} {alt} />
   {:else}
     <img src={getAssetUrl({ ...asset, resource: "placeholder" })} alt="" />
     <figcaption>Sensitive content <button type="button" onclick={onReveal}>View</button></figcaption>

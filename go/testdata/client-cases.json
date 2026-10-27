@@ -16661,7 +16661,7 @@
       ]
     },
     {
-      "name": "cdn.serve sends the lens, transform and allowAgeRestricted, the method and extra headers",
+      "name": "cdn.serve sends the lens, transform and ageConfirmed, the method and extra headers",
       "area": "cdn",
       "client": {
         "cdnBaseUrl": "https://media.example.test/v1/"
@@ -16688,7 +16688,7 @@
                 "width": 320
               }
             },
-            "allowAgeRestricted": true,
+            "ageConfirmed": true,
             "init": {
               "method": "HEAD",
               "headers": {
@@ -16714,10 +16714,10 @@
           "method": "HEAD",
           "origin": "https://media.example.test",
           "path": "/v1/assets/project-1/a%2Fb%20c/rendered/@thumb/width=320",
-          "rawQuery": "allowAgeRestricted=true",
+          "rawQuery": "ageConfirmed=true",
           "query": [
             [
-              "allowAgeRestricted",
+              "ageConfirmed",
               "true"
             ]
           ],

@@ -3,7 +3,7 @@ import "@calmlens/sdk/elements";
 // aspectRatio is width divided by height, which you store when the image is uploaded.
 export function renderPostPhoto(
   container,
-  { projectId, assetId, status, alt, aspectRatio, canView, onReveal },
+  { projectId, assetId, status, alt, aspectRatio, ageConfirmed, onReveal },
 ) {
   const media = document.createElement("calmlens-media");
   media.setAttribute("project-id", projectId);
@@ -13,7 +13,7 @@ export function renderPostPhoto(
   media.setAttribute("aspect-ratio", String(aspectRatio));
   media.setAttribute("widths", "400,800");
   media.setAttribute("sizes", "(min-width: 768px) 50vw, 100vw");
-  media.toggleAttribute("can-view", canView);
+  media.toggleAttribute("age-confirmed", ageConfirmed);
   media.addEventListener("calmlens-reveal", onReveal);
   container.replaceChildren(media);
 }

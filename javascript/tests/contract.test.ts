@@ -382,7 +382,7 @@ const present = async (capability: Capability): Promise<boolean> => {
     case "cdn-option":
       return client.cdn
         .getAssetUrl({ assetIdentifier: "asset-1", [name]: true })
-        .endsWith("?allowAgeRestricted=true");
+        .endsWith("?ageConfirmed=true");
     case "mock-method": {
       const mock = new testing.MockCalmLensServerClient({
         apiKey: testing.createMockApiKey(),

@@ -9,17 +9,17 @@
     alt: string;
     /** Width divided by height, which you store when the image is uploaded. */
     aspectRatio: number;
-    canView: boolean;
+    ageConfirmed: boolean;
     onReveal: () => void;
   };
-  let { projectId, assetId, status, alt, aspectRatio, canView, onReveal }: Props = $props();
+  let { projectId, assetId, status, alt, aspectRatio, ageConfirmed, onReveal }: Props = $props();
 </script>
 
 <CalmLensMedia
   {projectId}
   {assetId}
   {status}
-  {canView}
+  {ageConfirmed}
   {onReveal}
   {alt}
   {aspectRatio}

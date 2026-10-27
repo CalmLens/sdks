@@ -8,7 +8,7 @@ type PostPhotoProps = {
   alt: string;
   /** Width divided by height, which you store when the image is uploaded. */
   aspectRatio: number;
-  canView: boolean;
+  ageConfirmed: boolean;
   onReveal: () => void;
 };
 
@@ -18,7 +18,7 @@ export function PostPhoto({
   status,
   alt,
   aspectRatio,
-  canView,
+  ageConfirmed,
   onReveal,
 }: PostPhotoProps) {
   return (
@@ -26,7 +26,7 @@ export function PostPhoto({
       projectId={projectId}
       assetId={assetId}
       status={status}
-      canView={canView}
+      ageConfirmed={ageConfirmed}
       onReveal={onReveal}
       alt={alt}
       aspectRatio={aspectRatio}

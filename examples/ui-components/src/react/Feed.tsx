@@ -16,7 +16,7 @@ const isShown = (post: Post): post is ShownPost =>
 type FeedProps = {
   projectId: string;
   posts: Post[];
-  viewer: { canViewSensitiveMedia: boolean };
+  viewer: { ageConfirmed: boolean };
   onReveal: () => void;
 };
 
@@ -29,7 +29,7 @@ export function Feed({ projectId, posts, viewer, onReveal }: FeedProps) {
             projectId={projectId}
             assetId={post.assetId}
             status={post.status}
-            canView={viewer.canViewSensitiveMedia}
+            ageConfirmed={viewer.ageConfirmed}
             onReveal={onReveal}
             alt={post.alt}
             aspectRatio={post.aspectRatio}

@@ -216,11 +216,11 @@ CDN `serve` returns a streaming PSR-7 response, including HTTP error responses. 
 URLs let browsers access private content without your API key; `createSignedUrl` takes
 `resource` (`rendered`, the default, or `original`). URL builders accept `resource`
 (`rendered`, the default, `original` or `placeholder`), `lens`, a string or structured
-`transform` and `allowAgeRestricted`. Only `rendered` takes a lens or transform. `placeholder` is a small blurred PNG that the CDN serves for
-public assets whatever their moderation status; it takes no lens, transform or `allowAgeRestricted`.
+`transform` and `ageConfirmed`. Only `rendered` takes a lens or transform. `placeholder` is a small blurred PNG that the CDN serves for
+public assets whatever their moderation status; it takes no lens, transform or `ageConfirmed`.
 
 The CDN treats an `age-restricted` asset like a private one: its plain public URL is
-refused. Pass `'allowAgeRestricted' => true` to append `allowAgeRestricted=true`, so a public
+refused. Pass `'ageConfirmed' => true` to append `ageConfirmed=true`, so a public
 age-restricted asset is served from its public URL. Do that only where your app has
 already decided the viewer may see age-restricted content; otherwise use a signed URL.
 A `limited` asset is delivered exactly like an `allowed` one; it is marked so your app can
@@ -305,7 +305,7 @@ the asset and returns either. Content is kept only with `keepContentAfterProcess
 Like the CDN, the mock refuses blocked, purged and failed assets, and assets whose content
 was removed, with `403` `asset/not-available` whatever the key. The default key has no
 grants, like a real key without `assets:download`, so it also refuses private assets and
-public age-restricted ones requested without `allowAgeRestricted` (`403`
+public age-restricted ones requested without `ageConfirmed` (`403`
 `asset/api-key-missing-permission`). Pass `apiKey: MockServerClient::createApiKey([['actions' =>
 ['assets:download'], 'folderId' => null, 'includeSubfolders' => true]])` to read them; a
 `folderId` limits the grant to that folder, and `setApiKeyGrants($grants)` replaces the

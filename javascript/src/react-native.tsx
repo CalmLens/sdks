@@ -405,7 +405,7 @@ type LoadState = "loading" | "loaded" | "error";
 /**
  * Shows an asset from the CalmLens CDN, at the width in `widths` that covers its measured size,
  * with a blurred placeholder while it loads. Age-restricted assets stay behind the placeholder and
- * a reveal button until `canView` is set; blocked and purged assets show an unavailable notice.
+ * a reveal button until `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
  */
 export function CalmLensMedia(input: CalmLensMediaProps) {
   const {
@@ -413,7 +413,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     projectId,
     assetId,
     status,
-    canView,
+    ageConfirmed,
     type,
     resource,
     lens,
@@ -443,7 +443,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     projectId,
     assetId,
     status,
-    canView,
+    ageConfirmed,
     type,
     resource,
     lens,

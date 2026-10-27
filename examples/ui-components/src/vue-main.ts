@@ -6,7 +6,7 @@ import CommentForm from "./vue/CommentForm.vue";
 import Feed from "./vue/Feed.vue";
 import PhotoUpload from "./vue/PhotoUpload.vue";
 
-const canViewSensitiveMedia = ref(false);
+const ageConfirmed = ref(false);
 createApp({
   render: () =>
     h("main", { style: { maxWidth: "480px" } }, [
@@ -19,9 +19,9 @@ createApp({
       h(Feed, {
         projectId,
         posts,
-        canViewSensitiveMedia: canViewSensitiveMedia.value,
+        ageConfirmed: ageConfirmed.value,
         onReveal: () => {
-          canViewSensitiveMedia.value = true;
+          ageConfirmed.value = true;
         },
       }),
     ]),

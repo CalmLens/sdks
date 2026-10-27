@@ -1937,10 +1937,10 @@ export class MockCalmLensApi {
       return notAvailable();
     }
     // Then access: private assets, and public age-restricted ones requested without
-    // `allowAgeRestricted`, need an API key with `assets:download` for the asset's folder.
+    // `ageConfirmed`, need an API key with `assets:download` for the asset's folder.
     const isPrivate =
       asset.visibility !== "public" ||
-      (status === "age-restricted" && query.get("allowAgeRestricted") !== "true");
+      (status === "age-restricted" && query.get("ageConfirmed") !== "true");
     if (isPrivate && !canDownload()) {
       return this.jsonResponse(
         403,

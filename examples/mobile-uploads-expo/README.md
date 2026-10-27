@@ -78,7 +78,7 @@ digital ID (`ageRangeSource` `TIER_C` or `TIER_D`). Require that where the law a
 age.
 
 This app shows the photo from the phone itself. To show other people's age-restricted uploads
-from the CDN once the check passes, build the URL with `getAssetUrl({ ..., allowAgeRestricted: true })`;
+from the CDN once the check passes, build the URL with `getAssetUrl({ ..., ageConfirmed: true })`;
 the CDN refuses age-restricted assets on plain public URLs. If CalmLens itself must refuse everyone
 your server hasn't approved, have your server return
 [signed URLs](https://calmlens.com/docs/guides/delivering-assets#age-restricted-assets) instead.

@@ -1438,8 +1438,8 @@ final class MockApi {
         || "removed".equals(str(asset.getAsJsonObject("content"), "status")) || stored == null)
       return error(notAvailable);
     // Then access: private assets, and public age-restricted ones requested without
-    // allowAgeRestricted, need an API key with assets:download for the asset's folder.
-    boolean isPrivate = !isPublic || "age-restricted".equals(status) && !"true".equals(request.query().get("allowAgeRestricted"));
+    // ageConfirmed, need an API key with assets:download for the asset's folder.
+    boolean isPrivate = !isPublic || "age-restricted".equals(status) && !"true".equals(request.query().get("ageConfirmed"));
     if (isPrivate && !canDownload(str(asset, "folderId"), apiKey))
       return error(new Failure("asset/api-key-missing-permission", 403, "This API key needs assets:download permission for this asset’s folder."));
     String type = stored.type() == null || stored.type().isEmpty() ? "application/octet-stream" : stored.type();

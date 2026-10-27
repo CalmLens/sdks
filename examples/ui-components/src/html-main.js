@@ -18,11 +18,11 @@ renderAvatar(byId("avatar"), {
   status: "allowed",
   name: "Sam",
 });
-const showFeed = (canViewSensitiveMedia) =>
+const showFeed = (ageConfirmed) =>
   renderFeed(byId("feed"), {
     projectId,
     posts,
-    viewer: { canViewSensitiveMedia },
+    viewer: { ageConfirmed },
     onReveal: () => showFeed(true),
   });
 showFeed(false);

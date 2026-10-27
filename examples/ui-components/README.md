@@ -18,7 +18,7 @@ show these files, so they are type-checked and built here.
 Each library's components are in [`src/react`](src/react), [`src/vue`](src/vue),
 [`src/svelte`](src/svelte) and [`src/html`](src/html). They build CDN URLs with `getAssetUrl` from
 `@calmlens/sdk/app`, which needs no API key. Once your app lets a viewer see sensitive media, the
-sensitive image component adds the `allowAgeRestricted` opt-in to age-restricted images' URLs.
+sensitive image component adds the `ageConfirmed` opt-in to age-restricted images' URLs.
 
 ## Run the demo pages
 

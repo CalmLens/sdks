@@ -1632,7 +1632,7 @@ public final class Models {
     private String resource;
     private String lens;
     private transient Object transform;
-    private Boolean allowAgeRestricted;
+    private Boolean ageConfirmed;
     private String region;
     public CdnRequest region(String value) { region = value; return this; }
     private HttpOptions init;
@@ -1640,7 +1640,7 @@ public final class Models {
     /** @param assetIdentifier an asset ID or external ID */
     public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
     public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code rendered} (default), {@code original} (no lens or transform) or {@code placeholder} (no lens, transform or allowAgeRestricted) @return these options */
+    /** @param value {@code rendered} (default), {@code original} (no lens or transform) or {@code placeholder} (no lens, transform or ageConfirmed) @return these options */
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
@@ -1654,7 +1654,7 @@ public final class Models {
     public CdnRequest transform(List<Transform> value) { transform = value; return this; }
     Object transformValue() { return transform; }
     /**
-     * Adds {@code ?allowAgeRestricted=true} so the CDN serves a public asset whose moderation status is
+     * Adds {@code ?ageConfirmed=true} so the CDN serves a public asset whose moderation status is
      * {@code age-restricted} from its public URL; without it such an asset needs a signed URL or an
      * API key. Set it only where your app has already decided the viewer may see age-restricted
      * content. False or unset adds nothing.
@@ -1662,7 +1662,7 @@ public final class Models {
      * @param value whether to request age-restricted content
      * @return these options
      */
-    public CdnRequest allowAgeRestricted(Boolean value) { allowAgeRestricted = value; return this; }
+    public CdnRequest ageConfirmed(Boolean value) { ageConfirmed = value; return this; }
     /** @param value the request method and extra headers, such as {@code Range} @return these options */
     public CdnRequest init(HttpOptions value) { init = value; return this; }
     HttpOptions initValue() { return init; }

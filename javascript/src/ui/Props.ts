@@ -45,7 +45,7 @@ export interface MediaDisplayOptions {
   messages?: Partial<CalmLensMessages>;
   /**
    * Called when the viewer presses the reveal button on age-restricted media. Run your app's own
-   * check, then render again with `canView`. Without it, the notice has no button.
+   * check, then render again with `ageConfirmed`. Without it, the notice has no button.
    */
   onReveal?: () => void;
 }

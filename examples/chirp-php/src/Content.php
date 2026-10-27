@@ -170,7 +170,7 @@ final class Content
 
     /**
      * What a post's image slot shows. Never builds a content URL for an image that isn't
-     * published. Age-restricted images get the `allowAgeRestricted=true` opt-in only for viewers who
+     * published. Age-restricted images get the `ageConfirmed=true` opt-in only for viewers who
      * turned on "Show sensitive media" (authors included); everyone else gets the placeholder.
      *
      * @return array{url: ?string, placeholderUrl: ?string}
@@ -181,7 +181,7 @@ final class Content
         return match ($image['status'] ?? null) {
             'allowed', 'limited' => ['url' => $this->moderation->imageUrl($image['assetId']), 'placeholderUrl' => null],
             'age-restricted' => ($viewer['showSensitiveMedia'] ?? false)
-                ? ['url' => $this->moderation->imageUrl($image['assetId'], allowAgeRestricted: true), 'placeholderUrl' => null]
+                ? ['url' => $this->moderation->imageUrl($image['assetId'], ageConfirmed: true), 'placeholderUrl' => null]
                 : ['url' => null, 'placeholderUrl' => $this->moderation->placeholderUrl($image['assetId'])],
             default => ['url' => null, 'placeholderUrl' => null],
         };

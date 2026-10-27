@@ -89,7 +89,7 @@ LensType = Literal["image", "video", "audio", "document", "website"]
 #: Which CDN resource of an asset to address. ``rendered`` (the default) is the asset rendered through
 #: a lens or transform; ``original`` is the original file and takes no lens or transform.
 #: ``placeholder`` is a small blurred PNG, public for public assets whatever their moderation status;
-#: it takes no lens, transform or ``allowAgeRestricted``.
+#: it takes no lens, transform or ``ageConfirmed``.
 CdnResource = Literal["original", "rendered", "placeholder"]
 #: How ``assets.search`` matches.
 SearchMode = Literal["keyword", "semantic", "hybrid"]
@@ -1242,10 +1242,10 @@ class AssetUrlOptions(_AssetUrlRequired, total=False):
     resource: CdnResource
     lens: str
     transform: CdnTransform
-    #: Appends ``?allowAgeRestricted=true`` so the public URL serves a public asset whose moderation
+    #: Appends ``?ageConfirmed=true`` so the public URL serves a public asset whose moderation
     #: status is ``age-restricted``. Set it only where your app has already decided the viewer may
     #: see age-restricted content.
-    allowAgeRestricted: bool
+    ageConfirmed: bool
 
 
 class ServeInit(TypedDict, total=False):

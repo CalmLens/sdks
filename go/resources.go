@@ -360,8 +360,8 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Resource == ResourceOriginal && transformed {
 		return "", invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
 	}
-	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil || options.AllowAgeRestricted) {
-		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or allowAgeRestricted")
+	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil || options.AgeConfirmed) {
+		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or ageConfirmed")
 	}
 	asset, err := segment(options.AssetIdentifier)
 	if err != nil {
@@ -389,8 +389,8 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Region != "" {
 		params.Set("region", options.Region)
 	}
-	if options.AllowAgeRestricted {
-		params.Set("allowAgeRestricted", "true")
+	if options.AgeConfirmed {
+		params.Set("ageConfirmed", "true")
 	}
 	if len(params) > 0 {
 		endpoint += "?" + params.Encode()

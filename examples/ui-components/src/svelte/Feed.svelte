@@ -7,7 +7,7 @@
   type Props = {
     projectId: string;
     posts: Post[];
-    viewer: { canViewSensitiveMedia: boolean };
+    viewer: { ageConfirmed: boolean };
     onReveal: () => void;
   };
   let { projectId, posts, viewer, onReveal }: Props = $props();
@@ -23,7 +23,7 @@
         {projectId}
         assetId={post.assetId}
         status={post.status}
-        canView={viewer.canViewSensitiveMedia}
+        ageConfirmed={viewer.ageConfirmed}
         alt={post.alt}
         aspectRatio={post.aspectRatio}
         {onReveal}

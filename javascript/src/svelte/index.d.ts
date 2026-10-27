@@ -30,7 +30,7 @@ export declare const CalmLensUploader: Component<UploaderProps>;
 /**
  * Shows an asset from the CalmLens CDN with responsive widths and a blurred placeholder while
  * it loads. Age-restricted assets stay behind the placeholder and a reveal button until
- * `canView` is set; blocked and purged assets show an unavailable notice.
+ * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
  */
 export declare const CalmLensMedia: Component<MediaProps>;
 

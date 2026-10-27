@@ -6,4 +6,4 @@
   let { asset, region, ageConfirmed }: { asset: Asset; region: string; ageConfirmed: boolean } = $props();
 </script>
 
-<CalmLensMedia {asset} {region} canView={ageConfirmed} alt="Uploaded photo" />
+<CalmLensMedia {asset} {region} ageConfirmed={ageConfirmed} alt="Uploaded photo" />

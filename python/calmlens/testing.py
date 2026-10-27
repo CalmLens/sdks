@@ -1402,9 +1402,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     or asset["content"]["status"] == "removed" or stored is None):
                 return self._failure_response(not_available)
             # Then access: private assets, and public age-restricted ones requested without
-            # ``allowAgeRestricted=true``, need the download permission for the asset's folder.
+            # ``ageConfirmed=true``, need the download permission for the asset's folder.
             private = asset["visibility"] != "public" or (
-                status == "age-restricted" and query.get("allowAgeRestricted") not in (True, "true"))
+                status == "age-restricted" and query.get("ageConfirmed") not in (True, "true"))
             if private and not self._can_download(asset.get("folderId")):
                 return self._failure_response(_Failure(
                     "asset/api-key-missing-permission",

@@ -293,7 +293,7 @@ export const validateSignedUrlOptions = (options: {
  * `resource` is `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or
  * transform, and it serves images in the best format the browser accepts. A
  * placeholder is a small blurred PNG that the CDN serves for public assets whatever their
- * moderation status, so it also takes no `allowAgeRestricted`.
+ * moderation status, so it also takes no `ageConfirmed`.
  */
 export const getAssetUrl = ({
   projectId,
@@ -310,12 +310,12 @@ export const getAssetUrl = ({
   }
   if (
     resource === "placeholder" &&
-    (options.lens !== undefined || options.transform !== undefined || options.allowAgeRestricted)
+    (options.lens !== undefined || options.transform !== undefined || options.ageConfirmed)
   ) {
-    throw invalidArgument("A placeholder takes no lens, transform or allowAgeRestricted");
+    throw invalidArgument("A placeholder takes no lens, transform or ageConfirmed");
   }
-  if (options.allowAgeRestricted !== undefined && typeof options.allowAgeRestricted !== "boolean") {
-    throw invalidArgument("allowAgeRestricted must be true or false");
+  if (options.ageConfirmed !== undefined && typeof options.ageConfirmed !== "boolean") {
+    throw invalidArgument("ageConfirmed must be true or false");
   }
   const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${resource}`;
   return appendCdnSelector(url, options);
@@ -323,20 +323,20 @@ export const getAssetUrl = ({
 
 /**
  * Appends a CDN lens (`/@name`) followed by any direct transform selector to an asset URL, and
- * `?allowAgeRestricted=true` when requested.
+ * `?ageConfirmed=true` when requested.
  */
 export const appendCdnSelector = (
   url: string,
   options: {
     lens?: string;
     transform?: CdnTransform;
-    allowAgeRestricted?: boolean;
+    ageConfirmed?: boolean;
     region?: string;
   },
 ): string => {
   const path = appendCdnPathSelector(url, options);
   const query = new URLSearchParams();
-  if (options.allowAgeRestricted) query.set("allowAgeRestricted", "true");
+  if (options.ageConfirmed) query.set("ageConfirmed", "true");
   if (options.region !== undefined) {
     if (!/^[A-Z]{2}$/.test(options.region) || options.region === "EU")
       throw invalidArgument("region must be a viewer country code");

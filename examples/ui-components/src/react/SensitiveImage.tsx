@@ -4,7 +4,7 @@ type SensitiveImageProps = {
   projectId: string;
   assetId: string;
   status: "allowed" | "limited" | "age-restricted";
-  canView: boolean;
+  ageConfirmed: boolean;
   alt: string;
   /** Width divided by height, which you store when the image is uploaded. */
   aspectRatio: number;
@@ -17,7 +17,7 @@ export function SensitiveImage({
   projectId,
   assetId,
   status,
-  canView,
+  ageConfirmed,
   alt,
   aspectRatio,
   onReveal,
@@ -26,12 +26,8 @@ export function SensitiveImage({
   const asset = { projectId, assetIdentifier: assetId };
   return (
     <figure style={{ aspectRatio, margin: 0, position: "relative" }}>
-      {!restricted || canView ? (
-        <img
-          src={getAssetUrl({ ...asset, allowAgeRestricted: restricted })}
-          alt={alt}
-          style={fill}
-        />
+      {!restricted || ageConfirmed ? (
+        <img src={getAssetUrl({ ...asset, ageConfirmed: restricted })} alt={alt} style={fill} />
       ) : (
         <>
           <img src={getAssetUrl({ ...asset, resource: "placeholder" })} alt="" style={fill} />

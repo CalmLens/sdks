@@ -55,11 +55,16 @@ for (const binding of BINDINGS) {
     });
 
     it("loads an age-restricted image with the opt-in once the viewer may see it", async () => {
-      mounted = binding.mountMedia({ ...asset, status: "age-restricted", canView: true, messages });
+      mounted = binding.mountMedia({
+        ...asset,
+        status: "age-restricted",
+        ageConfirmed: true,
+        messages,
+      });
 
       const image = await view().findByRole("img", { name: asset.alt });
       expect(image.getAttribute("src")).toBe(
-        `${CDN}/assets/${PROJECT_ID}/a1/rendered?allowAgeRestricted=true`,
+        `${CDN}/assets/${PROJECT_ID}/a1/rendered?ageConfirmed=true`,
       );
     });
 
@@ -118,14 +123,14 @@ for (const binding of BINDINGS) {
             image: { thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI", width: 800, height: 600 },
           },
         },
-        canView: true,
+        ageConfirmed: true,
         alt: asset.alt,
         messages,
       });
       const image = await view().findByRole("img", { name: asset.alt });
 
       expect(image.getAttribute("src")).toBe(
-        `${CDN}/assets/${PROJECT_ID}/a1/rendered?allowAgeRestricted=true`,
+        `${CDN}/assets/${PROJECT_ID}/a1/rendered?ageConfirmed=true`,
       );
       if (binding.rendersHtmlImages) expect(image.getAttribute("width")).toBe("800");
       expect(decorative()).toHaveLength(1);

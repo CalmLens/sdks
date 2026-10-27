@@ -3,7 +3,7 @@ import { getAssetUrl } from "@calmlens/sdk/app";
 // aspectRatio is width divided by height, which you store when the image is uploaded.
 export function renderSensitiveImage(
   container,
-  { projectId, assetId, status, canView, alt, aspectRatio, onReveal },
+  { projectId, assetId, status, ageConfirmed, alt, aspectRatio, onReveal },
 ) {
   const restricted = status === "age-restricted";
   const asset = { projectId, assetIdentifier: assetId };
@@ -13,8 +13,8 @@ export function renderSensitiveImage(
   img.style.cssText = "width: 100%; height: 100%; object-fit: cover";
   figure.append(img);
 
-  if (!restricted || canView) {
-    img.src = getAssetUrl({ ...asset, allowAgeRestricted: restricted });
+  if (!restricted || ageConfirmed) {
+    img.src = getAssetUrl({ ...asset, ageConfirmed: restricted });
     img.alt = alt;
   } else {
     img.src = getAssetUrl({ ...asset, resource: "placeholder" });

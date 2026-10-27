@@ -37,13 +37,15 @@ mode.textContent = config.mode === "mock" ? "Mock API" : "Live project";
 mode.dataset.mode = config.mode;
 document.getElementById("mock-help")?.toggleAttribute("hidden", config.mode !== "mock");
 
-const canView = document.getElementById("can-view") as HTMLInputElement;
+const ageConfirmed = document.getElementById("age-confirmed") as HTMLInputElement;
 const multiple = document.getElementById("multiple") as HTMLInputElement;
 playground.subscribe((state) => {
-  canView.checked = state.canView;
+  ageConfirmed.checked = state.ageConfirmed;
   multiple.checked = state.multiple;
 });
-canView.addEventListener("change", () => playground.set({ canView: canView.checked }));
+ageConfirmed.addEventListener("change", () =>
+  playground.set({ ageConfirmed: ageConfirmed.checked }),
+);
 multiple.addEventListener("change", () => playground.set({ multiple: multiple.checked }));
 document.getElementById("clear")?.addEventListener("click", () => playground.set({ items: [] }));
 

@@ -25,7 +25,7 @@ export type PlaygroundState = {
   config: PlaygroundConfig;
   items: GalleryItem[];
   /** Your app's own decision: whether this viewer may see age-restricted media. */
-  canView: boolean;
+  ageConfirmed: boolean;
   multiple: boolean;
 };
 
@@ -36,7 +36,7 @@ if (config.mode === "mock") {
   config.cdnBaseUrl = new URL("/mock-cdn/v1", location.origin).href;
 }
 
-let state: PlaygroundState = { config, items: [], canView: false, multiple: true };
+let state: PlaygroundState = { config, items: [], ageConfirmed: false, multiple: true };
 const listeners = new Set<(state: PlaygroundState) => void>();
 
 export const playground = {
@@ -78,7 +78,7 @@ export const playground = {
   },
   /** Your app's age check would run here; the playground just asks. */
   reveal() {
-    if (confirm("Show sensitive media to this viewer?")) playground.set({ canView: true });
+    if (confirm("Show sensitive media to this viewer?")) playground.set({ ageConfirmed: true });
   },
 };
 

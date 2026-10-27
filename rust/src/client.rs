@@ -1440,8 +1440,8 @@ impl TextClient<'_> {
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
     /// The CDN URL of an asset's rendered (default), original or placeholder resource, with
-    /// `?allowAgeRestricted=true` when [`CdnRequest::allow_age_restricted`] is `Some(true)`. Only the
-    /// rendered resource takes a lens or transform; a placeholder also takes no `allow_age_restricted`.
+    /// `?ageConfirmed=true` when [`CdnRequest::age_confirmed`] is `Some(true)`. Only the
+    /// rendered resource takes a lens or transform; a placeholder also takes no `age_confirmed`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource
@@ -1458,10 +1458,10 @@ impl CdnClient<'_> {
                 "Lenses and transforms apply only to the rendered resource",
             ));
         }
-        if resource == "placeholder" && (transformed || options.allow_age_restricted == Some(true))
+        if resource == "placeholder" && (transformed || options.age_confirmed == Some(true))
         {
             return Err(invalid_argument(
-                "A placeholder takes no lens, transform or allowAgeRestricted",
+                "A placeholder takes no lens, transform or ageConfirmed",
             ));
         }
         let config = &self.0.inner.config;
@@ -1483,8 +1483,8 @@ impl CdnClient<'_> {
             }
         }
         let mut query = Query::default();
-        if options.allow_age_restricted == Some(true) {
-            query.push("allowAgeRestricted", "true");
+        if options.age_confirmed == Some(true) {
+            query.push("ageConfirmed", "true");
         }
         query.opt("region", options.region.as_ref());
         if !query.0.is_empty() {

@@ -352,7 +352,7 @@ type LoadState = "loading" | "loaded" | "error";
 /**
  * Shows an asset from the CalmLens CDN with responsive widths and a blurred placeholder while
  * it loads. Age-restricted assets stay behind the placeholder and a reveal button until
- * `canView` is set; blocked and purged assets show an unavailable notice.
+ * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
  */
 export const CalmLensMedia = defineComponent({
   name: "CalmLensMedia",
@@ -364,7 +364,7 @@ export const CalmLensMedia = defineComponent({
     /** Required without `asset`. */
     assetId: optional(String),
     status: optional(String as PropType<AssetModerationStatus>),
-    canView: { type: Boolean, default: false },
+    ageConfirmed: { type: Boolean, default: false },
     type: optional(String as PropType<"image" | "video" | "audio">),
     resource: optional(String as PropType<"original" | "rendered">),
     lens: optional(String),

@@ -1502,9 +1502,9 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * Builds the CDN URL of an asset's {@code rendered} (default), {@code original} or {@code placeholder}
-     * resource, with {@code ?allowAgeRestricted=true} when {@link Models.CdnRequest#allowAgeRestricted(Boolean)}
+     * resource, with {@code ?ageConfirmed=true} when {@link Models.CdnRequest#ageConfirmed(Boolean)}
      * is true. Only the rendered resource takes a lens or transform. A placeholder is a small blurred PNG,
-     * public for public assets whatever their moderation status; it takes no {@code allowAgeRestricted} either.
+     * public for public assets whatever their moderation status; it takes no {@code ageConfirmed} either.
      *
      * @param options the asset and selector
      * @return the URL
@@ -1517,15 +1517,15 @@ public final class CalmLensServerClient implements AutoCloseable {
       boolean transformed = o.has("lens") && !o.get("lens").isJsonNull() || transform != null;
       if (resource.equals("original") && transformed) throw argument("Lenses and transforms apply only to the rendered resource");
       if (resource.equals("placeholder") && (transformed
-          || o.has("allowAgeRestricted") && !o.get("allowAgeRestricted").isJsonNull() && o.get("allowAgeRestricted").getAsBoolean())) {
-        throw argument("A placeholder takes no lens, transform or allowAgeRestricted");
+          || o.has("ageConfirmed") && !o.get("ageConfirmed").isJsonNull() && o.get("ageConfirmed").getAsBoolean())) {
+        throw argument("A placeholder takes no lens, transform or ageConfirmed");
       }
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
       if (o.has("lens") && !o.get("lens").isJsonNull()) url += "/@" + id(o.get("lens").getAsString());
       if (transform instanceof String text) { if (!text.isEmpty()) url += "/" + transformPath(text); }
       // A serialized selector is already path-safe: unreserved characters, escapes, "=", "," and "/".
       else if (transform != null) url += "/" + serializeTransform(transform);
-      if (o.has("allowAgeRestricted") && !o.get("allowAgeRestricted").isJsonNull() && o.get("allowAgeRestricted").getAsBoolean()) url += "?allowAgeRestricted=true";
+      if (o.has("ageConfirmed") && !o.get("ageConfirmed").isJsonNull() && o.get("ageConfirmed").getAsBoolean()) url += "?ageConfirmed=true";
       if (o.has("region") && !o.get("region").isJsonNull()) url += (url.contains("?") ? "&" : "?") + "region=" + encodeComponent(o.get("region").getAsString());
       return url;
     }

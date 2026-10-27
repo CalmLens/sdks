@@ -27,7 +27,7 @@
           projectId={$playground.config.projectId}
           assetId={item.assetId}
           status={item.status}
-          canView={$playground.canView}
+          ageConfirmed={$playground.ageConfirmed}
           type={item.type}
           alt={item.name}
           aspectRatio={item.aspectRatio}

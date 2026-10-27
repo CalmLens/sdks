@@ -876,7 +876,7 @@ const (
 	// TransformSteps, or its default rendition when none is given.
 	ResourceRendered = "rendered"
 	// ResourcePlaceholder is a small blurred PNG, public for public assets whatever their
-	// moderation status. It takes no Lens, Transform, TransformSteps or AllowAgeRestricted.
+	// moderation status. It takes no Lens, Transform, TransformSteps or AgeConfirmed.
 	ResourcePlaceholder = "placeholder"
 )
 
@@ -1148,11 +1148,11 @@ type CDNAssetURLOptions struct {
 	Lens            string
 	Transform       string
 	TransformSteps  []LensTransform
-	// AllowAgeRestricted appends ?allowAgeRestricted=true, which the CDN requires before it serves a public
+	// AgeConfirmed appends ?ageConfirmed=true, which the CDN requires before it serves a public
 	// asset whose moderation status is age-restricted from its public URL (without it, such an
 	// asset needs a signed URL or an API key). Set it only where your app has already decided the
 	// viewer may see age-restricted content.
-	AllowAgeRestricted bool
+	AgeConfirmed bool
 }
 
 // CDNServeOptions fetches CDN content with an optional method and extra headers (such as

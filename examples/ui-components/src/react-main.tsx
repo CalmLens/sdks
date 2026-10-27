@@ -7,7 +7,7 @@ import { Feed } from "./react/Feed";
 import { PhotoUpload } from "./react/PhotoUpload";
 
 function App() {
-  const [canViewSensitiveMedia, setCanView] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   return (
     <main style={{ maxWidth: 480 }}>
       <PhotoUpload onUploaded={(upload: unknown) => show("Uploaded", upload)} />
@@ -16,8 +16,8 @@ function App() {
       <Feed
         projectId={projectId}
         posts={posts}
-        viewer={{ canViewSensitiveMedia }}
-        onReveal={() => setCanView(true)}
+        viewer={{ ageConfirmed }}
+        onReveal={() => setAgeConfirmed(true)}
       />
     </main>
   );

@@ -16,7 +16,7 @@ are moderated before anyone else sees them.
   - `age-restricted`: shown as the CDN's blurred `/placeholder` image behind a **Sensitive
     content** warning, unless the viewer turned on **Show sensitive media** on their profile
     (after confirming they are 18 or older). Then the image is the CDN URL with
-    `allowAgeRestricted=true`.
+    `ageConfirmed=true`.
   - `blocked` or `purged`: the post leaves the timeline and profiles. Its author still sees it,
     with the reason.
   - Failed processing (`asset.failed`): only the author sees the post, with a note to try again.
@@ -57,7 +57,7 @@ header. The live code path never loads it. It is not a moderation model:
   same handler live mode uses. The page reloads itself while your image is pending.
 - Demo images are served from `/demo-cdn/v1/…` by the mock CDN acting as a browser without an
   API key: it refuses `blocked` assets and age-restricted ones requested without
-  `allowAgeRestricted=true`, like the real CDN. Its placeholder is the image shrunk to a few pixels.
+  `ageConfirmed=true`, like the real CDN. Its placeholder is the image shrunk to a few pixels.
 
 ## Live mode
 

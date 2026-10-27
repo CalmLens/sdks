@@ -151,7 +151,7 @@ for anything still pending.
       webhook: asset.allowed, asset.blocked, …   or poll: assets.retrieve
                             └──────── allowed, limited → show in feed via CDN lens URL
                                       age-restricted → show in feed: the lens URL with
-                                        allowAgeRestricted=true if the viewer opted in, otherwise
+                                        ageConfirmed=true if the viewer opted in, otherwise
                                         the /placeholder image and a notice
                                       blocked, purged → author sees "not published" notice
 ```
@@ -166,7 +166,7 @@ and a reviewer can change it later. The app only needs one field:
 | --- | --- |
 | `allowed` | Publish |
 | `limited` | Publish, like `allowed`. The CDN serves it on the plain URL; the status only marks it so an app can reduce its reach, for example by keeping it out of recommendations |
-| `age-restricted` | Publish behind a placeholder. The CDN refuses the plain URL, so viewers who turned on **Show sensitive media** get the URL with `allowAgeRestricted=true`; everyone else, including signed-out visitors and the author with the setting off, gets the asset's blurred `/placeholder` image and a "Sensitive content" notice. The author also sees the status |
+| `age-restricted` | Publish behind a placeholder. The CDN refuses the plain URL, so viewers who turned on **Show sensitive media** get the URL with `ageConfirmed=true`; everyone else, including signed-out visitors and the author with the setting off, gets the asset's blurred `/placeholder` image and a "Sensitive content" notice. The author also sees the status |
 | `blocked` | Don't publish; tell the author which category matched (from `classification.moderation`) |
 | `purged` | As `blocked`. CalmLens has also deleted the stored content |
 | `pending` | Show only to the author with a "Checking…" placeholder |
@@ -188,7 +188,7 @@ like any other text that isn't `allowed` or `limited`.
 | [`src/index.tsx`](src/index.tsx) | Routes, including the upload token endpoint, the webhook handler (signature check on the raw body, idempotent by event ID) and the moderation queue |
 | [`src/sandbox.ts`](src/sandbox.ts) | The public demo's per-visitor storage and 24-hour cleanup |
 | [`src/budget.ts`](src/budget.ts) | The public demo's daily CalmLens budget |
-| [`src/moderation/demo.ts`](src/moderation/demo.ts) | The demo-mode simulator, including its stand-ins for the CDN's `allowAgeRestricted=true` opt-in and blurred `/placeholder` image |
+| [`src/moderation/demo.ts`](src/moderation/demo.ts) | The demo-mode simulator, including its stand-ins for the CDN's `ageConfirmed=true` opt-in and blurred `/placeholder` image |
 
 ### Things worth copying
 
@@ -205,7 +205,7 @@ like any other text that isn't `allowed` or `limited`.
   they are still pending, so Calmgram never sends an image URL to a browser until CalmLens has
   allowed or age-restricted it, and it uses CalmLens's random asset ID in URLs rather than its own
   (guessable) post IDs.
-- **Age-restricted photos opt in on the URL** (`cdn.getAssetUrl({ ..., allowAgeRestricted: true })`),
+- **Age-restricted photos opt in on the URL** (`cdn.getAssetUrl({ ..., ageConfirmed: true })`),
   and only for viewers whose setting allows it (`postMediaFor` in `src/content.ts`). An opted-in
   URL works for anyone who has it, so if you need CalmLens itself to refuse everyone else, issue
   short-lived signed URLs from your backend instead (see

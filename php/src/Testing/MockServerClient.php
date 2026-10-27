@@ -40,7 +40,7 @@ use Psr\Http\Message\ResponseInterface;
  * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
  * Then access: a private asset, or a public age-restricted one requested without the
- * `allowAgeRestricted` URL option, needs an `assets:download` grant for its folder. The default
+ * `ageConfirmed` URL option, needs an `assets:download` grant for its folder. The default
  * key has no grants, like a real key without `assets:download`; pass an `apiKey` from
  * `createApiKey()`, or call `setApiKeyGrants()`, to grant downloads.
  *
@@ -1411,8 +1411,8 @@ final class MockServerClient
             return $notAvailable();
         }
         // Age-restricted assets are delivered like private ones, unless a public one is requested
-        // with `allowAgeRestricted=true`.
-        $private = $asset['visibility'] !== 'public' || ($status === 'age-restricted' && ($query['allowAgeRestricted'] ?? null) !== 'true');
+        // with `ageConfirmed=true`.
+        $private = $asset['visibility'] !== 'public' || ($status === 'age-restricted' && ($query['ageConfirmed'] ?? null) !== 'true');
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
             return $this->json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'This API key needs assets:download permission for this asset’s folder.']);
         }

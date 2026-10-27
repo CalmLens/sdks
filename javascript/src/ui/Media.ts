@@ -62,7 +62,7 @@ export interface MediaSettings {
    * Whether your app lets this viewer see age-restricted media. Without it, age-restricted
    * assets show their blurred placeholder and a reveal button.
    */
-  canView?: boolean;
+  ageConfirmed?: boolean;
   /** `image` (default), `video` or `audio`. */
   type?: "image" | "video" | "audio";
   /**
@@ -226,7 +226,7 @@ const buildMediaState = ({
   assetId,
   status = "allowed",
   contentRemoved = false,
-  canView = false,
+  ageConfirmed = false,
   type = "image",
   resource = "rendered",
   lens,
@@ -249,7 +249,7 @@ const buildMediaState = ({
       (url || type !== "image" ? undefined : getAssetUrl({ ...asset, resource: "placeholder" })))
     : undefined;
   const restricted = status === "age-restricted";
-  if (restricted && !canView) return { kind: "gated", placeholderUrl };
+  if (restricted && !ageConfirmed) return { kind: "gated", placeholderUrl };
 
   const build = (options: { resource?: "original" | "rendered"; extra?: LensTransform } = {}) => {
     const chosen = options.resource ?? resource;
@@ -260,7 +260,7 @@ const buildMediaState = ({
       resource: chosen,
       lens: rendered ? lens : undefined,
       transform: rendered ? joinTransforms(transform, options.extra) : undefined,
-      allowAgeRestricted: restricted || undefined,
+      ageConfirmed: restricted || undefined,
     });
   };
 

@@ -9,7 +9,7 @@ export function renderFeed(list, { projectId, posts, viewer, onReveal }) {
         projectId,
         assetId: post.assetId,
         status: post.status,
-        canView: viewer.canViewSensitiveMedia,
+        ageConfirmed: viewer.ageConfirmed,
         alt: post.alt,
         aspectRatio: post.aspectRatio,
         onReveal,

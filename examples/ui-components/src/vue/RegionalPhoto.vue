@@ -7,5 +7,5 @@ defineProps<{ asset: Asset; region: string; ageConfirmed: boolean }>();
 </script>
 
 <template>
-  <CalmLensMedia :asset="asset" :region="region" :can-view="ageConfirmed" alt="Uploaded photo" />
+  <CalmLensMedia :asset="asset" :region="region" :age-confirmed="ageConfirmed" alt="Uploaded photo" />
 </template>

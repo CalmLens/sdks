@@ -346,11 +346,11 @@ text regions OCR found when the image was processed, before any other option app
 (after retrying retryable ones, see [Retries](#retries)); check `response.ok` and close it. Use signed URLs for private CDN delivery in browsers.
 
 A public asset whose moderation status is `age-restricted` is served from its public URL only
-with `allow_age_restricted=True` (`?allowAgeRestricted=true`); otherwise it needs a signed URL or an API
+with `age_confirmed=True` (`?ageConfirmed=true`); otherwise it needs a signed URL or an API
 key. Set it only where your app has already decided the viewer may see age-restricted content:
 
 ```python
-client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", allow_age_restricted=True)
+client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", age_confirmed=True)
 ```
 
 ## Webhooks
@@ -541,7 +541,7 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   (seed them through `database_storage`; the mock computes no hashes) and raises
   `hash-list/asset-not-hashed` without one. Uploads are not matched against the lists.
   `cdn.serve` serves a `limited` asset like an `allowed` one, and treats an `age-restricted` asset like a private one: it needs the
-  `assets:download` permission, unless a public one is requested with `allow_age_restricted=True`.
+  `assets:download` permission, unless a public one is requested with `age_confirmed=True`.
 - Like the API, content is `stored` when `processingOptions.keepContentAfterProcessing` is
   `True`; otherwise it is `temporary` and is removed (`removalReason` `retention`) once
   classification is `completed`, after which `cdn.serve` answers 403 `asset/not-available`. Pass
@@ -577,7 +577,7 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   event with `decided-by: reviewer`, `asset-type`, `asset-name` and `note` facts.
 - `cdn.serve` answers like the CDN: blocked, purged and failed assets and removed content get
   `403` `asset/not-available` whatever the key; private assets, and public age-restricted ones
-  requested without `allowAgeRestricted`, get `403` `asset/api-key-missing-permission` unless the
+  requested without `ageConfirmed`, get `403` `asset/api-key-missing-permission` unless the
   key has `assets:download` (the default key has no grants). Served content has `Cache-Control`
   as the CDN sets it: `public` only when anyone may see the asset, otherwise `private`, with
   `max-age=31536000, immutable` for images and `max-age=3600` for other content. It also carries

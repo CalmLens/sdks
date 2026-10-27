@@ -54,7 +54,7 @@ who is asking and passes the ID of the record being created as `externalId`; see
 | [`server/playground-server.ts`](server/playground-server.ts) | Token signing and the mock API and CDN                                     |
 
 "Viewer may see sensitive media" stands in for your app's own age check: off, age-restricted
-images stay behind the blurred placeholder; on, they load with the `allowAgeRestricted` opt-in.
+images stay behind the blurred placeholder; on, they load with the `ageConfirmed` opt-in.
 
 ## Check
 

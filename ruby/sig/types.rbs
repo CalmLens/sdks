@@ -774,14 +774,14 @@ module CalmLens
     # The asset ID or external ID.
     asset_identifier: String,
     # `rendered` is the default. `original` takes no lens or transform; `placeholder` is a small blurred PNG
-    # and takes no lens, transform or allow_age_restricted.
+    # and takes no lens, transform or age_confirmed.
     ?resource: "original" | "rendered" | "placeholder",
     # A lens runs before any additional transforms.
     ?lens: String,
     ?transform: transform_input,
-    # Appends `?allowAgeRestricted=true`, so a public `age-restricted` asset is served from this URL. Set it
+    # Appends `?ageConfirmed=true`, so a public `age-restricted` asset is served from this URL. Set it
     # only where your app has already decided the viewer may see age-restricted content.
-    ?allow_age_restricted: bool?
+    ?age_confirmed: bool?
   }
   type serve_options = {
     ?region: String,
@@ -789,7 +789,7 @@ module CalmLens
     ?resource: "original" | "rendered" | "placeholder",
     ?lens: String,
     ?transform: transform_input,
-    ?allow_age_restricted: bool?,
+    ?age_confirmed: bool?,
     ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] },
     ?request_options: request_options
   }

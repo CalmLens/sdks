@@ -9,7 +9,7 @@ defineProps<{
   alt: string;
   /** Width divided by height, which you store when the image is uploaded. */
   aspectRatio: number;
-  canView: boolean;
+  ageConfirmed: boolean;
 }>();
 const emit = defineEmits<{ reveal: [] }>();
 </script>
@@ -19,7 +19,7 @@ const emit = defineEmits<{ reveal: [] }>();
     :project-id="projectId"
     :asset-id="assetId"
     :status="status"
-    :can-view="canView"
+    :age-confirmed="ageConfirmed"
     :alt="alt"
     :aspect-ratio="aspectRatio"
     :widths="[400, 800]"
