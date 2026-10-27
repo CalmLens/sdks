@@ -643,7 +643,10 @@
     "name": "batch with an empty asset ID",
     "operation": "assets.batch",
     "options": {
-      "assetIds": ["asset-1", ""],
+      "assetIds": [
+        "asset-1",
+        ""
+      ],
       "operation": "delete"
     },
     "error": "sdk/invalid-argument"
@@ -652,7 +655,9 @@
     "name": "batch with an unknown operation",
     "operation": "assets.batch",
     "options": {
-      "assetIds": ["asset-1"],
+      "assetIds": [
+        "asset-1"
+      ],
       "operation": "purge"
     },
     "error": "sdk/invalid-argument"
