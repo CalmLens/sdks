@@ -33,7 +33,7 @@ const fetchUploadToken = async (): Promise<string> => {
  * token, which its status checks reuse. Photos are checked after they're stored, so the queue
  * checks each one until CalmLens decides, for up to a minute.
  */
-export const uploadOptions: UploadControllerOptions = {
+export const uploadOptions: UploadControllerOptions<PickedPhoto> = {
   uploadPresetId,
   token: fetchUploadToken,
   // Only set for a local backend. Leave it unset to use https://api.calmlens.com/v1.

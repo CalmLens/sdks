@@ -8,11 +8,8 @@ export interface PickedPhoto extends UploadFile {
   pickedAt: number;
 }
 
-/** The photo an upload in the queue is sending. */
-export const photoOf = (upload: UploadItem) => upload.file as PickedPhoto;
-
 /** Whether the photo still needs an answer from CalmLens. */
-export const isBusy = (upload: UploadItem) =>
+export const isBusy = (upload: UploadItem<PickedPhoto>) =>
   upload.stage === "selected" ||
   upload.stage === "queued" ||
   upload.stage === "uploading" ||
@@ -24,7 +21,7 @@ export const isBusy = (upload: UploadItem) =>
  * `pending` once the queue stops checking is `stalled`, and `retry` checks it again.
  */
 export const getOutcome = (
-  upload: UploadItem,
+  upload: UploadItem<PickedPhoto>,
 ):
   | "busy"
   | "shared"

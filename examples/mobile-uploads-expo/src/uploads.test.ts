@@ -1,13 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import type { UploadItem } from "@calmlens/sdk/react-native";
-import { getOutcome, isBusy } from "./uploads";
+import { getOutcome, isBusy, type PickedPhoto } from "./uploads";
 
-const item = (changes: Partial<UploadItem>): UploadItem => ({
+const item = (changes: Partial<UploadItem<PickedPhoto>>): UploadItem<PickedPhoto> => ({
   key: "upload-1",
   file: {
+    uri: "file:///lake.jpg",
     name: "lake.jpg",
     type: "image/jpeg",
     size: 3,
+    width: 1000,
+    height: 750,
+    pickedAt: 1,
     arrayBuffer: async () => new ArrayBuffer(3),
   },
   stage: "complete",

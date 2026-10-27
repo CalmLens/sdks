@@ -13,7 +13,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { type AgeCheck, requestAgeCheck } from "./src/ageCheck";
 import { describeError, isConfigured, pickPhoto, uploadOptions } from "./src/calmlens";
-import { getOutcome, isBusy, photoOf } from "./src/uploads";
+import { getOutcome, isBusy, type PickedPhoto } from "./src/uploads";
 
 const colors = {
   page: "#f7f7f5",
@@ -139,7 +139,7 @@ export default function App() {
  * Whether the photo is covered: refused photos never show, and age-restricted ones stay hidden
  * until the person shares an age range of 18 or older.
  */
-const isHidden = (upload: UploadItem, ageCheck: AgeCheck | undefined) => {
+const isHidden = (upload: UploadItem<PickedPhoto>, ageCheck: AgeCheck | undefined) => {
   const outcome = getOutcome(upload);
   return outcome === "refused" || (outcome === "age-restricted" && ageCheck?.result !== "adult");
 };
@@ -152,14 +152,14 @@ function Featured({
   onRetry,
   onChooseAnother,
 }: {
-  upload: UploadItem;
+  upload: UploadItem<PickedPhoto>;
   ageCheck: AgeCheck | undefined;
   checkingAge: boolean;
   onCheckAge: () => void;
   onRetry: () => void;
   onChooseAnother: () => void;
 }) {
-  const photo = photoOf(upload);
+  const photo = upload.file;
   const { width, height } = photo;
   // Portrait photos up to 4:5 and landscape ones up to 16:9 keep their shape.
   const aspectRatio = width && height ? Math.min(Math.max(width / height, 4 / 5), 16 / 9) : 1;
@@ -198,7 +198,7 @@ function Status({
   onRetry,
   onChooseAnother,
 }: {
-  upload: UploadItem;
+  upload: UploadItem<PickedPhoto>;
   ageCheck: AgeCheck | undefined;
   checkingAge: boolean;
   onCheckAge: () => void;
@@ -395,13 +395,13 @@ function RecentRow({
   hidden,
   onPress,
 }: {
-  upload: UploadItem;
+  upload: UploadItem<PickedPhoto>;
   selected: boolean;
   first: boolean;
   hidden: boolean;
   onPress: () => void;
 }) {
-  const photo = photoOf(upload);
+  const photo = upload.file;
   const label =
     upload.stage === "queued" || upload.stage === "uploading"
       ? { text: "Uploading", hint: "Sending your photo", tone: "neutral" as const }
