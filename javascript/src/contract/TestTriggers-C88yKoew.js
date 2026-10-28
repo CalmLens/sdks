@@ -1,11 +1,11 @@
-import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, s as updatedAt } from "./Ids-4lJ3KFur.js";
-import "./SharedConstants-D8IkEaRj.js";
-import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-DnLGy4R4.js";
+import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, s as updatedAt } from "./Ids-aHyP9ZcF.js";
+import "./SharedConstants-CyiUWW66.js";
+import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
 import * as zod from "zod";
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/DocMetaTypes.ts
+// packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/ZodUtils.ts
+// packages/shared/src/ZodUtils.ts
 const createdAtField = () => zod.number().int().meta({ examples: [17672256e5] });
 const updatedAtField = () => zod.number().int().optional().meta({
 	...metaStore([updatedAt()]),
@@ -127,7 +127,7 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
 	}
 };
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/ModerationPolicyDimensions.ts
+// packages/shared/src/ModerationPolicyDimensions.ts
 const MODERATION_QUALIFIER_INFO = {
 	"sexual-pornographic-media": {
 		category: "sexual",
@@ -554,6 +554,14 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "The author wishes or hopes that a real person or group suffers non-severe physical harm, such as falling ill or catching a disease, even a serious one such as cancer, feeling pain or having a minor accident, without threatening it, planning it or calling on anyone to cause it.",
 		exclusions: "Wishes that someone dies, is killed, attacked, seriously or permanently injured or sexually assaulted; threats, plans, requests or encouragement for others to cause harm; figurative curses such as telling someone to go choke on something; wishes of non-physical misfortune alone, such as losing a job or an election."
 	},
+	"violence-coded-incitement": {
+		category: "violence",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Indirect coded incitement",
+		description: "The author indirectly incites physical violence through coded language or an allusion whose harmful meaning is supported by the supplied context, without an explicit threat, concrete plan, direct harmful request or actionable instructions in that instance.",
+		exclusions: "A name, meme, ambiguous allusion or figure of speech without supported violent meaning; neutral reporting or condemnation; an explicit threat, concrete plan, direct harmful request or actionable instructions, even when disguised with euphemisms or censored spelling. A separate explicit harmful instance is assessed independently."
+	},
 	"violence-extremism": {
 		category: "violence",
 		kind: "harm",
@@ -977,6 +985,14 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "The author recruits for, endorses or promotes a concrete criminal or seriously dangerous act.",
 		exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
 	},
+	"criminal-activity-coded-incitement": {
+		category: "criminal-activity",
+		kind: "harm",
+		harmOption: false,
+		displayName: "Indirect coded incitement",
+		description: "The author indirectly incites a concrete violent or seriously dangerous criminal act through coded language or an allusion whose harmful meaning is supported by the supplied context, without an explicit threat, concrete plan, direct harmful request or actionable instructions in that instance.",
+		exclusions: "An absent offence, ambiguous allusion, bare wish or neutral report; lawful advocacy; an explicit threat, concrete plan, direct harmful request or actionable instructions, even when disguised with euphemisms or censored spelling. A separate explicit harmful instance is assessed independently."
+	},
 	"criminal-activity-substances": {
 		category: "criminal-activity",
 		kind: "harm",
@@ -1095,7 +1111,7 @@ function getModerationQualifierInfo(qualifier) {
 	return MODERATION_QUALIFIER_INFO[qualifier];
 }
 const getModerationQualifiers = (category) => MODERATION_QUALIFIERS_BY_CATEGORY[category] ?? [];
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/PolicyRule.ts
+// packages/shared/src/PolicyRule.ts
 /**
 * What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
 * reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
@@ -1125,7 +1141,7 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/TestRegionalActions.ts
+// packages/shared/src/TestRegionalActions.ts
 /** Authenticated test inputs can add regional delivery restrictions without inventing evidence. */
 const TEST_REGIONAL_ACTIONS_SCHEMA = zod.array(zod.object({
 	region: JURISDICTION_SCHEMA.exclude(["global"]),
@@ -1135,7 +1151,7 @@ const TEST_REGIONAL_ACTIONS_SCHEMA = zod.array(zod.object({
 		"block"
 	])
 }).strict()).max(7).refine((entries) => new Set(entries.map((entry) => entry.region)).size === entries.length, "Choose each region once");
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/ProcessingFeatures.ts
+// packages/shared/src/ProcessingFeatures.ts
 /**
 * Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
 * the single source for the request and result schemas, cache keys and metering. Features are
@@ -1471,7 +1487,7 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched."),
 	policy: CLASSIFICATION_REPORT_POLICY_SCHEMA.optional().describe("What the project's moderation policy made of this report when the asset was decided. Absent until then.")
 }).strict();
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/TestTriggers.ts
+// packages/shared/src/TestTriggers.ts
 /** A project's test input key: 32 hexadecimal characters only its members can see. */
 const TEST_INPUT_KEY_PATTERN = /^[a-f0-9]{32}$/;
 const TEXT_CODE_SIGNALS = [

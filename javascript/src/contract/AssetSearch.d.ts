@@ -145,6 +145,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -254,6 +255,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -316,6 +318,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -425,6 +428,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -483,6 +487,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -592,6 +597,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -655,6 +661,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -764,6 +771,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -826,6 +834,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -935,6 +944,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -993,6 +1003,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1102,6 +1113,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -1165,6 +1177,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1274,6 +1287,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -1336,6 +1350,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1445,6 +1460,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -1503,6 +1519,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1612,6 +1629,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -1675,6 +1693,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1784,6 +1803,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -1846,6 +1866,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1955,6 +1976,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -2013,6 +2035,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2122,6 +2145,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -2185,6 +2209,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2294,6 +2319,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -2356,6 +2382,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2465,6 +2492,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -2523,6 +2551,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2632,6 +2661,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -2695,6 +2725,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2804,6 +2835,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -2866,6 +2898,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2975,6 +3008,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -3033,6 +3067,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3142,6 +3177,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -3205,6 +3241,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3314,6 +3351,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -3376,6 +3414,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3485,6 +3524,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -3543,6 +3583,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3652,6 +3693,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -3715,6 +3757,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3824,6 +3867,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -3886,6 +3930,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             score: zod.ZodNumber;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3995,6 +4040,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -4053,6 +4099,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }>;
             qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
               "criminal-activity-alcohol": "criminal-activity-alcohol";
+              "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
               "criminal-activity-csam": "criminal-activity-csam";
               "criminal-activity-demonstration": "criminal-activity-demonstration";
               "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4162,6 +4209,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               "sexual-support-prevention": "sexual-support-prevention";
               "sexual-text": "sexual-text";
               "violence-attack": "violence-attack";
+              "violence-coded-incitement": "violence-coded-incitement";
               "violence-decapitation-act": "violence-decapitation-act";
               "violence-discussion": "violence-discussion";
               "violence-documentary": "violence-documentary";
@@ -4242,6 +4290,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4351,6 +4400,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -4413,6 +4463,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4522,6 +4573,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -4580,6 +4632,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4689,6 +4742,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -4752,6 +4806,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4861,6 +4916,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -4923,6 +4979,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5032,6 +5089,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -5090,6 +5148,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5199,6 +5258,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -5262,6 +5322,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5371,6 +5432,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -5433,6 +5495,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5542,6 +5605,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -5600,6 +5664,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5709,6 +5774,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -5772,6 +5838,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5881,6 +5948,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -5943,6 +6011,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -6052,6 +6121,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -6110,6 +6180,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -6219,6 +6290,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -6282,6 +6354,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -6391,6 +6464,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -6453,6 +6527,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -6562,6 +6637,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -6620,6 +6696,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -6729,6 +6806,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -6792,6 +6870,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -6901,6 +6980,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -6963,6 +7043,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -7072,6 +7153,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -7130,6 +7212,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -7239,6 +7322,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -7302,6 +7386,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -7411,6 +7496,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -7473,6 +7559,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -7582,6 +7669,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -7640,6 +7728,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -7749,6 +7838,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -7812,6 +7902,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -7921,6 +8012,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -7983,6 +8075,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 score: zod.ZodNumber;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -8092,6 +8185,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -8150,6 +8244,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 }>;
                 qualifiers: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -8259,6 +8354,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -8361,6 +8457,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 name: zod.ZodOptional<zod.ZodString>;
                 when: zod.ZodArray<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -8470,6 +8567,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -8496,6 +8594,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 match: zod.ZodOptional<zod.ZodLiteral<"all">>;
                 unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -8605,6 +8704,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -8640,6 +8740,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 name: zod.ZodOptional<zod.ZodString>;
                 when: zod.ZodArray<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -8749,6 +8850,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";
@@ -8775,6 +8877,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 match: zod.ZodOptional<zod.ZodLiteral<"all">>;
                 unless: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
                   "criminal-activity-alcohol": "criminal-activity-alcohol";
+                  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
                   "criminal-activity-csam": "criminal-activity-csam";
                   "criminal-activity-demonstration": "criminal-activity-demonstration";
                   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -8884,6 +8987,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "sexual-support-prevention": "sexual-support-prevention";
                   "sexual-text": "sexual-text";
                   "violence-attack": "violence-attack";
+                  "violence-coded-incitement": "violence-coded-incitement";
                   "violence-decapitation-act": "violence-decapitation-act";
                   "violence-discussion": "violence-discussion";
                   "violence-documentary": "violence-documentary";

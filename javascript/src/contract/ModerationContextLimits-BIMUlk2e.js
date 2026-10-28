@@ -1,4 +1,4 @@
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/ModerationContextLimits.ts
+// packages/shared/src/ModerationContextLimits.ts
 /** The longest earlier post one request may send. */
 const MODERATION_CONTEXT_MAX_ITEM_CHARACTERS = 2e3;
 /** The most characters of earlier posts one request may send in total. */

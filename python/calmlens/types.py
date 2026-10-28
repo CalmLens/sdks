@@ -19,7 +19,7 @@ class ViewerClaims(TypedDict, total=False):
 __all__ = [
     "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore", "ReportPolicy",
     "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "AssetReview", "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
+    "TestRegionalAction", "AssetReview", "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
@@ -617,7 +617,14 @@ class _AssetModerationRequired(TypedDict):
     manualReviews: List[AssetReview]
     status: AssetModerationStatus
 
+class TestRegionalAction(TypedDict):
+    region: str
+    action: str
+
+
 class AssetModeration(_AssetModerationRequired, total=False):
+    testCategoryActions: Dict[str, str]
+    testRegionalActions: List[TestRegionalAction]
     categories: ClassificationCategories
     score: float
     timeline: MediaClassificationReport
@@ -645,7 +652,7 @@ class AssetClassification(_AssetClassificationRequired, total=False):
     labels: Optional[list[ClassificationLabel]]
 
 
-class AssetContent(TypedDict):
+class _AssetContentRequired(TypedDict):
     """Content state: whether CalmLens holds the source, preview and extracted text
     (``temporary`` until processing finishes, ``stored`` or ``removed``) and its properties."""
     status: AssetContentStatus
@@ -660,6 +667,10 @@ class AssetContent(TypedDict):
     checksums: Optional[Checksums]
     image: Optional[AssetImage]
     extractedText: Optional[ExtractedText]
+
+
+class AssetContent(_AssetContentRequired, total=False):
+    safetyTest: bool
 
 
 class _AssetRequired(TypedDict):

@@ -2151,6 +2151,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -2244,6 +2253,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -2745,6 +2755,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -2838,6 +2857,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -3378,6 +3398,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -3471,6 +3500,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -3998,6 +4028,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -4091,6 +4130,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -4651,6 +4691,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -4744,6 +4793,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -5255,6 +5305,15 @@
                     "distance": 1,
                     "action": "flag"
                   }
+                ],
+                "testCategoryActions": {
+                  "sexual": "allow"
+                },
+                "testRegionalActions": [
+                  {
+                    "region": "DE",
+                    "action": "limit"
+                  }
                 ]
               },
               "personDetection": {
@@ -5348,6 +5407,7 @@
               "status": "temporary",
               "removalReason": "policy",
               "updatedAt": 1,
+              "safetyTest": true,
               "safetyHold": {
                 "placedAt": 1,
                 "reason": "suspected-illegal-content",
@@ -5865,6 +5925,15 @@
                   "distance": 1,
                   "action": "flag"
                 }
+              ],
+              "testCategoryActions": {
+                "sexual": "allow"
+              },
+              "testRegionalActions": [
+                {
+                  "region": "DE",
+                  "action": "limit"
+                }
               ]
             },
             "personDetection": {
@@ -5958,6 +6027,7 @@
             "status": "temporary",
             "removalReason": "policy",
             "updatedAt": 1,
+            "safetyTest": true,
             "safetyHold": {
               "placedAt": 1,
               "reason": "suspected-illegal-content",
@@ -6481,6 +6551,15 @@
                   "distance": 1,
                   "action": "flag"
                 }
+              ],
+              "testCategoryActions": {
+                "sexual": "allow"
+              },
+              "testRegionalActions": [
+                {
+                  "region": "DE",
+                  "action": "limit"
+                }
               ]
             },
             "personDetection": {
@@ -6574,6 +6653,7 @@
             "status": "temporary",
             "removalReason": "policy",
             "updatedAt": 1,
+            "safetyTest": true,
             "safetyHold": {
               "placedAt": 1,
               "reason": "suspected-illegal-content",
@@ -7091,6 +7171,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -7184,6 +7273,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -7685,6 +7775,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -7778,6 +7877,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -8279,6 +8379,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -8372,6 +8481,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -8873,6 +8983,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -8966,6 +9085,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -9470,6 +9590,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -9563,6 +9692,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -10099,6 +10229,15 @@
               "distance": 1,
               "action": "flag"
             }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
           ]
         },
         "personDetection": {
@@ -10192,6 +10331,7 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
+        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",

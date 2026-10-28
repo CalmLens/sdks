@@ -436,6 +436,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "The author wishes or hopes that a real person or group suffers non-severe physical harm, such as falling ill or catching a disease, even a serious one such as cancer, feeling pain or having a minor accident, without threatening it, planning it or calling on anyone to cause it.";
     readonly exclusions: "Wishes that someone dies, is killed, attacked, seriously or permanently injured or sexually assaulted; threats, plans, requests or encouragement for others to cause harm; figurative curses such as telling someone to go choke on something; wishes of non-physical misfortune alone, such as losing a job or an election.";
   };
+  readonly "violence-coded-incitement": {
+    readonly category: "violence";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Indirect coded incitement";
+    readonly description: "The author indirectly incites physical violence through coded language or an allusion whose harmful meaning is supported by the supplied context, without an explicit threat, concrete plan, direct harmful request or actionable instructions in that instance.";
+    readonly exclusions: "A name, meme, ambiguous allusion or figure of speech without supported violent meaning; neutral reporting or condemnation; an explicit threat, concrete plan, direct harmful request or actionable instructions, even when disguised with euphemisms or censored spelling. A separate explicit harmful instance is assessed independently.";
+  };
   readonly "violence-extremism": {
     readonly category: "violence";
     readonly kind: "harm";
@@ -859,6 +867,14 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "The author recruits for, endorses or promotes a concrete criminal or seriously dangerous act.";
     readonly exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
   };
+  readonly "criminal-activity-coded-incitement": {
+    readonly category: "criminal-activity";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Indirect coded incitement";
+    readonly description: "The author indirectly incites a concrete violent or seriously dangerous criminal act through coded language or an allusion whose harmful meaning is supported by the supplied context, without an explicit threat, concrete plan, direct harmful request or actionable instructions in that instance.";
+    readonly exclusions: "An absent offence, ambiguous allusion, bare wish or neutral report; lawful advocacy; an explicit threat, concrete plan, direct harmful request or actionable instructions, even when disguised with euphemisms or censored spelling. A separate explicit harmful instance is assessed independently.";
+  };
   readonly "criminal-activity-substances": {
     readonly category: "criminal-activity";
     readonly kind: "harm";
@@ -1019,6 +1035,7 @@ declare const CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA: z.ZodEnum<{
 type ClassificationNotEvaluatedReason = z.infer<typeof CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA>;
 declare const STRICT_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
   "criminal-activity-alcohol": "criminal-activity-alcohol";
+  "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
   "criminal-activity-csam": "criminal-activity-csam";
   "criminal-activity-demonstration": "criminal-activity-demonstration";
   "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1128,6 +1145,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
   "sexual-support-prevention": "sexual-support-prevention";
   "sexual-text": "sexual-text";
   "violence-attack": "violence-attack";
+  "violence-coded-incitement": "violence-coded-incitement";
   "violence-decapitation-act": "violence-decapitation-act";
   "violence-discussion": "violence-discussion";
   "violence-documentary": "violence-documentary";
@@ -1187,6 +1205,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
   score: z.ZodNumber;
   qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
+    "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
     "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
     "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1296,6 +1315,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
     "violence-attack": "violence-attack";
+    "violence-coded-incitement": "violence-coded-incitement";
     "violence-decapitation-act": "violence-decapitation-act";
     "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
@@ -1358,6 +1378,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
   score: z.ZodNumber;
   qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
+    "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
     "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
     "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1467,6 +1488,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
     "violence-attack": "violence-attack";
+    "violence-coded-incitement": "violence-coded-incitement";
     "violence-decapitation-act": "violence-decapitation-act";
     "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
@@ -1525,6 +1547,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
   }>;
   qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
     "criminal-activity-alcohol": "criminal-activity-alcohol";
+    "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
     "criminal-activity-csam": "criminal-activity-csam";
     "criminal-activity-demonstration": "criminal-activity-demonstration";
     "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1634,6 +1657,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
     "violence-attack": "violence-attack";
+    "violence-coded-incitement": "violence-coded-incitement";
     "violence-decapitation-act": "violence-decapitation-act";
     "violence-discussion": "violence-discussion";
     "violence-documentary": "violence-documentary";
@@ -1699,6 +1723,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1808,6 +1833,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -1870,6 +1896,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -1979,6 +2006,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -2037,6 +2065,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2146,6 +2175,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -2209,6 +2239,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2318,6 +2349,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -2380,6 +2412,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2489,6 +2522,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -2547,6 +2581,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2656,6 +2691,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -2719,6 +2755,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2828,6 +2865,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -2890,6 +2928,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -2999,6 +3038,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -3057,6 +3097,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3166,6 +3207,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -3229,6 +3271,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3338,6 +3381,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -3400,6 +3444,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3509,6 +3554,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -3567,6 +3613,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3676,6 +3723,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -3739,6 +3787,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -3848,6 +3897,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -3910,6 +3960,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4019,6 +4070,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -4077,6 +4129,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4186,6 +4239,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -4249,6 +4303,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4358,6 +4413,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -4420,6 +4476,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4529,6 +4586,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -4587,6 +4645,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4696,6 +4755,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -4759,6 +4819,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -4868,6 +4929,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -4930,6 +4992,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5039,6 +5102,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -5097,6 +5161,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5206,6 +5271,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -5269,6 +5335,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5378,6 +5445,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -5440,6 +5508,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     score: z.ZodNumber;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5549,6 +5618,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";
@@ -5607,6 +5677,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
     }>;
     qualifiers: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
       "criminal-activity-alcohol": "criminal-activity-alcohol";
+      "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
       "criminal-activity-csam": "criminal-activity-csam";
       "criminal-activity-demonstration": "criminal-activity-demonstration";
       "criminal-activity-discussion": "criminal-activity-discussion";
@@ -5716,6 +5787,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
       "violence-attack": "violence-attack";
+      "violence-coded-incitement": "violence-coded-incitement";
       "violence-decapitation-act": "violence-decapitation-act";
       "violence-discussion": "violence-discussion";
       "violence-documentary": "violence-documentary";

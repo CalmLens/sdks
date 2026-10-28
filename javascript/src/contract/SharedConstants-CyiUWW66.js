@@ -1,4 +1,4 @@
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/SharedConstants.ts
+// packages/shared/src/SharedConstants.ts
 const IMPERSONATION_COOKIE_NAME = "CL_impersonation";
 const DAY_MS = 864e5;
 const YEAR_MS = 365 * DAY_MS;

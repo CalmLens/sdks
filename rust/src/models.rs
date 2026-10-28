@@ -1608,6 +1608,12 @@ pub struct AssetReview {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetModeration {
+    /// Category outcomes supplied by an authenticated test input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test_category_actions: Option<HashMap<ClassificationCategory, String>>,
+    /// Regional restrictions supplied by an authenticated test input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test_regional_actions: Option<Vec<TestRegionalAction>>,
     /// Reviews in chronological order.
     #[serde(default)]
     pub manual_reviews: Vec<AssetReview>,
@@ -1635,11 +1641,25 @@ pub struct AssetModeration {
     pub extra: HashMap<String, Value>,
 }
 
+/// A regional restriction supplied by an authenticated test input.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct TestRegionalAction {
+    /// The jurisdiction receiving the restriction.
+    pub region: String,
+    /// The delivery restriction.
+    pub action: String,
+}
+
 /// Whether CalmLens holds an asset's content, and the content's details.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetContent {
+    /// Whether this is a synthetic back-office safety exercise asset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub safety_test: Option<bool>,
     /// `temporary` until processing finishes, `stored`, or `removed`.
     #[serde(default)]
     pub status: AssetContentStatus,

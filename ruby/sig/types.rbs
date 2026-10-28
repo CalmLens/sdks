@@ -132,7 +132,10 @@ module CalmLens
     "appliedToAsset" => bool
   }
   type regional_decision = { "region" => String, "action" => String, "rule" => String, ?"category" => String }
+  type test_regional_action = { "region" => String, "action" => String }
   type asset_moderation = {
+    ?"testCategoryActions" => Hash[String, String],
+    ?"testRegionalActions" => Array[test_regional_action],
     "manualReviews" => Array[asset_review],
     "status" => asset_moderation_status,
     ?"categories" => classification_categories,
@@ -144,6 +147,7 @@ module CalmLens
   }
   # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
   type asset_content = {
+    ?"safetyTest" => bool,
     "status" => asset_content_status,
     "removalReason" => asset_content_removal_reason?,
     "updatedAt" => Integer?,

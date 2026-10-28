@@ -118,6 +118,8 @@ string_enum! {
         ViolenceEncouragement = "violence-encouragement",
         /// Violence: Non-severe wish of harm.
         ViolenceWish = "violence-wish",
+        /// Violence: Indirect coded incitement.
+        ViolenceCodedIncitement = "violence-coded-incitement",
         /// Violence: Violent extremism.
         ViolenceExtremism = "violence-extremism",
         /// Violence: Injury.
@@ -236,6 +238,8 @@ string_enum! {
         CriminalActivityInstructions = "criminal-activity-instructions",
         /// Criminal activity: Recruitment or promotion.
         CriminalActivityPromotion = "criminal-activity-promotion",
+        /// Criminal activity: Indirect coded incitement.
+        CriminalActivityCodedIncitement = "criminal-activity-coded-incitement",
         /// Criminal activity: Drugs and controlled substances.
         CriminalActivitySubstances = "criminal-activity-substances",
         /// Criminal activity: Grooming and exploitation.

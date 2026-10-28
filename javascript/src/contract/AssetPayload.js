@@ -1,4 +1,4 @@
-// ../../../../private/tmp/calmlens-decision-contract/packages/shared/src/AssetPayload.ts
+// packages/shared/src/AssetPayload.ts
 const uint8ArrayInputToNumbers = (value) => {
 	if (Array.isArray(value)) return value;
 	return Array.from(value);

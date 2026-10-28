@@ -1811,6 +1811,12 @@ public final class Models {
       String reviewerName, String reviewerEmail,
       @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean appliedToAsset) {}
 
+  /** A regional restriction supplied by an authenticated test input.
+   * @param region the jurisdiction
+   * @param action the delivery restriction
+   */
+  public record TestRegionalAction(String region, String action) {}
+
   /**
    * Content-safety findings, policy assessment and reviewer decision.
    *
@@ -1818,8 +1824,9 @@ public final class Models {
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
       Map<String, CategoryResult> categories, Double score,
-      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches) {
-    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); hashMatches = list(hashMatches); }
+      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches,
+      Map<String, String> testCategoryActions, List<TestRegionalAction> testRegionalActions) {
+    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); hashMatches = list(hashMatches); testCategoryActions = map(testCategoryActions); testRegionalActions = list(testRegionalActions); }
   }
 
   /**
@@ -1829,6 +1836,7 @@ public final class Models {
    * @param removalReason why the content was removed: {@code policy}, {@code retention}, {@code
    *     requested}, {@code parent-removed} or {@code disposed}; null while content is held
    * @param updatedAt when the content status last changed
+   * @param safetyTest whether this is a synthetic safety exercise asset
    * @param safetyHold safety hold, if any
    * @param format MIME type of the content
    * @param extension file extension of the content
@@ -1839,7 +1847,7 @@ public final class Models {
    */
   public record AssetContent(AssetContentStatus status, String removalReason,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
-      SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
+      Boolean safetyTest, SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
       AssetImage image, ExtractedText extractedText) {}
 
 

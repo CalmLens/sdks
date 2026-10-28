@@ -186,9 +186,17 @@ type AssetReview struct {
 	AppliedToAsset bool    `json:"appliedToAsset"`
 }
 
+// TestRegionalAction is a regional restriction supplied by an authenticated test input.
+type TestRegionalAction struct {
+	Region string `json:"region"`
+	Action string `json:"action"`
+}
+
 // AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	ManualReviews []AssetReview `json:"manualReviews"`
+	TestCategoryActions map[string]string    `json:"testCategoryActions,omitempty"`
+	TestRegionalActions []TestRegionalAction `json:"testRegionalActions,omitempty"`
+	ManualReviews       []AssetReview        `json:"manualReviews"`
 	// Status is one of the ModerationStatus constants.
 	Status     string                     `json:"status"`
 	Categories map[string]CategoryResult  `json:"categories,omitempty"`
@@ -221,6 +229,7 @@ type HashMatch struct {
 // AssetContent describes an asset's content: its format and properties, and whether CalmLens
 // holds it.
 type AssetContent struct {
+	SafetyTest *bool `json:"safetyTest,omitempty"`
 	// Status is one of the ContentStatus constants.
 	Status string `json:"status"`
 	// RemovalReason is why the content was removed (a ContentRemovalReason constant); nil
