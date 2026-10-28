@@ -18335,6 +18335,7 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     retention: "retention";
   }>>;
   updatedAt: zod.ZodNullable<zod.ZodNumber>;
+  safetyTest: zod.ZodOptional<zod.ZodBoolean>;
   safetyHold: zod.ZodNullable<zod.ZodObject<{
     placedAt: zod.ZodNumber;
     reason: zod.ZodEnum<{
@@ -27627,6 +27628,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       retention: "retention";
     }>>;
     updatedAt: zod.ZodNullable<zod.ZodNumber>;
+    safetyTest: zod.ZodOptional<zod.ZodBoolean>;
     safetyHold: zod.ZodNullable<zod.ZodObject<{
       placedAt: zod.ZodNumber;
       reason: zod.ZodEnum<{

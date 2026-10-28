@@ -147,7 +147,8 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
   ruby:
-    runs-on: ubuntu-latest
+    # Ruby 3.1 binaries are unavailable on Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         ruby:

@@ -9280,6 +9280,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         retention: "retention";
       }>>;
       updatedAt: zod.ZodNullable<zod.ZodNumber>;
+      safetyTest: zod.ZodOptional<zod.ZodBoolean>;
       safetyHold: zod.ZodNullable<zod.ZodObject<{
         placedAt: zod.ZodNumber;
         reason: zod.ZodEnum<{
