@@ -1309,11 +1309,6 @@
       "retryable": false
     },
     {
-      "code": "upload/image-requires-multipart-upload",
-      "status": 400,
-      "retryable": false
-    },
-    {
       "code": "upload/multipart-image-too-small",
       "status": 400,
       "retryable": false

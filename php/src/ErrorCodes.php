@@ -24,7 +24,6 @@ final class ErrorCodes
     public const API_KEY_NOT_ACCEPTED = 'auth/api-key-not-accepted';
     public const PERMISSION_DENIED = 'auth/permission-denied';
     public const FILE_TOO_LARGE = 'upload/file-too-large';
-    public const IMAGE_REQUIRES_MULTIPART_UPLOAD = 'upload/image-requires-multipart-upload';
     public const MULTIPART_IMAGE_TOO_SMALL = 'upload/multipart-image-too-small';
     public const MULTIPART_IMAGE_TOO_LARGE = 'upload/multipart-image-too-large';
     public const IMAGE_EXCEEDED_MAX_DIMENSIONS = 'upload/image-exceeded-max-dimensions';
@@ -103,7 +102,6 @@ final class ErrorCodes
         'auth/api-key-not-accepted' => 403,
         'auth/permission-denied' => 403,
         'upload/file-too-large' => 400,
-        'upload/image-requires-multipart-upload' => 400,
         'upload/multipart-image-too-small' => 400,
         'upload/multipart-image-too-large' => 400,
         'upload/image-exceeded-max-dimensions' => 400,

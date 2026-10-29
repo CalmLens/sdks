@@ -17,7 +17,6 @@ module CalmLens
     API_KEY_NOT_ACCEPTED = 'auth/api-key-not-accepted'
     PERMISSION_DENIED = 'auth/permission-denied'
     FILE_TOO_LARGE = 'upload/file-too-large'
-    IMAGE_REQUIRES_MULTIPART_UPLOAD = 'upload/image-requires-multipart-upload'
     MULTIPART_IMAGE_TOO_SMALL = 'upload/multipart-image-too-small'
     MULTIPART_IMAGE_TOO_LARGE = 'upload/multipart-image-too-large'
     IMAGE_EXCEEDED_MAX_DIMENSIONS = 'upload/image-exceeded-max-dimensions'
@@ -96,7 +95,6 @@ module CalmLens
       'auth/api-key-not-accepted' => 403,
       'auth/permission-denied' => 403,
       'upload/file-too-large' => 400,
-      'upload/image-requires-multipart-upload' => 400,
       'upload/multipart-image-too-small' => 400,
       'upload/multipart-image-too-large' => 400,
       'upload/image-exceeded-max-dimensions' => 400,

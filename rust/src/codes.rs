@@ -24,8 +24,6 @@ error_codes! {
     PermissionDenied = "auth/permission-denied", 403;
     /// `upload/file-too-large` (HTTP 400): File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.
     FileTooLarge = "upload/file-too-large", 400;
-    /// `upload/image-requires-multipart-upload` (HTTP 400): Images of 10 MiB or more must use a multipart upload.
-    ImageRequiresMultipartUpload = "upload/image-requires-multipart-upload", 400;
     /// `upload/multipart-image-too-small` (HTTP 400): Multipart image uploads must total at least 10 MiB.
     MultipartImageTooSmall = "upload/multipart-image-too-small", 400;
     /// `upload/multipart-image-too-large` (HTTP 400): Multipart image uploads cannot exceed 20 MiB.

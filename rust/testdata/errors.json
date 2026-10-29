@@ -396,39 +396,6 @@
     }
   },
   {
-    "code": "upload/image-requires-multipart-upload",
-    "status": 400,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 400,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-image-requires-multipart-upload"
-      },
-      "body": {
-        "code": "upload/image-requires-multipart-upload",
-        "message": "Images of 10 MiB or more must use a multipart upload.",
-        "details": {
-          "reason": "image_requires_multipart_upload"
-        },
-        "traceId": "trace-upload-image-requires-multipart-upload"
-      }
-    },
-    "expected": {
-      "code": "upload/image-requires-multipart-upload",
-      "status": 400,
-      "requestId": "req-upload-image-requires-multipart-upload",
-      "retryAfter": null,
-      "details": {
-        "reason": "image_requires_multipart_upload",
-        "traceId": "trace-upload-image-requires-multipart-upload"
-      }
-    }
-  },
-  {
     "code": "upload/multipart-image-too-small",
     "status": 400,
     "operation": "assets.retrieve",
