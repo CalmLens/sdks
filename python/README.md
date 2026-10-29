@@ -349,7 +349,7 @@ A public asset whose moderation status is `age-restricted` is served from its pu
 with `viewer_claims={"ageConfirmed": True}` (a JSON `viewerClaims` query parameter containing `{ "ageConfirmed": true }`); otherwise delivery is refused, even with a signed URL or API key. Set it only where your app has already decided the viewer may see age-restricted content:
 
 ```python
-client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", age_confirmed=True)
+client.cdn.get_asset_url(asset_identifier=queued["id"], lens="thumbnail", viewer_claims={"ageConfirmed": True})
 ```
 
 ## Webhooks

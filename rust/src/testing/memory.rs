@@ -29,7 +29,8 @@ pub enum MockOutcome {
     /// allowed one.
     Limited,
     /// Processing completes with moderation `age-restricted`; the CDN then serves the asset
-    /// only with the download permission, or a public one with `age_confirmed`.
+    /// only with `ViewerClaims::age_confirmed` set to `true`, and a private one only with the
+    /// download permission too.
     AgeRestricted,
     /// Processing completes with moderation `blocked`; the CDN refuses it.
     Blocked,

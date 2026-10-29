@@ -16,9 +16,10 @@ module CalmLens
   # synchronously get `analyzed_outcome` and queued ones `queued_outcome`. Content is kept only with
   # `keepContentAfterProcessing: true`; otherwise it is removed once classification is `completed`, as in the API.
   # A `purged` outcome removes the content with reason `policy`. The CDN answers like the real one:
-  # `asset/not-available` (403) for blocked, purged, failed or removed content, and
-  # `asset/api-key-missing-permission` (403) for a private asset, or a public age-restricted one without
-  # `age_confirmed: true`, unless `api_key` comes from {.create_api_key} with an `assets:download`
+  # `asset/not-available` (403) for blocked, purged, failed or removed content,
+  # `viewer/age-confirmation-required` (403) for an age-restricted asset without
+  # `viewer_claims: {age_confirmed: true}`, whatever the key, and `asset/api-key-missing-permission` (403)
+  # for a private asset unless `api_key` comes from {.create_api_key} with an `assets:download`
   # grant. The default key has no grants. {#decide} applies a reviewer's decision, and
   # {Assets#wait_for_decision} takes no real time: a pending asset times out at once.
   # Filters join comparisons with `;` (and), which binds tighter than `,` (or), and group them with

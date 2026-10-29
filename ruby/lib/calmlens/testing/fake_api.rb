@@ -898,8 +898,8 @@ module CalmLens
       # Answers like the CDN: a placeholder is the asset's ThumbHash as a PNG, public for public
       # assets whatever their moderation; other resources pass delivery checks first, which refuse
       # everyone (content still uploading, blocked or purged, failed processing, removed content),
-      # then a private asset, or a public age-restricted one requested without
-      # `ageConfirmed=true`, needs an API key with `assets:download` for its folder.
+      # then an age-restricted asset needs `viewerClaims.ageConfirmed=true` whatever the key, and a
+      # private asset needs an API key with `assets:download` for its folder.
       def serve(method, relative)
         path, query = relative.split('#', 2).first.split('?', 2)
         segments = path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }

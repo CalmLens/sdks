@@ -48,9 +48,9 @@ import java.util.function.LongSupplier;
  * }</pre>
  *
  * <p>The CDN refuses {@code blocked} and {@code purged} assets, serves {@code limited} ones like
- * {@code allowed} ones, and serves private and
- * age-restricted ones only to an API key with the {@code assets:download} grant (see {@link
- * #createMockApiKey}); a public age-restricted asset is also served with {@code ageConfirmed}.
+ * {@code allowed} ones, serves age-restricted ones only with {@code viewerClaims(new
+ * ViewerClaims().ageConfirmed(true))} whatever the key, and serves private ones only to an API key
+ * with the {@code assets:download} grant (see {@link #createMockApiKey}).
  *
  * <p>Queued responses take precedence, in order: {@link #enqueue(int, Object)}, {@link
  * #enqueueError}, {@link #enqueueEvents}, {@link #enqueueCdn} and the other {@code enqueue}

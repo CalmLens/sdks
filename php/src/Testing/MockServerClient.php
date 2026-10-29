@@ -39,8 +39,9 @@ use Psr\Http\Message\ResponseInterface;
  *
  * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
- * Then access: a private asset, or a public age-restricted one requested without the
- * `ageConfirmed` URL option, needs an `assets:download` grant for its folder. The default
+ * Then access: an age-restricted asset requested without `'viewerClaims' => ['ageConfirmed' => true]`
+ * returns 403 `viewer/age-confirmation-required` whatever the key, and a private asset needs an
+ * `assets:download` grant for its folder. The default
  * key has no grants, like a real key without `assets:download`; pass an `apiKey` from
  * `createApiKey()`, or call `setApiKeyGrants()`, to grant downloads.
  *
@@ -1410,8 +1411,7 @@ final class MockServerClient
             || $asset['classification']['status'] === 'failed' || $asset['content']['status'] === 'removed') {
             return $notAvailable();
         }
-        // Age-restricted assets are delivered like private ones, unless a public one is requested
-        // with `ageConfirmed=true`.
+        // Age-restricted assets need `viewerClaims.ageConfirmed=true` whatever the key.
         $claims = json_decode($query['viewerClaims'] ?? '{}', true);
         if ($status === 'age-restricted' && ($claims['ageConfirmed'] ?? false) !== true) return $this->json(403, ['code' => 'viewer/age-confirmation-required']);
         $private = $asset['visibility'] !== 'public';

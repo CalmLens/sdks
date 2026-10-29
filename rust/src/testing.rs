@@ -326,9 +326,9 @@ impl MockServerClient {
     /// events feed read and change that storage, with the API's error codes, statuses and idempotent
     /// replays. `wait_for_decision` returns at once for a decided asset; a pending one waits
     /// for [`decide`](Self::decide) or the timeout. The CDN serves stored bytes, refusing
-    /// blocked and purged assets, and private or age-restricted ones unless the API key has
-    /// an `assets:download` grant ([`create_mock_api_key`]) or a public age-restricted asset is
-    /// requested with `age_confirmed`. Served content has its stored `content-type` and
+    /// blocked and purged assets, age-restricted ones requested without
+    /// `ViewerClaims::age_confirmed` set to `true` whatever the key, and private ones unless the
+    /// API key has an `assets:download` grant ([`create_mock_api_key`]). Served content has its stored `content-type` and
     /// the CDN's `cache-control`: `public` only when anyone may see the asset, otherwise
     /// `private`, with `max-age=31536000, immutable` for images and `max-age=3600` otherwise.
     /// Content is never classified or transformed.

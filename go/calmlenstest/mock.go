@@ -2015,8 +2015,8 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 		section(asset, "content")["status"] == calmlens.ContentStatusRemoved {
 		return notAvailable()
 	}
-	// Then access: a private asset, or a public age-restricted one requested without the
-	// ageConfirmed=true opt-in, needs the download permission for its folder.
+	// Then access: an age-restricted asset needs viewerClaims.ageConfirmed=true whatever the key,
+	// and a private asset needs the download permission for its folder.
 	claims := map[string]any{}
 	_ = json.Unmarshal([]byte(req.URL.Query().Get("viewerClaims")), &claims)
 	if moderation == calmlens.ModerationStatusAgeRestricted && claims["ageConfirmed"] != true {

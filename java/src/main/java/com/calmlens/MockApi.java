@@ -1437,8 +1437,8 @@ final class MockApi {
         || "failed".equals(str(asset.getAsJsonObject("classification"), "status"))
         || "removed".equals(str(asset.getAsJsonObject("content"), "status")) || stored == null)
       return error(notAvailable);
-    // Then access: private assets, and public age-restricted ones requested without
-    // ageConfirmed, need an API key with assets:download for the asset's folder.
+    // Then access: age-restricted assets need viewerClaims.ageConfirmed whatever the key, and
+    // private assets need an API key with assets:download for the asset's folder.
     JsonObject claims = JsonParser.parseString(request.query().getOrDefault("viewerClaims", "{}")).getAsJsonObject();
     if ("age-restricted".equals(status) && !(claims.has("ageConfirmed") && claims.get("ageConfirmed").getAsBoolean()))
       return error(new Failure("viewer/age-confirmation-required", 403, "Age confirmation required"));

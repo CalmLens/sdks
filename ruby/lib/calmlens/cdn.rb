@@ -11,13 +11,14 @@ module CalmLens
     # @option options [String] :asset_identifier the asset ID or external ID
     # @option options [String] :resource `rendered` (default), `original` or `placeholder`. Only `rendered`
     #   takes a lens or transform. A placeholder is a small blurred PNG that the CDN serves for public assets
-    #   whatever their moderation status; it also takes no age_confirmed.
+    #   whatever their moderation status; it needs no age confirmation.
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash, Array<Hash>] :transform a selector such as `width=200,fit=cover`,
     #   or structured steps: `{type: 'imageTransform', options: {width: 200}}` or an Array of them
-    # @option options [Boolean] :age_confirmed true appends `?ageConfirmed=true`, so a public asset whose
-    #   moderation status is `age-restricted` is served from this URL. Without it such an asset needs a signed
-    #   URL or the API key. Set it only where your app has already decided the viewer may see age-restricted content.
+    # @option options [Hash] :viewer_claims viewer assertions, such as `{age_confirmed: true}`, sent as a JSON
+    #   `viewerClaims` query parameter. The CDN serves an asset whose moderation status is `age-restricted` only
+    #   with `age_confirmed: true`, even with a signed URL or the API key. Set it only where your app has already
+    #   decided the viewer may see age-restricted content.
     # @return [String]
     def get_asset_url(options)
       call(options) { |api, _request| url(api) }
@@ -31,7 +32,7 @@ module CalmLens
     # not raised; check {Response#status}.
     #
     # @option options [String] :asset_identifier
-    # @option options [Boolean] :age_confirmed see {#get_asset_url}
+    # @option options [Hash] :viewer_claims see {#get_asset_url}
     # @option options [Hash] :init `{method: 'GET' | 'HEAD', headers: {...}}`
     # @yieldparam response [Response]
     # @return [Response, Object]

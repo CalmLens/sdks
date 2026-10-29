@@ -1401,8 +1401,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     or asset["classification"]["status"] == "failed"
                     or asset["content"]["status"] == "removed" or stored is None):
                 return self._failure_response(not_available)
-            # Then access: private assets, and public age-restricted ones requested without
-            # ``ageConfirmed=true``, need the download permission for the asset's folder.
+            # Then access: age-restricted assets need ``viewerClaims.ageConfirmed=true`` whatever
+            # the key, and private assets need the download permission for the asset's folder.
             claims = json.loads(query.get("viewerClaims", "{}"))
             if status == "age-restricted" and claims.get("ageConfirmed") is not True:
                 return self._failure_response(_Failure("viewer/age-confirmation-required", "Age confirmation required", 403))

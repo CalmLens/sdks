@@ -540,7 +540,7 @@ string_enum! {
         /// The asset rendered through a lens or transform, or its default rendition (the default).
         Rendered = "rendered",
         /// A small blurred PNG, public for public assets whatever their moderation status. Only
-        /// for CDN URLs, without a lens, transform or `age_confirmed`.
+        /// for CDN URLs, without a lens or transform; it needs no age confirmation.
         Placeholder = "placeholder",
     }
 }

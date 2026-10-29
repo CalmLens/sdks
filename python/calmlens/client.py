@@ -1513,11 +1513,12 @@ class CDN:
         first); ``original`` takes neither. Private assets need an API key or a signed URL.
 
         ``placeholder`` is a small blurred PNG that the CDN serves for public assets whatever their
-        moderation status. It takes no ``lens``, ``transform`` or ``age_confirmed``.
+        moderation status. It takes no ``lens`` or ``transform``, and needs no age confirmation.
 
-        ``age_confirmed=True`` appends ``?ageConfirmed=true``, which lets the public URL serve a
-        public asset whose moderation status is ``age-restricted``. Set it only where your app has
-        already decided the viewer may see age-restricted content."""
+        ``viewer_claims={"ageConfirmed": True}`` appends a ``viewerClaims`` query parameter, which
+        the CDN requires before it serves an asset whose moderation status is ``age-restricted``,
+        even with a signed URL or an API key. Set it only where your app has already decided the
+        viewer may see age-restricted content."""
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
                         viewer_claims=viewer_claims)
 
