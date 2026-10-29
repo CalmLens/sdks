@@ -438,6 +438,13 @@ const MODERATION_QUALIFIER_INFO = {
 		description: "A request, offer or advertisement for sexual services, escorting or a sexual encounter, performed by the message itself or a supplied chat turn.",
 		exclusions: "Promotion of adult content, such as a subscription page or explicit media for sale, which is adult content promotion; dating, ordinary romance, accepting money or vague offers without sexual content."
 	},
+	"sexual-paid": {
+		category: "sexual",
+		kind: "target",
+		displayName: "Paid sexual services",
+		description: "The solicitation is for paid or commercial sexual services: escorting, prostitution, a sexual encounter offered or sought for money, gifts or other payment, or advertising such services.",
+		exclusions: "An unpaid request or offer for a sexual encounter between adults; promotion of adult content such as a subscription page or explicit media for sale, which is adult content promotion."
+	},
 	"sexual-adult-promotion": {
 		category: "sexual",
 		kind: "harm",

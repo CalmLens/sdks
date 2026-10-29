@@ -275,6 +275,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -448,6 +449,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -617,6 +619,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -791,6 +794,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -964,6 +968,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1133,6 +1138,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1307,6 +1313,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1480,6 +1487,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1649,6 +1657,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1823,6 +1832,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -1996,6 +2006,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2165,6 +2176,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2339,6 +2351,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2512,6 +2525,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2681,6 +2695,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -2855,6 +2870,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3028,6 +3044,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3197,6 +3214,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3371,6 +3389,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3544,6 +3563,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3713,6 +3733,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -3887,6 +3908,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -4060,6 +4082,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -4229,6 +4252,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         "sexual-non-consensual": "sexual-non-consensual";
         "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
         "sexual-nudity": "sexual-nudity";
+        "sexual-paid": "sexual-paid";
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
@@ -4420,6 +4444,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4593,6 +4618,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4762,6 +4788,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -4936,6 +4963,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5109,6 +5137,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5278,6 +5307,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5452,6 +5482,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5625,6 +5656,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5794,6 +5826,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -5968,6 +6001,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6141,6 +6175,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6310,6 +6345,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6484,6 +6520,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6657,6 +6694,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -6826,6 +6864,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7000,6 +7039,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7173,6 +7213,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7342,6 +7383,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7516,6 +7558,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7689,6 +7732,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -7858,6 +7902,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -8032,6 +8077,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -8205,6 +8251,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -8374,6 +8421,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -8584,6 +8632,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -8721,6 +8770,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -8867,6 +8917,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -9004,6 +9055,7 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -9299,6 +9351,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9472,6 +9525,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9641,6 +9695,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9815,6 +9870,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -9988,6 +10044,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10157,6 +10214,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10331,6 +10389,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10504,6 +10563,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10673,6 +10733,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -10847,6 +10908,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -11020,6 +11082,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -11189,6 +11252,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -11363,6 +11427,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -11536,6 +11601,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -11705,6 +11771,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -11879,6 +11946,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -12052,6 +12120,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -12221,6 +12290,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -12395,6 +12465,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -12568,6 +12639,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -12737,6 +12809,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -12911,6 +12984,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -13084,6 +13158,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -13253,6 +13328,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           "sexual-non-consensual": "sexual-non-consensual";
           "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
           "sexual-nudity": "sexual-nudity";
+          "sexual-paid": "sexual-paid";
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
@@ -13444,6 +13520,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13617,6 +13694,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13786,6 +13864,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -13960,6 +14039,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14133,6 +14213,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14302,6 +14383,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14476,6 +14558,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14649,6 +14732,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14818,6 +14902,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -14992,6 +15077,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -15165,6 +15251,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -15334,6 +15421,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -15508,6 +15596,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -15681,6 +15770,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -15850,6 +15940,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -16024,6 +16115,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -16197,6 +16289,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -16366,6 +16459,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -16540,6 +16634,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -16713,6 +16808,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -16882,6 +16978,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -17056,6 +17153,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -17229,6 +17327,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -17398,6 +17497,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -17608,6 +17708,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -17745,6 +17846,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -17891,6 +17993,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -18028,6 +18131,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
               "sexual-non-consensual": "sexual-non-consensual";
               "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
               "sexual-nudity": "sexual-nudity";
+              "sexual-paid": "sexual-paid";
               "sexual-pornographic-media": "sexual-pornographic-media";
               "sexual-revealing-clothing": "sexual-revealing-clothing";
               "sexual-solicitation": "sexual-solicitation";
@@ -18590,6 +18694,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -18763,6 +18868,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -18932,6 +19038,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -19106,6 +19213,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -19279,6 +19387,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -19448,6 +19557,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -19622,6 +19732,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -19795,6 +19906,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -19964,6 +20076,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -20138,6 +20251,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -20311,6 +20425,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -20480,6 +20595,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -20654,6 +20770,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -20827,6 +20944,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -20996,6 +21114,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -21170,6 +21289,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -21343,6 +21463,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -21512,6 +21633,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -21686,6 +21808,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -21859,6 +21982,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -22028,6 +22152,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -22202,6 +22327,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -22375,6 +22501,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -22544,6 +22671,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             "sexual-non-consensual": "sexual-non-consensual";
             "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
             "sexual-nudity": "sexual-nudity";
+            "sexual-paid": "sexual-paid";
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
@@ -22735,6 +22863,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -22908,6 +23037,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -23077,6 +23207,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -23251,6 +23382,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -23424,6 +23556,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -23593,6 +23726,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -23767,6 +23901,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -23940,6 +24075,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -24109,6 +24245,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -24283,6 +24420,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -24456,6 +24594,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -24625,6 +24764,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -24799,6 +24939,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -24972,6 +25113,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -25141,6 +25283,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -25315,6 +25458,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -25488,6 +25632,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -25657,6 +25802,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -25831,6 +25977,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -26004,6 +26151,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -26173,6 +26321,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -26347,6 +26496,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -26520,6 +26670,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -26689,6 +26840,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -26899,6 +27051,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -27036,6 +27189,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -27182,6 +27336,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";
@@ -27319,6 +27474,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
                 "sexual-non-consensual": "sexual-non-consensual";
                 "sexual-non-erotic-nudity": "sexual-non-erotic-nudity";
                 "sexual-nudity": "sexual-nudity";
+                "sexual-paid": "sexual-paid";
                 "sexual-pornographic-media": "sexual-pornographic-media";
                 "sexual-revealing-clothing": "sexual-revealing-clothing";
                 "sexual-solicitation": "sexual-solicitation";

@@ -3,7 +3,7 @@ import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
-import { C as docPropertyInfo, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-Ci_z8PNn.js";
+import { C as docPropertyInfo, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-CqtL4mIS.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Ba-H8vMt.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
@@ -1002,7 +1002,7 @@ const PROJECT_MEMBER_JOINED = defineEventType({
 			display: "text",
 			inAppOnly: true
 		}),
-		role: field(ACCESS_ROLE_SCHEMA, {
+		role: field(PROJECT_MEMBER_ROLE_SCHEMA, {
 			label: "Role",
 			description: "The member's role: `admin`, `editor`, `viewer` or `custom`.",
 			display: "enum",
@@ -1068,7 +1068,7 @@ const CONNECTOR_FAILING = defineEventType({
 	}
 });
 /** Project roles a member can hold; reviewers only exist while the human review beta is on. */
-const MEMBER_ROLE_SCHEMA = ACCESS_ROLE_SCHEMA;
+const MEMBER_ROLE_SCHEMA = PROJECT_MEMBER_ROLE_SCHEMA;
 const memberUserIdField = field(zod.string(), {
 	label: "Member ID",
 	description: "User ID of the member.",
@@ -1146,7 +1146,7 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 	severity: "low",
 	notify: false,
 	permission: "reviews:read",
-	enabled: false,
+	enabled: true,
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
