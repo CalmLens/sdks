@@ -419,7 +419,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Threat of violence";
     readonly description: "A direct, conditional or clearly implied threat of physical harm against another person or animal.";
-    readonly exclusions: "A completed attack, figurative language or solely self-directed threats.";
+    readonly exclusions: "A completed attack, figurative language or solely self-directed threats; a hyperbolic urge to hit or punch someone with no weapon, plan or credible means, which is a non-severe wish of harm.";
   };
   readonly "violence-preparation": {
     readonly category: "violence";
@@ -433,15 +433,15 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Encouragement of violence";
     readonly description: "The author urges, endorses, praises or promotes physical violence.";
-    readonly exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention.";
+    readonly exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention; advocating lawful self-defence or a state's lawful military or police defence.";
   };
   readonly "violence-wish": {
     readonly category: "violence";
     readonly kind: "harm";
     readonly harmOption: false;
     readonly displayName: "Non-severe wish of harm";
-    readonly description: "The author wishes or hopes that a real person or group suffers non-severe physical harm, such as falling ill or catching a disease, even a serious one such as cancer, feeling pain or having a minor accident, without threatening it, planning it or calling on anyone to cause it.";
-    readonly exclusions: "Wishes that someone dies, is killed, attacked, seriously or permanently injured or sexually assaulted; threats, plans, requests or encouragement for others to cause harm; figurative curses such as telling someone to go choke on something; wishes of non-physical misfortune alone, such as losing a job or an election.";
+    readonly description: "The author wishes or hopes that a real person or group suffers non-severe physical harm, such as falling ill or catching a disease, even a serious one such as cancer, feeling pain or having a minor accident, or voices a hyperbolic urge to hit, slap or punch someone, such as “I'd beat his ass”, with no weapon, plan or credible means, without threatening it, planning it or calling on anyone to cause it.";
+    readonly exclusions: "Wishes that someone dies, is killed, attacked with a weapon or lethal force, seriously or permanently injured or sexually assaulted; threats, plans, requests or encouragement for others to cause harm; figurative curses such as telling someone to go choke on something; wishes of non-physical misfortune alone, such as losing a job or an election.";
   };
   readonly "violence-coded-incitement": {
     readonly category: "violence";
@@ -582,7 +582,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "self-harm";
     readonly kind: "harm";
     readonly displayName: "Thoughts or desire";
-    readonly description: "Current or recurring thoughts of intentional self-injury or suicide, or an explicitly expressed desire to die.";
+    readonly description: "Current or recurring thoughts of intentional self-injury or suicide, or an explicitly expressed desire or a stated intention to die by suicide. A hypothetical, conditional or figurative statement, such as I would die for this or I will die on this hill, is not.";
     readonly exclusions: "General sadness, figurative language, neutral statistics, resolved past thoughts or prevention alone. An image without readable disclosure does not establish thoughts.";
   };
   readonly "self-harm-preparation": {
@@ -604,7 +604,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Methods or instructions";
     readonly description: "Actionable methods, requests or practical instructions for intentional self-injury or suicide.";
-    readonly exclusions: "Prevention, support, recovery or non-actionable discussion without harmful methods.";
+    readonly exclusions: "Prevention, support, recovery or non-actionable discussion without harmful methods; naming a means, such as pills or jumping, without how-to detail, an amount, a location or other actionable instruction.";
   };
   readonly "self-harm-encouragement": {
     readonly category: "self-harm";
@@ -681,7 +681,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Threats or intimidation";
     readonly description: "A direct, conditional or clearly implied personal threat, or serious abusive or coercive intimidation, against an identifiable person or group. Violent rhetoric between groups belongs under Hate or Violence.";
-    readonly exclusions: "Figures of speech; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation.";
+    readonly exclusions: "Figures of speech; curses, religious condemnation and dismissals such as go to hell, you will burn in hell or get lost; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation.";
   };
   readonly "harassment-sexual": {
     readonly category: "harassment";
@@ -779,7 +779,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly category: "hate";
     readonly kind: "harm";
     readonly displayName: "Stated hatred";
-    readonly description: "Hatred, dislike or hostility stated towards a protected identity group as a whole, such as saying “I hate men”, with no slur, insult or epithet, dehumanization, inferiority claim or harmful stereotype, exclusion or threat. It counts so that a policy can allow or restrict it.";
+    readonly description: "Hatred, dislike or hostility stated towards a protected identity group as a whole, such as saying “I hate men”, including religious or moral condemnation of a protected identity, such as calling homosexuality a sin, or denying that an identity exists, with no slur, insult or epithet, dehumanization, inferiority claim or harmful stereotype, exclusion or threat. It counts so that a policy can allow or restrict it.";
     readonly exclusions: "Slurs, identity-based insults or epithets such as calling a group disgusting or repulsive, dehumanization, inferiority claims or harmful stereotypes, exclusion and threats, which are other forms; dislike of particular people; dislike of something a group does, such as “I hate how they …”; sarcastic or ironic praise; criticism of beliefs, ideologies or conduct.";
   };
   readonly "hate-threat": {
@@ -851,7 +851,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Intent or preparation";
     readonly description: "A concrete intent, preparation or plan for a criminal or seriously dangerous act expressed by the author.";
-    readonly exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
+    readonly exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. Violent speech, a wish of harm or a threat against someone, which Violence assesses, without a concrete criminal plan, request, instructions or recruitment; a hyperbolic or conditional urge to hit someone, such as “I'd beat his ass”, is not a concrete plan.";
   };
   readonly "criminal-activity-request": {
     readonly category: "criminal-activity";
@@ -872,7 +872,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly kind: "harm";
     readonly displayName: "Recruitment or promotion";
     readonly description: "The author recruits for, endorses or promotes a concrete criminal or seriously dangerous act.";
-    readonly exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct.";
+    readonly exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. Violent speech, a wish of harm or a threat against someone, which Violence assesses, without a concrete criminal plan, request, instructions or recruitment.";
   };
   readonly "criminal-activity-coded-incitement": {
     readonly category: "criminal-activity";

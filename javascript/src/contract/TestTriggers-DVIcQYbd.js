@@ -537,7 +537,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Threat of violence",
 		description: "A direct, conditional or clearly implied threat of physical harm against another person or animal.",
-		exclusions: "A completed attack, figurative language or solely self-directed threats."
+		exclusions: "A completed attack, figurative language or solely self-directed threats; a hyperbolic urge to hit or punch someone with no weapon, plan or credible means, which is a non-severe wish of harm."
 	},
 	"violence-preparation": {
 		category: "violence",
@@ -551,15 +551,15 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Encouragement of violence",
 		description: "The author urges, endorses, praises or promotes physical violence.",
-		exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention."
+		exclusions: "Reporting or depicting an attack without endorsement; condemnation or prevention; advocating lawful self-defence or a state's lawful military or police defence."
 	},
 	"violence-wish": {
 		category: "violence",
 		kind: "harm",
 		harmOption: false,
 		displayName: "Non-severe wish of harm",
-		description: "The author wishes or hopes that a real person or group suffers non-severe physical harm, such as falling ill or catching a disease, even a serious one such as cancer, feeling pain or having a minor accident, without threatening it, planning it or calling on anyone to cause it.",
-		exclusions: "Wishes that someone dies, is killed, attacked, seriously or permanently injured or sexually assaulted; threats, plans, requests or encouragement for others to cause harm; figurative curses such as telling someone to go choke on something; wishes of non-physical misfortune alone, such as losing a job or an election."
+		description: "The author wishes or hopes that a real person or group suffers non-severe physical harm, such as falling ill or catching a disease, even a serious one such as cancer, feeling pain or having a minor accident, or voices a hyperbolic urge to hit, slap or punch someone, such as “I'd beat his ass”, with no weapon, plan or credible means, without threatening it, planning it or calling on anyone to cause it.",
+		exclusions: "Wishes that someone dies, is killed, attacked with a weapon or lethal force, seriously or permanently injured or sexually assaulted; threats, plans, requests or encouragement for others to cause harm; figurative curses such as telling someone to go choke on something; wishes of non-physical misfortune alone, such as losing a job or an election."
 	},
 	"violence-coded-incitement": {
 		category: "violence",
@@ -700,7 +700,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "self-harm",
 		kind: "harm",
 		displayName: "Thoughts or desire",
-		description: "Current or recurring thoughts of intentional self-injury or suicide, or an explicitly expressed desire to die.",
+		description: "Current or recurring thoughts of intentional self-injury or suicide, or an explicitly expressed desire or a stated intention to die by suicide. A hypothetical, conditional or figurative statement, such as I would die for this or I will die on this hill, is not.",
 		exclusions: "General sadness, figurative language, neutral statistics, resolved past thoughts or prevention alone. An image without readable disclosure does not establish thoughts."
 	},
 	"self-harm-preparation": {
@@ -722,7 +722,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Methods or instructions",
 		description: "Actionable methods, requests or practical instructions for intentional self-injury or suicide.",
-		exclusions: "Prevention, support, recovery or non-actionable discussion without harmful methods."
+		exclusions: "Prevention, support, recovery or non-actionable discussion without harmful methods; naming a means, such as pills or jumping, without how-to detail, an amount, a location or other actionable instruction."
 	},
 	"self-harm-encouragement": {
 		category: "self-harm",
@@ -799,7 +799,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Threats or intimidation",
 		description: "A direct, conditional or clearly implied personal threat, or serious abusive or coercive intimidation, against an identifiable person or group. Violent rhetoric between groups belongs under Hate or Violence.",
-		exclusions: "Figures of speech; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation."
+		exclusions: "Figures of speech; curses, religious condemnation and dismissals such as go to hell, you will burn in hell or get lost; ordinary disagreement or criticism; lawful arrest, prosecution or accountability without abusive intimidation."
 	},
 	"harassment-sexual": {
 		category: "harassment",
@@ -897,7 +897,7 @@ const MODERATION_QUALIFIER_INFO = {
 		category: "hate",
 		kind: "harm",
 		displayName: "Stated hatred",
-		description: "Hatred, dislike or hostility stated towards a protected identity group as a whole, such as saying “I hate men”, with no slur, insult or epithet, dehumanization, inferiority claim or harmful stereotype, exclusion or threat. It counts so that a policy can allow or restrict it.",
+		description: "Hatred, dislike or hostility stated towards a protected identity group as a whole, such as saying “I hate men”, including religious or moral condemnation of a protected identity, such as calling homosexuality a sin, or denying that an identity exists, with no slur, insult or epithet, dehumanization, inferiority claim or harmful stereotype, exclusion or threat. It counts so that a policy can allow or restrict it.",
 		exclusions: "Slurs, identity-based insults or epithets such as calling a group disgusting or repulsive, dehumanization, inferiority claims or harmful stereotypes, exclusion and threats, which are other forms; dislike of particular people; dislike of something a group does, such as “I hate how they …”; sarcastic or ironic praise; criticism of beliefs, ideologies or conduct."
 	},
 	"hate-threat": {
@@ -969,7 +969,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Intent or preparation",
 		description: "A concrete intent, preparation or plan for a criminal or seriously dangerous act expressed by the author.",
-		exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
+		exclusions: "Vague danger, ordinary activities with incidental risk, neutral reporting or lawful preparation. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. Violent speech, a wish of harm or a threat against someone, which Violence assesses, without a concrete criminal plan, request, instructions or recruitment; a hyperbolic or conditional urge to hit someone, such as “I'd beat his ass”, is not a concrete plan."
 	},
 	"criminal-activity-request": {
 		category: "criminal-activity",
@@ -990,7 +990,7 @@ const MODERATION_QUALIFIER_INFO = {
 		kind: "harm",
 		displayName: "Recruitment or promotion",
 		description: "The author recruits for, endorses or promotes a concrete criminal or seriously dangerous act.",
-		exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct."
+		exclusions: "Neutral reporting, condemnation, lawful advocacy or vague dangerous references. Lawful adult alcohol, tobacco/vaping or gambling activity without separate criminal or seriously dangerous conduct. Consensual adult sexual solicitation alone, without separate criminal or seriously dangerous conduct. Violent speech, a wish of harm or a threat against someone, which Violence assesses, without a concrete criminal plan, request, instructions or recruitment."
 	},
 	"criminal-activity-coded-incitement": {
 		category: "criminal-activity",
