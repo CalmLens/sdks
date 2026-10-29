@@ -1889,7 +1889,7 @@ public final class Models {
 
   /** Historical category settings used to explain the saved decision. */
   public record CategoryPolicySettingsSnapshot(String categoryAction,
-      List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions, Boolean enabled) {
+      List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions) {
     public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
   }
 

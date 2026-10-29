@@ -641,7 +641,7 @@ fn newer_event_types_decode_to_their_own_variants() {
 
 #[test]
 fn report_policy_snapshot_decodes_into_typed_models() {
-    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"enabled":true,"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
+    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
     let category = &policy.categories[&ClassificationCategory::Violence];
     let settings = category.settings.as_ref().unwrap();
     assert_eq!(settings.category_action, "block");
@@ -650,7 +650,6 @@ fn report_policy_snapshot_decodes_into_typed_models() {
         Some("snapshot-rule")
     );
     assert_eq!(category.source.as_ref().unwrap().index, Some(0));
-    assert_eq!(settings.enabled, Some(true));
     assert_eq!(settings.restrictions[0].r#match.as_deref(), Some("all"));
     assert_eq!(
         settings.restrictions[0].unless.as_deref(),

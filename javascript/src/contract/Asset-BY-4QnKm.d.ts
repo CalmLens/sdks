@@ -8461,8 +8461,6 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
       }, zod.core.$strict>, zod.ZodObject<{
         kind: zod.ZodLiteral<"below-threshold">;
       }, zod.core.$strict>, zod.ZodObject<{
-        kind: zod.ZodLiteral<"disabled">;
-      }, zod.core.$strict>, zod.ZodObject<{
         kind: zod.ZodLiteral<"allowance">;
         index: zod.ZodNumber;
         indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
@@ -8472,7 +8470,6 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
       }, zod.core.$strict>], "kind">>;
       settings: zod.ZodOptional<zod.ZodObject<{
-        enabled: zod.ZodOptional<zod.ZodBoolean>;
         categoryAction: zod.ZodEnum<{
           "age-restrict": "age-restrict";
           allow: "allow";
@@ -17488,8 +17485,6 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
         }, zod.core.$strict>, zod.ZodObject<{
           kind: zod.ZodLiteral<"below-threshold">;
         }, zod.core.$strict>, zod.ZodObject<{
-          kind: zod.ZodLiteral<"disabled">;
-        }, zod.core.$strict>, zod.ZodObject<{
           kind: zod.ZodLiteral<"allowance">;
           index: zod.ZodNumber;
           indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
@@ -17499,7 +17494,6 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
         }, zod.core.$strict>], "kind">>;
         settings: zod.ZodOptional<zod.ZodObject<{
-          enabled: zod.ZodOptional<zod.ZodBoolean>;
           categoryAction: zod.ZodEnum<{
             "age-restrict": "age-restrict";
             allow: "allow";
@@ -26782,8 +26776,6 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
           }, zod.core.$strict>, zod.ZodObject<{
             kind: zod.ZodLiteral<"below-threshold">;
           }, zod.core.$strict>, zod.ZodObject<{
-            kind: zod.ZodLiteral<"disabled">;
-          }, zod.core.$strict>, zod.ZodObject<{
             kind: zod.ZodLiteral<"allowance">;
             index: zod.ZodNumber;
             indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
@@ -26793,7 +26785,6 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
           }, zod.core.$strict>], "kind">>;
           settings: zod.ZodOptional<zod.ZodObject<{
-            enabled: zod.ZodOptional<zod.ZodBoolean>;
             categoryAction: zod.ZodEnum<{
               "age-restrict": "age-restrict";
               allow: "allow";

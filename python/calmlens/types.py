@@ -465,14 +465,10 @@ class PolicyRuleSnapshot(_PolicyRuleSnapshotRequired, total=False):
     unless: List[str]
 
 
-class _CategoryPolicySettingsSnapshotRequired(TypedDict):
+class CategoryPolicySettingsSnapshot(TypedDict):
     categoryAction: ModerationAction
     allowances: List[PolicyRuleSnapshot]
     restrictions: List[PolicyRuleSnapshot]
-
-
-class CategoryPolicySettingsSnapshot(_CategoryPolicySettingsSnapshotRequired, total=False):
-    enabled: bool
 
 
 class _CategoryPolicySourceRequired(TypedDict):

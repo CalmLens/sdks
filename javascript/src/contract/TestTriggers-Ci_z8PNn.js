@@ -1404,7 +1404,6 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 		source: zod.discriminatedUnion("kind", [
 			zod.object({ kind: zod.literal("default") }).strict(),
 			zod.object({ kind: zod.literal("below-threshold") }).strict(),
-			zod.object({ kind: zod.literal("disabled") }).strict(),
 			zod.object({
 				kind: zod.literal("allowance"),
 				index: zod.number().int().nonnegative(),
@@ -1417,7 +1416,6 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 			}).strict()
 		]).optional(),
 		settings: zod.object({
-			enabled: zod.boolean().optional(),
 			categoryAction: FLAGGED_CONTENT_ACTION_SCHEMA,
 			allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50),
 			restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)

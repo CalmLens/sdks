@@ -417,7 +417,6 @@ type PolicyRuleSnapshot struct {
 
 // CategoryPolicySettingsSnapshot preserves settings independently of later policy edits.
 type CategoryPolicySettingsSnapshot struct {
-	Enabled        *bool                `json:"enabled,omitempty"`
 	CategoryAction string               `json:"categoryAction"`
 	Allowances     []PolicyRuleSnapshot `json:"allowances"`
 	Restrictions   []PolicyRuleSnapshot `json:"restrictions"`

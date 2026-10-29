@@ -1779,9 +1779,6 @@ pub struct PolicyRuleSnapshot {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryPolicySettingsSnapshot {
-    /// Whether the category was enabled.
-    #[serde(default)]
-    pub enabled: Option<bool>,
     /// Saved category action.
     #[serde(default)]
     pub category_action: String,

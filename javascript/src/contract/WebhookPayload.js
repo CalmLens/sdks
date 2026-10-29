@@ -3,7 +3,7 @@ import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
-import { C as docPropertyInfo, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-C88yKoew.js";
+import { C as docPropertyInfo, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-Ci_z8PNn.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-Ba-H8vMt.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
@@ -248,7 +248,6 @@ const getPolicyRuleConflict = (kind, rule, categoryAction) => {
 const policyRuleKey = (rule) => policyConditionKey("some", ruleCondition(rule));
 const uniqueRules = (rules) => new Set(rules.map(policyRuleKey)).size === rules.length;
 const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
-	enabled: zod.boolean().optional().meta({ description: "Whether this category can affect policy decisions. Disabled categories retain their configured actions and rules." }),
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches 0.5: allow it, limit it so it is delivered normally but marked for reduced reach, age-restrict it so it is delivered only with `viewerClaims.ageConfirmed: true` and any required private-asset access, block it while retaining content, or permanently purge content." })

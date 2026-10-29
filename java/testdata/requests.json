@@ -833,7 +833,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "purge",
                   "allowances": [
                     {
@@ -2101,7 +2100,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -2705,7 +2703,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -3348,7 +3345,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -3978,7 +3974,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -4641,7 +4636,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -5255,7 +5249,6 @@
                         ]
                       },
                       "settings": {
-                        "enabled": true,
                         "categoryAction": "allow",
                         "allowances": [
                           {
@@ -5875,7 +5868,6 @@
                       ]
                     },
                     "settings": {
-                      "enabled": true,
                       "categoryAction": "allow",
                       "allowances": [
                         {
@@ -6501,7 +6493,6 @@
                       ]
                     },
                     "settings": {
-                      "enabled": true,
                       "categoryAction": "allow",
                       "allowances": [
                         {
@@ -7121,7 +7112,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -7725,7 +7715,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -8329,7 +8318,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -8933,7 +8921,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -9540,7 +9527,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {
@@ -10179,7 +10165,6 @@
                   ]
                 },
                 "settings": {
-                  "enabled": true,
                   "categoryAction": "allow",
                   "allowances": [
                     {

@@ -304,7 +304,7 @@ module CalmLens
   }
   type category_policy_source = { "kind" => String, ?"index" => Integer, ?"indexes" => Array[Integer] }
   type category_policy_settings_snapshot = {
-    "categoryAction" => flagged_content_action, ?"enabled" => bool,
+    "categoryAction" => flagged_content_action,
     "allowances" => Array[policy_rule_snapshot], "restrictions" => Array[policy_rule_snapshot]
   }
   type category_policy_score = {
