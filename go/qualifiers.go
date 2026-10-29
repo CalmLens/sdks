@@ -47,6 +47,7 @@ const (
 	QualifierSexualExtreme                        = "sexual-extreme"
 	QualifierSexualMinors                         = "sexual-minors"
 	QualifierSexualSolicitation                   = "sexual-solicitation"
+	QualifierSexualPaid                           = "sexual-paid"
 	QualifierSexualAdultPromotion                 = "sexual-adult-promotion"
 	QualifierSexualRevealingClothing              = "sexual-revealing-clothing"
 	QualifierSexualSuggestive                     = "sexual-suggestive"

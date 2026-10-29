@@ -44,6 +44,7 @@ module CalmLens
     ?"sexual-extreme" => qualifier_result,
     ?"sexual-minors" => qualifier_result,
     ?"sexual-solicitation" => qualifier_result,
+    ?"sexual-paid" => qualifier_result,
     ?"sexual-adult-promotion" => qualifier_result,
     ?"sexual-revealing-clothing" => qualifier_result,
     ?"sexual-suggestive" => qualifier_result,

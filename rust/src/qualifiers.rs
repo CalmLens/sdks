@@ -86,6 +86,8 @@ string_enum! {
         SexualMinors = "sexual-minors",
         /// Sexual: Sexual solicitation.
         SexualSolicitation = "sexual-solicitation",
+        /// Sexual: Paid sexual services.
+        SexualPaid = "sexual-paid",
         /// Sexual: Adult content promotion.
         SexualAdultPromotion = "sexual-adult-promotion",
         /// Sexual: Revealing clothing.
