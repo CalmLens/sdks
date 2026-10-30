@@ -302,8 +302,8 @@ module Calmthread
           return 0
         end
         applied = 0
-        client.events.each_page(after: cursor, limit: EVENT_PAGE_SIZE).first(MAX_EVENT_PAGES).each do |page|
-          page['events'].each { |event| applied += 1 if %i[released removed].include?(apply(event, client, source: @source)) }
+        client.events.each_page(cursor: cursor, page_size: EVENT_PAGE_SIZE).first(MAX_EVENT_PAGES).each do |page|
+          page['items'].each { |event| applied += 1 if %i[released removed].include?(apply(event, client, source: @source)) }
           @state_lock.synchronize { @cursor = Calmthread.cursor(page) }
         end
         applied
@@ -448,7 +448,7 @@ module Calmthread
   end
 
   def self.cursor(page)
-    cursor = page.is_a?(Hash) ? page['cursor'] : nil
+    cursor = page.is_a?(Hash) ? page['nextCursor'] : nil
     unless cursor.is_a?(String) && !cursor.empty?
       raise CalmLens::InvalidResponseError.new(CalmLens::SdkErrorCodes::INVALID_RESPONSE, 'Events page has no cursor')
     end

@@ -159,19 +159,19 @@ class RobustnessTest {
   /** client-cases.json covers the pages and requests; {@code AutoPager.cursor()} is Java's own. */
   @Test void theEventPagerKeepsTheLatestCursor() {
     var events = new Scripted(
-        reply(200, "{\"events\":[{\"id\":\"e1\",\"type\":\"asset.classified\",\"facts\":[]}],\"cursor\":\"c1\",\"hasMore\":true}"),
-        reply(200, "{\"events\":[{\"id\":\"e2\",\"type\":\"asset.allowed\"}],\"cursor\":\"c2\",\"hasMore\":false}"));
-    AutoPager<Models.EventsPage> feed = events.client().events.pages(new Models.ListEvents().after("c0").limit(1));
+        reply(200, "{\"items\":[{\"id\":\"e1\",\"type\":\"asset.classified\",\"facts\":[]}],\"nextCursor\":\"c1\",\"hasMore\":true}"),
+        reply(200, "{\"items\":[{\"id\":\"e2\",\"type\":\"asset.allowed\"}],\"nextCursor\":\"c2\",\"hasMore\":false}"));
+    AutoPager<Models.EventsPage> feed = events.client().events.pages(new Models.ListEvents().cursor("c0").pageSize(1));
     List<String> ids = new ArrayList<>();
     List<String> cursors = new ArrayList<>();
     for (Models.EventsPage page : feed) {
-      page.events().forEach(event -> ids.add(event.id()));
-      cursors.add(page.cursor());
+      page.items().forEach(event -> ids.add(event.id()));
+      cursors.add(page.nextCursor());
     }
     assertEquals(List.of("e1", "e2"), ids);
     assertEquals(List.of("c1", "c2"), cursors);
     assertEquals("c2", feed.cursor());
-    assertEquals(List.of(), events.client().events.list(new Models.ListEvents()).events().get(0).facts());
+    assertEquals(List.of(), events.client().events.list(new Models.ListEvents()).items().get(0).facts());
   }
 
   @Test void closedClientsRefuseRequests() {

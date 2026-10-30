@@ -5,12 +5,15 @@ module CalmLens
   # project: a `flag` list reports matches, a `block` list also blocks close matches. Reach it through
   # {ServerClient#hash_lists}.
   class HashLists < Resource
-    # @return [Hash] `{'items' => [hash list, ...]}`, every hash list in the project.
+    # Lists one page of the project's hash lists, newest first.
+    # @option options [String] :cursor the previous page's `nextCursor`
+    # @option options [Integer] :page_size 1 to 100, default 10
+    # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
     def list(options = {})
-      call(options) do |_api, request|
-        response = request('GET', project('hash-lists'), request_options: request)
+      call(options) do |api, request|
+        response = request('GET', project('hash-lists'), query: api, request_options: request)
         valid = response.is_a?(Hash) && response['items'].is_a?(Array)
-        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid hash list list') unless valid
+        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid hash list page') unless valid
 
         response
       end

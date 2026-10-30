@@ -211,19 +211,20 @@ describe("pagination", () => {
   });
 
   test("events.pages follows the cursor until no more events are waiting", async () => {
-    const feed: Record<string, { events: { id: string }[]; cursor: string; hasMore: boolean }> = {
-      start: { events: [{ id: "e1" }], cursor: "c1", hasMore: true },
-      c1: { events: [{ id: "e2" }], cursor: "c2", hasMore: false },
-    };
+    const feed: Record<string, { items: { id: string }[]; nextCursor: string; hasMore: boolean }> =
+      {
+        start: { items: [{ id: "e1" }], nextCursor: "c1", hasMore: true },
+        c1: { items: [{ id: "e2" }], nextCursor: "c2", hasMore: false },
+      };
     const { fetchImpl } = recordingFetch((request) =>
-      Response.json(feed[new URL(request.url).searchParams.get("after")!]),
+      Response.json(feed[new URL(request.url).searchParams.get("cursor")!]),
     );
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
     const seen: string[] = [];
     let cursor = "start";
-    for await (const page of client.events.pages({ after: "start", limit: 100 })) {
-      seen.push(...page.events.map((event) => event.id));
-      cursor = page.cursor;
+    for await (const page of client.events.pages({ cursor: "start", pageSize: 100 })) {
+      seen.push(...page.items.map((event) => event.id));
+      cursor = page.nextCursor;
     }
     expect(seen).toEqual(["e1", "e2"]);
     expect(cursor).toBe("c2");

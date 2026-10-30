@@ -40,7 +40,7 @@ module CalmLens
     # run transforms or index for semantic search.
     # @api private
     class FakeAPI
-      JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize pageIndex searchAll resolveOnly limit
+      JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize searchAll resolveOnly limit
                       processingOptions metadata context].freeze
       # Keyword search fields, in the order matches are reported, and where each value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
@@ -50,10 +50,11 @@ module CalmLens
       MAX_SEARCH_TOKENS = 8
       MAX_SEARCH_LIMIT = 20
       MAX_SEARCH_QUERY_LENGTH = 200
-      DEFAULT_EVENTS_LIMIT = 50
-      MAX_EVENTS_LIMIT = 100
+      DEFAULT_EVENTS_PAGE_SIZE = 50
+      DEFAULT_PAGE_SIZE = 10
       MAX_PAGE_SIZE = 100
       REVIEW_DECISIONS = %w[allowed limited age-restricted blocked purged].freeze
+      MAX_DECISION_NOTE_LENGTH = 1499
       RESOURCES = %w[original rendered placeholder].freeze
       MIN_PART = 5 * 1024 * 1024
       MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
@@ -104,17 +105,7 @@ module CalmLens
         item = @state.assets[asset_id]
         return unless item && item['projectId'] == @project_id
 
-        apply_outcome(item, decision, 'requested')
-        item['classification']['moderation']['manualReviews'] <<
-          { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => nil, 'reviewerUserId' => nil,
-            'reviewedAt' => @now.call, 'appliedToAsset' => true }
-        lifecycle_event('asset.content-removed', item) if decision == 'purged'
-        # Like the event catalog: only allowing and limiting are low severity.
-        add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
-                  'title' => "asset.#{decision}", 'assetId' => asset_id, 'asset' => snapshot(item),
-                  'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }, { 'key' => 'asset-type', 'value' => item['type'] },
-                              { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{asset_id}" },
-                              { 'key' => 'note', 'value' => nil }])
+        record_decision(item, decision, nil, nil)
         deep_copy(item)
       end
 
@@ -144,6 +135,50 @@ module CalmLens
       end
 
       def request_id = "mock-request-#{@request_count += 1}"
+
+      # Applies a reviewer's decision like `decideAssetManually` in the API: the status and the review,
+      # then (for `purged`) the content removal and its event, then `asset.<decision>`.
+      def record_decision(item, decision, note, reviewer_name)
+        apply_outcome(item, decision, 'requested')
+        review = { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => note, 'reviewerUserId' => nil,
+                   'reviewedAt' => @now.call, 'appliedToAsset' => true }
+        reviewer_facts = []
+        if reviewer_name
+          review.merge!('reviewerName' => reviewer_name, 'reviewerEmail' => nil)
+          reviewer_facts = [{ 'key' => 'reviewer-user-id', 'value' => nil }, { 'key' => 'reviewer-name', 'value' => reviewer_name }]
+        end
+        item['classification']['moderation']['manualReviews'] << review
+        lifecycle_event('asset.content-removed', item) if decision == 'purged'
+        # Like the event catalog: only allowing and limiting are low severity.
+        add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
+                  'title' => "asset.#{decision}", 'assetId' => item['id'], 'asset' => snapshot(item),
+                  'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }, { 'key' => 'asset-type', 'value' => item['type'] },
+                              { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{item['id']}" },
+                              *reviewer_facts, { 'key' => 'note', 'value' => note }])
+      end
+
+      # `POST /assets/:id/decision` as the API validates and applies it. The mock's key is unnamed, so the
+      # review and its event name the reviewer `An API key`. An asset still uploading or processing is
+      # refused with `asset/processing`.
+      def decide_request(item, json)
+        decision = json['decision']
+        invalid!('validation/invalid-union', 'decision') unless REVIEW_DECISIONS.include?(decision)
+        note = json['note']
+        invalid!('validation/invalid-type', 'note') unless note.is_a?(String)
+        note = note.strip
+        invalid!('validation/too-small', 'note') if note.empty?
+        invalid!('validation/too-big', 'note') if note.length > MAX_DECISION_NOTE_LENGTH
+        invalid!('validation/invalid-value', 'confirmPurge') if decision == 'purged' && json['confirmPurge'] != true
+        processing = item['upload']['status'] == 'uploading' || item['classification']['status'] == 'processing'
+        fail!(ErrorCodes::ASSET_PROCESSING) if processing
+        status = item['classification']['moderation']['status']
+        fail!(ErrorCodes::ASSET_DECISION_NOT_ALLOWED) if status == 'pending' && !%w[blocked purged].include?(decision)
+        fail!(ErrorCodes::ASSET_DECISION_UNCHANGED) if status == decision
+        fail!(ErrorCodes::ASSET_CONTENT_PURGED) if status == 'purged' && decision != 'blocked'
+
+        record_decision(item, decision, note, 'An API key')
+        item
+      end
 
       # The asset summary events carry.
       def snapshot(item)
@@ -240,7 +275,7 @@ module CalmLens
         in ['PUT', ['lenses'], _] then lenses(json.fetch('lenses', []))
         in ['GET', ['folders'], _] then folder_page(query)
         in ['POST', ['folders'], _] then create_folder(json)
-        in ['GET', ['hash-lists'], _] then { 'items' => project_hash_lists.reverse }
+        in ['GET', ['hash-lists'], _] then page(project_hash_lists, query, JSON.generate([@project_id]))
         in ['POST', ['hash-lists'], _] then create_hash_list(json)
         in ['GET', ['assets', 'page'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
@@ -310,17 +345,20 @@ module CalmLens
         page(RSQL.filter(items, query['filter']), query, JSON.generate([@project_id, query['filter'], query['folderId']]))
       end
 
+      # Like the API: one keyset page of child folders (or search matches), by `name` ascending unless
+      # `ordering` (one entry, `name` or `createdAt`) says otherwise, with an `id` tie-breaker, and the
+      # ancestors of the listed and requested folders. Names compare by code point, so case matters.
       def folder_page(query)
-        size = check_range(query.fetch('pageSize', MAX_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         found = project_folders.select do |f|
           in_scope = (query['searchAll'] && query['search']) || f['parentId'] == query['parentId']
           in_scope && (!query['search'] || f['name'].downcase.include?(query['search'].downcase))
         end
-        # Like the database: names compare by code point, so case matters.
-        found.sort_by! { |f| [query['sort'] == 'createdAt' ? f['createdAt'] : f['name'], f['id']] }
-        found.reverse! if query['direction'] == 'DESC'
-        start = query.fetch('pageIndex', 0) * size
-        page = query['resolveOnly'] ? [] : found.slice(start, size) || []
+        invalid!('validation/too-big', 'ordering') if ordering(query, nil).size > 1
+        scope = JSON.generate([@project_id, query['parentId'], query['search'], query['searchAll'] == true])
+        result = page(found, { 'pageSize' => MAX_PAGE_SIZE }.merge(query), scope,
+                      fields: %w[name createdAt], default: { 'field' => 'name', 'direction' => 'ASC' })
+        result.merge!('items' => [], 'nextCursor' => nil, 'hasMore' => false) if query['resolveOnly']
+        page = result['items']
         ids = (Array(query['ids']) + [query['parentId']] + page.map { |f| f['id'] }).compact.uniq
         queue = ids.dup
         until queue.empty?
@@ -330,27 +368,25 @@ module CalmLens
             queue << parent
           end
         end
-        { 'folders' => page, 'ancestors' => project_folders.select do |f|
-          ids.include?(f['id']) && !page.include?(f)
-        end, 'hasMore' => !query['resolveOnly'] && found.length > start + size }
+        result.merge('ancestors' => project_folders.select { |f| ids.include?(f['id']) && !page.include?(f) })
       end
 
       def project_folders = @state.folders.values.select { |item| item['projectId'] == @project_id }
 
-      # Like the API: without a cursor, no events and a cursor for now; with one, up to `limit`
-      # events added since, oldest first.
+      # Like the API: without a cursor, no events and a `nextCursor` for now; with one, up to `pageSize`
+      # events added since, oldest first. `nextCursor` is never nil.
       def events(query)
-        limit = check_range(query.fetch('limit', DEFAULT_EVENTS_LIMIT), 'limit', MAX_EVENTS_LIMIT)
+        size = check_range(query.fetch('pageSize', DEFAULT_EVENTS_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         feed = @state.events
-        return { 'events' => [], 'cursor' => "mock_#{feed.size}", 'hasMore' => false } unless query['after']
+        return { 'items' => [], 'nextCursor' => "mock_#{feed.size}", 'hasMore' => false } unless query['cursor']
 
-        match = query['after'].to_s.match(/\Amock_(\d+)\z/)
+        match = query['cursor'].to_s.match(/\Amock_(\d+)\z/)
         position = match && Integer(match[1], 10)
-        fail!(ErrorCodes::INVALID_EVENT_CURSOR, details: { 'after' => query['after'] }) unless position && position <= feed.size
+        fail!(ErrorCodes::INVALID_CURSOR) unless position && position <= feed.size
 
-        taken = feed[position, limit]
+        taken = feed[position, size]
         following = position + taken.size
-        { 'events' => taken, 'cursor' => "mock_#{following}", 'hasMore' => following < feed.size }
+        { 'items' => taken, 'nextCursor' => "mock_#{following}", 'hasMore' => following < feed.size }
       end
 
       # Saves lenses in order, like the API: an unchanged definition returns the stored lens, a
@@ -576,6 +612,7 @@ module CalmLens
         in ['GET', 'children'] then page(project_assets.select { |child| child['parentId'] == id }, query, id)
         in ['POST', 'retry'] then retry_asset(item)
         in ['POST', 'explain'] then explain(item, json['rerun'])
+        in ['POST', 'decision'] then decide_request(item, json)
         in ['POST', 'move']
           check_folder(json['folderId']) if json['folderId']
           touch(item.merge!('folderId' => json['folderId']))
@@ -825,13 +862,13 @@ module CalmLens
         {}
       end
 
-      # One keyset page like the API's: ordered by `createdAt` and `id` (an `id` tie-breaker is
-      # added), starting after the cursor's values. The cursor is tied to `scope` (the filter, folder
-      # or parent) and the ordering, so it only continues the query it came from.
-      def page(items, query, scope)
-        size = check_range(query.fetch('pageSize', 10), 'pageSize', MAX_PAGE_SIZE)
-        ordering = ordering(query)
-        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Invalid ordering') if ordering.any? { |o| !%w[createdAt id].include?(o['field']) }
+      # One keyset page like the API's: ordered by `fields` (`createdAt` descending by default; an `id`
+      # tie-breaker is added), starting after the cursor's values. The cursor is tied to `scope` (the
+      # filter, folder or parent) and the ordering, so it only continues the query it came from.
+      def page(items, query, scope, fields: %w[createdAt id], default: { 'field' => 'createdAt', 'direction' => 'DESC' })
+        size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
+        ordering = ordering(query, default)
+        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Invalid ordering') if ordering.any? { |o| !fields.include?(o['field']) }
         ordering << { 'field' => 'id', 'direction' => ordering.first['direction'] } unless ordering.any? { |o| o['field'] == 'id' }
         signature = JSON.generate([scope, ordering])
         sorted = items.sort { |a, b| compare_items(a, b, ordering) }
@@ -850,10 +887,11 @@ module CalmLens
       end
 
       def cursor_values(cursor, signature, ordering)
+        text_fields = %w[id name]
         parsed = JSON.parse(cursor.unpack1('m0').force_encoding(Encoding::UTF_8))
         values = parsed.is_a?(Hash) ? parsed['values'] : nil
         valid = parsed.is_a?(Hash) && parsed['scope'] == signature && values.is_a?(Array) && values.size == ordering.size &&
-                values.zip(ordering).all? { |value, o| o['field'] == 'id' ? value.is_a?(String) : value.is_a?(Numeric) }
+                values.zip(ordering).all? { |value, o| text_fields.include?(o['field']) ? value.is_a?(String) : value.is_a?(Numeric) }
         fail!(ErrorCodes::INVALID_CURSOR) unless valid
         values
       rescue ArgumentError, JSON::ParserError, EncodingError
@@ -868,9 +906,9 @@ module CalmLens
         false
       end
 
-      def ordering(query)
+      def ordering(query, default)
         entries = query.keys.filter_map { |key| key.match(/\Aordering\[(\d+)\]\[(field|direction)\]\z/) }
-        return [{ 'field' => 'createdAt', 'direction' => 'DESC' }] if entries.empty?
+        return [default&.dup].compact if entries.empty?
 
         entries.group_by { |match| Integer(match[1], 10) }.sort.map do |_, matches|
           matches.to_h { |match| [match[2], query[match[0]]] }

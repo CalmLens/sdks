@@ -755,7 +755,7 @@ class CalmmarketTest {
     Calmmarket.Listing listing = app.listings().get(0);
     mock.enqueueEvents("cursor-0", false);
     assertEquals("/?notice=watching", post(app, "/reviews/sync", "csrf=" + app.csrf).headers().get("location"));
-    assertNull(mock.requests().get(3).query().get("after"));
+    assertNull(mock.requests().get(3).query().get("cursor"));
 
     Map<String, Object> blocking = Map.of("id", "event-1", "type", "asset.blocked", "assetId", "description-1",
         "facts", List.of(Map.of("key", "reviewer-user-id", "value", "user-9"), Map.of("key", "reviewer-name", "value", "Sam"),
@@ -771,10 +771,10 @@ class CalmmarketTest {
         .enqueueEvents("cursor-2", false, blocking);
     assertEquals("/?notice=decisions-applied", post(app, "/reviews/sync", "csrf=" + app.csrf).headers().get("location"));
     List<MockCalmLensServerClient.Request> sent = mock.requests();
-    assertEquals("cursor-0", sent.get(4).query().get("after"));
-    assertEquals("cursor-0", sent.get(6).query().get("after"));
+    assertEquals("cursor-0", sent.get(4).query().get("cursor"));
+    assertEquals("cursor-0", sent.get(6).query().get("cursor"));
     assertEquals("/v1/assets/description-1", sent.get(7).path());
-    assertEquals("cursor-1", sent.get(8).query().get("after"));
+    assertEquals("cursor-1", sent.get(8).query().get("cursor"));
     assertEquals(9, sent.size(), "a repeated event is not retrieved again");
     assertEquals(Calmmarket.State.REMOVED, listing.state());
     assertEquals(AssetModerationStatus.BLOCKED, listing.textStatus.get("description"), "the later decision replaces the submitted one");

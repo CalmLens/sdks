@@ -370,21 +370,21 @@ async fn enqueued_events_carry_the_asset_snapshot() {
     let page = mock
         .events()
         .list(ListEvents {
-            after: Some(start.cursor),
+            cursor: Some(start.next_cursor),
             ..Default::default()
         })
         .await
         .unwrap();
-    assert_eq!(page.events, vec![event]);
+    assert_eq!(page.items, vec![event]);
     let error = mock
         .events()
         .list(ListEvents {
-            after: Some("bogus".into()),
+            cursor: Some("bogus".into()),
             ..Default::default()
         })
         .await
         .unwrap_err();
-    assert_eq!(error.code(), &ErrorCode::InvalidEventCursor);
+    assert_eq!(error.code(), &ErrorCode::InvalidCursor);
 }
 
 #[tokio::test]

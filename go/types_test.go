@@ -352,7 +352,7 @@ func TestEnsureLensSendsTypedTransforms(t *testing.T) {
 func TestEventFactsDecode(t *testing.T) {
 	var page EventsPage
 	err := json.Unmarshal([]byte(`{
-  "events": [
+  "items": [
     {
       "id": "e",
       "type": "asset.classified",
@@ -411,13 +411,13 @@ func TestEventFactsDecode(t *testing.T) {
       ]
     }
   ],
-  "cursor": "c",
+  "nextCursor": "c",
   "hasMore": false
 }`), &page)
 	if err != nil {
 		t.Fatal(err)
 	}
-	flagged := page.Events[0]
+	flagged := page.Items[0]
 	var facts AssetClassifiedFacts
 	if err = flagged.Facts.Decode(&facts); err != nil {
 		t.Fatal(err)
@@ -438,10 +438,10 @@ func TestEventFactsDecode(t *testing.T) {
 		t.Fatalf("%+v", flagged)
 	}
 	var usage UsageLimitReachedFacts
-	if err = page.Events[1].Facts.Decode(&usage); err != nil || usage.Limit != 9007199254740993 || usage.Used != 10 || usage.OrganisationID != "user-1" {
+	if err = page.Items[1].Facts.Decode(&usage); err != nil || usage.Limit != 9007199254740993 || usage.Used != 10 || usage.OrganisationID != "user-1" {
 		t.Fatalf("%+v %v", usage, err)
 	}
-	if err = page.Events[1].Facts.Decode(&AssetClassifiedFacts{}); ErrorCode(err) != "" {
+	if err = page.Items[1].Facts.Decode(&AssetClassifiedFacts{}); ErrorCode(err) != "" {
 		t.Fatalf("unrelated keys are ignored, got %v", err)
 	}
 	if err = (EventFacts{{Key: FactLimit, Value: "many"}}).Decode(&UsageLimitReachedFacts{}); ErrorCode(err) != CodeSDKInvalidResponse {
@@ -451,52 +451,52 @@ func TestEventFactsDecode(t *testing.T) {
 
 func TestEventFactsDecodeTeamAndAPIKeyEvents(t *testing.T) {
 	var page EventsPage
-	err := json.Unmarshal([]byte(`{"events":[
+	err := json.Unmarshal([]byte(`{"items":[
 		{"id":"r","type":"api-key.revoked","severity":"low","facts":[{"key":"key-id","value":"key-1"},{"key":"key-name","value":"CI"},{"key":"action","value":"deleted"},{"key":"revoked-by-user-id","value":"user-1"}]},
 		{"id":"m","type":"project.member-removed","severity":"low","facts":[{"key":"member-user-id","value":"user-2"},{"key":"role","value":"editor"},{"key":"left","value":true},{"key":"removed-by-user-id","value":null}]},
 		{"id":"p","type":"upload-preset.daily-limit-reached","severity":"low","facts":[{"key":"preset-id","value":"p1"},{"key":"preset-name","value":"Avatars"},{"key":"daily-limit","value":500}]}],
-		"cursor":"c","hasMore":false}`), &page)
+		"nextCursor":"c","hasMore":false}`), &page)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Events[0].Type != EventAPIKeyRevoked || page.Events[1].Type != EventProjectMemberRemoved || page.Events[2].Type != EventUploadPresetDailyLimitReached {
-		t.Fatalf("types %q %q %q", page.Events[0].Type, page.Events[1].Type, page.Events[2].Type)
+	if page.Items[0].Type != EventAPIKeyRevoked || page.Items[1].Type != EventProjectMemberRemoved || page.Items[2].Type != EventUploadPresetDailyLimitReached {
+		t.Fatalf("types %q %q %q", page.Items[0].Type, page.Items[1].Type, page.Items[2].Type)
 	}
 	var revoked APIKeyRevokedFacts
-	if err = page.Events[0].Facts.Decode(&revoked); err != nil || revoked.Action != "deleted" || *revoked.KeyName != "CI" || *revoked.RevokedByUserID != "user-1" {
+	if err = page.Items[0].Facts.Decode(&revoked); err != nil || revoked.Action != "deleted" || *revoked.KeyName != "CI" || *revoked.RevokedByUserID != "user-1" {
 		t.Fatalf("revoked %+v %v", revoked, err)
 	}
 	var removed ProjectMemberRemovedFacts
-	if err = page.Events[1].Facts.Decode(&removed); err != nil || !removed.Left || removed.Role != "editor" || removed.RemovedByUserID != nil {
+	if err = page.Items[1].Facts.Decode(&removed); err != nil || !removed.Left || removed.Role != "editor" || removed.RemovedByUserID != nil {
 		t.Fatalf("removed %+v %v", removed, err)
 	}
 	var preset UploadPresetDailyLimitReachedFacts
-	if err = page.Events[2].Facts.Decode(&preset); err != nil || preset.DailyLimit != 500 || preset.PresetName != "Avatars" {
+	if err = page.Items[2].Facts.Decode(&preset); err != nil || preset.DailyLimit != 500 || preset.PresetName != "Avatars" {
 		t.Fatalf("preset %+v %v", preset, err)
 	}
-	if fact, ok := page.Events[0].Facts.Get(FactAction); !ok || fact.Key != "action" {
+	if fact, ok := page.Items[0].Facts.Get(FactAction); !ok || fact.Key != "action" {
 		t.Fatalf("FactAction %v", fact)
 	}
 }
 
 func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 	var page EventsPage
-	err := json.Unmarshal([]byte(`{"events":[
+	err := json.Unmarshal([]byte(`{"items":[
 		{"id":"a","type":"asset.blocked","severity":"high","facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"decided-by","value":"automated"},{"key":"flagged-categories","value":["violence"]}]},
 		{"id":"r","type":"asset.allowed","severity":"low","facts":[{"key":"decided-by","value":"reviewer"},{"key":"reviewer-user-id","value":"user-1"},{"key":"note","value":"Fine"}]}],
-		"cursor":"c","hasMore":false}`), &page)
+		"nextCursor":"c","hasMore":false}`), &page)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var automated AssetDecisionFacts
-	if err = page.Events[0].Facts.Decode(&automated); err != nil || automated.DecidedBy != DecidedByAutomated || !reflect.DeepEqual(automated.FlaggedCategories, []string{CategoryViolence}) || automated.ReviewerUserID != nil || automated.Note != nil {
+	if err = page.Items[0].Facts.Decode(&automated); err != nil || automated.DecidedBy != DecidedByAutomated || !reflect.DeepEqual(automated.FlaggedCategories, []string{CategoryViolence}) || automated.ReviewerUserID != nil || automated.Note != nil {
 		t.Fatalf("automated %+v %v", automated, err)
 	}
 	var reviewed AssetDecisionFacts
-	if err = page.Events[1].Facts.Decode(&reviewed); err != nil || reviewed.DecidedBy != DecidedByReviewer || reviewed.FlaggedCategories != nil || *reviewed.ReviewerUserID != "user-1" || *reviewed.Note != "Fine" {
+	if err = page.Items[1].Facts.Decode(&reviewed); err != nil || reviewed.DecidedBy != DecidedByReviewer || reviewed.FlaggedCategories != nil || *reviewed.ReviewerUserID != "user-1" || *reviewed.Note != "Fine" {
 		t.Fatalf("reviewed %+v %v", reviewed, err)
 	}
-	if fact, ok := page.Events[1].Facts.Get(FactDecidedBy); !ok || fact.Value != DecidedByReviewer {
+	if fact, ok := page.Items[1].Facts.Get(FactDecidedBy); !ok || fact.Value != DecidedByReviewer {
 		t.Fatalf("FactDecidedBy %+v", fact)
 	}
 }

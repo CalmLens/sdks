@@ -36,7 +36,8 @@ from .types import (
     ImageTransformRedaction, TextRegion, DetectedQrCode, DetectedLink, EvaluatedLinkDetectionResult,
     LinkDetectionResult, ProvenanceSignal, EvaluatedAiGeneratedDetectionResult, AiGeneratedDetectionResult,
     LinkDetectionFeatureOptions, AiGeneratedDetectionFeatureOptions, HashMatch, HashListAction, HashList,
-    HashListEntry, HashListList, HashListEntryPage, HashListIdOptions, HashListEntryIdOptions,
+    HashListEntry, HashListPage, ListHashListsOptions, HashListEntryPage, HashListIdOptions, HashListEntryIdOptions,
+    DecideAssetOptions, FolderOrdering,
     CreateHashListOptions, UpdateHashListOptions, ListHashListEntriesOptions, AddHashListEntryOptions,
 )
 from .webhooks import (WEBHOOK_DELIVERY_HEADER, WEBHOOK_SIGNATURE_HEADER, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
@@ -84,6 +85,7 @@ __all__ = ["ViewerClaims",
     "ImageTransformRedaction", "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult",
     "LinkDetectionResult", "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult",
     "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "HashMatch", "HashListAction", "HashList",
-    "HashListEntry", "HashListList", "HashListEntryPage", "HashListIdOptions", "HashListEntryIdOptions",
+    "HashListEntry", "HashListPage", "ListHashListsOptions", "HashListEntryPage", "HashListIdOptions",
+    "HashListEntryIdOptions", "DecideAssetOptions", "FolderOrdering",
     "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
 ]

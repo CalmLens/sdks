@@ -20,7 +20,6 @@ export const API_ERROR_CODES = {
   UPLOAD_LIMIT_EXCEEDED: "upload/limit-exceeded",
   SPEND_LIMIT_REACHED: "upload/spend-limit-reached",
   INVALID_UPLOAD_MIME_TYPE: "upload/invalid-mime-type",
-  INVALID_EVENT_CURSOR: "events/invalid-cursor",
   INVALID_UPLOAD_PAYLOAD: "upload/invalid-payload",
   USE_UPLOAD_PART: "upload/use-upload-part",
   UPLOAD_NOT_OPEN: "upload/not-open",
@@ -36,6 +35,9 @@ export const API_ERROR_CODES = {
   ASSET_REVIEW_NOTE_REQUIRED: "asset/review-note-required",
   ASSET_UPDATE_FAILED: "asset/update-failed",
   ASSET_SAFETY_HELD: "asset/safety-held",
+  ASSET_PROCESSING: "asset/processing",
+  ASSET_DECISION_NOT_ALLOWED: "asset/decision-not-allowed",
+  ASSET_DECISION_UNCHANGED: "asset/decision-unchanged",
   ASSET_NOT_RETRYABLE: "asset/not-retryable",
   ASSET_CONTENT_UNAVAILABLE: "asset/content-unavailable",
   ASSET_CONTENT_PURGED: "asset/content-purged",
@@ -162,10 +164,6 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 400,
     message: "Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
   },
-  "events/invalid-cursor": {
-    status: 400,
-    message: "The events cursor is invalid. Use the cursor from a previous response, or omit it to start from now.",
-  },
   "upload/invalid-payload": {
     status: 400,
     message: "Upload payload is invalid.",
@@ -225,6 +223,18 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "asset/safety-held": {
     status: 423,
     message: "Asset access is restricted by a safety hold.",
+  },
+  "asset/processing": {
+    status: 409,
+    message: "Wait for the asset to finish uploading and processing before deciding it.",
+  },
+  "asset/decision-not-allowed": {
+    status: 409,
+    message: "This asset has no moderation decision yet, so it can only be blocked or purged. Allow, limit or age-restrict it once moderation has decided it.",
+  },
+  "asset/decision-unchanged": {
+    status: 409,
+    message: "The asset already has this moderation status.",
   },
   "asset/not-retryable": {
     status: 409,

@@ -82,6 +82,7 @@ send `Accept: application/json`. `calmlens.Version` is the SDK version.
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `assets.create/classify`                  | `Assets.Create/Classify(ctx, SubmitAssetOptions)`                                                                                                                                                   |
 | `assets.retrieve/retry`                   | `Assets.Retrieve/Retry(ctx, AssetIDOptions)`                                                                                                                                                        |
+| `assets.decide`                           | `Assets.Decide(ctx, DecideAssetOptions)`: `Decision` and `Note`, plus `ConfirmPurge` to purge                                                                                                       |
 | `assets.explain`                          | `Assets.Explain(ctx, ExplainAssetOptions)`                                                                                                                                                          |
 | `assets.waitForDecision`                  | `Assets.WaitForDecision(ctx, WaitForDecisionOptions)`                                                                                                                                               |
 | `assets.update`                           | `Assets.Update(ctx, UpdateAssetOptions)`                                                                                                                                                            |
@@ -172,8 +173,8 @@ page, err := client.HashLists.ListEntries(ctx, calmlens.ListHashListEntriesOptio
 list, err = client.HashLists.Update(ctx, calmlens.UpdateHashListOptions{HashListID: list.ID, Description: calmlens.Null[string](), Action: calmlens.Ptr(calmlens.HashListActionFlag)})
 ```
 
-`ListEntries` returns entries newest first; pass `page.NextCursor` as `Cursor` while
-`page.HasMore` is true. `UpdateHashListOptions` sends only the fields you set, and its
+`HashLists.List` and `ListEntries` return pages newest first; pass `page.NextCursor` as
+`Cursor` while `page.HasMore` is true. `UpdateHashListOptions` sends only the fields you set, and its
 `Description` is a `calmlens.Patch`, so `calmlens.Null[string]()` clears it.
 
 ### Pagination
@@ -375,18 +376,19 @@ asset, err := client.Assets.Create(ctx, calmlens.SubmitAssetOptions{
 ## Events feed
 
 `Events.List` polls the project event feed. It returns `*calmlens.EventsPage`, the JSON
-`{events, cursor, hasMore}` as `Events []Event`, `Cursor string`, and `HasMore bool`.
-Calling it without `After` returns **no events** and a cursor for "now", so you only
-see events created after you connect. `Events.ListAll` follows the cursor until no more
+`{items, nextCursor, hasMore}` as `Items []Event`, `NextCursor string`, and `HasMore bool`.
+`NextCursor` is never empty: it is where to continue polling from. Calling it without
+`Cursor` returns **no events** and a cursor for "now", so you only see events created after
+you connect. `Events.ListAll` follows the cursor until no more
 events are available (`NextPage` and `Page` walk it a page at a time, empty pages included);
 save `Cursor()` and continue from it later:
 
 ```go
 start, err := client.Events.List(ctx, calmlens.ListEventsOptions{})
 if err != nil { return err }
-cursor := start.Cursor // save this; start.Events is always empty
+cursor := start.NextCursor // save this; start.Items is always empty
 // ...later:
-it := client.Events.ListAll(calmlens.ListEventsOptions{After: cursor, Limit: 100})
+it := client.Events.ListAll(calmlens.ListEventsOptions{Cursor: cursor, PageSize: 100})
 for it.Next(ctx) {
     event := it.Event()
     fmt.Println(event.Type, event.ID, event.Facts)
@@ -632,6 +634,12 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
   asset returns 403 `asset/api-key-missing-permission` unless the key has the `assets:download` permission; the default key has no grants, and `SetAPIKeyGrants`
   replaces them (the key stays the same). The placeholder is served for every image whatever its
   visibility or moderation, and refused once purged or removed.
+- `Assets.Decide` validates and applies a decision like the API: a pending asset can only be
+  blocked or purged (`asset/decision-not-allowed`), the current status is refused
+  (`asset/decision-unchanged`), purged content can only be blocked (`asset/content-purged`),
+  and an unknown asset is `asset/not-found`.
+- Folders list by name (or `Ordering` by `createdAt`), then ID, with cursors like the API's;
+  hash lists list newest first, 10 to a page by default.
 - `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeLimited`, `OutcomeAgeRestricted`,
   `OutcomePurged`) applies a reviewer's decision and adds the matching `asset.<decision>` event
   with a `decided-by: reviewer` fact; purging removes the content with `RemovalReason`

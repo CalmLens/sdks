@@ -79,6 +79,15 @@ func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Ass
 	return s.assetRequest(ctx, "POST", options.AssetID, "/retry", nil)
 }
 
+// Decide records a reviewer's decision, replacing the policy's: the asset's moderation status
+// becomes options.Decision, the note joins its review history and the matching asset.<status>
+// event is sent with decided-by: reviewer. An asset still pending moderation can only be
+// blocked or purged. Purging needs ConfirmPurge and the assets:delete permission, and
+// permanently deletes the stored content.
+func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) (*Asset, error) {
+	return s.assetRequest(ctx, "POST", options.AssetID, "/decision", options)
+}
+
 // Explain completes the policy evidence behind a decided asset's moderation decision: the report's
 // Policy.Evidence becomes PolicyEvidenceFull and every action stays as decided. With Rerun the
 // asset is moderated again with the project's current policy and returns in
@@ -269,7 +278,8 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	return &result, nil
 }
 
-// List returns one page of folders.
+// List returns one page of child folders, sorted by name unless options.Ordering says
+// otherwise. Pass the page's NextCursor as Cursor for the next page.
 func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (*FolderPage, error) {
 	params, err := query(options)
 	if err != nil {
@@ -511,10 +521,14 @@ func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions)
 // also block close ones.
 type HashListsService struct{ c *ServerClient }
 
-// List returns every hash list in the project.
-func (s *HashListsService) List(ctx context.Context, options ListHashListsOptions) (*HashListList, error) {
-	var result HashListList
-	if err := s.c.request(ctx, "GET", s.c.project("hash-lists"), nil, nil, &result); err != nil {
+// List returns one page of the project's hash lists, newest first.
+func (s *HashListsService) List(ctx context.Context, options ListHashListsOptions) (*HashListPage, error) {
+	params, err := query(options)
+	if err != nil {
+		return nil, err
+	}
+	var result HashListPage
+	if err := s.c.request(ctx, "GET", s.c.project("hash-lists"), params, nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

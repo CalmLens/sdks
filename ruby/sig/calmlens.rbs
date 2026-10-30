@@ -168,6 +168,7 @@ module CalmLens
     def wait_for_decision: (wait_for_decision_options options) -> asset
     def update: (update_asset_options options) -> asset
     def retry: (asset_id_options options) -> asset
+    def decide: (decide_asset_options options) -> asset
     def explain: (explain_asset_options options) -> asset
     def delete_content: (asset_id_options options) -> asset
     def delete: (asset_id_options options) -> nil
@@ -189,7 +190,7 @@ module CalmLens
   end
 
   class HashLists < Resource
-    def list: (?{ ?request_options: request_options } options) -> hash_list_list
+    def list: (?list_hash_lists_options options) -> hash_list_page
     def retrieve: (hash_list_id_options options) -> hash_list
     def create: (create_hash_list_options options) -> hash_list
     def update: (update_hash_list_options options) -> hash_list

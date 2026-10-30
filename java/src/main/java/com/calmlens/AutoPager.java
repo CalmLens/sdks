@@ -35,7 +35,7 @@ public final class AutoPager<T> implements Iterable<T> {
 
   /**
    * @param startSent whether {@code start} counts as a cursor already sent (the events feed's
-   *     {@code after}), so a page handing it back with more to follow fails
+   *     {@code cursor}), so a page handing it back with more to follow fails
    */
   AutoPager(Source<T> source, String start, boolean startSent) {
     this.source = source;
@@ -46,7 +46,7 @@ public final class AutoPager<T> implements Iterable<T> {
 
   /**
    * For {@code events.pages}: the cursor after the last page fetched, to persist and pass as
-   * {@code after} later. It advances only after a whole page was fetched.
+   * {@code cursor} later. It advances only after a whole page was fetched.
    *
    * @return the latest cursor
    */

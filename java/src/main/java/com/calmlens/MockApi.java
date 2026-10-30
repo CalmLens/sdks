@@ -69,7 +69,7 @@ final class MockApi {
   private record Saved(String fingerprint, int status, byte[] body) {}
 
   private static final Set<String> JSON_QUERY = Set.of("metadata", "processingOptions", "context");
-  private static final Set<String> INT_QUERY = Set.of("pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes");
+  private static final Set<String> INT_QUERY = Set.of("pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes");
   private static final Set<String> BOOL_QUERY = Set.of("queue", "isFinal", "searchAll", "resolveOnly");
   private static final Pattern ORDERING = Pattern.compile("ordering\\[(\\d+)]\\[(\\w+)]");
   private static final Pattern IDS = Pattern.compile("ids\\[(\\d+)]");
@@ -77,7 +77,7 @@ final class MockApi {
   private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[\\x21-\\x7e](?:[\\x20-\\x7e]{0,253}[\\x21-\\x7e])?");
   private static final long MIB = 1024 * 1024;
   private static final long MIN_PART_BYTES = 5 * MIB, MIN_MULTIPART_IMAGE_BYTES = 10 * MIB, MAX_IMAGE_BYTES = 20 * MIB;
-  private static final int MAX_PAGE_SIZE = 100, MAX_EVENTS_LIMIT = 100, MAX_FOLDER_PAGE_SIZE = 100;
+  private static final int MAX_PAGE_SIZE = 100, MAX_EVENTS_PAGE_SIZE = 100, MAX_FOLDER_PAGE_SIZE = 100;
   /**
    * The ThumbHash the mock gives every classified image, standing in for one computed from its
    * pixels. The {@code placeholder} resource serves it as a PNG, like the CDN.
@@ -343,13 +343,7 @@ final class MockApi {
         case "PUT lenses": return putLenses(body);
         case "GET folders": return listFolders(q);
         case "POST folders": return createFolder(body, now);
-        case "GET hash-lists": {
-          JsonArray items = new JsonArray();
-          projectHashLists().forEach(items::add);
-          JsonObject result = new JsonObject();
-          result.add("items", items);
-          return result;
-        }
+        case "GET hash-lists": return page(projectHashLists(), q, Json.write(new JsonPrimitive(projectId + "/hash-lists")));
         case "POST hash-lists": return createHashList(body, now);
         case "GET assets/search": return search(q);
         case "GET assets/page": {
@@ -751,6 +745,54 @@ final class MockApi {
     return asset;
   }
 
+  private static final Set<String> DECISIONS = Set.of("allowed", "limited", "age-restricted", "blocked", "purged");
+  private static final int MAX_DECISION_NOTE_LENGTH = 1499;
+
+  /**
+   * POST /assets/:id/decision, like the API: the body is validated, an asset still uploading or
+   * processing is refused, a pending asset can only be blocked or purged, the same status is refused and purged
+   * content can only be blocked. The status changes, a manual review is added, purging removes the
+   * content (with its {@code asset.content-removed} event) and an {@code asset.<status>} event
+   * records the reviewer's decision.
+   */
+  private JsonObject decide(JsonObject asset, JsonObject body, long now) throws Failure {
+    String decision = str(body, "decision");
+    if (decision == null || !DECISIONS.contains(decision)) throw Failure.validation("validation/invalid-union", "decision");
+    JsonElement rawNote = body.get("note");
+    if (rawNote == null || !rawNote.isJsonPrimitive() || !rawNote.getAsJsonPrimitive().isString()) throw Failure.validation("validation/invalid-type", "note");
+    String note = rawNote.getAsString().strip();
+    if (note.isEmpty()) throw Failure.validation("validation/too-small", "note");
+    if (note.length() > MAX_DECISION_NOTE_LENGTH) throw Failure.validation("validation/too-big", "note");
+    if (decision.equals("purged") && !bool(body, "confirmPurge")) throw Failure.validation("validation/invalid-value", "confirmPurge");
+    if ("uploading".equals(str(asset.getAsJsonObject("upload"), "status"))
+        || "processing".equals(str(asset.getAsJsonObject("classification"), "status")))
+      throw new Failure(ErrorCodes.ASSET_PROCESSING);
+    JsonObject moderation = asset.getAsJsonObject("classification").getAsJsonObject("moderation");
+    String status = str(moderation, "status");
+    if (!decision.equals("purged") && !decision.equals("blocked") && "pending".equals(status)) throw new Failure(ErrorCodes.ASSET_DECISION_NOT_ALLOWED);
+    if (decision.equals(status)) throw new Failure(ErrorCodes.ASSET_DECISION_UNCHANGED);
+    if (!decision.equals("purged") && !decision.equals("blocked") && "purged".equals(status)) throw new Failure(ErrorCodes.ASSET_CONTENT_PURGED);
+    moderation.addProperty("status", decision);
+    JsonObject review = new JsonObject();
+    review.addProperty("id", createId("rev"));
+    review.addProperty("decision", decision);
+    review.addProperty("note", note);
+    review.add("reviewerUserId", JsonNull.INSTANCE);
+    review.addProperty("reviewerName", "API key");
+    review.add("reviewerEmail", JsonNull.INSTANCE);
+    review.addProperty("reviewedAt", now);
+    review.addProperty("appliedToAsset", true);
+    if (!(moderation.get("manualReviews") instanceof JsonArray)) moderation.add("manualReviews", new JsonArray());
+    moderation.getAsJsonArray("manualReviews").add(review);
+    asset.addProperty("updatedAt", now);
+    if (decision.equals("purged")) removeContent(asset, now);
+    String name = str(asset, "name"), type = str(asset, "type");
+    recordEvent("asset." + decision, decision.equals("allowed") || decision.equals("limited") ? "low" : "high", asset, java.util.Arrays.asList(
+        new Models.EventFact("decided-by", "reviewer", null), new Models.EventFact("asset-type", type, null),
+        new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + str(asset, "id")), new Models.EventFact("note", note, null)));
+    return asset;
+  }
+
   private JsonElement assetRoute(String method, String id, String suffix, JsonObject q, JsonObject body, byte[] raw, long now)
       throws Failure, IOException {
     JsonObject asset = asset(id);
@@ -773,6 +815,7 @@ final class MockApi {
         applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now);
         lifecycle("asset.retried", asset);
         return asset;
+      case "POST decision": return decide(asset, body, now);
       case "POST explain": {
         if (!"completed".equals(str(asset.getAsJsonObject("classification"), "status"))) throw new Failure(ErrorCodes.ASSET_NOT_DECIDED);
         JsonObject moderation = asset.getAsJsonObject("classification").getAsJsonObject("moderation");
@@ -1089,21 +1132,62 @@ final class MockApi {
         throw new Failure(ErrorCodes.DUPLICATE_FOLDER_NAME, "A folder named \"" + name + "\" already exists in this location.");
   }
 
+  /**
+   * GET /projects/:id/folders, like the API: keyset pages ordered by {@code name} (by code point, the
+   * default, ascending) or {@code createdAt}, with the folder ID breaking ties, and the ancestors
+   * needed to show the listed, selected and parent folders' paths.
+   */
   private JsonObject listFolders(JsonObject q) throws Failure {
     long size = bounded(q, "pageSize", MAX_FOLDER_PAGE_SIZE, MAX_FOLDER_PAGE_SIZE);
     String parentId = str(q, "parentId"), search = Objects.requireNonNullElse(str(q, "search"), "").toLowerCase(Locale.ROOT);
     boolean everywhere = bool(q, "searchAll") && !search.isEmpty(), resolveOnly = bool(q, "resolveOnly");
+    JsonObject clause = new JsonObject();
+    clause.addProperty("field", "name");
+    clause.addProperty("direction", "ASC");
+    if (q.has("ordering")) {
+      JsonArray requested = q.getAsJsonArray("ordering");
+      if (requested.size() > 1) throw Failure.validation("validation/too-big", "ordering");
+      JsonObject order = requested.get(0).getAsJsonObject();
+      String field = str(order, "field"), direction = Objects.requireNonNullElse(str(order, "direction"), "ASC");
+      if (!"name".equals(field) && !"createdAt".equals(field)) throw Failure.validation("validation/invalid-value", "ordering.0.field");
+      if (!direction.equals("ASC") && !direction.equals("DESC")) throw Failure.validation("validation/invalid-value", "ordering.0.direction");
+      clause.addProperty("field", field);
+      clause.addProperty("direction", direction);
+    }
+    String field = str(clause, "field");
+    boolean descending = "DESC".equals(str(clause, "direction"));
     List<JsonObject> all = projectFolders();
     // Like the database: names compare by code point, so case matters, then IDs break ties.
-    Comparator<JsonObject> order = "createdAt".equals(str(q, "sort"))
+    Comparator<JsonObject> order = field.equals("createdAt")
         ? Comparator.<JsonObject, JsonElement>comparing(f -> f.get("createdAt"), MockApi::compare)
         : Comparator.comparing((JsonObject f) -> Objects.requireNonNullElse(str(f, "name"), ""), MockApi::byCodePoint);
     order = order.thenComparing((JsonObject f) -> str(f, "id"), MockApi::byCodePoint);
+    if (descending) order = order.reversed();
     List<JsonObject> found = all.stream()
         .filter(f -> (everywhere || Objects.equals(str(f, "parentId"), parentId)) && Objects.requireNonNullElse(str(f, "name"), "").toLowerCase(Locale.ROOT).contains(search))
-        .sorted("DESC".equals(str(q, "direction")) ? order.reversed() : order).collect(Collectors.toList());
-    long start = number(q, "pageIndex", 0, "pageIndex", 0, Integer.MAX_VALUE) * size;
-    List<JsonObject> page = resolveOnly ? List.of() : found.subList((int) Math.min(start, found.size()), (int) Math.min(start + size, found.size()));
+        .sorted(order).collect(Collectors.toList());
+    JsonArray scope = new JsonArray();
+    scope.add(projectId);
+    scope.add(nullable(parentId));
+    scope.add(search);
+    scope.add(everywhere);
+    scope.add(clause);
+    String cursor = str(q, "cursor");
+    if (cursor != null && !cursor.isEmpty()) {
+      JsonObject boundary = new JsonObject();
+      try {
+        JsonObject parsed = JsonParser.parseString(new String(Base64.getDecoder().decode(cursor), StandardCharsets.UTF_8)).getAsJsonObject();
+        if (!Json.write(scope).equals(str(parsed, "scope")) || str(parsed, "id") == null || !parsed.has("value")) throw new IllegalArgumentException("Invalid cursor");
+        boundary.add(field, parsed.get("value"));
+        boundary.add("id", parsed.get("id"));
+      } catch (RuntimeException invalid) {
+        throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
+      }
+      Comparator<JsonObject> keyset = order;
+      found = found.stream().filter(f -> keyset.compare(f, boundary) > 0).collect(Collectors.toList());
+    }
+    List<JsonObject> page = resolveOnly ? List.of() : found.subList(0, (int) Math.min(size, found.size()));
+    boolean more = !resolveOnly && found.size() > size;
     Set<String> ids = new HashSet<>();
     if (q.has("ids")) q.getAsJsonArray("ids").forEach(id -> ids.add(id.getAsString()));
     page.forEach(f -> ids.add(str(f, "id")));
@@ -1114,12 +1198,23 @@ final class MockApi {
       if (parent != null && ids.add(parent)) pending.add(parent);
     }
     JsonObject result = new JsonObject();
-    JsonArray folders = new JsonArray(), ancestors = new JsonArray();
-    page.forEach(folders::add);
+    JsonArray items = new JsonArray(), ancestors = new JsonArray(), ordering = new JsonArray();
+    page.forEach(items::add);
     all.stream().filter(f -> ids.contains(str(f, "id")) && !page.contains(f)).forEach(ancestors::add);
-    result.add("folders", folders);
+    ordering.add(clause);
+    result.add("items", items);
     result.add("ancestors", ancestors);
-    result.addProperty("hasMore", !resolveOnly && found.size() > start + size);
+    if (more) {
+      JsonObject last = page.get(page.size() - 1);
+      JsonObject next = new JsonObject();
+      next.addProperty("scope", Json.write(scope));
+      next.add("value", last.get(field));
+      next.add("id", last.get("id"));
+      result.addProperty("nextCursor", Base64.getEncoder().encodeToString(Json.write(next).getBytes(StandardCharsets.UTF_8)));
+    } else result.add("nextCursor", JsonNull.INSTANCE);
+    result.addProperty("pageSize", size);
+    result.addProperty("hasMore", more);
+    result.add("ordering", ordering);
     return result;
   }
 
@@ -1363,24 +1458,27 @@ final class MockApi {
     return answer;
   }
 
-  /** Cursors are {@code mock_<n>}: the number of events in the feed when the cursor was taken. */
+  /**
+   * Cursors are {@code mock_<n>}: the number of events in the feed when the cursor was taken.
+   * Without a cursor the page is empty and its {@code nextCursor} is the current position.
+   */
   private JsonObject events(JsonObject q) throws Failure {
-    long limit = bounded(q, "limit", 50, MAX_EVENTS_LIMIT);
+    long pageSize = bounded(q, "pageSize", 50, MAX_EVENTS_PAGE_SIZE);
     List<JsonObject> feed = storage.events.stream().filter(e -> projectId.equals(str(e, "projectId"))).collect(Collectors.toList());
     int position = feed.size();
-    String after = str(q, "after");
-    if (after != null && !after.isEmpty()) {
-      Matcher cursor = Pattern.compile("mock_(\\d{1,9})").matcher(after);
-      if (!cursor.matches() || Integer.parseInt(cursor.group(1)) > feed.size())
-        throw Failure.of(ErrorCodes.INVALID_EVENT_CURSOR, Map.of("after", after));
-      position = Integer.parseInt(cursor.group(1));
+    String cursor = str(q, "cursor");
+    if (cursor != null && !cursor.isEmpty()) {
+      Matcher match = Pattern.compile("mock_(\\d{1,9})").matcher(cursor);
+      if (!match.matches() || Integer.parseInt(match.group(1)) > feed.size())
+        throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
+      position = Integer.parseInt(match.group(1));
     }
-    int end = after == null || after.isEmpty() ? position : (int) Math.min(position + limit, feed.size());
+    int end = cursor == null || cursor.isEmpty() ? position : (int) Math.min(position + pageSize, feed.size());
     JsonObject page = new JsonObject();
-    JsonArray events = new JsonArray();
-    feed.subList(position, end).forEach(events::add);
-    page.add("events", events);
-    page.addProperty("cursor", "mock_" + end);
+    JsonArray items = new JsonArray();
+    feed.subList(position, end).forEach(items::add);
+    page.add("items", items);
+    page.addProperty("nextCursor", "mock_" + end);
     page.addProperty("hasMore", end < feed.size());
     return page;
   }

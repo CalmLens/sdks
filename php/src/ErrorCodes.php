@@ -30,7 +30,6 @@ final class ErrorCodes
     public const UPLOAD_LIMIT_EXCEEDED = 'upload/limit-exceeded';
     public const SPEND_LIMIT_REACHED = 'upload/spend-limit-reached';
     public const INVALID_UPLOAD_MIME_TYPE = 'upload/invalid-mime-type';
-    public const INVALID_EVENT_CURSOR = 'events/invalid-cursor';
     public const INVALID_UPLOAD_PAYLOAD = 'upload/invalid-payload';
     public const USE_UPLOAD_PART = 'upload/use-upload-part';
     public const UPLOAD_NOT_OPEN = 'upload/not-open';
@@ -46,6 +45,9 @@ final class ErrorCodes
     public const ASSET_REVIEW_NOTE_REQUIRED = 'asset/review-note-required';
     public const ASSET_UPDATE_FAILED = 'asset/update-failed';
     public const ASSET_SAFETY_HELD = 'asset/safety-held';
+    public const ASSET_PROCESSING = 'asset/processing';
+    public const ASSET_DECISION_NOT_ALLOWED = 'asset/decision-not-allowed';
+    public const ASSET_DECISION_UNCHANGED = 'asset/decision-unchanged';
     public const ASSET_NOT_RETRYABLE = 'asset/not-retryable';
     public const ASSET_CONTENT_UNAVAILABLE = 'asset/content-unavailable';
     public const ASSET_CONTENT_PURGED = 'asset/content-purged';
@@ -110,7 +112,6 @@ final class ErrorCodes
         'upload/limit-exceeded' => 403,
         'upload/spend-limit-reached' => 402,
         'upload/invalid-mime-type' => 400,
-        'events/invalid-cursor' => 400,
         'upload/invalid-payload' => 400,
         'upload/use-upload-part' => 409,
         'upload/not-open' => 409,
@@ -126,6 +127,9 @@ final class ErrorCodes
         'asset/review-note-required' => 400,
         'asset/update-failed' => 500,
         'asset/safety-held' => 423,
+        'asset/processing' => 409,
+        'asset/decision-not-allowed' => 409,
+        'asset/decision-unchanged' => 409,
         'asset/not-retryable' => 409,
         'asset/content-unavailable' => 409,
         'asset/content-purged' => 409,

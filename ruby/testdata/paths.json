@@ -44,6 +44,15 @@
       "error": "sdk/invalid-argument"
     },
     {
+      "operation": "assets.decide",
+      "options": {
+        "assetId": "..",
+        "decision": "blocked",
+        "note": "Spam"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
       "operation": "assets.move",
       "options": {
         "assetId": "..",

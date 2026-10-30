@@ -42,10 +42,10 @@ final class ClientTest extends TestCase
         self::assertSame([['id' => 'child-1'], ['id' => 'child-2']], iterator_to_array($client->assets->eachChild(['assetId' => 'parent', 'filter' => 'name=in=(one,two)']), false));
         self::assertSame('/v1/assets/parent/children', $mock->requests()[1]->getUri()->getPath());
         self::assertSame('filter=name%3Din%3D%28one%2Ctwo%29&cursor=opaque%2B%2F%3D', $mock->requests()[1]->getUri()->getQuery());
-        $mock->enqueueJson(['events' => [['id' => 'event-1']], 'hasMore' => true, 'cursor' => 'next+/=']);
-        $mock->enqueueJson(['events' => [['id' => 'event-2']], 'hasMore' => false, 'cursor' => 'end']);
-        self::assertSame([['id' => 'event-1'], ['id' => 'event-2']], iterator_to_array($client->events->each(['after' => 'start']), false));
-        self::assertSame('after=next%2B%2F%3D', $mock->requests()[3]->getUri()->getQuery());
+        $mock->enqueueJson(['items' => [['id' => 'event-1']], 'hasMore' => true, 'nextCursor' => 'next+/=']);
+        $mock->enqueueJson(['items' => [['id' => 'event-2']], 'hasMore' => false, 'nextCursor' => 'end']);
+        self::assertSame([['id' => 'event-1'], ['id' => 'event-2']], iterator_to_array($client->events->each(['cursor' => 'start']), false));
+        self::assertSame('cursor=next%2B%2F%3D', $mock->requests()[3]->getUri()->getQuery());
     }
 
     public static function invalidUploads(): iterable

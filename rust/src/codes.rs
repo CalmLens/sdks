@@ -36,8 +36,6 @@ error_codes! {
     SpendLimitReached = "upload/spend-limit-reached", 402;
     /// `upload/invalid-mime-type` (HTTP 400): Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.
     InvalidUploadMimeType = "upload/invalid-mime-type", 400;
-    /// `events/invalid-cursor` (HTTP 400): The events cursor is invalid. Use the cursor from a previous response, or omit it to start from now.
-    InvalidEventCursor = "events/invalid-cursor", 400;
     /// `upload/invalid-payload` (HTTP 400): Upload payload is invalid.
     InvalidUploadPayload = "upload/invalid-payload", 400;
     /// `upload/use-upload-part` (HTTP 409): Use uploadPart for multipart upload parts after the first part
@@ -68,6 +66,12 @@ error_codes! {
     AssetUpdateFailed = "asset/update-failed", 500;
     /// `asset/safety-held` (HTTP 423): Asset access is restricted by a safety hold.
     AssetSafetyHeld = "asset/safety-held", 423;
+    /// `asset/processing` (HTTP 409): Wait for the asset to finish uploading and processing before deciding it.
+    AssetProcessing = "asset/processing", 409;
+    /// `asset/decision-not-allowed` (HTTP 409): This asset has no moderation decision yet, so it can only be blocked or purged. Allow, limit or age-restrict it once moderation has decided it.
+    AssetDecisionNotAllowed = "asset/decision-not-allowed", 409;
+    /// `asset/decision-unchanged` (HTTP 409): The asset already has this moderation status.
+    AssetDecisionUnchanged = "asset/decision-unchanged", 409;
     /// `asset/not-retryable` (HTTP 409): Only assets that failed to process (status error) can be retried.
     AssetNotRetryable = "asset/not-retryable", 409;
     /// `asset/content-unavailable` (HTTP 409): This asset's content is no longer stored, so it can't be processed again. Upload it again instead.

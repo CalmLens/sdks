@@ -42,8 +42,6 @@ public final class ErrorCodes {
   public static final String SPEND_LIMIT_REACHED = "upload/spend-limit-reached";
   /** {@code upload/invalid-mime-type} (HTTP 400). */
   public static final String INVALID_UPLOAD_MIME_TYPE = "upload/invalid-mime-type";
-  /** {@code events/invalid-cursor} (HTTP 400). */
-  public static final String INVALID_EVENT_CURSOR = "events/invalid-cursor";
   /** {@code upload/invalid-payload} (HTTP 400). */
   public static final String INVALID_UPLOAD_PAYLOAD = "upload/invalid-payload";
   /** {@code upload/use-upload-part} (HTTP 409). */
@@ -80,6 +78,12 @@ public final class ErrorCodes {
   public static final String ASSET_CONTENT_UNAVAILABLE = "asset/content-unavailable";
   /** {@code asset/content-purged} (HTTP 409). */
   public static final String ASSET_CONTENT_PURGED = "asset/content-purged";
+  /** {@code asset/processing} (HTTP 409). */
+  public static final String ASSET_PROCESSING = "asset/processing";
+  /** {@code asset/decision-not-allowed} (HTTP 409). */
+  public static final String ASSET_DECISION_NOT_ALLOWED = "asset/decision-not-allowed";
+  /** {@code asset/decision-unchanged} (HTTP 409). */
+  public static final String ASSET_DECISION_UNCHANGED = "asset/decision-unchanged";
   /** {@code asset/not-decided} (HTTP 409). */
   public static final String ASSET_NOT_DECIDED = "asset/not-decided";
   /** {@code asset/policy-changed} (HTTP 409). */
@@ -206,7 +210,6 @@ public final class ErrorCodes {
       Map.entry(UPLOAD_LIMIT_EXCEEDED, 403),
       Map.entry(SPEND_LIMIT_REACHED, 402),
       Map.entry(INVALID_UPLOAD_MIME_TYPE, 400),
-      Map.entry(INVALID_EVENT_CURSOR, 400),
       Map.entry(INVALID_UPLOAD_PAYLOAD, 400),
       Map.entry(USE_UPLOAD_PART, 409),
       Map.entry(UPLOAD_NOT_OPEN, 409),
@@ -225,6 +228,9 @@ public final class ErrorCodes {
       Map.entry(ASSET_NOT_RETRYABLE, 409),
       Map.entry(ASSET_CONTENT_UNAVAILABLE, 409),
       Map.entry(ASSET_CONTENT_PURGED, 409),
+      Map.entry(ASSET_PROCESSING, 409),
+      Map.entry(ASSET_DECISION_NOT_ALLOWED, 409),
+      Map.entry(ASSET_DECISION_UNCHANGED, 409),
       Map.entry(ASSET_NOT_DECIDED, 409),
       Map.entry(ASSET_POLICY_CHANGED, 409),
       Map.entry(ASSET_REVIEWED, 409),

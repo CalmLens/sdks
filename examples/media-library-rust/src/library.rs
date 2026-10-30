@@ -122,19 +122,21 @@ impl Library {
                 let mut folders = Vec::new();
                 let mut parents = vec![None];
                 while let Some(parent_id) = parents.pop() {
-                    for page_index in 0.. {
+                    let mut cursor = None;
+                    loop {
                         let page = client
                             .folders()
                             .list(ListFolders {
                                 parent_id: parent_id.clone(),
-                                page_index: Some(page_index),
+                                cursor,
                                 page_size: Some(100),
                                 ..Default::default()
                             })
                             .await?;
-                        parents.extend(page.folders.iter().map(|folder| Some(folder.id.clone())));
-                        folders.extend(page.folders);
-                        if !page.has_more {
+                        parents.extend(page.items.iter().map(|folder| Some(folder.id.clone())));
+                        folders.extend(page.items);
+                        cursor = page.next_cursor.filter(|_| page.has_more == Some(true));
+                        if cursor.is_none() {
                             break;
                         }
                     }

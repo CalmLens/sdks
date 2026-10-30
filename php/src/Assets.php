@@ -82,6 +82,19 @@ final class Assets extends Resource
     }
 
     /**
+     * Records a reviewer's decision: `decision` (`allowed`, `limited`, `age-restricted`, `blocked`
+     * or `purged`) becomes the moderation status and a manual review with the required `note` is
+     * added. An asset still pending moderation can only be blocked or purged; purging deletes the
+     * stored content and needs `'confirmPurge' => true` and the `assets:delete` permission.
+     */
+    public function decide(array $options): array
+    {
+        [$api, $request] = $this->split($options);
+        $path = $this->path($api, 'assets', 'assetId');
+        return $this->session->request('POST', $path . '/decision', body: (object) $api, options: $request);
+    }
+
+    /**
      * Completes the policy evidence behind a decided asset's moderation decision: the report's
      * `classification.moderation.policy.evidence` becomes `full` and every action stays as decided.
      * With `'rerun' => true` the asset is moderated again with the project's current policy and

@@ -146,13 +146,14 @@ retried.
 | `assets.uploadPart(options)`                                  | `assets.upload_part(...)`                                                                                          |
 | `assets.createSignedUrl(options)`                             | `assets.create_signed_url(...)`                                                                                    |
 | `assets.move/retry/delete(options)`                           | Same names; `delete` returns `None`                                                                                |
+| `assets.decide({ assetId, decision, note, confirmPurge })`    | `assets.decide(asset_id=, decision="blocked", note="Spam")`; purging also needs `confirm_purge=True`               |
 | `assets.explain({ assetId, rerun })`                          | `assets.explain(asset_id=, rerun=True)`                                                                            |
 | `assets.deleteContent(options)`                               | `assets.delete_content(...)`                                                                                       |
 | `assets.batch({ assetIds, operation })`                       | `assets.batch(asset_ids=[...], operation="delete")`; returns `{"queued": True}`                                    |
 | `assets.waitForDecision({ assetId, timeoutMs })`              | `assets.wait_for_decision(asset_id=, timeout=60)`; `timeout` in seconds, no `signal`                               |
-| `folders.list()`                                              | `folders.list()`                                                                                                   |
+| `folders.list(options)`                                       | `folders.list(parent_id=, cursor=, page_size=, ordering=, ...)`; returns `items`, `ancestors` and `nextCursor`     |
 | `folders.create/retrieve/update/move/delete(options)`         | Same names                                                                                                         |
-| `hashLists.list()`                                            | `hash_lists.list()`; returns `{"items": [...]}`, newest first                                                      |
+| `hashLists.list(options)`                                     | `hash_lists.list(cursor=, page_size=)`; one page, newest first                                                     |
 | `hashLists.create/retrieve/update/delete(options)`            | `hash_lists.create/retrieve/update/delete(...)`; `delete` returns `None`                                           |
 | `hashLists.listEntries/addEntry/removeEntry(options)`         | `hash_lists.list_entries/add_entry/remove_entry(...)`; `remove_entry` returns `None`                               |
 | `events.list(options)`                                        | `events.list(...)`; `events.iter(...)` and `events.iter_pages(...)` (see [Events feed](#events-feed))              |
@@ -448,19 +449,20 @@ safe zero score and must not be treated as allowed coverage.
 ## Events feed
 
 `events.list` polls the project's event feed, the same events webhooks deliver. It
-returns an `EventsPage` dict: `{"events": [...], "cursor": str, "hasMore": bool}`. Each
+returns an `EventsPage` dict: `{"items": [...], "nextCursor": str, "hasMore": bool}`. Each
 event has `id`, `type` (e.g. `asset.allowed`), `createdAt`, `severity`, `title`,
 `description`, `assetId`, `asset` and `facts` (a list of `{key, value, url?}`).
 
-- Calling it **without `after`** returns **no events** and a cursor for _now_. Save that
-  cursor: the feed only returns events created after the cursor you pass.
-- Pass the previous `cursor` as `after` to get the next events (at most `limit`, default
-  50, oldest first). When there are no new events, the same cursor is returned.
+- Calling it **without `cursor`** returns **no events** and a `nextCursor` for _now_. Save
+  that cursor: the feed only returns events created after the cursor you pass.
+- Pass the previous `nextCursor` as `cursor` to get the next events (at most `page_size`,
+  1 to 100, default 50, oldest first). Unlike other lists, `nextCursor` is never `None`: when
+  there are no new events, the same cursor is returned.
 - `hasMore` is True when more events are already waiting. An invalid cursor raises
-  `CalmLensAPIError` with code `events/invalid-cursor`.
+  `CalmLensAPIError` with code `validation/invalid-cursor`.
 
-`events.iter_pages(after=...)` follows the cursor until a page reports `hasMore=False` (without
-`after` it yields the one empty page for now), and `events.iter(after=...)` yields the events of
+`events.iter_pages(cursor=...)` follows `nextCursor` until a page reports `hasMore=False` (without
+`cursor` it yields the one empty page for now), and `events.iter(cursor=...)` yields the events of
 those pages. A page that says more follow but repeats a cursor already sent raises
 `sdk/invalid-response` with `details["cursor"]` instead of looping; `assets.iter` and
 `assets.iter_children` do the same with `nextCursor`:
@@ -468,12 +470,12 @@ those pages. A page that says more follow but repeats a cursor already sent rais
 ```python
 import time
 
-cursor = client.events.list()["cursor"]           # start from now; no events
+cursor = client.events.list()["nextCursor"]       # start from now; no events
 while True:
-    for page in client.events.iter_pages(after=cursor, limit=50):
-        for event in page["events"]:
+    for page in client.events.iter_pages(cursor=cursor, page_size=50):
+        for event in page["items"]:
             handle(event)
-        cursor = page["cursor"]                    # persist to resume after a restart
+        cursor = page["nextCursor"]                # persist to resume after a restart
     time.sleep(5)
 ```
 
@@ -565,11 +567,17 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   editing the key in the portal would; the key, and the idempotency keys it used, stay the same.
 - `client.enqueue_event(type, facts=..., asset_id=..., severity=..., title=...)` adds an event
   to the feed; `events.list`, `events.iter` and cursors behave like the API's (cursors are
-  positions in the feed, so events added later reach cursors taken before them; `limit` is 1 to
-  100, default 50). Like the API, deleting an asset, removing its content and retrying it record
+  positions in the feed, so events added later reach cursors taken before them; `pageSize` is 1
+  to 100, default 50). Like the API, deleting an asset, removing its content and retrying it record
   `asset.deleted`, `asset.content-removed` and `asset.retried` events with `asset-name` and
   `asset-type` facts.
-- `client.decide(asset_id, decision)` applies a reviewer's decision (`allowed`, `limited`,
+- `assets.decide` validates and records a decision like the API: a note of 1 to 1499
+  characters, `confirm_purge=True` to purge, `asset/decision-not-allowed` for anything but
+  `blocked` or `purged` while moderation is `pending`, `asset/decision-unchanged` for the
+  current status, `asset/content-purged` for anything but `blocked` once purged and
+  `asset/processing` while the asset is still uploading or processing. The review and its event name
+  the reviewer `An API key`.
+- `client.decide(asset_id, decision)` simulates moderation finishing with a reviewer's decision (`allowed`, `limited`,
   `age-restricted`, `blocked` or `purged`, which also removes the content with `removalReason`
   `requested` after an `asset.content-removed` event) and adds the matching `asset.<decision>`
   event with `decided-by: reviewer`, `asset-type`, `asset-name` and `note` facts.
@@ -595,7 +603,7 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   (`idempotency/invalid-key`).
 - Requests the API's schema refuses fail with `validation/<issue>` (`too-small`, `too-big`,
   `invalid-type`), HTTP 400 and the field in `details["path"]`: list `pageSize` (1 to 100, default
-  10), folder `pageSize` (1 to 100), events `limit` and search `query` (1 to 200 characters) and
+  10), folder `pageSize` (1 to 100, default 100), events `pageSize` (1 to 100, default 50) and search `query` (1 to 200 characters) and
   `limit` (1 to 20, default 10).
 - `assets.search` is keyword search like the API's: the query is split on whitespace (at most
   8 distinct words, case-insensitive) and an asset matches when every word appears in its name,
@@ -607,7 +615,8 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
 - List cursors resume after the last item returned, so assets created or deleted between pages
   are neither skipped nor repeated, and only continue the query (filter, folder or parent and
   ordering) they came from; another query raises `validation/invalid-cursor`.
-- Folder names are unique among siblings (case-sensitive) and list in code-point order;
+- Folder names are unique among siblings (case-sensitive) and list in code-point order, paged
+  with keyset cursors by `ordering` and an `id` tie-breaker;
   deleting a folder that is not empty raises `folder/not-empty` with `hasAssets` and
   `hasChildren` in `details`. Unchanged lens definitions return the saved lens, a changed one
   needs a greater `version` (`lens/version-conflict` with `currentVersion`, `minimumVersion` and
@@ -647,7 +656,7 @@ process.
 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
-Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names.
+Folder listings return a cursor page like every other list: `items`, visible `ancestors`, `nextCursor`, `hasMore`, `pageSize` and `ordering`. Set `parent_id` to open a branch (omit it for the project root), and pass `nextCursor` as `cursor` to load the next page. `page_size` is 1 to 100 (default 100), and `ordering` takes one `{"field": "name" | "createdAt", "direction": "ASC" | "DESC"}` entry (default name, ascending). `search` with `search_all` finds names in unopened branches; `ids` with `resolve_only` resolves selected folder paths.
 
 ### Viewer context for CDN delivery
 

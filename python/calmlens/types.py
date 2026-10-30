@@ -46,8 +46,8 @@ __all__ = [
     "ImageTransformRedaction", "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult",
     "LinkDetectionResult", "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult",
     "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "HashMatch", "HashListAction", "HashList",
-    "HashListEntry", "HashListList", "HashListEntryPage", "HashListIdOptions", "HashListEntryIdOptions",
-    "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
+    "HashListEntry", "HashListPage", "ListHashListsOptions", "HashListEntryPage", "HashListIdOptions",
+    "HashListEntryIdOptions", "DecideAssetOptions", "FolderOrdering", "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
 ]
 
 # ---- Enum-like values -----------------------------------------------------------------------
@@ -778,9 +778,13 @@ class HashListEntry(_HashListEntryRequired, total=False):
     createdByUserId: Optional[str]
 
 
-class HashListList(TypedDict):
-    """Every hash list in the project, newest first."""
+class HashListPage(TypedDict):
+    """One page of the project's hash lists, newest first."""
     items: List[HashList]
+    hasMore: bool
+    nextCursor: Optional[str]
+    pageSize: int
+    ordering: List[Ordering]
 
 
 class HashListEntryPage(TypedDict):
@@ -1016,8 +1020,10 @@ class WebhookEventPayload(TypedDict):
 
 
 class EventsPage(TypedDict):
-    events: list[Event]
-    cursor: str
+    items: list[Event]
+    #: Pass as ``cursor`` for the next request. Unlike other lists it is never ``None``: keep it to
+    #: receive later events.
+    nextCursor: str
     hasMore: bool
 
 
@@ -1089,6 +1095,13 @@ class UpdateHashListOptions(HashListIdOptions, total=False):
     action: HashListAction
 
 
+class ListHashListsOptions(TypedDict, total=False):
+    #: The previous page's ``nextCursor``; omit for the first page.
+    cursor: str
+    #: 1 to 100, default 10.
+    pageSize: int
+
+
 class ListHashListEntriesOptions(HashListIdOptions, total=False):
     #: The previous page's ``nextCursor``; omit for the first page.
     cursor: str
@@ -1117,6 +1130,20 @@ class MoveAssetOptions(AssetIdOptions):
 
 class ExplainAssetOptions(AssetIdOptions, total=False):
     rerun: bool
+
+
+class _DecideAssetRequired(AssetIdOptions):
+    #: The moderation status to set: ``allowed``, ``limited``, ``age-restricted``, ``blocked`` or
+    #: ``purged`` (which also needs ``confirmPurge``).
+    decision: Literal["allowed", "limited", "age-restricted", "blocked", "purged"]
+    #: Why the reviewer decided this, 1 to 1499 characters after trimming.
+    note: str
+
+
+class DecideAssetOptions(_DecideAssetRequired, total=False):
+    """A reviewer's decision for ``assets.decide``."""
+    #: Must be ``True`` to purge: purging permanently deletes the stored content.
+    confirmPurge: bool
 
 
 #: What ``assets.batch`` does to every asset: ``delete`` deletes it with its child assets and stored
@@ -1220,8 +1247,10 @@ class UpdateFolderOptions(FolderIdOptions, total=False):
 
 
 class ListEventsOptions(TypedDict, total=False):
-    after: str
-    limit: int
+    #: The previous response's ``nextCursor``. Omit it to get a cursor for now without any events.
+    cursor: str
+    #: 1 to 100, default 50.
+    pageSize: int
 
 
 class _LensRequired(TypedDict):
@@ -1262,18 +1291,30 @@ class ServeOptions(AssetUrlOptions, total=False):
     init: ServeInit
 
 
+FolderOrdering = TypedDict("FolderOrdering", {"field": Literal["name", "createdAt"],
+                                               "direction": Literal["ASC", "DESC"]})
+
+
 class ListFoldersOptions(TypedDict, total=False):
+    #: List this folder's children; omit for the project root.
     parentId: str
-    pageIndex: int
+    #: The previous page's ``nextCursor``; omit for the first page.
+    cursor: str
+    #: 1 to 100, default 100.
     pageSize: int
+    #: At most one entry; the default is ``name`` ascending.
+    ordering: List[FolderOrdering]
     search: str
     searchAll: bool
     resolveOnly: bool
     ids: List[str]
-    sort: Literal["name", "createdAt"]
-    direction: Literal["ASC", "DESC"]
+
 
 class FolderPage(TypedDict):
-    folders: List[Folder]
+    items: List[Folder]
+    #: Folders above the listed or requested folders, for showing their paths.
     ancestors: List[Folder]
     hasMore: bool
+    nextCursor: Optional[str]
+    pageSize: int
+    ordering: List[Ordering]

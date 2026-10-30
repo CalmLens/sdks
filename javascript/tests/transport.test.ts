@@ -137,7 +137,7 @@ const brokenBodyFetch = (cause: Error) =>
 
 const transportCalls = (client: CalmLensServerClient) => [
   () => client.assets.retrieve({ assetId: "a" }),
-  () => client.events.list({ after: "cursor" }),
+  () => client.events.list({ cursor: "cursor" }),
   () => client.assets.classify(upload),
   () => client.text.classify({ text: "hello" }),
 ];

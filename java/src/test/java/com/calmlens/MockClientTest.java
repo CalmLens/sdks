@@ -90,10 +90,10 @@ class MockClientTest {
         "facts", List.of(Map.of("key", "reviewer-name", "value", "Ada")));
     MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueueEvents("cursor-2", false, event)
         .enqueueCdn(200, "image/webp", new byte[] {1, 2, 3});
-    Models.EventsPage page = mock.client.events.list(new Models.ListEvents().after("cursor-1"));
-    assertEquals("cursor-2", page.cursor());
-    assertEquals("asset.blocked", page.events().get(0).type());
-    assertEquals("Ada", page.events().get(0).facts().get(0).value());
+    Models.EventsPage page = mock.client.events.list(new Models.ListEvents().cursor("cursor-1"));
+    assertEquals("cursor-2", page.nextCursor());
+    assertEquals("asset.blocked", page.items().get(0).type());
+    assertEquals("Ada", page.items().get(0).facts().get(0).value());
     try (CdnResponse response = mock.client.cdn.serve(new Models.CdnRequest("asset-1").lens("card"))) {
       assertEquals(200, response.status());
       assertEquals("image/webp", response.header("Content-Type"));
@@ -171,7 +171,7 @@ class MockClientTest {
     assertInstanceOf(RequestTimeoutException.class, assertThrows(CalmLensException.class, () -> mock.client.text.classify("hello")));
 
     mock.enqueueEvents("c1", false);
-    assertEquals("c1", mock.client.events.list(new Models.ListEvents().after("c0").limit(10)).cursor());
+    assertEquals("c1", mock.client.events.list(new Models.ListEvents().cursor("c0").pageSize(10)).nextCursor());
     var classify = mock.requests().get(0);
     assertEquals("POST", classify.method());
     assertEquals("/v1/projects/project-9/assets", classify.path());
@@ -182,7 +182,7 @@ class MockClientTest {
     assertFalse(classify.toString().contains("ignored-key"));
     var events = mock.requests().get(2);
     assertEquals("/v1/projects/project-9/events", events.path());
-    assertEquals(Map.of("after", "c0", "limit", "10"), events.query());
+    assertEquals(Map.of("cursor", "c0", "pageSize", "10"), events.query());
     assertNull(events.bodyText());
     byte[] captured = classify.body();
     captured[0] = 0;

@@ -686,14 +686,20 @@ impl Backend {
     /// Records a reviewer decision on a stored asset and adds the matching `asset.<status>` event
     /// (after an `asset.content-removed` event for a purge).
     pub(super) fn decide(&mut self, asset_id: &str, decision: &str) -> Option<Value> {
+        self.owned(&self.storage.assets, asset_id)?;
+        Some(self.record_review(asset_id, decision, Value::Null))
+    }
+
+    /// Applies a reviewer's decision to stored asset `asset_id`, like the API: the moderation
+    /// status changes (purged also removes the content with removal reason `requested`,
+    /// recording an `asset.content-removed` event first), the review joins `manualReviews`, and
+    /// an `asset.<decision>` event with a `decided-by: reviewer` fact joins the feed. `note` is
+    /// the reviewer's note, or null for [`decide`](Self::decide).
+    fn record_review(&mut self, asset_id: &str, decision: &str, note: Value) -> Value {
         let now = self.now();
         let review_id = self.create_id("rev");
-        let project_id = self.options.project_id.clone();
         let storage = &mut self.storage;
-        let asset = storage
-            .assets
-            .get_mut(asset_id)
-            .filter(|asset| asset["projectId"] == project_id.as_str())?;
+        let asset = storage.assets.get_mut(asset_id).expect("stored asset");
         apply_outcome(asset, &mut storage.content, decision, "requested", now);
         let moderation = &mut asset["classification"]["moderation"];
         if !moderation["manualReviews"].is_array() {
@@ -703,8 +709,9 @@ impl Backend {
             .as_array_mut()
             .expect("array")
             .push(json!({
-                "id": review_id, "decision": decision, "note": null, "reviewerUserId": null,
-                "reviewedAt": now, "appliedToAsset": true,
+                "id": review_id, "decision": decision, "note": note, "reviewerUserId": null,
+                "reviewerName": null, "reviewerEmail": null, "reviewedAt": now,
+                "appliedToAsset": true,
             }));
         let asset = asset.clone();
         if decision == "purged" {
@@ -721,10 +728,71 @@ impl Backend {
             {"key": "decided-by", "value": "reviewer"},
             {"key": "asset-type", "value": asset["type"]},
             {"key": "asset-name", "value": asset["name"], "url": format!("https://calmlens.com/go/asset/{asset_id}")},
-            {"key": "note", "value": null},
+            {"key": "note", "value": note},
         ]);
         self.push_event(&event_type, severity, &asset, facts);
-        Some(asset)
+        asset
+    }
+
+    /// Answers `POST /assets/:id/decision` like the API: the body is validated first (a known
+    /// decision, a trimmed note of 1 to 1499 characters, `confirmPurge: true` to purge), then the
+    /// asset must exist and have finished uploading and processing (`asset/processing`). An
+    /// undecided asset (whose processing failed) can only be blocked or purged, the current
+    /// status is refused as unchanged, and purged content can only be blocked. Mock assets
+    /// carry no safety holds and the mock key may make every decision.
+    fn decide_asset(&mut self, id: &str, body: Map<String, Value>) -> Outcome<Value> {
+        let decision = body.get("decision").and_then(Value::as_str).unwrap_or("");
+        if !matches!(
+            decision,
+            "allowed" | "limited" | "age-restricted" | "blocked" | "purged"
+        ) {
+            return Err(validation("invalid-value", "decision"));
+        }
+        let Some(note) = body.get("note").and_then(Value::as_str).map(str::trim) else {
+            return Err(validation("invalid-type", "note"));
+        };
+        if note.is_empty() {
+            return Err(validation("too-small", "note"));
+        }
+        // JavaScript counts string length in UTF-16 code units.
+        if note.encode_utf16().count() > 1499 {
+            return Err(validation("too-big", "note"));
+        }
+        if decision == "purged" && body.get("confirmPurge") != Some(&Value::Bool(true)) {
+            return Err(validation("invalid-value", "confirmPurge"));
+        }
+        let asset = self
+            .owned(&self.storage.assets, id)
+            .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?;
+        let status = text(&asset["classification"]["moderation"]["status"]);
+        let undecided = !matches!(decision, "blocked" | "purged");
+        if asset["upload"]["status"] == "uploading"
+            || asset["classification"]["status"] == "processing"
+        {
+            return Err(fail(
+                ErrorCode::AssetProcessing,
+                "The asset is still processing",
+            ));
+        }
+        if status == "pending" && undecided {
+            return Err(fail(
+                ErrorCode::AssetDecisionNotAllowed,
+                "An asset pending moderation can only be blocked or purged",
+            ));
+        }
+        if status == decision {
+            return Err(fail(
+                ErrorCode::AssetDecisionUnchanged,
+                "The asset already has this status",
+            ));
+        }
+        if undecided && content_purged(asset) {
+            return Err(fail(
+                ErrorCode::AssetContentPurged,
+                "This asset's content was purged, so it can only be blocked",
+            ));
+        }
+        Ok(self.record_review(id, decision, note.into()))
     }
 
     /// Adds an event to the feed, as the API records it.
@@ -966,9 +1034,14 @@ impl Backend {
                     ("PUT", "lenses") => self.ensure_lenses(body, now),
                     ("GET", "folders") => self.list_folders(q),
                     ("POST", "folders") => self.create_folder(body, now),
-                    ("GET", "hash-lists") => Ok(json!({
-                        "items": self.own_hash_lists().rev().collect::<Vec<_>>(),
-                    })),
+                    ("GET", "hash-lists") => {
+                        // Like the API: newest first unless ordering says otherwise, 10 to a page.
+                        let size = bounded(q.get("pageSize"), 10, 1, 100, "pageSize")?;
+                        let ordering = cursor_ordering(q)?;
+                        let lists = self.own_hash_lists().collect();
+                        let scope = json!(["hash-lists", self.options.project_id]).to_string();
+                        keyset_page(lists, &ordering, q.get("cursor"), &scope, size)
+                    }
                     ("POST", "hash-lists") => self.create_hash_list(body, now),
                     ("GET", "assets/page") => {
                         let folder = q.get("folderId").cloned();
@@ -987,6 +1060,11 @@ impl Backend {
                     }
                     _ => Err(unknown_route()),
                 }
+            }
+            [scope, id, suffix]
+                if scope == "assets" && method == "POST" && suffix == "decision" =>
+            {
+                self.decide_asset(id, body)
             }
             [scope, id, suffix @ ..] if scope == "assets" => {
                 self.asset_route(method, id, &suffix.join("/"), body, q, raw, now)
@@ -1051,24 +1129,21 @@ impl Backend {
     fn list_events(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let events = &self.storage.events;
         // Like the API's query schema: an integer from 1 to 100, 50 by default.
-        let limit = bounded(q.get("limit"), 50, 1, 100, "limit")?;
+        let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
         // Cursors are `<n>_mock`: the number of events already delivered. Without one, the
-        // page is empty and its cursor marks now.
-        let start = match q.get("after") {
+        // page is empty and its cursor marks now. `nextCursor` is never null: it is where to
+        // keep polling from.
+        let start = match q.get("cursor") {
             None => events.len(),
-            Some(after) => after
+            Some(cursor) => cursor
                 .strip_suffix("_mock")
                 .and_then(|n| n.parse::<usize>().ok())
                 .filter(|n| *n <= events.len())
-                .ok_or_else(|| {
-                    let mut failure = fail(ErrorCode::InvalidEventCursor, "Invalid events cursor");
-                    failure.details = json!({ "after": after });
-                    failure
-                })?,
+                .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?,
         };
-        let end = (start + limit).min(events.len());
+        let end = (start + size).min(events.len());
         Ok(json!({
-            "events": events[start..end], "cursor": format!("{end}_mock"),
+            "items": events[start..end], "nextCursor": format!("{end}_mock"),
             "hasMore": end < events.len(),
         }))
     }
@@ -1130,9 +1205,9 @@ impl Backend {
 
     fn list_folders(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let get = |key: &str| q.get(key).map_or("", String::as_str);
-        let search = get("search").to_lowercase();
+        let search = get("search").trim().to_lowercase();
         let search_all = get("searchAll") == "true" && !search.is_empty();
-        let mut folders: Vec<&Value> = self
+        let folders: Vec<&Value> = self
             .storage
             .folders
             .values()
@@ -1140,32 +1215,36 @@ impl Backend {
             .filter(|folder| search_all || text(&folder["parentId"]) == get("parentId"))
             .filter(|folder| text(&folder["name"]).to_lowercase().contains(&search))
             .collect();
-        let key = if get("sort") == "createdAt" {
-            "createdAt"
-        } else {
-            "name"
-        };
-        folders.sort_by(|a, b| {
-            let order = compare(&a[key], &b[key]).then_with(|| compare(&a["id"], &b["id"]));
-            if get("direction") == "DESC" {
-                order.reverse()
-            } else {
-                order
+        // Like the API: one ordering by name (the default, ascending) or createdAt, then the ID
+        // in the same direction. Names compare by code point, so case matters.
+        if q.contains_key("ordering[1][field]") {
+            return Err(validation("too-big", "ordering"));
+        }
+        let (field, ascending) = match q.get("ordering[0][field]") {
+            None => ("name".to_owned(), true),
+            Some(field) => {
+                if field != "name" && field != "createdAt" {
+                    return Err(validation("invalid-value", "ordering.0.field"));
+                }
+                match get("ordering[0][direction]") {
+                    "ASC" => (field.clone(), true),
+                    "DESC" => (field.clone(), false),
+                    _ => return Err(validation("invalid-value", "ordering.0.direction")),
+                }
             }
-        });
-        let size = bounded(q.get("pageSize"), 100, 1, 100, "pageSize")?;
-        let index = get("pageIndex").parse().unwrap_or(0usize);
-        let resolve_only = get("resolveOnly") == "true";
-        let page: Vec<&Value> = if resolve_only {
-            Vec::new()
-        } else {
-            folders
-                .iter()
-                .skip(index * size)
-                .take(size)
-                .copied()
-                .collect()
         };
+        let ordering = [(field, ascending), ("id".to_owned(), ascending)];
+        let size = bounded(q.get("pageSize"), 100, 1, 100, "pageSize")?;
+        let resolve_only = get("resolveOnly") == "true";
+        let scope =
+            json!([self.options.project_id, get("parentId"), search, search_all]).to_string();
+        let mut result = keyset_page(folders, &ordering, q.get("cursor"), &scope, size)?;
+        if resolve_only {
+            result["items"] = json!([]);
+            result["hasMore"] = false.into();
+            result["nextCursor"] = Value::Null;
+        }
+        let page: Vec<Value> = result["items"].as_array().cloned().unwrap_or_default();
         // Ancestors: the folders on the paths to the parent, the selected IDs and the page.
         let mut pending: Vec<String> = (0..)
             .map_while(|index| q.get(&format!("ids[{index}]")).cloned())
@@ -1189,10 +1268,8 @@ impl Backend {
                 }
             }
         }
-        Ok(json!({
-            "folders": page, "ancestors": ancestors,
-            "hasMore": !resolve_only && folders.len() > (index + 1) * size,
-        }))
+        result["ancestors"] = ancestors.into();
+        Ok(result)
     }
 
     fn create_folder(&mut self, mut body: Map<String, Value>, now: u64) -> Outcome<Value> {
@@ -1270,7 +1347,7 @@ impl Backend {
         Ok(folder.clone())
     }
 
-    /// This project's hash lists, oldest first.
+    /// This project's hash lists, in the order they were created.
     fn own_hash_lists(&self) -> impl DoubleEndedIterator<Item = &Value> {
         let project = self.options.project_id.as_str();
         self.storage
@@ -1865,39 +1942,8 @@ impl Backend {
             .get("filter")
             .map(|expression| parse_filter(expression))
             .transpose()?;
-        let mut ordering = Vec::new();
-        while let Some(field) = q.get(&format!("ordering[{}][field]", ordering.len())) {
-            let direction = q
-                .get(&format!("ordering[{}][direction]", ordering.len()))
-                .map_or(String::new(), |d| d.to_uppercase());
-            if !["createdAt", "id"].contains(&field.as_str())
-                || !["ASC", "DESC"].contains(&direction.as_str())
-            {
-                return Err(invalid("Ordering must be createdAt or id, ASC or DESC"));
-            }
-            ordering.push((field.clone(), direction == "ASC"));
-        }
-        if ordering.is_empty() {
-            ordering.push(("createdAt".into(), false));
-        }
-        if !ordering.iter().any(|(field, _)| field == "id") {
-            ordering.push(("id".into(), ordering[0].1));
-        }
-        let order = |a: &Value, b: &Value| {
-            ordering
-                .iter()
-                .map(|(field, ascending)| {
-                    let order = compare(&a[field], &b[field]);
-                    if *ascending {
-                        order
-                    } else {
-                        order.reverse()
-                    }
-                })
-                .find(|order| order.is_ne())
-                .unwrap_or(Ordering::Equal)
-        };
-        let mut items: Vec<&Value> = self
+        let ordering = cursor_ordering(q)?;
+        let items: Vec<&Value> = self
             .storage
             .assets
             .values()
@@ -1905,59 +1951,7 @@ impl Backend {
             .filter(|asset| include(asset))
             .filter(|asset| filter.as_ref().is_none_or(|filter| filter.matches(asset)))
             .collect();
-        items.sort_by(|a, b| order(a, b));
-        let ordering_json: Vec<Value> = ordering
-            .iter()
-            .map(|(field, ascending)| {
-                json!({"field": field, "direction": if *ascending { "ASC" } else { "DESC" }})
-            })
-            .collect();
-        let signature = json!([scope, ordering_json]).to_string();
-        let engine = base64::engine::general_purpose::STANDARD;
-        if let Some(cursor) = q.get("cursor") {
-            let values: Vec<Value> = engine
-                .decode(cursor)
-                .ok()
-                .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
-                .filter(|parsed| parsed["scope"] == signature.as_str())
-                .and_then(|parsed| parsed["values"].as_array().cloned())
-                .filter(|values| {
-                    values.len() == ordering.len()
-                        && values.iter().zip(&ordering).all(|(value, (field, _))| {
-                            if field == "id" {
-                                value.is_string()
-                            } else {
-                                value.is_number()
-                            }
-                        })
-                })
-                .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?;
-            let boundary: Map<String, Value> = ordering
-                .iter()
-                .map(|(field, _)| field.clone())
-                .zip(values)
-                .collect();
-            let boundary = Value::Object(boundary);
-            items.retain(|item| order(item, &boundary).is_gt());
-        }
-        let has_more = items.len() > size;
-        items.truncate(size);
-        let next_cursor = match items.last() {
-            Some(last) if has_more => {
-                let values: Vec<Value> = ordering
-                    .iter()
-                    .map(|(field, _)| last[field].clone())
-                    .collect();
-                let cursor = json!({"scope": signature, "values": values});
-                Value::from(engine.encode(cursor.to_string()))
-            }
-            _ => Value::Null,
-        };
-        let ordering = ordering_json;
-        Ok(json!({
-            "items": items, "nextCursor": next_cursor, "pageSize": size, "ordering": ordering,
-            "hasMore": has_more,
-        }))
+        keyset_page(items, &ordering, q.get("cursor"), scope, size)
     }
 
     /// Keyword search like the API: every whitespace-separated query token (case-insensitive, at
@@ -2252,6 +2246,7 @@ impl Backend {
             ("POST", ["assets", _, "signed-url"]) => "assets.createSignedUrl",
             ("POST", ["assets", _, "retry"]) => "assets.retry",
             ("POST", ["assets", _, "explain"]) => "assets.explain",
+            ("POST", ["assets", _, "decision"]) => "assets.decide",
             ("POST", ["assets", _, "move"]) => "assets.move",
             ("POST", ["assets", _, "part"]) => "assets.uploadPart",
             ("GET", ["folders", _]) => "folders.retrieve",
@@ -2371,6 +2366,128 @@ const SEARCH_FIELDS: [&str; 9] = [
 ];
 /// The most distinct query tokens a keyword search uses.
 const SEARCH_TOKENS: usize = 8;
+
+/// Whether an asset's content was purged, like the API: a reviewer purged it, or it was removed
+/// by policy or disposed of.
+fn content_purged(asset: &Value) -> bool {
+    let moderation = &asset["classification"]["moderation"];
+    moderation["status"] == "purged"
+        || (asset["content"]["status"] == "removed"
+            && matches!(
+                text(&asset["content"]["removalReason"]),
+                "policy" | "disposed"
+            ))
+        || moderation["manualReviews"]
+            .as_array()
+            .is_some_and(|reviews| {
+                reviews.iter().any(|review| {
+                    review["decision"] == "purged" && review["appliedToAsset"] == true
+                })
+            })
+}
+
+/// A cursor list's ordering by `createdAt` or `id`, as `(field, ascending)`: newest first by
+/// default, with the `id` tie-breaker added like the API.
+fn cursor_ordering(q: &HashMap<String, String>) -> Outcome<Vec<(String, bool)>> {
+    let mut ordering = Vec::new();
+    while let Some(field) = q.get(&format!("ordering[{}][field]", ordering.len())) {
+        let direction = q
+            .get(&format!("ordering[{}][direction]", ordering.len()))
+            .map_or(String::new(), |d| d.to_uppercase());
+        if !["createdAt", "id"].contains(&field.as_str())
+            || !["ASC", "DESC"].contains(&direction.as_str())
+        {
+            return Err(invalid("Ordering must be createdAt or id, ASC or DESC"));
+        }
+        ordering.push((field.clone(), direction == "ASC"));
+    }
+    if ordering.is_empty() {
+        ordering.push(("createdAt".into(), false));
+    }
+    if !ordering.iter().any(|(field, _)| field == "id") {
+        ordering.push(("id".into(), ordering[0].1));
+    }
+    Ok(ordering)
+}
+
+/// Sorts `items` by `ordering` (which ends with the `id` tie-breaker) and returns the page of up
+/// to `size` items after `cursor`, like the API's cursor lists. A cursor holds the ordering
+/// values of the last item it follows and continues only the query (`scope` and ordering) it
+/// came from; `id` and `name` values are text, the others numbers.
+fn keyset_page(
+    mut items: Vec<&Value>,
+    ordering: &[(String, bool)],
+    cursor: Option<&String>,
+    scope: &str,
+    size: usize,
+) -> Outcome<Value> {
+    let order = |a: &Value, b: &Value| {
+        ordering
+            .iter()
+            .map(|(field, ascending)| {
+                let order = compare(&a[field], &b[field]);
+                if *ascending {
+                    order
+                } else {
+                    order.reverse()
+                }
+            })
+            .find(|order| order.is_ne())
+            .unwrap_or(Ordering::Equal)
+    };
+    items.sort_by(|a, b| order(a, b));
+    let ordering_json: Vec<Value> = ordering
+        .iter()
+        .map(|(field, ascending)| {
+            json!({"field": field, "direction": if *ascending { "ASC" } else { "DESC" }})
+        })
+        .collect();
+    let signature = json!([scope, ordering_json]).to_string();
+    let engine = base64::engine::general_purpose::STANDARD;
+    if let Some(cursor) = cursor {
+        let values: Vec<Value> = engine
+            .decode(cursor)
+            .ok()
+            .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
+            .filter(|parsed| parsed["scope"] == signature.as_str())
+            .and_then(|parsed| parsed["values"].as_array().cloned())
+            .filter(|values| {
+                values.len() == ordering.len()
+                    && values.iter().zip(ordering).all(|(value, (field, _))| {
+                        if field == "id" || field == "name" {
+                            value.is_string()
+                        } else {
+                            value.is_number()
+                        }
+                    })
+            })
+            .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?;
+        let boundary: Map<String, Value> = ordering
+            .iter()
+            .map(|(field, _)| field.clone())
+            .zip(values)
+            .collect();
+        let boundary = Value::Object(boundary);
+        items.retain(|item| order(item, &boundary).is_gt());
+    }
+    let has_more = items.len() > size;
+    items.truncate(size);
+    let next_cursor = match items.last() {
+        Some(last) if has_more => {
+            let values: Vec<Value> = ordering
+                .iter()
+                .map(|(field, _)| last[field].clone())
+                .collect();
+            let cursor = json!({"scope": signature, "values": values});
+            Value::from(engine.encode(cursor.to_string()))
+        }
+        _ => Value::Null,
+    };
+    Ok(json!({
+        "items": items, "nextCursor": next_cursor, "pageSize": size, "ordering": ordering_json,
+        "hasMore": has_more,
+    }))
+}
 
 /// Orders JSON values: null first, then numbers numerically, then everything else as text.
 fn compare(a: &Value, b: &Value) -> Ordering {

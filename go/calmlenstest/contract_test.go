@@ -411,12 +411,20 @@ func normalize(t *testing.T, value any) any {
 		for i, item := range typed.Items {
 			out.(map[string]any)["items"].([]any)[i].(map[string]any)["asset"] = normalize(t, item.Asset.Raw)
 		}
+	case *calmlens.FolderPage:
+		if typed.NextCursor == "" {
+			out.(map[string]any)["nextCursor"] = nil
+		}
+	case *calmlens.HashListPage:
+		if typed.NextCursor == "" {
+			out.(map[string]any)["nextCursor"] = nil
+		}
 	case *calmlens.EventsPage:
 		events := []any{}
-		for _, event := range typed.Events {
+		for _, event := range typed.Items {
 			events = append(events, normalize(t, event.Raw))
 		}
-		out.(map[string]any)["events"] = events
+		out.(map[string]any)["items"] = events
 	case []calmlens.EventsPage:
 		pages := []any{}
 		for i := range typed {
@@ -542,6 +550,10 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		result, err = m.Assets.CreateSignedURL(ctx, options)
 	case "assets.retry":
 		result, err = m.Assets.Retry(ctx, decode[calmlens.AssetIDOptions](t, args))
+	case "assets.decide":
+		options := decode[calmlens.DecideAssetOptions](t, args)
+		options.AssetID, _ = args["assetId"].(string)
+		result, err = m.Assets.Decide(ctx, options)
 	case "assets.explain":
 		result, err = m.Assets.Explain(ctx, decode[calmlens.ExplainAssetOptions](t, args))
 	case "assets.deleteContent":

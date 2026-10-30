@@ -699,19 +699,19 @@ describe("MockCalmLensServerClient", () => {
 
     // 5. List folders (sorted alphabetically)
     const list = await client.folders.list();
-    expect(list.folders.map((f) => f.id)).toEqual([marketing.id, product.id]);
-    expect(
-      (await client.folders.list({ parentId: marketing.id })).folders.map((f) => f.id),
-    ).toEqual([campaigns.id]);
+    expect(list.items.map((f) => f.id)).toEqual([marketing.id, product.id]);
+    expect((await client.folders.list({ parentId: marketing.id })).items.map((f) => f.id)).toEqual([
+      campaigns.id,
+    ]);
 
     const first = await client.folders.list({ pageSize: 1 });
-    expect(first.folders.map((folder) => folder.id)).toEqual([marketing.id]);
+    expect(first.items.map((folder) => folder.id)).toEqual([marketing.id]);
     expect(first.hasMore).toBe(true);
-    const second = await client.folders.list({ pageIndex: 1, pageSize: 1 });
-    expect(second.folders.map((folder) => folder.id)).toEqual([product.id]);
+    const second = await client.folders.list({ cursor: first.nextCursor!, pageSize: 1 });
+    expect(second.items.map((folder) => folder.id)).toEqual([product.id]);
     expect(second.hasMore).toBe(false);
     const resolved = await client.folders.list({ ids: [campaigns.id], resolveOnly: true });
-    expect(resolved.folders).toEqual([]);
+    expect(resolved.items).toEqual([]);
     expect(resolved.ancestors.map((folder) => folder.id).sort()).toEqual(
       [marketing.id, campaigns.id].sort(),
     );
@@ -1043,8 +1043,8 @@ describe("MockCalmLensServerClient", () => {
     await client.ensureLenses({ lenses: [lens] });
     // The lens cache answers this one without a request.
     await client.ensureLens(lens);
-    const { cursor } = await client.events.list();
-    await client.events.list({ after: cursor, limit: 10 });
+    const { nextCursor } = await client.events.list();
+    await client.events.list({ cursor: nextCursor, pageSize: 10 });
     await client.folders.create({ name: "Inbox" });
     await client.folders.retrieve({ folderId: "fldr_00000000000000000000" }).catch(() => undefined);
 
@@ -1068,7 +1068,7 @@ describe("MockCalmLensServerClient", () => {
       `/assets/${moderated.id}`,
     ]);
     expect(client.callsTo("ensureLens")).toEqual(client.callsTo("ensureLenses"));
-    expect(client.callsTo("events.list")[1]?.query).toEqual({ after: cursor, limit: "10" });
+    expect(client.callsTo("events.list")[1]?.query).toEqual({ cursor: nextCursor, pageSize: "10" });
     expect(client.callsTo("folders.create")[0]?.body).toEqual({ name: "Inbox" });
   });
 

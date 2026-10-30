@@ -346,6 +346,36 @@ const asset = await client.assets.explain({ assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c
 // asset.classification.moderation.policy?.evidence === "full"
 ```
 
+##### assets.decide(options)
+
+Record a reviewer's decision on an asset, replacing the policy's. The asset's
+`classification.moderation.status` becomes `decision` (`allowed`, `limited`, `age-restricted`,
+`blocked` or `purged`), the decision and its `note` (required, up to 1,499 characters) join
+`classification.moderation.manualReviews`, and the matching `asset.<status>` event is sent with a
+`decided-by: reviewer` fact. Purging needs `confirmPurge: true` and the `assets:delete`
+permission, and permanently deletes the stored content.
+
+It throws `asset/processing` while the asset is still uploading or processing,
+`asset/decision-not-allowed` when an asset pending moderation is allowed, limited or
+age-restricted (it can only be blocked or purged), `asset/decision-unchanged` when the asset
+already has that status and `asset/content-purged` when purged content is anything but blocked.
+
+```typescript
+const asset = await client.assets.decide({
+  assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c",
+  decision: "blocked",
+  note: "Spam reported by three members",
+});
+// asset.classification.moderation.status === "blocked"
+
+await client.assets.decide({
+  assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c",
+  decision: "purged",
+  note: "Illegal content",
+  confirmPurge: true,
+});
+```
+
 ##### assets.waitForDecision(options)
 
 Wait for an asset's moderation decision and get the decided asset: it returns once `classification.moderation.status`
@@ -365,10 +395,20 @@ if (status !== "allowed" && status !== "limited") hidePhoto(decided.id);
 
 ##### folders.list(options)
 
-Fetch one page of immediate child folders. Omit `parentId` for the project root. The response contains `folders`, visible `ancestors`, and `hasMore`; advance `pageIndex` to load more.
+Fetch one page of immediate child folders, sorted by name. Omit `parentId` for the project root.
+The response contains `items`, the visible `ancestors` of the listed folders, `hasMore` and
+`nextCursor`; pass `nextCursor` as `cursor` to load the next page. `pageSize` is 1 to 100
+(default 100), and `ordering: [{ field: "createdAt", direction: "DESC" }]` sorts by creation
+time instead (`name` or `createdAt`, one rule).
 
 ```typescript
 const page = await client.folders.list({ parentId: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P", pageSize: 100 });
+if (page.hasMore) {
+  const next = await client.folders.list({
+    parentId: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
+    cursor: page.nextCursor!,
+  });
+}
 ```
 
 ##### folders.retrieve(options)
@@ -785,7 +825,7 @@ Like the API, the mock gives each new object an ID with its kind's prefix, an un
 
 `MockCalmLensServerClient` is a `CalmLensServerClient`: every method runs the real client's code (validation, request building, response and error handling, the lens cache), and its `fetch` is an in-memory API that answers each request as CalmLens does, with the API's HTTP statuses, JSON bodies and error bodies (`code`, `message`, `details`) and an `X-Request-Id`. It accepts the same options as `CalmLensServerClient` (`apiKey`, `projectId`, `baseUrl`, `cdnBaseUrl`, `timeoutMs`, `maxRetries`, ...) and validates them the same way, plus `mockOptions`; requests never leave the process, whatever `fetch` you pass. `maxRetries` defaults to 0, so a failed request fails once; set it to test retries. Waits take no real time: retry backoff and `assets.waitForDecision` only move the mock's clock on, so `waitForDecision` fails with `sdk/timeout` straight away for an asset that stays pending. `cdn.getAssetUrl` uses `cdnBaseUrl` (default `mock://calmlens/v1`), and `cdn.serve` requests are answered by the in-memory CDN.
 
-The in-memory API behaves like CalmLens where tests depend on it: `assets.list` applies `ordering`, `folderId` and `filter` expressions (comparisons joined by `;`, which binds tighter than `,`, and grouped with parentheses; anything else throws `sdk/invalid-argument` rather than returning wrong results), with cursors that resume after the last asset returned and only continue the query they came from; `assets.search` runs the API's keyword search, where every word must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status, with the API's scores and `matchedFields`; assets created in a row get increasing `createdAt` values; multipart parts must arrive in order, every part but the last is at least 5 MiB, images total 10 MiB to 20 MiB, parts add up to any declared `totalSizeInBytes`, and the queue mode chosen at the start applies to the final part; out-of-range `pageSize`, `limit` and search queries fail with the API's `validation/too-small` or `validation/too-big`; unset asset fields are `null`, as the API returns them; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `limited`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, an automated `purged` outcome removes it with reason `policy`, and `assets.deleteContent` and a reviewer's `purged` decision remove it with reason `requested`; a reused `idempotencyKey` replays the first response; and `cdn.serve` returns CDN-like responses with JSON error bodies: blocked, purged and failed assets and removed content get `403` `asset/not-available` whatever the key, then private assets get `403` `asset/api-key-missing-permission` unless the key has `assets:download` (keys from `createMockApiKey()` have no grants); a classified image's `placeholder` is a PNG, public for every asset whatever its visibility or status, and refused once the asset is purged or its content removed. Originals carry the CDN's `Cache-Control`, `Cache-Tag` and protection headers, and images an `ETag` and `Expires`. `client.setApiKeyGrants(grants)` changes the key's grants mid-test. `client.decide(assetId, decision)` applies a reviewer's decision (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`) and adds the matching `asset.<decision>` event with a `decided-by: reviewer` fact; `assets.delete`, `assets.deleteContent` and `assets.retry` add `asset.deleted`, `asset.content-removed` and `asset.retried` events (the mock records no processing events such as `asset.uploaded` or `asset.classified`). `queuedOutcome` and `analyzedOutcome` can also be functions of the new asset, for example to decide from its name. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
+The in-memory API behaves like CalmLens where tests depend on it: `assets.list` applies `ordering`, `folderId` and `filter` expressions (comparisons joined by `;`, which binds tighter than `,`, and grouped with parentheses; anything else throws `sdk/invalid-argument` rather than returning wrong results), with cursors that resume after the last asset returned and only continue the query they came from; `assets.search` runs the API's keyword search, where every word must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status, with the API's scores and `matchedFields`; assets created in a row get increasing `createdAt` values; multipart parts must arrive in order, every part but the last is at least 5 MiB, images total 10 MiB to 20 MiB, parts add up to any declared `totalSizeInBytes`, and the queue mode chosen at the start applies to the final part; out-of-range `pageSize`, `limit` and search queries fail with the API's `validation/too-small` or `validation/too-big`; unset asset fields are `null`, as the API returns them; `mockOptions.queuedOutcome` (default `pending`) and `mockOptions.analyzedOutcome` (default `allowed`) set where queued and waited-for uploads end up (`pending`, `allowed`, `limited`, `age-restricted`, `blocked`, `purged` or `failed`); content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, an automated `purged` outcome removes it with reason `policy`, and `assets.deleteContent` and a reviewer's `purged` decision remove it with reason `requested`; a reused `idempotencyKey` replays the first response; and `cdn.serve` returns CDN-like responses with JSON error bodies: blocked, purged and failed assets and removed content get `403` `asset/not-available` whatever the key, then private assets get `403` `asset/api-key-missing-permission` unless the key has `assets:download` (keys from `createMockApiKey()` have no grants); a classified image's `placeholder` is a PNG, public for every asset whatever its visibility or status, and refused once the asset is purged or its content removed. Originals carry the CDN's `Cache-Control`, `Cache-Tag` and protection headers, and images an `ETag` and `Expires`. `client.setApiKeyGrants(grants)` changes the key's grants mid-test. `client.decide(assetId, decision)` applies a reviewer's decision (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`) and adds the matching `asset.<decision>` event with a `decided-by: reviewer` fact; `assets.decide` checks decisions like the API (`asset/processing` while an upload is open or still processing, `asset/decision-not-allowed`, `asset/decision-unchanged`, `asset/content-purged`) and records its note with the reviewer `An API key`; `folders.list` and `hashLists.list` return cursor pages like the API; `assets.delete`, `assets.deleteContent` and `assets.retry` add `asset.deleted`, `asset.content-removed` and `asset.retried` events (the mock records no processing events such as `asset.uploaded` or `asset.classified`). `queuedOutcome` and `analyzedOutcome` can also be functions of the new asset, for example to decide from its name. `client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return.
 
 Every request the client sends is recorded in `client.calls` as `{ operation, method, url, path, query, headers, body, status }`: the client method that sent it (`"assets.retrieve"`, `"events.list"`, `"cdn.serve"`, ...), the request as the API received it (`path` relative to the API or CDN base URL, `body` as parsed JSON, the text of a text upload or the bytes of a file) and the HTTP status of the answer (`undefined` when it failed without one). Methods that send nothing, such as `uploadTokens.sign` or an `ensureLens` answered from the lens cache, are not recorded. `client.callsTo(operation)` filters them; a request several methods send matches each of them, so `callsTo("text.classify")` also lists text uploads through `assets.classify`, and `callsTo("assets.waitForDecision")` the `assets.retrieve` requests it polls with. To test failure handling, `client.failNextRequest()` makes the next request fail like a network failure, so the client throws `sdk/transport-error`; pass `"timeout"` for `sdk/timeout`, an API error code such as `"upload/limit-exceeded"` for that API error with its HTTP status, a `CalmLensError` to throw it as is or another `Error` to fail with it as the cause, and `{ operation }` to fail only the next request that method sends. Each queued failure is used once.
 
@@ -912,33 +952,33 @@ The same feed is available in code with [`events.list`](#events-feed).
 
 ## Events feed
 
-`client.events.list({ after?, limit? })` reads the project's events, oldest first, without a public webhook URL. It resolves to an `EventsPage`:
+`client.events.list({ cursor?, pageSize? })` reads the project's events, oldest first, without a public webhook URL. It resolves to an `EventsPage`:
 
 ```typescript
 {
-  events: TypedEvent[]; // { id, projectId, type, severity, title, description?, assetId?, asset?, facts, createdAt, updatedAt }
-  cursor: string;       // pass back as `after` to continue after the last event returned
-  hasMore: boolean;     // true when more events are already waiting after `cursor`
+  items: TypedEvent[]; // { id, projectId, type, severity, title, description?, assetId?, asset?, facts, createdAt, updatedAt }
+  nextCursor: string;  // pass back as `cursor` to continue after the last event returned
+  hasMore: boolean;    // true when more events are already waiting after `nextCursor`
 }
 ```
 
-- Without `after` (or with an empty string), it returns **no events** and a `cursor` for the current time, so you only see events created after you start reading. It does not return history.
-- With `after`, it returns up to `limit` events (default 50) created after that cursor. When there are none, `cursor` is the `after` you passed.
-- Keep passing the latest `cursor` as `after` until `hasMore` is `false`, then wait before polling again. Store the cursor if you want to resume after a restart.
-- An unknown or malformed cursor fails with the `CalmLensError` code `events/invalid-cursor`.
+- Without `cursor`, it returns **no events** and a `nextCursor` for the current time, so you only see events created after you start reading. It does not return history.
+- With `cursor`, it returns up to `pageSize` events (1 to 100, default 50) created after that cursor. When there are none, `nextCursor` is the `cursor` you passed; it is never null.
+- Keep passing the latest `nextCursor` as `cursor` until `hasMore` is `false`, then wait before polling again. Store the cursor if you want to resume after a restart.
+- An unknown or malformed cursor fails with the `CalmLensError` code `validation/invalid-cursor`.
 
-`client.events.pages({ after, limit })` follows the cursor for you: it yields each page until no more events are waiting.
+`client.events.pages({ cursor, pageSize })` follows the cursor for you: it yields each page until no more events are waiting.
 
 ```typescript
-let { cursor } = await client.events.list(); // no events, cursor = "now"
+let { nextCursor: cursor } = await client.events.list(); // no events, a cursor for "now"
 
 async function drainEvents() {
-  for await (const page of client.events.pages({ after: cursor, limit: 100 })) {
-    for (const event of page.events) {
+  for await (const page of client.events.pages({ cursor, pageSize: 100 })) {
+    for (const event of page.items) {
       // narrow on event.type to read its typed facts
       console.log(event.type, event.facts);
     }
-    cursor = page.cursor; // save it to resume after a restart
+    cursor = page.nextCursor; // save it to resume after a restart
   }
 }
 

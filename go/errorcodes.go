@@ -41,8 +41,6 @@ const (
 	CodeSpendLimitReached = "upload/spend-limit-reached"
 	// CodeInvalidUploadMimeType is returned with HTTP 400.
 	CodeInvalidUploadMimeType = "upload/invalid-mime-type"
-	// CodeInvalidEventCursor is returned with HTTP 400.
-	CodeInvalidEventCursor = "events/invalid-cursor"
 	// CodeInvalidUploadPayload is returned with HTTP 400.
 	CodeInvalidUploadPayload = "upload/invalid-payload"
 	// CodeUseUploadPart is returned with HTTP 409.
@@ -73,6 +71,12 @@ const (
 	CodeAssetUpdateFailed = "asset/update-failed"
 	// CodeAssetSafetyHeld is returned with HTTP 423.
 	CodeAssetSafetyHeld = "asset/safety-held"
+	// CodeAssetProcessing is returned with HTTP 409.
+	CodeAssetProcessing = "asset/processing"
+	// CodeAssetDecisionNotAllowed is returned with HTTP 409.
+	CodeAssetDecisionNotAllowed = "asset/decision-not-allowed"
+	// CodeAssetDecisionUnchanged is returned with HTTP 409.
+	CodeAssetDecisionUnchanged = "asset/decision-unchanged"
 	// CodeAssetNotRetryable is returned with HTTP 409.
 	CodeAssetNotRetryable = "asset/not-retryable"
 	// CodeAssetContentUnavailable is returned with HTTP 409.
@@ -180,7 +184,6 @@ var publicErrorStatuses = map[string]int{
 	CodeUploadLimitExceeded:               403,
 	CodeSpendLimitReached:                 402,
 	CodeInvalidUploadMimeType:             400,
-	CodeInvalidEventCursor:                400,
 	CodeInvalidUploadPayload:              400,
 	CodeUseUploadPart:                     409,
 	CodeUploadNotOpen:                     409,
@@ -196,6 +199,9 @@ var publicErrorStatuses = map[string]int{
 	CodeAssetReviewNoteRequired:           400,
 	CodeAssetUpdateFailed:                 500,
 	CodeAssetSafetyHeld:                   423,
+	CodeAssetProcessing:                   409,
+	CodeAssetDecisionNotAllowed:           409,
+	CodeAssetDecisionUnchanged:            409,
 	CodeAssetNotRetryable:                 409,
 	CodeAssetContentUnavailable:           409,
 	CodeAssetContentPurged:                409,

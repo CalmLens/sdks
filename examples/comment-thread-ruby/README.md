@@ -128,7 +128,7 @@ the event's snapshot:
   its `externalId`): nothing changes.
 
 **Events feed (pull).** Click **Check for decisions** in the review queue. The app calls
-`client.events.list(after: cursor, limit: 50)` and follows `hasMore`. The first call without
+`client.events.list(cursor: cursor, page_size: 50)` and follows `hasMore`. The first call without
 a cursor returns a cursor for "now". The app takes it before its first moderation request,
 so only later events count. Pages are read with `client.events.each_page`. The cursor advances
 only after a whole page is applied, so a failed retrieval or deletion retries the page.

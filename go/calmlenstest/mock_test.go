@@ -392,3 +392,37 @@ func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
 		t.Fatalf("listed entries of a deleted list: %v", err)
 	}
 }
+
+func TestMockDecideValidatesLikeTheAPI(t *testing.T) {
+	c, _ := NewServerClient(Options{AnalyzedOutcome: OutcomeAllowed})
+	ctx := context.Background()
+	asset, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "n", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("x")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused := func(options calmlens.DecideAssetOptions, code, path string) {
+		t.Helper()
+		options.AssetID = asset.ID
+		_, err := c.Assets.Decide(ctx, options)
+		var apiErr *calmlens.Error
+		if !errors.As(err, &apiErr) || apiErr.Code != code || (path != "" && apiErr.Details["path"] != path) {
+			t.Fatalf("%+v: got %v, want %s at %q", options, err, code, path)
+		}
+	}
+	refused(calmlens.DecideAssetOptions{Decision: "approved", Note: "x"}, "validation/invalid-value", "decision")
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusBlocked, Note: "  "}, "validation/too-small", "note")
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusBlocked, Note: strings.Repeat("x", 1500)}, "validation/too-big", "note")
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusPurged, Note: "x"}, "validation/invalid-value", "confirmPurge")
+	purged, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationStatusPurged, Note: " Illegal ", ConfirmPurge: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviews := purged.Classification.Moderation.ManualReviews
+	if len(reviews) != 1 || reviews[0].Note == nil || *reviews[0].Note != "Illegal" {
+		t.Fatalf("reviews %+v", reviews)
+	}
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusAllowed, Note: "x"}, calmlens.CodeAssetContentPurged, "")
+	if blocked, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationStatusBlocked, Note: "x"}); err != nil || blocked.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+		t.Fatalf("blocking purged content: %v", err)
+	}
+}

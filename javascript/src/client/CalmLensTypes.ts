@@ -35,6 +35,7 @@ import type {
   PatchFolderBody,
   PatchHashListBody,
   PostAssetBatchOperationResponse,
+  PostAssetDecisionBody,
   PostAssetSignedUrlResponse,
   PostFolderBody,
   PostHashListBody,
@@ -434,6 +435,9 @@ export interface RetryAssetOptions {
   assetId: string;
 }
 
+/** A reviewer's decision for `assets.decide`; purging must be confirmed. */
+export type DecideAssetOptions = { assetId: string } & PostAssetDecisionBody;
+
 export interface ExplainAssetOptions {
   assetId: string;
   /**
@@ -486,8 +490,14 @@ export interface MoveFolderOptions extends FolderIdOptions {
   parentId: string | null;
 }
 export type { HashList, HashListEntry };
-/** Every hash list in the project, newest first. */
-export type HashListList = GetHashListsResponse;
+/** `hashLists.list` options: a page of the project's hash lists, newest first. */
+export type ListHashListsOptions = {
+  /** The previous page's `nextCursor`; omit for the first page. */
+  cursor?: string;
+  /** 1 to 100; 10 by default. */
+  pageSize?: number;
+};
+export type HashListPage = GetHashListsResponse;
 export type CreateHashListOptions = PostHashListBody;
 export type UpdateHashListOptions = PatchHashListBody & { hashListId: string };
 export interface HashListIdOptions {

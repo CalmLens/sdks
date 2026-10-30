@@ -18,7 +18,6 @@ IMAGE_EXCEEDED_MAX_DIMENSIONS = "upload/image-exceeded-max-dimensions"
 UPLOAD_LIMIT_EXCEEDED = "upload/limit-exceeded"
 SPEND_LIMIT_REACHED = "upload/spend-limit-reached"
 INVALID_UPLOAD_MIME_TYPE = "upload/invalid-mime-type"
-INVALID_EVENT_CURSOR = "events/invalid-cursor"
 INVALID_UPLOAD_PAYLOAD = "upload/invalid-payload"
 USE_UPLOAD_PART = "upload/use-upload-part"
 UPLOAD_NOT_OPEN = "upload/not-open"
@@ -34,6 +33,9 @@ ASSET_REVIEW_CHANGED = "asset/review-changed"
 ASSET_REVIEW_NOTE_REQUIRED = "asset/review-note-required"
 ASSET_UPDATE_FAILED = "asset/update-failed"
 ASSET_SAFETY_HELD = "asset/safety-held"
+ASSET_PROCESSING = "asset/processing"
+ASSET_DECISION_NOT_ALLOWED = "asset/decision-not-allowed"
+ASSET_DECISION_UNCHANGED = "asset/decision-unchanged"
 ASSET_NOT_RETRYABLE = "asset/not-retryable"
 ASSET_CONTENT_UNAVAILABLE = "asset/content-unavailable"
 ASSET_CONTENT_PURGED = "asset/content-purged"
@@ -109,7 +111,6 @@ STATUS_BY_CODE: dict[str, int] = {
     "upload/limit-exceeded": 403,
     "upload/spend-limit-reached": 402,
     "upload/invalid-mime-type": 400,
-    "events/invalid-cursor": 400,
     "upload/invalid-payload": 400,
     "upload/use-upload-part": 409,
     "upload/not-open": 409,
@@ -125,6 +126,9 @@ STATUS_BY_CODE: dict[str, int] = {
     "asset/review-note-required": 400,
     "asset/update-failed": 500,
     "asset/safety-held": 423,
+    "asset/processing": 409,
+    "asset/decision-not-allowed": 409,
+    "asset/decision-unchanged": 409,
     "asset/not-retryable": 409,
     "asset/content-unavailable": 409,
     "asset/content-purged": 409,

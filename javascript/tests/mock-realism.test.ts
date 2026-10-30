@@ -116,28 +116,99 @@ describe("MockCalmLensServerClient listing", () => {
 describe("MockCalmLensServerClient events", () => {
   it("returns enqueued events after a cursor, in pages, like the API", async () => {
     const client = createClient();
-    const { cursor: start } = await client.events.list();
+    const { nextCursor: start } = await client.events.list();
     const first = client.enqueueEvent({ type: "asset.uploaded" });
     const second = client.enqueueEvent({ type: "asset.allowed", assetId: "asset-1" });
 
-    const page = await client.events.list({ after: start, limit: 1 });
-    expect(page.events.map((event) => event.id)).toEqual([first.id]);
+    const page = await client.events.list({ cursor: start, pageSize: 1 });
+    expect(page.items.map((event) => event.id)).toEqual([first.id]);
     expect(page.hasMore).toBe(true);
-    const rest = await client.events.list({ after: page.cursor });
-    expect(rest.events.map((event) => event.id)).toEqual([second.id]);
+    const rest = await client.events.list({ cursor: page.nextCursor });
+    expect(rest.items.map((event) => event.id)).toEqual([second.id]);
     expect(rest.hasMore).toBe(false);
 
     const seen: string[] = [];
-    for await (const eventPage of client.events.pages({ after: start, limit: 1 })) {
-      seen.push(...eventPage.events.map((event) => event.id));
+    for await (const eventPage of client.events.pages({ cursor: start, pageSize: 1 })) {
+      seen.push(...eventPage.items.map((event) => event.id));
     }
     expect(seen).toEqual([first.id, second.id]);
     expect(toWebhookEventPayload(second as never).data.assetId).toBe("asset-1");
 
-    expect(await caught(client.events.list({ after: "bogus" }))).toMatchObject({
-      code: "events/invalid-cursor",
+    expect(await caught(client.events.list({ cursor: "bogus" }))).toMatchObject({
+      code: "validation/invalid-cursor",
       status: 400,
     });
+  });
+});
+
+describe("MockCalmLensServerClient assets.decide", () => {
+  it("records the reviewer and note, and refuses decisions the API refuses", async () => {
+    const client = createClient();
+    const asset = await client.assets.classify(text("post"));
+    const { nextCursor } = await client.events.list();
+
+    const blocked = await client.assets.decide({
+      assetId: asset.id,
+      decision: "blocked",
+      note: "  Spam  ",
+    });
+    expect(blocked.classification.moderation.manualReviews).toEqual([
+      expect.objectContaining({
+        decision: "blocked",
+        note: "Spam",
+        reviewerUserId: null,
+        reviewerName: "An API key",
+        appliedToAsset: true,
+      }),
+    ]);
+    const [event] = (await client.events.list({ cursor: nextCursor })).items;
+    expect(event?.facts).toEqual(
+      expect.arrayContaining([
+        { key: "decided-by", value: "reviewer" },
+        { key: "reviewer-name", value: "An API key" },
+        { key: "note", value: "Spam" },
+      ]),
+    );
+
+    expect(
+      await caught(client.assets.decide({ assetId: asset.id, decision: "allowed", note: " " })),
+    ).toMatchObject({ code: "validation/too-small", status: 400, details: { path: "note" } });
+    expect(
+      await caught(
+        client.assets.decide({ assetId: asset.id, decision: "purged", note: "Illegal" } as never),
+      ),
+    ).toMatchObject({ code: "validation/invalid-value", details: { path: "confirmPurge" } });
+
+    await client.assets.decide({
+      assetId: asset.id,
+      decision: "purged",
+      note: "Illegal",
+      confirmPurge: true,
+    });
+    expect(
+      await caught(client.assets.decide({ assetId: asset.id, decision: "allowed", note: "Fine" })),
+    ).toMatchObject({ code: "asset/content-purged", status: 409 });
+    expect(
+      (await client.assets.decide({ assetId: asset.id, decision: "blocked", note: "Keep blocked" }))
+        .classification.moderation.status,
+    ).toBe("blocked");
+
+    const uploading = await client.assets.create({
+      name: "doc.pdf",
+      part: {
+        uint8Array: new Uint8Array(MIN_MULTIPART_UPLOAD_PART_BYTES).fill(1),
+        type: "application/pdf",
+        isFinal: false,
+      },
+    });
+    expect(
+      await caught(client.assets.decide({ assetId: uploading.id, decision: "blocked", note: "x" })),
+    ).toMatchObject({ code: "asset/processing", status: 409 });
+    const queued = await client.assets.create(text("queued"));
+    expect(queued.classification.status).toBe("processing");
+    expect(
+      await caught(client.assets.decide({ assetId: queued.id, decision: "blocked", note: "x" })),
+    ).toMatchObject({ code: "asset/processing", status: 409 });
   });
 });
 

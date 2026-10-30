@@ -858,8 +858,8 @@ public final class Calmmarket {
   private int sync(CalmLensServerClient feed) {
     int applied = 0;
     for (int page = 0; page < MAX_EVENT_PAGES; page++) {
-      EventsPage events = feed.events.list(new ListEvents().after(cursor).limit(EVENT_PAGE_SIZE));
-      for (Event event : events.events())
+      EventsPage events = feed.events.list(new ListEvents().cursor(cursor).pageSize(EVENT_PAGE_SIZE));
+      for (Event event : events.items())
         if (apply(event.id(), event.type(), event.assetId(), event.facts())) applied++;
       cursor = cursor(events);
       if (!events.hasMore()) break;
@@ -868,9 +868,9 @@ public final class Calmmarket {
   }
 
   private static String cursor(EventsPage page) {
-    if (page.cursor() == null || page.cursor().isEmpty())
+    if (page.nextCursor() == null || page.nextCursor().isEmpty())
       throw new IllegalStateException("The events feed returned a page without a cursor");
-    return page.cursor();
+    return page.nextCursor();
   }
 
   /**

@@ -375,11 +375,6 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
 		status: 400
 	}),
-	INVALID_EVENT_CURSOR: new ErrorCode({
-		id: "events/invalid-cursor",
-		defaultMessage: "The events cursor is invalid. Use the cursor from a previous response, or omit it to start from now.",
-		status: 400
-	}),
 	INVALID_UPLOAD_PAYLOAD: new ErrorCode({
 		id: "upload/invalid-payload",
 		defaultMessage: "Upload payload is invalid.",
@@ -454,6 +449,21 @@ const PUBLIC_ERROR_CODES = {
 		id: "asset/safety-held",
 		defaultMessage: "Asset access is restricted by a safety hold.",
 		status: 423
+	}),
+	ASSET_PROCESSING: new ErrorCode({
+		id: "asset/processing",
+		defaultMessage: "Wait for the asset to finish uploading and processing before deciding it.",
+		status: 409
+	}),
+	ASSET_DECISION_NOT_ALLOWED: new ErrorCode({
+		id: "asset/decision-not-allowed",
+		defaultMessage: "This asset has no moderation decision yet, so it can only be blocked or purged. Allow, limit or age-restrict it once moderation has decided it.",
+		status: 409
+	}),
+	ASSET_DECISION_UNCHANGED: new ErrorCode({
+		id: "asset/decision-unchanged",
+		defaultMessage: "The asset already has this moderation status.",
+		status: 409
 	}),
 	ASSET_NOT_RETRYABLE: new ErrorCode({
 		id: "asset/not-retryable",

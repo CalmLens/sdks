@@ -113,13 +113,13 @@ func (it *AssetIterator) All(ctx context.Context) func(yield func(Asset, error) 
 
 // EventIterator follows the event feed cursor until no more events are available.
 //
-//	it := client.Events.ListAll(calmlens.ListEventsOptions{After: savedCursor})
+//	it := client.Events.ListAll(calmlens.ListEventsOptions{Cursor: savedCursor})
 //	for it.Next(ctx) {
 //		handle(it.Event())
 //	}
 //	savedCursor = it.Cursor() // persist it, even after an error
 //
-// Without After the feed starts at "now", so the first page is empty and iteration stops
+// Without Cursor the feed starts at "now", so the first page is empty and iteration stops
 // at once; save Cursor and iterate again later. NextPage walks the same feed a page at a time.
 type EventIterator struct {
 	s       *EventsService
@@ -131,11 +131,11 @@ type EventIterator struct {
 	sent    map[string]bool
 }
 
-// ListAll iterates over events after options.After, following the cursor across pages.
+// ListAll iterates over events after options.Cursor, following each page's NextCursor.
 func (s *EventsService) ListAll(options ListEventsOptions) *EventIterator {
 	it := &EventIterator{s: s, options: options}
-	if options.After != "" {
-		it.sent = map[string]bool{options.After: true}
+	if options.Cursor != "" {
+		it.sent = map[string]bool{options.Cursor: true}
 	}
 	return it
 }
@@ -154,13 +154,13 @@ func (it *EventIterator) NextPage(ctx context.Context) bool {
 		return false
 	}
 	if page.HasMore {
-		if it.err = repeatedCursor(&it.sent, page.Cursor); it.err != nil {
+		if it.err = repeatedCursor(&it.sent, page.NextCursor); it.err != nil {
 			return false
 		}
 	}
 	it.page, it.pos = page, 0
-	if page.Cursor != "" {
-		it.options.After = page.Cursor
+	if page.NextCursor != "" {
+		it.options.Cursor = page.NextCursor
 	}
 	it.done = !page.HasMore
 	return true
@@ -173,7 +173,7 @@ func (it *EventIterator) Page() *EventsPage { return it.page }
 // a request failed; check Err afterwards.
 func (it *EventIterator) Next(ctx context.Context) bool {
 	for {
-		if it.page != nil && it.pos < len(it.page.Events) {
+		if it.page != nil && it.pos < len(it.page.Items) {
 			it.pos++
 			return true
 		}
@@ -184,11 +184,11 @@ func (it *EventIterator) Next(ctx context.Context) bool {
 }
 
 // Event returns the current event. Call it only after Next returned true.
-func (it *EventIterator) Event() Event { return it.page.Events[it.pos-1] }
+func (it *EventIterator) Event() Event { return it.page.Items[it.pos-1] }
 
-// Cursor returns the cursor to resume from: pass it as After to continue after the last
-// page fetched.
-func (it *EventIterator) Cursor() string { return it.options.After }
+// Cursor returns the cursor to resume from: pass it as ListEventsOptions.Cursor to continue
+// after the last page fetched.
+func (it *EventIterator) Cursor() string { return it.options.Cursor }
 
 // Err returns the error that stopped iteration, if any.
 func (it *EventIterator) Err() error { return it.err }

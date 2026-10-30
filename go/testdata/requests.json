@@ -1029,6 +1029,74 @@
     }
   },
   {
+    "operation": "assets.decide",
+    "options": {
+      "assetId": "asset-1",
+      "decision": "blocked",
+      "note": "Spam"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/decision",
+      "query": {},
+      "body": {
+        "decision": "blocked",
+        "note": "Spam"
+      }
+    },
+    "response": {
+      "id": "asset-1",
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "status": "allowed"
+        }
+      }
+    }
+  },
+  {
+    "operation": "assets.decide",
+    "options": {
+      "assetId": "asset-1",
+      "decision": "purged",
+      "note": "Illegal",
+      "confirmPurge": true
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/decision",
+      "query": {},
+      "body": {
+        "decision": "purged",
+        "note": "Illegal",
+        "confirmPurge": true
+      }
+    },
+    "response": {
+      "id": "asset-1",
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "status": "allowed"
+        }
+      }
+    }
+  },
+  {
     "operation": "assets.deleteContent",
     "options": {
       "assetId": "asset-1"
@@ -1239,7 +1307,7 @@
     "operation": "folders.list",
     "options": {
       "parentId": "folder-1",
-      "pageIndex": 1,
+      "cursor": "opaque+/cursor=",
       "pageSize": 25
     },
     "request": {
@@ -1247,15 +1315,17 @@
       "path": "/v1/projects/project-1/folders",
       "query": {
         "parentId": "folder-1",
-        "pageIndex": "1",
+        "cursor": "opaque+/cursor=",
         "pageSize": "25"
       },
       "body": null
     },
     "response": {
-      "folders": [],
+      "items": [],
       "ancestors": [],
-      "hasMore": false
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 100
     }
   },
   {
@@ -1276,9 +1346,11 @@
       "body": null
     },
     "response": {
-      "folders": [],
+      "items": [],
       "ancestors": [],
-      "hasMore": false
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 100
     }
   },
   {
@@ -1397,7 +1469,43 @@
           "createdAt": 1760000000000,
           "updatedAt": 1760000000000
         }
-      ]
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 10
+    }
+  },
+  {
+    "operation": "hashLists.list",
+    "options": {
+      "cursor": "opaque+/cursor=",
+      "pageSize": 20
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/hash-lists",
+      "query": {
+        "cursor": "opaque+/cursor=",
+        "pageSize": "20"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "list-1",
+          "projectId": "project-1",
+          "name": "Removed images",
+          "description": null,
+          "action": "block",
+          "createdByUserId": null,
+          "createdAt": 1760000000000,
+          "updatedAt": 1760000000000
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null,
+      "pageSize": 10
     }
   },
   {
@@ -1595,21 +1703,21 @@
   {
     "operation": "events.list",
     "options": {
-      "after": "123_abc",
-      "limit": 100
+      "cursor": "123_abc",
+      "pageSize": 100
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/events",
       "query": {
-        "after": "123_abc",
-        "limit": "100"
+        "cursor": "123_abc",
+        "pageSize": "100"
       },
       "body": null
     },
     "response": {
-      "events": [],
-      "cursor": "123_abc",
+      "items": [],
+      "nextCursor": "123_abc",
       "hasMore": false
     }
   },
@@ -8502,6 +8610,614 @@
     "fullModel": true
   },
   {
+    "operation": "assets.decide",
+    "options": {
+      "assetId": "asset-1",
+      "decision": "blocked",
+      "note": "Spam"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/decision",
+      "query": {},
+      "body": {
+        "decision": "blocked",
+        "note": "Spam"
+      }
+    },
+    "response": {
+      "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+      "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
+      "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+      "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
+      "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225900000,
+      "type": "image",
+      "name": "example",
+      "description": "example",
+      "externalId": "example",
+      "externalUrl": "https://example.com/resource",
+      "authorId": "example",
+      "context": {
+        "items": [
+          {
+            "text": "example",
+            "authorId": "example"
+          }
+        ]
+      },
+      "metadata": [
+        {
+          "id": "example",
+          "value": {
+            "example": "example"
+          }
+        }
+      ],
+      "tags": [
+        "example"
+      ],
+      "processingOptions": {
+        "keepContentAfterProcessing": true,
+        "flaggedContentPolicy": {
+          "action": "allow"
+        },
+        "features": {
+          "ocr": {
+            "enabled": true
+          },
+          "linkDetection": {
+            "enabled": true
+          }
+        }
+      },
+      "visibility": "public",
+      "upload": {
+        "status": "uploading",
+        "updatedAt": 1,
+        "partsReceived": 1
+      },
+      "classification": {
+        "status": "pending",
+        "updatedAt": 1,
+        "completedAt": 1,
+        "moderation": {
+          "status": "pending",
+          "manualReviews": [
+            {
+              "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
+              "decision": "allowed",
+              "note": "example",
+              "reviewerUserId": "example",
+              "reviewerName": "example",
+              "reviewerEmail": "example",
+              "reviewedAt": 1,
+              "appliedToAsset": true
+            }
+          ],
+          "categories": {
+            "sexual": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "violence": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "self-harm": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "harassment": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "hate": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "criminal-activity": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "personal-information": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "profanity": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            }
+          },
+          "score": 1.5,
+          "timeline": {
+            "durationSeconds": 1.5,
+            "frameIntervalSeconds": 1.5,
+            "sampledFrames": 1,
+            "audioTranscribed": true,
+            "segments": [
+              {
+                "source": "frame",
+                "startSeconds": 1.5,
+                "endSeconds": 1.5,
+                "categories": {
+                  "sexual": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  },
+                  "violence": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  },
+                  "self-harm": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  },
+                  "harassment": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  },
+                  "hate": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  },
+                  "criminal-activity": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  },
+                  "personal-information": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  },
+                  "profanity": {
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0.5,
+                    "qualifiers": {
+                      "sexual-pornographic-media": {
+                        "status": "evaluated",
+                        "someScore": 0.5,
+                        "allScore": 0.5,
+                        "likelihood": "very-unlikely"
+                      }
+                    },
+                    "policyConditions": {
+                      "example": {
+                        "status": "evaluated",
+                        "score": 0.5
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "policy": {
+            "score": 0.5,
+            "categories": {
+              "sexual": {
+                "score": 0.5,
+                "action": "allow",
+                "source": {
+                  "kind": "allowance",
+                  "index": 1,
+                  "indexes": [
+                    1,
+                    1
+                  ]
+                },
+                "settings": {
+                  "categoryAction": "allow",
+                  "allowances": [
+                    {
+                      "name": "example",
+                      "when": [
+                        "sexual-pornographic-media"
+                      ],
+                      "match": "all",
+                      "action": "allow"
+                    }
+                  ],
+                  "restrictions": [
+                    {
+                      "name": "example",
+                      "when": [
+                        "sexual-pornographic-media"
+                      ],
+                      "match": "all",
+                      "action": "allow"
+                    }
+                  ]
+                }
+              }
+            },
+            "evidence": "decision",
+            "decision": {
+              "source": "policy",
+              "action": "limit",
+              "regions": [
+                {
+                  "region": "DE",
+                  "action": "limit",
+                  "rule": "example",
+                  "category": "sexual"
+                }
+              ],
+              "flaggedCategories": [
+                "sexual"
+              ]
+            }
+          },
+          "hashMatches": [
+            {
+              "source": "hash-list",
+              "listId": "example",
+              "entryId": "example",
+              "distance": 1,
+              "action": "flag"
+            }
+          ],
+          "testCategoryActions": {
+            "sexual": "allow"
+          },
+          "testRegionalActions": [
+            {
+              "region": "DE",
+              "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
+            }
+          ]
+        },
+        "linkDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "qrCodes": [
+            {
+              "value": "example",
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              }
+            }
+          ],
+          "links": [
+            {
+              "url": "example",
+              "source": "qr-code"
+            }
+          ]
+        },
+        "aiGeneratedDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "provenance": "ai-generated",
+          "signals": [
+            {
+              "kind": "c2pa",
+              "value": "example"
+            }
+          ]
+        },
+        "textRegions": [
+          {
+            "box": {
+              "left": 1.5,
+              "top": 1.5,
+              "width": 1.5,
+              "height": 1.5
+            },
+            "personalInformation": true
+          }
+        ],
+        "labels": [
+          {
+            "description": "example",
+            "score": 1.5,
+            "topicalityScore": 1.5,
+            "likelihood": "very-unlikely",
+            "knowledgeBaseId": "example"
+          }
+        ]
+      },
+      "content": {
+        "status": "temporary",
+        "removalReason": "policy",
+        "updatedAt": 1,
+        "safetyTest": true,
+        "safetyHold": {
+          "placedAt": 1,
+          "reason": "suspected-illegal-content",
+          "disposedAt": 1
+        },
+        "format": "example",
+        "extension": "example",
+        "sizeInBytes": 1,
+        "checksums": {
+          "md5": "example",
+          "sha1": "example",
+          "sha256": "example",
+          "sha384": "example",
+          "sha512": "example"
+        },
+        "image": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example",
+          "perceptualHash": "example",
+          "perceptualHashQuality": 1
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        }
+      }
+    },
+    "fullModel": true
+  },
+  {
     "operation": "assets.deleteContent",
     "options": {
       "assetId": "asset-1"
@@ -10352,7 +11068,7 @@
     "operation": "folders.list",
     "options": {
       "parentId": "folder-1",
-      "pageIndex": 1,
+      "cursor": "opaque+/cursor=",
       "pageSize": 25
     },
     "request": {
@@ -10360,13 +11076,13 @@
       "path": "/v1/projects/project-1/folders",
       "query": {
         "parentId": "folder-1",
-        "pageIndex": "1",
+        "cursor": "opaque+/cursor=",
         "pageSize": "25"
       },
       "body": null
     },
     "response": {
-      "folders": [
+      "items": [
         {
           "id": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
@@ -10374,6 +11090,15 @@
           "name": "example",
           "createdAt": 1767225600000,
           "updatedAt": 1767225900000
+        }
+      ],
+      "nextCursor": "example",
+      "pageSize": 1,
+      "hasMore": true,
+      "ordering": [
+        {
+          "field": "example",
+          "direction": "ASC"
         }
       ],
       "ancestors": [
@@ -10385,8 +11110,7 @@
           "createdAt": 1767225600000,
           "updatedAt": 1767225900000
         }
-      ],
-      "hasMore": true
+      ]
     },
     "fullModel": true
   },
@@ -10504,6 +11228,15 @@
           "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
           "createdAt": 1767225600000,
           "updatedAt": 1767225900000
+        }
+      ],
+      "nextCursor": "example",
+      "pageSize": 1,
+      "hasMore": true,
+      "ordering": [
+        {
+          "field": "example",
+          "direction": "ASC"
         }
       ]
     },
@@ -10661,20 +11394,20 @@
   {
     "operation": "events.list",
     "options": {
-      "after": "123_abc",
-      "limit": 100
+      "cursor": "123_abc",
+      "pageSize": 100
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/events",
       "query": {
-        "after": "123_abc",
-        "limit": "100"
+        "cursor": "123_abc",
+        "pageSize": "100"
       },
       "body": null
     },
     "response": {
-      "events": [
+      "items": [
         {
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
@@ -10713,7 +11446,7 @@
           "readAt": 1
         }
       ],
-      "cursor": "example",
+      "nextCursor": "example",
       "hasMore": true
     },
     "fullModel": true

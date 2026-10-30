@@ -40,8 +40,8 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
                     SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, SubmitAssetOptions,
                     UpdateAssetOptions, UpdateFolderOptions, UploadPartOptions,
                     AddHashListEntryOptions, CreateHashListOptions, HashList, HashListAction, HashListEntry,
-                    HashListEntryIdOptions, HashListEntryPage, HashListIdOptions, HashListList,
-                    ListHashListEntriesOptions, UpdateHashListOptions,
+                    HashListEntryIdOptions, HashListEntryPage, HashListIdOptions, HashListPage,
+                    ListHashListEntriesOptions, ListHashListsOptions, DecideAssetOptions, FolderOrdering, UpdateHashListOptions,
                     ViewerClaims, Visibility, WaitForDecisionOptions)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
@@ -1312,6 +1312,21 @@ class Assets:
         merged = _merge(options, asset_id=asset_id)
         return cast(Asset, self._c._request("POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/retry"))
 
+    def decide(self, options: DecideAssetOptions | None = None, /, *, asset_id: str = _UNSET,
+               decision: Literal["allowed", "limited", "age-restricted", "blocked", "purged"] = _UNSET,
+               note: str = _UNSET, confirm_purge: bool = _UNSET) -> Asset:
+        """Record a reviewer's decision, replacing the policy's: ``classification.moderation.status``
+        becomes ``decision``, the decision and ``note`` join ``classification.moderation.manualReviews``
+        and the matching ``asset.<status>`` event is sent with ``decided-by: reviewer``. An asset still
+        pending moderation can only be ``blocked`` or ``purged``. Purging needs ``confirm_purge=True``
+        and the ``assets:delete`` permission, and permanently deletes the stored content. Not
+        retried: it carries no ``Idempotency-Key``."""
+        merged = _merge(options, asset_id=asset_id, decision=decision, note=note, confirm_purge=confirm_purge)
+        path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/decision"
+        _require(merged, "decision")
+        _require(merged, "note")
+        return cast(Asset, self._c._request("POST", path, body={k: v for k, v in merged.items() if k != "assetId"}))
+
     def explain(self, options: ExplainAssetOptions | None = None, /, *, asset_id: str = _UNSET,
                 rerun: bool = _UNSET) -> Asset:
         """Complete the policy evidence behind a decided asset's moderation decision: the report's
@@ -1357,9 +1372,15 @@ class Folders:
     def __init__(self, client: CalmLensServerClient):
         self._c = client
 
-    def list(self, options: ListFoldersOptions | None = None, /, **kwargs: Any) -> FolderPage:
-        """One page of child folders, with visible paths for selected folders."""
-        return cast(FolderPage, self._c._request("GET", self._c._project("folders"), query=_merge(options, **kwargs)))
+    def list(self, options: ListFoldersOptions | None = None, /, *, parent_id: str = _UNSET, cursor: str = _UNSET,
+             page_size: int = _UNSET, ordering: List[FolderOrdering] = _UNSET, search: str = _UNSET,
+             search_all: bool = _UNSET, ids: List[str] = _UNSET, resolve_only: bool = _UNSET) -> FolderPage:
+        """One page of child folders (of ``parent_id``, or the project root), sorted by name unless
+        ``ordering`` says otherwise, with ``ancestors`` for showing their paths. Pass the page's
+        ``nextCursor`` as ``cursor`` for the next page."""
+        merged = _merge(options, parent_id=parent_id, cursor=cursor, page_size=page_size, ordering=ordering,
+                        search=search, search_all=search_all, ids=ids, resolve_only=resolve_only)
+        return cast(FolderPage, self._c._request("GET", self._c._project("folders"), query=merged))
 
     def retrieve(self, options: FolderIdOptions | None = None, /, *, folder_id: str = _UNSET) -> Folder:
         """Fetch a folder by ID."""
@@ -1402,12 +1423,12 @@ class HashLists:
     def __init__(self, client: CalmLensServerClient):
         self._c = client
 
-    def list(self, options: Mapping[str, Any] | None = None, /) -> HashListList:
-        """Every hash list in the project, newest first. Takes no options; an empty options dict
-        is accepted like the other methods'."""
-        if _merge(options):
-            raise _invalid("hash_lists.list takes no options")
-        return cast(HashListList, self._c._request("GET", self._c._project("hash-lists")))
+    def list(self, options: ListHashListsOptions | None = None, /, *, cursor: str = _UNSET,
+             page_size: int = _UNSET) -> HashListPage:
+        """One page of the project's hash lists, newest first; pass the previous page's
+        ``nextCursor`` as ``cursor`` for the next."""
+        merged = _merge(options, cursor=cursor, page_size=page_size)
+        return cast(HashListPage, self._c._request("GET", self._c._project("hash-lists"), query=merged))
 
     def retrieve(self, options: HashListIdOptions | None = None, /, *, hash_list_id: str = _UNSET) -> HashList:
         """Fetch a hash list by ID."""
@@ -1468,35 +1489,35 @@ class Events:
     def __init__(self, client: CalmLensServerClient):
         self._c = client
 
-    def list(self, options: ListEventsOptions | None = None, /, *, after: str = _UNSET,
-             limit: int = _UNSET) -> EventsPage:
-        """Events created after the ``after`` cursor, oldest first. Without ``after`` it
-        returns no events and a cursor for now."""
-        merged = _merge(options, after=after, limit=limit)
+    def list(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
+             page_size: int = _UNSET) -> EventsPage:
+        """Events created after ``cursor`` (a previous response's ``nextCursor``), oldest first.
+        Without ``cursor`` it returns no events and a ``nextCursor`` for now."""
+        merged = _merge(options, cursor=cursor, page_size=page_size)
         return cast(EventsPage, self._c._request("GET", self._c._project("events"), query=merged))
 
-    def iter_pages(self, options: ListEventsOptions | None = None, /, *, after: str = _UNSET,
-                   limit: int = _UNSET) -> Iterator[EventsPage]:
-        """Yield pages from ``after`` until one reports ``hasMore=False``. Persist the last
-        page's ``cursor`` to resume later. Without ``after`` it yields one empty page whose cursor
-        is now. Raises ``sdk/invalid-response`` (``details.cursor``) instead of looping when a page
-        with more to follow returns a cursor already sent."""
-        merged = _merge(options, after=after, limit=limit)
-        sent = {merged["after"]} if merged.get("after") is not None else set()
+    def iter_pages(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
+                   page_size: int = _UNSET) -> Iterator[EventsPage]:
+        """Yield pages from ``cursor`` until one reports ``hasMore=False``. Persist the last
+        page's ``nextCursor`` to resume later. Without ``cursor`` it yields one empty page whose
+        ``nextCursor`` is now. Raises ``sdk/invalid-response`` (``details.cursor``) instead of looping
+        when a page with more to follow returns a cursor already sent."""
+        merged = _merge(options, cursor=cursor, page_size=page_size)
+        sent = {merged["cursor"]} if merged.get("cursor") is not None else set()
         while True:
             page = self.list(cast(ListEventsOptions, merged))
             if page.get("hasMore"):
-                _new_cursor(sent, page["cursor"])
+                _new_cursor(sent, page["nextCursor"])
             yield page
             if not page.get("hasMore"):
                 return
-            merged["after"] = page["cursor"]
+            merged["cursor"] = page["nextCursor"]
 
-    def iter(self, options: ListEventsOptions | None = None, /, *, after: str = _UNSET,
-             limit: int = _UNSET) -> Iterator[Event]:
-        """Yield every event currently waiting after ``after`` (see :meth:`iter_pages`)."""
-        for page in self.iter_pages(options, after=after, limit=limit):
-            yield from page["events"]
+    def iter(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
+             page_size: int = _UNSET) -> Iterator[Event]:
+        """Yield every event currently waiting after ``cursor`` (see :meth:`iter_pages`)."""
+        for page in self.iter_pages(options, cursor=cursor, page_size=page_size):
+            yield from page["items"]
 
 
 class CDN:

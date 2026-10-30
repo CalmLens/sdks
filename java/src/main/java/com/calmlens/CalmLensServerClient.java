@@ -1135,6 +1135,20 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
+     * Records a reviewer's decision: the moderation status becomes {@code decision}, a manual review
+     * with the note is added to {@code classification.moderation.manualReviews}, and an
+     * {@code asset.<status>} event is recorded. An asset still pending moderation can only be blocked
+     * or purged; purging deletes the stored content and needs the {@code assets:delete} permission.
+     *
+     * @param options the asset, decision and note
+     * @return the asset
+     */
+    public Models.Asset decide(Models.DecideAsset options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("POST", "/assets/" + id(str(o, "assetId", null)) + "/decision", null, without(o, "assetId")), Models.Asset.class);
+    }
+
+    /**
      * Completes the policy evidence behind a decided asset's moderation decision: the report's
      * {@code classification.moderation.policy.evidence} becomes {@code full} and every action stays as
      * decided. With {@code rerun} the asset is moderated again with the project's current policy and
@@ -1358,11 +1372,18 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final class Folders {
     private Folders() {}
 
-    /** @return one child-folder page */
+    /**
+     * Lists one page of child folders (the project root without {@code parentId}), searches folder
+     * names, or resolves the paths of {@code ids}. Pass the page's {@code nextCursor} as {@code cursor}
+     * for the next page.
+     *
+     * @param options parent, cursor, page size, ordering and search
+     * @return one folder page
+     */
     public Models.FolderPage list(Models.ListFolders options) {
       Reply reply = json("GET", project("folders"), Models.encode(options), null);
       JsonObject page = object(reply);
-      if (!page.has("folders") || !page.get("folders").isJsonArray() || !page.has("ancestors") || !page.get("ancestors").isJsonArray() || !page.has("hasMore") || !page.get("hasMore").isJsonPrimitive() || !page.get("hasMore").getAsJsonPrimitive().isBoolean())
+      if (!page.has("items") || !page.get("items").isJsonArray() || !page.has("ancestors") || !page.get("ancestors").isJsonArray() || !page.has("hasMore") || !page.get("hasMore").isJsonPrimitive() || !page.get("hasMore").getAsJsonPrimitive().isBoolean())
         throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected a folder page", null, reply.status(), reply.headers(), null);
       return decode(reply, Models.FolderPage.class);
     }
@@ -1405,10 +1426,13 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final class HashLists {
     private HashLists() {}
 
-    /** @return every hash list in the project */
-    public Models.HashListList list() {
-      return decode(json("GET", project("hash-lists"), null, null), Models.HashListList.class);
+    /** @param options cursor and page size @return one page of the project's hash lists */
+    public Models.HashListPage list(Models.ListHashLists options) {
+      return decode(json("GET", project("hash-lists"), Models.encode(options), null), Models.HashListPage.class);
     }
+
+    /** @return the first page of the project's hash lists */
+    public Models.HashListPage list() { return list(new Models.ListHashLists()); }
 
     /** @param options the hash list @return the hash list */
     public Models.HashList retrieve(Models.HashListId options) {
@@ -1460,10 +1484,10 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Events() {}
 
     /**
-     * Lists events after a cursor. Without {@code after} it returns no events and a cursor for the
-     * current time.
+     * Lists events after a cursor. Without {@code cursor} it returns no events and a
+     * {@code nextCursor} for the current time.
      *
-     * @param options cursor and limit
+     * @param options cursor and page size
      * @return one page of events
      */
     public Models.EventsPage list(Models.ListEvents options) {
@@ -1471,9 +1495,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Yields pages of events after {@code after} until no more are waiting, like the JavaScript
-     * SDK's {@code events.pages}. Save each page's {@code cursor()} after handling it to resume
-     * later. Without {@code after}, it yields one empty page whose cursor is "now".
+     * Yields pages of events after {@code cursor} until no more are waiting, like the JavaScript
+     * SDK's {@code events.pages}. Save each page's {@code nextCursor()} after handling it to resume
+     * later. Without {@code cursor}, it yields one empty page whose cursor is "now".
      *
      * @param options cursor and page size
      * @return a lazy iterable of pages
@@ -1482,12 +1506,12 @@ public final class CalmLensServerClient implements AutoCloseable {
       JsonObject o = Models.encode(options);
       return new AutoPager<>(token -> {
         JsonObject query = o.deepCopy();
-        if (token != null) query.addProperty("after", token);
+        if (token != null) query.addProperty("cursor", token);
         Models.EventsPage page = decode(json("GET", project("events"), query, null), Models.EventsPage.class);
-        if (page.cursor() == null || page.cursor().isEmpty())
-          throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Events page has no cursor", null, 200, Map.of(), null);
-        return new AutoPager.Chunk<>(List.of(page), page.cursor(), page.hasMore());
-      }, str(o, "after", null), true);
+        if (page.nextCursor() == null || page.nextCursor().isEmpty())
+          throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Events page has no nextCursor", null, 200, Map.of(), null);
+        return new AutoPager.Chunk<>(List.of(page), page.nextCursor(), page.hasMore());
+      }, str(o, "cursor", null), true);
     }
   }
 

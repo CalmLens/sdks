@@ -1391,6 +1391,27 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
+  /**
+   * Options for {@code assets.decide}: a reviewer's decision and the note recorded with it. Purging
+   * deletes the stored content and needs {@link #confirmPurge(boolean)}.
+   */
+  public static final class DecideAsset {
+    private String assetId;
+    private AssetModerationDecision decision;
+    private String note;
+    private Boolean confirmPurge;
+    public DecideAsset() {}
+    /** @param assetId the asset @param decision the new moderation status @param note why, 1 to 1499 characters */
+    public DecideAsset(String assetId, AssetModerationDecision decision, String note) { this.assetId = assetId; this.decision = decision; this.note = note; }
+    public DecideAsset assetId(String value) { assetId = value; return this; }
+    public DecideAsset decision(AssetModerationDecision value) { decision = value; return this; }
+    /** @param value why the reviewer decided this, 1 to 1499 characters after trimming @return these options */
+    public DecideAsset note(String value) { note = value; return this; }
+    /** @param value must be true to purge: the content is deleted and can't be restored @return these options */
+    public DecideAsset confirmPurge(boolean value) { confirmPurge = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
   /** Options for {@code assets.explain}. */
   public static final class ExplainAsset {
     private String assetId;
@@ -1508,27 +1529,48 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
-  /** One page of folders and the visible paths needed to reveal them. */
-  public record FolderPage(List<Folder> folders, List<Folder> ancestors, boolean hasMore) {}
+  /**
+   * One page of folders and the visible paths needed to reveal them.
+   *
+   * @param items folders on this page
+   * @param ancestors folders on the paths to the listed, selected and parent folders
+   * @param nextCursor pass as {@code cursor} to get the next page; null on the last page
+   * @param pageSize page size
+   * @param hasMore whether another page follows
+   * @param ordering ordering applied
+   */
+  public record FolderPage(List<Folder> items, List<Folder> ancestors, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+    /** Copies collections; missing lists become empty. */
+    public FolderPage { items = listOrEmpty(items); ancestors = listOrEmpty(ancestors); ordering = list(ordering); }
+  }
+
+  /** Options for {@code folders.list}. */
   public static final class ListFolders {
     private String parentId;
-    private Integer pageIndex;
+    private String cursor;
     private Integer pageSize;
+    private List<Order> ordering;
     private String search;
     private Boolean searchAll;
     private Boolean resolveOnly;
     private List<String> ids;
-    private String sort;
-    private String direction;
+    /** @param value lists this folder's children; unset lists the project root @return these options */
     public ListFolders parentId(String value) { parentId = value; return this; }
-    public ListFolders pageIndex(Integer value) { pageIndex = value; return this; }
+    /** @param value the previous page's {@code nextCursor} @return these options */
+    public ListFolders cursor(String value) { cursor = value; return this; }
+    /** @param value folders per page, 1 to 100 (default 100) @return these options */
     public ListFolders pageSize(Integer value) { pageSize = value; return this; }
+    /** @param value one clause ordering by {@code name} (the default, ascending) or {@code createdAt} @return these options */
+    public ListFolders ordering(List<Order> value) { ordering = value; return this; }
+    /** @param value case-insensitive text the folder name contains @return these options */
     public ListFolders search(String value) { search = value; return this; }
+    /** @param value whether {@code search} covers every folder rather than one parent's children @return these options */
     public ListFolders searchAll(Boolean value) { searchAll = value; return this; }
+    /** @param value whether to return only the ancestors of {@code ids}, without a page of folders @return these options */
     public ListFolders resolveOnly(Boolean value) { resolveOnly = value; return this; }
+    /** @param value folders whose paths to include in {@code ancestors} @return these options */
     public ListFolders ids(List<String> value) { ids = value; return this; }
-    public ListFolders sort(String value) { sort = value; return this; }
-    public ListFolders direction(String value) { direction = value; return this; }
+    @Override public String toString() { return describe(this); }
   }
 
   /** Options for {@code folders.create}. */
@@ -1574,12 +1616,13 @@ public final class Models {
 
   /** Options for {@code events.list} and {@code events.pages}. */
   public static final class ListEvents {
-    private String after;
-    private Integer limit;
+    private String cursor;
+    private Integer pageSize;
     public ListEvents() {}
-    /** @param value a cursor from a previous page; omit for a cursor at the current time @return these options */
-    public ListEvents after(String value) { after = value; return this; }
-    public ListEvents limit(Integer value) { limit = value; return this; }
+    /** @param value a previous page's {@code nextCursor}; omit for an empty page whose cursor is the current time @return these options */
+    public ListEvents cursor(String value) { cursor = value; return this; }
+    /** @param value events per page, 1 to 100 (default 50) @return these options */
+    public ListEvents pageSize(Integer value) { pageSize = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -2225,13 +2268,29 @@ public final class Models {
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt) {}
 
   /**
-   * Every hash list in a project.
+   * One page of a project's hash lists.
    *
-   * @param items the hash lists
+   * @param items hash lists on this page
+   * @param nextCursor pass as {@code cursor} to get the next page; null on the last page
+   * @param pageSize page size
+   * @param hasMore whether another page follows
+   * @param ordering ordering applied
    */
-  public record HashListList(List<HashList> items) {
+  public record HashListPage(List<HashList> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
     /** Copies collections; a missing item list becomes empty. */
-    public HashListList { items = listOrEmpty(items); }
+    public HashListPage { items = listOrEmpty(items); ordering = list(ordering); }
+  }
+
+  /** Options for {@code hashLists.list}. */
+  public static final class ListHashLists {
+    private String cursor;
+    private Integer pageSize;
+    public ListHashLists() {}
+    /** @param value the previous page's {@code nextCursor} @return these options */
+    public ListHashLists cursor(String value) { cursor = value; return this; }
+    /** @param value hash lists per page, 1 to 100 (default 10) @return these options */
+    public ListHashLists pageSize(Integer value) { pageSize = value; return this; }
+    @Override public String toString() { return describe(this); }
   }
 
   /**
@@ -2428,13 +2487,13 @@ public final class Models {
   /**
    * One page of the events feed.
    *
-   * @param events events, oldest first
-   * @param cursor pass as {@code after} to get newer events; persist it to resume
+   * @param items events, oldest first
+   * @param nextCursor pass as {@code cursor} to get newer events; never null, so persist it to resume
    * @param hasMore whether more events are available now
    */
-  public record EventsPage(List<Event> events, String cursor, boolean hasMore) {
+  public record EventsPage(List<Event> items, String nextCursor, boolean hasMore) {
     /** Copies events; a missing list becomes empty. */
-    public EventsPage { events = listOrEmpty(events); }
+    public EventsPage { items = listOrEmpty(items); }
   }
 
   /**

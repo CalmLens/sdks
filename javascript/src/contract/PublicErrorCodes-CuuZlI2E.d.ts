@@ -25,7 +25,6 @@ declare const PUBLIC_ERROR_CODES: {
   readonly UPLOAD_LIMIT_EXCEEDED: RequestErrorCode;
   readonly SPEND_LIMIT_REACHED: RequestErrorCode;
   readonly INVALID_UPLOAD_MIME_TYPE: RequestErrorCode;
-  readonly INVALID_EVENT_CURSOR: RequestErrorCode;
   readonly INVALID_UPLOAD_PAYLOAD: RequestErrorCode;
   readonly USE_UPLOAD_PART: RequestErrorCode;
   readonly UPLOAD_NOT_OPEN: RequestErrorCode;
@@ -41,6 +40,9 @@ declare const PUBLIC_ERROR_CODES: {
   readonly ASSET_REVIEW_NOTE_REQUIRED: RequestErrorCode;
   readonly ASSET_UPDATE_FAILED: RequestErrorCode;
   readonly ASSET_SAFETY_HELD: RequestErrorCode;
+  readonly ASSET_PROCESSING: RequestErrorCode;
+  readonly ASSET_DECISION_NOT_ALLOWED: RequestErrorCode;
+  readonly ASSET_DECISION_UNCHANGED: RequestErrorCode;
   readonly ASSET_NOT_RETRYABLE: RequestErrorCode;
   readonly ASSET_CONTENT_UNAVAILABLE: RequestErrorCode;
   readonly ASSET_CONTENT_PURGED: RequestErrorCode;

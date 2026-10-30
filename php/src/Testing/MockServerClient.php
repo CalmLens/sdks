@@ -347,7 +347,7 @@ final class MockServerClient
         }
         $names = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST move' => 'move',
             'GET children' => 'listChildren', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
-            'POST explain' => 'explain', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
+            'POST explain' => 'explain', 'POST decision' => 'decide', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
         $name = $names[$method . ' ' . $suffix] ?? null;
         if ($name === null || !in_array($resource, ['assets', 'folders'], true)) {
             return [];
@@ -476,7 +476,7 @@ final class MockServerClient
                 $route === 'PUT lenses' => $this->saveLenses($json['lenses'] ?? []),
                 $route === 'GET folders' => $this->listFolders($query),
                 $route === 'POST folders' => $this->createFolder($json),
-                $route === 'GET hash-lists' => ['items' => array_values(array_reverse($this->hashLists))],
+                $route === 'GET hash-lists' => $this->page($this->hashLists, $query, $this->projectId . '/hash-lists'),
                 $route === 'POST hash-lists' => $this->createHashList($json),
                 $route === 'GET assets/page' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
@@ -538,6 +538,8 @@ final class MockServerClient
                 $asset = $this->applyOutcome($asset, 'pending');
                 $this->lifecycleEvent('asset.retried', $asset);
                 return $asset;
+            case 'POST decision':
+                return $this->reviewerDecision($asset, $json);
             case 'POST explain':
                 if ($asset['classification']['status'] !== 'completed') {
                     self::fail(ErrorCodes::ASSET_NOT_DECIDED);
@@ -755,6 +757,61 @@ final class MockServerClient
      * extracted text and the placeholder go. Content already removed keeps its reason, and an
      * `asset.content-removed` event is recorded either way.
      */
+    /**
+     * POST /assets/:id/decision, like the API: the body is validated, an asset still uploading or
+     * processing is refused, a pending asset can only be blocked or purged, the same status is refused and purged
+     * content can only be blocked. The status changes and a manual review is added; purging removes
+     * the content (after an `asset.content-removed` event), and an `asset.<status>` event records
+     * the reviewer's decision with its note.
+     */
+    private function reviewerDecision(array $asset, array $json): array
+    {
+        $decision = $json['decision'] ?? null;
+        if (!is_string($decision) || !in_array($decision, self::DECISIONS, true)) {
+            self::invalid('validation/invalid-union', 'decision');
+        }
+        if (!is_string($json['note'] ?? null)) {
+            self::invalid('validation/invalid-type', 'note');
+        }
+        $note = trim($json['note']);
+        if ($note === '') {
+            self::invalid('validation/too-small', 'note');
+        }
+        if (mb_strlen($note) > 1499) {
+            self::invalid('validation/too-big', 'note');
+        }
+        if ($decision === 'purged' && ($json['confirmPurge'] ?? null) !== true) {
+            self::invalid('validation/invalid-value', 'confirmPurge');
+        }
+        if ($asset['upload']['status'] === 'uploading' || $asset['classification']['status'] === 'processing') {
+            self::fail(ErrorCodes::ASSET_PROCESSING);
+        }
+        $status = $asset['classification']['moderation']['status'];
+        $restrictive = in_array($decision, ['blocked', 'purged'], true);
+        if (!$restrictive && $status === 'pending') {
+            self::fail(ErrorCodes::ASSET_DECISION_NOT_ALLOWED);
+        }
+        if ($decision === $status) {
+            self::fail(ErrorCodes::ASSET_DECISION_UNCHANGED);
+        }
+        if (!$restrictive && $status === 'purged') {
+            self::fail(ErrorCodes::ASSET_CONTENT_PURGED);
+        }
+        $asset['classification']['moderation']['status'] = $decision;
+        $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)('rev'), 'decision' => $decision,
+            'note' => $note, 'reviewerUserId' => null, 'reviewerName' => 'API key', 'reviewerEmail' => null,
+            'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
+        $asset = $this->assets[$asset['id']] = $this->touch($asset);
+        if ($decision === 'purged') {
+            $asset = $this->requestedRemoval($asset);
+        }
+        $this->enqueueEvent(['type' => 'asset.' . $decision, 'severity' => in_array($decision, ['allowed', 'limited'], true) ? 'low' : 'high',
+            'title' => 'asset.' . $decision, 'assetId' => $asset['id'], 'asset' => $this->snapshot($asset),
+            'facts' => [['key' => 'decided-by', 'value' => 'reviewer'], ['key' => 'asset-type', 'value' => $asset['type']],
+                ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $asset['id']], ['key' => 'note', 'value' => $note]]]);
+        return $asset;
+    }
+
     private function requestedRemoval(array $asset): array
     {
         unset($this->content[$asset['id']]);
@@ -1155,23 +1212,48 @@ final class MockServerClient
         return $this->folders[$folder['id']] = $folder;
     }
 
-    /** One level of a folder tree with its visible ancestors, like the API's folder page. */
+    /**
+     * One page of a folder level (or a search) with its visible ancestors, like the API: keyset
+     * pages ordered by `name` (by code point, the default, ascending) or `createdAt`, with the
+     * folder ID breaking ties. A cursor only continues the query it came from.
+     */
     private function listFolders(array $query): array
     {
         $size = self::size($query, 'pageSize', 100, 100);
         $search = strtolower((string) ($query['search'] ?? ''));
+        $everywhere = $search !== '' && self::flag($query['searchAll'] ?? null);
         $parentId = $query['parentId'] ?? null;
         $resolveOnly = self::flag($query['resolveOnly'] ?? null);
-        $found = array_values(array_filter($this->folders, fn ($folder) => (($search !== '' && self::flag($query['searchAll'] ?? null)) || $folder['parentId'] === $parentId)
-            && ($search === '' || str_contains(strtolower($folder['name']), $search))));
-        $byDate = ($query['sort'] ?? null) === 'createdAt';
-        // Like the database: names compare by code point, so case matters.
-        usort($found, fn ($a, $b) => ($byDate ? $a['createdAt'] <=> $b['createdAt'] : strcmp($a['name'], $b['name'])) ?: strcmp($a['id'], $b['id']));
-        if (strtoupper((string) ($query['direction'] ?? 'ASC')) === 'DESC') {
-            $found = array_reverse($found);
+        $ordering = is_array($query['ordering'] ?? null) ? array_values($query['ordering']) : [];
+        if (count($ordering) > 1) {
+            self::invalid('validation/too-big', 'ordering');
         }
-        $start = (int) ($query['pageIndex'] ?? 0) * $size;
-        $page = $resolveOnly ? [] : array_slice($found, $start, $size);
+        $field = $ordering[0]['field'] ?? 'name';
+        $direction = $ordering[0]['direction'] ?? 'ASC';
+        if (!in_array($field, ['name', 'createdAt'], true)) {
+            self::invalid('validation/invalid-value', 'ordering.0.field');
+        }
+        if (!in_array($direction, ['ASC', 'DESC'], true)) {
+            self::invalid('validation/invalid-value', 'ordering.0.direction');
+        }
+        $sign = $direction === 'DESC' ? -1 : 1;
+        // Like the database: names compare by code point, so case matters; IDs break ties.
+        $compare = fn ($a, $b, string $aId, string $bId): int => $sign * ((is_string($a) ? strcmp($a, (string) $b) : $a <=> $b) ?: strcmp($aId, $bId));
+        $found = array_values(array_filter($this->folders, fn ($folder) => ($everywhere || $folder['parentId'] === $parentId)
+            && ($search === '' || str_contains(strtolower($folder['name']), $search))));
+        usort($found, fn ($a, $b) => $compare($a[$field], $b[$field], $a['id'], $b['id']));
+        $signature = Values::json([$this->projectId, $parentId, $search, $everywhere, $field, $direction]);
+        if (isset($query['cursor']) && $query['cursor'] !== '') {
+            $decoded = base64_decode((string) $query['cursor'], true);
+            $cursor = $decoded === false ? null : json_decode($decoded, true);
+            if (!is_array($cursor) || ($cursor['scope'] ?? null) !== $signature || !is_string($cursor['id'] ?? null) || !array_key_exists('value', $cursor)
+                || !($field === 'name' ? is_string($cursor['value']) : is_int($cursor['value']))) {
+                self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
+            }
+            $found = array_values(array_filter($found, fn ($folder) => $compare($folder[$field], $cursor['value'], $folder['id'], $cursor['id']) > 0));
+        }
+        $page = $resolveOnly ? [] : array_slice($found, 0, $size);
+        $more = !$resolveOnly && count($found) > $size;
         $ids = array_fill_keys(array_merge(array_values((array) ($query['ids'] ?? [])), $parentId === null ? [] : [$parentId], array_column($page, 'id')), true);
         $queue = array_keys($ids);
         while ($queue !== []) {
@@ -1183,7 +1265,10 @@ final class MockServerClient
         }
         $inPage = array_column($page, 'id');
         $ancestors = array_values(array_filter($this->folders, fn ($folder) => isset($ids[$folder['id']]) && !in_array($folder['id'], $inPage, true)));
-        return ['folders' => $page, 'ancestors' => $ancestors, 'hasMore' => !$resolveOnly && count($found) > $start + $size];
+        $last = $page === [] ? null : $page[array_key_last($page)];
+        $next = $more ? base64_encode(Values::json(['scope' => $signature, 'value' => $last[$field], 'id' => $last['id']])) : null;
+        return ['items' => $page, 'ancestors' => $ancestors, 'nextCursor' => $next, 'pageSize' => $size, 'hasMore' => $more,
+            'ordering' => [['field' => $field, 'direction' => $direction]]];
     }
 
     private function folderRoute(string $method, string $id, string $suffix, array $json): ?array
@@ -1310,19 +1395,22 @@ final class MockServerClient
         return $this->hashListEntries[$entry['id']] = $entry;
     }
 
-    /** Without `after` the feed starts from now, like the API; `limit` is 1 to 100, 50 by default. */
+    /**
+     * Without `cursor` the page is empty and its `nextCursor` is now, like the API; `pageSize` is 1
+     * to 100, 50 by default. Cursors are `mock_<n>`: the number of events in the feed when taken.
+     */
     private function listEvents(array $query): array
     {
-        $limit = self::size($query, 'limit', 50, 100);
-        if (!isset($query['after']) || $query['after'] === '') {
-            return ['events' => [], 'cursor' => 'mock_' . count($this->events), 'hasMore' => false];
+        $size = self::size($query, 'pageSize', 50, 100);
+        if (!isset($query['cursor']) || $query['cursor'] === '') {
+            return ['items' => [], 'nextCursor' => 'mock_' . count($this->events), 'hasMore' => false];
         }
-        if (!preg_match('/^mock_(\d+)$/D', (string) $query['after'], $match) || (int) $match[1] > count($this->events)) {
-            self::fail(ErrorCodes::INVALID_EVENT_CURSOR, null, 'Invalid event cursor', ['after' => $query['after']]);
+        if (!preg_match('/^mock_(\d+)$/D', (string) $query['cursor'], $match) || (int) $match[1] > count($this->events)) {
+            self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
         }
-        $taken = array_slice($this->events, (int) $match[1], $limit);
+        $taken = array_slice($this->events, (int) $match[1], $size);
         $next = (int) $match[1] + count($taken);
-        return ['events' => $taken, 'cursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events)];
+        return ['items' => $taken, 'nextCursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events)];
     }
 
     /**

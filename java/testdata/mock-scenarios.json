@@ -118,6 +118,211 @@
       ]
     },
     {
+      "name": "assets.decide records a reviewer's decision with its note, and refuses decisions the asset can't take",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "reported.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "reported",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "allowed"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "reported.id"
+            },
+            "decision": "blocked",
+            "note": "Spam"
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "reported.id"
+              },
+              "classification.moderation.status": "blocked",
+              "classification.moderation.manualReviews.length": 1,
+              "classification.moderation.manualReviews.0.decision": "blocked",
+              "classification.moderation.manualReviews.0.note": "Spam",
+              "content.status": "stored"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "reported.id"
+            },
+            "decision": "blocked",
+            "note": "Spam again"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/decision-unchanged",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.type": "asset.blocked",
+              "items.0.assetId": {
+                "$ref": "reported.id"
+              },
+              "items.0.facts": {
+                "$contains": {
+                  "key": "decided-by",
+                  "value": "reviewer"
+                }
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "queued",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "decision": "blocked",
+            "note": "Spam"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/processing",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": "asset_00000000000000000000",
+            "decision": "blocked",
+            "note": "Spam"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "assets.decide can only block or purge an asset whose processing failed",
+      "mock": {
+        "queuedOutcome": "failed"
+      },
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "failed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "failed",
+          "expect": {
+            "result": {
+              "classification.status": "failed",
+              "classification.moderation.status": "pending"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "failed.id"
+            },
+            "decision": "allowed",
+            "note": "Looks fine"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/decision-not-allowed",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "failed.id"
+            },
+            "decision": "purged",
+            "note": "Illegal",
+            "confirmPurge": true
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "purged",
+              "content.status": "removed",
+              "content.removalReason": "requested"
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
       "name": "a reviewer's block shows in retrieve, list, filters and events, and stops delivery",
       "mock": {
         "apiKeyGrants": [
@@ -137,7 +342,7 @@
           "save": "feed",
           "expect": {
             "result": {
-              "events.length": 0,
+              "items.length": 0,
               "hasMore": false
             },
             "httpStatus": 200
@@ -300,24 +505,24 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "save": "decisions",
           "expect": {
             "result": {
-              "events.length": 1,
-              "events.0.id": {
+              "items.length": 1,
+              "items.0.id": {
                 "$id": "evt"
               },
-              "events.0.type": "asset.blocked",
-              "events.0.severity": "high",
-              "events.0.assetId": {
+              "items.0.type": "asset.blocked",
+              "items.0.severity": "high",
+              "items.0.assetId": {
                 "$ref": "blocked.id"
               },
-              "events.0.asset.classification.moderation.status": "blocked",
-              "events.0.facts": {
+              "items.0.asset.classification.moderation.status": "blocked",
+              "items.0.facts": {
                 "$contains": {
                   "key": "decided-by",
                   "value": "reviewer"
@@ -331,16 +536,16 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "decisions.cursor"
+            "cursor": {
+              "$ref": "decisions.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 0,
+              "items.length": 0,
               "hasMore": false,
-              "cursor": {
-                "$ref": "decisions.cursor"
+              "nextCursor": {
+                "$ref": "decisions.nextCursor"
               }
             },
             "httpStatus": 200
@@ -1020,20 +1225,20 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 2,
-              "events.1.type": "asset.limited",
-              "events.1.severity": "low",
-              "events.1.assetId": {
+              "items.length": 2,
+              "items.1.type": "asset.limited",
+              "items.1.severity": "low",
+              "items.1.assetId": {
                 "$ref": "public.id"
               },
-              "events.1.asset.classification.moderation.status": "limited",
-              "events.1.facts": {
+              "items.1.asset.classification.moderation.status": "limited",
+              "items.1.facts": {
                 "$contains": {
                   "key": "decided-by",
                   "value": "reviewer"
@@ -1404,7 +1609,9 @@
           "operation": "hashLists.list",
           "expect": {
             "result": {
-              "items.length": 1
+              "items.length": 1,
+              "hasMore": false,
+              "nextCursor": null
             },
             "httpStatus": 200
           }
@@ -2169,7 +2376,7 @@
           "save": "feed",
           "expect": {
             "result": {
-              "events.length": 0
+              "items.length": 0
             },
             "httpStatus": 200
           }
@@ -2192,18 +2399,18 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 1,
-              "events.0.type": "asset.review-requested",
-              "events.0.assetId": {
+              "items.length": 1,
+              "items.0.type": "asset.review-requested",
+              "items.0.assetId": {
                 "$ref": "queued.id"
               },
-              "events.0.facts": {
+              "items.0.facts": {
                 "$contains": {
                   "key": "automated-outcome",
                   "value": "allowed"
@@ -2809,30 +3016,30 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 2,
-              "events.0.type": "asset.retried",
-              "events.0.severity": "low",
-              "events.0.assetId": {
+              "items.length": 2,
+              "items.0.type": "asset.retried",
+              "items.0.severity": "low",
+              "items.0.assetId": {
                 "$ref": "failed.id"
               },
-              "events.0.asset.classification.status": "processing",
-              "events.0.facts": {
+              "items.0.asset.classification.status": "processing",
+              "items.0.facts": {
                 "$contains": {
                   "key": "asset-type",
                   "value": "image"
                 }
               },
-              "events.1.type": "asset.content-removed",
-              "events.1.assetId": {
+              "items.1.type": "asset.content-removed",
+              "items.1.assetId": {
                 "$ref": "emptied.id"
               },
-              "events.1.asset.content.status": "removed"
+              "items.1.asset.content.status": "removed"
             },
             "httpStatus": 200
           }
@@ -3141,15 +3348,15 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 3,
-              "events.0.type": "asset.content-removed",
-              "events.0.facts": {
+              "items.length": 3,
+              "items.0.type": "asset.content-removed",
+              "items.0.facts": {
                 "$contains": {
                   "key": "asset-name",
                   "value": "kept.png",
@@ -3163,14 +3370,14 @@
                   }
                 }
               },
-              "events.1.type": "asset.content-removed",
-              "events.2.type": "asset.deleted",
-              "events.2.severity": "low",
-              "events.2.assetId": {
+              "items.1.type": "asset.content-removed",
+              "items.2.type": "asset.deleted",
+              "items.2.severity": "low",
+              "items.2.assetId": {
                 "$ref": "kept.id"
               },
-              "events.2.asset.content.status": "removed",
-              "events.2.facts": {
+              "items.2.asset.content.status": "removed",
+              "items.2.facts": {
                 "$contains": {
                   "key": "asset-name",
                   "value": "kept.png"
@@ -3301,13 +3508,13 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 0
+              "items.length": 0
             },
             "httpStatus": 200
           }
@@ -3409,19 +3616,19 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 3,
-              "events.0.type": "asset.content-removed",
-              "events.0.assetId": {
+              "items.length": 3,
+              "items.0.type": "asset.content-removed",
+              "items.0.assetId": {
                 "$ref": "a.id"
               },
-              "events.0.asset.content.status": "removed",
-              "events.0.facts": {
+              "items.0.asset.content.status": "removed",
+              "items.0.facts": {
                 "$contains": {
                   "key": "asset-name",
                   "value": "a.png",
@@ -3435,24 +3642,24 @@
                   }
                 }
               },
-              "events.1.type": "asset.deleted",
-              "events.1.severity": "low",
-              "events.1.assetId": {
+              "items.1.type": "asset.deleted",
+              "items.1.severity": "low",
+              "items.1.assetId": {
                 "$ref": "a.id"
               },
-              "events.1.asset.content.status": "removed",
-              "events.1.facts": {
+              "items.1.asset.content.status": "removed",
+              "items.1.facts": {
                 "$contains": {
                   "key": "asset-name",
                   "value": "a.png"
                 }
               },
-              "events.2.type": "asset.deleted",
-              "events.2.assetId": {
+              "items.2.type": "asset.deleted",
+              "items.2.assetId": {
                 "$ref": "b.id"
               },
-              "events.2.asset.content.status": "stored",
-              "events.2.facts": {
+              "items.2.asset.content.status": "stored",
+              "items.2.facts": {
                 "$contains": {
                   "key": "asset-name",
                   "value": "b.png"
@@ -3505,21 +3712,21 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "expect": {
             "result": {
-              "events.length": 2,
-              "events.0.type": "asset.content-removed",
-              "events.0.assetId": {
+              "items.length": 2,
+              "items.0.type": "asset.content-removed",
+              "items.0.assetId": {
                 "$ref": "purged.id"
               },
-              "events.1.type": "asset.purged",
-              "events.1.severity": "high",
-              "events.1.asset.content.status": "removed",
-              "events.1.facts": {
+              "items.1.type": "asset.purged",
+              "items.1.severity": "high",
+              "items.1.asset.content.status": "removed",
+              "items.1.facts": {
                 "$contains": {
                   "key": "decided-by",
                   "value": "reviewer"
@@ -3545,7 +3752,7 @@
       ]
     },
     {
-      "name": "events page by limit until hasMore is false, with a default limit of 50 and a maximum of 100",
+      "name": "events page by pageSize until hasMore is false, with a default of 50 and a maximum of 100",
       "mock": {},
       "steps": [
         {
@@ -3554,7 +3761,7 @@
           "save": "feed",
           "expect": {
             "result": {
-              "events.length": 0
+              "items.length": 0
             },
             "httpStatus": 200
           }
@@ -3575,15 +3782,15 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             },
-            "limit": 2
+            "pageSize": 2
           },
           "save": "first",
           "expect": {
             "result": {
-              "events.length": 2,
+              "items.length": 2,
               "hasMore": true
             },
             "httpStatus": 200
@@ -3592,15 +3799,15 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "first.cursor"
+            "cursor": {
+              "$ref": "first.nextCursor"
             },
-            "limit": 2
+            "pageSize": 2
           },
           "save": "second",
           "expect": {
             "result": {
-              "events.length": 1,
+              "items.length": 1,
               "hasMore": false
             },
             "httpStatus": 200
@@ -3609,17 +3816,17 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "second.cursor"
+            "cursor": {
+              "$ref": "second.nextCursor"
             },
-            "limit": 2
+            "pageSize": 2
           },
           "expect": {
             "result": {
-              "events.length": 0,
+              "items.length": 0,
               "hasMore": false,
-              "cursor": {
-                "$ref": "second.cursor"
+              "nextCursor": {
+                "$ref": "second.nextCursor"
               }
             },
             "httpStatus": 200
@@ -3628,20 +3835,20 @@
         {
           "operation": "events.pages",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             },
-            "limit": 2
+            "pageSize": 2
           },
           "expect": {
             "result": {
               "length": 2,
-              "0.events.length": 2,
+              "0.items.length": 2,
               "0.hasMore": true,
-              "1.events.length": 1,
+              "1.items.length": 1,
               "1.hasMore": false,
-              "1.cursor": {
-                "$ref": "second.cursor"
+              "1.nextCursor": {
+                "$ref": "second.nextCursor"
               }
             },
             "httpStatus": 200
@@ -3663,14 +3870,14 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             }
           },
           "save": "defaultPage",
           "expect": {
             "result": {
-              "events.length": 50,
+              "items.length": 50,
               "hasMore": true
             },
             "httpStatus": 200
@@ -3679,14 +3886,14 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             },
-            "limit": 100
+            "pageSize": 100
           },
           "expect": {
             "result": {
-              "events.length": 100,
+              "items.length": 100,
               "hasMore": true
             },
             "httpStatus": 200
@@ -3695,14 +3902,14 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "defaultPage.cursor"
+            "cursor": {
+              "$ref": "defaultPage.nextCursor"
             },
-            "limit": 100
+            "pageSize": 100
           },
           "expect": {
             "result": {
-              "events.length": 51,
+              "items.length": 51,
               "hasMore": false
             },
             "httpStatus": 200
@@ -3711,17 +3918,17 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             },
-            "limit": 101
+            "pageSize": 101
           },
           "expect": {
             "error": {
               "code": "validation/too-big",
               "status": 400,
               "details": {
-                "path": "limit"
+                "path": "pageSize"
               }
             }
           }
@@ -3729,17 +3936,17 @@
         {
           "operation": "events.list",
           "args": {
-            "after": {
-              "$ref": "feed.cursor"
+            "cursor": {
+              "$ref": "feed.nextCursor"
             },
-            "limit": 0
+            "pageSize": 0
           },
           "expect": {
             "error": {
               "code": "validation/too-small",
               "status": 400,
               "details": {
-                "path": "limit"
+                "path": "pageSize"
               }
             }
           }
@@ -3747,15 +3954,12 @@
         {
           "operation": "events.list",
           "args": {
-            "after": "not-a-cursor"
+            "cursor": "not-a-cursor"
           },
           "expect": {
             "error": {
-              "code": "events/invalid-cursor",
-              "status": 400,
-              "details": {
-                "after": "not-a-cursor"
-              }
+              "code": "validation/invalid-cursor",
+              "status": 400
             }
           }
         }
@@ -5255,14 +5459,14 @@
           "args": {},
           "expect": {
             "result": {
-              "folders.length": 3,
-              "folders.0.id": {
+              "items.length": 3,
+              "items.0.id": {
                 "$ref": "photos.id"
               },
-              "folders.1.id": {
+              "items.1.id": {
                 "$ref": "rootTrips.id"
               },
-              "folders.2.id": {
+              "items.2.id": {
                 "$ref": "lower.id"
               },
               "ancestors.length": 0,
@@ -5280,8 +5484,8 @@
           },
           "expect": {
             "result": {
-              "folders.length": 1,
-              "folders.0.id": {
+              "items.length": 1,
+              "items.0.id": {
                 "$ref": "year.id"
               },
               "ancestors.length": 2,
@@ -5306,7 +5510,7 @@
           },
           "expect": {
             "result": {
-              "folders.length": 0,
+              "items.length": 0,
               "ancestors.length": 3,
               "hasMore": false
             },
@@ -5321,7 +5525,7 @@
           },
           "expect": {
             "result": {
-              "folders.length": 2
+              "items.length": 2
             },
             "httpStatus": 200
           }
@@ -5333,8 +5537,8 @@
           },
           "expect": {
             "result": {
-              "folders.length": 1,
-              "folders.0.id": {
+              "items.length": 1,
+              "items.0.id": {
                 "$ref": "rootTrips.id"
               }
             },
@@ -5346,9 +5550,10 @@
           "args": {
             "pageSize": 2
           },
+          "save": "firstFolders",
           "expect": {
             "result": {
-              "folders.length": 2,
+              "items.length": 2,
               "hasMore": true
             },
             "httpStatus": 200
@@ -5358,15 +5563,18 @@
           "operation": "folders.list",
           "args": {
             "pageSize": 2,
-            "pageIndex": 1
+            "cursor": {
+              "$ref": "firstFolders.nextCursor"
+            }
           },
           "expect": {
             "result": {
-              "folders.length": 1,
-              "folders.0.id": {
+              "items.length": 1,
+              "items.0.id": {
                 "$ref": "lower.id"
               },
-              "hasMore": false
+              "hasMore": false,
+              "nextCursor": null
             },
             "httpStatus": 200
           }
@@ -5374,15 +5582,19 @@
         {
           "operation": "folders.list",
           "args": {
-            "sort": "createdAt",
-            "direction": "DESC"
+            "ordering": [
+              {
+                "field": "createdAt",
+                "direction": "DESC"
+              }
+            ]
           },
           "expect": {
             "result": {
-              "folders.0.id": {
+              "items.0.id": {
                 "$ref": "rootTrips.id"
               },
-              "folders.2.id": {
+              "items.2.id": {
                 "$ref": "photos.id"
               }
             },

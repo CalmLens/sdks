@@ -716,8 +716,8 @@ impl ServerClient {
     }
     async fn events_page(&self, options: &ListEvents) -> Result<EventsPage> {
         let mut query = Query::default();
-        query.opt("after", options.after.as_ref());
-        query.opt("limit", options.limit);
+        query.opt("cursor", options.cursor.as_ref());
+        query.opt("pageSize", options.page_size);
         self.call(self.prepare(Method::GET, &self.project_path("events")?, &query.0)?)
             .await
     }
@@ -1008,6 +1008,16 @@ impl AssetsClient<'_> {
         let path = format!("/assets/{}/retry", id(&options.asset_id)?);
         self.0.call(self.0.prepare(Method::POST, &path, &[])?).await
     }
+    /// Records a reviewer's decision, replacing the policy's: the asset's moderation status
+    /// becomes `options.decision`, the note joins its review history and the matching
+    /// `asset.<status>` event is sent with `decided-by: reviewer`. An asset still pending
+    /// moderation can only be blocked or purged. Purging needs `confirm_purge` and the
+    /// `assets:delete` permission, and permanently deletes the stored content.
+    pub async fn decide(&self, options: DecideAsset) -> Result<Asset> {
+        let path = format!("/assets/{}/decision", id(&options.asset_id)?);
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
     /// Completes the policy evidence behind a decided asset's moderation decision: the report's
     /// `policy.evidence` becomes `full` and every action stays as decided. With `rerun` the asset
     /// is moderated again with the project's current policy and returns in `processing`; use it
@@ -1170,20 +1180,20 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct FoldersClient<'a>(&'a ServerClient);
 impl FoldersClient<'_> {
-    /// One page of child folders.
+    /// One page of child folders, sorted by name unless `ordering` says otherwise. Pass the
+    /// page's `next_cursor` as `cursor` for the next page.
     pub async fn list(&self, options: ListFolders) -> Result<FolderPage> {
         let mut query = Query::default();
         query.opt("parentId", options.parent_id.as_ref());
-        query.opt("pageIndex", options.page_index);
         query.opt("pageSize", options.page_size);
+        query.ordering(options.ordering.as_deref());
+        query.opt("cursor", options.cursor.as_ref());
         query.opt("search", options.search.as_ref());
         query.opt("searchAll", options.search_all);
-        query.opt("resolveOnly", options.resolve_only);
-        query.opt("sort", options.sort.as_ref());
-        query.opt("direction", options.direction.as_ref());
         for (index, folder_id) in options.ids.unwrap_or_default().iter().enumerate() {
             query.push(&format!("ids[{index}]"), folder_id);
         }
+        query.opt("resolveOnly", options.resolve_only);
         let request = self
             .0
             .prepare(Method::GET, &self.0.project_path("folders")?, &query.0)?;
@@ -1230,11 +1240,15 @@ impl FoldersClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct HashListsClient<'a>(&'a ServerClient);
 impl HashListsClient<'_> {
-    /// Every hash list in the project.
-    pub async fn list(&self) -> Result<HashListList> {
+    /// One page of the project's hash lists, newest first. Pass the page's `next_cursor` as
+    /// `cursor` for the next page.
+    pub async fn list(&self, options: ListHashLists) -> Result<HashListPage> {
+        let mut query = Query::default();
+        query.opt("cursor", options.cursor.as_ref());
+        query.opt("pageSize", options.page_size);
         let request = self
             .0
-            .prepare(Method::GET, &self.0.project_path("hash-lists")?, &[])?;
+            .prepare(Method::GET, &self.0.project_path("hash-lists")?, &query.0)?;
         self.0.call(request).await
     }
     /// Retrieves a hash list.
@@ -1294,26 +1308,26 @@ impl HashListsClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct EventsClient<'a>(&'a ServerClient);
 impl EventsClient<'_> {
-    /// One page of events after `options.after`. Without `after` the page is empty and its
-    /// cursor marks now.
+    /// One page of events after `options.cursor`, oldest first. Without `cursor` the page is
+    /// empty and its `next_cursor` marks now.
     pub async fn list(&self, options: ListEvents) -> Result<EventsPage> {
         self.0.events_page(&options).await
     }
-    /// Pages of events from `options.after`, following each page's cursor until a page has
-    /// `has_more: false`. Store the last page's `cursor` and continue from it later. A page
+    /// Pages of events from `options.cursor`, following each page's `next_cursor` until a page
+    /// has `has_more: false`. Store the last page's `next_cursor` and continue from it later. A page
     /// with more to follow that hands back a cursor already sent fails with
     /// `sdk/invalid-response` (`details.cursor`) and is not yielded.
     pub fn pages(&self, options: ListEvents) -> BoxStream<'static, Result<EventsPage>> {
         let client = self.0.clone();
         pages(
             options,
-            |options| options.after.clone(),
+            |options| options.cursor.clone(),
             move |options| {
                 let client = client.clone();
                 async move {
                     let page = client.events_page(&options).await?;
                     let next = page.has_more.then(|| ListEvents {
-                        after: Some(page.cursor.clone()),
+                        cursor: Some(page.next_cursor.clone()),
                         ..options
                     });
                     Ok((page, next))

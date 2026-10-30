@@ -56,7 +56,7 @@ configuration. The defaults are constants on `ServerClient`. Requests send a
 
 | Resource       | Methods                                                                                                                                                                                                               |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `assets`       | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
+| `assets`       | `create`, `classify`, `search`, `list`, `each`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `decide`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `eachChild`, `uploadPart`, `createSignedUrl` |
 | `folders`      | `list`, `create`, `retrieve`, `update`, `move`, `delete`                                                                                                                                                              |
 | `hashLists`    | `list`, `retrieve`, `create`, `update`, `delete`, `listEntries`, `addEntry`, `removeEntry`                                                                                                                            |
 | `text`         | `classify`                                                                                                                                                                                                            |
@@ -95,6 +95,14 @@ It returns once `classification.moderation.status` is no longer `pending` (`allo
 `sdk/timeout`. A classification failure is not a decision to allow. Manual reviews in
 `classification.moderation.manualReviews` record their `decision` as one of those five
 statuses. Filter lists with `classification.moderation.status==allowed`.
+
+Record a reviewer's decision with `decide`; the note is required. An asset still pending
+moderation can only be blocked or purged, and purging deletes the stored content:
+
+```php
+$client->assets->decide(['assetId' => $asset['id'], 'decision' => 'blocked', 'note' => 'Spam reported by members']);
+$client->assets->decide(['assetId' => $asset['id'], 'decision' => 'purged', 'note' => 'Illegal content', 'confirmPurge' => true]);
+```
 
 Supply a `name` and exactly one of `content`, `part` or `url`. Content accepts one of
 `plainText`, `base64`, or `data`/`bytes` (binary string, PHP stream resource or PSR-7
@@ -150,16 +158,20 @@ content is removed.
 
 ```php
 foreach ($client->assets->each(['pageSize' => 100]) as $asset) {
-    // Process each asset; opaque cursors are forwarded unchanged.
+    // Process each asset.
 }
-foreach ($client->events->eachPage(['after' => $savedCursor]) as $page) {
-    // Handle $page['events'], then persist $page['cursor'].
+foreach ($client->events->eachPage(['cursor' => $savedCursor]) as $page) {
+    // Handle $page['items'], then persist $page['nextCursor'].
 }
 ```
 
-Asset lists use `cursor`, `pageSize`, `ordering` and `filter`. Child lists work the
-same way, as do hash list entries (`listEntries`, newest first). Folder lists retain `pageIndex`. An event list without `after` starts at
-the current feed position; save the returned cursor to consume subsequent events.
+Every list returns a cursor page (`items`, `nextCursor`, `hasMore`): pass a page's `nextCursor`
+as `cursor` for the next one and treat it as opaque. Asset lists also take `pageSize`, `ordering`
+and `filter`. Child lists work the same way, as do hash lists (`hashLists->list`), hash list
+entries (`listEntries`, newest first) and folders (`folders->list`, ordered by `name` or
+`createdAt`, with the `ancestors` needed to show their paths). An event list without `cursor`
+returns no events and a `nextCursor` for the current feed position; save it to consume later
+events (`pageSize` 1 to 100, 50 by default).
 `assets->each` and `eachChild` stop at a page without a next cursor, with `hasMore` false or
 with no items, and `events->eachPage` when `hasMore` is false. Rather than loop, they throw
 `sdk/invalid-response` (with the repeated cursor in `details['cursor']`) when a page with more

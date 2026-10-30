@@ -67,6 +67,10 @@ let client = calmlens::ServerClient::builder(api_key, project_id)
 - `Debug` output of the client and builder never includes the API key.
 - Every request sends `User-Agent: calmlens-rust/<version> (rustc/<compiler version>)` (`calmlens::VERSION` is the crate version) and the API key in `x-api-key`; API calls also send `Accept: application/json`.
 
+## Reviewer decisions
+
+`assets().decide(DecideAsset::new(asset_id, AssetModerationDecision::Blocked, "Spam"))` records a reviewer's decision, replacing the policy's: the moderation status becomes the decision, the note (1 to 1499 characters) joins `classification.moderation.manual_reviews` and the matching `asset.<status>` event is sent with `decided-by: reviewer`. An asset still pending moderation can only be blocked or purged. Purging also needs `confirm_purge: true` and the `assets:delete` permission, and permanently deletes the stored content.
+
 ## Waiting for a decision
 
 `assets().wait_for_decision(WaitForDecision::new(asset_id))` retrieves a queued asset until it is decided (moderation status no longer `pending`, or classification status `failed`) and returns it. It checks again after 0.5 s, waiting 1.5 times longer each time up to 5 s, and fails with `sdk/timeout` if there's no decision within the timeout (60 s by default, or `.timeout(duration)`). The error's `details()` carry `assetId` and the last `classificationStatus` and `moderationStatus`. Drop the future to stop waiting; the blocking client's method blocks until the decision or the timeout. `Asset::is_decided` tells you whether an asset's outcome is final. Webhooks report decisions without polling.
@@ -204,7 +208,7 @@ assert_eq!(url, same);
 
 ## Hash lists
 
-Hash lists hold PDQ hashes of images the project never wants again. Image uploads are compared with every list in the project: a `HashListAction::Flag` list records matches in `classification.moderation.hash_matches`, and a `HashListAction::Block` list also blocks close matches. `hash_lists()` has `list()`, `retrieve(HashListId)`, `create(CreateHashList)`, `update(UpdateHashList)` (set `description: Patch::Null` to clear it), `delete(HashListId)` (which also deletes the list's entries), `list_entries(ListHashListEntries)` (a cursor page, newest first), `add_entry(AddHashListEntry)` and `remove_entry(HashListEntryId)`. Add an entry from a `hash` of 64 hexadecimal characters, or from an image asset's perceptual hash with `asset_id`; an asset without one fails with `hash-list/asset-not-hashed`. Adding a hash the list already holds returns the existing entry.
+Hash lists hold PDQ hashes of images the project never wants again. Image uploads are compared with every list in the project: a `HashListAction::Flag` list records matches in `classification.moderation.hash_matches`, and a `HashListAction::Block` list also blocks close matches. `hash_lists()` has `list(ListHashLists)` (a cursor page, newest first, 10 by default), `retrieve(HashListId)`, `create(CreateHashList)`, `update(UpdateHashList)` (set `description: Patch::Null` to clear it), `delete(HashListId)` (which also deletes the list's entries), `list_entries(ListHashListEntries)` (a cursor page, newest first), `add_entry(AddHashListEntry)` and `remove_entry(HashListEntryId)`. Add an entry from a `hash` of 64 hexadecimal characters, or from an image asset's perceptual hash with `asset_id`; an asset without one fails with `hash-list/asset-not-hashed`. Adding a hash the list already holds returns the existing entry.
 
 ```rust
 let list = client
@@ -229,18 +233,19 @@ client
 ## Pagination and events
 
 - `assets().iterate(ListAssets)` and `assets().iterate_children(ListChildren)` return a `Stream` of assets (`Iterator` for the blocking client) that fetches pages from `cursor` on as it is read, keeping the filter and ordering. It ends at a page without a next cursor, with `has_more: false` or without items. An error ends the stream.
-- `events().pages(ListEvents)` returns pages of the events feed, following each page's cursor until a page has `has_more: false`.
-- A page with more to follow whose cursor the iteration already sent fails with `sdk/invalid-response` and `details.cursor`, instead of repeating pages forever; that page is not yielded. Store the last page's `cursor` and pass it as `after` on the next poll. Without `after`, the first page is empty and its cursor marks the current time.
+- `folders().list(ListFolders)` and `hash_lists().list(ListHashLists)` return one cursor page: pass its `next_cursor` as `cursor` while `has_more` is true. Folders sort by name unless `ordering` names `createdAt`.
+- `events().pages(ListEvents)` returns pages of the events feed, following each page's `next_cursor` until a page has `has_more: false`.
+- A page with more to follow whose cursor the iteration already sent fails with `sdk/invalid-response` and `details.cursor`, instead of repeating pages forever; that page is not yielded. An events page's `next_cursor` is always set: store the last one and pass it as `cursor` on the next poll. Without `cursor`, the first page is empty and its `next_cursor` marks the current time.
 
 ```rust
 use futures_util::TryStreamExt;
 
-let mut pages = client.events().pages(ListEvents { after: Some(cursor), limit: Some(100) });
+let mut pages = client.events().pages(ListEvents { cursor: Some(cursor.clone()), page_size: Some(100) });
 while let Some(page) = pages.try_next().await? {
-    for event in &page.events {
+    for event in &page.items {
         println!("{} {:?}", event.id, event.event_type);
     }
-    cursor = page.cursor;
+    cursor = page.next_cursor;
 }
 // Persist `cursor`, then poll again later.
 ```
@@ -352,12 +357,12 @@ use calmlens::{models::*, testing::*};
 
 let mock = MockServerClient::in_memory(MockOptions::new().analyzed_outcome(MockOutcome::AgeRestricted))?;
 let asset = mock.assets().create(SubmitAsset::text("hello")).await?; // pending
-let start = mock.events().list(ListEvents::default()).await?.cursor;
+let start = mock.events().list(ListEvents::default()).await?.next_cursor;
 mock.decide(&asset.id, AssetModerationDecision::Blocked)?; // adds an asset.blocked event
-let page = mock.events().list(ListEvents { after: Some(start), ..Default::default() }).await?;
+let page = mock.events().list(ListEvents { cursor: Some(start), ..Default::default() }).await?;
 ```
 
-`decide(asset_id, decision)` applies a reviewer decision and adds the matching `asset.<status>` event with the event catalog's severity (`low` for `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact; a purge removes the content with reason `requested` after an `asset.content-removed` event. `enqueue_event(event)` adds any event to the feed. `cdn().serve` returns stored bytes with their stored `content-type`, `content-length`, `cache-tag`, `x-content-type-options: nosniff`, a sandboxing `content-security-policy` and `cache-control` as the CDN sets it (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable` with an `etag` and `expires` for images and `max-age=3600` for other content). A classified image gets a ThumbHash, and its `placeholder` resource is served as the PNG it renders; removing the content removes it. Like the CDN, it first refuses blocked, purged and failed assets, and assets whose content was removed or is still uploading, with `403` `asset/not-available` whatever the key; then it refuses age-restricted assets requested without `ViewerClaims { age_confirmed: Some(true), .. }` with `403` `viewer/age-confirmation-required` whatever the key, and serves private assets only when the API key has a download grant, such as `MockOptions::new().api_key(create_mock_api_key(&[MockApiKeyGrant::download()]))`. The default key has no grants. `with_storage(|storage| ..)` reads or seeds `assets`, `folders`, `hash_lists`, `hash_list_entries`, `content` and `events` in the API's JSON shape. New objects get IDs like the API's: their kind's prefix, `_` and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`. `create_id(|prefix| ..)` (it receives `asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`), `now` and `project_id` make results deterministic (the default clock moves on by at least a millisecond per reading, so assets created in a row get increasing `created_at`), and `api_base_url` and `cdn_base_url` set the URLs the mock client uses. Waits take no real time: retry backoff and `wait_for_decision` advance the mock's virtual clock (`mock.elapsed()`), so a pending asset fails with `sdk/timeout` at once. This applies to `MockServerClient::new()` and `from_builder` too. The mock does not classify or transform content.
+`assets().decide(DecideAsset)` validates and applies a decision like the API: an asset still uploading or processing fails with `asset/processing`, an undecided asset can only be blocked or purged (`asset/decision-not-allowed`), its current status is refused (`asset/decision-unchanged`), and purged content can only be blocked (`asset/content-purged`). The `decide(asset_id, decision)` test hook applies a reviewer decision and adds the matching `asset.<status>` event with the event catalog's severity (`low` for `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact; a purge removes the content with reason `requested` after an `asset.content-removed` event. `enqueue_event(event)` adds any event to the feed. `cdn().serve` returns stored bytes with their stored `content-type`, `content-length`, `cache-tag`, `x-content-type-options: nosniff`, a sandboxing `content-security-policy` and `cache-control` as the CDN sets it (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable` with an `etag` and `expires` for images and `max-age=3600` for other content). A classified image gets a ThumbHash, and its `placeholder` resource is served as the PNG it renders; removing the content removes it. Like the CDN, it first refuses blocked, purged and failed assets, and assets whose content was removed or is still uploading, with `403` `asset/not-available` whatever the key; then it refuses age-restricted assets requested without `ViewerClaims { age_confirmed: Some(true), .. }` with `403` `viewer/age-confirmation-required` whatever the key, and serves private assets only when the API key has a download grant, such as `MockOptions::new().api_key(create_mock_api_key(&[MockApiKeyGrant::download()]))`. The default key has no grants. `with_storage(|storage| ..)` reads or seeds `assets`, `folders`, `hash_lists`, `hash_list_entries`, `content` and `events` in the API's JSON shape. New objects get IDs like the API's: their kind's prefix, `_` and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`. `create_id(|prefix| ..)` (it receives `asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`), `now` and `project_id` make results deterministic (the default clock moves on by at least a millisecond per reading, so assets created in a row get increasing `created_at`), and `api_base_url` and `cdn_base_url` set the URLs the mock client uses. Waits take no real time: retry backoff and `wait_for_decision` advance the mock's virtual clock (`mock.elapsed()`), so a pending asset fails with `sdk/timeout` at once. This applies to `MockServerClient::new()` and `from_builder` too. The mock does not classify or transform content.
 
 ## Development
 

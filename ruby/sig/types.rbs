@@ -583,7 +583,8 @@ module CalmLens
     ?"updatedAt" => Integer,
     ?"readAt" => Integer?
   }
-  type events_page = { "events" => Array[event], "cursor" => String, "hasMore" => bool }
+  # Unlike other lists, `nextCursor` is never nil: keep it to receive later events.
+  type events_page = { "items" => Array[event], "nextCursor" => String, "hasMore" => bool }
 
   # WEBHOOK_EVENT_DATA_SCHEMA: the event fields a webhook delivery carries under `data`.
   type webhook_event_data = {
@@ -638,6 +639,14 @@ module CalmLens
   type batch_assets_options = { asset_ids: Array[String], operation: asset_batch_operation, ?request_options: request_options }
   type move_asset_options = { asset_id: String, folder_id: String?, ?request_options: request_options }
   type explain_asset_options = { asset_id: String, ?rerun: bool, ?request_options: request_options }
+  # A reviewer's decision. `note` is 1 to 1499 characters; purging also needs `confirm_purge: true`.
+  type decide_asset_options = {
+    asset_id: String,
+    decision: "allowed" | "limited" | "age-restricted" | "blocked" | "purged",
+    note: String,
+    ?confirm_purge: bool,
+    ?request_options: request_options
+  }
   type create_signed_url_options = {
     ?viewer_claims: viewer_claims,
     asset_id: String,
@@ -741,13 +750,41 @@ module CalmLens
   }
   type signed_upload_token = { "token" => String, "expiresAt" => Integer }
 
-  type list_folders_options = { ?parent_id: String, ?page_index: Integer, ?page_size: Integer, ?search: String, ?search_all: bool, ?resolve_only: bool, ?ids: Array[String], ?sort: String, ?direction: String, ?request_options: request_options }
-  type folder_page = { "folders" => Array[folder], "ancestors" => Array[folder], "hasMore" => bool }
+  type folder_order_input = { field: "name" | "createdAt", direction: order_direction }
+  type list_folders_options = {
+    ?parent_id: String,
+    ?cursor: String,
+    # 1 to 100, default 100.
+    ?page_size: Integer,
+    # At most one entry; the default is `name` ascending.
+    ?ordering: Array[folder_order_input],
+    ?search: String,
+    ?search_all: bool,
+    ?resolve_only: bool,
+    ?ids: Array[String],
+    ?request_options: request_options
+  }
+  type folder_page = {
+    "items" => Array[folder],
+    "ancestors" => Array[folder],
+    "hasMore" => bool,
+    "nextCursor" => String?,
+    "pageSize" => Integer,
+    "ordering" => Array[order]
+  }
   type folder_id_options = { folder_id: String, ?request_options: request_options }
   type create_folder_options = { name: String, ?parent_id: String?, ?request_options: request_options }
   type update_folder_options = { folder_id: String, ?name: String, ?request_options: request_options }
   type move_folder_options = { folder_id: String, parent_id: String?, ?request_options: request_options }
-  type hash_list_list = { "items" => Array[hash_list] }
+  # 1 to 100 lists per page, default 10.
+  type list_hash_lists_options = { ?cursor: String, ?page_size: Integer, ?request_options: request_options }
+  type hash_list_page = {
+    "items" => Array[hash_list],
+    "hasMore" => bool,
+    "nextCursor" => String?,
+    "pageSize" => Integer,
+    "ordering" => Array[order]
+  }
   type hash_list_id_options = { hash_list_id: String, ?request_options: request_options }
   type create_hash_list_options = { name: String, action: hash_list_action, ?description: String?, ?request_options: request_options }
   type update_hash_list_options = { hash_list_id: String, ?name: String, ?description: String?, ?action: hash_list_action,
@@ -758,7 +795,8 @@ module CalmLens
                                        ?request_options: request_options }
   type hash_list_entry_id_options = { entry_id: String, ?request_options: request_options }
 
-  type list_events_options = { ?after: String, ?limit: Integer, ?request_options: request_options }
+  # `page_size` is 1 to 100, default 50.
+  type list_events_options = { ?cursor: String, ?page_size: Integer, ?request_options: request_options }
 
   type ensure_lenses_options = { lenses: Array[lens_definition], ?request_options: request_options }
   type ensure_lens_options = {

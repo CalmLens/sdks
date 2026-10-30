@@ -9,7 +9,7 @@ require_relative 'demo'
 
 module TestHelpers
   HOLD_POLICY = { 'keepContentAfterProcessing' => true, 'flaggedContentPolicy' => { 'action' => 'block' } }.freeze
-  CURSOR = { 'events' => [], 'cursor' => 'c0', 'hasMore' => false }.freeze
+  CURSOR = { 'items' => [], 'nextCursor' => 'c0', 'hasMore' => false }.freeze
 
   def demo_app(**options)
     Calmthread::App.new(Calmthread::Discussion.new(Calmthread::Demo::Moderator.new), webhooks: :manual, **options)
@@ -60,7 +60,7 @@ module TestHelpers
       'content' => { 'status' => 'stored' } }
   end
 
-  def page_of(*events, cursor: 'c1', more: false) = { 'events' => events, 'cursor' => cursor, 'hasMore' => more }
+  def page_of(*events, cursor: 'c1', more: false) = { 'items' => events, 'nextCursor' => cursor, 'hasMore' => more }
 
   def request(app, method, path, fields: nil, body: nil, headers: {}, type: 'application/x-www-form-urlencoded')
     body ||= fields ? URI.encode_www_form(fields) : ''
@@ -391,7 +391,7 @@ class ReviewTest < Minitest::Test
     before = mock.requests.size
     sync(app)
     assert_equal before + 2, mock.requests.size, 'no asset was retrieved'
-    assert_equal({ 'after' => 'c1', 'limit' => '50' }, mock.requests.last.query)
+    assert_equal({ 'cursor' => 'c1', 'pageSize' => '50' }, mock.requests.last.query)
     assert_equal 'c2', app.feed.cursor
     assert_equal [:held], app.discussion.replies.map { |reply| reply[:state] }
     assert_equal 1, app.discussion.activity.count { |entry| entry[:kind] == :test }
@@ -412,7 +412,7 @@ class ReviewTest < Minitest::Test
   end
 
   def test_first_live_sync_only_starts_the_cursor
-    app, = live_app({ 'events' => [], 'cursor' => 'now', 'hasMore' => false })
+    app, = live_app({ 'items' => [], 'nextCursor' => 'now', 'hasMore' => false })
     _, headers, = sync(app)
     assert_equal '/?notice=watching', headers['location']
     assert_equal 'now', app.feed.cursor
@@ -590,7 +590,7 @@ class RequestTest < Minitest::Test
   end
 
   def test_live_handler_ignores_demo_overrides
-    app, mock = live_app({ 'events' => [], 'cursor' => 'start', 'hasMore' => false },
+    app, mock = live_app({ 'items' => [], 'nextCursor' => 'start', 'hasMore' => false },
                          asset('n', 'allowed'), asset('t', 'allowed'))
     assert_equal 303, post_reply(app, demo_result: 'held').first
     assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }

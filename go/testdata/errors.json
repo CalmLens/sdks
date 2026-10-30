@@ -594,39 +594,6 @@
     }
   },
   {
-    "code": "events/invalid-cursor",
-    "status": 400,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 400,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-events-invalid-cursor"
-      },
-      "body": {
-        "code": "events/invalid-cursor",
-        "message": "The events cursor is invalid. Use the cursor from a previous response, or omit it to start from now.",
-        "details": {
-          "reason": "invalid_event_cursor"
-        },
-        "traceId": "trace-events-invalid-cursor"
-      }
-    },
-    "expected": {
-      "code": "events/invalid-cursor",
-      "status": 400,
-      "requestId": "req-events-invalid-cursor",
-      "retryAfter": null,
-      "details": {
-        "reason": "invalid_event_cursor",
-        "traceId": "trace-events-invalid-cursor"
-      }
-    }
-  },
-  {
     "code": "upload/invalid-payload",
     "status": 400,
     "operation": "assets.retrieve",
@@ -1119,6 +1086,105 @@
       "details": {
         "reason": "asset_safety_held",
         "traceId": "trace-asset-safety-held"
+      }
+    }
+  },
+  {
+    "code": "asset/processing",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-processing"
+      },
+      "body": {
+        "code": "asset/processing",
+        "message": "Wait for the asset to finish uploading and processing before deciding it.",
+        "details": {
+          "reason": "asset_processing"
+        },
+        "traceId": "trace-asset-processing"
+      }
+    },
+    "expected": {
+      "code": "asset/processing",
+      "status": 409,
+      "requestId": "req-asset-processing",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_processing",
+        "traceId": "trace-asset-processing"
+      }
+    }
+  },
+  {
+    "code": "asset/decision-not-allowed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-decision-not-allowed"
+      },
+      "body": {
+        "code": "asset/decision-not-allowed",
+        "message": "This asset has no moderation decision yet, so it can only be blocked or purged. Allow, limit or age-restrict it once moderation has decided it.",
+        "details": {
+          "reason": "asset_decision_not_allowed"
+        },
+        "traceId": "trace-asset-decision-not-allowed"
+      }
+    },
+    "expected": {
+      "code": "asset/decision-not-allowed",
+      "status": 409,
+      "requestId": "req-asset-decision-not-allowed",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_decision_not_allowed",
+        "traceId": "trace-asset-decision-not-allowed"
+      }
+    }
+  },
+  {
+    "code": "asset/decision-unchanged",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-decision-unchanged"
+      },
+      "body": {
+        "code": "asset/decision-unchanged",
+        "message": "The asset already has this moderation status.",
+        "details": {
+          "reason": "asset_decision_unchanged"
+        },
+        "traceId": "trace-asset-decision-unchanged"
+      }
+    },
+    "expected": {
+      "code": "asset/decision-unchanged",
+      "status": 409,
+      "requestId": "req-asset-decision-unchanged",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_decision_unchanged",
+        "traceId": "trace-asset-decision-unchanged"
       }
     }
   },

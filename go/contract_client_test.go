@@ -331,6 +331,10 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		return one(c.Assets.CreateSignedURL(ctx, options))
 	case "assets.retry":
 		return one(c.Assets.Retry(ctx, into[AssetIDOptions](t, args)))
+	case "assets.decide":
+		options := into[DecideAssetOptions](t, args)
+		options.AssetID, _ = args["assetId"].(string)
+		return one(c.Assets.Decide(ctx, options))
 	case "assets.explain":
 		return one(c.Assets.Explain(ctx, into[ExplainAssetOptions](t, args)))
 	case "assets.deleteContent":

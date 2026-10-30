@@ -1267,6 +1267,7 @@ fn references() -> BTreeSet<&'static str> {
         "assets().move_asset" => ServerClient::assets, AssetsClient::move_asset;
         "assets().batch" => ServerClient::assets, AssetsClient::batch;
         "assets().retry" => ServerClient::assets, AssetsClient::retry;
+        "assets().decide" => ServerClient::assets, AssetsClient::decide;
         "assets().explain" => ServerClient::assets, AssetsClient::explain;
         "assets().create_signed_url" => ServerClient::assets, AssetsClient::create_signed_url;
         "assets().classify" => ServerClient::assets, AssetsClient::classify;

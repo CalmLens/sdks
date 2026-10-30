@@ -31,25 +31,24 @@ abstract class Resource
     }
 
     /**
-     * Pages through a list. Asset pages stop without a next cursor, when `hasMore` is false or at
-     * an empty page; event pages when `hasMore` is false. A page with more to follow that hands
-     * back a cursor already sent fails with `sdk/invalid-response` (`details.cursor`) rather than
-     * loop, and is not yielded.
+     * Pages through a list by following `nextCursor` as `cursor`. Asset pages stop without a next
+     * cursor, when `hasMore` is false or at an empty page; event pages (`$events`) when `hasMore`
+     * is false. A page with more to follow that hands back a cursor already sent fails with
+     * `sdk/invalid-response` (`details.cursor`) rather than loop, and is not yielded.
      */
-    protected function pages(callable $fetch, array $options, string $items = 'items', string $cursor = 'nextCursor', string $parameter = 'cursor'): \Generator
+    protected function pages(callable $fetch, array $options, bool $events = false): \Generator
     {
-        $events = $items === 'events';
         $seen = [];
-        if ($events && isset($options[$parameter])) {
-            $seen[$options[$parameter]] = true;
+        if ($events && isset($options['cursor'])) {
+            $seen[$options['cursor']] = true;
         }
         do {
             $page = $fetch($options);
-            if (!is_array($page) || !is_array($page[$items] ?? null) || !is_bool($page['hasMore'] ?? null)) {
+            if (!is_array($page) || !is_array($page['items'] ?? null) || !is_bool($page['hasMore'] ?? null)) {
                 throw CalmLensException::create('sdk/invalid-response', 'Invalid page');
             }
-            $next = $page[$cursor] ?? null;
-            $more = $page['hasMore'] && ($events || (is_string($next) && $next !== '' && $page[$items] !== []));
+            $next = $page['nextCursor'] ?? null;
+            $more = $page['hasMore'] && ($events || (is_string($next) && $next !== '' && $page['items'] !== []));
             if ($more) {
                 if (!is_string($next) || $next === '') {
                     throw CalmLensException::create('sdk/invalid-response', 'A page with more to follow has no cursor');
@@ -64,7 +63,7 @@ abstract class Resource
             if (!$more) {
                 return;
             }
-            $options[$parameter] = $next;
+            $options['cursor'] = $next;
         } while (true);
     }
 }

@@ -47,6 +47,8 @@ updated = client.assets.update(asset_id: uploaded['id'], tags: %w[a b], descript
 client.assets.move(asset_id: updated['id'], folder_id: nil)
 client.assets.retry(asset_id: updated['id'])
 client.assets.explain(asset_id: updated['id'], rerun: true)
+client.assets.decide(asset_id: updated['id'], decision: 'blocked', note: 'Spam')
+client.assets.decide(asset_id: updated['id'], decision: 'purged', note: 'Illegal', confirm_purge: true)
 client.assets.wait_for_decision(asset_id: uploaded['id'], timeout: 30)['classification']['moderation']['status']
 client.assets.delete_content(asset_id: updated['id'])['content']['updatedAt']
 signed = client.assets.create_signed_url(asset_id: updated['id'],
@@ -57,13 +59,17 @@ client.assets.delete(asset_id: updated['id'])
 folder = client.folders.create(name: 'Inbox', parent_id: nil)
 client.folders.update(folder_id: folder['id'], name: 'Archive')
 client.folders.move(folder_id: folder['id'], parent_id: nil)
-client.folders.list['folders'].map { |item| item['parentId'] }
+folders = client.folders.list(ordering: [{ field: 'createdAt', direction: 'DESC' }], page_size: 20)
+folders['items'].map { |item| item['parentId'] }
+client.folders.list(cursor: folders['nextCursor']) if folders['nextCursor']
 client.folders.retrieve(folder_id: folder['id'])
 client.folders.delete(folder_id: folder['id'])
 
 hash_list = client.hash_lists.create(name: 'Removed images', action: 'block', description: nil)
 client.hash_lists.update(hash_list_id: hash_list['id'], action: 'flag', description: nil)
-client.hash_lists.list['items'].map { |item| item['action'] }
+hash_lists = client.hash_lists.list(page_size: 20)
+hash_lists['items'].map { |item| item['action'] }
+client.hash_lists.list(cursor: hash_lists['nextCursor']) if hash_lists['nextCursor']
 client.hash_lists.retrieve(hash_list_id: hash_list['id'])
 entry = client.hash_lists.add_entry(hash_list_id: hash_list['id'], hash: '0' * 64, quality: 90, label: 'Report 1042')
 client.hash_lists.add_entry(hash_list_id: hash_list['id'], asset_id: 'asset-1')
@@ -82,9 +88,9 @@ bytes = client.cdn.serve(asset_identifier: 'post-1', init: { method: 'HEAD', hea
   response.success? ? response.body(limit: 1024) : nil
 end
 
-cursor = client.events.list['cursor']
-client.events.each_page(after: cursor, limit: 10) { |events_page| events_page['cursor'] }
-client.events.each(after: cursor) do |event|
+cursor = client.events.list['nextCursor']
+client.events.each_page(cursor: cursor, page_size: 10) { |events_page| events_page['nextCursor'] }
+client.events.each(cursor: cursor) do |event|
   case event['type']
   when 'asset.blocked', 'asset.purged'
     event['facts'].select { |fact| fact['key'] == 'flagged-categories' }.map { |fact| fact['value'] }

@@ -253,6 +253,8 @@ blocking_methods!(AssetsClient => assets {
     fn update(options: UpdateAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::retry`].
     fn retry(options: AssetId) -> Result<Asset>;
+    /// See [`crate::AssetsClient::decide`].
+    fn decide(options: DecideAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::explain`].
     fn explain(options: ExplainAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::delete_content`].
@@ -301,7 +303,7 @@ blocking_methods!(FoldersClient => folders {
 pub struct HashListsClient<'a>(&'a ServerClient);
 blocking_methods!(HashListsClient => hash_lists {
     /// See [`crate::HashListsClient::list`].
-    fn list() -> Result<HashListList>;
+    fn list(options: ListHashLists) -> Result<HashListPage>;
     /// See [`crate::HashListsClient::retrieve`].
     fn retrieve(options: HashListId) -> Result<HashList>;
     /// See [`crate::HashListsClient::create`].

@@ -10,15 +10,15 @@ namespace CalmLens;
  */
 final class HashLists extends Resource
 {
-    /** Every hash list in the project, as `['items' => [...]]`. */
+    /** One page of the project's hash lists; pass the page's `nextCursor` as `cursor` and a `pageSize` (1 to 100, 10 by default). */
     public function list(array $options = []): array
     {
-        [, $request] = $this->split($options);
-        $lists = $this->session->request('GET', $this->session->project('hash-lists'), options: $request);
-        if (!is_array($lists) || !is_array($lists['items'] ?? null) || !array_is_list($lists['items'])) {
-            throw CalmLensException::create('sdk/invalid-response', 'Invalid hash list list');
+        [$api, $request] = $this->split($options);
+        $page = $this->session->request('GET', $this->session->project('hash-lists'), query: $api, options: $request);
+        if (!is_array($page) || !is_array($page['items'] ?? null) || !array_is_list($page['items']) || !is_bool($page['hasMore'] ?? null)) {
+            throw CalmLensException::create('sdk/invalid-response', 'Invalid hash list page');
         }
-        return $lists;
+        return $page;
     }
 
     public function retrieve(array $options): array

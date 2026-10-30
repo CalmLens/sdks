@@ -567,12 +567,12 @@ async fn live_listing_paginates_and_filters_the_folder() {
     let app = live(&mock, "");
     mock.enqueue(
         200,
-        json!({"folders": [{"id": "folder-1", "name": "Photos"}], "ancestors": [], "hasMore": false}),
+        json!({"items": [{"id": "folder-1", "name": "Photos"}], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     // The folder tree is walked, so Photos is asked for its children too.
     mock.enqueue(
         200,
-        json!({"folders": [], "ancestors": [], "hasMore": false}),
+        json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     mock.enqueue(
         200,
@@ -618,7 +618,7 @@ async fn listing_filters_only_accept_known_statuses() {
     let app = live(&mock, "");
     mock.enqueue(
         200,
-        json!({"folders": [], "ancestors": [], "hasMore": false}),
+        json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     mock.enqueue(200, json!({"items": [], "total": 0}));
     app.get("/?status=allowed,status==blocked").await;
@@ -634,7 +634,7 @@ async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_statu
     let app = live(&mock, "");
     mock.enqueue(
         200,
-        json!({"folders": [], "ancestors": [], "hasMore": false}),
+        json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     mock.enqueue(
         200,
@@ -658,7 +658,7 @@ async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_statu
     // An unknown mode falls back to hybrid.
     mock.enqueue(
         200,
-        json!({"folders": [], "ancestors": [], "hasMore": false}),
+        json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     mock.enqueue(
         200,
@@ -1401,7 +1401,7 @@ async fn library_load_failure_shows_nothing() {
     let app = live(&mock, "");
     mock.enqueue(
         200,
-        json!({"folders": [], "ancestors": [], "hasMore": false}),
+        json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     mock.enqueue_timeout();
     let response = app.get("/").await;
@@ -1422,7 +1422,7 @@ async fn undelivered_images_show_the_flagged_categories_from_the_report() {
     });
     mock.enqueue(
         200,
-        json!({"folders": [], "ancestors": [], "hasMore": false}),
+        json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     mock.enqueue(200, json!({"items": [blocked.clone()], "hasMore": false}));
     mock.enqueue(200, blocked);

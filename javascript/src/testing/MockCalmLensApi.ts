@@ -83,6 +83,7 @@ export type MockCalmLensOperation =
   | "assets.move"
   | "assets.retry"
   | "assets.explain"
+  | "assets.decide"
   | "assets.deleteContent"
   | "assets.delete"
   | "assets.batch"
@@ -192,11 +193,13 @@ export interface MockEndpoints {
   cdnBaseUrl: string;
 }
 
-const DEFAULT_EVENTS_LIMIT = 50;
-const MAX_EVENTS_LIMIT = 100;
+const DEFAULT_EVENTS_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
+const MAX_DECISION_NOTE_LENGTH = 1499;
+/** How the API names a reviewer acting through an unnamed API key. */
+const API_KEY_REVIEWER_NAME = "An API key";
 const MAX_SEARCH_LIMIT = 20;
 const MAX_SEARCH_QUERY_LENGTH = 200;
-const MAX_FOLDER_PAGE_SIZE = 100;
 
 /**
  * The ThumbHash the mock gives every classified image, standing in for one computed from its
@@ -371,6 +374,8 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       return ["assets.retry"];
     case "explain":
       return ["assets.explain"];
+    case "decision":
+      return ["assets.decide"];
   }
   return [];
 };
@@ -509,6 +514,55 @@ export class MockCalmLensApi {
     } catch (failure) {
       throw this.toError(failure);
     }
+    return structuredClone(await this.recordDecision(asset, decision));
+  }
+
+  /**
+   * `POST /assets/:assetId/decision`, like the API: an asset still uploading or processing can't
+   * be decided, one pending moderation can only be blocked or purged, a decision must change the
+   * status and purged content can only be blocked. Mock API keys have no name, so the reviewer is
+   * "An API key".
+   */
+  private async decideAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
+    const { decision, note: rawNote } = body;
+    if (decision === "purged") {
+      if (body.confirmPurge !== true)
+        throw invalidField("validation/invalid-value", "confirmPurge");
+    } else if (!REVIEW_DECISIONS.includes(decision as MockReviewDecision)) {
+      throw invalidField("validation/invalid-value", "decision");
+    }
+    if (typeof rawNote !== "string") throw invalidField("validation/invalid-type", "note");
+    const note = rawNote.trim();
+    if (!note) throw invalidField("validation/too-small", "note");
+    if (note.length > MAX_DECISION_NOTE_LENGTH) throw invalidField("validation/too-big", "note");
+    const asset = await this.findOwnAsset(assetId);
+    if (asset.upload.status === "uploading" || asset.classification.status === "processing") {
+      throw fail(API_ERROR_CODES.ASSET_PROCESSING);
+    }
+    const status = asset.classification.moderation.status;
+    if (decision !== "purged" && decision !== "blocked" && status === "pending") {
+      throw fail(API_ERROR_CODES.ASSET_DECISION_NOT_ALLOWED);
+    }
+    if (status === decision) throw fail(API_ERROR_CODES.ASSET_DECISION_UNCHANGED);
+    if (decision !== "purged" && decision !== "blocked" && status === "purged") {
+      throw fail(API_ERROR_CODES.ASSET_CONTENT_PURGED);
+    }
+    return this.recordDecision(asset, decision as MockReviewDecision, {
+      note,
+      reviewerName: API_KEY_REVIEWER_NAME,
+    });
+  }
+
+  /**
+   * Sets the reviewer's decision: the moderation status, a manual review and the
+   * `asset.<status>` event (after `asset.content-removed` when purging). The test hook records no
+   * reviewer or note; the API's handler records both.
+   */
+  private async recordDecision(
+    asset: Asset,
+    decision: MockReviewDecision,
+    review?: { note: string; reviewerName: string },
+  ): Promise<Asset> {
     const decided = await this.applyOutcome(asset, decision, "requested");
     const now = this.now();
     decided.classification.moderation.manualReviews = [
@@ -516,8 +570,9 @@ export class MockCalmLensApi {
       {
         id: this.createId("rev"),
         decision,
-        note: null,
+        note: review?.note ?? null,
         reviewerUserId: null,
+        ...(review && { reviewerName: review.reviewerName, reviewerEmail: null }),
         reviewedAt: now,
         appliedToAsset: true,
       },
@@ -539,10 +594,16 @@ export class MockCalmLensApi {
           value: stored.name,
           url: `https://calmlens.com/go/asset/${stored.id}`,
         },
-        { key: "note", value: null },
+        ...(review
+          ? [
+              { key: "reviewer-user-id", value: null },
+              { key: "reviewer-name", value: review.reviewerName },
+            ]
+          : []),
+        { key: "note", value: review?.note ?? null },
       ],
     } as MockEventInput);
-    return structuredClone(stored);
+    return stored;
   }
 
   /** The `CalmLensError` the real client throws for an API failure, for helpers that send none. */
@@ -768,7 +829,7 @@ export class MockCalmLensApi {
         case "POST folders":
           return [201, await this.createFolder(this.json(request))];
         case "GET hash-lists":
-          return [200, { items: [...this.hashLists.values()].reverse() }];
+          return [200, this.listHashLists(request.query)];
         case "POST hash-lists":
           return [201, this.createHashList(this.json(request))];
         case "PUT lenses":
@@ -798,6 +859,8 @@ export class MockCalmLensApi {
           return [200, await this.retryAsset(id)];
         case "POST explain":
           return [200, await this.explainAsset(id, this.json(request))];
+        case "POST decision":
+          return [200, await this.decideAsset(id, this.json(request))];
         case "DELETE content":
           return [200, await this.removeContent(await this.findOwnAsset(id))];
       }
@@ -861,6 +924,13 @@ export class MockCalmLensApi {
     };
     this.hashLists.set(list.id, list);
     return list;
+  }
+
+  private listHashLists(query: URLSearchParams) {
+    return createPage([...this.hashLists.values()], this.pageQuery(query), {
+      scope: `hash-lists:${this.projectId}`,
+      fail: this.pageFailure,
+    });
   }
 
   private findHashList(hashListId: string): HashList {
@@ -1650,58 +1720,63 @@ export class MockCalmLensApi {
   // ---- Events ------------------------------------------------------------------------------
 
   /**
-   * Reads the feed like the API: without `after`, no events and a cursor for "now"; with
-   * `after`, up to `limit` events added since, oldest first.
+   * Reads the feed like the API: without `cursor`, no events and a `nextCursor` for "now"; with
+   * `cursor`, up to `pageSize` events added since, oldest first. `nextCursor` is never null: it
+   * is where to keep polling from.
    */
   private listEvents(query: URLSearchParams) {
-    const limit = this.integer(query, "limit", DEFAULT_EVENTS_LIMIT);
+    const pageSize = this.integer(query, "pageSize", DEFAULT_EVENTS_PAGE_SIZE);
     // Like the API's query schema: an integer from 1 to 100.
-    if (limit < 1) throw invalidField("validation/too-small", "limit");
-    if (limit > MAX_EVENTS_LIMIT) throw invalidField("validation/too-big", "limit");
-    const after = query.get("after");
-    if (!after) return { events: [], cursor: `mock_${this.eventFeed.length}`, hasMore: false };
-    const match = /^mock_(\d+)$/.exec(after);
+    if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
+    if (pageSize > MAX_PAGE_SIZE) throw invalidField("validation/too-big", "pageSize");
+    const cursor = query.get("cursor");
+    if (!cursor) return { items: [], nextCursor: `mock_${this.eventFeed.length}`, hasMore: false };
+    const match = /^mock_(\d+)$/.exec(cursor);
     const position = match ? Number(match[1]) : Number.NaN;
     if (!Number.isSafeInteger(position) || position > this.eventFeed.length) {
-      throw fail(API_ERROR_CODES.INVALID_EVENT_CURSOR, { details: { after } });
+      throw fail(API_ERROR_CODES.INVALID_CURSOR);
     }
-    const events = this.eventFeed.slice(position, position + limit);
-    const next = position + events.length;
-    return { events, cursor: `mock_${next}`, hasMore: next < this.eventFeed.length };
+    const items = this.eventFeed.slice(position, position + pageSize);
+    const next = position + items.length;
+    return { items, nextCursor: `mock_${next}`, hasMore: next < this.eventFeed.length };
   }
 
   // ---- Folders -----------------------------------------------------------------------------
 
+  /**
+   * Lists folders like the API: one keyset page of a parent's children (or of every match with
+   * `searchAll`), by name unless `ordering` says otherwise, with the folders above them.
+   */
   private async listFolders(query: URLSearchParams) {
     const all = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
-    const size = this.integer(query, "pageSize", MAX_FOLDER_PAGE_SIZE);
-    if (size < 1) throw invalidField("validation/too-small", "pageSize");
-    if (size > MAX_FOLDER_PAGE_SIZE) throw invalidField("validation/too-big", "pageSize");
     const parentId = query.get("parentId");
-    const search = query.get("search");
+    const search = query.get("search")?.trim() || null;
     const searchAll = query.get("searchAll") === "true";
     const resolveOnly = query.get("resolveOnly") === "true";
-    const descending = query.get("direction") === "DESC";
-    const byCreatedAt = query.get("sort") === "createdAt";
+    const ordering = this.folderOrdering(query);
     const requestedIds = [...query]
       .filter(([key]) => /^ids\[\d+\]$/.test(key))
       .map(([, value]) => value);
-    // Like the database: names compare by code point, so case matters.
-    const byCodePoint = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
-    const matching = all
-      .filter(
-        (folder) =>
-          ((searchAll && search) || (folder.parentId ?? null) === parentId) &&
-          (!search || folder.name.toLowerCase().includes(search.toLowerCase())),
-      )
-      .sort((a, b) => {
-        const order =
-          (byCreatedAt ? a.createdAt - b.createdAt : byCodePoint(a.name, b.name)) ||
-          byCodePoint(a.id, b.id);
-        return descending ? -order : order;
-      });
-    const start = this.integer(query, "pageIndex", 0) * size;
-    const folders = resolveOnly ? [] : matching.slice(start, start + size);
+    const matching = all.filter(
+      (folder) =>
+        ((searchAll && search) || (folder.parentId ?? null) === parentId) &&
+        (!search || folder.name.toLowerCase().includes(search.toLowerCase())),
+    );
+    const page = createPage(
+      matching,
+      {
+        cursor: query.get("cursor") ?? undefined,
+        pageSize: this.integer(query, "pageSize", MAX_PAGE_SIZE),
+        ordering,
+      },
+      {
+        scope: JSON.stringify([this.projectId, parentId, search, searchAll]),
+        fail: this.pageFailure,
+        defaultPageSize: MAX_PAGE_SIZE,
+        defaultOrdering: [{ field: "name", direction: "ASC" }],
+      },
+    );
+    const folders = resolveOnly ? [] : page.items;
     const ids = new Set([
       ...requestedIds,
       ...(parentId ? [parentId] : []),
@@ -1713,12 +1788,28 @@ export class MockCalmLensApi {
       if (parent) ids.add(parent);
     }
     return {
-      folders,
+      items: folders,
       ancestors: all.filter(
         (folder) => ids.has(folder.id) && !folders.some((item) => item.id === folder.id),
       ),
-      hasMore: !resolveOnly && matching.length > start + size,
+      nextCursor: resolveOnly ? null : page.nextCursor,
+      pageSize: page.pageSize,
+      hasMore: !resolveOnly && page.hasMore,
+      ordering: page.ordering,
     };
+  }
+
+  /** The folder list's `ordering`: at most one rule, by `name` or `createdAt`. */
+  private folderOrdering(query: URLSearchParams) {
+    const ordering = this.ordering(query) as Array<{ field: string; direction: string }>;
+    if (ordering.length > 1) throw invalidField("validation/too-big", "ordering");
+    for (const [index, rule] of ordering.entries()) {
+      if (rule.field !== "name" && rule.field !== "createdAt")
+        throw invalidField("validation/invalid-value", `ordering.${index}.field`);
+      if (rule.direction !== "ASC" && rule.direction !== "DESC")
+        throw invalidField("validation/invalid-value", `ordering.${index}.direction`);
+    }
+    return ordering as Array<{ field: "name" | "createdAt"; direction: "ASC" | "DESC" }>;
   }
 
   private async createFolder(body: Record<string, unknown>): Promise<Folder> {

@@ -31,6 +31,7 @@ import type {
   CreateAssetSignedUrlOptions,
   CreateFolderOptions,
   CreateHashListOptions,
+  DecideAssetOptions,
   DeleteAssetContentOptions,
   DeleteAssetOptions,
   EnsureLensesOptions,
@@ -43,7 +44,7 @@ import type {
   HashListEntryIdOptions,
   HashListEntryPage,
   HashListIdOptions,
-  HashListList,
+  HashListPage,
   IterateAssetChildrenOptions,
   IterateAssetsOptions,
   Lens,
@@ -52,6 +53,7 @@ import type {
   ListEventsOptions,
   ListFoldersOptions,
   ListHashListEntriesOptions,
+  ListHashListsOptions,
   MoveAssetOptions,
   MoveFolderOptions,
   RequestOptions,
@@ -424,6 +426,15 @@ export default class CalmLensServerClient {
         this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/retry`),
 
       /**
+       * Records a reviewer's decision, replacing the policy's: the asset's moderation status
+       * becomes `decision`, the note joins its review history and the matching `asset.<status>`
+       * event is sent. An asset still pending moderation can only be blocked or purged. Purging
+       * needs `confirmPurge: true` and permanently deletes the stored content.
+       */
+      decide: async ({ assetId, ...body }: DecideAssetOptions): Promise<Asset> =>
+        this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/decision`, { body }),
+
+      /**
        * Completes the policy evidence behind a decided asset's moderation decision: the report's
        * `classification.moderation.policy.evidence` becomes `full` and every action stays as
        * decided. With `rerun: true` the asset is moderated again with the project's current policy
@@ -487,16 +498,17 @@ export default class CalmLensServerClient {
   get events() {
     return {
       /**
-       * Lists project events after a cursor, oldest first. Call without `after` to get a cursor
-       * for "now", then poll with the returned `cursor`. Webhook deliveries carry the same events
-       * reshaped as `{ id, type, createdAt, projectId, data }`.
+       * Lists project events after a cursor, oldest first. Call without `cursor` to get a cursor
+       * for "now", then poll with each response's `nextCursor`. Webhook deliveries carry the same
+       * events reshaped as `{ id, type, createdAt, projectId, data }`.
        */
       list: async (options: ListEventsOptions = {}): Promise<GetEventsResponse> =>
         this.request("GET", `${this.projectPath}/events`, { query: { ...options } }),
 
       /**
-       * Yields pages of events after `after` until no more are waiting. Save each page's
-       * `cursor` to resume later. Without `after`, yields one empty page whose cursor is "now".
+       * Yields pages of events after `cursor` until no more are waiting. Save each page's
+       * `nextCursor` to resume later. Without `cursor`, yields one empty page whose `nextCursor`
+       * is "now".
        */
       pages: (
         options: ListEventsOptions = {},
@@ -507,14 +519,14 @@ export default class CalmLensServerClient {
   private async *iterateEventPages(
     options: ListEventsOptions,
   ): AsyncGenerator<GetEventsResponse, void, undefined> {
-    let after = options.after;
-    const sent = new Set(after === undefined ? [] : [after]);
+    let cursor = options.cursor;
+    const sent = new Set(cursor === undefined ? [] : [cursor]);
     for (;;) {
-      const page = await this.events.list({ ...options, after });
-      if (page.hasMore) assertNewCursor(sent, page.cursor);
+      const page = await this.events.list({ ...options, cursor });
+      if (page.hasMore) assertNewCursor(sent, page.nextCursor);
       yield page;
       if (!page.hasMore) return;
-      after = page.cursor;
+      cursor = page.nextCursor;
     }
   }
 
@@ -537,7 +549,10 @@ export default class CalmLensServerClient {
 
   get folders() {
     return {
-      /** Lists one page of child folders; fetch a branch when it is opened. */
+      /**
+       * Lists one page of child folders, sorted by name unless `ordering` says otherwise. Pass
+       * `nextCursor` as `cursor` for the next page; fetch a branch when it is opened.
+       */
       list: async (options: ListFoldersOptions = {}): Promise<FolderPage> =>
         this.request("GET", `${this.projectPath}/folders`, { query: options }),
 
@@ -570,8 +585,9 @@ export default class CalmLensServerClient {
    */
   get hashLists() {
     return {
-      list: async (): Promise<HashListList> =>
-        this.request("GET", `${this.projectPath}/hash-lists`),
+      /** Lists one page of the project's hash lists, newest first. */
+      list: async (options: ListHashListsOptions = {}): Promise<HashListPage> =>
+        this.request("GET", `${this.projectPath}/hash-lists`, { query: options }),
 
       retrieve: async ({ hashListId }: HashListIdOptions): Promise<HashList> =>
         this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}`),

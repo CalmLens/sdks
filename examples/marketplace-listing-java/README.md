@@ -111,7 +111,7 @@ placed in a link is never displayed.
 ## Review decisions
 
 **Events feed (pull).** Click **Check now** in the Activity panel. The first call to
-`events.list` without a cursor returns a cursor for "now". Later calls pass it as `after`,
+`events.list` without a cursor returns a `nextCursor` for "now". Later calls pass it as `cursor`,
 follow `hasMore`, and apply each `asset.*` event about a local listing by retrieving the
 current state; the event's snapshot is not trusted. An event about a photo refreshes its combined decision and extracted text. A title or
 description that is no longer `allowed` or `limited` takes the listing down. The cursor advances only after a whole page is

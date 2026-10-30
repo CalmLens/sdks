@@ -52,7 +52,7 @@ module Calmthread
       def demo? = true
 
       # The feed starts at the mock's current cursor, so only simulated decisions are read.
-      def start_cursor = client.events.list['cursor']
+      def start_cursor = client.events.list['nextCursor']
 
       def moderate_reply(reply_id, fields, demo_result = 'clean')
         @outcome_lock.synchronize { @outcomes[reply_id] = demo_result }

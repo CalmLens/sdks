@@ -149,7 +149,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c = MockCalmLensServerClient(project_id="p1", mock_options={"create_id": lambda prefix: "a1"})
         c.assets.classify(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})
         c.assets.update({"assetId": "a1", "tags": ["x"]})
-        c.events.list(after="mock_0", limit=5)
+        c.events.list(cursor="mock_0", page_size=5)
         c.cdn.serve({"assetIdentifier": "a1", "lens": "thumb"}).close()
         upload, update, events, serve = c.requests
         self.assertEqual((upload.method, upload.path), ("POST", "/projects/p1/assets"))
@@ -162,7 +162,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertNotIn(c.api_key, repr(upload))
         self.assertTrue(upload.url.startswith(c.base_url + "/projects/p1/assets?"))
         self.assertEqual((update.method, update.path, update.body), ("PATCH", "/assets/a1", {"tags": ["x"]}))
-        self.assertEqual(events.query, {"after": "mock_0", "limit": 5})
+        self.assertEqual(events.query, {"cursor": "mock_0", "pageSize": 5})
         self.assertEqual((serve.method, serve.path), ("GET", "/assets/p1/a1/rendered/@thumb"))
         c.requests[0].query["externalId"] = "changed"
         self.assertEqual(c.requests[0].query["externalId"], "e1")

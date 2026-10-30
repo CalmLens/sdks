@@ -51,7 +51,7 @@ _MOCK_OUTCOMES = ("pending", "allowed", "limited", "age-restricted", "blocked", 
 MockAssetOutcome = Literal["pending", "allowed", "limited", "age-restricted", "blocked", "purged", "failed"]
 #: A mock outcome, or a function choosing one from the uploaded asset.
 MockAssetOutcomeOption = Union[MockAssetOutcome, Callable[[Asset], MockAssetOutcome]]
-_INT_QUERY = {"pageSize", "pageIndex", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
+_INT_QUERY = {"pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal", "searchAll", "resolveOnly"}
 _JSON_QUERY = {"metadata", "processingOptions", "context"}
 _MIB = 1024 * 1024
@@ -343,12 +343,14 @@ class MockOptions(TypedDict, total=False):
 #: The ThumbHash the mock gives every classified image, standing in for one computed from its
 #: pixels. The ``placeholder`` resource serves it as a PNG, like the CDN.
 _MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
-_DEFAULT_EVENTS_LIMIT = 50
-_MAX_EVENTS_LIMIT = 100
+_DEFAULT_EVENTS_PAGE_SIZE = 50
+_MAX_EVENTS_PAGE_SIZE = 100
 _MAX_SEARCH_LIMIT = 20
 _MAX_SEARCH_QUERY_LENGTH = 200
 _MAX_FOLDER_PAGE_SIZE = 100
 _REVIEW_DECISIONS = ("allowed", "limited", "age-restricted", "blocked", "purged")
+_MAX_DECISION_NOTE_LENGTH = 1499
+_DEFAULT_PAGE_SIZE = 10
 #: Like the API: 1 to 255 printable ASCII characters, once HTTP has trimmed the header value.
 _IDEMPOTENCY_KEY = re.compile(r"[\x21-\x7e](?:[\x20-\x7e]{0,253}[\x21-\x7e])?")
 #: A PDQ hash, as the API accepts it once trimmed and lowercased.
@@ -630,23 +632,64 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if not asset or asset["projectId"] != self.project_id:
                 raise CalmLensError(error_codes.ASSET_NOT_FOUND, "Asset not found",
                                     status=error_codes.STATUS_BY_CODE[error_codes.ASSET_NOT_FOUND])
-            record = cast(dict[str, Any], asset)
-            self._apply_outcome(record, decision, "requested")
-            now = self.now()
-            record["classification"]["moderation"].setdefault("manualReviews", []).append(
-                {"id": self.create_id("rev"), "decision": decision, "note": None, "reviewerUserId": None,
-                 "reviewedAt": now, "appliedToAsset": True})
-            if decision == "purged":
-                self._lifecycle_event("asset.content-removed", record)
-            # Like the event catalog: only allowing and limiting are low severity.
-            self.enqueue_event("asset." + decision, asset_id=asset_id,
-                               severity="low" if decision in ("allowed", "limited") else "high",
-                               facts=[{"key": "decided-by", "value": "reviewer"},
-                                      {"key": "asset-type", "value": record["type"]},
-                                      {"key": "asset-name", "value": record["name"],
-                                       "url": f"https://calmlens.com/go/asset/{record['id']}"},
-                                      {"key": "note", "value": None}])
+            self._record_decision(cast(dict[str, Any], asset), decision, None, None)
             return copy.deepcopy(asset)
+
+    def _record_decision(self, record: dict[str, Any], decision: str, note: str | None,
+                         reviewer_name: str | None) -> None:
+        """Apply a reviewer's decision like ``decideAssetManually`` in the API: the status, the
+        review, then (for ``purged``) the content removal and its event, then ``asset.<decision>``."""
+        self._apply_outcome(record, decision, "requested")
+        now = self.now()
+        review: dict[str, Any] = {"id": self.create_id("rev"), "decision": decision, "note": note,
+                                  "reviewerUserId": None, "reviewedAt": now, "appliedToAsset": True}
+        reviewer_facts: list[dict[str, Any]] = []
+        if reviewer_name is not None:
+            review.update(reviewerName=reviewer_name, reviewerEmail=None)
+            reviewer_facts = [{"key": "reviewer-user-id", "value": None},
+                              {"key": "reviewer-name", "value": reviewer_name}]
+        record["classification"]["moderation"].setdefault("manualReviews", []).append(review)
+        if decision == "purged":
+            self._lifecycle_event("asset.content-removed", record)
+        # Like the event catalog: only allowing and limiting are low severity.
+        self.enqueue_event("asset." + decision, asset_id=record["id"],
+                           severity="low" if decision in ("allowed", "limited") else "high",
+                           facts=cast(list[EventFact], [
+                               {"key": "decided-by", "value": "reviewer"},
+                               {"key": "asset-type", "value": record["type"]},
+                               {"key": "asset-name", "value": record["name"],
+                                "url": f"https://calmlens.com/go/asset/{record['id']}"},
+                               *reviewer_facts,
+                               {"key": "note", "value": note}]))
+
+    def _decide_request(self, asset: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+        """``POST /assets/:id/decision`` as the API validates and applies it. The mock's key is
+        unnamed, so the review and its event name the reviewer ``An API key``. An asset still
+        uploading or processing is refused with ``asset/processing``."""
+        decision = body.get("decision")
+        if decision not in _REVIEW_DECISIONS:
+            raise _invalid_field("validation/invalid-union", "decision")
+        note = body.get("note")
+        if not isinstance(note, str):
+            raise _invalid_field("validation/invalid-type", "note")
+        note = note.strip()
+        if not note:
+            raise _invalid_field("validation/too-small", "note")
+        if len(note) > _MAX_DECISION_NOTE_LENGTH:
+            raise _invalid_field("validation/too-big", "note")
+        if decision == "purged" and body.get("confirmPurge") is not True:
+            raise _invalid_field("validation/invalid-value", "confirmPurge")
+        if asset["upload"]["status"] == "uploading" or asset["classification"]["status"] == "processing":
+            raise _Failure(error_codes.ASSET_PROCESSING)
+        status = asset["classification"]["moderation"]["status"]
+        if status == "pending" and decision not in ("blocked", "purged"):
+            raise _Failure(error_codes.ASSET_DECISION_NOT_ALLOWED)
+        if status == decision:
+            raise _Failure(error_codes.ASSET_DECISION_UNCHANGED)
+        if status == "purged" and decision != "blocked":
+            raise _Failure(error_codes.ASSET_CONTENT_PURGED)
+        self._record_decision(asset, decision, note, "An API key")
+        return asset
 
     def _lifecycle_event(self, type: str, asset: Mapping[str, Any]) -> None:
         """An ``asset.deleted``, ``asset.content-removed`` or ``asset.retried`` event, like the API."""
@@ -706,7 +749,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return "hashLists." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, method.lower())
         if suffix:
             return {"children": "assets.listChildren", "part": "assets.uploadPart", "signed-url": "assets.createSignedUrl",
-                    "content": "assets.deleteContent"}.get(suffix, f"{resource}.{suffix}")
+                    "content": "assets.deleteContent", "decision": "assets.decide"}.get(suffix, f"{resource}.{suffix}")
         return f"{resource}." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, method.lower())
 
     def _serve(self, request: Request, timeout: float) -> _Response:
@@ -854,8 +897,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return folder
         if resource == "hash-lists":
             if method == "GET":
-                lists = [h for h in self.database_storage.hash_lists.values() if h["projectId"] == self.project_id]
-                return {"items": sorted(lists, key=lambda h: (h["createdAt"], _code_points(h["id"])), reverse=True)}
+                lists = [cast(dict[str, Any], h) for h in self.database_storage.hash_lists.values()
+                         if h["projectId"] == self.project_id]
+                return self._page(lists, query, [self.project_id])
             return self._create_hash_list(body, now)
         suffix = parts[1] if len(parts) > 1 else ""
         if suffix == "batch":
@@ -870,17 +914,22 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return self._create_asset(upload, query, body, raw, now)
 
     def _folders_list(self, query: dict[str, Any]) -> dict[str, Any]:
+        """Like the API: one keyset page of child folders (or search matches), by ``name`` ascending
+        unless ``ordering`` (one entry, ``name`` or ``createdAt``) says otherwise, with an ``id``
+        tie-breaker, and the ancestors of the listed and requested folders."""
         everything = self._project_folders()
-        size = _bounded_int(query.get("pageSize", _MAX_FOLDER_PAGE_SIZE), "pageSize", _MAX_FOLDER_PAGE_SIZE)
         search = query.get("search")
         found = [f for f in everything
                  if ((query.get("searchAll") and search) or f.get("parentId") == query.get("parentId"))
                  and (not search or str(search).lower() in f["name"].lower())]
-        by_created = query.get("sort") == "createdAt"
-        found.sort(key=lambda f: (f["createdAt"] if by_created else _code_points(f["name"]), _code_points(f["id"])),
-                   reverse=query.get("direction") == "DESC")
-        start = query.get("pageIndex", 0) * size
-        page = [] if query.get("resolveOnly") else found[start:start + size]
+        if len(query.get("ordering") or []) > 1:
+            raise _invalid_field("validation/too-big", "ordering")
+        result = self._page(found, {**query, "pageSize": query.get("pageSize", _MAX_FOLDER_PAGE_SIZE)},
+                            [self.project_id, query.get("parentId"), search, bool(query.get("searchAll"))],
+                            fields=("name", "createdAt"), default=[{"field": "name", "direction": "ASC"}])
+        if query.get("resolveOnly"):
+            result.update(items=[], nextCursor=None, hasMore=False)
+        page = result["items"]
         ids = list(dict.fromkeys([*(query.get("ids") or []), *([query["parentId"]] if query.get("parentId") else []),
                                   *(f["id"] for f in page)]))
         by_id = {f["id"]: f for f in everything}
@@ -889,8 +938,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if parent and parent not in ids:
                 ids.append(parent)
         page_ids = {f["id"] for f in page}
-        return {"folders": page, "ancestors": [f for f in everything if f["id"] in ids and f["id"] not in page_ids],
-                "hasMore": not query.get("resolveOnly", False) and len(found) > start + size}
+        result["ancestors"] = [f for f in everything if f["id"] in ids and f["id"] not in page_ids]
+        return result
 
     def _create_asset(self, upload: str, query: dict[str, Any], body: dict[str, Any], raw: bytes | None,
                       now: int) -> dict[str, Any]:
@@ -1068,6 +1117,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self._apply_outcome(asset, "pending")
             self._lifecycle_event("asset.retried", asset)
             return asset
+        if suffix == "decision":
+            return self._decide_request(asset, body)
         if suffix == "explain":
             if asset["classification"]["status"] != "completed":
                 raise _Failure(error_codes.ASSET_NOT_DECIDED)
@@ -1281,19 +1332,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _events(self, query: dict[str, Any]) -> dict[str, Any]:
         # Cursors are positions in the feed (``mock_<n>``), so events added later reach cursors
-        # taken before them.
-        limit = _bounded_int(query.get("limit", _DEFAULT_EVENTS_LIMIT), "limit", _MAX_EVENTS_LIMIT)
+        # taken before them. Like the API, ``nextCursor`` is never null.
+        size = _bounded_int(query.get("pageSize", _DEFAULT_EVENTS_PAGE_SIZE), "pageSize", _MAX_EVENTS_PAGE_SIZE)
         events = [e for e in self.database_storage.events if e["projectId"] == self.project_id]
-        after = query.get("after")
-        if not after:
-            return {"events": [], "cursor": f"mock_{len(events)}", "hasMore": False}
-        found = re.fullmatch(r"mock_([0-9]+)", str(after))
+        cursor = query.get("cursor")
+        if not cursor:
+            return {"items": [], "nextCursor": f"mock_{len(events)}", "hasMore": False}
+        found = re.fullmatch(r"mock_([0-9]+)", str(cursor))
         if not found or int(found.group(1)) > len(events):
-            raise _Failure(error_codes.INVALID_EVENT_CURSOR, details={"after": after})
+            raise _Failure(error_codes.INVALID_CURSOR)
         position = int(found.group(1))
-        page = events[position:position + limit]
+        page = events[position:position + size]
         following = position + len(page)
-        return {"events": page, "cursor": f"mock_{following}", "hasMore": following < len(events)}
+        return {"items": page, "nextCursor": f"mock_{following}", "hasMore": following < len(events)}
 
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
         # Keyword search like the API's; the mock has no semantic index, so every mode is
@@ -1326,16 +1377,20 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return {"query": text, "items": items[:limit], "semanticStatus": "disabled"}
 
     @staticmethod
-    def _page(items: list[dict[str, Any]], query: dict[str, Any], scope: Any) -> dict[str, Any]:
-        """One keyset page like the API's: ordered by ``createdAt`` and ``id`` (an ``id``
-        tie-breaker is added), after the cursor's values. The cursor is tied to ``scope`` (the
-        filter, folder or parent) and the ordering, so it only continues the query it came from."""
-        size = _bounded_int(query.get("pageSize", 10), "pageSize", 100)
+    def _page(items: list[dict[str, Any]], query: dict[str, Any], scope: Any,
+              fields: tuple[str, ...] = ("createdAt", "id"),
+              default: list[dict[str, str]] | None = None) -> dict[str, Any]:
+        """One keyset page like the API's: ordered by ``fields`` (``createdAt`` descending by
+        default; an ``id`` tie-breaker is added), after the cursor's values. The cursor is tied to
+        ``scope`` (the filter, folder or parent) and the ordering, so it only continues the query
+        it came from."""
+        size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", 100)
         if query.get("filter"):
             matches = _rsql(query["filter"])
             items = [item for item in items if matches(item)]
-        ordering = [dict(order) for order in query.get("ordering") or [{"field": "createdAt", "direction": "DESC"}]]
-        if any(o.get("field") not in ("createdAt", "id") for o in ordering):
+        ordering = [dict(order) for order in
+                    query.get("ordering") or default or [{"field": "createdAt", "direction": "DESC"}]]
+        if any(o.get("field") not in fields for o in ordering):
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Invalid ordering")
         if not any(o["field"] == "id" for o in ordering):
             ordering.append({"field": "id", "direction": ordering[0]["direction"]})
@@ -1349,7 +1404,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 decoded = json.loads(base64.b64decode(query["cursor"], validate=True).decode("utf-8"))
                 values = decoded.get("values") if isinstance(decoded, dict) else None
                 if decoded.get("scope") != signature or not isinstance(values, list) or len(values) != len(ordering) \
-                        or any(not isinstance(value, str) if o["field"] == "id" else
+                        or any(not isinstance(value, str) if o["field"] in ("id", "name") else
                                isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
                                for o, value in zip(ordering, values)):
                     raise ValueError("Invalid cursor")

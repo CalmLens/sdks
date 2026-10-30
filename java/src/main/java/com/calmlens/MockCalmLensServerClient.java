@@ -459,15 +459,15 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /**
    * Queues one page of the events feed. {@code events} may be {@link Models.Event} records or maps.
    *
-   * @param cursor the page's cursor
+   * @param nextCursor the page's {@code nextCursor}
    * @param hasMore whether more events follow
    * @param events the events, oldest first
    * @return this mock
    */
-  public MockCalmLensServerClient enqueueEvents(String cursor, boolean hasMore, Object... events) {
+  public MockCalmLensServerClient enqueueEvents(String nextCursor, boolean hasMore, Object... events) {
     Map<String, Object> page = new LinkedHashMap<>();
-    page.put("events", List.of(events));
-    page.put("cursor", Objects.requireNonNull(cursor, "cursor"));
+    page.put("items", List.of(events));
+    page.put("nextCursor", Objects.requireNonNull(nextCursor, "nextCursor"));
     page.put("hasMore", hasMore);
     return enqueue("GET", "/events", 200, page);
   }

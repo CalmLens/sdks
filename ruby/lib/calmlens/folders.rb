@@ -3,11 +3,20 @@
 module CalmLens
   # Folders organise a project's assets. Reach it through {ServerClient#folders}.
   class Folders < Resource
-    # @return [Hash] folders, ancestors and hasMore for one child page.
+    # Lists one page of child folders, sorted by name unless `ordering` says otherwise.
+    # @option options [String] :parent_id list this folder's children; omit for the project root
+    # @option options [String] :cursor the previous page's `nextCursor`
+    # @option options [Integer] :page_size 1 to 100, default 100
+    # @option options [Array<Hash>] :ordering one `{field: 'name' | 'createdAt', direction: 'ASC' | 'DESC'}`
+    # @option options [String] :search
+    # @option options [Boolean] :search_all search every branch, not only `parent_id`'s children
+    # @option options [Array<String>] :ids folders whose paths to return in `ancestors`
+    # @option options [Boolean] :resolve_only return only the `ancestors` of `ids`
+    # @return [Hash] a cursor page (items, nextCursor, hasMore, pageSize, ordering) with ancestors.
     def list(options = {})
       call(options) do |api, request|
         response = request('GET', project('folders'), query: api, request_options: request)
-        valid = response.is_a?(Hash) && response['folders'].is_a?(Array) && response['ancestors'].is_a?(Array) &&
+        valid = response.is_a?(Hash) && response['items'].is_a?(Array) && response['ancestors'].is_a?(Array) &&
                 [true, false].include?(response['hasMore'])
         raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid folder page') unless valid
 

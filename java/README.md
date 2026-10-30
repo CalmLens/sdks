@@ -32,7 +32,7 @@ Create one client per API key, share it across threads and close it on shutdown.
 
 | Resource           | Methods                                                                                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `client.assets`    | `create`, `classify`, `search`, `list`, `iterate`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `iterateChildren`, `uploadPart`, `createSignedUrl` |
+| `client.assets`    | `create`, `classify`, `search`, `list`, `iterate`, `retrieve`, `waitForDecision`, `update`, `retry`, `explain`, `decide`, `deleteContent`, `delete`, `batch`, `move`, `listChildren`, `iterateChildren`, `uploadPart`, `createSignedUrl` |
 | `client.text`      | `classify`                                                                                                                                                                                                                     |
 | `client.folders`   | `list`, `create`, `retrieve`, `update`, `move`, `delete`                                                                                                                                                                       |
 | `client.hashLists` | `list`, `create`, `retrieve`, `update`, `delete`, `listEntries`, `addEntry`, `removeEntry`                                                                                                                                     |
@@ -40,9 +40,9 @@ Create one client per API key, share it across threads and close it on shutdown.
 | `client.cdn`       | `getAssetUrl`, `serve`                                                                                                                                                                                                         |
 | `client`           | `ensureLens`, `ensureLenses`                                                                                                                                                                                                   |
 
-`assets.create` queues processing and returns the asset while its `classification().status()` is `processing`; `assets.classify` and `text.classify` wait for classification. `text.classify` supplies `text/plain` content and names the asset `text` unless you set a name. `assets.deleteContent` removes the stored bytes (the record and report stay, with `content().status()` `removed` and `content().removalReason()` `requested`); `assets.retry` processes an asset whose `classification().status()` is `failed` again; `assets.explain` completes the policy evidence behind a decision (`policy().evidence()` becomes `full`, every action stays as decided), or with `rerun(true)` moderates the asset again with the current policy; `assets.delete` removes everything. `assets.batch(new BatchAssets().assetIds(ids).operation(AssetBatchOperation.DELETE))` deletes up to 500 assets, or removes their content with `AssetBatchOperation.REMOVE_CONTENT`, in one request: every asset must exist and the key needs `assets:delete` for its folder, or nothing is queued (`asset/not-found`, `auth/permission-denied`). It returns `BatchAssetsResponse` (`queued()` is true) once queued, the work runs in the background, and it is not retried.
+`assets.create` queues processing and returns the asset while its `classification().status()` is `processing`; `assets.classify` and `text.classify` wait for classification. `text.classify` supplies `text/plain` content and names the asset `text` unless you set a name. `assets.deleteContent` removes the stored bytes (the record and report stay, with `content().status()` `removed` and `content().removalReason()` `requested`); `assets.retry` processes an asset whose `classification().status()` is `failed` again; `assets.explain` completes the policy evidence behind a decision (`policy().evidence()` becomes `full`, every action stays as decided), or with `rerun(true)` moderates the asset again with the current policy; `assets.decide(new DecideAsset(id, AssetModerationDecision.BLOCKED, note))` records a reviewer's decision with its note (an asset still pending moderation can only be blocked or purged, and purging needs `confirmPurge(true)` and the `assets:delete` permission); `assets.delete` removes everything. `assets.batch(new BatchAssets().assetIds(ids).operation(AssetBatchOperation.DELETE))` deletes up to 500 assets, or removes their content with `AssetBatchOperation.REMOVE_CONTENT`, in one request: every asset must exist and the key needs `assets:delete` for its folder, or nothing is queued (`asset/not-found`, `auth/permission-denied`). It returns `BatchAssetsResponse` (`queued()` is true) once queued, the work runs in the background, and it is not retried.
 
-Hash lists hold PDQ perceptual hashes that image uploads are compared with. A `HashListAction.FLAG` list reports matches in `classification().moderation().hashMatches()`; a `HashListAction.BLOCK` list also blocks close matches (the decision's `policy().decision().source()` is `hash-list`). `hashLists.addEntry` takes a 64-character hex `hash` (with an optional `quality`) or an image `assetId`, whose `content().image().perceptualHash()` is added (`hash-list/asset-not-hashed` when it has none); adding a hash the list already holds returns the existing entry. `hashLists.delete` removes the list and every entry in it.
+Hash lists hold PDQ perceptual hashes that image uploads are compared with. A `HashListAction.FLAG` list reports matches in `classification().moderation().hashMatches()`; a `HashListAction.BLOCK` list also blocks close matches (the decision's `policy().decision().source()` is `hash-list`). `hashLists.addEntry` takes a 64-character hex `hash` (with an optional `quality`) or an image `assetId`, whose `content().image().perceptualHash()` is added (`hash-list/asset-not-hashed` when it has none); adding a hash the list already holds returns the existing entry. `hashLists.delete` removes the list and every entry in it. `hashLists.list` and `folders.list` return cursor pages like `assets.list`: pass a page's `nextCursor()` as `cursor` for the next one.
 
 ```java
 HashList list = client.hashLists.create(new CreateHashList("Removed images", HashListAction.BLOCK));
@@ -132,14 +132,14 @@ client.assets.iterateChildren(new ListChildren(photoId)).stream().filter(child -
 
 ## Events feed
 
-`events.list(new ListEvents())` without `after` returns no events and a cursor for the current time. Pass that cursor as `after` to receive newer events, oldest first. `events.pages` yields pages while `hasMore` is true; save each page's cursor after handling it:
+`events.list(new ListEvents())` without `cursor` returns no events and a `nextCursor` for the current time. Pass that as `cursor` to receive newer events, oldest first (`pageSize` 1 to 100, default 50). `events.pages` yields pages while `hasMore` is true; save each page's `nextCursor()` after handling it:
 
 ```java
-String cursor = client.events.list(new ListEvents()).cursor(); // "now"
+String cursor = client.events.list(new ListEvents()).nextCursor(); // "now"
 // later:
-for (EventsPage page : client.events.pages(new ListEvents().after(cursor).limit(100))) {
-  for (Event event : page.events()) System.out.println(event.type() + " " + event.assetId());
-  cursor = page.cursor(); // persist this to resume
+for (EventsPage page : client.events.pages(new ListEvents().cursor(cursor).pageSize(100))) {
+  for (Event event : page.items()) System.out.println(event.type() + " " + event.assetId());
+  cursor = page.nextCursor(); // persist this to resume
 }
 ```
 

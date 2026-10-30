@@ -318,15 +318,15 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 	}
 	h.calls = nil
 	h.next = []reply{
-		{status: 200, result: JSON{"events": []JSON{{"id": "e1"}}, "cursor": "c1", "hasMore": true, "nextCursor": "next-token"}},
-		{status: 200, result: JSON{"events": []JSON{{"id": "e2"}}, "cursor": "c2", "hasMore": false}},
+		{status: 200, result: JSON{"items": []JSON{{"id": "e1"}}, "nextCursor": "c1", "hasMore": true}},
+		{status: 200, result: JSON{"items": []JSON{{"id": "e2"}}, "nextCursor": "c2", "hasMore": false}},
 	}
-	events := c.Events.ListAll(ListEventsOptions{After: "c0"})
+	events := c.Events.ListAll(ListEventsOptions{Cursor: "c0"})
 	ids = nil
 	for events.Next(ctx) {
 		ids = append(ids, events.Event().ID)
 	}
-	if fmt.Sprint(ids) != "[e1 e2]" || events.Cursor() != "c2" || h.calls[1].URL.Query().Get("after") != "c1" {
+	if fmt.Sprint(ids) != "[e1 e2]" || events.Cursor() != "c2" || h.calls[1].URL.Query().Get("cursor") != "c1" {
 		t.Fatal(ids, events.Cursor())
 	}
 }

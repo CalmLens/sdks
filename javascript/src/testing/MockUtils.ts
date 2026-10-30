@@ -1,6 +1,6 @@
 import { invalidArgument } from "../client/CalmLensError";
 import type { Asset, AssetSearchResponse } from "../client/CalmLensTypes";
-import type { CursorPage, CursorPageQuery, Page } from "../contract/Page.js";
+import type { CursorPage, Page } from "../contract/Page.js";
 
 type Ordering = NonNullable<Page<unknown>["ordering"]>;
 
@@ -21,27 +21,41 @@ export type PageRequestFailure = (
   path?: string,
 ) => Error;
 
+/** A cursor page request: the API's `cursor`, `pageSize` and `ordering` query values. */
+export interface PageRequest<Field extends string = "createdAt" | "id"> {
+  cursor?: string;
+  pageSize?: number;
+  ordering?: Array<{ field: Field; direction: "ASC" | "DESC" }>;
+}
+
 /**
  * One keyset page like the API's (packages/shared-backend/src/CursorPagination.ts): ordered by
- * `createdAt` and `id` (an `id` tie-breaker is added), starting after the cursor's values. The
- * cursor is tied to `scope` (the filter, folder or parent) and the ordering, so it only
- * continues the query it came from.
+ * `ordering` (newest first by default) with an `id` tie-breaker added, starting after the
+ * cursor's values. The cursor is tied to `scope` (the filter, folder or parent) and the
+ * ordering, so it only continues the query it came from. `name` and `id` are compared by code
+ * point, like the database.
  */
-export const createPage = <T extends { id: string; createdAt: number }>(
+export const createPage = <T extends { id: string }, Field extends string = "createdAt" | "id">(
   items: T[],
-  query: CursorPageQuery,
-  { scope, fail }: { scope: string; fail: PageRequestFailure },
+  query: PageRequest<Field>,
+  {
+    scope,
+    fail,
+    defaultPageSize = 10,
+    defaultOrdering = [{ field: "createdAt", direction: "DESC" }],
+  }: {
+    scope: string;
+    fail: PageRequestFailure;
+    defaultPageSize?: number;
+    defaultOrdering?: Ordering;
+  },
 ): CursorPage<T> => {
-  const pageSize = query.pageSize ?? 10;
+  const pageSize = query.pageSize ?? defaultPageSize;
   if (typeof pageSize !== "number" || !Number.isFinite(pageSize) || pageSize < 1)
     throw fail("validation/too-small", "pageSize");
   if (pageSize > 100) throw fail("validation/too-big", "pageSize");
   if (!Number.isInteger(pageSize)) throw invalidArgument("Invalid page size");
-  const ordering: NonNullable<CursorPageQuery["ordering"]> = query.ordering?.length
-    ? [...query.ordering]
-    : [{ field: "createdAt", direction: "DESC" } as const];
-  if (ordering.some(({ field }) => field !== "createdAt" && field !== "id"))
-    throw invalidArgument("Invalid ordering");
+  const ordering: Ordering = query.ordering?.length ? [...query.ordering] : [...defaultOrdering];
   if (!ordering.some(({ field }) => field === "id"))
     ordering.push({ field: "id", direction: ordering[0]!.direction });
   const signature = JSON.stringify([scope, ordering]);
@@ -56,7 +70,7 @@ export const createPage = <T extends { id: string; createdAt: number }>(
         !Array.isArray(values) ||
         values.length !== ordering.length ||
         values.some((value, i) =>
-          ordering[i]!.field === "id"
+          STRING_FIELDS.has(ordering[i]!.field)
             ? typeof value !== "string"
             : typeof value !== "number" || !Number.isFinite(value),
         )
@@ -93,12 +107,16 @@ export const createPage = <T extends { id: string; createdAt: number }>(
   };
 };
 
+const STRING_FIELDS = new Set(["id", "name"]);
+
 const compareValues = (left: unknown, right: unknown): number => {
   if (left === right) return 0;
   if (left === undefined || left === null) return -1;
   if (right === undefined || right === null) return 1;
   if (typeof left === "number" && typeof right === "number") return left - right;
-  return String(left).localeCompare(String(right));
+  // Like the database: text compares by code point, so case matters.
+  const [a, b] = [String(left), String(right)];
+  return a < b ? -1 : a > b ? 1 : 0;
 };
 
 /** Sorts like the API's `ordering`; without one, newest first. */

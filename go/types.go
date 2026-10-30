@@ -725,6 +725,17 @@ type AssetIDOptions struct {
 	AssetID string
 }
 
+// DecideAssetOptions records a reviewer's decision with AssetsService.Decide. Decision is
+// ModerationStatusAllowed, ...Limited, ...AgeRestricted, ...Blocked or ...Purged; Note (1 to
+// 1499 characters after trimming) says why and joins the asset's review history. Purging
+// permanently deletes the stored content, so it needs ConfirmPurge.
+type DecideAssetOptions struct {
+	AssetID      string `json:"-"`
+	Decision     string `json:"decision"`
+	Note         string `json:"note"`
+	ConfirmPurge bool   `json:"confirmPurge,omitempty"`
+}
+
 // ExplainAssetOptions selects the asset AssetsService.Explain explains. Rerun moderates it again
 // with the project's current policy instead of explaining the decision as made.
 type ExplainAssetOptions struct {
@@ -971,9 +982,13 @@ type HashListEntry struct {
 	CreatedAt       int64   `json:"createdAt"`
 }
 
-// HashListList is every hash list in a project.
-type HashListList struct {
-	Items []HashList `json:"items"`
+// HashListPage is one page of a project's hash lists, newest first.
+type HashListPage struct {
+	Items      []HashList `json:"items"`
+	HasMore    bool       `json:"hasMore"`
+	NextCursor string     `json:"nextCursor"`
+	PageSize   int        `json:"pageSize"`
+	Ordering   []Order    `json:"ordering"`
 }
 
 // HashListEntryPage is one page of a hash list's entries, newest first.
@@ -985,8 +1000,12 @@ type HashListEntryPage struct {
 	Ordering   []Order         `json:"ordering"`
 }
 
-// ListHashListsOptions lists a project's hash lists. It has no fields yet.
-type ListHashListsOptions struct{}
+// ListHashListsOptions selects a page of a project's hash lists. Cursor is the previous page's
+// NextCursor; PageSize is 1 to 100 (0 for the API's default of 10).
+type ListHashListsOptions struct {
+	Cursor   string `json:"cursor,omitempty"`
+	PageSize int    `json:"pageSize,omitempty"`
+}
 
 // HashListIDOptions identifies a hash list.
 type HashListIDOptions struct{ HashListID string }
@@ -1122,18 +1141,20 @@ type Event struct {
 	Raw JSON `json:"-"`
 }
 
-// ListEventsOptions reads events after a cursor. Without After, the response is empty
-// and its cursor marks "now".
+// ListEventsOptions reads events after Cursor, a previous page's NextCursor. Without Cursor,
+// the response is empty and its NextCursor marks "now". PageSize is 1 to 100 (0 for the
+// API's default of 50).
 type ListEventsOptions struct {
-	After string `json:"after,omitempty"`
-	Limit int    `json:"limit,omitempty"`
+	Cursor   string `json:"cursor,omitempty"`
+	PageSize int    `json:"pageSize,omitempty"`
 }
 
-// EventsPage is one page of the event feed.
+// EventsPage is one page of the event feed, oldest first. Unlike other pages, NextCursor is
+// never empty: keep it to poll for later events.
 type EventsPage struct {
-	Events  []Event `json:"events"`
-	Cursor  string  `json:"cursor,omitempty"`
-	HasMore bool    `json:"hasMore"`
+	Items      []Event `json:"items"`
+	NextCursor string  `json:"nextCursor"`
+	HasMore    bool    `json:"hasMore"`
 }
 
 // CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
@@ -1273,22 +1294,29 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 
 var _ json.Unmarshaler = (*Asset)(nil)
 
-// ListFoldersOptions selects a page of immediate children or searches folder names.
+// ListFoldersOptions selects a page of immediate children or searches folder names. Cursor is
+// the previous page's NextCursor; PageSize is 1 to 100 (0 for the API's default of 100).
+// Ordering holds at most one Order, by "name" (the default, ascending) or "createdAt".
 type ListFoldersOptions struct {
 	ParentID    *string  `json:"parentId,omitempty"`
-	PageIndex   int      `json:"pageIndex,omitempty"`
+	Cursor      string   `json:"cursor,omitempty"`
 	PageSize    int      `json:"pageSize,omitempty"`
+	Ordering    []Order  `json:"ordering,omitempty"`
 	Search      string   `json:"search,omitempty"`
 	SearchAll   *bool    `json:"searchAll,omitempty"`
-	ResolveOnly *bool    `json:"resolveOnly,omitempty"`
 	IDs         []string `json:"ids,omitempty"`
-	Sort        string   `json:"sort,omitempty"`
-	Direction   string   `json:"direction,omitempty"`
+	ResolveOnly *bool    `json:"resolveOnly,omitempty"`
 }
+
+// FolderPage is one page of folders, with the folders above the listed or requested ones in
+// Ancestors.
 type FolderPage struct {
-	Folders   []Folder `json:"folders"`
-	Ancestors []Folder `json:"ancestors"`
-	HasMore   bool     `json:"hasMore"`
+	Items      []Folder `json:"items"`
+	Ancestors  []Folder `json:"ancestors"`
+	HasMore    bool     `json:"hasMore"`
+	NextCursor string   `json:"nextCursor"`
+	PageSize   int      `json:"pageSize"`
+	Ordering   []Order  `json:"ordering"`
 }
 
 // ViewerClaims are optional customer assertions. Age confirmation defaults to false.

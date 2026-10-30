@@ -142,6 +142,24 @@ module CalmLens
       end
     end
 
+    # Records a reviewer's decision, replacing the policy's: `classification.moderation.status`
+    # becomes the decision, the decision and note join `classification.moderation.manualReviews` and
+    # the matching `asset.<status>` event is sent with `decided-by: reviewer`. An asset still pending
+    # moderation can only be blocked or purged. Purging needs `confirm_purge: true` and the
+    # `assets:delete` permission, and permanently deletes the stored content. Not retried: it carries
+    # no `Idempotency-Key`.
+    # @option options [String] :asset_id
+    # @option options [String] :decision `allowed`, `limited`, `age-restricted`, `blocked` or `purged`
+    # @option options [String] :note why, 1 to 1499 characters
+    # @option options [Boolean] :confirm_purge must be true to purge
+    # @return [Hash] the asset
+    def decide(options)
+      call(options) do |api, request|
+        request('POST', "/assets/#{Internal.segment(api['assetId'])}/decision", body: without(api, 'assetId'),
+                                                                                request_options: request)
+      end
+    end
+
     # Completes the policy evidence behind a decided asset's moderation decision: the report's
     # `classification.moderation.policy.evidence` becomes `full` and every action stays as decided.
     # With `rerun: true` the asset is moderated again with the project's current policy and returns

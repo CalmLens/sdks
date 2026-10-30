@@ -375,7 +375,7 @@ fn flagged_content_policy_encodes_as_an_object() {
 #[test]
 fn events_decode_typed_type_severity_and_asset_snapshot() {
     let page: EventsPage = serde_json::from_value(json!({
-      "events": [
+      "items": [
         {
           "id": "e1",
           "type": "asset.blocked",
@@ -414,11 +414,11 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
           "facts": []
         }
       ],
-      "cursor": "c",
+      "nextCursor": "c",
       "hasMore": false
     }))
     .unwrap();
-    let blocked = &page.events[0];
+    let blocked = &page.items[0];
     assert_eq!(blocked.event_type, Some(EventType::AssetBlocked));
     assert_eq!(blocked.severity, Some(EventSeverity::High));
     let asset = blocked.asset.as_ref().unwrap();
@@ -438,7 +438,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
             Some(AssetContentStatus::Removed)
         )
     );
-    let future = &page.events[1];
+    let future = &page.items[1];
     assert_eq!(
         future.event_type,
         Some(EventType::Unknown("billing.charged".into()))

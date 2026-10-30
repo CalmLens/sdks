@@ -2692,8 +2692,8 @@
         {
           "status": 200,
           "body": {
-            "events": [],
-            "cursor": "now-cursor",
+            "items": [],
+            "nextCursor": "now-cursor",
             "hasMore": false
           },
           "headers": {
@@ -2707,8 +2707,8 @@
           "operation": "events.list",
           "expect": {
             "result": {
-              "events": [],
-              "cursor": "now-cursor",
+              "items": [],
+              "nextCursor": "now-cursor",
               "hasMore": false
             }
           }
@@ -2744,9 +2744,11 @@
         {
           "status": 200,
           "body": {
-            "folders": [],
+            "items": [],
             "ancestors": [],
-            "hasMore": false
+            "hasMore": false,
+            "nextCursor": null,
+            "pageSize": 10
           },
           "headers": {
             "x-request-id": "req-1",
@@ -2760,9 +2762,13 @@
           "args": {
             "parentId": "folder-1",
             "pageSize": 10,
-            "sort": "createdAt",
-            "direction": "DESC",
-            "pageIndex": 2,
+            "ordering": [
+              {
+                "field": "createdAt",
+                "direction": "DESC"
+              }
+            ],
+            "cursor": "opaque+/cursor=",
             "search": "a&b",
             "searchAll": true,
             "ids": [
@@ -2773,9 +2779,11 @@
           },
           "expect": {
             "result": {
-              "folders": [],
+              "items": [],
               "ancestors": [],
-              "hasMore": false
+              "hasMore": false,
+              "nextCursor": null,
+              "pageSize": 10
             }
           }
         }
@@ -2785,7 +2793,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/folders",
-          "rawQuery": "parentId=folder-1&pageSize=10&sort=createdAt&direction=DESC&pageIndex=2&search=a%26b&searchAll=true&ids%5B0%5D=folder-2&ids%5B1%5D=folder-3&resolveOnly=false",
+          "rawQuery": "parentId=folder-1&pageSize=10&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=DESC&cursor=opaque%2B%2Fcursor%3D&search=a%26b&searchAll=true&ids%5B0%5D=folder-2&ids%5B1%5D=folder-3&resolveOnly=false",
           "query": [
             [
               "parentId",
@@ -2796,16 +2804,16 @@
               "10"
             ],
             [
-              "sort",
+              "ordering[0][field]",
               "createdAt"
             ],
             [
-              "direction",
+              "ordering[0][direction]",
               "DESC"
             ],
             [
-              "pageIndex",
-              "2"
+              "cursor",
+              "opaque+/cursor="
             ],
             [
               "search",
@@ -8975,7 +8983,7 @@
         {
           "status": 200,
           "body": {
-            "events": [
+            "items": [
               {
                 "id": "event-1",
                 "projectId": "project-1",
@@ -9009,7 +9017,7 @@
                 "updatedAt": 1760000000001
               }
             ],
-            "cursor": "cursor-2",
+            "nextCursor": "cursor-2",
             "hasMore": true
           },
           "headers": {
@@ -9020,7 +9028,7 @@
         {
           "status": 200,
           "body": {
-            "events": [
+            "items": [
               {
                 "id": "event-3",
                 "projectId": "project-1",
@@ -9038,7 +9046,7 @@
                 "updatedAt": 1760000000000
               }
             ],
-            "cursor": "cursor-3",
+            "nextCursor": "cursor-3",
             "hasMore": false
           },
           "headers": {
@@ -9051,13 +9059,13 @@
         {
           "operation": "events.iterate",
           "args": {
-            "after": "cursor-0",
-            "limit": 2
+            "cursor": "cursor-0",
+            "pageSize": 2
           },
           "expect": {
             "result": [
               {
-                "events": [
+                "items": [
                   {
                     "id": "event-1",
                     "projectId": "project-1",
@@ -9091,11 +9099,11 @@
                     "updatedAt": 1760000000001
                   }
                 ],
-                "cursor": "cursor-2",
+                "nextCursor": "cursor-2",
                 "hasMore": true
               },
               {
-                "events": [
+                "items": [
                   {
                     "id": "event-3",
                     "projectId": "project-1",
@@ -9113,7 +9121,7 @@
                     "updatedAt": 1760000000000
                   }
                 ],
-                "cursor": "cursor-3",
+                "nextCursor": "cursor-3",
                 "hasMore": false
               }
             ]
@@ -9125,14 +9133,14 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
-          "rawQuery": "after=cursor-0&limit=2",
+          "rawQuery": "cursor=cursor-0&pageSize=2",
           "query": [
             [
-              "after",
+              "cursor",
               "cursor-0"
             ],
             [
-              "limit",
+              "pageSize",
               "2"
             ]
           ],
@@ -9154,14 +9162,14 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
-          "rawQuery": "after=cursor-2&limit=2",
+          "rawQuery": "cursor=cursor-2&pageSize=2",
           "query": [
             [
-              "after",
+              "cursor",
               "cursor-2"
             ],
             [
-              "limit",
+              "pageSize",
               "2"
             ]
           ],
@@ -9182,14 +9190,14 @@
       ]
     },
     {
-      "name": "events.iterate without after yields the one empty page for now",
+      "name": "events.iterate without a cursor yields the one empty page for now",
       "area": "pagination",
       "responses": [
         {
           "status": 200,
           "body": {
-            "events": [],
-            "cursor": "now-cursor",
+            "items": [],
+            "nextCursor": "now-cursor",
             "hasMore": false
           },
           "headers": {
@@ -9204,8 +9212,8 @@
           "expect": {
             "result": [
               {
-                "events": [],
-                "cursor": "now-cursor",
+                "items": [],
+                "nextCursor": "now-cursor",
                 "hasMore": false
               }
             ]
@@ -9242,7 +9250,7 @@
         {
           "status": 200,
           "body": {
-            "events": [
+            "items": [
               {
                 "id": "event-1",
                 "projectId": "project-1",
@@ -9260,7 +9268,7 @@
                 "updatedAt": 1760000000000
               }
             ],
-            "cursor": "cursor-1",
+            "nextCursor": "cursor-1",
             "hasMore": true
           },
           "headers": {
@@ -9271,8 +9279,8 @@
         {
           "status": 200,
           "body": {
-            "events": [],
-            "cursor": "cursor-1",
+            "items": [],
+            "nextCursor": "cursor-1",
             "hasMore": true
           },
           "headers": {
@@ -9285,7 +9293,7 @@
         {
           "operation": "events.iterate",
           "args": {
-            "after": "cursor-0"
+            "cursor": "cursor-0"
           },
           "expect": {
             "error": {
@@ -9299,7 +9307,7 @@
             },
             "partialResult": [
               {
-                "events": [
+                "items": [
                   {
                     "id": "event-1",
                     "projectId": "project-1",
@@ -9317,7 +9325,7 @@
                     "updatedAt": 1760000000000
                   }
                 ],
-                "cursor": "cursor-1",
+                "nextCursor": "cursor-1",
                 "hasMore": true
               }
             ]
@@ -9329,10 +9337,10 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
-          "rawQuery": "after=cursor-0",
+          "rawQuery": "cursor=cursor-0",
           "query": [
             [
-              "after",
+              "cursor",
               "cursor-0"
             ]
           ],
@@ -9354,10 +9362,10 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
-          "rawQuery": "after=cursor-1",
+          "rawQuery": "cursor=cursor-1",
           "query": [
             [
-              "after",
+              "cursor",
               "cursor-1"
             ]
           ],

@@ -1201,6 +1201,38 @@ pub struct ExplainAsset {
     pub rerun: bool,
 }
 
+/// A reviewer's decision for [`AssetsClient::decide`](crate::AssetsClient::decide).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecideAsset {
+    /// The asset ID.
+    #[serde(skip_serializing)]
+    pub asset_id: String,
+    /// The moderation status to set.
+    pub decision: AssetModerationDecision,
+    /// Why the reviewer made this decision, 1 to 1499 characters after trimming. It is kept in
+    /// the asset's review history.
+    pub note: String,
+    /// Must be `true` to purge: purging permanently deletes the stored content.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub confirm_purge: bool,
+}
+impl DecideAsset {
+    /// Records `decision` on asset `asset_id` with `note`. To purge, also set `confirm_purge`.
+    pub fn new(
+        asset_id: impl Into<String>,
+        decision: AssetModerationDecision,
+        note: impl Into<String>,
+    ) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            decision,
+            note: note.into(),
+            confirm_purge: false,
+        }
+    }
+}
+
 /// Moves an asset to a folder, or to the project root with `folder_id: None`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1336,12 +1368,13 @@ pub struct MoveFolder {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListEvents {
-    /// The cursor from a previous page. Without it, the feed starts from now.
+    /// A previous page's `next_cursor`. Without it, the page is empty and its `next_cursor`
+    /// marks now.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub after: Option<String>,
-    /// The page size.
+    pub cursor: Option<String>,
+    /// Events per page, 1 to 100 (the API's default is 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limit: Option<u32>,
+    pub page_size: Option<u32>,
 }
 
 /// A named lens definition.
@@ -2644,12 +2677,13 @@ pub struct WebhookEventData {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct EventsPage {
-    /// The events.
+    /// The events, oldest first.
     #[serde(default)]
-    pub events: Vec<Event>,
-    /// Pass as `after` to continue; store it between polls.
+    pub items: Vec<Event>,
+    /// Pass as `cursor` to continue. Unlike other pages it is always set: store it between
+    /// polls to receive later events.
     #[serde(default)]
-    pub cursor: String,
+    pub next_cursor: String,
     /// Whether more events are available now.
     #[serde(default)]
     pub has_more: bool,
@@ -2658,11 +2692,11 @@ pub struct EventsPage {
     pub extra: HashMap<String, Value>,
 }
 impl EventsPage {
-    /// A page of `events`, e.g. for a mock response.
-    pub fn new(events: Vec<Event>, cursor: impl Into<String>, has_more: bool) -> Self {
+    /// A page of `items`, e.g. for a mock response.
+    pub fn new(items: Vec<Event>, next_cursor: impl Into<String>, has_more: bool) -> Self {
         Self {
-            events,
-            cursor: cursor.into(),
+            items,
+            next_cursor: next_cursor.into(),
             has_more,
             extra: HashMap::new(),
         }
@@ -3570,16 +3604,32 @@ pub struct AssetSearchResponse {
     pub extra: HashMap<String, Value>,
 }
 
-/// One page of child folders.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One page of child folders, with the folders above them.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct FolderPage {
-    /// Child folders on this page.
-    pub folders: Vec<Folder>,
-    /// Visible folders needed to reveal the selected paths.
+    /// The folders on this page.
+    #[serde(default)]
+    pub items: Vec<Folder>,
+    /// Folders above the listed or requested folders, for showing their paths.
+    #[serde(default)]
     pub ancestors: Vec<Folder>,
-    /// Whether another page is available.
-    pub has_more: bool,
+    /// The cursor for the next page, or None.
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+    /// The page size.
+    #[serde(default)]
+    pub page_size: Option<u32>,
+    /// Whether another page follows.
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    /// The sort orders applied.
+    #[serde(default)]
+    pub ordering: Option<Vec<Order>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<FolderPage, _>")]
+    pub extra: HashMap<String, Value>,
 }
 
 /// Options for browsing folders.
@@ -3589,12 +3639,15 @@ pub struct ListFolders {
     /// Lists immediate children of this folder; omit for project root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
-    /// Zero-based page number.
+    /// The previous page's `next_cursor`; omit for the first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub page_index: Option<u32>,
-    /// Page size from 1 to 100.
+    pub cursor: Option<String>,
+    /// Page size from 1 to 100 (the API's default is 100).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
+    /// At most one sort order, by `name` (the default, ascending) or `createdAt`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ordering: Option<Vec<Order>>,
     /// Literal folder-name substring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
@@ -3607,12 +3660,6 @@ pub struct ListFolders {
     /// Selected folder IDs whose paths should be resolved.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ids: Option<Vec<String>>,
-    /// Sort by name or createdAt.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sort: Option<String>,
-    /// ASC or DESC.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub direction: Option<String>,
 }
 
 string_enum! {
@@ -3705,17 +3752,41 @@ pub struct HashListEntry {
     pub extra: HashMap<String, Value>,
 }
 
-/// Every hash list in a project.
+/// A page of a project's hash lists, newest first.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct HashListList {
-    /// The hash lists.
+pub struct HashListPage {
+    /// The hash lists on this page.
     #[serde(default)]
     pub items: Vec<HashList>,
+    /// The cursor for the next page, or None.
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+    /// The page size.
+    #[serde(default)]
+    pub page_size: Option<u32>,
+    /// Whether another page follows.
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    /// The sort orders applied.
+    #[serde(default)]
+    pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten, deserialize_with = "extra_fields::<HashListList, _>")]
+    #[serde(flatten, deserialize_with = "extra_fields::<HashListPage, _>")]
     pub extra: HashMap<String, Value>,
+}
+
+/// Options for one page of a project's hash lists.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListHashLists {
+    /// The previous page's `next_cursor`; omit for the first page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Hash lists per page, 1 to 100 (the API's default is 10).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
 }
 
 /// A page of hash list entries, newest first.
