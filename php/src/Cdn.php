@@ -21,7 +21,7 @@ final class Cdn extends Resource
         if ($resource === 'original' && $transformed) {
             Values::invalid('Lenses and transforms apply only to the rendered resource');
         }
-        // A placeholder is a small blurred PNG, public for public assets whatever their moderation status.
+        // A placeholder is a small blurred PNG, public for every asset whatever its visibility or moderation.
         if ($resource === 'placeholder' && ($transformed)) {
             Values::invalid('A placeholder takes no lens, transform or ageConfirmed');
         }

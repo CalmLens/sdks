@@ -3,7 +3,7 @@ import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
-import { C as docPropertyInfo, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-DVIcQYbd.js";
+import { C as msg, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, w as docPropertyInfo, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-CvlLZOVx.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DjKQmOVp.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
@@ -53,8 +53,13 @@ const HUMAN_REVIEW_SETTINGS_SCHEMA = zod.object({
 	allowedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
 	restrictedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0)
 }).strict();
-/** Automated outcomes that can be sampled, and the decisions a reviewer can make. */
+/** The decisions a reviewer can make, and the statuses they review. */
 const HUMAN_REVIEW_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
+/**
+* Automated outcomes that can be sampled. Purged content is deleted as soon as it is decided, for
+* safety and legal reasons, so there is never anything left to review.
+*/
+const HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA.exclude(["purged"]);
 const HUMAN_REVIEW_STATUS_SCHEMA = zod.enum(["pending", "completed"]);
 zod.object({
 	id: primaryIdField("rev"),
@@ -63,9 +68,14 @@ zod.object({
 	automatedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA,
 	status: HUMAN_REVIEW_STATUS_SCHEMA,
 	decision: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
+	/**
+	* The decision the reviewer judged: the asset's status when they decided, which differs from
+	* the automated outcome when someone decided the asset after sampling. Set once completed.
+	*/
+	reviewedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
 	note: zod.string().max(1e3).nullish(),
 	reviewerUserId: zod.string().nullish(),
-	/** Whether the decision changed the asset's status (only when it overturned the outcome). */
+	/** Whether the decision changed the asset's status (only when it overturned `reviewedOutcome`). */
 	appliedToAsset: zod.boolean().nullish(),
 	createdAt: createdAtField(),
 	reviewedAt: zod.number().int().nullish()
@@ -248,8 +258,8 @@ const getPolicyRuleConflict = (kind, rule, categoryAction) => {
 const policyRuleKey = (rule) => policyConditionKey("some", ruleCondition(rule));
 const uniqueRules = (rules) => new Set(rules.map(policyRuleKey)).size === rules.length;
 const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
-	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, "Two allowances cannot be about the same qualifiers").optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
-	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, "Two restrictions cannot be about the same qualifiers").optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
+	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50).refine(uniqueRules, msg("Two allowances cannot be about the same qualifiers")).optional().meta({ description: "Contexts that let content through, or act on it more softly, when all of the category's content is one of their qualifiers." }),
+	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50).refine(uniqueRules, msg("Two restrictions cannot be about the same qualifiers")).optional().meta({ description: "Conditions that act on at least one matching qualifying instance. They outweigh allowances." }),
 	flaggedContentPolicy: FLAGGED_CONTENT_POLICY_SCHEMA.nullish().meta({ description: "What happens when this category's policy score reaches 0.5: allow it, limit it so it is delivered normally but marked for reduced reach, age-restrict it so it is delivered only with `viewerClaims.ageConfirmed: true` and any required private-asset access, block it while retaining content, or permanently purge content." })
 }).strict().superRefine((value, context) => {
 	const categoryAction = value.flaggedContentPolicy?.action ?? "block";
@@ -259,7 +269,7 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 			const conflict = getPolicyRuleConflict(kind, rule, categoryAction);
 			if (conflict) context.addIssue({
 				code: "custom",
-				message: conflict === "allowance-not-softer" ? "An allowance's action must be softer than the category action" : "A restriction's action must be at least as strong as the category action",
+				message: conflict === "allowance-not-softer" ? msg("An allowance's action must be softer than the category action") : msg("A restriction's action can't be Allow"),
 				path: [
 					key,
 					index,
@@ -273,7 +283,7 @@ const CATEGORY_FLAGGING_SETTINGS_SCHEMA = zod.object({
 zod.object({ categorySettings: zod.partialRecord(MODERATION_POLICY_CATEGORY_SCHEMA, CATEGORY_FLAGGING_SETTINGS_SCHEMA) }).strict().superRefine((settings, context) => {
 	for (const [category, value] of Object.entries(settings.categorySettings)) for (const key of ["allowances", "restrictions"]) for (const [index, rule] of (value?.[key] ?? []).entries()) if ([...rule.when, ...rule.unless ?? []].some((q) => !getModerationQualifiers(category).includes(q))) context.addIssue({
 		code: "custom",
-		message: "Unsupported qualifier for this category",
+		message: msg("Unsupported qualifier for this category"),
 		path: [
 			"categorySettings",
 			category,
@@ -305,21 +315,25 @@ const METADATA_FIELD_DEFINITION_SCHEMA = zod.object({
 	]),
 	color: zod.string().regex(/^#[0-9a-fA-F]{6}$/)
 });
-const METADATA_FIELD_DEFINITIONS_SCHEMA = zod.array(METADATA_FIELD_DEFINITION_SCHEMA).max(50).refine((fields) => new Set(fields.map((field) => field.id)).size === fields.length, { message: "Metadata field IDs must be unique" });
+const METADATA_FIELD_DEFINITIONS_SCHEMA = zod.array(METADATA_FIELD_DEFINITION_SCHEMA).max(50).refine((fields) => new Set(fields.map((field) => field.id)).size === fields.length, { message: msg("Metadata field IDs must be unique") });
 /**
 * Which websites and files a project accepts by URL. A domain also covers its subdomains:
 * `example.com` matches `example.com` and `www.example.com`.
 */
 const REMOTE_URL_RULE_SCHEMA = zod.object({
 	mode: zod.enum(["allow", "deny"]).meta({ description: "`allow` accepts only the listed domains; `deny` accepts every domain except the listed ones." }),
-	domains: zod.array(zod.string().regex(/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/, { message: "Use a bare lowercase domain such as example.com" })).min(1).max(100).refine((domains) => new Set(domains).size === domains.length, { message: "Domains must be unique" })
+	domains: zod.array(zod.string().regex(/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/, { message: msg("Use a bare lowercase domain such as example.com") })).min(1).max(100).refine((domains) => new Set(domains).size === domains.length, { message: msg("Domains must be unique") })
 });
-zod.enum([
-	"general-community",
+const DEFAULT_MODERATION_PROFILE_ID = "general-community";
+msg("Default");
+/** The built-in policies (`BUILT_IN_MODERATION_PROFILES`), in the order the portal offers them. */
+const POLICY_PRESET_IDS = [
+	DEFAULT_MODERATION_PROFILE_ID,
 	"children-platform",
 	"education-support",
 	"wholesome-community"
-]);
+];
+zod.enum(POLICY_PRESET_IDS);
 const PROJECT_SETTINGS_SCHEMA = zod.object({
 	jurisdictions: SERVED_JURISDICTIONS_SCHEMA.optional().describe("Jurisdictions served; global always applies. Defaults to global only."),
 	aiMediaSearchEnabled: zod.boolean().optional().meta({ description: "Index audio speech and video frames and transcripts for AI search. Billed per indexed media unit. Disabled by default; images are always searchable." }),
@@ -717,6 +731,7 @@ zod.enum([
 	"api-keys",
 	"connectors"
 ]);
+msg("Assets"), msg("Moderation"), msg("Usage"), msg("Team"), msg("API keys"), msg("Connectors");
 zod.enum([
 	"text",
 	"code",
@@ -724,13 +739,46 @@ zod.enum([
 	"list",
 	"number"
 ]);
+const ASSET_TYPE_LABELS = {
+	image: msg("Image"),
+	video: msg("Video"),
+	audio: msg("Audio"),
+	"plaintext-document": msg("Plaintext document"),
+	"multimedia-document": msg("Multimedia document"),
+	website: msg("Website"),
+	file: msg("File")
+};
+const MODERATION_STATUS_LABELS = {
+	pending: msg("Pending"),
+	allowed: msg("Allowed"),
+	limited: msg("Limited"),
+	"age-restricted": msg("Age restricted"),
+	blocked: msg("Blocked"),
+	purged: msg("Purged")
+};
+const PROCESSING_STATUS_LABELS = {
+	pending: msg("Pending"),
+	processing: msg("Processing"),
+	completed: msg("Completed"),
+	failed: msg("Failed")
+};
+const CATEGORY_LABELS = {
+	sexual: msg("Sexual"),
+	violence: msg("Violence"),
+	"self-harm": msg("Self harm"),
+	harassment: msg("Harassment"),
+	hate: msg("Hate"),
+	"personal-information": msg("Personal information"),
+	profanity: msg("Profanity"),
+	"criminal-activity": msg("Criminal activity")
+};
 /** Project roles as the portal names them. */
 const PROJECT_ROLE_LABELS = {
-	admin: "Administrator",
-	editor: "Editor",
-	viewer: "Viewer",
-	custom: "Custom",
-	reviewer: "Reviewer"
+	admin: msg("Administrator"),
+	editor: msg("Editor"),
+	viewer: msg("Viewer"),
+	custom: msg("Custom"),
+	reviewer: msg("Reviewer")
 };
 const field = (schema, info) => ({
 	...info,
@@ -738,23 +786,24 @@ const field = (schema, info) => ({
 });
 const dataSchemaFromFields = (fields, description) => zod.object(Object.fromEntries(Object.entries(fields).map(([key, definition]) => [key, definition.schema]))).meta(metaStore([docPropertyInfo({ description })]));
 const assetNameField = field(zod.string().nullish(), {
-	label: "Asset",
+	label: msg("Asset"),
 	description: "The asset's name when the event was created.",
 	display: "text"
 });
 const assetTypeField = field(ASSET_TYPE_SCHEMA.nullish(), {
-	label: "Asset type",
+	label: msg("Asset type"),
 	description: "The asset's type, such as `image` or `video`.",
-	display: "enum"
+	display: "enum",
+	valueLabels: ASSET_TYPE_LABELS
 });
 const reviewerUserIdField = field(zod.string().nullish(), {
-	label: "Reviewer ID",
+	label: msg("Reviewer ID"),
 	description: "ID of the user who made the decision, or `null` when an API key made it.",
 	display: "code",
 	hidden: true
 });
 const reviewerNameField = field(zod.string().nullish(), {
-	label: "Reviewer",
+	label: msg("Reviewer"),
 	description: "Name or email of the user who made the decision, when known.",
 	display: "text",
 	inAppOnly: true
@@ -770,8 +819,8 @@ const defineEventType = (definition) => ({
 });
 const ASSET_UPLOADED = defineEventType({
 	id: "asset.uploaded",
-	name: "Asset uploaded",
-	description: "A new asset was uploaded to the project.",
+	name: msg("Asset uploaded"),
+	description: msg("A new asset was uploaded to the project."),
 	category: "assets",
 	severity: "low",
 	notify: false,
@@ -780,7 +829,7 @@ const ASSET_UPLOADED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		fileFormat: field(zod.string().nullish(), {
-			label: "File format",
+			label: msg("File format"),
 			description: "The uploaded file's format, such as `jpg`.",
 			display: "code"
 		})
@@ -792,14 +841,15 @@ const ASSET_UPLOADED = defineEventType({
 	}
 });
 const FLAGGED_CATEGORIES_INFO = {
-	label: "Categories",
+	label: msg("Categories"),
 	description: "The parent policy categories whose findings decided the status, or none when nothing was acted on. Inspect the asset's classification results for qualifier detail.",
-	display: "list"
+	display: "list",
+	valueLabels: CATEGORY_LABELS
 };
 const ASSET_CLASSIFIED = defineEventType({
 	id: "asset.classified",
-	name: "Asset classified",
-	description: "Classification finished for the asset, including the moderation decision it produced.",
+	name: msg("Asset classified"),
+	description: msg("Classification finished for the asset, including the moderation decision it produced."),
 	category: "moderation",
 	severity: "low",
 	notify: false,
@@ -809,9 +859,10 @@ const ASSET_CLASSIFIED = defineEventType({
 		assetType: assetTypeField,
 		flaggedCategories: field(zod.array(zod.string()), FLAGGED_CATEGORIES_INFO),
 		moderationStatus: field(ASSET_MODERATION_STATUS_SCHEMA, {
-			label: "Moderation status",
+			label: msg("Moderation status"),
 			description: "The status the policy decided: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`. A reviewer's earlier decision on the asset keeps precedence.",
-			display: "enum"
+			display: "enum",
+			valueLabels: MODERATION_STATUS_LABELS
 		})
 	},
 	example: {
@@ -823,8 +874,8 @@ const ASSET_CLASSIFIED = defineEventType({
 });
 const ASSET_REGION_RESTRICTED = defineEventType({
 	id: "asset.region-restricted",
-	name: "Asset region restricted",
-	description: "An asset has a stricter delivery decision in a jurisdiction served by the project.",
+	name: msg("Asset region restricted"),
+	description: msg("An asset has a stricter delivery decision in a jurisdiction served by the project."),
 	category: "moderation",
 	severity: "low",
 	notify: false,
@@ -833,19 +884,25 @@ const ASSET_REGION_RESTRICTED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		region: field(JURISDICTION_SCHEMA.exclude(["global"]), {
-			label: "Region",
+			label: msg("Region"),
 			description: "Jurisdiction whose mandatory rule raises the delivery action.",
 			display: "code"
 		}),
 		rule: field(zod.string(), {
-			label: "Rule",
+			label: msg("Rule"),
 			description: "Stable mandatory rule key.",
 			display: "code"
 		}),
 		action: field(FLAGGED_CONTENT_ACTION_SCHEMA.exclude(["allow"]), {
-			label: "Action",
+			label: msg("Action"),
 			description: "Regional delivery action.",
-			display: "enum"
+			display: "enum",
+			valueLabels: {
+				limit: msg("Limit"),
+				"age-restrict": msg("Age restrict"),
+				block: msg("Block"),
+				purge: msg("Purge")
+			}
 		})
 	},
 	example: {
@@ -857,12 +914,12 @@ const ASSET_REGION_RESTRICTED = defineEventType({
 	}
 });
 const decidedByField = field(zod.enum(["automated", "reviewer"]), {
-	label: "Decided by",
+	label: msg("Decided by"),
 	description: "Who made the decision: `automated` moderation or a `reviewer` in the portal, through the API or by resolving an appeal.",
 	display: "enum",
 	valueLabels: {
-		automated: "Automated moderation",
-		reviewer: "Reviewer"
+		automated: msg("Automated moderation"),
+		reviewer: msg("Reviewer")
 	}
 });
 /** One event per moderation status, emitted whenever automated moderation or a reviewer sets it. */
@@ -878,7 +935,7 @@ const defineModerationOutcome = (outcome) => defineEventType({
 		reviewerUserId: reviewerUserIdField,
 		reviewerName: reviewerNameField,
 		note: field(zod.string().nullish(), {
-			label: "Note",
+			label: msg("Note"),
 			description: "The reviewer's note, or `null`.",
 			display: "text"
 		})
@@ -892,43 +949,43 @@ const defineModerationOutcome = (outcome) => defineEventType({
 });
 const ASSET_ALLOWED = defineModerationOutcome({
 	id: "asset.allowed",
-	name: "Asset allowed",
-	description: "The asset was allowed and is delivered normally.",
+	name: msg("Asset allowed"),
+	description: msg("The asset was allowed and is delivered normally."),
 	severity: "low",
 	notify: false
 });
 const ASSET_LIMITED = defineModerationOutcome({
 	id: "asset.limited",
-	name: "Asset limited",
-	description: "The asset was limited: it is delivered normally, but marked so your app can reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it lower or collapsing it.",
+	name: msg("Asset limited"),
+	description: msg("The asset was limited: it is delivered normally, but marked so your app can reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it lower or collapsing it."),
 	severity: "low",
 	notify: false
 });
 const ASSET_AGE_RESTRICTED = defineModerationOutcome({
 	id: "asset.age-restricted",
-	name: "Asset age-restricted",
-	description: "The asset was age-restricted: it is not served from its plain URL, only with `viewerClaims.ageConfirmed: true` and any required private-asset access, so your app decides who sees it.",
+	name: msg("Asset age-restricted"),
+	description: msg("The asset was age-restricted: it is not served from its plain URL, only with `viewerClaims.ageConfirmed: true` and any required private-asset access, so your app decides who sees it."),
 	severity: "high",
 	notify: true
 });
 const ASSET_BLOCKED = defineModerationOutcome({
 	id: "asset.blocked",
-	name: "Asset blocked",
-	description: "The asset was blocked and is no longer delivered. Its content is kept.",
+	name: msg("Asset blocked"),
+	description: msg("The asset was blocked and is no longer delivered. Its content is kept."),
 	severity: "high",
 	notify: true
 });
 const ASSET_PURGED = defineModerationOutcome({
 	id: "asset.purged",
-	name: "Asset purged",
-	description: "The asset was purged: it is no longer delivered and its stored content was deleted.",
+	name: msg("Asset purged"),
+	description: msg("The asset was purged: it is no longer delivered and its stored content was deleted."),
 	severity: "high",
 	notify: true
 });
 const ASSET_FAILED = defineEventType({
 	id: "asset.failed",
-	name: "Asset failed",
-	description: "The asset could not be processed and its processing status is `failed`.",
+	name: msg("Asset failed"),
+	description: msg("The asset could not be processed and its processing status is `failed`."),
 	category: "assets",
 	severity: "high",
 	notify: true,
@@ -937,9 +994,10 @@ const ASSET_FAILED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		previousStatus: field(ASSET_CLASSIFICATION_STATUS_SCHEMA.nullish(), {
-			label: "Previous status",
+			label: msg("Previous status"),
 			description: "The asset's processing status before it failed, such as `processing`.",
-			display: "enum"
+			display: "enum",
+			valueLabels: PROCESSING_STATUS_LABELS
 		})
 	},
 	example: {
@@ -950,25 +1008,25 @@ const ASSET_FAILED = defineEventType({
 });
 const USAGE_LIMIT_REACHED = defineEventType({
 	id: "usage.limit-reached",
-	name: "Upload limit reached",
-	description: "The project's organisation used its free upload allowance; new uploads are blocked until billing is set up.",
+	name: msg("Upload limit reached"),
+	description: msg("The project's organisation used its free upload allowance; new uploads are blocked until billing is set up."),
 	category: "usage",
 	severity: "high",
 	notify: true,
 	permission: "assets:read",
 	fields: {
 		limit: field(zod.number().int(), {
-			label: "Limit",
+			label: msg("Limit"),
 			description: "Number of free uploads in the allowance.",
 			display: "number"
 		}),
 		used: field(zod.number().int(), {
-			label: "Used",
+			label: msg("Used"),
 			description: "Number of free uploads used.",
 			display: "number"
 		}),
 		organisationId: field(idField("org"), {
-			label: "Organisation ID",
+			label: msg("Organisation ID"),
 			description: "ID of the organisation whose allowance was used.",
 			display: "code",
 			hidden: true,
@@ -983,33 +1041,33 @@ const USAGE_LIMIT_REACHED = defineEventType({
 });
 const PROJECT_MEMBER_JOINED = defineEventType({
 	id: "project.member-joined",
-	name: "Member joined",
-	description: "Someone accepted an invitation and joined the project.",
+	name: msg("Member joined"),
+	description: msg("Someone accepted an invitation and joined the project."),
 	category: "team",
 	severity: "low",
 	notify: true,
 	permission: "members:read",
 	fields: {
 		memberUserId: field(idField("user"), {
-			label: "Member ID",
+			label: msg("Member ID"),
 			description: "User ID of the new member.",
 			display: "code",
 			hidden: true
 		}),
 		memberName: field(zod.string().nullish(), {
-			label: "Member",
+			label: msg("Member"),
 			description: "The new member's name or email.",
 			display: "text",
 			inAppOnly: true
 		}),
 		role: field(PROJECT_MEMBER_ROLE_SCHEMA, {
-			label: "Role",
+			label: msg("Role"),
 			description: "The member's role: `admin`, `editor`, `viewer` or `custom`.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		}),
 		invitedByUserId: field(zod.string().nullish(), {
-			label: "Invited by ID",
+			label: msg("Invited by ID"),
 			description: "User ID of the person who sent the invitation.",
 			display: "code",
 			hidden: true
@@ -1024,36 +1082,42 @@ const PROJECT_MEMBER_JOINED = defineEventType({
 });
 const CONNECTOR_FAILING = defineEventType({
 	id: "connector.failing",
-	name: "Connector failing",
-	description: "Deliveries to a connector kept failing, so it was turned off.",
+	name: msg("Connector failing"),
+	description: msg("Deliveries to a connector kept failing, so it was turned off."),
 	category: "connectors",
 	severity: "high",
 	notify: true,
 	permission: "connectors:read",
 	fields: {
 		connectorId: field(idField("conn"), {
-			label: "Connector ID",
+			label: msg("Connector ID"),
 			description: "ID of the failing connector.",
 			display: "code",
 			hidden: true
 		}),
 		connectorName: field(zod.string(), {
-			label: "Connector",
+			label: msg("Connector"),
 			description: "The connector's name.",
 			display: "text"
 		}),
 		connectorType: field(zod.string(), {
-			label: "Connector type",
+			label: msg("Connector type"),
 			description: "The connector's type, such as `webhook`, `slack` or `email`.",
-			display: "enum"
+			display: "enum",
+			valueLabels: {
+				"in-app": msg("In app"),
+				webhook: msg("Webhook"),
+				slack: msg("Slack"),
+				email: msg("Email")
+			}
 		}),
 		consecutiveFailures: field(zod.number().int(), {
-			label: "Failures in a row",
+			label: msg("Failures in a row"),
 			description: "Number of deliveries in a row that failed after their retries.",
 			display: "number"
 		}),
 		lastError: field(zod.string().nullish(), {
-			label: "Last error",
+			label: msg("Last error"),
 			description: "Summary of the most recent failure, or `null`.",
 			display: "text",
 			inAppOnly: true
@@ -1070,13 +1134,13 @@ const CONNECTOR_FAILING = defineEventType({
 /** Project roles a member can hold; reviewers only exist while the human review beta is on. */
 const MEMBER_ROLE_SCHEMA = PROJECT_MEMBER_ROLE_SCHEMA;
 const memberUserIdField = field(zod.string(), {
-	label: "Member ID",
+	label: msg("Member ID"),
 	description: "User ID of the member.",
 	display: "code",
 	hidden: true
 });
 const memberNameField = field(zod.string().nullish(), {
-	label: "Member",
+	label: msg("Member"),
 	description: "The member's name or email.",
 	display: "text",
 	inAppOnly: true
@@ -1089,8 +1153,8 @@ const actorUserIdField = (label, description) => field(zod.string().nullish(), {
 });
 const ASSET_DELETED = defineEventType({
 	id: "asset.deleted",
-	name: "Asset deleted",
-	description: "An asset was deleted from the project, with its stored content.",
+	name: msg("Asset deleted"),
+	description: msg("An asset was deleted from the project, with its stored content."),
 	category: "assets",
 	severity: "low",
 	notify: false,
@@ -1106,8 +1170,8 @@ const ASSET_DELETED = defineEventType({
 });
 const ASSET_CONTENT_REMOVED = defineEventType({
 	id: "asset.content-removed",
-	name: "Content removed",
-	description: "An asset's stored content was removed on request. The asset and its classification results remain.",
+	name: msg("Content removed"),
+	description: msg("An asset's stored content was removed on request. The asset and its classification results remain."),
 	category: "assets",
 	severity: "low",
 	notify: false,
@@ -1123,8 +1187,8 @@ const ASSET_CONTENT_REMOVED = defineEventType({
 });
 const ASSET_RETRIED = defineEventType({
 	id: "asset.retried",
-	name: "Asset retried",
-	description: "A failed asset was queued for processing again.",
+	name: msg("Asset retried"),
+	description: msg("A failed asset was queued for processing again."),
 	category: "assets",
 	severity: "low",
 	notify: false,
@@ -1140,8 +1204,8 @@ const ASSET_RETRIED = defineEventType({
 });
 const ASSET_REVIEW_REQUESTED = defineEventType({
 	id: "asset.review-requested",
-	name: "Review requested",
-	description: "An asset was added to the human review queue.",
+	name: msg("Review requested"),
+	description: msg("An asset was added to the human review queue."),
 	category: "moderation",
 	severity: "low",
 	notify: false,
@@ -1150,10 +1214,11 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
-		automatedOutcome: field(ASSET_MODERATION_STATUS_SCHEMA, {
-			label: "Automated outcome",
-			description: "The asset's status from automated moderation: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`.",
-			display: "enum"
+		automatedOutcome: field(HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA, {
+			label: msg("Automated outcome"),
+			description: "The asset's status from automated moderation: `allowed`, `limited`, `age-restricted` or `blocked`.",
+			display: "enum",
+			valueLabels: MODERATION_STATUS_LABELS
 		})
 	},
 	example: {
@@ -1164,8 +1229,8 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 });
 const ASSET_HASH_MATCHED = defineEventType({
 	id: "asset.hash-matched",
-	name: "Hash list match",
-	description: "An uploaded image matched an entry in one of the project's hash lists. A close match on a block list blocks the asset.",
+	name: msg("Hash list match"),
+	description: msg("An uploaded image matched an entry in one of the project's hash lists. A close match on a block list blocks the asset."),
 	category: "moderation",
 	severity: "high",
 	notify: true,
@@ -1174,28 +1239,28 @@ const ASSET_HASH_MATCHED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		hashListId: field(idField("hl"), {
-			label: "Hash list ID",
+			label: msg("Hash list ID"),
 			description: "ID of the hash list with the closest match.",
 			display: "code",
 			hidden: true
 		}),
 		hashListName: field(zod.string(), {
-			label: "Hash list",
+			label: msg("Hash list"),
 			description: "Name of the hash list with the closest match.",
 			display: "text"
 		}),
 		distance: field(zod.number().int(), {
-			label: "Distance",
+			label: msg("Distance"),
 			description: "Number of bits that differ between the image's PDQ hash and the listed hash. 0 is the same picture.",
 			display: "number"
 		}),
 		matchAction: field(HASH_LIST_ACTION_SCHEMA, {
-			label: "Action",
+			label: msg("Action"),
 			description: "What the match did: `block` blocked the asset, `flag` only reported it.",
 			display: "enum",
 			valueLabels: {
-				flag: "Flagged",
-				block: "Blocked"
+				flag: msg("Flagged"),
+				block: msg("Blocked")
 			}
 		})
 	},
@@ -1210,8 +1275,8 @@ const ASSET_HASH_MATCHED = defineEventType({
 });
 const USAGE_SPEND_LIMIT_REACHED = defineEventType({
 	id: "usage.spend-limit-reached",
-	name: "Spend limit reached",
-	description: "The project's organisation reached a limit on its usage; new uploads are paused until it resumes.",
+	name: msg("Spend limit reached"),
+	description: msg("The project's organisation reached a limit on its usage; new uploads are paused until it resumes."),
 	category: "usage",
 	severity: "high",
 	notify: true,
@@ -1223,12 +1288,18 @@ const USAGE_SPEND_LIMIT_REACHED = defineEventType({
 			"project-budget",
 			"payment-failed"
 		]), {
-			label: "Reason",
+			label: msg("Reason"),
 			description: "Which limit paused uploads: the organisation's `spend-limit`, its `usage-cap`, the project's `project-budget`, or `payment-failed` while an invoice is unpaid.",
-			display: "enum"
+			display: "enum",
+			valueLabels: {
+				"spend-limit": msg("Spend limit"),
+				"usage-cap": msg("Usage cap"),
+				"project-budget": msg("Project budget"),
+				"payment-failed": msg("Payment failed")
+			}
 		}),
 		resumesOn: field(zod.string().nullish(), {
-			label: "Uploads resume",
+			label: msg("Uploads resume"),
 			description: "The date uploads resume, as `YYYY-MM-DD` in UTC: the end of the billing period, or sooner if the limit is raised. Null while an invoice is unpaid: uploads resume once it is paid.",
 			display: "text"
 		})
@@ -1240,26 +1311,26 @@ const USAGE_SPEND_LIMIT_REACHED = defineEventType({
 });
 const UPLOAD_PRESET_DAILY_LIMIT_REACHED = defineEventType({
 	id: "upload-preset.daily-limit-reached",
-	name: "Preset daily limit reached",
-	description: "A client reached an upload preset's daily upload limit; that client's uploads pause until it resets.",
+	name: msg("Preset daily limit reached"),
+	description: msg("A client reached an upload preset's daily upload limit; that client's uploads pause until it resets."),
 	category: "usage",
 	severity: "low",
 	notify: false,
 	permission: "upload-presets:read",
 	fields: {
 		presetId: field(idField("preset"), {
-			label: "Preset ID",
+			label: msg("Preset ID"),
 			description: "ID of the upload preset.",
 			display: "code",
 			hidden: true
 		}),
 		presetName: field(zod.string(), {
-			label: "Preset",
+			label: msg("Preset"),
 			description: "The upload preset's name.",
 			display: "text"
 		}),
 		dailyLimit: field(zod.number().int(), {
-			label: "Daily limit",
+			label: msg("Daily limit"),
 			description: "Number of uploads the preset allows each day.",
 			display: "number"
 		})
@@ -1272,8 +1343,8 @@ const UPLOAD_PRESET_DAILY_LIMIT_REACHED = defineEventType({
 });
 const PROJECT_MEMBER_REMOVED = defineEventType({
 	id: "project.member-removed",
-	name: "Member removed",
-	description: "A member was removed from the project, or left it.",
+	name: msg("Member removed"),
+	description: msg("A member was removed from the project, or left it."),
 	category: "team",
 	severity: "low",
 	notify: true,
@@ -1282,13 +1353,13 @@ const PROJECT_MEMBER_REMOVED = defineEventType({
 		memberUserId: memberUserIdField,
 		memberName: memberNameField,
 		role: field(MEMBER_ROLE_SCHEMA, {
-			label: "Role",
+			label: msg("Role"),
 			description: "The role the member held.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		}),
 		left: field(zod.boolean(), {
-			label: "Left the project",
+			label: msg("Left the project"),
 			description: "`true` when the member left, `false` when someone removed them.",
 			display: "enum"
 		}),
@@ -1304,8 +1375,8 @@ const PROJECT_MEMBER_REMOVED = defineEventType({
 });
 const PROJECT_MEMBER_ROLE_CHANGED = defineEventType({
 	id: "project.member-role-changed",
-	name: "Member access changed",
-	description: "A member's role or custom permissions were changed.",
+	name: msg("Member access changed"),
+	description: msg("A member's role or custom permissions were changed."),
 	category: "team",
 	severity: "low",
 	notify: true,
@@ -1314,13 +1385,13 @@ const PROJECT_MEMBER_ROLE_CHANGED = defineEventType({
 		memberUserId: memberUserIdField,
 		memberName: memberNameField,
 		previousRole: field(MEMBER_ROLE_SCHEMA, {
-			label: "Previous role",
+			label: msg("Previous role"),
 			description: "The member's role before the change.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		}),
 		role: field(MEMBER_ROLE_SCHEMA, {
-			label: "Role",
+			label: msg("Role"),
 			description: "The member's role after the change; `custom` roles may have changed permissions.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
@@ -1337,21 +1408,21 @@ const PROJECT_MEMBER_ROLE_CHANGED = defineEventType({
 });
 const PROJECT_INVITATION_SENT = defineEventType({
 	id: "project.invitation-sent",
-	name: "Invitation sent",
-	description: "Someone was invited to join the project.",
+	name: msg("Invitation sent"),
+	description: msg("Someone was invited to join the project."),
 	category: "team",
 	severity: "low",
 	notify: false,
 	permission: "members:read",
 	fields: {
 		inviteeEmail: field(zod.string(), {
-			label: "Invitee",
+			label: msg("Invitee"),
 			description: "The email address that was invited.",
 			display: "text",
 			inAppOnly: true
 		}),
 		role: field(MEMBER_ROLE_SCHEMA, {
-			label: "Role",
+			label: msg("Role"),
 			description: "The role the invitation grants.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
@@ -1366,33 +1437,33 @@ const PROJECT_INVITATION_SENT = defineEventType({
 });
 const API_KEY_CREATED = defineEventType({
 	id: "api-key.created",
-	name: "API key created",
-	description: "An API key was created for the project.",
+	name: msg("API key created"),
+	description: msg("An API key was created for the project."),
 	category: "api-keys",
 	severity: "low",
 	notify: false,
 	permission: "api-keys:read",
 	fields: {
 		keyId: field(idField("key"), {
-			label: "Key ID",
+			label: msg("Key ID"),
 			description: "ID of the API key.",
 			display: "code",
 			hidden: true
 		}),
 		keyName: field(zod.string().nullish(), {
-			label: "Key",
+			label: msg("Key"),
 			description: "The API key's name.",
 			display: "text"
 		}),
 		role: field(ACCESS_ROLE_SCHEMA, {
-			label: "Role",
+			label: msg("Role"),
 			description: "The access the key was created with: `admin`, `editor`, `viewer` or `custom`.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		}),
 		createdByUserId: actorUserIdField("Created by ID", "User ID of the person who created the key."),
 		createdByName: field(zod.string().nullish(), {
-			label: "Created by",
+			label: msg("Created by"),
 			description: "Name or email of the person who created the key, when known.",
 			display: "text",
 			inAppOnly: true
@@ -1408,32 +1479,36 @@ const API_KEY_CREATED = defineEventType({
 });
 const API_KEY_REVOKED = defineEventType({
 	id: "api-key.revoked",
-	name: "API key revoked",
-	description: "An API key was revoked or deleted and can no longer be used.",
+	name: msg("API key revoked"),
+	description: msg("An API key was revoked or deleted and can no longer be used."),
 	category: "api-keys",
 	severity: "low",
 	notify: false,
 	permission: "api-keys:read",
 	fields: {
 		keyId: field(idField("key"), {
-			label: "Key ID",
+			label: msg("Key ID"),
 			description: "ID of the API key.",
 			display: "code",
 			hidden: true
 		}),
 		keyName: field(zod.string().nullish(), {
-			label: "Key",
+			label: msg("Key"),
 			description: "The API key's name.",
 			display: "text"
 		}),
 		action: field(zod.enum(["revoked", "deleted"]), {
-			label: "Action",
+			label: msg("Action"),
 			description: "`revoked` when the key was kept but disabled, `deleted` when it was removed.",
-			display: "enum"
+			display: "enum",
+			valueLabels: {
+				revoked: msg("Revoked"),
+				deleted: msg("Deleted")
+			}
 		}),
 		revokedByUserId: actorUserIdField("Revoked by ID", "User ID of the person who revoked the key."),
 		revokedByName: field(zod.string().nullish(), {
-			label: "Revoked by",
+			label: msg("Revoked by"),
 			description: "Name or email of the person who revoked the key, when known.",
 			display: "text",
 			inAppOnly: true
@@ -1449,7 +1524,7 @@ const API_KEY_REVOKED = defineEventType({
 });
 const appealFields = {
 	appealId: field(idField("apl"), {
-		label: "Appeal",
+		label: msg("Appeal"),
 		description: "The appeal identifier.",
 		display: "code"
 	}),
@@ -1459,12 +1534,18 @@ const appealFields = {
 		"reported-post",
 		"reported-user"
 	]), {
-		label: "Subject type",
+		label: msg("Subject type"),
 		description: "The type of moderation decision appealed.",
-		display: "enum"
+		display: "enum",
+		valueLabels: {
+			post: msg("Post"),
+			user: msg("User"),
+			"reported-post": msg("Reported post"),
+			"reported-user": msg("Reported user")
+		}
 	}),
 	subjectId: field(zod.string(), {
-		label: "Subject",
+		label: msg("Subject"),
 		description: "The customer's subject identifier.",
 		display: "code"
 	})
@@ -1497,8 +1578,8 @@ const EVENT_TYPE_INFO = {
 	"connector.failing": CONNECTOR_FAILING,
 	"appeal.submitted": defineEventType({
 		id: "appeal.submitted",
-		name: "Appeal submitted",
-		description: "A moderation decision was appealed.",
+		name: msg("Appeal submitted"),
+		description: msg("A moderation decision was appealed."),
 		category: "moderation",
 		severity: "low",
 		notify: true,
@@ -1512,8 +1593,8 @@ const EVENT_TYPE_INFO = {
 	}),
 	"appeal.resolved": defineEventType({
 		id: "appeal.resolved",
-		name: "Appeal resolved",
-		description: "A reviewer upheld or overturned a moderation decision.",
+		name: msg("Appeal resolved"),
+		description: msg("A reviewer upheld or overturned a moderation decision."),
 		category: "moderation",
 		severity: "low",
 		notify: true,
@@ -1521,17 +1602,21 @@ const EVENT_TYPE_INFO = {
 		fields: {
 			...appealFields,
 			decision: field(zod.enum(["upheld", "overturned"]), {
-				label: "Decision",
+				label: msg("Decision"),
 				description: "The appeal outcome.",
-				display: "enum"
+				display: "enum",
+				valueLabels: {
+					upheld: msg("Upheld"),
+					overturned: msg("Overturned")
+				}
 			}),
 			action: field(zod.string(), {
-				label: "Action",
+				label: msg("Action"),
 				description: "The final action for the customer's integration.",
 				display: "code"
 			}),
 			appliedToAsset: field(zod.boolean(), {
-				label: "Applied to asset",
+				label: msg("Applied to asset"),
 				description: "Whether CalmLens updated the linked asset.",
 				display: "enum"
 			})

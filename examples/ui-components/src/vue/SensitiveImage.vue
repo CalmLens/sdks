@@ -15,7 +15,10 @@ const emit = defineEmits<{ reveal: [] }>();
 
 const restricted = computed(() => props.status === "age-restricted");
 const asset = computed(() => ({ projectId: props.projectId, assetIdentifier: props.assetId }));
-const contentUrl = computed(() => getAssetUrl({ ...asset.value, viewerClaims: { ageConfirmed: props.ageConfirmed } }));
+// Claims make the response private and uncacheable: send them only when needed.
+const contentUrl = computed(() =>
+  getAssetUrl(restricted.value ? { ...asset.value, viewerClaims: { ageConfirmed: props.ageConfirmed } } : asset.value),
+);
 const placeholderUrl = computed(() => getAssetUrl({ ...asset.value, resource: "placeholder" }));
 </script>
 

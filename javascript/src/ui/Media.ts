@@ -85,8 +85,7 @@ export interface MediaSettings {
   placeholder?: boolean;
   /**
    * The asset's `content.image.thumbhash`, if your app stores it. The placeholder is then
-   * drawn in the browser instead of requested from the CDN, which also works for private assets
-   * and signed URLs.
+   * drawn in the browser instead of requested from the CDN.
    */
   placeholderHash?: string;
   /** Your own placeholder image URL, used when there is no `placeholderHash`. */
@@ -232,16 +231,32 @@ const buildMediaState = ({
   viewerClaims,
 }: MediaSettings & { projectId: string; assetId: string }): MediaState => {
   if (status === "blocked" || status === "purged" || contentRemoved) return { kind: "unavailable" };
-  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl, viewerClaims };
+  // Claims make the CDN's responses private and uncacheable, so send only the ones that say
+  // something: a region, or a confirmed age (unconfirmed is the default).
+  const region = viewerClaims?.region;
+  const ageConfirmed = viewerClaims?.ageConfirmed === true;
+  const claims =
+    region || ageConfirmed
+      ? { ...(region ? { region } : {}), ...(ageConfirmed ? { ageConfirmed } : {}) }
+      : undefined;
+  const asset = { projectId, assetIdentifier: assetId, cdnBaseUrl, viewerClaims: claims };
   const placeholderUrl = placeholder
     ? (decodePlaceholderHash(placeholderHash) ??
       customPlaceholderUrl ??
-      // The CDN draws placeholders only for images. A private asset's placeholder needs the same
-      // access as its content, so a signed URL gets none from the CDN.
-      (url || type !== "image" ? undefined : getAssetUrl({ ...asset, resource: "placeholder" })))
+      // The CDN draws placeholders only for images. They are public, private assets' included;
+      // only a regional project's needs the viewer's region.
+      (type !== "image"
+        ? undefined
+        : getAssetUrl({
+            projectId,
+            assetIdentifier: assetId,
+            cdnBaseUrl,
+            resource: "placeholder",
+            viewerClaims: region ? { region } : undefined,
+          })))
     : undefined;
   const restricted = status === "age-restricted";
-  if (restricted && !viewerClaims?.ageConfirmed) return { kind: "gated", placeholderUrl };
+  if (restricted && !ageConfirmed) return { kind: "gated", placeholderUrl };
 
   const build = (options: { resource?: "original" | "rendered"; extra?: LensTransform } = {}) => {
     const chosen = options.resource ?? resource;

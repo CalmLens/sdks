@@ -79,7 +79,7 @@ final class Moderation
         return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'lens' => 'chirp-feed', ...($ageConfirmed ? ['viewerClaims' => ['ageConfirmed' => true]] : [])]);
     }
 
-    /** A small blurred PNG of the image, served for public assets whatever their status (not purged). */
+    /** A small blurred PNG of the image, public whatever the asset's visibility or status (not purged). */
     public function placeholderUrl(string $assetId): string
     {
         return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'resource' => 'placeholder']);

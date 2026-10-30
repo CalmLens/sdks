@@ -77,6 +77,8 @@ const (
 	CodeAssetNotRetryable = "asset/not-retryable"
 	// CodeAssetContentUnavailable is returned with HTTP 409.
 	CodeAssetContentUnavailable = "asset/content-unavailable"
+	// CodeAssetContentPurged is returned with HTTP 409.
+	CodeAssetContentPurged = "asset/content-purged"
 	// CodeAssetNotDecided is returned with HTTP 409.
 	CodeAssetNotDecided = "asset/not-decided"
 	// CodeAssetPolicyChanged is returned with HTTP 409.
@@ -97,6 +99,8 @@ const (
 	CodeFolderParentCycle = "folder/parent-cycle"
 	// CodeLensVersionConflict is returned with HTTP 409.
 	CodeLensVersionConflict = "lens/version-conflict"
+	// CodeLensIdentifierReserved is returned with HTTP 409.
+	CodeLensIdentifierReserved = "lens/identifier-reserved"
 	// CodeHashListNotFound is returned with HTTP 404.
 	CodeHashListNotFound = "hash-list/not-found"
 	// CodeHashListEntryNotFound is returned with HTTP 404.
@@ -194,6 +198,7 @@ var publicErrorStatuses = map[string]int{
 	CodeAssetSafetyHeld:                   423,
 	CodeAssetNotRetryable:                 409,
 	CodeAssetContentUnavailable:           409,
+	CodeAssetContentPurged:                409,
 	CodeAssetNotDecided:                   409,
 	CodeAssetPolicyChanged:                409,
 	CodeAssetReviewed:                     409,
@@ -204,6 +209,7 @@ var publicErrorStatuses = map[string]int{
 	CodeFolderNotEmpty:                    409,
 	CodeFolderParentCycle:                 409,
 	CodeLensVersionConflict:               409,
+	CodeLensIdentifierReserved:            409,
 	CodeHashListNotFound:                  404,
 	CodeHashListEntryNotFound:             404,
 	CodeHashListLimitReached:              409,

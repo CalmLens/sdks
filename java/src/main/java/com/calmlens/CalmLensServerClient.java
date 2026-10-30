@@ -1499,7 +1499,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     /**
      * Builds the CDN URL of an asset's {@code rendered} (default), {@code original} or {@code placeholder}
      * resource, with optional {@code viewerClaims} encoded in its query. Only the rendered resource takes a lens or transform. A placeholder is a small blurred PNG,
-     * public for public assets whatever their moderation status; it needs no age confirmation either.
+     * public whatever the asset's visibility or moderation status; it needs no age confirmation either.
      *
      * @param options the asset and selector
      * @return the URL

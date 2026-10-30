@@ -113,6 +113,8 @@ final class MockServerClient
      *   `hle`, `lens`, `evt` or `rev`) and returns the ID; by default, like the API, the prefix, `_`
      *   and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
+     * @param int $maxResponseBytes the largest response body the mock's client reads, as for `ServerClient`.
+     * @param int|float|null $uploadTimeout the mock's client's binary upload timeout, as for `ServerClient`.
      */
     public function __construct(
         public readonly string $projectId = 'project-1',
@@ -124,6 +126,8 @@ final class MockServerClient
         string $cdnBaseUrl = 'https://cdn.calmlens.invalid/v1',
         #[\SensitiveParameter] ?string $apiKey = null,
         int $maxRetries = 0,
+        int|float $maxResponseBytes = ServerClient::DEFAULT_MAX_RESPONSE_BYTES,
+        int|float|null $uploadTimeout = ServerClient::DEFAULT_UPLOAD_TIMEOUT,
     ) {
         self::checkOutcome($queuedOutcome);
         if (is_string($analyzedOutcome)) {
@@ -140,7 +144,8 @@ final class MockServerClient
         $this->grants = $apiKey === null ? [] : self::grantsOf($apiKey);
         $stack = HandlerStack::create(fn (RequestInterface $request, array $options) => $this->handle($request));
         $this->client = new ServerClient($apiKey ?? 'mock-key', $projectId, $baseUrl, $cdnBaseUrl, maxRetries: $maxRetries,
-            httpClient: new Client(['handler' => $stack]));
+            httpClient: new Client(['handler' => $stack]), maxResponseBytes: $maxResponseBytes,
+            uploadTimeout: $uploadTimeout);
         $session = (fn (): Session => $this->session)->call($this->client);
         $session->sleep = function (float $seconds): void { $this->elapsed += $seconds; };
         $session->clock = fn (): float => $this->elapsed;
@@ -1393,16 +1398,14 @@ final class MockServerClient
         $notAvailable = fn () => $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
         $status = $asset['classification']['moderation']['status'];
         if ($resource === 'placeholder') {
-            // Like the CDN: an image's ThumbHash, public for public assets whatever their moderation
-            // status; refused for purged assets, assets without one and, for private assets, keys
-            // without `assets:download`.
+            // Like the CDN: an image's ThumbHash, public whatever the asset's visibility or
+            // moderation status; refused for purged assets and assets without one.
             $thumbhash = $asset['content']['image']['thumbhash'] ?? null;
-            $public = $asset['visibility'] === 'public';
-            if ($thumbhash === null || $status === 'purged' || (!$public && !$this->canDownload($asset['folderId'] ?? null))) {
+            if ($thumbhash === null || $status === 'purged') {
                 return $notAvailable();
             }
             return $this->cdnResponse($method, Placeholder::png($thumbhash), ['Content-Type' => 'image/png',
-                'Cache-Control' => ($public ? 'public' : 'private') . ', max-age=3600', 'Cache-Tag' => 'asset-' . $asset['id'],
+                'Cache-Control' => 'public, max-age=3600', 'Cache-Tag' => 'asset-' . $asset['id'],
                 'ETag' => '"' . $thumbhash . '"']);
         }
         // Delivery checks come first and refuse everyone, like the CDN.

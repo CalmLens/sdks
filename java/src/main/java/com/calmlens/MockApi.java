@@ -1421,14 +1421,13 @@ final class MockApi {
     boolean isPublic = "public".equals(str(asset, "visibility"));
     String apiKey = request.header("X-Api-Key");
     if (resource.equals("placeholder")) {
-      // Like the CDN's placeholder handler: an image's ThumbHash, public for public assets whatever
-      // their moderation status; refused for purged assets, assets without one (not yet classified,
-      // or content removed) and, for private assets, keys without assets:download.
+      // Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+      // visibility or moderation status; refused for purged assets and assets without one (not yet
+      // classified, or content removed).
       String thumbhash = str(asset.getAsJsonObject("content").get("image") instanceof JsonObject image ? image : null, "thumbhash");
       if (thumbhash == null || "purged".equals(status)) return error(notAvailable);
-      if (!isPublic && !canDownload(str(asset, "folderId"), apiKey)) return error(notAvailable);
       return served(request, Thumbhash.toPng(Base64.getDecoder().decode(thumbhash)), "image/png", "Cache-Control",
-          (isPublic ? "public" : "private") + ", max-age=3600", "Cache-Tag", "asset-" + str(asset, "id"), "ETag", "\"" + thumbhash + "\"");
+          "public, max-age=3600", "Cache-Tag", "asset-" + str(asset, "id"), "ETag", "\"" + thumbhash + "\"");
     }
     // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
     // blocked or purged, failed processing or removed content.

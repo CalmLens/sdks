@@ -156,6 +156,24 @@ final class MockServerClientTest extends TestCase
         self::assertCount(3, $retrying->requests());
     }
 
+    public function testAcceptsTheClientsUploadTimeoutAndResponseSizeLimit(): void
+    {
+        try {
+            new MockServerClient(uploadTimeout: 0);
+            self::fail('Expected an invalid upload timeout to be refused');
+        } catch (CalmLensException $error) {
+            self::assertSame('sdk/invalid-config', $error->errorCode);
+        }
+        // The limit applies to the mock's answers as to the API's.
+        $mock = new MockServerClient(maxResponseBytes: 64, uploadTimeout: 90);
+        try {
+            self::image($mock);
+            self::fail('Expected the response size limit to apply');
+        } catch (CalmLensException $error) {
+            self::assertSame('sdk/response-too-large', $error->errorCode);
+        }
+    }
+
     private function assertTimeout(callable $call): void
     {
         try {

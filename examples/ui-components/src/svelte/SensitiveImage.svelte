@@ -19,7 +19,8 @@
 
 <figure class="sensitive" style:aspect-ratio={aspectRatio}>
   {#if !restricted || ageConfirmed}
-    <img src={getAssetUrl({ ...asset, viewerClaims: { ageConfirmed } })} {alt} />
+    <!-- Claims make the response private and uncacheable: send them only when needed. -->
+    <img src={getAssetUrl(restricted ? { ...asset, viewerClaims: { ageConfirmed } } : asset)} {alt} />
   {:else}
     <img src={getAssetUrl({ ...asset, resource: "placeholder" })} alt="" />
     <figcaption>Sensitive content <button type="button" onclick={onReveal}>View</button></figcaption>

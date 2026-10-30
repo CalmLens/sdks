@@ -90,7 +90,8 @@ const (
 )
 
 // Options mirrors calmlens.Options (APIKey, ProjectID, BaseURL, CDNBaseURL, Timeout,
-// MaxRetries) and adds in-memory storage and deterministic ID/clock/outcome controls.
+// UploadTimeout, MaxRetries, MaxResponseBytes) and adds in-memory storage and deterministic
+// ID/clock/outcome controls.
 type Options struct {
 	APIKey    string
 	ProjectID string
@@ -98,6 +99,9 @@ type Options struct {
 	// never leave the process.
 	BaseURL string
 	Timeout time.Duration
+	// UploadTimeout and MaxResponseBytes are validated and applied as by calmlens.NewServerClient.
+	UploadTimeout    time.Duration
+	MaxResponseBytes int64
 	// MaxRetries defaults to 0 in the mock, so FailNext fails exactly one call. Set it to
 	// test the client's retry behaviour. Waits take no real time: retry backoff and
 	// Assets.WaitForDecision only advance the mock client's clock, so WaitForDecision returns
@@ -449,7 +453,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 		images.Content = map[string]*StoredContent{}
 	}
 	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}}
-	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, MaxRetries: options.MaxRetries, HTTPClient: &http.Client{Transport: transport{mock}}})
+	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
 	if err != nil {
 		return nil, err
 	}
@@ -1981,27 +1985,18 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	moderation := section(section(asset, "classification"), "moderation")["status"]
 	tag := "asset-" + text(asset["id"])
 	if parts[3] == calmlens.ResourcePlaceholder {
-		// Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
-		// whatever their moderation status; refused for purged assets, assets without one (not
-		// yet classified, or content removed) and, for private assets, keys without
-		// assets:download.
+		// Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+		// visibility or moderation status; refused for purged assets and assets without one (not
+		// yet classified, or content removed).
 		thumbhash := text(contentImage(asset)["thumbhash"])
 		if thumbhash == "" || moderation == calmlens.ModerationStatusPurged {
-			return notAvailable()
-		}
-		public := asset["visibility"] == calmlens.VisibilityPublic
-		if !public && !canDownload() {
 			return notAvailable()
 		}
 		png, err := placeholderPNG(thumbhash)
 		if err != nil {
 			return notAvailable()
 		}
-		access := "private"
-		if public {
-			access = "public"
-		}
-		header.Set("Cache-Control", access+", max-age=3600")
+		header.Set("Cache-Control", "public, max-age=3600")
 		header.Set("Cache-Tag", tag)
 		header.Set("ETag", strconv.Quote(thumbhash))
 		return http.StatusOK, png, "image/png"

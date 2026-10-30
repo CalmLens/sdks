@@ -26,6 +26,19 @@ fn kept(name: &str, bytes: &'static [u8]) -> SubmitAsset {
 fn named(name: &str) -> SubmitAsset {
     SubmitAsset::new(name, Content::text(name))
 }
+/// The mock client takes the real client's upload timeout and response size limit, and the
+/// limit applies to the mock's answers as to the API's.
+#[tokio::test]
+async fn applies_the_upload_timeout_and_response_size_limit() {
+    let mock = MockServerClient::in_memory(
+        options()
+            .upload_timeout(std::time::Duration::from_secs(90))
+            .max_response_bytes(64),
+    )
+    .unwrap();
+    let error = mock.assets().create(named("note")).await.unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::ResponseTooLarge);
+}
 /// The shared scenarios cover the statuses, recorded review, events and delivery a decision
 /// gives; these are the mock's own IDs and the refusal of an unknown asset.
 #[tokio::test]

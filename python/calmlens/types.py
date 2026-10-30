@@ -93,7 +93,7 @@ ProcessingFeatureStage = Union[Literal["beta", "ga"], str]
 LensType = Literal["image", "video", "audio", "document", "website"]
 #: Which CDN resource of an asset to address. ``rendered`` (the default) is the asset rendered through
 #: a lens or transform; ``original`` is the original file and takes no lens or transform.
-#: ``placeholder`` is a small blurred PNG, public for public assets whatever their moderation status;
+#: ``placeholder`` is a small blurred PNG, served publicly for every asset whatever its visibility or moderation status;
 #: it takes no lens or transform, and needs no age confirmation.
 CdnResource = Literal["original", "rendered", "placeholder"]
 #: How ``assets.search`` matches.

@@ -345,10 +345,17 @@ impl MockServerClient {
     /// # Ok(()) }
     /// ```
     pub fn in_memory(options: MockOptions) -> Result<Self> {
-        let builder = ServerClient::builder(options.api_key.clone(), options.project_id.clone())
-            .base_url(&options.api_base_url)
-            .cdn_base_url(&options.cdn_base_url)
-            .max_retries(options.max_retries);
+        let mut builder =
+            ServerClient::builder(options.api_key.clone(), options.project_id.clone())
+                .base_url(&options.api_base_url)
+                .cdn_base_url(&options.cdn_base_url)
+                .max_retries(options.max_retries);
+        if let Some(value) = options.upload_timeout {
+            builder = builder.upload_timeout(value);
+        }
+        if let Some(value) = options.max_response_bytes {
+            builder = builder.max_response_bytes(value);
+        }
         let transport = Arc::new(MockTransport::new(State {
             backend: Some(memory::Backend::new(options)),
             ..State::default()

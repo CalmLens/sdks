@@ -1189,6 +1189,39 @@
     }
   },
   {
+    "code": "asset/content-purged",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-content-purged"
+      },
+      "body": {
+        "code": "asset/content-purged",
+        "message": "This asset's content was purged, so it can only be blocked. Upload it again to have it moderated afresh.",
+        "details": {
+          "reason": "asset_content_purged"
+        },
+        "traceId": "trace-asset-content-purged"
+      }
+    },
+    "expected": {
+      "code": "asset/content-purged",
+      "status": 409,
+      "requestId": "req-asset-content-purged",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_content_purged",
+        "traceId": "trace-asset-content-purged"
+      }
+    }
+  },
+  {
     "code": "asset/not-decided",
     "status": 409,
     "operation": "assets.retrieve",
@@ -1515,6 +1548,39 @@
       "details": {
         "reason": "lens_version_conflict",
         "traceId": "trace-lens-version-conflict"
+      }
+    }
+  },
+  {
+    "code": "lens/identifier-reserved",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-lens-identifier-reserved"
+      },
+      "body": {
+        "code": "lens/identifier-reserved",
+        "message": "The identifier belongs to a built-in lens (thumbnail, sm, md, lg, xl or 2xl). Give the lens another identifier.",
+        "details": {
+          "reason": "lens_identifier_reserved"
+        },
+        "traceId": "trace-lens-identifier-reserved"
+      }
+    },
+    "expected": {
+      "code": "lens/identifier-reserved",
+      "status": 409,
+      "requestId": "req-lens-identifier-reserved",
+      "retryAfter": null,
+      "details": {
+        "reason": "lens_identifier_reserved",
+        "traceId": "trace-lens-identifier-reserved"
       }
     }
   },
@@ -2459,7 +2525,7 @@
       },
       "body": {
         "code": "appeal/content-unavailable",
-        "message": "The appeal's content is unavailable, or approval would require restoring removed content.",
+        "message": "The appeal's content is unavailable, or the asset's content was purged, so it can only be blocked.",
         "details": {
           "reason": "appeal_content_unavailable"
         },

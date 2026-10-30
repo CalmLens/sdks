@@ -465,6 +465,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This asset's content is no longer stored, so it can't be processed again. Upload it again instead.",
 		status: 409
 	}),
+	ASSET_CONTENT_PURGED: new ErrorCode({
+		id: "asset/content-purged",
+		defaultMessage: "This asset's content was purged, so it can only be blocked. Upload it again to have it moderated afresh.",
+		status: 409
+	}),
 	ASSET_NOT_DECIDED: new ErrorCode({
 		id: "asset/not-decided",
 		defaultMessage: "This asset has no automatic moderation decision to explain yet.",
@@ -513,6 +518,11 @@ const PUBLIC_ERROR_CODES = {
 	LENS_VERSION_CONFLICT: new ErrorCode({
 		id: "lens/version-conflict",
 		defaultMessage: "Lens updates require a version greater than the current version.",
+		status: 409
+	}),
+	LENS_IDENTIFIER_RESERVED: new ErrorCode({
+		id: "lens/identifier-reserved",
+		defaultMessage: "The identifier belongs to a built-in lens (thumbnail, sm, md, lg, xl or 2xl). Give the lens another identifier.",
 		status: 409
 	}),
 	HASH_LIST_NOT_FOUND: new ErrorCode({
@@ -657,9 +667,9 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	APPEAL_CONTENT_UNAVAILABLE: new ErrorCode({
 		id: "appeal/content-unavailable",
-		defaultMessage: "The appeal's content is unavailable, or approval would require restoring removed content.",
+		defaultMessage: "The appeal's content is unavailable, or the asset's content was purged, so it can only be blocked.",
 		status: 409
 	})
 };
-PUBLIC_ERROR_CODES.MISSING_TOKEN, PUBLIC_ERROR_CODES.INVALID_API_KEY, PUBLIC_ERROR_CODES.API_KEY_PROJECT_MISMATCH;
+PUBLIC_ERROR_CODES.MISSING_TOKEN, PUBLIC_ERROR_CODES.INVALID_API_KEY, PUBLIC_ERROR_CODES.API_KEY_PROJECT_MISMATCH, PUBLIC_ERROR_CODES.PERMISSION_DENIED;
 export { PUBLIC_ERROR_CODES };

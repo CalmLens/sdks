@@ -1903,21 +1903,18 @@ export class MockCalmLensApi {
     const isHead = request.method === "HEAD";
 
     if (resource === "placeholder") {
-      // Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
-      // whatever their moderation status; refused for purged assets, assets without one
-      // (not yet classified, or content removed) and, for private assets, keys without
-      // `assets:download`.
+      // Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+      // visibility or moderation status; refused for purged assets and assets without one (not
+      // yet classified, or content removed).
       const thumbhash = asset.content.image?.thumbhash;
       if (!thumbhash || status === "purged") return notAvailable();
-      const isPublic = asset.visibility === "public";
-      if (!isPublic && !canDownload()) return notAvailable();
       const png = Uint8Array.from(
         atob(placeholderHashToDataURL(thumbhash).split(",", 2)[1]!),
         (char) => char.charCodeAt(0),
       );
       return this.cdnResponse(isHead, png, url, {
         "Content-Type": "image/png",
-        "Cache-Control": `${isPublic ? "public" : "private"}, max-age=3600`,
+        "Cache-Control": "public, max-age=3600",
         "Cache-Tag": `asset-${asset.id}`,
         ETag: `"${thumbhash}"`,
       });

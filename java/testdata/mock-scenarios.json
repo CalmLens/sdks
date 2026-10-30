@@ -5981,7 +5981,7 @@
       ]
     },
     {
-      "name": "a public image's placeholder is served whatever its moderation, and refused once purged or removed",
+      "name": "an image's placeholder is public whatever its visibility or moderation, and refused once purged or removed",
       "mock": {},
       "steps": [
         {
@@ -6167,40 +6167,11 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
-            }
-          }
-        },
-        {
-          "operation": "mock.grant",
-          "args": {
-            "grants": [
-              {
-                "actions": [
-                  "assets:download"
-                ],
-                "folderId": null,
-                "includeSubfolders": true
-              }
-            ]
-          }
-        },
-        {
-          "operation": "cdn.serve",
-          "args": {
-            "assetIdentifier": {
-              "$ref": "private.id"
-            },
-            "resource": "placeholder"
-          },
-          "expect": {
-            "cdn": {
               "status": 200,
               "bodyPrefixBase64": "iVBORw0KGgo=",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "private, max-age=3600",
+                "Cache-Control": "public, max-age=3600",
                 "Cache-Tag": {
                   "$concat": [
                     "asset-",
@@ -6213,6 +6184,21 @@
               "headersPresent": [
                 "ETag"
               ]
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "private.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/api-key-missing-permission"
             }
           }
         },

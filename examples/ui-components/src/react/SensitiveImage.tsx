@@ -28,7 +28,8 @@ export function SensitiveImage({
     <figure style={{ aspectRatio, margin: 0, position: "relative" }}>
       {!restricted || ageConfirmed ? (
         <img
-          src={getAssetUrl({ ...asset, viewerClaims: { ageConfirmed } })}
+          // Claims make the response private and uncacheable: send them only when needed.
+          src={getAssetUrl(restricted ? { ...asset, viewerClaims: { ageConfirmed } } : asset)}
           alt={alt}
           style={fill}
         />

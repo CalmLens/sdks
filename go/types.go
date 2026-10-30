@@ -875,8 +875,8 @@ const (
 	// ResourceRendered is the default: the asset rendered through a Lens, Transform or
 	// TransformSteps, or its default rendition when none is given.
 	ResourceRendered = "rendered"
-	// ResourcePlaceholder is a small blurred PNG, public for public assets whatever their
-	// moderation status. It takes no Lens, Transform or TransformSteps, and needs no age confirmation.
+	// ResourcePlaceholder is a small blurred PNG, public for every asset whatever its visibility
+	// or moderation status. It takes no Lens, Transform or TransformSteps, and needs no age confirmation.
 	ResourcePlaceholder = "placeholder"
 )
 

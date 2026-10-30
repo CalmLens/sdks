@@ -133,6 +133,18 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         with self.assertRaises(CalmLensError):
             MockCalmLensServerClient(mock_options={"cdn_base_url": "https://x.test"})
 
+    def test_accepts_upload_timeout_and_response_size_limit(self):
+        c = MockCalmLensServerClient(upload_timeout=90, max_response_bytes=64,
+                                     mock_options={"create_id": lambda prefix: "a1"})
+        self.assertEqual(c.upload_timeout, 90)
+        # The limit applies to the mock's answers as to the API's.
+        with self.assertRaises(CalmLensError) as raised:
+            c.assets.create(name="a", content={"plainText": "a", "type": "text/plain"})
+        self.assertEqual(raised.exception.code, "sdk/response-too-large")
+        with self.assertRaises(CalmLensError) as invalid:
+            MockCalmLensServerClient(upload_timeout=0)
+        self.assertEqual(invalid.exception.code, "sdk/invalid-config")
+
     def test_captures_requests(self):
         c = MockCalmLensServerClient(project_id="p1", mock_options={"create_id": lambda prefix: "a1"})
         c.assets.classify(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})

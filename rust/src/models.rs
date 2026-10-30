@@ -539,7 +539,7 @@ string_enum! {
         Original = "original",
         /// The asset rendered through a lens or transform, or its default rendition (the default).
         Rendered = "rendered",
-        /// A small blurred PNG, public for public assets whatever their moderation status. Only
+        /// A small blurred PNG, public whatever the asset's visibility or moderation. Only
         /// for CDN URLs, without a lens or transform; it needs no age confirmation.
         Placeholder = "placeholder",
     }

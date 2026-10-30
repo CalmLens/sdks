@@ -189,9 +189,9 @@ removed = client.hash_lists.create(name="Removed images", action="block")
 client.hash_lists.add_entry(hash_list_id=removed["id"], asset_id=asset_id, label="Report 1042")
 entries = client.hash_lists.list_entries(hash_list_id=removed["id"], page_size=50)  # entries["nextCursor"]
 
-client.ensure_lens(identifier="thumbnail", name="Thumbnail", type="image", active=True, version=1,
-                   transforms=[{"type": "imageTransform", "options": {"width": 128}}])
-signed = client.assets.create_signed_url(asset_id=asset_id, resource="rendered", lens="thumbnail")
+client.ensure_lens(identifier="product-thumbnail", name="Product thumbnail", type="image",
+                   active=True, version=1, transforms=[{"type": "imageTransform", "options": {"width": 128}}])
+signed = client.assets.create_signed_url(asset_id=asset_id, resource="rendered", lens="product-thumbnail")
 ```
 
 `create` queues processing; `classify` waits for classification. Text uses UTF-8 `text/plain`
@@ -581,9 +581,9 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   `Cache-Tag: asset-<id>`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox;
   default-src 'none'`, `Content-Disposition: attachment` for content a browser could run, and,
   for images, an `ETag` and an `Expires` a year ahead. The `placeholder` resource is the image's
-  ThumbHash as a PNG, served for public assets whatever their moderation status (`max-age=3600`)
-  and refused with `asset/not-available` once purged or removed, for assets without one, and for
-  private assets without `assets:download`.
+  ThumbHash as a PNG, served publicly for every asset whatever its visibility or moderation status
+  (`public, max-age=3600`) and refused with `asset/not-available` once purged or removed and for
+  assets without one.
 - `assets.wait_for_decision` reads the mock's `database_storage` and takes no real time: it
   returns an asset that is already decided (or whose processing failed) and raises
   `sdk/timeout` at once for one whose moderation stays `pending`. Set the stored asset's

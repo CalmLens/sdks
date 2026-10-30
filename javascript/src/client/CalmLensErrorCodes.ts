@@ -38,6 +38,7 @@ export const API_ERROR_CODES = {
   ASSET_SAFETY_HELD: "asset/safety-held",
   ASSET_NOT_RETRYABLE: "asset/not-retryable",
   ASSET_CONTENT_UNAVAILABLE: "asset/content-unavailable",
+  ASSET_CONTENT_PURGED: "asset/content-purged",
   ASSET_NOT_DECIDED: "asset/not-decided",
   ASSET_POLICY_CHANGED: "asset/policy-changed",
   ASSET_REVIEWED: "asset/reviewed",
@@ -48,6 +49,7 @@ export const API_ERROR_CODES = {
   FOLDER_NOT_EMPTY: "folder/not-empty",
   FOLDER_PARENT_CYCLE: "folder/parent-cycle",
   LENS_VERSION_CONFLICT: "lens/version-conflict",
+  LENS_IDENTIFIER_RESERVED: "lens/identifier-reserved",
   HASH_LIST_NOT_FOUND: "hash-list/not-found",
   HASH_LIST_ENTRY_NOT_FOUND: "hash-list/entry-not-found",
   HASH_LIST_LIMIT_REACHED: "hash-list/limit-reached",
@@ -232,6 +234,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 409,
     message: "This asset's content is no longer stored, so it can't be processed again. Upload it again instead.",
   },
+  "asset/content-purged": {
+    status: 409,
+    message: "This asset's content was purged, so it can only be blocked. Upload it again to have it moderated afresh.",
+  },
   "asset/not-decided": {
     status: 409,
     message: "This asset has no automatic moderation decision to explain yet.",
@@ -271,6 +277,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "lens/version-conflict": {
     status: 409,
     message: "Lens updates require a version greater than the current version.",
+  },
+  "lens/identifier-reserved": {
+    status: 409,
+    message: "The identifier belongs to a built-in lens (thumbnail, sm, md, lg, xl or 2xl). Give the lens another identifier.",
   },
   "hash-list/not-found": {
     status: 404,

@@ -1512,8 +1512,8 @@ class CDN:
         rendered resource optionally goes through a named ``lens``, a ``transform``, or both (the lens runs
         first); ``original`` takes neither. Private assets need an API key or a signed URL.
 
-        ``placeholder`` is a small blurred PNG that the CDN serves for public assets whatever their
-        moderation status. It takes no ``lens`` or ``transform``, and needs no age confirmation.
+        ``placeholder`` is a small blurred PNG that the CDN serves publicly for every asset, whatever
+        its visibility or moderation status. It takes no ``lens`` or ``transform``, and needs no age confirmation.
 
         ``viewer_claims={"ageConfirmed": True}`` appends a ``viewerClaims`` query parameter, which
         the CDN requires before it serves an asset whose moderation status is ``age-restricted``,

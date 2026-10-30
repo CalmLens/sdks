@@ -72,6 +72,8 @@ error_codes! {
     AssetNotRetryable = "asset/not-retryable", 409;
     /// `asset/content-unavailable` (HTTP 409): This asset's content is no longer stored, so it can't be processed again. Upload it again instead.
     AssetContentUnavailable = "asset/content-unavailable", 409;
+    /// `asset/content-purged` (HTTP 409): This asset's content was purged, so it can only be blocked. Upload it again to have it moderated afresh.
+    AssetContentPurged = "asset/content-purged", 409;
     /// `asset/not-decided` (HTTP 409): This asset has no automatic moderation decision to explain yet.
     AssetNotDecided = "asset/not-decided", 409;
     /// `asset/policy-changed` (HTTP 409): The project's moderation policy has changed since this decision, so it can't be explained as made. Re-run moderation with the current policy instead.
@@ -92,6 +94,8 @@ error_codes! {
     FolderParentCycle = "folder/parent-cycle", 409;
     /// `lens/version-conflict` (HTTP 409): Lens updates require a version greater than the current version.
     LensVersionConflict = "lens/version-conflict", 409;
+    /// `lens/identifier-reserved` (HTTP 409): The identifier belongs to a built-in lens (thumbnail, sm, md, lg, xl or 2xl). Give the lens another identifier.
+    LensIdentifierReserved = "lens/identifier-reserved", 409;
     /// `hash-list/not-found` (HTTP 404): Hash list not found. Check the list ID in the portal.
     HashListNotFound = "hash-list/not-found", 404;
     /// `hash-list/entry-not-found` (HTTP 404): Hash list entry not found.
@@ -148,6 +152,6 @@ error_codes! {
     AppealInvalidAction = "appeal/invalid-action", 400;
     /// `appeal/safety-held` (HTTP 409): A safety hold prevents this appeal from being submitted or applied.
     AppealSafetyHeld = "appeal/safety-held", 409;
-    /// `appeal/content-unavailable` (HTTP 409): The appeal's content is unavailable, or approval would require restoring removed content.
+    /// `appeal/content-unavailable` (HTTP 409): The appeal's content is unavailable, or the asset's content was purged, so it can only be blocked.
     AppealContentUnavailable = "appeal/content-unavailable", 409;
 }

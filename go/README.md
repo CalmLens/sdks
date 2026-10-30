@@ -630,9 +630,8 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
   whatever the key. An age-restricted asset requested without `ViewerClaims` with `AgeConfirmed`
   pointing to `true` returns 403 `viewer/age-confirmation-required` whatever the key. A private
   asset returns 403 `asset/api-key-missing-permission` unless the key has the `assets:download` permission; the default key has no grants, and `SetAPIKeyGrants`
-  replaces them (the key stays the same). The placeholder is served for public images whatever
-  their moderation, and refused once purged or removed, and for private images without the
-  permission.
+  replaces them (the key stays the same). The placeholder is served for every image whatever its
+  visibility or moderation, and refused once purged or removed.
 - `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeLimited`, `OutcomeAgeRestricted`,
   `OutcomePurged`) applies a reviewer's decision and adds the matching `asset.<decision>` event
   with a `decided-by: reviewer` fact; purging removes the content with `RemovalReason`

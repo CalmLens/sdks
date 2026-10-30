@@ -78,6 +78,8 @@ public final class ErrorCodes {
   public static final String ASSET_NOT_RETRYABLE = "asset/not-retryable";
   /** {@code asset/content-unavailable} (HTTP 409). */
   public static final String ASSET_CONTENT_UNAVAILABLE = "asset/content-unavailable";
+  /** {@code asset/content-purged} (HTTP 409). */
+  public static final String ASSET_CONTENT_PURGED = "asset/content-purged";
   /** {@code asset/not-decided} (HTTP 409). */
   public static final String ASSET_NOT_DECIDED = "asset/not-decided";
   /** {@code asset/policy-changed} (HTTP 409). */
@@ -98,6 +100,8 @@ public final class ErrorCodes {
   public static final String FOLDER_PARENT_CYCLE = "folder/parent-cycle";
   /** {@code lens/version-conflict} (HTTP 409). */
   public static final String LENS_VERSION_CONFLICT = "lens/version-conflict";
+  /** {@code lens/identifier-reserved} (HTTP 409). */
+  public static final String LENS_IDENTIFIER_RESERVED = "lens/identifier-reserved";
   /** {@code viewer/invalid-region} (HTTP 400). */
   public static final String INVALID_VIEWER_REGION = "viewer/invalid-region";
   /** {@code viewer/region-required} (HTTP 403). */
@@ -220,6 +224,7 @@ public final class ErrorCodes {
       Map.entry(ASSET_SAFETY_HELD, 423),
       Map.entry(ASSET_NOT_RETRYABLE, 409),
       Map.entry(ASSET_CONTENT_UNAVAILABLE, 409),
+      Map.entry(ASSET_CONTENT_PURGED, 409),
       Map.entry(ASSET_NOT_DECIDED, 409),
       Map.entry(ASSET_POLICY_CHANGED, 409),
       Map.entry(ASSET_REVIEWED, 409),
@@ -230,6 +235,7 @@ public final class ErrorCodes {
       Map.entry(FOLDER_NOT_EMPTY, 409),
       Map.entry(FOLDER_PARENT_CYCLE, 409),
       Map.entry(LENS_VERSION_CONFLICT, 409),
+      Map.entry(LENS_IDENTIFIER_RESERVED, 409),
       Map.entry(INVALID_VIEWER_REGION, 400),
       Map.entry(VIEWER_REGION_REQUIRED, 403),
       Map.entry(REGIONAL_EVIDENCE_REQUIRED, 403),

@@ -988,15 +988,13 @@ declare const EVENT_TYPE_INFO: {
         allowed: "allowed";
         blocked: "blocked";
         limited: "limited";
-        pending: "pending";
-        purged: "purged";
       }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      automatedOutcome: "age-restricted" | "allowed" | "blocked" | "limited" | "pending" | "purged";
+      automatedOutcome: "age-restricted" | "allowed" | "blocked" | "limited";
     }>;
     factInfo: {
       label: string;
@@ -1030,8 +1028,6 @@ declare const EVENT_TYPE_INFO: {
         allowed: "allowed";
         blocked: "blocked";
         limited: "limited";
-        pending: "pending";
-        purged: "purged";
       }>;
     }, zod.core.$strip>;
   };

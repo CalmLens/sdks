@@ -1,3 +1,4 @@
+import "./Permissions-BfEFqPWR.js";
 import "zod";
 interface RequestErrorCode {
   getId(): string;
@@ -42,6 +43,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly ASSET_SAFETY_HELD: RequestErrorCode;
   readonly ASSET_NOT_RETRYABLE: RequestErrorCode;
   readonly ASSET_CONTENT_UNAVAILABLE: RequestErrorCode;
+  readonly ASSET_CONTENT_PURGED: RequestErrorCode;
   readonly ASSET_NOT_DECIDED: RequestErrorCode;
   readonly ASSET_POLICY_CHANGED: RequestErrorCode;
   readonly ASSET_REVIEWED: RequestErrorCode;
@@ -52,6 +54,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly FOLDER_NOT_EMPTY: RequestErrorCode;
   readonly FOLDER_PARENT_CYCLE: RequestErrorCode;
   readonly LENS_VERSION_CONFLICT: RequestErrorCode;
+  readonly LENS_IDENTIFIER_RESERVED: RequestErrorCode;
   readonly HASH_LIST_NOT_FOUND: RequestErrorCode;
   readonly HASH_LIST_ENTRY_NOT_FOUND: RequestErrorCode;
   readonly HASH_LIST_LIMIT_REACHED: RequestErrorCode;

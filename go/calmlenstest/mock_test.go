@@ -138,6 +138,21 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 	}
 }
 
+func TestMockAppliesUploadTimeoutAndResponseSizeLimit(t *testing.T) {
+	if _, err := NewServerClient(Options{UploadTimeout: -time.Second}); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidConfig {
+		t.Fatal("invalid upload timeout accepted", err)
+	}
+	c, err := NewServerClient(Options{UploadTimeout: time.Minute, MaxResponseBytes: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The limit applies to the mock's answers as to the API's.
+	_, err = c.Assets.Create(context.Background(), calmlens.SubmitAssetOptions{Name: "note", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
+	if calmlens.ErrorCode(err) != calmlens.CodeSDKResponseTooLarge {
+		t.Fatal("response size limit not applied", err)
+	}
+}
+
 func TestMockSimulatesTransportFailures(t *testing.T) {
 	c, err := NewServerClient(Options{})
 	if err != nil {

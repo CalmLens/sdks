@@ -895,8 +895,8 @@ module CalmLens
         left.to_s <=> right.to_s
       end
 
-      # Answers like the CDN: a placeholder is the asset's ThumbHash as a PNG, public for public
-      # assets whatever their moderation; other resources pass delivery checks first, which refuse
+      # Answers like the CDN: a placeholder is the asset's ThumbHash as a PNG, public whatever
+      # the asset's visibility or moderation; other resources pass delivery checks first, which refuse
       # everyone (content still uploading, blocked or purged, failed processing, removed content),
       # then an age-restricted asset needs `viewerClaims.ageConfirmed=true` whatever the key, and a
       # private asset needs an API key with `assets:download` for its folder.
@@ -946,19 +946,15 @@ module CalmLens
 
       def not_available = error('asset/not-available', 'Asset is not available', status: 403)
 
-      # Like the CDN's placeholder handler: an image's ThumbHash, public for public assets whatever
-      # their moderation; refused for purged assets, assets without one (not yet classified, or
-      # content removed) and, for private assets, keys without `assets:download`.
+      # Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+      # visibility or moderation; refused for purged assets and assets without one (not yet
+      # classified, or content removed).
       def placeholder(method, item)
         thumbhash = item.dig('content', 'image', 'thumbhash')
-        public = item['visibility'] == 'public'
-        if thumbhash.nil? || item['classification']['moderation']['status'] == 'purged' ||
-           (!public && !can_download?(item['folderId']))
-          return not_available
-        end
+        return not_available if thumbhash.nil? || item['classification']['moderation']['status'] == 'purged'
 
         cdn_response(method, Placeholder.png(thumbhash),
-                     'content-type' => 'image/png', 'cache-control' => "#{public ? 'public' : 'private'}, max-age=3600",
+                     'content-type' => 'image/png', 'cache-control' => 'public, max-age=3600',
                      'cache-tag' => "asset-#{item['id']}", 'etag' => "\"#{thumbhash}\"")
       end
 

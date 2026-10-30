@@ -48,6 +48,7 @@ final class ErrorCodes
     public const ASSET_SAFETY_HELD = 'asset/safety-held';
     public const ASSET_NOT_RETRYABLE = 'asset/not-retryable';
     public const ASSET_CONTENT_UNAVAILABLE = 'asset/content-unavailable';
+    public const ASSET_CONTENT_PURGED = 'asset/content-purged';
     public const ASSET_NOT_DECIDED = 'asset/not-decided';
     public const ASSET_POLICY_CHANGED = 'asset/policy-changed';
     public const ASSET_REVIEWED = 'asset/reviewed';
@@ -58,6 +59,7 @@ final class ErrorCodes
     public const FOLDER_NOT_EMPTY = 'folder/not-empty';
     public const FOLDER_PARENT_CYCLE = 'folder/parent-cycle';
     public const LENS_VERSION_CONFLICT = 'lens/version-conflict';
+    public const LENS_IDENTIFIER_RESERVED = 'lens/identifier-reserved';
     public const HASH_LIST_NOT_FOUND = 'hash-list/not-found';
     public const HASH_LIST_ENTRY_NOT_FOUND = 'hash-list/entry-not-found';
     public const HASH_LIST_LIMIT_REACHED = 'hash-list/limit-reached';
@@ -126,6 +128,7 @@ final class ErrorCodes
         'asset/safety-held' => 423,
         'asset/not-retryable' => 409,
         'asset/content-unavailable' => 409,
+        'asset/content-purged' => 409,
         'asset/not-decided' => 409,
         'asset/policy-changed' => 409,
         'asset/reviewed' => 409,
@@ -136,6 +139,7 @@ final class ErrorCodes
         'folder/not-empty' => 409,
         'folder/parent-cycle' => 409,
         'lens/version-conflict' => 409,
+        'lens/identifier-reserved' => 409,
         'hash-list/not-found' => 404,
         'hash-list/entry-not-found' => 404,
         'hash-list/limit-reached' => 409,

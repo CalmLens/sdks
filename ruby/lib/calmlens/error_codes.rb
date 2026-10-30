@@ -41,6 +41,7 @@ module CalmLens
     ASSET_SAFETY_HELD = 'asset/safety-held'
     ASSET_NOT_RETRYABLE = 'asset/not-retryable'
     ASSET_CONTENT_UNAVAILABLE = 'asset/content-unavailable'
+    ASSET_CONTENT_PURGED = 'asset/content-purged'
     ASSET_NOT_DECIDED = 'asset/not-decided'
     ASSET_POLICY_CHANGED = 'asset/policy-changed'
     ASSET_REVIEWED = 'asset/reviewed'
@@ -51,6 +52,7 @@ module CalmLens
     FOLDER_NOT_EMPTY = 'folder/not-empty'
     FOLDER_PARENT_CYCLE = 'folder/parent-cycle'
     LENS_VERSION_CONFLICT = 'lens/version-conflict'
+    LENS_IDENTIFIER_RESERVED = 'lens/identifier-reserved'
     HASH_LIST_NOT_FOUND = 'hash-list/not-found'
     HASH_LIST_ENTRY_NOT_FOUND = 'hash-list/entry-not-found'
     HASH_LIST_LIMIT_REACHED = 'hash-list/limit-reached'
@@ -119,6 +121,7 @@ module CalmLens
       'asset/safety-held' => 423,
       'asset/not-retryable' => 409,
       'asset/content-unavailable' => 409,
+      'asset/content-purged' => 409,
       'asset/not-decided' => 409,
       'asset/policy-changed' => 409,
       'asset/reviewed' => 409,
@@ -129,6 +132,7 @@ module CalmLens
       'folder/not-empty' => 409,
       'folder/parent-cycle' => 409,
       'lens/version-conflict' => 409,
+      'lens/identifier-reserved' => 409,
       'hash-list/not-found' => 404,
       'hash-list/entry-not-found' => 404,
       'hash-list/limit-reached' => 409,

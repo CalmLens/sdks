@@ -10,7 +10,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt,
     sync::{Arc, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 pub(super) const API_BASE_URL: &str = "https://api.calmlens.invalid/v1";
@@ -157,6 +157,8 @@ pub struct MockOptions {
     pub(super) max_retries: u32,
     pub(super) api_base_url: String,
     pub(super) cdn_base_url: String,
+    pub(super) upload_timeout: Option<Duration>,
+    pub(super) max_response_bytes: Option<usize>,
     queued_outcome: OutcomeFor,
     analyzed_outcome: OutcomeFor,
     create_id: CreateId,
@@ -171,6 +173,8 @@ impl Default for MockOptions {
             max_retries: 0,
             api_base_url: API_BASE_URL.into(),
             cdn_base_url: CDN_BASE_URL.into(),
+            upload_timeout: None,
+            max_response_bytes: None,
             queued_outcome: Arc::new(|_| MockOutcome::Pending),
             analyzed_outcome: Arc::new(|_| MockOutcome::Allowed),
             create_id: Arc::new(crate::transport::new_id),
@@ -199,6 +203,8 @@ impl fmt::Debug for MockOptions {
             .field("max_retries", &self.max_retries)
             .field("api_base_url", &self.api_base_url)
             .field("cdn_base_url", &self.cdn_base_url)
+            .field("upload_timeout", &self.upload_timeout)
+            .field("max_response_bytes", &self.max_response_bytes)
             .field("signed_url_base_url", &self.signed_url_base_url)
             .finish_non_exhaustive()
     }
@@ -232,6 +238,18 @@ impl MockOptions {
     /// from the API base URL.
     pub fn cdn_base_url(mut self, value: impl Into<String>) -> Self {
         self.cdn_base_url = value.into();
+        self
+    }
+    /// The mock client's binary upload timeout, as
+    /// [`ServerClientBuilder::upload_timeout`](crate::ServerClientBuilder::upload_timeout).
+    pub fn upload_timeout(mut self, value: Duration) -> Self {
+        self.upload_timeout = Some(value);
+        self
+    }
+    /// The largest response body the mock client reads, as
+    /// [`ServerClientBuilder::max_response_bytes`](crate::ServerClientBuilder::max_response_bytes).
+    pub fn max_response_bytes(mut self, value: usize) -> Self {
+        self.max_response_bytes = Some(value);
         self
     }
     /// The outcome of `assets().create` and queued multipart uploads.
@@ -2055,23 +2073,21 @@ impl Backend {
         let can_download =
             || self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"));
         if resource == "placeholder" {
-            // Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
-            // whatever their moderation; refused for purged assets, assets without one (not yet
-            // classified, or content removed) and, for private assets, keys without
-            // `assets:download`.
+            // Like the CDN's placeholder handler: an image's ThumbHash, public whatever the
+            // asset's visibility or moderation; refused for purged assets and assets without one
+            // (not yet classified, or content removed).
             let thumbhash = text(&asset["content"]["image"]["thumbhash"]);
-            if thumbhash.is_empty() || status == "purged" || (!public && !can_download()) {
+            if thumbhash.is_empty() || status == "purged" {
                 return not_available();
             }
             let Some(png) = super::placeholder::placeholder_png(thumbhash) else {
                 return not_available();
             };
-            let access = if public { "public" } else { "private" };
             return cdn_response(
                 png,
                 &[
                     ("content-type", "image/png".into()),
-                    ("cache-control", format!("{access}, max-age=3600")),
+                    ("cache-control", "public, max-age=3600".into()),
                     ("cache-tag", format!("asset-{id}")),
                     ("etag", format!("\"{thumbhash}\"")),
                 ],

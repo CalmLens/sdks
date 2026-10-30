@@ -14,7 +14,8 @@ export function renderSensitiveImage(
   figure.append(img);
 
   if (!restricted || ageConfirmed) {
-    img.src = getAssetUrl({ ...asset, viewerClaims: { ageConfirmed } });
+    // Claims make the response private and uncacheable: send them only when needed.
+    img.src = getAssetUrl(restricted ? { ...asset, viewerClaims: { ageConfirmed } } : asset);
     img.alt = alt;
   } else {
     img.src = getAssetUrl({ ...asset, resource: "placeholder" });

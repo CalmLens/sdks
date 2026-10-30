@@ -366,8 +366,8 @@ export interface IdempotencyOptions {
 /**
  * What a CDN URL serves: the asset's `original` file, exactly as uploaded; its `rendered` form for
  * display, in the best format the client accepts, which takes lenses and transforms; or its
- * `placeholder`, a small blurred PNG that is public for public assets whatever their moderation
- * status. Defaults to `rendered`; ask for `original` to download the exact file. A
+ * `placeholder`, a small blurred PNG that is public for every asset whatever its visibility or
+ * moderation status. Defaults to `rendered`; ask for `original` to download the exact file. A
  * placeholder takes no lens or transform.
  */
 export type CdnResource = "original" | "rendered" | "placeholder";

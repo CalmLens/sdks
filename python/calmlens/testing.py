@@ -29,8 +29,8 @@ from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from urllib.request import Request
 
 from . import error_codes
-from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_TIMEOUT, CalmLensServerClient, _invalid, _json, _merge,
-                     _sign_upload_token)
+from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_TIMEOUT, CalmLensServerClient,
+                     _invalid, _json, _merge, _sign_upload_token)
 from .errors import CalmLensError
 from .moderation_context import select_moderation_context_items
 from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, HashList, HashListEntry,
@@ -509,15 +509,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
     def __init__(self, *, api_key: str | None = None, project_id: str = "mock-project",
                  base_url: str = "https://api.calmlens.invalid/v1",
                  cdn_base_url: str = "https://mock.calmlens.invalid/v1",
-                 timeout: float = DEFAULT_TIMEOUT, connect_timeout: float = DEFAULT_CONNECT_TIMEOUT,
-                 max_retries: int = 0, mock_options: MockOptions | None = None):
+                 timeout: float = DEFAULT_TIMEOUT, upload_timeout: float | None = None,
+                 connect_timeout: float = DEFAULT_CONNECT_TIMEOUT, max_retries: int = 0,
+                 max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES, mock_options: MockOptions | None = None):
         options: MockOptions = mock_options if mock_options is not None else {}
         unknown = set(options) - _MOCK_OPTIONS
         if unknown:
             raise _invalid("Unknown mock options: " + ", ".join(sorted(unknown)), error_codes.SDK_INVALID_CONFIG)
         super().__init__(api_key=api_key or create_mock_api_key(), project_id=project_id, base_url=base_url,
-                         cdn_base_url=cdn_base_url, timeout=timeout, connect_timeout=connect_timeout,
-                         max_retries=max_retries, transport=self._serve)
+                         cdn_base_url=cdn_base_url, timeout=timeout, upload_timeout=upload_timeout,
+                         connect_timeout=connect_timeout, max_retries=max_retries,
+                         max_response_bytes=max_response_bytes, transport=self._serve)
         # The fake API answers multipart size checks in the API's order.
         self._defer_upload_checks = True
         self._state_lock = threading.RLock()
@@ -1383,16 +1385,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
             status = asset["classification"]["moderation"].get("status")
             if resource == "placeholder":
-                # Like the CDN's placeholder handler: an image's ThumbHash, public for public assets
-                # whatever their moderation status; refused for purged assets, assets without one
-                # (not yet classified, or content removed) and, for private assets, keys without
-                # assets:download.
+                # Like the CDN's placeholder handler: an image's ThumbHash, served publicly for every
+                # asset whatever its visibility or moderation status; refused for purged assets and
+                # assets without one (not yet classified, or content removed).
                 thumbhash = cast(dict[str, Any], asset["content"].get("image") or {}).get("thumbhash")
-                public = asset["visibility"] == "public"
-                if not thumbhash or status == "purged" or (not public and not self._can_download(asset.get("folderId"))):
+                if not thumbhash or status == "purged":
                     return self._failure_response(not_available)
                 return self._cdn_response(method, _thumbhash_png(thumbhash), {
-                    "Content-Type": "image/png", "Cache-Control": f"{'public' if public else 'private'}, max-age=3600",
+                    "Content-Type": "image/png", "Cache-Control": "public, max-age=3600",
                     "Cache-Tag": f"asset-{asset['id']}", "ETag": f'"{thumbhash}"'})
             # Like the CDN, delivery checks come first and refuse everyone: content still uploading,
             # blocked or purged, failed processing or removed content.

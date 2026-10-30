@@ -64,13 +64,29 @@ describe("getMediaState", () => {
     });
   });
 
-  it("uses a signed URL as given, without a placeholder that would need the same access", () => {
+  it("uses a signed URL as given, with the public CDN placeholder", () => {
     const url = "https://cdn.calmlens.com/v1/assets/p/a1/rendered?exp=1&sig=abc";
     expect(getMediaState({ projectId: PROJECT_ID, assetId: "a1", url })).toEqual({
       kind: "image",
       src: url,
-      placeholderUrl: undefined,
+      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
     });
+  });
+
+  it("sends only viewer claims that differ from the defaults, and only the region for placeholders", () => {
+    const options = { projectId: PROJECT_ID, assetId: "a1" };
+    const unconfirmed = getMediaState({ ...options, viewerClaims: { ageConfirmed: false } });
+    expect(unconfirmed.kind === "image" && unconfirmed.src).toBe(
+      `${CDN}/assets/${PROJECT_ID}/a1/rendered`,
+    );
+    const both = getMediaState({ ...options, viewerClaims: { region: "US", ageConfirmed: true } });
+    if (both.kind !== "image") throw new Error("expected-image");
+    expect(new URL(both.src).searchParams.get("viewerClaims")).toBe(
+      JSON.stringify({ region: "US", ageConfirmed: true }),
+    );
+    expect(new URL(both.placeholderUrl!).searchParams.get("viewerClaims")).toBe(
+      JSON.stringify({ region: "US" }),
+    );
   });
 
   it("draws the placeholder from a stored ThumbHash instead of requesting it", () => {

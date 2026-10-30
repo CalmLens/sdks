@@ -1429,6 +1429,11 @@
       "retryable": false
     },
     {
+      "code": "asset/content-purged",
+      "status": 409,
+      "retryable": false
+    },
+    {
       "code": "asset/not-decided",
       "status": 409,
       "retryable": false
@@ -1475,6 +1480,11 @@
     },
     {
       "code": "lens/version-conflict",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "lens/identifier-reserved",
       "status": 409,
       "retryable": false
     },

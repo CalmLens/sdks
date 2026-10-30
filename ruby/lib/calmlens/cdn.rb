@@ -10,8 +10,8 @@ module CalmLens
     # ({#serve}) or a signed URL ({Assets#create_signed_url}).
     # @option options [String] :asset_identifier the asset ID or external ID
     # @option options [String] :resource `rendered` (default), `original` or `placeholder`. Only `rendered`
-    #   takes a lens or transform. A placeholder is a small blurred PNG that the CDN serves for public assets
-    #   whatever their moderation status; it needs no age confirmation.
+    #   takes a lens or transform. A placeholder is a small blurred PNG that the CDN serves publicly for every
+    #   asset whatever its visibility or moderation status; it needs no age confirmation.
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash, Array<Hash>] :transform a selector such as `width=200,fit=cover`,
     #   or structured steps: `{type: 'imageTransform', options: {width: 200}}` or an Array of them

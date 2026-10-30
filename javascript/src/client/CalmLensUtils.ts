@@ -293,8 +293,8 @@ export const validateSignedUrlOptions = (options: {
  *
  * `resource` is `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or
  * transform, and it serves images in the best format the browser accepts. A
- * placeholder is a small blurred PNG that the CDN serves for public assets whatever their
- * moderation status, without requiring age confirmation.
+ * placeholder is a small blurred PNG that the CDN serves publicly for every asset whatever its
+ * visibility or moderation status, without requiring age confirmation.
  */
 export const getAssetUrl = ({
   projectId,
