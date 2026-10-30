@@ -3,7 +3,7 @@ import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
-import { C as msg, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, w as docPropertyInfo, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-CvlLZOVx.js";
+import { C as msg, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, w as docPropertyInfo, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-bcNuce4c.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DjKQmOVp.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
@@ -154,7 +154,22 @@ const MANDATORY_RULES = [
 		}],
 		safetyHold: false
 	},
-	...[],
+	{
+		key: "child-sexual-abuse-material",
+		regions: ["global"],
+		action: "block",
+		category: "criminal-activity",
+		condition: [
+			"criminal-activity-instructions",
+			"criminal-activity-preparation",
+			"criminal-activity-promotion",
+			"criminal-activity-request"
+		].map((conduct) => ({
+			all: ["criminal-activity-csam", conduct],
+			none: []
+		})),
+		safetyHold: true
+	},
 	...[
 		"DE",
 		"AT",
