@@ -30,8 +30,6 @@ public final class ErrorCodes {
   public static final String PERMISSION_DENIED = "auth/permission-denied";
   /** {@code upload/file-too-large} (HTTP 400). */
   public static final String FILE_TOO_LARGE = "upload/file-too-large";
-  /** {@code upload/image-requires-multipart-upload} (HTTP 400). */
-  public static final String IMAGE_REQUIRES_MULTIPART_UPLOAD = "upload/image-requires-multipart-upload";
   /** {@code upload/multipart-image-too-small} (HTTP 400). */
   public static final String MULTIPART_IMAGE_TOO_SMALL = "upload/multipart-image-too-small";
   /** {@code upload/multipart-image-too-large} (HTTP 400). */
@@ -198,7 +196,6 @@ public final class ErrorCodes {
       Map.entry(API_KEY_NOT_ACCEPTED, 403),
       Map.entry(PERMISSION_DENIED, 403),
       Map.entry(FILE_TOO_LARGE, 400),
-      Map.entry(IMAGE_REQUIRES_MULTIPART_UPLOAD, 400),
       Map.entry(MULTIPART_IMAGE_TOO_SMALL, 400),
       Map.entry(MULTIPART_IMAGE_TOO_LARGE, 400),
       Map.entry(IMAGE_EXCEEDED_MAX_DIMENSIONS, 400),

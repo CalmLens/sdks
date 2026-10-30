@@ -6,7 +6,7 @@ import "./EventCatalog-pe_QYTei.js";
 import { t as CursorPage } from "./Page-CHCx12S3.js";
 import { r as TypedEvent } from "./Event-BGf1ikUM.js";
 import "./Lens-DM7EOzP8.js";
-import "./PublicErrorCodes-CCDjaAYB.js";
+import "./PublicErrorCodes-BpCoqQIf.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;

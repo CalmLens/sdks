@@ -29,8 +29,6 @@ const (
 	CodePermissionDenied = "auth/permission-denied"
 	// CodeFileTooLarge is returned with HTTP 400.
 	CodeFileTooLarge = "upload/file-too-large"
-	// CodeImageRequiresMultipartUpload is returned with HTTP 400.
-	CodeImageRequiresMultipartUpload = "upload/image-requires-multipart-upload"
 	// CodeMultipartImageTooSmall is returned with HTTP 400.
 	CodeMultipartImageTooSmall = "upload/multipart-image-too-small"
 	// CodeMultipartImageTooLarge is returned with HTTP 400.
@@ -172,7 +170,6 @@ var publicErrorStatuses = map[string]int{
 	CodeAPIKeyNotAccepted:                 403,
 	CodePermissionDenied:                  403,
 	CodeFileTooLarge:                      400,
-	CodeImageRequiresMultipartUpload:      400,
 	CodeMultipartImageTooSmall:            400,
 	CodeMultipartImageTooLarge:            400,
 	CodeImageExceededMaxDimensions:        400,

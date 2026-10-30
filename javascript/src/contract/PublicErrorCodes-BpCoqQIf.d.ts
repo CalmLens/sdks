@@ -18,7 +18,6 @@ declare const PUBLIC_ERROR_CODES: {
   readonly API_KEY_NOT_ACCEPTED: RequestErrorCode;
   readonly PERMISSION_DENIED: RequestErrorCode;
   readonly FILE_TOO_LARGE: RequestErrorCode;
-  readonly IMAGE_REQUIRES_MULTIPART_UPLOAD: RequestErrorCode;
   readonly MULTIPART_IMAGE_TOO_SMALL: RequestErrorCode;
   readonly MULTIPART_IMAGE_TOO_LARGE: RequestErrorCode;
   readonly IMAGE_EXCEEDED_MAX_DIMENSIONS: RequestErrorCode;

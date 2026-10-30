@@ -72,9 +72,9 @@ const permits = (grants, action, folderId, folders) => grants.some((grant) => {
 	return false;
 });
 /**
-* What a person can let an AI assistant or the CLI do for them. `read` looks at assets, folders and
-* events; `write` also creates, changes and deletes assets and folders. Members, API keys,
-* connectors, sharing, downloads and project settings are never delegated.
+* What a person can let an AI assistant or the CLI do for them. `read` looks at assets, folders,
+* hash lists and events; `write` also creates, changes and deletes assets, folders and hash lists.
+* Members, API keys, connectors, sharing, downloads and project settings are never delegated.
 */
 const AGENT_SCOPE_SCHEMA = zod.enum(["read", "write"]);
 zod.array(AGENT_SCOPE_SCHEMA).min(1).max(2);
