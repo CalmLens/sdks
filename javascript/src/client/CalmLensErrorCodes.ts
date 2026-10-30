@@ -396,6 +396,6 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "appeal/content-unavailable": {
     status: 409,
-    message: "The appeal's content is unavailable, or approval would require restoring removed content.",
+    message: "The appeal's content is unavailable, or the asset's content was purged, so it can only be blocked.",
   },
 };
