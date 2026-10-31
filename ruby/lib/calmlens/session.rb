@@ -334,10 +334,12 @@ module CalmLens
                                                                                  headers: response.headers)
       end
 
-      details = data['details'].is_a?(Hash) ? data['details'].dup : nil
-      details = (details || {}).merge('traceId' => data['traceId']) if data['traceId'].is_a?(String)
-      Error.build(data['code'], data['message'].is_a?(String) ? data['message'] : nil,
-                  status: response.status, details: details, headers: response.headers)
+      # The X-Request-Id header, or the body's `requestId` when a proxy dropped the header.
+      request_id = response.headers['x-request-id'] || (data['requestId'] if data['requestId'].is_a?(String))
+      message = data['message'].is_a?(String) ? data['message'] : nil
+      details = data['details'].is_a?(Hash) ? data['details'] : nil
+      Error.build(data['code'], message, status: response.status, details: details, headers: response.headers,
+                                         request_id: request_id)
     rescue InvalidResponseError => e
       e
     end

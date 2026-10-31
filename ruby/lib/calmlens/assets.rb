@@ -45,13 +45,13 @@ module CalmLens
 
     # Lists one page of assets.
     # @option options [String] :cursor from the previous page
-    # @option options [Integer] :page_size
+    # @option options [Integer] :page_size 1 to 100, default 50
     # @option options [String] :filter an RSQL filter such as `classification.moderation.status==allowed`
-    # @option options [Array<Hash>] :ordering `[{field: 'createdAt', direction: 'DESC'}]`
-    # @return [Hash] `{'items', 'total', 'hasMore', 'cursor', 'pageSize'}`
+    # @option options [Array<Hash>] :ordering `[{field: 'createdAt', direction: 'desc'}]`
+    # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
     def list(options = {})
       call(options) do |api, request|
-        request('GET', project('assets/page'), query: api, request_options: request)
+        request('GET', project('assets'), query: api, request_options: request)
       end
     end
 

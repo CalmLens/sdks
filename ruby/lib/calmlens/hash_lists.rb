@@ -7,7 +7,7 @@ module CalmLens
   class HashLists < Resource
     # Lists one page of the project's hash lists, newest first.
     # @option options [String] :cursor the previous page's `nextCursor`
-    # @option options [Integer] :page_size 1 to 100, default 10
+    # @option options [Integer] :page_size 1 to 100, default 50
     # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
     def list(options = {})
       call(options) do |api, request|
@@ -58,7 +58,7 @@ module CalmLens
     # Lists one page of a list's entries, newest first.
     # @option options [String] :hash_list_id
     # @option options [String] :cursor the previous page's `nextCursor`
-    # @option options [Integer] :page_size
+    # @option options [Integer] :page_size 1 to 100, default 50
     # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
     def list_entries(options)
       call(options) do |api, request|

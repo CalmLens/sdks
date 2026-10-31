@@ -93,18 +93,18 @@ class MockTest < Minitest::Test
     })
     %w[good-b bad-a good-a good-c].each { |name| mock.assets.classify(name: name, content: { plain_text: name, type: 'text/plain' }) }
 
-    page = mock.assets.list(filter: 'classification.moderation.status==allowed', ordering: [{ field: 'createdAt', direction: 'ASC' }],
+    page = mock.assets.list(filter: 'classification.moderation.status==allowed', ordering: [{ field: 'createdAt', direction: 'asc' }],
                             page_size: 2)
     assert_equal [%w[good-b good-a], true], [page['items'].map { |asset| asset['name'] }, page['hasMore']]
     assert_equal(%w[good-c good-a bad-a good-b], mock.assets.each.map { |asset| asset['name'] })
     either = mock.assets.list(filter: 'classification.moderation.status==blocked,name==good-c',
-                              ordering: [{ field: 'createdAt', direction: 'ASC' }])
+                              ordering: [{ field: 'createdAt', direction: 'asc' }])
     assert_equal(%w[bad-a good-c], either['items'].map { |asset| asset['name'] })
     ascending = mock.assets.each(filter: 'name==good-*;classification.moderation.status!=blocked', page_size: 1,
-                                 ordering: [{ field: 'createdAt', direction: 'ASC' }])
+                                 ordering: [{ field: 'createdAt', direction: 'asc' }])
     assert_equal(%w[good-b good-a good-c], ascending.map { |asset| asset['name'] })
     by_name = lambda do |filter|
-      mock.assets.each(filter: filter, ordering: [{ field: 'createdAt', direction: 'ASC' }]).map { |asset| asset['name'] }
+      mock.assets.each(filter: filter, ordering: [{ field: 'createdAt', direction: 'asc' }]).map { |asset| asset['name'] }
     end
     created = mock.assets.each.to_h { |asset| [asset['name'], asset['createdAt']] }
     assert_equal %w[bad-a good-c], by_name.call("name=in=(bad-a,\"good-c\");createdAt=gt=#{created['good-b']}")
@@ -112,6 +112,21 @@ class MockTest < Minitest::Test
     assert_equal %w[good-b bad-a], by_name.call("createdAt=le=#{created['bad-a']}")
     error = assert_raises(CalmLens::InvalidArgumentError) { mock.assets.list(filter: 'name=like=good') }
     assert_equal 'sdk/invalid-argument', error.code
+  end
+
+  def test_mock_errors_always_carry_a_details_object_and_request_id
+    error = assert_raises(CalmLens::NotFoundError) { CalmLens::MockServerClient.new.assets.retrieve(asset_id: 'missing') }
+    assert_equal [{}, 'mock-request-1'], [error.details, error.request_id]
+  end
+
+  def test_mock_events_have_the_public_event_fields
+    mock = CalmLens::MockServerClient.new
+    cursor = mock.events.list['nextCursor']
+    mock.enqueue_event(type: 'api-key.created')
+    event = mock.events.list(cursor: cursor)['items'].first
+    assert_equal %w[asset assetId createdAt description facts id projectId severity title type], event.keys.sort
+    assert_equal [nil, nil, nil], event.values_at('description', 'assetId', 'asset')
+    assert_equal event, CalmLens.to_webhook_event_payload(event)
   end
 
   def test_queued_responses_come_first_then_the_fake_answers

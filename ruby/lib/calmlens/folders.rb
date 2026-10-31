@@ -6,12 +6,9 @@ module CalmLens
     # Lists one page of child folders, sorted by name unless `ordering` says otherwise.
     # @option options [String] :parent_id list this folder's children; omit for the project root
     # @option options [String] :cursor the previous page's `nextCursor`
-    # @option options [Integer] :page_size 1 to 100, default 100
-    # @option options [Array<Hash>] :ordering one `{field: 'name' | 'createdAt', direction: 'ASC' | 'DESC'}`
-    # @option options [String] :search
-    # @option options [Boolean] :search_all search every branch, not only `parent_id`'s children
-    # @option options [Array<String>] :ids folders whose paths to return in `ancestors`
-    # @option options [Boolean] :resolve_only return only the `ancestors` of `ids`
+    # @option options [Integer] :page_size 1 to 100, default 50
+    # @option options [Array<Hash>] :ordering one `{field: 'name' | 'createdAt', direction: 'asc' | 'desc'}`
+    # @option options [String] :search only children whose name contains it
     # @return [Hash] a cursor page (items, nextCursor, hasMore, pageSize, ordering) with ancestors.
     def list(options = {})
       call(options) do |api, request|

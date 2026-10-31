@@ -40,8 +40,8 @@ module CalmLens
     # run transforms or index for semantic search.
     # @api private
     class FakeAPI
-      JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize searchAll resolveOnly limit
-                      processingOptions metadata context].freeze
+      JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize limit processingOptions metadata
+                      context].freeze
       # Keyword search fields, in the order matches are reported, and where each value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
@@ -50,8 +50,8 @@ module CalmLens
       MAX_SEARCH_TOKENS = 8
       MAX_SEARCH_LIMIT = 20
       MAX_SEARCH_QUERY_LENGTH = 200
-      DEFAULT_EVENTS_PAGE_SIZE = 50
-      DEFAULT_PAGE_SIZE = 10
+      # Every API cursor list returns this many items unless `pageSize` says otherwise.
+      DEFAULT_PAGE_SIZE = 50
       MAX_PAGE_SIZE = 100
       REVIEW_DECISIONS = %w[allowed limited age-restricted blocked purged].freeze
       MAX_DECISION_NOTE_LENGTH = 1499
@@ -88,8 +88,8 @@ module CalmLens
       # Adds an event to the feed, filling the fields the API always sets.
       def add_event(event)
         time = @now.call
-        record = { 'id' => @create_id.call('evt'), 'projectId' => @project_id, 'severity' => 'low', 'facts' => [],
-                   'createdAt' => time, 'updatedAt' => time }.merge(event)
+        record = { 'id' => @create_id.call('evt'), 'projectId' => @project_id, 'severity' => 'low', 'description' => nil,
+                   'assetId' => nil, 'asset' => nil, 'facts' => [], 'createdAt' => time }.merge(event)
         record['title'] ||= record['type']
         @state.events << record
         record
@@ -120,18 +120,19 @@ module CalmLens
         error(e.code, e.message, details: e.details, status: e.status)
       end
 
-      # An API error response, as the API sends it: the code's status, message and details.
+      # An API error response, as the API sends it: `{ code, message, requestId, details }` with the
+      # code's status, `requestId` matching the `x-request-id` header and `details` always an object.
       def error(code, message = nil, details: nil, status: nil)
-        body = { 'code' => code, 'message' => message || code }
-        body['details'] = details if details
-        respond(status || ErrorCodes::STATUSES.fetch(code, 400), body)
+        id = request_id
+        body = { 'code' => code, 'message' => message || code, 'requestId' => id, 'details' => details || {} }
+        respond(status || ErrorCodes::STATUSES.fetch(code, 400), body, id: id)
       end
 
       private
 
-      def respond(status, data, headers = {})
+      def respond(status, data, headers = {}, id: request_id)
         Response.new(status: status, body: data.nil? ? '' : JSON.generate(data),
-                     headers: { 'content-type' => 'application/json', 'x-request-id' => request_id }.merge(headers))
+                     headers: { 'content-type' => 'application/json', 'x-request-id' => id }.merge(headers))
       end
 
       def request_id = "mock-request-#{@request_count += 1}"
@@ -200,6 +201,8 @@ module CalmLens
 
       def fail!(code, message = nil, details: nil) = raise(Failure.new(code, message, details: details))
 
+      def route_not_found!(method, parts) = fail!(ErrorCodes::ROUTE_NOT_FOUND, "No route for #{method} /#{parts.join('/')}")
+
       # A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
       def invalid!(code, path) = raise(Failure.new(code, "Invalid #{path}", details: { 'path' => path }, status: 400))
 
@@ -215,8 +218,6 @@ module CalmLens
         uri = URI.parse(relative)
         parts = uri.path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
         query = URI.decode_www_form(uri.query.to_s).to_h.to_h { |key, value| [key, query_value(key, value)] }
-        selected_ids = query.keys.grep(/\Aids\[\d+\]\z/).sort_by { |key| key[/\d+/].to_i }
-        query['ids'] = selected_ids.map { |key| query.delete(key) } unless selected_ids.empty?
         content_type = header(headers, 'Content-Type')
         json = content_type == 'application/json' && body ? JSON.parse(body) : {}
         # HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
@@ -259,7 +260,7 @@ module CalmLens
                when 'folders' then folder(method, parts, json)
                when 'hash-lists' then hash_list(method, parts, query, json)
                when 'hash-list-entries' then remove_hash_list_entry(method, parts)
-               else fail!(ErrorCodes::ASSET_NOT_FOUND, 'Not found')
+               else route_not_found!(method, parts)
                end
         data.is_a?(Response) ? data : respond(200, deep_copy(data))
       end
@@ -277,13 +278,13 @@ module CalmLens
         in ['POST', ['folders'], _] then create_folder(json)
         in ['GET', ['hash-lists'], _] then page(project_hash_lists, query, JSON.generate([@project_id]))
         in ['POST', ['hash-lists'], _] then create_hash_list(json)
-        in ['GET', ['assets', 'page'], _] then list(query)
+        in ['GET', ['assets'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
         in ['POST', ['assets', 'batch'], _] then batch(json)
         in ['POST', ['assets'], nil] then create_asset(json, query['queue'] == true, url: json['url'])
         in ['POST', ['assets'], 'content'] then create_asset(query, query['queue'] == true, data: body)
         in ['POST', ['assets'], 'part'] then start_multipart(query, body)
-        else fail!(ErrorCodes::ASSET_NOT_FOUND, 'Not found')
+        else route_not_found!(method, parts)
         end
       end
 
@@ -345,21 +346,19 @@ module CalmLens
         page(RSQL.filter(items, query['filter']), query, JSON.generate([@project_id, query['filter'], query['folderId']]))
       end
 
-      # Like the API: one keyset page of child folders (or search matches), by `name` ascending unless
-      # `ordering` (one entry, `name` or `createdAt`) says otherwise, with an `id` tie-breaker, and the
-      # ancestors of the listed and requested folders. Names compare by code point, so case matters.
+      # Like the API: one keyset page of a parent's child folders, optionally matching `search`, by
+      # `name` ascending unless `ordering` (one entry, `name` or `createdAt`) says otherwise, with an
+      # `id` tie-breaker, and the ancestors of the parent and the listed folders. Names compare by
+      # code point, so case matters.
       def folder_page(query)
         found = project_folders.select do |f|
-          in_scope = (query['searchAll'] && query['search']) || f['parentId'] == query['parentId']
-          in_scope && (!query['search'] || f['name'].downcase.include?(query['search'].downcase))
+          f['parentId'] == query['parentId'] && (!query['search'] || f['name'].downcase.include?(query['search'].downcase))
         end
         invalid!('validation/too-big', 'ordering') if ordering(query, nil).size > 1
-        scope = JSON.generate([@project_id, query['parentId'], query['search'], query['searchAll'] == true])
-        result = page(found, { 'pageSize' => MAX_PAGE_SIZE }.merge(query), scope,
-                      fields: %w[name createdAt], default: { 'field' => 'name', 'direction' => 'ASC' })
-        result.merge!('items' => [], 'nextCursor' => nil, 'hasMore' => false) if query['resolveOnly']
+        scope = JSON.generate([@project_id, query['parentId'], query['search']])
+        result = page(found, query, scope, fields: %w[name createdAt], default: { 'field' => 'name', 'direction' => 'asc' })
         page = result['items']
-        ids = (Array(query['ids']) + [query['parentId']] + page.map { |f| f['id'] }).compact.uniq
+        ids = ([query['parentId']] + page.map { |f| f['id'] }).compact.uniq
         queue = ids.dup
         until queue.empty?
           parent = @state.folders.dig(queue.pop, 'parentId')
@@ -376,7 +375,7 @@ module CalmLens
       # Like the API: without a cursor, no events and a `nextCursor` for now; with one, up to `pageSize`
       # events added since, oldest first. `nextCursor` is never nil.
       def events(query)
-        size = check_range(query.fetch('pageSize', DEFAULT_EVENTS_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
+        size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         feed = @state.events
         return { 'items' => [], 'nextCursor' => "mock_#{feed.size}", 'hasMore' => false } unless query['cursor']
 
@@ -479,7 +478,7 @@ module CalmLens
         keep = processing.is_a?(Hash) && processing['keepContentAfterProcessing'] == true
         context = options['context'].is_a?(Hash) ? ModerationContext.select_items(options['context'].fetch('items', [])) : []
         # Fields the API returns as null when they are not set.
-        asset = { 'id' => @create_id.call('asset'), 'projectId' => @project_id, 'userId' => nil, 'parentId' => nil,
+        asset = { 'id' => @create_id.call('asset'), 'projectId' => @project_id, 'parentId' => nil,
                   'folderId' => options['folderId'], 'uploadPresetId' => options['uploadPresetId'],
                   'createdAt' => now, 'updatedAt' => now, 'name' => options['name'], 'description' => options['description'],
                   'externalId' => options['externalId'], 'externalUrl' => url || options['externalUrl'],
@@ -618,7 +617,7 @@ module CalmLens
           touch(item.merge!('folderId' => json['folderId']))
         in ['POST', 'signed-url'] then signed_url(id, json)
         in ['POST', 'part'] then part(item, query, body)
-        else fail!(ErrorCodes::ASSET_NOT_FOUND, 'Not found')
+        else route_not_found!(method, parts)
         end
       end
 
@@ -865,10 +864,14 @@ module CalmLens
       # One keyset page like the API's: ordered by `fields` (`createdAt` descending by default; an `id`
       # tie-breaker is added), starting after the cursor's values. The cursor is tied to `scope` (the
       # filter, folder or parent) and the ordering, so it only continues the query it came from.
-      def page(items, query, scope, fields: %w[createdAt id], default: { 'field' => 'createdAt', 'direction' => 'DESC' })
+      def page(items, query, scope, fields: %w[createdAt id], default: { 'field' => 'createdAt', 'direction' => 'desc' })
         size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         ordering = ordering(query, default)
-        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Invalid ordering') if ordering.any? { |o| !fields.include?(o['field']) }
+        # Like the API's query schema: each entry's field and direction are enum values.
+        ordering.each_with_index do |rule, index|
+          invalid!('validation/invalid-value', "ordering.#{index}.field") unless fields.include?(rule['field'])
+          invalid!('validation/invalid-value', "ordering.#{index}.direction") unless %w[asc desc].include?(rule['direction'])
+        end
         ordering << { 'field' => 'id', 'direction' => ordering.first['direction'] } unless ordering.any? { |o| o['field'] == 'id' }
         signature = JSON.generate([scope, ordering])
         sorted = items.sort { |a, b| compare_items(a, b, ordering) }
@@ -901,7 +904,7 @@ module CalmLens
       def after_cursor?(item, values, ordering)
         ordering.each_with_index do |rule, index|
           result = compare_values(item[rule['field']], values[index])
-          return rule['direction'] == 'DESC' ? result.negative? : result.positive? unless result.zero?
+          return rule['direction'] == 'desc' ? result.negative? : result.positive? unless result.zero?
         end
         false
       end
@@ -918,7 +921,7 @@ module CalmLens
       def compare_items(left, right, ordering)
         ordering.each do |rule|
           result = compare_values(left[rule['field']], right[rule['field']])
-          return rule['direction'] == 'DESC' ? -result : result unless result.zero?
+          return rule['direction'] == 'desc' ? -result : result unless result.zero?
         end
         0
       end

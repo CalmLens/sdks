@@ -36,7 +36,7 @@ used = CalmLens::ModerationContext.select_items([{ text: 'Nice photo!' }]).map {
 limits = [CalmLens::ModerationContext::USED_ITEMS, CalmLens::ModerationContext::USED_CHARACTERS]
 
 page = client.assets.list(page_size: 20, filter: 'classification.moderation.status==allowed',
-                          ordering: [{ field: 'createdAt', direction: 'DESC' }])
+                          ordering: [{ field: 'createdAt', direction: 'desc' }])
 names = page['items'].map { |item| item['name'] }
 more = page['hasMore']
 client.assets.each(filter: 'classification.moderation.status==blocked') { |item| item['id'] }
@@ -59,7 +59,7 @@ client.assets.delete(asset_id: updated['id'])
 folder = client.folders.create(name: 'Inbox', parent_id: nil)
 client.folders.update(folder_id: folder['id'], name: 'Archive')
 client.folders.move(folder_id: folder['id'], parent_id: nil)
-folders = client.folders.list(ordering: [{ field: 'createdAt', direction: 'DESC' }], page_size: 20)
+folders = client.folders.list(ordering: [{ field: 'createdAt', direction: 'desc' }], page_size: 20)
 folders['items'].map { |item| item['parentId'] }
 client.folders.list(cursor: folders['nextCursor']) if folders['nextCursor']
 client.folders.retrieve(folder_id: folder['id'])
@@ -100,11 +100,11 @@ end
 begin
   client.assets.retrieve(asset_id: 'missing')
 rescue CalmLens::NotFoundError => e
-  [e.code == CalmLens::ErrorCodes::ASSET_NOT_FOUND, e.status, e.request_id, e.details['traceId']]
+  [e.code == CalmLens::ErrorCodes::ASSET_NOT_FOUND, e.status, e.request_id, e.details&.dig('issues')]
 end
 
 webhook = CalmLens.parse_webhook_event(payload: '{}', signature: 'v1=x', timestamp: '1', secret: 'whsec')
-webhook_status = webhook.data['asset']&.dig('classification', 'moderation', 'status')
+webhook_status = webhook.asset&.dig('classification', 'moderation', 'status')
 webhook_test = webhook.test?
 client.close
 

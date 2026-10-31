@@ -22,7 +22,7 @@ module CalmLens
 
   class Error < StandardError
     attr_reader code: String
-    # The API error's details (any JSON) with its `"traceId"`, or nil when it has none.
+    # The API error's details (any JSON), such as validation `issues`, or nil when it has none.
     attr_reader details: Hash[String, json_value]?
     attr_reader status: Integer?
     attr_reader request_id: String?
@@ -228,19 +228,25 @@ module CalmLens
              | [T] (serve_options options) { (Response) -> T } -> T
   end
 
+  # A verified webhook delivery, with the fields of an `events.list` item.
   class WebhookEvent < Struct[untyped]
     attr_accessor id: String
-    attr_accessor type: event_type
+    attr_accessor project_id: String
+    # New types may appear: ignore unknown ones.
+    attr_accessor type: event_type | String
+    attr_accessor severity: event_severity?
+    attr_accessor title: String?
+    attr_accessor description: String?
+    attr_accessor asset_id: String?
+    attr_accessor asset: event_asset?
+    attr_accessor facts: Array[event_fact]
     # Milliseconds since the Unix epoch.
     attr_accessor created_at: Integer
-    attr_accessor project_id: String
-    attr_accessor data: webhook_event_data
-    # Other top-level fields of the delivery body, as received.
-    attr_accessor fields: Hash[String, json_value]
-    def initialize: (id: String, type: event_type, created_at: Integer, project_id: String, data: webhook_event_data,
-                     ?fields: Hash[String, json_value]) -> void
-    def asset_id: () -> String?
-    def facts: () -> Array[event_fact]
+    # The delivery body as received, with every field.
+    attr_accessor payload: Hash[String, json_value]
+    def initialize: (?id: String, ?project_id: String, ?type: event_type | String, ?severity: event_severity?, ?title: String?,
+                     ?description: String?, ?asset_id: String?, ?asset: event_asset?, ?facts: Array[event_fact],
+                     ?created_at: Integer, ?payload: Hash[String, json_value]) -> void
     def test?: () -> bool
     # The delivery body as received, with every field.
     def to_payload: () -> Hash[String, json_value]
@@ -257,7 +263,7 @@ module CalmLens
   module Webhooks
     def self.signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
     def self.headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
-    def self.to_payload: (event event) -> Hash[String, untyped]
+    def self.to_payload: (event event) -> event
     def self.verify: (payload: String, secret: String, ?signature: String?, ?timestamp: String?, ?headers: webhook_headers?,
                       ?tolerance_seconds: Integer, ?now: number) -> bool
     def self.verify_request: (payload: String, headers: webhook_headers, secret: String, ?tolerance_seconds: Integer,
@@ -269,7 +275,7 @@ module CalmLens
 
   def self.create_webhook_signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
   def self.create_webhook_headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
-  def self.to_webhook_event_payload: (event event) -> Hash[String, untyped]
+  def self.to_webhook_event_payload: (event event) -> event
   def self.verify_webhook_signature: (payload: String, secret: String, ?signature: String?, ?timestamp: String?,
                                       ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> bool
   def self.verify_webhook_request: (payload: String, headers: webhook_headers, secret: String, ?tolerance_seconds: Integer,

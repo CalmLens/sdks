@@ -32,12 +32,13 @@ module CalmLens
   #   @return [String] a stable identifier such as `asset/not-found` or `sdk/timeout`.
   #     Compare it with {ErrorCodes} or {SdkErrorCodes}, never with the message.
   # @!attribute [r] details
-  #   @return [Hash{String => Object}, nil] the API's details, with its `"traceId"` when there is one;
-  #     nil when the error has none.
+  #   @return [Hash{String => Object}, nil] the API's details, such as validation `issues`; nil when
+  #     the error has no details object.
   # @!attribute [r] status
   #   @return [Integer, nil] the HTTP status, or nil when no response was received.
   # @!attribute [r] request_id
-  #   @return [String, nil] the `X-Request-Id` response header. Include it when contacting support.
+  #   @return [String, nil] the `X-Request-Id` response header, or the error body's `requestId`.
+  #     Include it when contacting support.
   # @!attribute [r] headers
   #   @return [Hash{String => String}] response headers with lowercase names (empty without a response).
   class Error < StandardError

@@ -234,7 +234,7 @@ module CalmLens
     end
 
     # Adds an event to the mock's events feed. Fields you omit (`id`, `projectId`, `createdAt`,
-    # `severity`, `title`, `facts`) are filled in.
+    # `severity`, `title`, `facts`, and nil `description`, `assetId` and `asset`) are filled in.
     # @param event [Hash] at least `type:`; snake_case keys are converted.
     # @return [Hash] the stored event
     def enqueue_event(event)

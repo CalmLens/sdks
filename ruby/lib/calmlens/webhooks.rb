@@ -14,35 +14,28 @@ module CalmLens
   # Deliveries whose timestamp is further than this from the receiver's clock are rejected.
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300
 
-  # A verified webhook delivery: `{id, type, createdAt, projectId, data}`, where `data` holds the
-  # event's `severity`, `title`, `description`, `assetId`, `asset` and `facts`. Fields CalmLens adds
-  # later are kept: unknown `data`, asset and fact fields stay in `data`, and unknown top-level
-  # fields in `fields`.
+  # A verified webhook delivery. The body has the shape of an {Events#list} item:
+  # `{id, projectId, type, severity, title, description, assetId, asset, facts, createdAt}`.
+  # Fields CalmLens adds later are kept in {#payload}, as are unknown asset and fact fields.
   #
   # @!attribute id [String] the event ID.
-  # @!attribute type [String] such as `asset.allowed`. New types may appear: ignore unknown ones.
-  # @!attribute created_at [Integer] milliseconds since the epoch.
   # @!attribute project_id [String]
-  # @!attribute data [Hash{String => Object}] the event fields, with the API's camelCase keys.
-  # @!attribute fields [Hash{String => Object}] other top-level fields of the body, as received.
-  WebhookEvent = Struct.new(:id, :type, :created_at, :project_id, :data, :fields, keyword_init: true) do
-    def initialize(fields: {}, **members)
-      super
-    end
-
-    # @return [String, nil]
-    def asset_id = data['assetId']
-
-    # @return [Array<Hash>] `{'key', 'value', 'url'?}` entries registered for the event type.
-    def facts = data['facts'].is_a?(Array) ? data['facts'] : []
-
+  # @!attribute type [String] such as `asset.allowed`. New types may appear: ignore unknown ones.
+  # @!attribute severity [String, nil] `low` or `high`.
+  # @!attribute title [String, nil]
+  # @!attribute description [String, nil]
+  # @!attribute asset_id [String, nil]
+  # @!attribute asset [Hash, nil] the asset's status when the event was created.
+  # @!attribute facts [Array<Hash>] `{'key', 'value', 'url'?}` entries registered for the event type.
+  # @!attribute created_at [Integer] milliseconds since the epoch.
+  # @!attribute payload [Hash{String => Object}] the delivery body as received, with every field.
+  WebhookEvent = Struct.new(:id, :project_id, :type, :severity, :title, :description, :asset_id, :asset, :facts,
+                            :created_at, :payload, keyword_init: true) do
     # @return [Boolean] true for a test send from the portal or CLI.
     def test? = Webhooks.test_event?(self)
 
     # @return [Hash{String => Object}] the delivery body as received, with every field.
-    def to_payload
-      fields.merge('id' => id, 'type' => type, 'createdAt' => created_at, 'projectId' => project_id, 'data' => data)
-    end
+    def to_payload = payload
   end
 
   # Webhook signing and verification. Always verify the exact bytes received: read the raw body
@@ -78,24 +71,24 @@ module CalmLens
     end
 
     # Whether an event is a test send from the portal or the CLI rather than a real event: its
-    # `data.facts` hold the registered `{ key: "test", value: true }` fact.
+    # `facts` hold the registered `{ key: "test", value: true }` fact.
     # @param event [WebhookEvent, Hash] a parsed delivery, or a delivery body with string keys
     # @return [Boolean]
     def test_event?(event)
-      data = event.is_a?(Hash) ? event['data'] : event.data
-      facts = data.is_a?(Hash) ? data['facts'] : nil
+      facts = event.is_a?(Hash) ? event['facts'] : event.facts
       facts.is_a?(Array) && facts.any? { |fact| fact.is_a?(Hash) && fact['key'] == 'test' && fact['value'] == true }
     end
 
-    # Converts an event from {Events#list} to the JSON body of its webhook delivery.
+    # Converts an event from {Events#list} to the JSON body of its webhook delivery, which has the
+    # same fields: `description`, `assetId` and `asset` are nil when absent.
     # @param event [Hash] an event with string keys, as {Events#list} returns it
-    # @return [Hash] `{ 'id', 'type', 'createdAt', 'projectId', 'data' }`
+    # @return [Hash] `{ 'id', 'projectId', 'type', 'severity', 'title', 'description', 'assetId', 'asset', 'facts', 'createdAt' }`
     def to_payload(event)
       raise Internal.invalid('event must be a Hash') unless event.is_a?(Hash)
 
-      { 'id' => event['id'], 'type' => event['type'], 'createdAt' => event['createdAt'], 'projectId' => event['projectId'],
-        'data' => { 'severity' => event['severity'], 'title' => event['title'], 'description' => event['description'],
-                    'assetId' => event['assetId'], 'asset' => event['asset'], 'facts' => event['facts'] } }
+      { 'id' => event['id'], 'projectId' => event['projectId'], 'type' => event['type'], 'severity' => event['severity'],
+        'title' => event['title'], 'description' => event['description'], 'assetId' => event['assetId'],
+        'asset' => event['asset'], 'facts' => event['facts'], 'createdAt' => event['createdAt'] }
     end
 
     # Checks a delivery's signature and freshness in constant time. Pass the `signature` and
@@ -156,24 +149,24 @@ module CalmLens
       body = JSON.parse(payload.dup.force_encoding(Encoding::UTF_8))
       raise WebhookVerificationError.new(SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD, 'Webhook body is not a CalmLens event') unless event?(body)
 
-      WebhookEvent.new(id: body['id'], type: body['type'], created_at: body['createdAt'], project_id: body['projectId'],
-                       data: body['data'], fields: body.except('id', 'type', 'createdAt', 'projectId', 'data'))
+      WebhookEvent.new(id: body['id'], project_id: body['projectId'], type: body['type'], severity: body['severity'],
+                       title: body['title'], description: body['description'], asset_id: body['assetId'],
+                       asset: body['asset'], facts: body.fetch('facts', []), created_at: body['createdAt'], payload: body)
     rescue JSON::ParserError, EncodingError => e
       raise WebhookVerificationError.new(SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD, 'Webhook body is not JSON'), cause: e
     end
 
-    # The API's rules for a received body: the envelope fields CalmLens always sends, and the types
-    # of the known `data` fields when present. Unknown fields are accepted.
+    # The API's rules for a received body: the fields CalmLens always sends, and the types of the
+    # other known fields when present. Unknown fields are accepted.
     def event?(body)
       return false unless body.is_a?(Hash) && body['id'].is_a?(String) && body['type'].is_a?(String) &&
-                          body['projectId'].is_a?(String) && body['createdAt'].is_a?(Numeric) && body['data'].is_a?(Hash)
+                          body['projectId'].is_a?(String) && body['createdAt'].is_a?(Numeric)
 
-      data = body['data']
-      optional = ->(key, *types) { !data.key?(key) || types.any? { |type| type.nil? ? data[key].nil? : data[key].is_a?(type) } }
-      asset = data['asset']
+      optional = ->(key, *types) { !body.key?(key) || types.any? { |type| type.nil? ? body[key].nil? : body[key].is_a?(type) } }
+      asset = body['asset']
       optional.call('severity', String) && optional.call('title', String) && optional.call('description', String, nil) &&
         optional.call('assetId', String, nil) && (asset.nil? || (asset.is_a?(Hash) && asset['id'].is_a?(String))) &&
-        (!data.key?('facts') || (data['facts'].is_a?(Array) && data['facts'].all? { |fact| fact?(fact) }))
+        (!body.key?('facts') || (body['facts'].is_a?(Array) && body['facts'].all? { |fact| fact?(fact) }))
     end
 
     def fact?(fact)

@@ -31,7 +31,7 @@ Any method also accepts `request_options:`:
 
 ## Types
 
-`sig/` holds RBS signatures for every public method, with record types for each option Hash and response (in `sig/types.rbs`): `CalmLens::asset` (with `asset_classification`, `asset_moderation` and `asset_content`), `classification_report` (categories, qualifiers, labels, media segments and `features` results), `processing_options_input`, `folder`, `lens`, `event`, `events_page`, `asset_page`, `asset_search_response`, `signed_url`, `webhook_event_data` and the rest. Steep and other RBS tools check your calls and the response keys you read:
+`sig/` holds RBS signatures for every public method, with record types for each option Hash and response (in `sig/types.rbs`): `CalmLens::asset` (with `asset_classification`, `asset_moderation` and `asset_content`), `classification_report` (categories, qualifiers, labels, media segments and `features` results), `processing_options_input`, `folder`, `lens`, `event`, `events_page`, `asset_page`, `asset_search_response`, `signed_url` and the rest. Steep and other RBS tools check your calls and the response keys you read:
 
 ```ruby
 asset = client.assets.classify(name: 'photo.jpg', content: {data: File.binread('photo.jpg'), type: 'image/jpeg'},
@@ -47,7 +47,7 @@ The signatures describe snake_case Symbol option keys; camelCase and String keys
 `assets.classify` and `text.classify` return the asset, whose state is in three parts:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status` (`pending`, `allowed`, `limited`, `age-restricted`, `blocked` or `purged`), category scores, policy assessment, an optional `timeline` and `manualReviews`, each with the reviewer's `decision`. A reviewer decision does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `labels`, and `moderation`. The moderation section contains `status` (`pending`, `allowed`, `limited`, `age-restricted`, `blocked` or `purged`), category scores, policy assessment, an optional `timeline` and `manualReviews`, each with the reviewer's `decision`. A reviewer decision does not change `completedAt`.
 - `content`: `status` is `temporary` (held until processing finishes), `stored` (kept with `keep_content_after_processing: true`) or `removed`, with `removalReason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`). It also holds `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image` (the picture served at the rendered resource), `extractedText` and `safetyHold`.
 
 The moderation status also decides delivery. Show content to everyone only when `asset['classification']['moderation']['status']` is `allowed` or `limited`. CalmLens delivers a `limited` asset like an `allowed` one; it is marked so your app can reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it lower or collapsing it. CalmLens delivers an `age-restricted` asset only with `viewerClaims.ageConfirmed=true`, so show it only behind your own age check. Don't show `blocked` assets (content kept, not delivered) or `purged` ones (content deleted, `removalReason` `policy`). A reviewer's decision takes precedence over the policy's; allowing a purged asset does not restore removed content. New statuses, visibilities and fields may appear in later API versions: the SDK returns them unchanged, so treat any value you do not recognise as not ready.
@@ -138,7 +138,7 @@ See [Upload presets](https://calmlens.com/docs/guides/upload-presets). `CalmLens
 
 ## Pagination
 
-Every list returns a cursor page: pass its `nextCursor` as `cursor:` to fetch the next one (`page_size:` sets its length). Folder pages also hold the `ancestors` of the listed folders, and `folders.list` takes one `ordering:` entry by `name` (the default, ascending) or `createdAt`.
+Every list returns a cursor page: pass its `nextCursor` as `cursor:` to fetch the next one (`page_size:` sets its length, 1 to 100, default 50). `ordering:` entries take a `field:` and a lowercase `direction:`, `'asc'` or `'desc'`. Folder pages also hold the `ancestors` of the listed folders, and `folders.list` takes one `ordering:` entry by `name` (the default, ascending) or `createdAt`.
 
 ```ruby
 page = client.folders.list(parent_id: folder_id, page_size: 50) # items, ancestors, nextCursor, hasMore
@@ -175,11 +175,11 @@ client.events.each_page(cursor: cursor, page_size: 50) do |page|
 end
 ```
 
-Each event carries `facts`, an array of `{'key', 'value', 'url'?}` entries registered for its `type`. An unknown cursor raises `validation/invalid-cursor`.
+Each event has `id`, `projectId`, `type`, `severity`, `title`, `description`, `assetId`, `asset` (the asset's status when the event was created), `facts` and `createdAt`; `description`, `assetId` and `asset` are nil when the event has none. `facts` is an array of `{'key', 'value', 'url'?}` entries registered for its `type`. Webhook deliveries carry the same events in the same shape. An unknown cursor raises `validation/invalid-cursor`.
 
 ## Webhooks
 
-Verify the **raw** request body, never re-serialized JSON. `CalmLens.parse_webhook_event` verifies the signature and timestamp, then parses the delivery into a `CalmLens::WebhookEvent` (`id`, `type`, `created_at`, `project_id`, `data`, plus `asset_id`, `facts` and `test?`). Fields CalmLens adds later are kept: unknown `data`, asset and fact fields stay in `data`, other top-level fields in `fields`, and `to_payload` returns the whole body. Instead of `signature:` and `timestamp:`, you can pass the request's `headers:`: a Hash with names in any case (repeated values as an Array are joined with `,`), `Net::HTTPHeader`, or a Rack env. It raises `CalmLens::WebhookVerificationError` with code `sdk/invalid-webhook-signature` or `sdk/invalid-webhook-payload`. Passing a parsed Hash instead of the body raises `CalmLens::InvalidArgumentError`.
+Verify the **raw** request body, never re-serialized JSON. `CalmLens.parse_webhook_event` verifies the signature and timestamp, then parses the delivery into a `CalmLens::WebhookEvent` with the fields of an `events.list` item: `id`, `project_id`, `type`, `severity`, `title`, `description`, `asset_id`, `asset`, `facts` and `created_at`, plus `test?`. `description`, `asset_id` and `asset` are nil when the event has none. Fields CalmLens adds later are kept: `to_payload` returns the whole body as received, including unknown fields, asset fields and fact fields. `CalmLens.to_webhook_event_payload(event)` turns an `events.list` item into the same body. Instead of `signature:` and `timestamp:`, you can pass the request's `headers:`: a Hash with names in any case (repeated values as an Array are joined with `,`), `Net::HTTPHeader`, or a Rack env. It raises `CalmLens::WebhookVerificationError` with code `sdk/invalid-webhook-signature` or `sdk/invalid-webhook-payload`. Passing a parsed Hash instead of the body raises `CalmLens::InvalidArgumentError`.
 
 Rails:
 
@@ -193,7 +193,7 @@ class CalmLensWebhooksController < ActionController::API
       secret: ENV.fetch('CALMLENS_WEBHOOK_SECRET')
     )
     # Acknowledge first; do the work in a job. Skip a delivery ID you have already queued.
-    CalmLensEventJob.perform_later(request.headers[CalmLens::WEBHOOK_DELIVERY_HEADER], event.to_h)
+    CalmLensEventJob.perform_later(request.headers[CalmLens::WEBHOOK_DELIVERY_HEADER], event.to_payload)
     head :no_content
   rescue CalmLens::WebhookVerificationError
     head :bad_request
@@ -223,7 +223,7 @@ The header names are exported as `CalmLens::WEBHOOK_SIGNATURE_HEADER`, `WEBHOOK_
 
 ## Errors
 
-Every error the SDK raises is a `CalmLens::Error` with `code`, `message`, `details` (the API's details with its `traceId`, or nil), `status` (nil without a response), `request_id` (the `X-Request-Id` header, for support), `headers`, `retry_after` (whole seconds from `Retry-After`) and the original exception in `cause`. Helpers: `not_found?` and `retryable?` (true for `sdk/transport-error`, `sdk/timeout`, `idempotency/request-in-progress`, `429`, `502`, `503` and `504`, whichever error class carries them). Compare codes with the constants in `CalmLens::ErrorCodes` (API codes, generated from the API's list, with their HTTP statuses in `ErrorCodes::STATUSES`) and `CalmLens::SdkErrorCodes`.
+Every error the SDK raises is a `CalmLens::Error` with `code`, `message`, `details` (the API's details object, such as validation `issues`, or nil), `status` (nil without a response), `request_id` (the `X-Request-Id` header, or the error body's `requestId`; include it when you contact support), `headers`, `retry_after` (whole seconds from `Retry-After`) and the original exception in `cause`. Helpers: `not_found?` and `retryable?` (true for `sdk/transport-error`, `sdk/timeout`, `idempotency/request-in-progress`, `429`, `502`, `503` and `504`, whichever error class carries them). Compare codes with the constants in `CalmLens::ErrorCodes` (API codes, generated from the API's list, with their HTTP statuses in `ErrorCodes::STATUSES`) and `CalmLens::SdkErrorCodes`.
 
 | Class                                                                                                                                                                        | When                                                                                                                                                                                         |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -277,7 +277,7 @@ Native tests (Ruby 3.1+, Bundler 2.6+): `bundle install && bundle exec ruby -Ili
 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
-Folder listings return a cursor page like every other list: `items`, visible `ancestors`, `nextCursor`, `hasMore`, `pageSize` and `ordering`. Set `parent_id:` to open a branch (omit it for the project root), and pass `nextCursor` as `cursor:` to load the next page. `page_size:` is 1 to 100 (default 100). `search:` with `search_all: true` finds names in unopened branches; `ids:` with `resolve_only: true` resolves selected folder paths.
+Folder listings return a cursor page like every other list: `items`, visible `ancestors`, `nextCursor`, `hasMore`, `pageSize` and `ordering`. Set `parent_id:` to open a branch (omit it for the project root), and pass `nextCursor` as `cursor:` to load the next page. `page_size:` is 1 to 100 (default 50). `search:` lists only the children whose name contains it.
 
 ### Viewer context for CDN delivery
 

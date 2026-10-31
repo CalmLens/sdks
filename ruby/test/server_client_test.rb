@@ -42,6 +42,14 @@ class ServerClientTest < Minitest::Test
     refute assert_raises(CalmLens::RateLimitError) { client.assets.retrieve(asset_id: 'x', request_options: { max_retries: 0 }) }.not_found?
   end
 
+  def test_the_request_id_comes_from_the_header_or_else_the_error_body
+    body = '{"code":"asset/not-found","message":"Not found","requestId":"body-id","details":{"path":"assetId"}}'
+    client, = scripted([404, body, { 'x-request-id' => 'header-id' }], [404, body])
+    from_header = assert_raises(CalmLens::NotFoundError) { client.assets.retrieve(asset_id: 'x') }
+    assert_equal ['header-id', { 'path' => 'assetId' }], [from_header.request_id, from_header.details]
+    assert_equal 'body-id', assert_raises(CalmLens::NotFoundError) { client.assets.retrieve(asset_id: 'x') }.request_id
+  end
+
   def test_upload_timeout_limits_each_attempt_of_a_binary_upload_only
     slow = lambda do |request|
       sleep 2 if request.headers['Content-Type'] == 'application/pdf'

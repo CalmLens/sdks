@@ -147,7 +147,6 @@ module CalmLens
   }
   # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
   type asset_content = {
-    ?"safetyTest" => bool,
     "status" => asset_content_status,
     "removalReason" => asset_content_removal_reason?,
     "updatedAt" => Integer?,
@@ -163,7 +162,6 @@ module CalmLens
   type asset = {
     "id" => String,
     "projectId" => String,
-    ?"userId" => String?,
     ?"parentId" => String?,
     ?"folderId" => String?,
     ?"uploadPresetId" => String?,
@@ -318,7 +316,7 @@ module CalmLens
 
   # ---- Pages and search (Page.ts, AssetSearch.ts) --------------------------------------------
 
-  type order_direction = "ASC" | "DESC"
+  type order_direction = "asc" | "desc"
   type order_input = { field: String, direction: order_direction }
   type order = { "field" => String, "direction" => order_direction }
 
@@ -567,34 +565,21 @@ module CalmLens
     "classification" => { "status" => asset_classification_status, "moderation" => { "status" => asset_moderation_status } },
     "content" => { "status" => asset_content_status }
   }
+  # An `events.list` item, and the body of its webhook delivery.
   type event = {
     "id" => String,
     "projectId" => String,
-    ?"userId" => String?,
     "type" => event_type,
     "severity" => event_severity,
     "title" => String,
-    ?"description" => String?,
-    ?"assetId" => String?,
-    ?"asset" => event_asset?,
+    "description" => String?,
+    "assetId" => String?,
+    "asset" => event_asset?,
     "facts" => Array[event_fact],
-    ?"notify" => bool?,
-    "createdAt" => Integer,
-    ?"updatedAt" => Integer,
-    ?"readAt" => Integer?
+    "createdAt" => Integer
   }
   # Unlike other lists, `nextCursor` is never nil: keep it to receive later events.
   type events_page = { "items" => Array[event], "nextCursor" => String, "hasMore" => bool }
-
-  # WEBHOOK_EVENT_DATA_SCHEMA: the event fields a webhook delivery carries under `data`.
-  type webhook_event_data = {
-    "severity" => event_severity,
-    "title" => String,
-    ?"description" => String?,
-    ?"assetId" => String?,
-    ?"asset" => event_asset?,
-    "facts" => Array[event_fact]
-  }
 
   # ---- Method options -------------------------------------------------------------------------
 
@@ -754,14 +739,11 @@ module CalmLens
   type list_folders_options = {
     ?parent_id: String,
     ?cursor: String,
-    # 1 to 100, default 100.
+    # 1 to 100, default 50.
     ?page_size: Integer,
     # At most one entry; the default is `name` ascending.
     ?ordering: Array[folder_order_input],
     ?search: String,
-    ?search_all: bool,
-    ?resolve_only: bool,
-    ?ids: Array[String],
     ?request_options: request_options
   }
   type folder_page = {
@@ -776,7 +758,7 @@ module CalmLens
   type create_folder_options = { name: String, ?parent_id: String?, ?request_options: request_options }
   type update_folder_options = { folder_id: String, ?name: String, ?request_options: request_options }
   type move_folder_options = { folder_id: String, parent_id: String?, ?request_options: request_options }
-  # 1 to 100 lists per page, default 10.
+  # 1 to 100 lists per page, default 50.
   type list_hash_lists_options = { ?cursor: String, ?page_size: Integer, ?request_options: request_options }
   type hash_list_page = {
     "items" => Array[hash_list],
