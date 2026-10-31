@@ -94,9 +94,10 @@ func (scripted scriptedResponse) response(req *http.Request) *http.Response {
 	var data []byte
 	switch {
 	case len(scripted.Body) > 0:
-		var value any
-		_ = json.Unmarshal(scripted.Body, &value)
-		data, _ = json.Marshal(value)
+		// Compact keeps the fixture's key order, as the JS SDK's JSON.stringify of the body does.
+		var compact bytes.Buffer
+		_ = json.Compact(&compact, scripted.Body)
+		data = compact.Bytes()
 	case scripted.BodyBase64 != nil:
 		data, _ = base64.StdEncoding.DecodeString(*scripted.BodyBase64)
 	case scripted.BodyText != nil:

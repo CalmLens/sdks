@@ -116,7 +116,6 @@ type Asset struct {
 	Name      string `json:"name"`
 	// Type is one of the AssetType constants.
 	Type     string  `json:"type"`
-	UserID   *string `json:"userId"`
 	ParentID *string `json:"parentId"`
 	FolderID *string `json:"folderId"`
 	// UploadPresetID is the upload preset the asset was uploaded through, if any.
@@ -229,7 +228,6 @@ type HashMatch struct {
 // AssetContent describes an asset's content: its format and properties, and whether CalmLens
 // holds it.
 type AssetContent struct {
-	SafetyTest *bool `json:"safetyTest,omitempty"`
 	// Status is one of the ContentStatus constants.
 	Status string `json:"status"`
 	// RemovalReason is why the content was removed (a ContentRemovalReason constant); nil
@@ -691,8 +689,8 @@ type ClassificationLabel struct {
 
 // Order directions.
 const (
-	OrderAscending  = "ASC"
-	OrderDescending = "DESC"
+	OrderAscending  = "asc"
+	OrderDescending = "desc"
 )
 
 // Order sorts a list by Field in Direction (OrderAscending or OrderDescending).
@@ -1001,7 +999,7 @@ type HashListEntryPage struct {
 }
 
 // ListHashListsOptions selects a page of a project's hash lists. Cursor is the previous page's
-// NextCursor; PageSize is 1 to 100 (0 for the API's default of 10).
+// NextCursor; PageSize is 1 to 100 (0 for the API's default of 50).
 type ListHashListsOptions struct {
 	Cursor   string `json:"cursor,omitempty"`
 	PageSize int    `json:"pageSize,omitempty"`
@@ -1119,11 +1117,11 @@ type Lens struct {
 	UpdatedAt *int64  `json:"updatedAt"`
 }
 
-// Event is an entry in the project event feed.
+// Event is an entry in the project event feed, in the shape Events.List returns and webhook
+// connectors deliver.
 type Event struct {
-	ID        string  `json:"id"`
-	ProjectID string  `json:"projectId"`
-	UserID    *string `json:"userId"`
+	ID        string `json:"id"`
+	ProjectID string `json:"projectId"`
 	// Type is one of the EventType constants.
 	Type string `json:"type"`
 	// Severity is SeverityLow or SeverityHigh.
@@ -1133,11 +1131,8 @@ type Event struct {
 	AssetID     *string     `json:"assetId"`
 	Asset       *EventAsset `json:"asset"`
 	Facts       EventFacts  `json:"facts"`
-	Notify      *bool       `json:"notify"`
 	CreatedAt   int64       `json:"createdAt"`
-	UpdatedAt   *int64      `json:"updatedAt"`
-	ReadAt      *int64      `json:"readAt"`
-	// Raw contains the entire event.
+	// Raw contains the entire event, including fields added to the API after this SDK.
 	Raw JSON `json:"-"`
 }
 
@@ -1295,17 +1290,14 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 var _ json.Unmarshaler = (*Asset)(nil)
 
 // ListFoldersOptions selects a page of immediate children or searches folder names. Cursor is
-// the previous page's NextCursor; PageSize is 1 to 100 (0 for the API's default of 100).
+// the previous page's NextCursor; PageSize is 1 to 100 (0 for the API's default of 50).
 // Ordering holds at most one Order, by "name" (the default, ascending) or "createdAt".
 type ListFoldersOptions struct {
-	ParentID    *string  `json:"parentId,omitempty"`
-	Cursor      string   `json:"cursor,omitempty"`
-	PageSize    int      `json:"pageSize,omitempty"`
-	Ordering    []Order  `json:"ordering,omitempty"`
-	Search      string   `json:"search,omitempty"`
-	SearchAll   *bool    `json:"searchAll,omitempty"`
-	IDs         []string `json:"ids,omitempty"`
-	ResolveOnly *bool    `json:"resolveOnly,omitempty"`
+	ParentID *string `json:"parentId,omitempty"`
+	Cursor   string  `json:"cursor,omitempty"`
+	PageSize int     `json:"pageSize,omitempty"`
+	Ordering []Order `json:"ordering,omitempty"`
+	Search   string  `json:"search,omitempty"`
 }
 
 // FolderPage is one page of folders, with the folders above the listed or requested ones in

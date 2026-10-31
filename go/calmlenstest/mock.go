@@ -286,9 +286,6 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 		if event.CreatedAt == 0 {
 			event.CreatedAt = m.options.Now()
 		}
-		if event.UpdatedAt == nil {
-			event.UpdatedAt = calmlens.Ptr(event.CreatedAt)
-		}
 		if event.Facts == nil {
 			event.Facts = []calmlens.EventFact{}
 		}
@@ -429,10 +426,10 @@ func contentPurged(a calmlens.JSON) bool {
 func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON, facts []any) {
 	now := m.options.Now()
 	m.events = append(m.events, calmlens.JSON{
-		"id": m.options.CreateID("evt"), "projectId": m.options.ProjectID, "userId": nil,
+		"id": m.options.CreateID("evt"), "projectId": m.options.ProjectID,
 		"type": eventType, "severity": severity, "title": eventType,
 		"description": nil, "assetId": a["id"], "asset": snapshot(a),
-		"facts": facts, "notify": false, "createdAt": now, "updatedAt": now, "readAt": nil,
+		"facts": facts, "createdAt": now,
 	})
 }
 
@@ -743,7 +740,7 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 			return []string{"hashLists.list"}
 		case route == "hash-lists":
 			return []string{"hashLists.create"}
-		case route == "assets/page":
+		case route == "assets" && method == "GET":
 			return []string{"assets.list", "assets.iterate"}
 		case route == "assets/search":
 			return []string{"assets.search"}
@@ -817,11 +814,13 @@ func (m *MockServerClient) jsonResponse(req *http.Request, header http.Header, r
 			failure = &apiError{code: calmlens.CodeInvalidUploadPayload, status: http.StatusBadRequest}
 		}
 		status = failure.status
-		body := calmlens.JSON{"code": failure.code, "message": err.Error()}
-		if failure.details != nil {
-			body["details"] = failure.details
+		// The API's error body: requestId repeats the X-Request-Id header, and details is always
+		// an object.
+		details := failure.details
+		if details == nil {
+			details = calmlens.JSON{}
 		}
-		result = body
+		result = calmlens.JSON{"code": failure.code, "message": err.Error(), "requestId": header.Get("X-Request-Id"), "details": details}
 	}
 	data, _ := json.Marshal(result)
 	return response(req, status, header, "application/json", data)
@@ -898,7 +897,7 @@ func number(value any) float64 {
 	return n
 }
 
-var errUnknownRoute = &apiError{code: "mock/unknown-route", status: http.StatusNotFound}
+var errUnknownRoute = &apiError{code: calmlens.CodeRouteNotFound, status: http.StatusNotFound}
 
 // validation is a request the API's schema refuses: validation/<issue> with HTTP 400 and the
 // field in details.path.
@@ -926,20 +925,21 @@ func intRange(q url.Values, name string, fallback, low, high int) (int, error) {
 }
 
 const (
-	defaultEventsPageSize = 50
-	maxEventsPageSize     = 100
-	maxPageSize           = 100
-	maxSearchLimit        = 20
-	maxSearchQuery        = 200
-	maxFolderPageSize     = 100
-	minMultipartPart      = 5 * 1024 * 1024
-	minMultipartImage     = 10 * 1024 * 1024
-	maxMultipartImage     = 20 * 1024 * 1024
-	imageCacheLifetime    = 31536000
-	mockThumbHash         = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
-	mockAverageColor      = "#7f7f7f"
-	defaultContentType    = "application/octet-stream"
-	cdnProtectionPolicy   = "sandbox; default-src 'none'"
+	// defaultPageSize is how many items every cursor list returns when the query has no pageSize.
+	defaultPageSize     = 50
+	maxEventsPageSize   = 100
+	maxPageSize         = 100
+	maxSearchLimit      = 20
+	maxSearchQuery      = 200
+	maxFolderPageSize   = 100
+	minMultipartPart    = 5 * 1024 * 1024
+	minMultipartImage   = 10 * 1024 * 1024
+	maxMultipartImage   = 20 * 1024 * 1024
+	imageCacheLifetime  = 31536000
+	mockThumbHash       = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
+	mockAverageColor    = "#7f7f7f"
+	defaultContentType  = "application/octet-stream"
+	cdnProtectionPolicy = "sandbox; default-src 'none'"
 )
 
 func (m *MockServerClient) dispatch(method string, parts []string, q url.Values, raw []byte, headers http.Header) (any, error) {
@@ -971,7 +971,7 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.listHashLists(q)
 		case route == "hash-lists" && method == "POST":
 			return m.createHashList(body, now)
-		case route == "assets/page" && method == "GET":
+		case route == "assets" && method == "GET":
 			folder, hasFolder := q["folderId"]
 			return m.page(func(a calmlens.JSON) bool { return !hasFolder || a["folderId"] == folder[0] }, q, "assets:"+q.Get("filter")+":"+strings.Join(folder, ""))
 		case route == "assets/search" && method == "GET":
@@ -1013,7 +1013,7 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 // with cursor, up to pageSize (default 50, at most 100) events added since, oldest first.
 // nextCursor is never null: it is where to keep polling from.
 func (m *MockServerClient) listEvents(q url.Values) (any, error) {
-	size, err := intRange(q, "pageSize", defaultEventsPageSize, 1, maxEventsPageSize)
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxEventsPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -1200,7 +1200,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	id := m.options.CreateID("asset")
 	// Fields the API returns as null when they are not set.
 	a := calmlens.JSON{
-		"id": id, "projectId": m.options.ProjectID, "userId": nil, "parentId": nil,
+		"id": id, "projectId": m.options.ProjectID, "parentId": nil,
 		"folderId": orNull("folderId"), "uploadPresetId": orNull("uploadPresetId"),
 		"createdAt": now, "updatedAt": now, "name": options["name"],
 		"description": orNull("description"), "externalId": orNull("externalId"), "externalUrl": externalURL,
@@ -1669,13 +1669,13 @@ func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, 
 // listed and requested folders, like the API.
 func (m *MockServerClient) listFolders(q url.Values) (any, error) {
 	db := m.DatabaseStorage
-	size, err := intRange(q, "pageSize", maxFolderPageSize, 1, maxFolderPageSize)
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxFolderPageSize)
 	if err != nil {
 		return nil, err
 	}
 	// Like the API: one ordering by name (the default, ascending) or createdAt, then the ID in
 	// the same direction. Names compare by code point, so case matters.
-	order := calmlens.Order{Field: "name", Direction: "ASC"}
+	order := calmlens.Order{Field: "name", Direction: calmlens.OrderAscending}
 	if q.Has("ordering[1][field]") {
 		return nil, validation("validation/too-big", "ordering")
 	}
@@ -1684,7 +1684,7 @@ func (m *MockServerClient) listFolders(q url.Values) (any, error) {
 		if order.Field != "name" && order.Field != "createdAt" {
 			return nil, validation("validation/invalid-value", "ordering.0.field")
 		}
-		if order.Direction != "ASC" && order.Direction != "DESC" {
+		if order.Direction != calmlens.OrderAscending && order.Direction != calmlens.OrderDescending {
 			return nil, validation("validation/invalid-value", "ordering.0.direction")
 		}
 	}
@@ -1692,30 +1692,18 @@ func (m *MockServerClient) listFolders(q url.Values) (any, error) {
 	search := strings.ToLower(strings.TrimSpace(q.Get("search")))
 	folders := []calmlens.JSON{}
 	for _, f := range db.Folders {
-		if f["projectId"] == m.options.ProjectID && ((q.Get("searchAll") == "true" && search != "") || text(f["parentId"]) == q.Get("parentId")) && strings.Contains(strings.ToLower(text(f["name"])), search) {
+		if f["projectId"] == m.options.ProjectID && text(f["parentId"]) == q.Get("parentId") && strings.Contains(strings.ToLower(text(f["name"])), search) {
 			folders = append(folders, f)
 		}
 	}
-	scope, _ := json.Marshal([]any{q.Get("parentId"), search, q.Get("searchAll") == "true"})
+	scope, _ := json.Marshal([]any{q.Get("parentId"), search})
 	result, err := keysetPage(folders, ordering, q.Get("cursor"), "folders:"+string(scope), size)
 	if err != nil {
 		return nil, err
 	}
 	page := result["items"].([]calmlens.JSON)
-	if q.Get("resolveOnly") == "true" {
-		page = []calmlens.JSON{}
-		result["items"], result["hasMore"], result["nextCursor"] = page, false, nil
-	}
 	ids := map[string]bool{}
-	var selected []string
-	for index := 0; ; index++ {
-		id := q.Get(fmt.Sprintf("ids[%d]", index))
-		if id == "" {
-			break
-		}
-		selected = append(selected, id)
-	}
-	selected = append(selected, q.Get("parentId"))
+	selected := []string{q.Get("parentId")}
 	for _, f := range page {
 		selected = append(selected, text(f["id"]))
 	}
@@ -1827,10 +1815,10 @@ func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values, 
 	if expression := q.Get("filter"); expression != "" {
 		var err error
 		if filter, err = parseFilter(expression); err != nil {
-			return nil, &apiError{code: "mock/invalid-filter", status: http.StatusBadRequest, details: calmlens.JSON{"reason": err.Error()}}
+			return nil, &apiError{code: calmlens.CodeInvalidFilter, status: http.StatusBadRequest, details: calmlens.JSON{"reason": err.Error()}}
 		}
 	}
-	size, err := intRange(q, "pageSize", 10, 1, maxPageSize)
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -1852,14 +1840,14 @@ func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values, 
 func cursorOrdering(q url.Values) ([]calmlens.Order, error) {
 	ordering := []calmlens.Order{}
 	for i := 0; q.Has(fmt.Sprintf("ordering[%d][field]", i)); i++ {
-		order := calmlens.Order{Field: q.Get(fmt.Sprintf("ordering[%d][field]", i)), Direction: strings.ToUpper(q.Get(fmt.Sprintf("ordering[%d][direction]", i)))}
-		if (order.Field != "createdAt" && order.Field != "id") || order.Direction != "ASC" && order.Direction != "DESC" {
+		order := calmlens.Order{Field: q.Get(fmt.Sprintf("ordering[%d][field]", i)), Direction: q.Get(fmt.Sprintf("ordering[%d][direction]", i))}
+		if (order.Field != "createdAt" && order.Field != "id") || order.Direction != calmlens.OrderAscending && order.Direction != calmlens.OrderDescending {
 			return nil, fail(calmlens.CodeInvalidUploadPayload)
 		}
 		ordering = append(ordering, order)
 	}
 	if len(ordering) == 0 {
-		ordering = append(ordering, calmlens.Order{Field: "createdAt", Direction: "DESC"})
+		ordering = append(ordering, calmlens.Order{Field: "createdAt", Direction: calmlens.OrderDescending})
 	}
 	if !slices.ContainsFunc(ordering, func(order calmlens.Order) bool { return order.Field == "id" }) {
 		ordering = append(ordering, calmlens.Order{Field: "id", Direction: ordering[0].Direction})
@@ -1877,7 +1865,7 @@ func keysetPage(items []calmlens.JSON, ordering []calmlens.Order, encoded, scope
 		for i, order := range ordering {
 			result := compareValues(lookup(item, order.Field), fmt.Sprint(values[i]))
 			if result != 0 {
-				if order.Direction == "DESC" {
+				if order.Direction == calmlens.OrderDescending {
 					return -result
 				}
 				return result
@@ -2212,8 +2200,6 @@ func (m *MockServerClient) canDownload(folder, apiKey string) bool {
 // ---- Hash lists -----------------------------------------------------------------------------
 // Lists and entries live in DatabaseStorage. Uploads aren't matched against them.
 
-const defaultHashListEntryPageSize = 20
-
 var pdqHash = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // newestFirst sorts items by createdAt, then ID, newest first, like the API.
@@ -2229,7 +2215,7 @@ func newestFirst(items []calmlens.JSON) {
 // listHashLists pages the project's hash lists, newest first unless ordering says otherwise,
 // 10 to a page by default.
 func (m *MockServerClient) listHashLists(q url.Values) (any, error) {
-	size, err := intRange(q, "pageSize", defaultHashListPageSize, 1, maxPageSize)
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -2245,9 +2231,6 @@ func (m *MockServerClient) listHashLists(q url.Values) (any, error) {
 	}
 	return keysetPage(items, ordering, q.Get("cursor"), "hash-lists", size)
 }
-
-// defaultHashListPageSize is the API's hash list page size when the query has none.
-const defaultHashListPageSize = 10
 
 func validHashListAction(value any) bool {
 	return value == calmlens.HashListActionFlag || value == calmlens.HashListActionBlock
@@ -2306,7 +2289,7 @@ func (m *MockServerClient) hashListRoute(method, id, suffix string, body calmlen
 // listHashListEntries pages a list's entries newest first. The cursor is the base64 offset of
 // the next page.
 func (m *MockServerClient) listHashListEntries(id string, q url.Values) (any, error) {
-	size, err := intRange(q, "pageSize", defaultHashListEntryPageSize, 1, maxPageSize)
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -2333,7 +2316,7 @@ func (m *MockServerClient) listHashListEntries(id string, q url.Values) (any, er
 	if end < len(entries) {
 		next = base64.StdEncoding.EncodeToString([]byte(strconv.Itoa(end)))
 	}
-	ordering := []calmlens.Order{{Field: "createdAt", Direction: "DESC"}, {Field: "id", Direction: "DESC"}}
+	ordering := []calmlens.Order{{Field: "createdAt", Direction: calmlens.OrderDescending}, {Field: "id", Direction: calmlens.OrderDescending}}
 	return calmlens.JSON{"items": entries[start:end], "hasMore": end < len(entries), "nextCursor": next, "pageSize": size, "ordering": ordering}, nil
 }
 

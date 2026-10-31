@@ -14,7 +14,7 @@ import (
 var filterFields = map[string]bool{
 	"id": true, "name": true, "type": true, "visibility": true, "parentId": true,
 	"folderId": true, "externalId": true, "externalUrl": true, "createdAt": true, "updatedAt": true,
-	"tags": true, "description": true, "userId": true,
+	"tags": true, "description": true,
 	"classification.status": true, "classification.updatedAt": true,
 	"classification.moderation.status": true,
 	"moderation.completedAt":           true,

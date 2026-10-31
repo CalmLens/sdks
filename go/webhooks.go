@@ -24,66 +24,31 @@ const (
 	DefaultWebhookTolerance = 300 * time.Second
 )
 
-// WebhookEventPayload is the JSON body of a webhook connector delivery.
-type WebhookEventPayload struct {
-	ID string `json:"id"`
-	// Type is one of the EventType constants.
-	Type      string           `json:"type"`
-	CreatedAt int64            `json:"createdAt"`
-	ProjectID string           `json:"projectId"`
-	Data      WebhookEventData `json:"data"`
-	// Raw is the whole body, including fields added to CalmLens after this SDK (at the top
-	// level, in data, in the asset snapshot and in facts). ParseWebhookEvent and
-	// ToWebhookEventPayload set it; marshal Raw to reproduce the body.
-	Raw JSON `json:"-"`
-}
+// webhookEventFields are the fields of the public event shape that events.list returns and
+// webhook connectors deliver.
+var webhookEventFields = []string{"id", "projectId", "type", "severity", "title", "description", "assetId", "asset", "facts", "createdAt"}
 
-// WebhookEventData holds the event fields of a webhook delivery.
-type WebhookEventData struct {
-	// Severity is SeverityLow or SeverityHigh.
-	Severity    string      `json:"severity"`
-	Title       string      `json:"title"`
-	Description *string     `json:"description"`
-	AssetID     *string     `json:"assetId"`
-	Asset       *EventAsset `json:"asset"`
-	Facts       EventFacts  `json:"facts"`
-}
-
-// ToWebhookEventPayload converts a feed event into the body a webhook connector delivers. Raw
-// holds that body with every field of the event's Raw (or, for an event built in code, of its
-// typed fields), so fields this SDK does not know are delivered too.
-func ToWebhookEventPayload(event Event) WebhookEventPayload {
+// ToWebhookEventPayload returns the body a webhook connector delivers for an event, such as one
+// from Events.List: the event in the same shape. Its Raw holds that body, built from the event's
+// Raw (or, for an event built in code, from its typed fields), with Description, AssetID and
+// Asset null when absent; fields that are not part of the shape are left out.
+func ToWebhookEventPayload(event Event) Event {
 	source := event.Raw
 	if source == nil {
 		if data, err := json.Marshal(event); err == nil {
 			_ = decodeJSON(data, &source)
 		}
 	}
-	orNull := func(key string) any {
+	raw := JSON{}
+	for _, key := range webhookEventFields {
 		if value, ok := source[key]; ok {
-			return value
+			raw[key] = value
+		} else if key == "description" || key == "assetId" || key == "asset" {
+			raw[key] = nil
 		}
-		return nil
 	}
-	data := JSON{"severity": source["severity"], "title": source["title"], "description": orNull("description"), "assetId": orNull("assetId"), "asset": orNull("asset")}
-	if facts, ok := source["facts"]; ok {
-		data["facts"] = facts
-	}
-	return WebhookEventPayload{
-		ID:        event.ID,
-		Type:      event.Type,
-		CreatedAt: event.CreatedAt,
-		ProjectID: event.ProjectID,
-		Data: WebhookEventData{
-			Severity:    event.Severity,
-			Title:       event.Title,
-			Description: event.Description,
-			AssetID:     event.AssetID,
-			Asset:       event.Asset,
-			Facts:       event.Facts,
-		},
-		Raw: JSON{"id": source["id"], "type": source["type"], "createdAt": source["createdAt"], "projectId": source["projectId"], "data": data},
-	}
+	event.Raw = raw
+	return event
 }
 
 // SignWebhookPayload returns the x-calmlens-signature value for payload:
@@ -222,9 +187,9 @@ func webhookHeader(header http.Header, name string) string {
 // ParseWebhookEvent verifies a delivery with VerifyWebhookSignature and then decodes it.
 // It returns a *Error with code sdk/invalid-webhook-signature when verification fails and
 // sdk/invalid-webhook-payload when the verified body is not an event: a JSON object with string
-// id, type and projectId, a numeric createdAt and an object data whose known fields, when
-// present, have the API's types. Unknown fields are kept in Raw.
-func ParseWebhookEvent(payload []byte, signature, timestamp, secret string, options ...WebhookOption) (*WebhookEventPayload, error) {
+// id, type and projectId and a numeric createdAt, whose other known fields, when present, have
+// the API's types. The body has the shape Events.List returns; unknown fields are kept in Raw.
+func ParseWebhookEvent(payload []byte, signature, timestamp, secret string, options ...WebhookOption) (*Event, error) {
 	if !VerifyWebhookSignature(payload, signature, timestamp, secret, options...) {
 		return nil, invalid(CodeSDKInvalidWebhookSignature, "Webhook signature or timestamp did not verify")
 	}
@@ -236,7 +201,7 @@ func ParseWebhookEvent(payload []byte, signature, timestamp, secret string, opti
 	if !ok || !isWebhookEvent(object) {
 		return nil, invalid(CodeSDKInvalidWebhookPayload, "Webhook body is not a CalmLens event")
 	}
-	var event WebhookEventPayload
+	var event Event
 	if err := decodeJSON(payload, &event); err != nil {
 		return nil, &Error{Code: CodeSDKInvalidWebhookPayload, Message: "Webhook body does not match the event type", Cause: err}
 	}
@@ -248,24 +213,23 @@ func ParseWebhookEvent(payload []byte, signature, timestamp, secret string, opti
 func isWebhookEvent(value map[string]any) bool {
 	isString := func(v any) bool { _, ok := v.(string); return ok }
 	_, numeric := value["createdAt"].(json.Number)
-	data, isObject := value["data"].(map[string]any)
-	if !isString(value["id"]) || !isString(value["type"]) || !isString(value["projectId"]) || !numeric || !isObject {
+	if !isString(value["id"]) || !isString(value["type"]) || !isString(value["projectId"]) || !numeric {
 		return false
 	}
 	optional := func(key string, nullable bool) bool {
-		v, present := data[key]
+		v, present := value[key]
 		return !present || nullable && v == nil || isString(v)
 	}
 	if !optional("severity", false) || !optional("title", false) || !optional("description", true) || !optional("assetId", true) {
 		return false
 	}
-	if asset, present := data["asset"]; present && asset != nil {
+	if asset, present := value["asset"]; present && asset != nil {
 		object, ok := asset.(map[string]any)
 		if !ok || !isString(object["id"]) {
 			return false
 		}
 	}
-	if facts, present := data["facts"]; present {
+	if facts, present := value["facts"]; present {
 		list, ok := facts.([]any)
 		if !ok {
 			return false
@@ -290,7 +254,7 @@ func isWebhookEvent(value map[string]any) bool {
 // with the signature and timestamp headers (see VerifyWebhookHeaders) and returns the decoded
 // event. Call it before anything else reads the body. Afterwards r.Body is replaced with the
 // raw bytes so later handlers can read them again.
-func VerifyWebhookRequest(r *http.Request, secret string, options ...WebhookOption) (*WebhookEventPayload, error) {
+func VerifyWebhookRequest(r *http.Request, secret string, options ...WebhookOption) (*Event, error) {
 	config := webhookOptions(options)
 	if r.Body == nil {
 		return nil, invalid(CodeSDKInvalidWebhookPayload, "Webhook request has no body")

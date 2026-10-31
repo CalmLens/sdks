@@ -152,8 +152,8 @@ if err == nil {
 `Retry` processes an asset whose processing failed again (processing returns to `processing`
 and moderation to `pending`). `DeleteContent` removes stored content but keeps the record and
 report (the result's `Content.Status` is `removed` with `RemovalReason` `requested`, and the CDN
-stops serving it); `Delete` removes the record and its content. Lists default to page index 0;
-signed URLs default to the rendered resource and 900 seconds. Lens ensures cache full definitions,
+stops serving it); `Delete` removes the record and its content. Cursor lists return 50 items
+unless `PageSize` says otherwise; signed URLs default to the rendered resource and 900 seconds. Lens ensures cache full definitions,
 deduplicate batches/concurrent calls, and invalidate prior definitions by identifier.
 
 ### Hash lists
@@ -431,9 +431,9 @@ if calmlens.ErrorCode(err) == calmlens.CodeDuplicateExternalID { /* ... */ }
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `Code`                 | An API code (constants such as `calmlens.CodeAssetNotFound`, generated from the API's error list) or an `sdk/` code below.      |
 | `Status`               | HTTP status, or 0 when no response arrived.                                                                                     |
-| `RequestID`            | The `X-Request-Id` response header; include it when contacting support.                                                         |
+| `RequestID`            | The `X-Request-Id` response header, or the error body's `requestId` without it; include it when contacting support.            |
 | `Header`, `RetryAfter` | Response headers and the parsed `Retry-After` delay (`*time.Duration`, nil without the header).                                 |
-| `Details`              | Structured API details with any `traceId`, or SDK details such as `cursor`; nil when there are none, as for transport failures. |
+| `Details`              | Structured API details, such as validation issues, or SDK details such as `cursor`; nil for transport failures.                 |
 | `Cause`                | The underlying error; `errors.Is` and `errors.As` reach it through `Unwrap`.                                                    |
 
 `Error()` includes the code, status, message and request ID. `IsRetryable(err)` (or
@@ -463,16 +463,16 @@ Deliveries are POSTs with three headers, exported as constants:
 | `x-calmlens-timestamp` | `calmlens.WebhookTimestampHeader` | unix seconds                              |
 | `x-calmlens-delivery`  | `calmlens.WebhookDeliveryHeader`  | unique delivery ID, for deduplication     |
 
-Deliveries are JSON `{id, type, createdAt, projectId, data}` (`WebhookEventPayload`),
-signed as `v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. Verification needs the
+Deliveries are JSON `{id, projectId, type, severity, title, description, assetId, asset, facts,
+createdAt}`, the same shape `Events.List` returns, decoded into an `Event`, and are signed as `v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. Verification needs the
 **exact raw bytes** of the body: the functions take `[]byte`, never a decoded value, and
 re-encoding JSON changes the bytes. Any matching `v1=` entry is accepted, and timestamps
 more than `DefaultWebhookTolerance` (5 minutes) from now are rejected. Header names match in
 any case, and repeated signature headers are joined into one list. A verified body must be an
-event (string `id`, `type` and `projectId`, numeric `createdAt`, object `data` whose known
-fields have the API's types), or parsing fails with `sdk/invalid-webhook-payload`. The parsed
-`WebhookEventPayload` keeps the whole body, including fields added after this SDK, in `Raw`, and
-`event.Data.Facts.IsTest()` reports a test send from the portal or CLI.
+event (string `id`, `type` and `projectId`, numeric `createdAt`, and the API's types for its
+other known fields), or parsing fails with `sdk/invalid-webhook-payload`. The parsed `*Event`
+keeps the whole body, including fields added after this SDK, in `Raw`, and
+`event.Facts.IsTest()` reports a test send from the portal or CLI.
 
 With `net/http`, `VerifyWebhookRequest` reads the body (up to 1 MiB), verifies it and
 returns the event. It leaves the raw bytes in `r.Body` for later handlers:
@@ -584,7 +584,8 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
 `OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:
 
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
-  `folder/not-empty`, ...), details and error body, with an `X-Request-Id` on every response.
+  `folder/not-empty`, ...), details and error body (`{code, message, requestId, details}`), with
+  an `X-Request-Id` on every response. An unknown route is `misc/route-not-found`.
   Requests the API's schema refuses fail with `validation/<issue>` and the field in
   `details.path` (page sizes from 1 to 100, event limits from 1 to 100, search limits from 1 to
   20 and queries of 1 to 200 characters). Refusals the client makes before sending, such as
@@ -639,7 +640,7 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
   (`asset/decision-unchanged`), purged content can only be blocked (`asset/content-purged`),
   and an unknown asset is `asset/not-found`.
 - Folders list by name (or `Ordering` by `createdAt`), then ID, with cursors like the API's;
-  hash lists list newest first, 10 to a page by default.
+  hash lists list newest first. Every cursor list returns 50 items by default.
 - `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeLimited`, `OutcomeAgeRestricted`,
   `OutcomePurged`) applies a reviewer's decision and adds the matching `asset.<decision>` event
   with a `decided-by: reviewer` fact; purging removes the content with `RemovalReason`
@@ -696,7 +697,7 @@ App; no Go registry token is needed.
 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
-Folder listings return a page with `folders`, visible `ancestors`, and `hasMore`. Set `parentId` to open a branch (omit it for project root), and advance `pageIndex` to load another page. `pageSize` is at most 100. `search` with `searchAll` finds names in unopened branches; `ids` with `resolveOnly` resolves selected folder paths. Use the SDK’s language-specific option names (in Go, `SearchAll` and `ResolveOnly` are `*bool`, so an explicit `false` is sent).
+`Folders.List` returns a `FolderPage` of one folder's children (`ParentID`; omit it for the project root) in `Items`, the folders above them in `Ancestors`, and `HasMore` and `NextCursor` for the next page. `PageSize` is 1 to 100 (50 by default). `Search` keeps the children whose names contain it, and `Ordering` sorts by `name` (the default, `calmlens.OrderAscending`) or `createdAt`.
 
 ### Viewer context for CDN delivery
 

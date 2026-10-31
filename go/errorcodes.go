@@ -15,6 +15,46 @@ const (
 	CodeViewerRegionRequired = "viewer/region-required"
 	// CodeRegionalEvidenceRequired is returned with HTTP 403.
 	CodeRegionalEvidenceRequired = "asset/regional-evidence-required"
+	// CodeInvalidType is returned with HTTP 400.
+	CodeInvalidType = "validation/invalid-type"
+	// CodeTooSmall is returned with HTTP 400.
+	CodeTooSmall = "validation/too-small"
+	// CodeTooBig is returned with HTTP 400.
+	CodeTooBig = "validation/too-big"
+	// CodeInvalidFormat is returned with HTTP 400.
+	CodeInvalidFormat = "validation/invalid-format"
+	// CodeInvalidValue is returned with HTTP 400.
+	CodeInvalidValue = "validation/invalid-value"
+	// CodeUnknownField is returned with HTTP 400.
+	CodeUnknownField = "validation/unknown-field"
+	// CodeUnsupportedContentType is returned with HTTP 415.
+	CodeUnsupportedContentType = "validation/unsupported-content-type"
+	// CodeInvalidFilter is returned with HTTP 400.
+	CodeInvalidFilter = "validation/invalid-filter"
+	// CodeInvalidOrderingField is returned with HTTP 400.
+	CodeInvalidOrderingField = "validation/invalid-ordering-field"
+	// CodeRouteNotFound is returned with HTTP 404.
+	CodeRouteNotFound = "misc/route-not-found"
+	// CodeInternalError is returned with HTTP 500.
+	CodeInternalError = "misc/internal-error"
+	// CodeUnauthenticated is returned with HTTP 401.
+	CodeUnauthenticated = "auth/unauthenticated"
+	// CodeTokenExpired is returned with HTTP 401.
+	CodeTokenExpired = "auth/token-expired"
+	// CodeInvalidToken is returned with HTTP 401.
+	CodeInvalidToken = "auth/invalid-token"
+	// CodeSearchUnavailable is returned with HTTP 503.
+	CodeSearchUnavailable = "search/unavailable"
+	// CodeInvalidTransform is returned with HTTP 400.
+	CodeInvalidTransform = "asset/invalid-transform"
+	// CodeInvalidTransformOptions is returned with HTTP 400.
+	CodeInvalidTransformOptions = "asset/invalid-transform-options"
+	// CodeRemoteURLRedirectLimit is returned with HTTP 400.
+	CodeRemoteURLRedirectLimit = "asset/remote-url-redirect-limit"
+	// CodeCopyrightContentHeld is returned with HTTP 409.
+	CodeCopyrightContentHeld = "copyright/content-held"
+	// CodeDownloadPermissionRequired is returned with HTTP 403.
+	CodeDownloadPermissionRequired = "asset/api-key-missing-permission"
 	// CodeInvalidCursor is returned with HTTP 400.
 	CodeInvalidCursor = "validation/invalid-cursor"
 	// CodeMissingToken is returned with HTTP 401.
@@ -171,6 +211,26 @@ var publicErrorStatuses = map[string]int{
 	CodeInvalidViewerRegion:               400,
 	CodeViewerRegionRequired:              403,
 	CodeRegionalEvidenceRequired:          403,
+	CodeInvalidType:                       400,
+	CodeTooSmall:                          400,
+	CodeTooBig:                            400,
+	CodeInvalidFormat:                     400,
+	CodeInvalidValue:                      400,
+	CodeUnknownField:                      400,
+	CodeUnsupportedContentType:            415,
+	CodeInvalidFilter:                     400,
+	CodeInvalidOrderingField:              400,
+	CodeRouteNotFound:                     404,
+	CodeInternalError:                     500,
+	CodeUnauthenticated:                   401,
+	CodeTokenExpired:                      401,
+	CodeInvalidToken:                      401,
+	CodeSearchUnavailable:                 503,
+	CodeInvalidTransform:                  400,
+	CodeInvalidTransformOptions:           400,
+	CodeRemoteURLRedirectLimit:            400,
+	CodeCopyrightContentHeld:              409,
+	CodeDownloadPermissionRequired:        403,
 	CodeInvalidCursor:                     400,
 	CodeMissingToken:                      401,
 	CodeInvalidAPIKey:                     401,

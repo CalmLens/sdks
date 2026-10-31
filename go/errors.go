@@ -48,13 +48,14 @@ type Error struct {
 	Code string `json:"code"`
 	// Message is a human-readable description. Do not match on it.
 	Message string `json:"message"`
-	// Details holds structured details from the API, with the API's "traceId" when it sent one,
-	// or local details such as "cursor" for a repeated iterator cursor. It is nil when there are
-	// none, as for transport failures.
+	// Details holds structured details from the API, such as validation issues, or local
+	// details such as "cursor" for a repeated iterator cursor. It is nil when there are none,
+	// as for transport failures.
 	Details JSON `json:"details"`
 	// Status is the HTTP status, or 0 when no response was received.
 	Status int `json:"-"`
-	// RequestID is the X-Request-Id response header; include it when contacting support.
+	// RequestID is the X-Request-Id response header, or the error body's requestId when the
+	// header is missing; include it when contacting support.
 	RequestID string `json:"-"`
 	// Header holds the response headers, or nil when no response was received.
 	Header http.Header `json:"-"`

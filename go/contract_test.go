@@ -150,7 +150,7 @@ func TestWebhookContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if event.Type != f.ExpectedType || len(event.Data.Facts) == 0 || event.Data.Facts[0].Key != f.ExpectedFactKey || !reflect.DeepEqual(plain(t, event.Raw), plainJSON(t, f.Body)) {
+			if event.Type != f.ExpectedType || len(event.Facts) == 0 || event.Facts[0].Key != f.ExpectedFactKey || !reflect.DeepEqual(plain(t, event.Raw), plainJSON(t, f.Body)) {
 				t.Fatal(event)
 			}
 		})
@@ -241,18 +241,18 @@ func TestWebhookContract(t *testing.T) {
 			if event.ID != expected["id"] || event.Type != expected["type"] || event.ProjectID != expected["projectId"] || float64(event.CreatedAt) != expected["createdAt"] {
 				t.Fatalf("typed fields %+v", event)
 			}
-			if event.Data.Facts.IsTest() != fixture.IsTest {
+			if event.Facts.IsTest() != fixture.IsTest {
 				t.Fatalf("IsTest = %v", !fixture.IsTest)
 			}
 		})
 	}
 	for _, fixture := range fixtures.TestFacts {
 		t.Run("test fact: "+fixture.Name, func(t *testing.T) {
-			var event WebhookEventPayload
+			var event Event
 			if err := decodeJSON(fixture.Event, &event); err != nil {
 				t.Fatal(err)
 			}
-			if event.Data.Facts.IsTest() != fixture.IsTest {
+			if event.Facts.IsTest() != fixture.IsTest {
 				t.Fatalf("IsTest = %v, want %v", !fixture.IsTest, fixture.IsTest)
 			}
 		})
@@ -284,8 +284,8 @@ func TestWebhookContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(plain(t, received.Raw), fixture.Payload) || received.Data.Facts.IsTest() != fixture.IsTest {
-				t.Fatalf("received %v (test %v)", received.Raw, received.Data.Facts.IsTest())
+			if !reflect.DeepEqual(plain(t, received.Raw), fixture.Payload) || received.Facts.IsTest() != fixture.IsTest {
+				t.Fatalf("received %v (test %v)", received.Raw, received.Facts.IsTest())
 			}
 			// The body stays readable for later handlers.
 			if body, _ := io.ReadAll(request.Body); string(body) != fixture.Body {

@@ -223,14 +223,20 @@ func TestErrors(t *testing.T) {
 	c, h := setup(t)
 	h.status = 404
 	h.header = http.Header{"X-Request-Id": {"req_1"}}
-	h.result = JSON{"code": "asset/not-found", "message": "Missing", "details": JSON{"x": 1}, "traceId": "trace"}
+	h.result = JSON{"code": "asset/not-found", "message": "Missing", "requestId": "req_body", "details": JSON{"x": 1}}
 	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "x"})
 	var failure *Error
-	if asset != nil || !errors.As(err, &failure) || failure.Code != CodeAssetNotFound || failure.Status != 404 || failure.Details["traceId"] != "trace" || failure.RequestID != "req_1" || !IsNotFound(err) || IsRetryable(err) {
+	if asset != nil || !errors.As(err, &failure) || failure.Code != CodeAssetNotFound || failure.Status != 404 || failure.Details["x"] != json.Number("1") || failure.RequestID != "req_1" || !IsNotFound(err) || IsRetryable(err) {
 		t.Fatal(asset, err)
 	}
 	if message := err.Error(); !strings.Contains(message, CodeAssetNotFound) || !strings.Contains(message, "404") || !strings.Contains(message, "req_1") {
 		t.Fatal(message)
+	}
+	// Without the X-Request-Id header, the request ID comes from the error body.
+	h.header = http.Header{}
+	_, err = c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "x"})
+	if !errors.As(err, &failure) || failure.RequestID != "req_body" {
+		t.Fatal(err)
 	}
 }
 

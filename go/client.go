@@ -332,16 +332,6 @@ func query(values any) (url.Values, error) {
 			result.Set(fmt.Sprintf("ordering[%d][direction]", i), order.Direction)
 		}
 	}
-	if raw, ok := fields["ids"]; ok {
-		var ids []string
-		if err := json.Unmarshal(raw, &ids); err != nil {
-			return nil, argumentError("Could not encode folder IDs", err)
-		}
-		result.Del("ids")
-		for index, id := range ids {
-			result.Set(fmt.Sprintf("ids[%d]", index), id)
-		}
-	}
 	return result, nil
 }
 
@@ -566,20 +556,16 @@ func redirectError(res *http.Response) error {
 func responseError(res *http.Response, data []byte, now time.Time) error {
 	result := &Error{Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header, RetryAfter: parseRetryAfter(res.Header.Get("Retry-After"), now)}
 	var failure struct {
-		Code    *string `json:"code"`
-		Message *string `json:"message"`
-		Details JSON    `json:"details"`
-		TraceID string  `json:"traceId"`
+		Code      *string `json:"code"`
+		Message   *string `json:"message"`
+		Details   JSON    `json:"details"`
+		RequestID string  `json:"requestId"`
 	}
 	if decodeJSON(data, &failure) == nil && failure.Code != nil {
-		details := failure.Details
-		if failure.TraceID != "" {
-			if details == nil {
-				details = JSON{}
-			}
-			details["traceId"] = failure.TraceID
+		result.Code, result.Message, result.Details = *failure.Code, *failure.Code, failure.Details
+		if result.RequestID == "" {
+			result.RequestID = failure.RequestID
 		}
-		result.Code, result.Message, result.Details = *failure.Code, *failure.Code, details
 		if failure.Message != nil {
 			result.Message = *failure.Message
 		}

@@ -183,7 +183,7 @@ func TestMockErrorsUseAPIStatusesAndShape(t *testing.T) {
 	ctx := context.Background()
 	_, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: "missing"})
 	var apiErr *calmlens.Error
-	if !errors.As(err, &apiErr) || apiErr.Status != 404 || apiErr.Code != calmlens.CodeAssetNotFound || apiErr.Details != nil || apiErr.RequestID == "" || !calmlens.IsNotFound(err) {
+	if !errors.As(err, &apiErr) || apiErr.Status != 404 || apiErr.Code != calmlens.CodeAssetNotFound || apiErr.Details == nil || len(apiErr.Details) != 0 || apiErr.RequestID == "" || !calmlens.IsNotFound(err) {
 		t.Fatalf("%#v", apiErr)
 	}
 	folder, _ := c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Box"})
@@ -223,7 +223,7 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 		}
 		return fmt.Sprint(out)
 	}
-	desc := []calmlens.Order{{Field: "createdAt", Direction: "DESC"}}
+	desc := []calmlens.Order{{Field: "createdAt", Direction: calmlens.OrderDescending}}
 	if got := names(calmlens.ListAssetsOptions{Ordering: desc}); got != "[c a b]" {
 		t.Fatal(got)
 	}
@@ -233,7 +233,7 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==blocked,name=in=(b,x)"), Ordering: desc}); got != "[a b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.status==processing;content.format==text/plain"), Ordering: []calmlens.Order{{Field: "createdAt", Direction: "ASC"}}}); got != "[b a c]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.status==processing;content.format==text/plain"), Ordering: []calmlens.Order{{Field: "createdAt", Direction: calmlens.OrderAscending}}}); got != "[b a c]" {
 		t.Fatal(got)
 	}
 	if got := names(calmlens.ListAssetsOptions{FolderID: &folder.ID}); got != "[c a]" {
@@ -242,7 +242,7 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 	for _, filter := range []string{"secret==1", "status==pending"} {
 		_, err := c.Assets.List(ctx, calmlens.ListAssetsOptions{Filter: calmlens.Ptr(filter)})
 		var apiErr *calmlens.Error
-		if !errors.As(err, &apiErr) || apiErr.Status != 400 {
+		if !errors.As(err, &apiErr) || apiErr.Status != 400 || apiErr.Code != calmlens.CodeInvalidFilter {
 			t.Fatal("unknown filter field accepted", filter, err)
 		}
 	}

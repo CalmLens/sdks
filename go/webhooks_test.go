@@ -30,14 +30,14 @@ func signedRequest(t *testing.T, body string, now time.Time) *http.Request {
 
 func TestParseAndVerifyWebhookRequest(t *testing.T) {
 	now := time.Unix(1760000000, 0)
-	body := `{"id": "event-1", "type": "asset.blocked", "createdAt": 1760000000000, "projectId": "p", "data": {"severity": "low", "title": "t", "assetId": "a", "asset": {"id": "a", "externalId": null, "content": {"status": "removed"}, "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"status": "blocked"}}}, "facts": [{"key": "limit", "value": 9007199254740993}, {"key": "test", "value": true}]}}`
+	body := `{"id": "event-1", "type": "asset.blocked", "createdAt": 1760000000000, "projectId": "p", "severity": "low", "title": "t", "description": null, "assetId": "a", "asset": {"id": "a", "externalId": null, "content": {"status": "removed"}, "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"status": "blocked"}}}, "facts": [{"key": "limit", "value": 9007199254740993}, {"key": "test", "value": true}]}`
 	req := signedRequest(t, body, now)
 	event, err := VerifyWebhookRequest(req, "secret", WithNow(now))
-	if err != nil || event.ID != "event-1" || *event.Data.AssetID != "a" || !event.Data.Facts.IsTest() || event.Data.Asset.Classification.Status != ClassificationStatusCompleted || event.Data.Asset.Classification.Moderation.Status != ModerationStatusBlocked || event.Data.Asset.Content.Status != ContentStatusRemoved || event.Data.Asset.ExternalID != nil {
+	if err != nil || event.ID != "event-1" || *event.AssetID != "a" || !event.Facts.IsTest() || event.Asset.Classification.Status != ClassificationStatusCompleted || event.Asset.Classification.Moderation.Status != ModerationStatusBlocked || event.Asset.Content.Status != ContentStatusRemoved || event.Asset.ExternalID != nil {
 		t.Fatal(event, err)
 	}
-	if limit, ok := event.Data.Facts[0].Int64(); !ok || limit != 9007199254740993 {
-		t.Fatal("fact lost integer precision", event.Data.Facts[0])
+	if limit, ok := event.Facts[0].Int64(); !ok || limit != 9007199254740993 {
+		t.Fatal("fact lost integer precision", event.Facts[0])
 	}
 	if again, _ := io.ReadAll(req.Body); string(again) != body {
 		t.Fatal("body not restored for later handlers")

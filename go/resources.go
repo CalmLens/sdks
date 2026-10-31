@@ -46,7 +46,7 @@ func (s *AssetsService) List(ctx context.Context, options ListAssetsOptions) (*A
 		return nil, err
 	}
 	var result AssetPage
-	if err = s.c.request(ctx, "GET", s.c.project("assets/page"), params, nil, &result); err != nil {
+	if err = s.c.request(ctx, "GET", s.c.project("assets"), params, nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
