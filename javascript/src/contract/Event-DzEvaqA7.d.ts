@@ -1,6 +1,6 @@
-import "./Asset-DSK-5Da0.js";
+import "./Asset-ALTaFAoR.js";
 import { i as EventFacts, o as EventType } from "./EventCatalog-DAVzR6RB.js";
-import "./Page-CHCx12S3.js";
+import "./Page-i9w2NSnX.js";
 import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;

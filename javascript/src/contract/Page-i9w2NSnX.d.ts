@@ -24,22 +24,6 @@ interface Page<T> extends Required<PageQuery> {
   total: number | undefined;
   hasMore: boolean;
 }
-/** Public collections use a stable position rather than an offset into a changing list. */
-declare const CURSOR_PAGE_QUERY_SCHEMA: zod.ZodObject<{
-  cursor: zod.ZodOptional<zod.ZodString>;
-  pageSize: zod.ZodOptional<zod.ZodNumber>;
-  ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
-    direction: zod.ZodEnum<{
-      ASC: "ASC";
-      DESC: "DESC";
-    }>;
-    field: zod.ZodEnum<{
-      createdAt: "createdAt";
-      id: "id";
-    }>;
-  }, zod.core.$strip>>>;
-}, zod.core.$strict>;
-type CursorPageQuery = zod.infer<typeof CURSOR_PAGE_QUERY_SCHEMA>;
 interface CursorPage<T> {
   items: T[];
   nextCursor: string | null;
@@ -47,4 +31,4 @@ interface CursorPage<T> {
   hasMore: boolean;
   ordering: Order[];
 }
-export { Page as i, CursorPageQuery as n, Order as r, CursorPage as t };
+export { Order as n, Page as r, CursorPage as t };
