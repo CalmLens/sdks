@@ -205,6 +205,41 @@ fn streaming_cdn_preserves_range_method_and_headers() {
     worker.join().unwrap();
 }
 
+#[test]
+fn an_api_error_without_a_request_id_header_takes_the_body_request_id() {
+    let server = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/v1", server.local_addr().unwrap());
+    let worker = thread::spawn(move || {
+        let (mut stream, _) = server.accept().unwrap();
+        read_request(&mut stream);
+        let body = r#"{"code":"asset/not-found","message":"Asset not found","requestId":"req-body","details":{}}"#;
+        let _ = write!(
+            stream,
+            "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+    });
+    let client = blocking::ServerClient::builder("key", "project")
+        .base_url(&url)
+        .max_retries(0)
+        .build()
+        .unwrap();
+    let error = client
+        .assets()
+        .retrieve(AssetId::new("asset-1"))
+        .unwrap_err();
+    assert_eq!(
+        (error.code(), error.status(), error.request_id()),
+        (
+            &calmlens::ErrorCode::AssetNotFound,
+            Some(404),
+            Some("req-body")
+        )
+    );
+    worker.join().unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn reader_uploads_stream_with_their_declared_length() {
     // The test server reads exactly Content-Length bytes, so a chunked body arrives empty.

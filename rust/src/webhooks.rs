@@ -122,8 +122,7 @@ pub fn verify_webhook_signature(
 /// Parses a webhook delivery body without verifying it; prefer [`construct_webhook_event`].
 ///
 /// The body must be a JSON object with string `id`, `type` and `projectId`, a numeric
-/// `createdAt` and an object `data` whose fields, when present, have the API's types:
-/// `severity` and `title` strings, `description` and `assetId` strings or null, `asset` null or
+/// `createdAt`, and its other fields, when present, must have the API's types: `severity` and `title` strings, `description` and `assetId` strings or null, `asset` null or
 /// an object with a string `id`, and `facts` an array of `{key, value, url?}` objects with a
 /// string `key` and `url`. Anything else returns `sdk/invalid-webhook-payload`. Unknown fields
 /// are kept: [`WebhookEventPayload::json`] returns the body as received.
@@ -163,41 +162,37 @@ fn check_payload(value: &Value) -> std::result::Result<(), &'static str> {
     if !payload.get("createdAt").is_some_and(Value::is_number) {
         return Err("createdAt");
     }
-    let data = payload
-        .get("data")
-        .and_then(Value::as_object)
-        .ok_or("data")?;
-    if !optional(data, "severity", false) {
-        return Err("data.severity");
+    if !optional(payload, "severity", false) {
+        return Err("severity");
     }
-    if !optional(data, "title", false) {
-        return Err("data.title");
+    if !optional(payload, "title", false) {
+        return Err("title");
     }
-    if !optional(data, "description", true) {
-        return Err("data.description");
+    if !optional(payload, "description", true) {
+        return Err("description");
     }
-    if !optional(data, "assetId", true) {
-        return Err("data.assetId");
+    if !optional(payload, "assetId", true) {
+        return Err("assetId");
     }
-    match data.get("asset") {
+    match payload.get("asset") {
         None | Some(Value::Null) => {}
         Some(Value::Object(asset)) if string(asset, "id") => {}
-        Some(_) => return Err("data.asset"),
+        Some(_) => return Err("asset"),
     }
-    match data.get("facts") {
+    match payload.get("facts") {
         None => {}
         Some(Value::Array(facts)) => {
             for fact in facts {
-                let fact = fact.as_object().ok_or("data.facts")?;
+                let fact = fact.as_object().ok_or("facts")?;
                 if !string(fact, "key") || !fact.contains_key("value") {
-                    return Err("data.facts");
+                    return Err("facts");
                 }
                 if !optional(fact, "url", false) {
-                    return Err("data.facts");
+                    return Err("facts");
                 }
             }
         }
-        Some(_) => return Err("data.facts"),
+        Some(_) => return Err("facts"),
     }
     Ok(())
 }

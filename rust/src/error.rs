@@ -200,8 +200,7 @@ impl Error {
     pub fn message(&self) -> &str {
         &self.inner.message
     }
-    /// The API's `details` object, with the response's `traceId` when the API sent one. Empty
-    /// for SDK errors such as transport failures, except where a code documents its details.
+    /// The API's `details` object, such as validation issues. Empty for SDK errors such as transport failures, except where a code documents its details.
     pub fn details(&self) -> &Map<String, Value> {
         &self.inner.details
     }
@@ -209,7 +208,8 @@ impl Error {
     pub fn status(&self) -> Option<u16> {
         self.inner.status
     }
-    /// The `X-Request-Id` of the response that failed.
+    /// The request ID of the response that failed: its `X-Request-Id` header, or the error
+    /// body's `requestId` when the header is missing.
     pub fn request_id(&self) -> Option<&str> {
         self.inner.request_id.as_deref()
     }

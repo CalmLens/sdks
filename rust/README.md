@@ -124,7 +124,7 @@ Set `Content.size_in_bytes` to declare a payload's byte length explicitly. A val
 
 For a multipart upload, start with `SubmitAsset::multipart(name, content.part(1, is_final))` and send later parts with `assets().upload_part(UploadPart { asset_id, part: content.part(n, is_final), .. })`. Non-final parts must be at least 5 MiB, and image uploads in parts must total 10 to 20 MiB. The client refuses a part of known size before sending it: a non-final part under 5 MiB with `upload/invalid-payload`, and a first image part over 20 MiB, or a final one under 10 MiB, with `upload/multipart-image-too-large` or `upload/multipart-image-too-small`. The API checks the totals across parts and answers with the same codes. Set `total_size_in_bytes` on the first request when you know the file's size; CalmLens then refuses an upload that could never finish and parts that overshoot or fall short. CalmLens saves the `queue` choice when the upload starts, so any process or client that knows the asset ID can send the remaining parts; set `queue` on a part only to override it.
 
-Optional analyses are off unless a request turns them on in `ProcessingOptions::features`. Person and face detection are in beta; their results are informational, never change the moderation decision, and are returned in `asset.classification.personDetection` and `asset.classification.faceDetection`:
+Optional analyses are off unless a request turns them on in `ProcessingOptions::features`. Person and face detection are in beta; their results are informational and never change the moderation decision:
 
 ```rust
 let asset = client.assets().classify(SubmitAsset {
@@ -233,8 +233,8 @@ client
 ## Pagination and events
 
 - `assets().iterate(ListAssets)` and `assets().iterate_children(ListChildren)` return a `Stream` of assets (`Iterator` for the blocking client) that fetches pages from `cursor` on as it is read, keeping the filter and ordering. It ends at a page without a next cursor, with `has_more: false` or without items. An error ends the stream.
-- `folders().list(ListFolders)` and `hash_lists().list(ListHashLists)` return one cursor page: pass its `next_cursor` as `cursor` while `has_more` is true. Folders sort by name unless `ordering` names `createdAt`.
-- `events().pages(ListEvents)` returns pages of the events feed, following each page's `next_cursor` until a page has `has_more: false`.
+- `folders().list(ListFolders)` and `hash_lists().list(ListHashLists)` return one cursor page (50 items unless `page_size` says otherwise, up to 100): pass its `next_cursor` as `cursor` while `has_more` is true. Folders sort by name unless `ordering` names `createdAt`. An `Order` sorts with `SortDirection::Asc` or `SortDirection::Desc`, sent as `asc` and `desc`.
+- `events().pages(ListEvents)` returns pages of the events feed, following each page's `next_cursor` until a page has `has_more: false`. An `Event` has `id`, `project_id`, `event_type`, `severity`, `title`, `description`, `asset_id`, `asset`, `facts` and `created_at`; `description`, `asset_id` and `asset` are `None` when the event has none.
 - A page with more to follow whose cursor the iteration already sent fails with `sdk/invalid-response` and `details.cursor`, instead of repeating pages forever; that page is not yielded. An events page's `next_cursor` is always set: store the last one and pass it as `cursor` on the next poll. Without `cursor`, the first page is empty and its `next_cursor` marks the current time.
 
 ```rust
@@ -259,9 +259,9 @@ Every call returns `calmlens::Error`. `Display` prefixes the message with `[calm
 | `code()`                                           | `&ErrorCode`: a variant per API error code (generated from the API's public error list, with `http_status()`) and per SDK code, or `ErrorCode::Other(String)` for codes this version doesn't know. Compare with strings: `error.code() == "asset/not-found"` |
 | `message()`                                        | The message without the prefix                                                                                                                                                                                                                               |
 | `status()`                                         | The HTTP status of an API error                                                                                                                                                                                                                              |
-| `request_id()`                                     | The response's `X-Request-Id`; log it and quote it to support                                                                                                                                                                                                |
+| `request_id()`                                     | The response's `X-Request-Id` (the error body's `requestId` without one); log it and quote it to support                                                                                                                                                     |
 | `retry_after()`                                    | The `Retry-After` delay of a `429` or `idempotency/request-in-progress` response                                                                                                                                                                             |
-| `details()`                                        | The API's `details`, plus its `traceId`; empty for SDK errors such as transport failures                                                                                                                                                                     |
+| `details()`                                        | The API's `details`, such as validation issues; empty for SDK errors such as transport failures                                                                                                                                                              |
 | `headers()`                                        | The failed response's headers                                                                                                                                                                                                                                |
 | `source()`                                         | The underlying reqwest, IO or JSON error                                                                                                                                                                                                                     |
 | `is_not_found()`, `is_retryable()`, `is_timeout()` | Common checks                                                                                                                                                                                                                                                |
@@ -275,7 +275,7 @@ Rust fields are snake_case; the wire JSON is camelCase. Response models are `#[n
 `assets().classify(SubmitAsset)` and `text().classify(ClassifyText)` return an `Asset`. Its state is in three parts:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and reviewer decisions (`manual_reviews`, each with a `decision` of `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer decision does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and reviewer decisions (`manual_reviews`, each with a `decision` of `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer decision does not change `completedAt`.
 - `content`: `status` (`temporary` until processing finishes, `stored` or `removed`), `removal_reason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updated_at`, `safety_hold`, `format` (the MIME type), `extension`, `size_in_bytes`, `checksums`, `image` (the picture served at the rendered resource) and `extracted_text`.
 
 The moderation status also decides delivery:
@@ -306,7 +306,7 @@ let needs_age_check =
 
 CalmLens signs each delivery with `WEBHOOK_SIGNATURE_HEADER` (`x-calmlens-signature`, `v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`), `WEBHOOK_TIMESTAMP_HEADER` (`x-calmlens-timestamp`, Unix seconds) and `WEBHOOK_DELIVERY_HEADER` (`x-calmlens-delivery`, for deduplicating retries).
 
-`construct_webhook_event(raw_body, &http::HeaderMap, secret)` verifies the signature against the exact raw bytes, rejects timestamps more than `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS` (300) from now, and returns a `models::WebhookEventPayload`. It reads the headers in any case and joins repeated ones with `,`, so a signature list split across headers verifies. It fails with `sdk/invalid-webhook-signature` (answer 401) or `sdk/invalid-webhook-payload` (answer 400): the body must be a JSON object with string `id`, `type` and `projectId`, a numeric `createdAt` and an object `data` whose fields have the API's types. `payload.json()` returns the body as received, with fields this SDK version doesn't model, and `payload.is_test()` tells a test send (a `test` fact with the value `true`) from a real event. `verify_webhook_headers(raw_body, &headers, secret, now_seconds, tolerance_seconds)` only verifies. It takes raw bytes (`&[u8]`, `Bytes`, `Vec<u8>` or `&str`), never a parsed JSON value, because re-serialized JSON may not match the signed bytes.
+`construct_webhook_event(raw_body, &http::HeaderMap, secret)` verifies the signature against the exact raw bytes, rejects timestamps more than `WEBHOOK_SIGNATURE_TOLERANCE_SECONDS` (300) from now, and returns a `models::WebhookEventPayload`. It reads the headers in any case and joins repeated ones with `,`, so a signature list split across headers verifies. It fails with `sdk/invalid-webhook-signature` (answer 401) or `sdk/invalid-webhook-payload` (answer 400): the body must be a JSON object with string `id`, `type` and `projectId`, a numeric `createdAt`, and its other fields must have the API's types. The body is the event in the same flat shape `events().list` returns: `{ id, projectId, type, severity, title, description, assetId, asset, facts, createdAt }`, without a `data` envelope. `payload.json()` returns the body as received, with fields this SDK version doesn't model, and `payload.is_test()` tells a test send (a `test` fact with the value `true`) from a real event. `verify_webhook_headers(raw_body, &headers, secret, now_seconds, tolerance_seconds)` only verifies. It takes raw bytes (`&[u8]`, `Bytes`, `Vec<u8>` or `&str`), never a parsed JSON value, because re-serialized JSON may not match the signed bytes.
 
 With axum, extract the body as `axum::body::Bytes`, not `Json`:
 
@@ -317,7 +317,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
     let secret = std::env::var("CALMLENS_WEBHOOK_SECRET").unwrap_or_default();
     match calmlens::construct_webhook_event(&body, &headers, &secret) {
         Ok(event) => {
-            if let Some(asset) = &event.data.asset {
+            if let Some(asset) = &event.asset {
                 println!("{} {} {:?}", event.event_type, asset.id(), asset.moderation_status());
             }
             StatusCode::NO_CONTENT
@@ -328,7 +328,7 @@ async fn calmlens_webhook(headers: HeaderMap, body: Bytes) -> StatusCode {
 }
 ```
 
-actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.data.asset` is an `EventAsset`, a snapshot of the asset when the event was created, holding the fields CalmLens sent: read them with `id()`, `external_id()`, `upload_preset_id()`, `upload_status()`, `classification_status()`, `moderation_status()` and `content_status()`, or `get(field)`.
+actix-web has its own header types: extract `web::Bytes` and pass the header values to `construct_webhook_event_at(body, signature, timestamp, secret, now_seconds, tolerance_seconds)`. `verify_webhook_signature` and `parse_webhook_event` are also available separately, `create_webhook_signature_header` signs test deliveries, and `WebhookEventPayload::from_event` builds the body CalmLens sends for an event. `event.asset` is an `EventAsset`, a snapshot of the asset when the event was created, holding the fields CalmLens sent: read them with `id()`, `external_id()`, `upload_preset_id()`, `upload_status()`, `classification_status()`, `moderation_status()` and `content_status()`, or `get(field)`.
 
 ## Offline testing
 

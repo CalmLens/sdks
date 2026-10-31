@@ -478,8 +478,9 @@ pub(crate) fn with_response(mut error: Error, status: u16, headers: &HeaderMap) 
     error
 }
 
-/// The [`Error`] for an unsuccessful API response: its `code`, `message` and `details` (with
-/// the `traceId`), or `sdk/http-error` when the body is not a CalmLens error.
+/// The [`Error`] for an unsuccessful API response: its `code`, `message`, `details` and request
+/// ID (the `X-Request-Id` header, or the body's `requestId` without one), or `sdk/http-error`
+/// when the body is not a CalmLens error.
 pub(crate) fn api_error(status: u16, headers: &HeaderMap, body: &[u8]) -> Error {
     let parsed = serde_json::from_slice::<Value>(body);
     let api_code = match &parsed {
@@ -488,15 +489,12 @@ pub(crate) fn api_error(status: u16, headers: &HeaderMap, body: &[u8]) -> Error 
     };
     let error = match (api_code, &parsed) {
         (Some(code), Ok(Value::Object(object))) => {
-            let mut details: Map<String, Value> = object
+            let details: Map<String, Value> = object
                 .get("details")
                 .and_then(Value::as_object)
                 .cloned()
                 .unwrap_or_default();
-            if let Some(trace) = object.get("traceId").filter(|trace| !trace.is_null()) {
-                details.insert("traceId".into(), trace.clone());
-            }
-            Error::new(
+            let error = Error::new(
                 code,
                 object
                     .get("message")
@@ -504,7 +502,11 @@ pub(crate) fn api_error(status: u16, headers: &HeaderMap, body: &[u8]) -> Error 
                     .unwrap_or(code)
                     .to_owned(),
             )
-            .with_details(details)
+            .with_details(details);
+            match object.get("requestId").and_then(Value::as_str) {
+                Some(id) => error.with_request_id(id),
+                None => error,
+            }
         }
         _ => {
             let error = Error::new(ErrorCode::HttpError, format!("HTTP {status}"));

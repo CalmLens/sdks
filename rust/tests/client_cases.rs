@@ -256,7 +256,21 @@ fn check(outcome: Outcome, expect: &Value, label: &str) {
         (Outcome::Value(value), None) => {
             if let Some(cdn) = expect.get("cdn") {
                 assert_eq!(value["status"], cdn["status"], "{label}: status");
-                assert_eq!(value["bodyBase64"], cdn["bodyBase64"], "{label}: body");
+                // A body the case scripted as JSON is compared as JSON: the harness serialized
+                // it, so its key order is the harness's, not the fixture's.
+                let served = STANDARD
+                    .decode(value["bodyBase64"].as_str().unwrap())
+                    .unwrap();
+                let wanted = STANDARD
+                    .decode(cdn["bodyBase64"].as_str().unwrap())
+                    .unwrap();
+                match (
+                    serde_json::from_slice::<Value>(&served),
+                    serde_json::from_slice::<Value>(&wanted),
+                ) {
+                    (Ok(served), Ok(wanted)) => assert_eq!(served, wanted, "{label}: body"),
+                    _ => assert_eq!(served, wanted, "{label}: body"),
+                }
                 for (name, wanted) in cdn["headers"].as_object().into_iter().flatten() {
                     let served = &value["headers"][name.to_ascii_lowercase()];
                     assert_eq!(served, wanted, "{label}: header {name}");

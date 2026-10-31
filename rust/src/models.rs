@@ -526,9 +526,9 @@ string_enum! {
     /// A sort direction.
     SortDirection {
         /// Ascending.
-        Asc = "ASC",
+        Asc = "asc",
         /// Descending.
-        Desc = "DESC",
+        Desc = "desc",
     }
 }
 
@@ -1455,9 +1455,6 @@ pub struct Asset {
     /// The owning project.
     #[serde(default)]
     pub project_id: Option<String>,
-    /// The user who created the asset.
-    #[serde(default)]
-    pub user_id: Option<String>,
     /// The parent asset, for child assets CalmLens extracts during processing.
     #[serde(default)]
     pub parent_id: Option<String>,
@@ -1690,9 +1687,6 @@ pub struct TestRegionalAction {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetContent {
-    /// Whether this is a synthetic back-office safety exercise asset.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub safety_test: Option<bool>,
     /// `temporary` until processing finishes, `stored`, or `removed`.
     #[serde(default)]
     pub status: AssetContentStatus,
@@ -2461,9 +2455,6 @@ pub struct Event {
     /// The owning project.
     #[serde(default)]
     pub project_id: Option<String>,
-    /// The user the event concerns.
-    #[serde(default)]
-    pub user_id: Option<String>,
     /// The severity.
     #[serde(default)]
     pub severity: Option<EventSeverity>,
@@ -2483,15 +2474,6 @@ pub struct Event {
     /// The event's facts.
     #[serde(default)]
     pub facts: Vec<EventFact>,
-    /// Whether the event notifies.
-    #[serde(default)]
-    pub notify: Option<bool>,
-    /// Milliseconds since the Unix epoch.
-    #[serde(default)]
-    pub updated_at: Option<u64>,
-    /// Milliseconds since the Unix epoch.
-    #[serde(default)]
-    pub read_at: Option<u64>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<Event, _>")]
     pub extra: HashMap<String, Value>,
@@ -2507,9 +2489,10 @@ impl Event {
     }
 }
 
-/// The JSON body of a webhook delivery. Read it with [`crate::construct_webhook_event`], which
-/// checks the fields' types first; [`json`](Self::json) returns the body as received,
-/// including fields this SDK version does not model.
+/// The JSON body of a webhook delivery: the event in the same shape as an [`Event`] from the
+/// events feed. Read it with [`crate::construct_webhook_event`], which checks the fields' types
+/// first; [`json`](Self::json) returns the body as received, including fields this SDK version
+/// does not model.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2523,8 +2506,25 @@ pub struct WebhookEventPayload {
     pub created_at: u64,
     /// The owning project.
     pub project_id: String,
-    /// The event fields.
-    pub data: WebhookEventData,
+    /// The severity.
+    #[serde(default)]
+    pub severity: Option<EventSeverity>,
+    /// The title.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// The description, or `None` when the event has none.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The asset the event concerns, or `None`.
+    #[serde(default)]
+    pub asset_id: Option<String>,
+    /// Snapshot of the asset's state when the event was created, or `None`. Retrieve the asset
+    /// for its current state.
+    #[serde(default)]
+    pub asset: Option<EventAsset>,
+    /// The event's facts.
+    #[serde(default)]
+    pub facts: Vec<EventFact>,
     /// The body this payload was parsed from.
     #[serde(skip)]
     received: Option<Value>,
@@ -2537,22 +2537,19 @@ impl WebhookEventPayload {
             event_type: event.event_type.clone().unwrap_or_default(),
             created_at: event.created_at.unwrap_or_default(),
             project_id: event.project_id.clone().unwrap_or_default(),
-            data: WebhookEventData {
-                severity: event.severity.clone(),
-                title: event.title.clone(),
-                description: event.description.clone(),
-                asset_id: event.asset_id.clone(),
-                asset: event.asset.clone(),
-                facts: event.facts.clone(),
-            },
+            severity: event.severity.clone(),
+            title: event.title.clone(),
+            description: event.description.clone(),
+            asset_id: event.asset_id.clone(),
+            asset: event.asset.clone(),
+            facts: event.facts.clone(),
             received: None,
         }
     }
     /// Whether this is a test send from the portal or API: its facts include `test` with the
     /// value `true`. Handle test sends without acting on the asset they name.
     pub fn is_test(&self) -> bool {
-        self.data
-            .facts
+        self.facts
             .iter()
             .any(|fact| fact.key == "test" && fact.value == Value::Bool(true))
     }
@@ -2644,32 +2641,6 @@ impl EventAsset {
         }
         object.get(*last)?.as_str()
     }
-}
-
-/// The event fields of a webhook delivery; the events feed has the same fields at the top level.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct WebhookEventData {
-    /// The severity.
-    #[serde(default)]
-    pub severity: Option<EventSeverity>,
-    /// The title.
-    #[serde(default)]
-    pub title: Option<String>,
-    /// The description.
-    #[serde(default)]
-    pub description: Option<String>,
-    /// The asset the event concerns.
-    #[serde(default)]
-    pub asset_id: Option<String>,
-    /// Snapshot of the asset's state when the event was created. Retrieve the asset for its
-    /// current state.
-    #[serde(default)]
-    pub asset: Option<EventAsset>,
-    /// The event's facts.
-    #[serde(default)]
-    pub facts: Vec<EventFact>,
 }
 
 /// A page of the events feed.
@@ -3642,7 +3613,7 @@ pub struct ListFolders {
     /// The previous page's `next_cursor`; omit for the first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
-    /// Page size from 1 to 100 (the API's default is 100).
+    /// Page size from 1 to 100 (the API's default is 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
     /// At most one sort order, by `name` (the default, ascending) or `createdAt`.
@@ -3651,15 +3622,6 @@ pub struct ListFolders {
     /// Literal folder-name substring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
-    /// Search the accessible tree instead of only the current parent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub search_all: Option<bool>,
-    /// Only resolve selected paths without listing children.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resolve_only: Option<bool>,
-    /// Selected folder IDs whose paths should be resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ids: Option<Vec<String>>,
 }
 
 string_enum! {
@@ -3784,7 +3746,7 @@ pub struct ListHashLists {
     /// The previous page's `next_cursor`; omit for the first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
-    /// Hash lists per page, 1 to 100 (the API's default is 10).
+    /// Hash lists per page, 1 to 100 (the API's default is 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
 }

@@ -406,11 +406,10 @@ async fn webhook_payload_contracts() {
             assert_eq!(parsed.id, expected["id"].as_str().unwrap());
             assert_eq!(
                 parsed
-                    .data
                     .asset
                     .as_ref()
                     .and_then(|asset| asset.upload_preset_id()),
-                expected["data"]["asset"]["uploadPresetId"].as_str()
+                expected["asset"]["uploadPresetId"].as_str()
             );
             assert_eq!(serde_json::to_value(&parsed).unwrap(), *expected);
             // The same conversion CalmLens applies to a stored event before delivering it.
@@ -444,11 +443,8 @@ async fn future_webhook_fields_and_types_are_accepted() {
                 event.event_type.as_str(),
                 f["expectedType"].as_str().unwrap()
             );
-            assert_eq!(
-                event.data.facts[0].key,
-                f["expectedFactKey"].as_str().unwrap()
-            );
-            assert_eq!(event.data.facts[0].value, serde_json::json!({"count": 3}));
+            assert_eq!(event.facts[0].key, f["expectedFactKey"].as_str().unwrap());
+            assert_eq!(event.facts[0].value, serde_json::json!({"count": 3}));
         },
     )
     .await;
@@ -539,10 +535,7 @@ async fn webhook_parsed_contracts() {
                 )
             );
             assert_eq!(event.project_id, expected["projectId"].as_str().unwrap());
-            assert_eq!(
-                event.data.asset_id.as_deref(),
-                expected["data"]["assetId"].as_str()
-            );
+            assert_eq!(event.asset_id.as_deref(), expected["assetId"].as_str());
             assert_eq!(event.is_test(), c["isTest"].as_bool().unwrap());
         },
     )
@@ -627,7 +620,7 @@ fn webhook_verification_uses_exact_raw_bytes() {
 /// `construct_webhook_event` reads the real clock, which the fixtures cannot fix.
 #[test]
 fn construct_webhook_event_checks_against_the_current_time() {
-    let body = r#"{"id":"event-1","type":"asset.blocked","createdAt":1,"projectId":"p","data":{}}"#;
+    let body = r#"{"id":"event-1","type":"asset.blocked","createdAt":1,"projectId":"p"}"#;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()

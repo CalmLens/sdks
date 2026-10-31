@@ -13,7 +13,7 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
     mock.enqueue_response(
         MockResponse::json(
             404,
-            json!({"code":"asset/not-found","message":"Missing","details":{"field":"id"},"traceId":"trace"}),
+            json!({"code":"asset/not-found","message":"Missing","requestId":"request-7","details":{"field":"id"}}),
         )
         .header("x-request-id", "request-7"),
     );
@@ -39,6 +39,27 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
         (&ErrorCode::FolderNotEmpty, Some(409))
     );
     assert_eq!(error.request_id(), Some("mock-request-2"));
+
+    // Its body is the API's error body, whose requestId is the response's X-Request-Id.
+    mock.enqueue_api_error("asset/not-found", "Asset not found");
+    let response = mock
+        .cdn()
+        .serve(CdnRequest {
+            asset_identifier: "asset-1".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let request_id = response.headers()["x-request-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let body: Value = serde_json::from_slice(&response.bytes().await.unwrap()).unwrap();
+    assert_eq!(request_id, "mock-request-3");
+    assert_eq!(
+        (&body["code"], &body["requestId"], &body["details"]),
+        (&json!("asset/not-found"), &json!(request_id), &json!({}))
+    );
 
     // Codes this SDK does not know are kept as they are.
     mock.enqueue_api_error("billing/new-code", "New");

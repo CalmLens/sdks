@@ -80,6 +80,8 @@ pub struct MockResponse {
     status: u16,
     headers: HeaderMap,
     body: Bytes,
+    /// An API error body, which gets the response's request ID as `requestId`.
+    api_error: bool,
 }
 impl MockResponse {
     /// An empty response with `status`.
@@ -88,6 +90,7 @@ impl MockResponse {
             status,
             headers: HeaderMap::new(),
             body: Bytes::new(),
+            api_error: false,
         }
     }
     /// A JSON response serialized from a model or `serde_json::Value`.
@@ -97,14 +100,21 @@ impl MockResponse {
             .body(serde_json::to_vec(&body).expect("serializable mock response"))
     }
     /// The API's error response for `code`, with the status the API uses for it (400 for
-    /// codes without one) and the same body shape: `{code, message, details}`.
+    /// codes without one) and the same body shape: `{code, message, requestId, details}`, where
+    /// `requestId` is the `x-request-id` header the mock adds.
     pub fn api_error(code: impl Into<ErrorCode>, message: impl Into<String>) -> Self {
         let code = code.into();
         let status = code.http_status().unwrap_or(400);
-        Self::json(
+        Self::api_error_body(status, code.as_str(), message.into(), serde_json::json!({}))
+    }
+    /// An API error response with `status` and the body `{code, message, requestId, details}`.
+    pub(crate) fn api_error_body(status: u16, code: &str, message: String, details: Value) -> Self {
+        let mut response = Self::json(
             status,
-            serde_json::json!({"code": code.as_str(), "message": message.into(), "details": {}}),
-        )
+            serde_json::json!({"code": code, "message": message, "details": details}),
+        );
+        response.api_error = true;
+        response
     }
     /// Adds a header, e.g. `content-type`, `content-range` or `retry-after`.
     pub fn header(mut self, name: &str, value: &str) -> Self {
@@ -238,10 +248,20 @@ impl MockTransport {
         match reply {
             Some(Reply::Response(mut response)) => {
                 if !response.headers.contains_key("x-request-id") {
+                    let request_id = format!("mock-request-{number}");
+                    if response.api_error {
+                        if let Ok(Value::Object(mut error)) =
+                            serde_json::from_slice::<Value>(&response.body)
+                        {
+                            error.insert("requestId".into(), request_id.clone().into());
+                            response.body = serde_json::to_vec(&error)
+                                .expect("serializable mock response")
+                                .into();
+                        }
+                    }
                     response.headers.insert(
                         "x-request-id",
-                        HeaderValue::from_str(&format!("mock-request-{number}"))
-                            .expect("valid header value"),
+                        HeaderValue::from_str(&request_id).expect("valid header value"),
                     );
                 }
                 Ok(Exchange {

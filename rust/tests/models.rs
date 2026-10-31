@@ -450,7 +450,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
 
     let payload = WebhookEventPayload::from_event(blocked);
     assert_eq!(payload.event_type, EventType::AssetBlocked);
-    assert_eq!(payload.data.asset.as_ref(), Some(asset));
+    assert_eq!(payload.asset.as_ref(), Some(asset));
 }
 
 #[test]

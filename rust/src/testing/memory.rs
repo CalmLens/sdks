@@ -418,9 +418,11 @@ fn unknown_route() -> Failure {
 }
 impl Failure {
     fn response(&self) -> MockResponse {
-        MockResponse::json(
+        MockResponse::api_error_body(
             self.status,
-            json!({"code": self.code, "message": self.message, "details": self.details}),
+            &self.code,
+            self.message.clone(),
+            self.details.clone(),
         )
     }
 }
@@ -800,8 +802,8 @@ impl Backend {
         let now = self.now();
         let event = json!({
             "id": self.create_id("evt"), "projectId": self.options.project_id, "type": event_type,
-            "severity": severity, "title": event_type, "assetId": asset["id"],
-            "asset": snapshot(asset), "facts": facts, "createdAt": now, "updatedAt": now,
+            "severity": severity, "title": event_type, "description": null,
+            "assetId": asset["id"], "asset": snapshot(asset), "facts": facts, "createdAt": now,
         });
         self.storage.events.push(event);
     }
@@ -1035,15 +1037,15 @@ impl Backend {
                     ("GET", "folders") => self.list_folders(q),
                     ("POST", "folders") => self.create_folder(body, now),
                     ("GET", "hash-lists") => {
-                        // Like the API: newest first unless ordering says otherwise, 10 to a page.
-                        let size = bounded(q.get("pageSize"), 10, 1, 100, "pageSize")?;
+                        // Like the API: newest first unless ordering says otherwise, 50 to a page.
+                        let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
                         let ordering = cursor_ordering(q)?;
                         let lists = self.own_hash_lists().collect();
                         let scope = json!(["hash-lists", self.options.project_id]).to_string();
                         keyset_page(lists, &ordering, q.get("cursor"), &scope, size)
                     }
                     ("POST", "hash-lists") => self.create_hash_list(body, now),
-                    ("GET", "assets/page") => {
+                    ("GET", "assets") => {
                         let folder = q.get("folderId").cloned();
                         let scope =
                             json!([self.options.project_id, q.get("filter"), folder]).to_string();
@@ -1206,13 +1208,12 @@ impl Backend {
     fn list_folders(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let get = |key: &str| q.get(key).map_or("", String::as_str);
         let search = get("search").trim().to_lowercase();
-        let search_all = get("searchAll") == "true" && !search.is_empty();
         let folders: Vec<&Value> = self
             .storage
             .folders
             .values()
             .filter(|folder| folder["projectId"] == self.options.project_id.as_str())
-            .filter(|folder| search_all || text(&folder["parentId"]) == get("parentId"))
+            .filter(|folder| text(&folder["parentId"]) == get("parentId"))
             .filter(|folder| text(&folder["name"]).to_lowercase().contains(&search))
             .collect();
         // Like the API: one ordering by name (the default, ascending) or createdAt, then the ID
@@ -1227,29 +1228,19 @@ impl Backend {
                     return Err(validation("invalid-value", "ordering.0.field"));
                 }
                 match get("ordering[0][direction]") {
-                    "ASC" => (field.clone(), true),
-                    "DESC" => (field.clone(), false),
+                    "asc" => (field.clone(), true),
+                    "desc" => (field.clone(), false),
                     _ => return Err(validation("invalid-value", "ordering.0.direction")),
                 }
             }
         };
         let ordering = [(field, ascending), ("id".to_owned(), ascending)];
-        let size = bounded(q.get("pageSize"), 100, 1, 100, "pageSize")?;
-        let resolve_only = get("resolveOnly") == "true";
-        let scope =
-            json!([self.options.project_id, get("parentId"), search, search_all]).to_string();
+        let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+        let scope = json!([self.options.project_id, get("parentId"), search]).to_string();
         let mut result = keyset_page(folders, &ordering, q.get("cursor"), &scope, size)?;
-        if resolve_only {
-            result["items"] = json!([]);
-            result["hasMore"] = false.into();
-            result["nextCursor"] = Value::Null;
-        }
         let page: Vec<Value> = result["items"].as_array().cloned().unwrap_or_default();
-        // Ancestors: the folders on the paths to the parent, the selected IDs and the page.
-        let mut pending: Vec<String> = (0..)
-            .map_while(|index| q.get(&format!("ids[{index}]")).cloned())
-            .collect();
-        pending.push(get("parentId").to_owned());
+        // Ancestors: the folders on the paths to the parent and to the page's folders.
+        let mut pending = vec![get("parentId").to_owned()];
         pending.extend(
             page.iter()
                 .map(|folder| text(&folder["parentId"]).to_owned()),
@@ -1435,7 +1426,7 @@ impl Backend {
                 Ok(json!({}))
             }
             ("GET", "entries") => {
-                let page_size = bounded(q.get("pageSize"), 20, 1, 100, "pageSize")?;
+                let page_size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
                 let entries: Vec<&Value> = self
                     .storage
                     .hash_list_entries
@@ -1459,8 +1450,8 @@ impl Backend {
                     "nextCursor": has_more.then(|| format!("{end}_mock")),
                     "pageSize": page_size,
                     "ordering": [
-                        {"field": "createdAt", "direction": "DESC"},
-                        {"field": "id", "direction": "DESC"},
+                        {"field": "createdAt", "direction": "desc"},
+                        {"field": "id", "direction": "desc"},
                     ],
                 }))
             }
@@ -1642,7 +1633,7 @@ impl Backend {
         let id = self.create_id("asset");
         // Fields the API returns as `null` when they are not set.
         let mut asset = json!({
-            "id": id, "projectId": self.options.project_id, "userId": null, "parentId": null,
+            "id": id, "projectId": self.options.project_id, "parentId": null,
             "folderId": null, "uploadPresetId": null, "createdAt": now, "updatedAt": now,
             "name": null, "description": null, "externalId": null, "externalUrl": null,
             "type": kind, "metadata": null, "authorId": null, "context": null, "tags": null,
@@ -1937,7 +1928,7 @@ impl Backend {
         scope: &str,
         include: impl Fn(&Value) -> bool,
     ) -> Outcome<Value> {
-        let size = bounded(q.get("pageSize"), 10, 1, 100, "pageSize")?;
+        let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
         let filter = q
             .get("filter")
             .map(|expression| parse_filter(expression))
@@ -2393,13 +2384,14 @@ fn cursor_ordering(q: &HashMap<String, String>) -> Outcome<Vec<(String, bool)>> 
     while let Some(field) = q.get(&format!("ordering[{}][field]", ordering.len())) {
         let direction = q
             .get(&format!("ordering[{}][direction]", ordering.len()))
-            .map_or(String::new(), |d| d.to_uppercase());
+            .cloned()
+            .unwrap_or_default();
         if !["createdAt", "id"].contains(&field.as_str())
-            || !["ASC", "DESC"].contains(&direction.as_str())
+            || !["asc", "desc"].contains(&direction.as_str())
         {
-            return Err(invalid("Ordering must be createdAt or id, ASC or DESC"));
+            return Err(invalid("Ordering must be createdAt or id, asc or desc"));
         }
-        ordering.push((field.clone(), direction == "ASC"));
+        ordering.push((field.clone(), direction == "asc"));
     }
     if ordering.is_empty() {
         ordering.push(("createdAt".into(), false));
@@ -2439,7 +2431,7 @@ fn keyset_page(
     let ordering_json: Vec<Value> = ordering
         .iter()
         .map(|(field, ascending)| {
-            json!({"field": field, "direction": if *ascending { "ASC" } else { "DESC" }})
+            json!({"field": field, "direction": if *ascending { "asc" } else { "desc" }})
         })
         .collect();
     let signature = json!([scope, ordering_json]).to_string();

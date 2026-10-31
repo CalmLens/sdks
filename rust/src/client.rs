@@ -702,7 +702,7 @@ impl ServerClient {
         query.opt("filter", options.filter.as_ref());
         query.ordering(options.ordering.as_deref());
         query.opt("folderId", options.folder_id.as_ref());
-        self.call(self.prepare(Method::GET, &self.project_path("assets/page")?, &query.0)?)
+        self.call(self.prepare(Method::GET, &self.project_path("assets")?, &query.0)?)
             .await
     }
     async fn children_page(&self, options: &ListChildren) -> Result<AssetPage> {
@@ -1189,11 +1189,6 @@ impl FoldersClient<'_> {
         query.ordering(options.ordering.as_deref());
         query.opt("cursor", options.cursor.as_ref());
         query.opt("search", options.search.as_ref());
-        query.opt("searchAll", options.search_all);
-        for (index, folder_id) in options.ids.unwrap_or_default().iter().enumerate() {
-            query.push(&format!("ids[{index}]"), folder_id);
-        }
-        query.opt("resolveOnly", options.resolve_only);
         let request = self
             .0
             .prepare(Method::GET, &self.0.project_path("folders")?, &query.0)?;
