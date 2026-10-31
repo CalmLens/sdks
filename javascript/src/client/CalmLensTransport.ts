@@ -162,7 +162,7 @@ const isApiErrorPayload = (
   code: string;
   message?: string;
   details?: Record<string, unknown>;
-  traceId?: string;
+  requestId?: string;
 } => !!value && typeof value === "object" && typeof (value as { code?: unknown }).code === "string";
 
 /** Reads at most `limit` bytes of a body, failing with `sdk/response-too-large` beyond that. */
@@ -216,11 +216,13 @@ export const toHttpError = (response: Response, bytes: Uint8Array): CalmLensErro
     data = JSON.parse(new TextDecoder().decode(bytes));
   } catch {}
   if (isApiErrorPayload(data)) {
-    const { code, message, details, traceId } = data;
+    const { code, message, details, requestId } = data;
+    const info = responseInfo(response);
     return new CalmLensError(code, {
       message: message ?? code,
-      ...responseInfo(response),
-      details: details || traceId ? { ...details, ...(traceId ? { traceId } : {}) } : undefined,
+      ...info,
+      requestId: info.requestId ?? (typeof requestId === "string" ? requestId : undefined),
+      details,
     });
   }
   return new CalmLensError(SDK_ERROR_CODES.HTTP_ERROR, {

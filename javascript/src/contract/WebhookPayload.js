@@ -615,6 +615,10 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	aiGeneratedDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.aiGeneratedDetection,
 	textRegions: CLASSIFICATION_REPORT_SCHEMA.shape.textRegions,
 	labels: CLASSIFICATION_REPORT_SCHEMA.shape.labels
+}).omit({
+	personDetection: true,
+	faceDetection: true,
+	aiGeneratedDetection: true
 }).meta(metaStore([docPropertyInfo({
 	description: "Classification results",
 	namedType: "AssetClassification"
@@ -623,7 +627,6 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	status: ASSET_CONTENT_STATUS_SCHEMA.describe("Whether CalmLens holds the content (source, preview and extracted text): `temporary` until processing finishes, `stored`, or `removed`"),
 	removalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullable().describe("Why the content was removed: your `policy` purged it, `retention` because `keepContentAfterProcessing` was off, `requested` through the API or portal, `parent-removed` with its parent asset's content, or `disposed` after a safety hold. `null` while content is held."),
 	updatedAt: epoch("When the content status last changed"),
-	safetyTest: zod.boolean().optional().describe("Marks a synthetic back-office safety exercise asset"),
 	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullable().describe("Internal delivery restriction for suspected illegal content. Held content cannot be viewed, changed, or deleted through normal asset operations."),
 	format: zod.string().nullable().describe("MIME type of the content"),
 	extension: zod.string().nullable().describe("File extension of the content"),
@@ -638,7 +641,6 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 STORED_ASSET_SCHEMA.pick({
 	id: true,
 	projectId: true,
-	userId: true,
 	parentId: true,
 	folderId: true,
 	uploadPresetId: true,
@@ -697,7 +699,10 @@ STORED_ASSET_SCHEMA.pick({
 			extractedText: null
 		}
 	}
-})]));
+})])).extend({
+	userId: STORED_ASSET_SCHEMA.shape.userId,
+	content: ASSET_CONTENT_SCHEMA.extend({ safetyTest: zod.boolean().optional().describe("Marks a synthetic back-office safety exercise asset") })
+});
 /**
 * Where a composite asset (a website or document with extracted children) is in unpacking its
 * content. Its status comes from its children only once they all exist (`ready`).
@@ -1701,7 +1706,17 @@ const EVENT_FIELDS = {
 	updatedAt: updatedAtField().describe("When the event was last updated, in milliseconds since the Unix epoch"),
 	readAt: zod.number().int().nullish().describe("When the event was marked as read in the portal, in milliseconds since the Unix epoch")
 };
-const EVENT_SCHEMA = zod.strictObject(EVENT_FIELDS).meta(metaStore([docPropertyInfo({
+/** Fields only the portal uses: who caused the event and its in-app notification state. */
+const PORTAL_EVENT_FIELD_KEYS = [
+	"userId",
+	"notify",
+	"updatedAt",
+	"readAt"
+];
+const PUBLIC_EVENT_FIELDS = Object.fromEntries(Object.entries(EVENT_FIELDS).filter(([key]) => !PORTAL_EVENT_FIELD_KEYS.includes(key)));
+zod.strictObject(EVENT_FIELDS);
+/** An event as `GET /events` lists it and webhooks deliver it. */
+const PUBLIC_EVENT_SCHEMA = zod.strictObject(PUBLIC_EVENT_FIELDS).meta(metaStore([docPropertyInfo({
 	description: "An event or alert in the system",
 	namedType: "Event",
 	example: {
@@ -1728,12 +1743,26 @@ const EVENT_SCHEMA = zod.strictObject(EVENT_FIELDS).meta(metaStore([docPropertyI
 		createdAt: 17672256e5
 	}
 })]));
+/** The event as the API lists it and webhooks deliver it: its public fields, in one shape. */
+const toPublicEvent = (event) => ({
+	id: event.id,
+	projectId: event.projectId,
+	type: event.type,
+	severity: event.severity,
+	title: event.title,
+	description: event.description ?? null,
+	assetId: event.assetId ?? null,
+	asset: event.asset ?? null,
+	facts: event.facts,
+	createdAt: event.createdAt
+});
 const typedEventVariant = (type) => zod.strictObject({
-	...EVENT_FIELDS,
+	...PUBLIC_EVENT_FIELDS,
 	type: zod.literal(type).meta(metaStore([docPropertyInfo({ description: EVENT_TYPE_INFO[type].description })])),
 	facts: EVENT_FACT_SCHEMAS[type]
 }).meta(metaStore([docPropertyInfo({ description: `${EVENT_TYPE_INFO[type].name}: ${EVENT_TYPE_INFO[type].description}` })]));
-zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type))).meta(metaStore([docPropertyInfo({
+/** An event whose `facts` is typed by its `type`. Used for the public events feed. */
+const TYPED_EVENT_SCHEMA = zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type))).meta(metaStore([docPropertyInfo({
 	description: "An event; `facts` depends on `type`",
 	namedType: "Event",
 	example: {
@@ -1759,7 +1788,7 @@ zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type)
 		],
 		createdAt: 17672256e5
 	},
-	docsSchema: EVENT_SCHEMA
+	docsSchema: PUBLIC_EVENT_SCHEMA
 })]));
 EXAMPLE_IDS.asset;
 // packages/shared/src/WebhookPayload.ts
@@ -1768,37 +1797,10 @@ const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";
 const WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
 /** Receivers reject deliveries whose timestamp is further than this from their clock. */
 const WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300;
-const WEBHOOK_EVENT_DATA_SCHEMA = zod.strictObject({
-	severity: EVENT_SEVERITY_SCHEMA,
-	title: zod.string(),
-	description: zod.string().nullish(),
-	assetId: zod.string().nullish(),
-	asset: EVENT_ASSET_SCHEMA.nullish(),
-	facts: EVENT_FACTS_SCHEMA
-});
-const webhookPayloadVariant = (type) => zod.strictObject({
-	id: zod.string(),
-	type: zod.literal(type),
-	createdAt: zod.number(),
-	projectId: zod.string(),
-	data: WEBHOOK_EVENT_DATA_SCHEMA.extend({ facts: EVENT_FACT_SCHEMAS[type] })
-});
-/** The webhook body, discriminated by `type`: `data.facts` is typed per event type. */
-const WEBHOOK_EVENT_PAYLOAD_SCHEMA = zod.discriminatedUnion("type", EVENT_TYPES.map((type) => webhookPayloadVariant(type)));
-const toWebhookEventPayload = (event) => ({
-	id: event.id,
-	type: event.type,
-	createdAt: event.createdAt,
-	projectId: event.projectId,
-	data: {
-		severity: event.severity,
-		title: event.title,
-		description: event.description ?? null,
-		assetId: event.assetId ?? null,
-		asset: event.asset ?? null,
-		facts: event.facts
-	}
-});
+/** The webhook body: the event, exactly as `GET /events` lists it, with `facts` typed by `type`. */
+const WEBHOOK_EVENT_PAYLOAD_SCHEMA = TYPED_EVENT_SCHEMA;
+/** The body CalmLens sends for an event (its public fields; see `toPublicEvent`). */
+const toWebhookEventPayload = (event) => toPublicEvent(event);
 /** `v1=<hex HMAC-SHA256 of "<timestamp>.<body>">`, the `x-calmlens-signature` header value. */
 const createWebhookSignatureHeader = async (secret, timestampSeconds, body) => `v1=${await hmacSha256Hex(secret, `${timestampSeconds}.${body}`)}`;
 /** Headers for one signed delivery of `body`. */
@@ -1816,17 +1818,15 @@ zod.looseObject({
 	type: zod.string(),
 	projectId: zod.string(),
 	createdAt: zod.number(),
-	data: zod.looseObject({
-		severity: zod.string().optional(),
-		title: zod.string().optional(),
-		description: zod.string().nullish(),
-		assetId: zod.string().nullish(),
-		asset: zod.looseObject({ id: zod.string() }).nullish(),
-		facts: zod.array(zod.looseObject({
-			key: zod.string(),
-			value: zod.unknown(),
-			url: zod.string().optional()
-		})).optional()
-	})
+	severity: zod.string().optional(),
+	title: zod.string().optional(),
+	description: zod.string().nullish(),
+	assetId: zod.string().nullish(),
+	asset: zod.looseObject({ id: zod.string() }).nullish(),
+	facts: zod.array(zod.looseObject({
+		key: zod.string(),
+		value: zod.unknown(),
+		url: zod.string().optional()
+	})).optional()
 });
 export { WEBHOOK_DELIVERY_HEADER, WEBHOOK_EVENT_PAYLOAD_SCHEMA, WEBHOOK_SIGNATURE_HEADER, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS, WEBHOOK_TIMESTAMP_HEADER, createWebhookHeaders, toWebhookEventPayload };

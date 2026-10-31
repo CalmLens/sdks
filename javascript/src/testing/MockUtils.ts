@@ -21,11 +21,14 @@ export type PageRequestFailure = (
   path?: string,
 ) => Error;
 
+/** Every API cursor list returns this many items unless `pageSize` says otherwise. */
+export const DEFAULT_PAGE_SIZE = 50;
+
 /** A cursor page request: the API's `cursor`, `pageSize` and `ordering` query values. */
 export interface PageRequest<Field extends string = "createdAt" | "id"> {
   cursor?: string;
   pageSize?: number;
-  ordering?: Array<{ field: Field; direction: "ASC" | "DESC" }>;
+  ordering?: Array<{ field: Field; direction: "asc" | "desc" }>;
 }
 
 /**
@@ -41,8 +44,8 @@ export const createPage = <T extends { id: string }, Field extends string = "cre
   {
     scope,
     fail,
-    defaultPageSize = 10,
-    defaultOrdering = [{ field: "createdAt", direction: "DESC" }],
+    defaultPageSize = DEFAULT_PAGE_SIZE,
+    defaultOrdering = [{ field: "createdAt", direction: "desc" }],
   }: {
     scope: string;
     fail: PageRequestFailure;
@@ -82,7 +85,7 @@ export const createPage = <T extends { id: string }, Field extends string = "cre
     remaining = remaining.filter((item) => {
       for (const [i, rule] of ordering.entries()) {
         const result = compareValues(item[rule.field as keyof T], values[i]);
-        if (result) return rule.direction === "DESC" ? result < 0 : result > 0;
+        if (result) return rule.direction === "desc" ? result < 0 : result > 0;
       }
       return false;
     });
@@ -123,14 +126,14 @@ const compareValues = (left: unknown, right: unknown): number => {
 export const orderItems = <T>(items: T[], ordering: Ordering | null | undefined): T[] => {
   const rules: Ordering = ordering?.length
     ? ordering
-    : ([{ field: "createdAt", direction: "DESC" }] as Ordering);
+    : ([{ field: "createdAt", direction: "desc" }] as Ordering);
   return [...items].sort((a, b) => {
     for (const rule of rules) {
       const result = compareValues(
         (a as Record<string, unknown>)[rule.field],
         (b as Record<string, unknown>)[rule.field],
       );
-      if (result !== 0) return rule.direction === "DESC" ? -result : result;
+      if (result !== 0) return rule.direction === "desc" ? -result : result;
     }
     return 0;
   });

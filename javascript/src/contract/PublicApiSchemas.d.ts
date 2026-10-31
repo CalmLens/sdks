@@ -1,12 +1,12 @@
-import "./Asset-ALTaFAoR.js";
+import "./Asset-DjACmrnx.js";
 import "./AssetPayload-BpPkhqVM.js";
 import { n as HashListEntry, t as HashList } from "./HashList-CKW9itTf.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
 import "./EventCatalog-DAVzR6RB.js";
-import { t as CursorPage } from "./Page-i9w2NSnX.js";
-import { r as TypedEvent } from "./Event-DzEvaqA7.js";
+import { t as CursorPage } from "./Page-DNdKkX2B.js";
+import { r as TypedEvent } from "./Event-C-AqH_iD.js";
 import "./Lens-DM7EOzP8.js";
-import "./PublicErrorCodes-CuuZlI2E.js";
+import "./PublicErrorCodes-DWjlxEgq.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
@@ -14,8 +14,8 @@ declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   pageSize: zod.ZodDefault<zod.ZodNumber>;
   ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
     direction: zod.ZodEnum<{
-      ASC: "ASC";
-      DESC: "DESC";
+      asc: "asc";
+      desc: "desc";
     }>;
     field: zod.ZodEnum<{
       createdAt: "createdAt";
@@ -23,9 +23,6 @@ declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
     }>;
   }, zod.core.$strip>>>;
   search: zod.ZodOptional<zod.ZodString>;
-  searchAll: zod.ZodPreprocess<zod.ZodOptional<zod.ZodCoercedBoolean<unknown>>, unknown>;
-  ids: zod.ZodDefault<zod.ZodArray<zod.ZodString>>;
-  resolveOnly: zod.ZodPreprocess<zod.ZodOptional<zod.ZodCoercedBoolean<unknown>>, unknown>;
 }, zod.core.$strip>;
 type GetFoldersQuery = Partial<zod.input<typeof GET_FOLDERS_QUERY_SCHEMA>>;
 type GetFoldersResponse = CursorPage<Folder> & {
@@ -45,8 +42,8 @@ declare const GET_ASSETS_PAGE_QUERY_SCHEMA: zod.ZodObject<{
   pageSize: zod.ZodOptional<zod.ZodNumber>;
   ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
     direction: zod.ZodEnum<{
-      ASC: "ASC";
-      DESC: "DESC";
+      asc: "asc";
+      desc: "desc";
     }>;
     field: zod.ZodEnum<{
       createdAt: "createdAt";
@@ -62,8 +59,8 @@ declare const GET_ASSET_CHILDREN_QUERY_SCHEMA: zod.ZodObject<{
   pageSize: zod.ZodOptional<zod.ZodNumber>;
   ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
     direction: zod.ZodEnum<{
-      ASC: "ASC";
-      DESC: "DESC";
+      asc: "asc";
+      desc: "desc";
     }>;
     field: zod.ZodEnum<{
       createdAt: "createdAt";

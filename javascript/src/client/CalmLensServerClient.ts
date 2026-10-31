@@ -318,7 +318,7 @@ export default class CalmLensServerClient {
 
       /** Lists one page of the project's assets, with optional filter and ordering. */
       list: async (options: ListAssetsOptions = {}): Promise<AssetPage> =>
-        this.request("GET", `${this.projectPath}/assets/page`, {
+        this.request("GET", `${this.projectPath}/assets`, {
           query: options,
         }),
 

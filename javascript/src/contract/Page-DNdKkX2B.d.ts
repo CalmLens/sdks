@@ -2,8 +2,8 @@ import * as zod from "zod";
 declare const ORDER_SCHEMA: zod.ZodObject<{
   field: zod.ZodString;
   direction: zod.ZodEnum<{
-    ASC: "ASC";
-    DESC: "DESC";
+    asc: "asc";
+    desc: "desc";
   }>;
 }, zod.core.$strip>;
 type Order = zod.infer<typeof ORDER_SCHEMA>;
@@ -13,8 +13,8 @@ declare const PAGE_QUERY_SCHEMA: zod.ZodObject<{
   ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
     field: zod.ZodString;
     direction: zod.ZodEnum<{
-      ASC: "ASC";
-      DESC: "DESC";
+      asc: "asc";
+      desc: "desc";
     }>;
   }, zod.core.$strip>>>;
 }, zod.core.$strip>;

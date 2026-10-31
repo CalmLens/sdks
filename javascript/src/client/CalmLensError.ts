@@ -34,8 +34,8 @@ export type SdkErrorCode = (typeof SDK_ERROR_CODES)[keyof typeof SDK_ERROR_CODES
 export const CALMLENS_ERROR_CODES = { ...API_ERROR_CODES, ...SDK_ERROR_CODES } as const;
 
 /**
- * A known error code. API validation codes (`validation/*`) and codes added to the API after
- * this SDK version are still delivered as plain strings, so compare against `string`.
+ * A known error code. Codes added to the API after this SDK version are still delivered as plain
+ * strings, so compare against `string` and fall back to the HTTP status.
  */
 export type CalmLensErrorCode = ApiErrorCode | SdkErrorCode;
 
@@ -73,7 +73,7 @@ export class CalmLensError extends Error {
   readonly code: CalmLensErrorCode | (string & {});
   /** The HTTP status, when the API responded. */
   readonly status?: number;
-  /** Structured diagnostics from the API, such as validation issues and `traceId`. */
+  /** Structured diagnostics from the API, such as validation issues. */
   readonly details?: CalmLensErrorDetails;
   /** The `X-Request-Id` response header. Include it when you contact support. */
   readonly requestId?: string;

@@ -380,7 +380,7 @@ const appendQueryValue = (parts: string[], key: string, value: unknown): void =>
 
 /**
  * Serialises a query object the way the API parses it (qs bracket notation), for example
- * `ordering[0][field]=createdAt&ordering[0][direction]=DESC`. Every key and value is
+ * `ordering[0][field]=createdAt&ordering[0][direction]=desc`. Every key and value is
  * percent-encoded and missing values are omitted.
  */
 export const stringifyQuery = (query: Record<string, unknown>): string => {

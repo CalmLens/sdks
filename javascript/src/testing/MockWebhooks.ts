@@ -4,27 +4,28 @@ import {
   WEBHOOK_TIMESTAMP_HEADER,
 } from "../client/CalmLensWebhooks";
 import { hmacSha256Hex } from "../contract/CryptoUtils.js";
-import type { Event } from "../contract/Event.js";
+import type { TypedEvent } from "../contract/Event.js";
 import type { WebhookEventPayload } from "../contract/WebhookPayload.js";
 
 // Builds webhook deliveries the way CalmLens sends them, for testing a webhook handler without
 // a connector. Mirrors shared/WebhookPayload; tests/webhooks.test.ts keeps the two in step.
 
-/** The JSON body of a webhook delivery for a stored event (or an event from `events.list`). */
-export const toWebhookEventPayload = (event: Event): WebhookEventPayload =>
+/**
+ * The JSON body of a webhook delivery for an event, such as one from `events.list`: the event in
+ * the same shape `events.list` returns it. Fields that are not part of that shape are left out.
+ */
+export const toWebhookEventPayload = (event: TypedEvent): WebhookEventPayload =>
   ({
     id: event.id,
-    type: event.type,
-    createdAt: event.createdAt,
     projectId: event.projectId,
-    data: {
-      severity: event.severity,
-      title: event.title,
-      description: event.description ?? null,
-      assetId: event.assetId ?? null,
-      asset: event.asset ?? null,
-      facts: event.facts,
-    },
+    type: event.type,
+    severity: event.severity,
+    title: event.title,
+    description: event.description ?? null,
+    assetId: event.assetId ?? null,
+    asset: event.asset ?? null,
+    facts: event.facts,
+    createdAt: event.createdAt,
   }) as WebhookEventPayload;
 
 /** `v1=<hex HMAC-SHA256 of "<timestamp>.<body>">`, the `x-calmlens-signature` header value. */

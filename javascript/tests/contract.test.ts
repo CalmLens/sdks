@@ -32,7 +32,7 @@ describe("webhook parsing", () => {
       });
       expect(parsed).toEqual(JSON.parse(fixture.body));
       expect(parsed.type).toBe(fixture.expectedType);
-      expect(parsed.data.facts?.[0]?.key).toBe(fixture.expectedFactKey);
+      expect(parsed.facts?.[0]?.key).toBe(fixture.expectedFactKey);
     });
   }
 });

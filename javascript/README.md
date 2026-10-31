@@ -113,7 +113,7 @@ async assets.create(options: SubmitAssetOptions): Promise<Asset>
 - `part` (optional): First part of a sequential multipart upload
 - `description` (string, optional): Description of the asset
 - `processingOptions.keepContentAfterProcessing` (boolean, optional): Retain content after processing
-- `processingOptions.features` (object, optional): Optional analyses to run, each turned on with `enabled: true`: `ocr`, and in beta `personDetection` and `faceDetection` (with `ageEstimation`). Person and face results are returned in `asset.classification.personDetection` and `asset.classification.faceDetection`. See [People and faces](https://calmlens.com/docs/guides/people-and-faces).
+- `processingOptions.features` (object, optional): Optional analyses to run, each turned on with `enabled: true`: `ocr`, and in beta `personDetection` and `faceDetection` (with `ageEstimation`). See [People and faces](https://calmlens.com/docs/guides/people-and-faces).
 - `visibility` (string, optional): "public" or "private"
 
 **Example:**
@@ -200,7 +200,7 @@ console.log(asset.classification.moderation); // Classification results
 
 ##### ensureLens(options)
 
-Create a project-scoped named lens, or update it safely. A lens can start at any positive version. Repeating the exact same version and definition is idempotent; any other update must use a version greater than the current one. A stale or conflicting version throws `lens/version-conflict`.
+Create a project-scoped named lens, or update it safely. A lens can start at any positive version. Repeating the exact same version and definition is idempotent; any other update must use a version greater than the current one. A stale or conflicting version throws `lens/version-conflict`. It sends the definition through `PUT /v1/projects/{projectId}/lenses`, the request `ensureLenses()` uses, and skips the request when the client already ensured the same definition.
 
 ```typescript
 const lens = await client.ensureLens({
@@ -239,7 +239,7 @@ List assets in your project with pagination.
 async assets.list(options: {
   cursor?: string;
   pageSize?: number;
-  ordering?: Array<{ field: "createdAt" | "id"; direction: "ASC" | "DESC" }>;
+  ordering?: Array<{ field: "createdAt" | "id"; direction: "asc" | "desc" }>;
   filter?: string | null;
 }): Promise<{
   items: Asset[];
@@ -398,7 +398,7 @@ if (status !== "allowed" && status !== "limited") hidePhoto(decided.id);
 Fetch one page of immediate child folders, sorted by name. Omit `parentId` for the project root.
 The response contains `items`, the visible `ancestors` of the listed folders, `hasMore` and
 `nextCursor`; pass `nextCursor` as `cursor` to load the next page. `pageSize` is 1 to 100
-(default 100), and `ordering: [{ field: "createdAt", direction: "DESC" }]` sorts by creation
+(default 50), and `ordering: [{ field: "createdAt", direction: "desc" }]` sorts by creation
 time instead (`name` or `createdAt`, one rule).
 
 ```typescript
@@ -762,10 +762,10 @@ try {
 | ------------ | --------------------------------------------------------------------------------------------------------------- |
 | `code`       | A stable identifier such as `asset/not-found` or `sdk/timeout`.`CALMLENS_ERROR_CODES` lists the documented ones |
 | `status`     | The HTTP status, when the API responded                                                                         |
-| `requestId`  | The `X-Request-Id` response header. Include it when you contact support                                         |
+| `requestId`  | The `X-Request-Id` response header (the error body's `requestId`). Include it when you contact support          |
 | `headers`    | The response headers, when the API responded                                                                    |
 | `retryAfter` | Seconds to wait, from the `Retry-After` header (on `429` and `idempotency/request-in-progress`)                 |
-| `details`    | Structured diagnostics from the API, such as validation issues and `traceId`                                    |
+| `details`    | Structured diagnostics from the API, such as validation issues                                                  |
 | `cause`      | The underlying error, for transport failures                                                                    |
 
 `error.isNotFound()` is true for `404`, and `error.isRetryable()` for transport failures, timeouts (`sdk/timeout`, including `waitForDecision`'s deadline), `429`, `502`, `503`, `504` and `idempotency/request-in-progress`. `instanceof CalmLensError` and `CalmLensError.isCalmLensError(error)` recognise errors from any copy of the SDK, including the ES module and CommonJS builds loaded side by side.
@@ -867,19 +867,19 @@ A `webhook` connector POSTs each event to your URL as JSON:
 ```json
 {
   "id": "…",
-  "type": "asset.blocked",
-  "createdAt": 1760000000000,
   "projectId": "…",
-  "data": {
-    "severity": "high",
-    "title": "…",
-    "description": null,
-    "assetId": "…",
-    "asset": null,
-    "facts": [{ "key": "asset-name", "value": "photo.jpg" }]
-  }
+  "type": "asset.blocked",
+  "severity": "high",
+  "title": "…",
+  "description": null,
+  "assetId": "…",
+  "asset": null,
+  "facts": [{ "key": "asset-name", "value": "photo.jpg" }],
+  "createdAt": 1760000000000
 }
 ```
+
+The body is the event exactly as [`events.list`](#events-feed) returns it.
 
 Each delivery has these headers (the names are exported as constants):
 
@@ -956,7 +956,7 @@ The same feed is available in code with [`events.list`](#events-feed).
 
 ```typescript
 {
-  items: TypedEvent[]; // { id, projectId, type, severity, title, description?, assetId?, asset?, facts, createdAt, updatedAt }
+  items: TypedEvent[]; // { id, projectId, type, severity, title, description, assetId, asset, facts, createdAt }
   nextCursor: string;  // pass back as `cursor` to continue after the last event returned
   hasMore: boolean;    // true when more events are already waiting after `nextCursor`
 }
@@ -985,7 +985,7 @@ async function drainEvents() {
 setInterval(drainEvents, 5_000);
 ```
 
-Events carry `facts: { key, value, url? }[]`; webhook deliveries carry the same events reshaped as `{ id, type, createdAt, projectId, data }`.
+Events carry `facts: { key, value, url? }[]`; `description`, `assetId` and `asset` are `null` when the event has none. Webhook deliveries carry the same events in the same shape.
 
 ## Request budgets
 

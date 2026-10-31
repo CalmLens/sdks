@@ -69,7 +69,7 @@ describe("MockCalmLensServerClient listing", () => {
 
     const allowedByName = await client.assets.list({
       filter: "classification.moderation.status==allowed",
-      ordering: [{ field: "createdAt", direction: "ASC" }],
+      ordering: [{ field: "createdAt", direction: "asc" }],
     });
     expect(allowedByName.items.map((asset) => asset.name)).toEqual(["b-allowed", "c-allowed"]);
     expect(allowedByName.hasMore).toBe(false);
@@ -92,7 +92,7 @@ describe("MockCalmLensServerClient listing", () => {
     const names: string[] = [];
     for await (const asset of client.assets.iterate({
       pageSize: 2,
-      ordering: [{ field: "createdAt", direction: "ASC" }],
+      ordering: [{ field: "createdAt", direction: "asc" }],
     })) {
       names.push(asset.name);
     }
@@ -132,7 +132,9 @@ describe("MockCalmLensServerClient events", () => {
       seen.push(...eventPage.items.map((event) => event.id));
     }
     expect(seen).toEqual([first.id, second.id]);
-    expect(toWebhookEventPayload(second as never).data.assetId).toBe("asset-1");
+    // A webhook delivers the event in the shape events.list returns it.
+    expect(toWebhookEventPayload(rest.items[0]!)).toEqual(rest.items[0]!);
+    expect(rest.items[0]).toMatchObject({ assetId: "asset-1", description: null, asset: null });
 
     expect(await caught(client.events.list({ cursor: "bogus" }))).toMatchObject({
       code: "validation/invalid-cursor",

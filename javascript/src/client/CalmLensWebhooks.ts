@@ -122,8 +122,8 @@ const isOptional = (value: unknown, type: "string" | "object", nullable: boolean
 
 /**
  * Whether `value` is a webhook body, by the rules of shared/WebhookPayload's
- * RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA: the envelope fields CalmLens always sends, and the types
- * of the known `data` fields when present. Each fact needs a string `key` and a `value` (any JSON
+ * RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA: the fields CalmLens always sends, and the types of the
+ * other known fields when present. Each fact needs a string `key` and a `value` (any JSON
  * value, `null` included). Unknown fields and fact values are accepted.
  */
 const isWebhookEvent = (value: unknown): value is ReceivedWebhookEventPayload => {
@@ -132,12 +132,11 @@ const isWebhookEvent = (value: unknown): value is ReceivedWebhookEventPayload =>
     typeof value.id !== "string" ||
     typeof value.type !== "string" ||
     typeof value.projectId !== "string" ||
-    typeof value.createdAt !== "number" ||
-    !isObject(value.data)
+    typeof value.createdAt !== "number"
   ) {
     return false;
   }
-  const { severity, title, description, assetId, asset, facts } = value.data;
+  const { severity, title, description, assetId, asset, facts } = value;
   return (
     isOptional(severity, "string", false) &&
     isOptional(title, "string", false) &&
@@ -160,6 +159,6 @@ const isWebhookEvent = (value: unknown): value is ReceivedWebhookEventPayload =>
  * Whether a webhook event is a test send from the portal or the CLI rather than a real event: it
  * carries the registered `{ key: "test", value: true }` fact.
  */
-export const isTestWebhookEvent = (event: Pick<ReceivedWebhookEventPayload, "data">): boolean =>
-  Array.isArray(event?.data?.facts) &&
-  event.data.facts.some((fact) => fact?.key === "test" && fact.value === true);
+export const isTestWebhookEvent = (event: Pick<ReceivedWebhookEventPayload, "facts">): boolean =>
+  Array.isArray(event?.facts) &&
+  event.facts.some((fact) => fact?.key === "test" && fact.value === true);

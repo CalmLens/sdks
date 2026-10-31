@@ -31,7 +31,7 @@ import {
 } from "../contract/SharedConstants.js";
 import { isFileAccepted } from "../ui/UploadController";
 import type { MockDatabaseStorage, MockImageStorage } from "./MockStorage";
-import { createPage, filterAssets, searchAssets } from "./MockUtils";
+import { createPage, DEFAULT_PAGE_SIZE, filterAssets, searchAssets } from "./MockUtils";
 
 // The in-memory CalmLens API and CDN behind the mock clients. The mocks run the real clients,
 // whose `fetch` is `MockCalmLensApi.handle`: every request is answered here with the API's
@@ -193,7 +193,6 @@ export interface MockEndpoints {
   cdnBaseUrl: string;
 }
 
-const DEFAULT_EVENTS_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 const MAX_DECISION_NOTE_LENGTH = 1499;
 /** How the API names a reviewer acting through an unnamed API key. */
@@ -312,13 +311,12 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         return method === "GET" ? ["folders.list"] : ["folders.create"];
       case "hash-lists":
         return method === "GET" ? ["hashLists.list"] : ["hashLists.create"];
-      case "assets/page":
-        return ["assets.list", "assets.iterate"];
       case "assets/search":
         return ["assets.search"];
       case "assets/batch":
         return ["assets.batch"];
       case "assets":
+        if (method === "GET") return ["assets.list", "assets.iterate"];
         if (query.get("queue") === "true") return ["assets.create"];
         return isTextUpload(request) ? ["assets.classify", "text.classify"] : ["assets.classify"];
     }
@@ -494,9 +492,11 @@ export class MockCalmLensApi {
       projectId: this.projectId,
       severity: "low",
       title: input.type,
+      description: null,
+      assetId: null,
+      asset: null,
       facts: [],
       createdAt: now,
-      updatedAt: now,
       ...input,
     } as TypedEvent;
     this.eventFeed.push(event);
@@ -613,7 +613,7 @@ export class MockCalmLensApi {
     return new CalmLensError(failure.code, {
       message: failure.message,
       status: failure.status,
-      details: failure.details,
+      details: failure.details ?? {},
       requestId,
       headers: new Headers({ "content-type": "application/json", "x-request-id": requestId }),
     });
@@ -718,8 +718,8 @@ export class MockCalmLensApi {
     body: string | Uint8Array<ArrayBuffer> | null,
     url: string,
     headers: Record<string, string>,
+    requestId = `mock-request-${++this.requestCount}`,
   ): Response {
-    const requestId = `mock-request-${++this.requestCount}`;
     const response = new Response(body, {
       status,
       headers: { ...headers, "X-Request-Id": requestId },
@@ -733,22 +733,31 @@ export class MockCalmLensApi {
     body: unknown,
     url: string,
     headers: Record<string, string> = {},
+    requestId?: string,
   ): Response {
-    return this.response(status, JSON.stringify(body), url, {
-      "Content-Type": "application/json",
-      ...headers,
-    });
+    return this.response(
+      status,
+      JSON.stringify(body),
+      url,
+      { "Content-Type": "application/json", ...headers },
+      requestId,
+    );
   }
 
+  /** The API's error body: `{ code, message, requestId, details }`, `requestId` as in the header. */
   private failureResponse(failure: ApiFailure, url: string): Response {
+    const requestId = `mock-request-${++this.requestCount}`;
     return this.jsonResponse(
       failure.status,
       {
         code: failure.code,
         message: failure.message,
-        ...(failure.details ? { details: failure.details } : {}),
+        requestId,
+        details: failure.details ?? {},
       },
       url,
+      {},
+      requestId,
     );
   }
 
@@ -816,7 +825,7 @@ export class MockCalmLensApi {
       switch (`${method} ${route}`) {
         case "POST assets":
           return [200, await this.createAsset(request)];
-        case "GET assets/page":
+        case "GET assets":
           return [200, await this.listAssets(request.query)];
         case "GET assets/search":
           return [200, await this.searchAssets(request.query)];
@@ -895,7 +904,9 @@ export class MockCalmLensApi {
       if (!this.hashListEntries.delete(id)) throw fail(API_ERROR_CODES.HASH_LIST_ENTRY_NOT_FOUND);
       return [200, {}];
     }
-    throw new ApiFailure(404, "not-found", `No route for ${method} /${segments.join("/")}`);
+    throw fail(API_ERROR_CODES.ROUTE_NOT_FOUND, {
+      message: `No route for ${method} /${segments.join("/")}`,
+    });
   }
 
   // ---- Hash lists --------------------------------------------------------------------------
@@ -965,7 +976,7 @@ export class MockCalmLensApi {
 
   private listHashListEntries(hashListId: string, query: URLSearchParams): HashListEntryPage {
     this.findHashList(hashListId);
-    const pageSize = this.integer(query, "pageSize", 20);
+    const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
     const entries = [...this.hashListEntries.values()]
       .filter((entry) => entry.hashListId === hashListId)
       .reverse();
@@ -980,8 +991,8 @@ export class MockCalmLensApi {
       nextCursor: hasMore ? btoa(String(start + pageSize)) : null,
       pageSize,
       ordering: [
-        { field: "createdAt", direction: "DESC" },
-        { field: "id", direction: "DESC" },
+        { field: "createdAt", direction: "desc" },
+        { field: "id", direction: "desc" },
       ],
     };
   }
@@ -1055,7 +1066,7 @@ export class MockCalmLensApi {
 
   /** `ordering[i][field]` and `ordering[i][direction]` pairs, as qs parses them. */
   private ordering(query: URLSearchParams) {
-    const ordering: Array<{ field: "createdAt" | "id"; direction: "ASC" | "DESC" }> = [];
+    const ordering: Array<{ field: "createdAt" | "id"; direction: "asc" | "desc" }> = [];
     for (const [key, value] of query) {
       const match = /^ordering\[(\d+)\]\[(field|direction)\]$/.exec(key);
       if (!match) continue;
@@ -1076,7 +1087,7 @@ export class MockCalmLensApi {
   private pageQuery(query: URLSearchParams) {
     const ordering = this.ordering(query);
     return {
-      pageSize: this.integer(query, "pageSize", 10),
+      pageSize: this.integer(query, "pageSize", DEFAULT_PAGE_SIZE),
       cursor: query.get("cursor") ?? undefined,
       ordering: ordering.length ? ordering : undefined,
     };
@@ -1423,7 +1434,6 @@ export class MockCalmLensApi {
     const asset: Asset = {
       id,
       projectId: this.projectId,
-      userId: null,
       parentId: null,
       folderId: fields.folderId ?? null,
       uploadPresetId: fields.uploadPresetId ?? null,
@@ -1725,7 +1735,7 @@ export class MockCalmLensApi {
    * is where to keep polling from.
    */
   private listEvents(query: URLSearchParams) {
-    const pageSize = this.integer(query, "pageSize", DEFAULT_EVENTS_PAGE_SIZE);
+    const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
     // Like the API's query schema: an integer from 1 to 100.
     if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
     if (pageSize > MAX_PAGE_SIZE) throw invalidField("validation/too-big", "pageSize");
@@ -1744,44 +1754,34 @@ export class MockCalmLensApi {
   // ---- Folders -----------------------------------------------------------------------------
 
   /**
-   * Lists folders like the API: one keyset page of a parent's children (or of every match with
-   * `searchAll`), by name unless `ordering` says otherwise, with the folders above them.
+   * Lists folders like the API: one keyset page of a parent's children, optionally matching
+   * `search`, by name unless `ordering` says otherwise, with the folders above them.
    */
   private async listFolders(query: URLSearchParams) {
     const all = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
     const parentId = query.get("parentId");
     const search = query.get("search")?.trim() || null;
-    const searchAll = query.get("searchAll") === "true";
-    const resolveOnly = query.get("resolveOnly") === "true";
     const ordering = this.folderOrdering(query);
-    const requestedIds = [...query]
-      .filter(([key]) => /^ids\[\d+\]$/.test(key))
-      .map(([, value]) => value);
     const matching = all.filter(
       (folder) =>
-        ((searchAll && search) || (folder.parentId ?? null) === parentId) &&
+        (folder.parentId ?? null) === parentId &&
         (!search || folder.name.toLowerCase().includes(search.toLowerCase())),
     );
     const page = createPage(
       matching,
       {
         cursor: query.get("cursor") ?? undefined,
-        pageSize: this.integer(query, "pageSize", MAX_PAGE_SIZE),
+        pageSize: this.integer(query, "pageSize", DEFAULT_PAGE_SIZE),
         ordering,
       },
       {
-        scope: JSON.stringify([this.projectId, parentId, search, searchAll]),
+        scope: JSON.stringify([this.projectId, parentId, search]),
         fail: this.pageFailure,
-        defaultPageSize: MAX_PAGE_SIZE,
-        defaultOrdering: [{ field: "name", direction: "ASC" }],
+        defaultOrdering: [{ field: "name", direction: "asc" }],
       },
     );
-    const folders = resolveOnly ? [] : page.items;
-    const ids = new Set([
-      ...requestedIds,
-      ...(parentId ? [parentId] : []),
-      ...folders.map((folder) => folder.id),
-    ]);
+    const folders = page.items;
+    const ids = new Set([...(parentId ? [parentId] : []), ...folders.map((folder) => folder.id)]);
     const byId = new Map(all.map((folder) => [folder.id, folder]));
     for (const id of ids) {
       const parent = byId.get(id)?.parentId;
@@ -1792,9 +1792,9 @@ export class MockCalmLensApi {
       ancestors: all.filter(
         (folder) => ids.has(folder.id) && !folders.some((item) => item.id === folder.id),
       ),
-      nextCursor: resolveOnly ? null : page.nextCursor,
+      nextCursor: page.nextCursor,
       pageSize: page.pageSize,
-      hasMore: !resolveOnly && page.hasMore,
+      hasMore: page.hasMore,
       ordering: page.ordering,
     };
   }
@@ -1806,10 +1806,10 @@ export class MockCalmLensApi {
     for (const [index, rule] of ordering.entries()) {
       if (rule.field !== "name" && rule.field !== "createdAt")
         throw invalidField("validation/invalid-value", `ordering.${index}.field`);
-      if (rule.direction !== "ASC" && rule.direction !== "DESC")
+      if (rule.direction !== "asc" && rule.direction !== "desc")
         throw invalidField("validation/invalid-value", `ordering.${index}.direction`);
     }
-    return ordering as Array<{ field: "name" | "createdAt"; direction: "ASC" | "DESC" }>;
+    return ordering as Array<{ field: "name" | "createdAt"; direction: "asc" | "desc" }>;
   }
 
   private async createFolder(body: Record<string, unknown>): Promise<Folder> {

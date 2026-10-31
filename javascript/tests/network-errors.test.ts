@@ -11,7 +11,7 @@ describe("network errors", () => {
     const apiError = {
       code: "validation/invalid-type",
       message: "Invalid input: expected array, received object",
-      traceId: "40d366f9-8c1f-4245-986b-59c633a0a512",
+      requestId: "req-123",
       details: {
         path: "metadata",
         issues: [
@@ -57,11 +57,27 @@ describe("network errors", () => {
           code: "validation/invalid-type",
         },
       ],
-      traceId: "40d366f9-8c1f-4245-986b-59c633a0a512",
     });
     expect(error.status).toBe(400);
     expect(error.requestId).toBe("req-123");
     expect(error.retryAfter).toBe(7);
     expect(error.headers.get("x-request-id")).toBe("req-123");
+  });
+
+  it("takes the request ID from the error body when the response has no X-Request-Id header", async () => {
+    const fetchImpl = (async () =>
+      Response.json(
+        { code: "misc/route-not-found", message: "Not found", requestId: "req-body", details: {} },
+        { status: 404 },
+      )) as typeof fetch;
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+
+    const error = await client.assets.retrieve({ assetId: "asset-1" }).catch((error) => error);
+
+    expect(error).toBeInstanceOf(CalmLensError);
+    expect(error.code).toBe("misc/route-not-found");
+    expect(error.status).toBe(404);
+    expect(error.requestId).toBe("req-body");
+    expect(error.details).toEqual({});
   });
 });

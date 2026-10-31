@@ -710,9 +710,9 @@ describe("MockCalmLensServerClient", () => {
     const second = await client.folders.list({ cursor: first.nextCursor!, pageSize: 1 });
     expect(second.items.map((folder) => folder.id)).toEqual([product.id]);
     expect(second.hasMore).toBe(false);
-    const resolved = await client.folders.list({ ids: [campaigns.id], resolveOnly: true });
-    expect(resolved.items).toEqual([]);
-    expect(resolved.ancestors.map((folder) => folder.id).sort()).toEqual(
+    const insideCampaigns = await client.folders.list({ parentId: campaigns.id });
+    expect(insideCampaigns.items).toEqual([]);
+    expect(insideCampaigns.ancestors.map((folder) => folder.id).sort()).toEqual(
       [marketing.id, campaigns.id].sort(),
     );
 

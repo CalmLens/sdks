@@ -9,7 +9,7 @@ const createClient = (projectId = "project-1") => {
     const request = new Request(input, init);
     requests.push({ method: request.method, url: new URL(request.url) });
     return Response.json(
-      request.url.includes("/assets/page")
+      request.method === "GET" && new URL(request.url).pathname.endsWith("/assets")
         ? page
         : {
             id: "a",
@@ -38,7 +38,7 @@ describe("request paths", () => {
     const { client, requests } = createClient();
     await client.assets.list();
     expect(requests.map(({ method, url }) => `${method} ${url.pathname}${url.search}`)).toEqual([
-      "GET /v1/projects/project-1/assets/page",
+      "GET /v1/projects/project-1/assets",
     ]);
   });
 
@@ -53,7 +53,7 @@ describe("request paths", () => {
     await client.assets.list({ pageSize: 5 });
     await client.assets.create({ name: "a.txt", content: { plainText: "a", type: "text/plain" } });
     expect(requests.map(({ url }) => url.pathname)).toEqual([
-      "/v1/projects/p%2F..%2Fx%3Fy%23z/assets/page",
+      "/v1/projects/p%2F..%2Fx%3Fy%23z/assets",
       "/v1/projects/p%2F..%2Fx%3Fy%23z/assets",
     ]);
   });

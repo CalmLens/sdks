@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import * as sdk from "../src/client/CalmLensWebhooks";
-import type { Event } from "../src/contract/Event.js";
+import type { Event, TypedEvent } from "../src/contract/Event.js";
 import * as shared from "../src/contract/WebhookPayload.js";
 import {
   CalmLensError,
@@ -10,28 +10,38 @@ import {
 } from "../src/server";
 import * as builders from "../src/testing/MockWebhooks";
 
-const event: Event = {
-  id: "event-1",
+const event: TypedEvent = {
+  id: "evt_8fK2mQx7Lp4NvB3tRz9Y",
   projectId: "proj_8fK2mQx7Lp4NvB3tRz9Y",
   type: "asset.blocked",
   severity: "high",
   title: "Asset blocked",
   description: "Blocked by your policy",
-  assetId: "asset-1",
+  assetId: "asset_8fK2mQx7Lp4NvB3tRz9Y",
+  asset: null,
   facts: [
     { key: "asset-name", value: "photo.jpg" },
     { key: "decided-by", value: "automated" },
     { key: "flagged-categories", value: ["harassment"] },
   ],
   createdAt: 1760000000000,
-  updatedAt: 1760000000001,
-} as Event;
+} as TypedEvent;
 
 describe("webhook payload and headers", () => {
   it("match shared/WebhookPayload, which the server uses", async () => {
-    expect(builders.toWebhookEventPayload(event)).toEqual(shared.toWebhookEventPayload(event));
-    const minimal = { ...event, description: undefined, assetId: undefined, facts: [] };
-    expect(builders.toWebhookEventPayload(minimal)).toEqual(shared.toWebhookEventPayload(minimal));
+    expect(builders.toWebhookEventPayload(event)).toEqual(
+      shared.toWebhookEventPayload(event as Event),
+    );
+    const minimal = {
+      ...event,
+      description: undefined,
+      assetId: undefined,
+      asset: undefined,
+      facts: [],
+    } as unknown as TypedEvent;
+    expect(builders.toWebhookEventPayload(minimal)).toEqual(
+      shared.toWebhookEventPayload(minimal as Event),
+    );
     expect(
       shared.WEBHOOK_EVENT_PAYLOAD_SCHEMA.parse(builders.toWebhookEventPayload(event)),
     ).toEqual(builders.toWebhookEventPayload(event));
@@ -46,6 +56,11 @@ describe("webhook payload and headers", () => {
     expect(sdk.WEBHOOK_SIGNATURE_TOLERANCE_SECONDS).toBe(
       shared.WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
     );
+  });
+
+  it("is the event as events.list returns it, without fields outside that shape", () => {
+    const stored = { ...event, userId: "user-1", notify: true, readAt: 1, updatedAt: 2 };
+    expect(builders.toWebhookEventPayload(stored as TypedEvent)).toEqual(event);
   });
 
   it("signs the shared test vector", async () => {
@@ -202,7 +217,10 @@ describe("parseWebhookEvent", () => {
       "[]",
       JSON.stringify({ id: "e", type: "x" }),
       // Every event CalmLens sends has its creation time.
-      JSON.stringify({ id: "e", type: "x", projectId: "p", data: {} }),
+      JSON.stringify({ id: "e", type: "x", projectId: "p", facts: [] }),
+      // Known fields keep their types.
+      JSON.stringify({ id: "e", type: "x", projectId: "p", createdAt: 1, title: 5 }),
+      JSON.stringify({ id: "e", type: "x", projectId: "p", createdAt: 1, facts: [{ value: 1 }] }),
     ]) {
       const signature = await builders.createWebhookSignatureHeader(
         secret,

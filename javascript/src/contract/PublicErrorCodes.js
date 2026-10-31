@@ -310,6 +310,106 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This asset needs moderation evidence for the newly served jurisdiction.",
 		status: 403
 	}),
+	INVALID_TYPE: new ErrorCode({
+		id: "validation/invalid-type",
+		defaultMessage: "A field has the wrong type. details.issues lists each problem.",
+		status: 400
+	}),
+	TOO_SMALL: new ErrorCode({
+		id: "validation/too-small",
+		defaultMessage: "A value is below its minimum. details.issues lists each problem.",
+		status: 400
+	}),
+	TOO_BIG: new ErrorCode({
+		id: "validation/too-big",
+		defaultMessage: "A value is above its maximum. details.issues lists each problem.",
+		status: 400
+	}),
+	INVALID_FORMAT: new ErrorCode({
+		id: "validation/invalid-format",
+		defaultMessage: "A string is not in the required format, such as an ID or URL. details.issues lists each problem.",
+		status: 400
+	}),
+	INVALID_VALUE: new ErrorCode({
+		id: "validation/invalid-value",
+		defaultMessage: "A field has a value it cannot take. details.issues lists each problem.",
+		status: 400
+	}),
+	UNKNOWN_FIELD: new ErrorCode({
+		id: "validation/unknown-field",
+		defaultMessage: "The request has a field this endpoint does not accept.",
+		status: 400
+	}),
+	UNSUPPORTED_CONTENT_TYPE: new ErrorCode({
+		id: "validation/unsupported-content-type",
+		defaultMessage: "Send the request body as application/json.",
+		status: 415
+	}),
+	INVALID_FILTER: new ErrorCode({
+		id: "validation/invalid-filter",
+		defaultMessage: "The filter has invalid syntax or names a field that can't be filtered.",
+		status: 400
+	}),
+	INVALID_ORDERING_FIELD: new ErrorCode({
+		id: "validation/invalid-ordering-field",
+		defaultMessage: "The list cannot be ordered by this field.",
+		status: 400
+	}),
+	ROUTE_NOT_FOUND: new ErrorCode({
+		id: "misc/route-not-found",
+		defaultMessage: "No endpoint matches this method and path.",
+		status: 404
+	}),
+	INTERNAL_ERROR: new ErrorCode({
+		id: "misc/internal-error",
+		defaultMessage: "An internal error occurred. Retry later, and quote requestId to support.",
+		status: 500
+	}),
+	UNAUTHENTICATED: new ErrorCode({
+		id: "auth/unauthenticated",
+		defaultMessage: "Authentication required.",
+		status: 401
+	}),
+	TOKEN_EXPIRED: new ErrorCode({
+		id: "auth/token-expired",
+		defaultMessage: "The session token has expired. Sign in again.",
+		status: 401
+	}),
+	INVALID_TOKEN: new ErrorCode({
+		id: "auth/invalid-token",
+		defaultMessage: "The session token is invalid. Sign in again.",
+		status: 401
+	}),
+	SEARCH_UNAVAILABLE: new ErrorCode({
+		id: "search/unavailable",
+		defaultMessage: "Search is temporarily unavailable. Retry later.",
+		status: 503
+	}),
+	INVALID_TRANSFORM: new ErrorCode({
+		id: "asset/invalid-transform",
+		defaultMessage: "The transform names an unknown type or is not a valid selector.",
+		status: 400
+	}),
+	INVALID_TRANSFORM_OPTIONS: new ErrorCode({
+		id: "asset/invalid-transform-options",
+		defaultMessage: "The transform's options are invalid for its type.",
+		status: 400
+	}),
+	REMOTE_URL_REDIRECT_LIMIT: new ErrorCode({
+		id: "asset/remote-url-redirect-limit",
+		defaultMessage: "The remote URL redirected too many times.",
+		status: 400
+	}),
+	COPYRIGHT_CONTENT_HELD: new ErrorCode({
+		id: "copyright/content-held",
+		defaultMessage: "The asset's content is held for a copyright claim and cannot be changed.",
+		status: 409
+	}),
+	DOWNLOAD_PERMISSION_REQUIRED: new ErrorCode({
+		id: "asset/api-key-missing-permission",
+		defaultMessage: "This API key needs assets:download permission for this asset's folder.",
+		status: 403
+	}),
 	INVALID_CURSOR: new ErrorCode({
 		id: "validation/invalid-cursor",
 		defaultMessage: "The cursor is invalid or belongs to a different query.",
@@ -681,5 +781,7 @@ const PUBLIC_ERROR_CODES = {
 		status: 409
 	})
 };
+PUBLIC_ERROR_CODES.INVALID_TYPE, PUBLIC_ERROR_CODES.TOO_SMALL, PUBLIC_ERROR_CODES.TOO_BIG, PUBLIC_ERROR_CODES.INVALID_FORMAT, PUBLIC_ERROR_CODES.INVALID_VALUE, PUBLIC_ERROR_CODES.UNKNOWN_FIELD;
+PUBLIC_ERROR_CODES.INTERNAL_ERROR;
 PUBLIC_ERROR_CODES.MISSING_TOKEN, PUBLIC_ERROR_CODES.INVALID_API_KEY, PUBLIC_ERROR_CODES.API_KEY_PROJECT_MISMATCH, PUBLIC_ERROR_CODES.PERMISSION_DENIED;
 export { PUBLIC_ERROR_CODES };

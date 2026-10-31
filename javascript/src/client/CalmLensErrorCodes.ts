@@ -7,6 +7,26 @@ export const API_ERROR_CODES = {
   INVALID_VIEWER_REGION: "viewer/invalid-region",
   VIEWER_REGION_REQUIRED: "viewer/region-required",
   REGIONAL_EVIDENCE_REQUIRED: "asset/regional-evidence-required",
+  INVALID_TYPE: "validation/invalid-type",
+  TOO_SMALL: "validation/too-small",
+  TOO_BIG: "validation/too-big",
+  INVALID_FORMAT: "validation/invalid-format",
+  INVALID_VALUE: "validation/invalid-value",
+  UNKNOWN_FIELD: "validation/unknown-field",
+  UNSUPPORTED_CONTENT_TYPE: "validation/unsupported-content-type",
+  INVALID_FILTER: "validation/invalid-filter",
+  INVALID_ORDERING_FIELD: "validation/invalid-ordering-field",
+  ROUTE_NOT_FOUND: "misc/route-not-found",
+  INTERNAL_ERROR: "misc/internal-error",
+  UNAUTHENTICATED: "auth/unauthenticated",
+  TOKEN_EXPIRED: "auth/token-expired",
+  INVALID_TOKEN: "auth/invalid-token",
+  SEARCH_UNAVAILABLE: "search/unavailable",
+  INVALID_TRANSFORM: "asset/invalid-transform",
+  INVALID_TRANSFORM_OPTIONS: "asset/invalid-transform-options",
+  REMOTE_URL_REDIRECT_LIMIT: "asset/remote-url-redirect-limit",
+  COPYRIGHT_CONTENT_HELD: "copyright/content-held",
+  DOWNLOAD_PERMISSION_REQUIRED: "asset/api-key-missing-permission",
   INVALID_CURSOR: "validation/invalid-cursor",
   MISSING_TOKEN: "auth/missing-token",
   INVALID_API_KEY: "auth/invalid-api-key",
@@ -111,6 +131,86 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "asset/regional-evidence-required": {
     status: 403,
     message: "This asset needs moderation evidence for the newly served jurisdiction.",
+  },
+  "validation/invalid-type": {
+    status: 400,
+    message: "A field has the wrong type. details.issues lists each problem.",
+  },
+  "validation/too-small": {
+    status: 400,
+    message: "A value is below its minimum. details.issues lists each problem.",
+  },
+  "validation/too-big": {
+    status: 400,
+    message: "A value is above its maximum. details.issues lists each problem.",
+  },
+  "validation/invalid-format": {
+    status: 400,
+    message: "A string is not in the required format, such as an ID or URL. details.issues lists each problem.",
+  },
+  "validation/invalid-value": {
+    status: 400,
+    message: "A field has a value it cannot take. details.issues lists each problem.",
+  },
+  "validation/unknown-field": {
+    status: 400,
+    message: "The request has a field this endpoint does not accept.",
+  },
+  "validation/unsupported-content-type": {
+    status: 415,
+    message: "Send the request body as application/json.",
+  },
+  "validation/invalid-filter": {
+    status: 400,
+    message: "The filter has invalid syntax or names a field that can't be filtered.",
+  },
+  "validation/invalid-ordering-field": {
+    status: 400,
+    message: "The list cannot be ordered by this field.",
+  },
+  "misc/route-not-found": {
+    status: 404,
+    message: "No endpoint matches this method and path.",
+  },
+  "misc/internal-error": {
+    status: 500,
+    message: "An internal error occurred. Retry later, and quote requestId to support.",
+  },
+  "auth/unauthenticated": {
+    status: 401,
+    message: "Authentication required.",
+  },
+  "auth/token-expired": {
+    status: 401,
+    message: "The session token has expired. Sign in again.",
+  },
+  "auth/invalid-token": {
+    status: 401,
+    message: "The session token is invalid. Sign in again.",
+  },
+  "search/unavailable": {
+    status: 503,
+    message: "Search is temporarily unavailable. Retry later.",
+  },
+  "asset/invalid-transform": {
+    status: 400,
+    message: "The transform names an unknown type or is not a valid selector.",
+  },
+  "asset/invalid-transform-options": {
+    status: 400,
+    message: "The transform's options are invalid for its type.",
+  },
+  "asset/remote-url-redirect-limit": {
+    status: 400,
+    message: "The remote URL redirected too many times.",
+  },
+  "copyright/content-held": {
+    status: 409,
+    message: "The asset's content is held for a copyright claim and cannot be changed.",
+  },
+  "asset/api-key-missing-permission": {
+    status: 403,
+    message: "This API key needs assets:download permission for this asset's folder.",
   },
   "validation/invalid-cursor": {
     status: 400,

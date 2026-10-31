@@ -18433,7 +18433,6 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     retention: "retention";
   }>>;
   updatedAt: zod.ZodNullable<zod.ZodNumber>;
-  safetyTest: zod.ZodOptional<zod.ZodBoolean>;
   safetyHold: zod.ZodNullable<zod.ZodObject<{
     placedAt: zod.ZodNumber;
     reason: zod.ZodEnum<{
@@ -18471,7 +18470,6 @@ type AssetContent = zod.infer<typeof ASSET_CONTENT_SCHEMA>;
 declare const ASSET_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   projectId: zod.ZodString;
-  userId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   parentId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   folderId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   uploadPresetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -27775,7 +27773,6 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       retention: "retention";
     }>>;
     updatedAt: zod.ZodNullable<zod.ZodNumber>;
-    safetyTest: zod.ZodOptional<zod.ZodBoolean>;
     safetyHold: zod.ZodNullable<zod.ZodObject<{
       placedAt: zod.ZodNumber;
       reason: zod.ZodEnum<{
