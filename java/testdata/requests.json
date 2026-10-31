@@ -495,7 +495,7 @@
     },
     "request": {
       "method": "GET",
-      "path": "/v1/projects/project-1/assets/page",
+      "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
         "filter": "classification.moderation.status==allowed",
@@ -580,24 +580,24 @@
       "ordering": [
         {
           "field": "createdAt",
-          "direction": "DESC"
+          "direction": "desc"
         },
         {
           "field": "id",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ],
       "filter": "classification.moderation.status==allowed,name==\"a&b #1\""
     },
     "request": {
       "method": "GET",
-      "path": "/v1/projects/project-1/assets/page",
+      "path": "/v1/projects/project-1/assets",
       "query": {
         "cursor": "opaque+/cursor=",
         "ordering[0][field]": "createdAt",
-        "ordering[0][direction]": "DESC",
+        "ordering[0][direction]": "desc",
         "ordering[1][field]": "id",
-        "ordering[1][direction]": "ASC",
+        "ordering[1][direction]": "asc",
         "filter": "classification.moderation.status==allowed,name==\"a&b #1\""
       },
       "body": null
@@ -633,7 +633,7 @@
       "ordering": [
         {
           "field": "createdAt",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ]
     },
@@ -642,7 +642,7 @@
       "path": "/v1/assets/asset-1/children",
       "query": {
         "ordering[0][field]": "createdAt",
-        "ordering[0][direction]": "ASC"
+        "ordering[0][direction]": "asc"
       },
       "body": null
     },
@@ -1331,17 +1331,21 @@
   {
     "operation": "folders.list",
     "options": {
-      "ids": [
-        "folder-1"
-      ],
-      "resolveOnly": true
+      "search": "a&b",
+      "ordering": [
+        {
+          "field": "name",
+          "direction": "desc"
+        }
+      ]
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/folders",
       "query": {
-        "ids[0]": "folder-1",
-        "resolveOnly": "true"
+        "search": "a&b",
+        "ordering[0][field]": "name",
+        "ordering[0][direction]": "desc"
       },
       "body": null
     },
@@ -1802,7 +1806,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -2268,40 +2271,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -2320,17 +2289,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -2359,7 +2317,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -2405,7 +2362,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -2871,40 +2827,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -2923,17 +2845,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -2962,7 +2873,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -3047,7 +2957,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -3513,40 +3422,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -3565,17 +3440,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -3604,7 +3468,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -3676,7 +3539,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -4142,40 +4004,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -4194,17 +4022,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -4233,7 +4050,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -4338,7 +4154,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -4804,40 +4619,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -4856,17 +4637,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -4895,7 +4665,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -4951,7 +4720,6 @@
           "asset": {
             "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
             "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-            "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
             "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
             "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
             "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -5417,40 +5185,6 @@
                   }
                 ]
               },
-              "personDetection": {
-                "status": "evaluated",
-                "stage": "beta",
-                "people": [
-                  {
-                    "box": {
-                      "left": 1.5,
-                      "top": 1.5,
-                      "width": 1.5,
-                      "height": 1.5
-                    },
-                    "confidence": 0.5
-                  }
-                ]
-              },
-              "faceDetection": {
-                "status": "evaluated",
-                "stage": "beta",
-                "faces": [
-                  {
-                    "box": {
-                      "left": 1.5,
-                      "top": 1.5,
-                      "width": 1.5,
-                      "height": 1.5
-                    },
-                    "confidence": 0.5,
-                    "ageRange": {
-                      "low": 1,
-                      "high": 1
-                    }
-                  }
-                ]
-              },
               "linkDetection": {
                 "status": "evaluated",
                 "stage": "beta",
@@ -5469,17 +5203,6 @@
                   {
                     "url": "example",
                     "source": "qr-code"
-                  }
-                ]
-              },
-              "aiGeneratedDetection": {
-                "status": "evaluated",
-                "stage": "beta",
-                "provenance": "ai-generated",
-                "signals": [
-                  {
-                    "kind": "c2pa",
-                    "value": "example"
                   }
                 ]
               },
@@ -5508,7 +5231,6 @@
               "status": "temporary",
               "removalReason": "policy",
               "updatedAt": 1,
-              "safetyTest": true,
               "safetyHold": {
                 "placedAt": 1,
                 "reason": "suspected-illegal-content",
@@ -5557,7 +5279,7 @@
     },
     "request": {
       "method": "GET",
-      "path": "/v1/projects/project-1/assets/page",
+      "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
         "filter": "classification.moderation.status==allowed",
@@ -5570,7 +5292,6 @@
         {
           "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-          "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
           "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
           "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
           "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -6036,40 +5757,6 @@
                 }
               ]
             },
-            "personDetection": {
-              "status": "evaluated",
-              "stage": "beta",
-              "people": [
-                {
-                  "box": {
-                    "left": 1.5,
-                    "top": 1.5,
-                    "width": 1.5,
-                    "height": 1.5
-                  },
-                  "confidence": 0.5
-                }
-              ]
-            },
-            "faceDetection": {
-              "status": "evaluated",
-              "stage": "beta",
-              "faces": [
-                {
-                  "box": {
-                    "left": 1.5,
-                    "top": 1.5,
-                    "width": 1.5,
-                    "height": 1.5
-                  },
-                  "confidence": 0.5,
-                  "ageRange": {
-                    "low": 1,
-                    "high": 1
-                  }
-                }
-              ]
-            },
             "linkDetection": {
               "status": "evaluated",
               "stage": "beta",
@@ -6088,17 +5775,6 @@
                 {
                   "url": "example",
                   "source": "qr-code"
-                }
-              ]
-            },
-            "aiGeneratedDetection": {
-              "status": "evaluated",
-              "stage": "beta",
-              "provenance": "ai-generated",
-              "signals": [
-                {
-                  "kind": "c2pa",
-                  "value": "example"
                 }
               ]
             },
@@ -6127,7 +5803,6 @@
             "status": "temporary",
             "removalReason": "policy",
             "updatedAt": 1,
-            "safetyTest": true,
             "safetyHold": {
               "placedAt": 1,
               "reason": "suspected-illegal-content",
@@ -6164,7 +5839,7 @@
       "ordering": [
         {
           "field": "example",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ]
     },
@@ -6177,7 +5852,7 @@
       "ordering": [
         {
           "field": "createdAt",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ]
     },
@@ -6186,7 +5861,7 @@
       "path": "/v1/assets/asset-1/children",
       "query": {
         "ordering[0][field]": "createdAt",
-        "ordering[0][direction]": "ASC"
+        "ordering[0][direction]": "asc"
       },
       "body": null
     },
@@ -6195,7 +5870,6 @@
         {
           "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-          "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
           "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
           "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
           "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -6661,40 +6335,6 @@
                 }
               ]
             },
-            "personDetection": {
-              "status": "evaluated",
-              "stage": "beta",
-              "people": [
-                {
-                  "box": {
-                    "left": 1.5,
-                    "top": 1.5,
-                    "width": 1.5,
-                    "height": 1.5
-                  },
-                  "confidence": 0.5
-                }
-              ]
-            },
-            "faceDetection": {
-              "status": "evaluated",
-              "stage": "beta",
-              "faces": [
-                {
-                  "box": {
-                    "left": 1.5,
-                    "top": 1.5,
-                    "width": 1.5,
-                    "height": 1.5
-                  },
-                  "confidence": 0.5,
-                  "ageRange": {
-                    "low": 1,
-                    "high": 1
-                  }
-                }
-              ]
-            },
             "linkDetection": {
               "status": "evaluated",
               "stage": "beta",
@@ -6713,17 +6353,6 @@
                 {
                   "url": "example",
                   "source": "qr-code"
-                }
-              ]
-            },
-            "aiGeneratedDetection": {
-              "status": "evaluated",
-              "stage": "beta",
-              "provenance": "ai-generated",
-              "signals": [
-                {
-                  "kind": "c2pa",
-                  "value": "example"
                 }
               ]
             },
@@ -6752,7 +6381,6 @@
             "status": "temporary",
             "removalReason": "policy",
             "updatedAt": 1,
-            "safetyTest": true,
             "safetyHold": {
               "placedAt": 1,
               "reason": "suspected-illegal-content",
@@ -6789,7 +6417,7 @@
       "ordering": [
         {
           "field": "example",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ]
     },
@@ -6814,7 +6442,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -7280,40 +6907,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -7332,17 +6925,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -7371,7 +6953,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -7417,7 +6998,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -7883,40 +7463,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -7935,17 +7481,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -7974,7 +7509,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -8020,7 +7554,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -8486,40 +8019,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -8538,17 +8037,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -8577,7 +8065,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -8628,7 +8115,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -9094,40 +8580,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -9146,17 +8598,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -9185,7 +8626,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -9231,7 +8671,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -9697,40 +9136,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -9749,17 +9154,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -9788,7 +9182,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -9837,7 +9230,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -10303,40 +9695,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -10355,17 +9713,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -10394,7 +9741,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -10475,7 +9821,6 @@
     "response": {
       "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-      "userId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "parentId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
       "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
@@ -10941,40 +10286,6 @@
             }
           ]
         },
-        "personDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "people": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5
-            }
-          ]
-        },
-        "faceDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "faces": [
-            {
-              "box": {
-                "left": 1.5,
-                "top": 1.5,
-                "width": 1.5,
-                "height": 1.5
-              },
-              "confidence": 0.5,
-              "ageRange": {
-                "low": 1,
-                "high": 1
-              }
-            }
-          ]
-        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -10993,17 +10304,6 @@
             {
               "url": "example",
               "source": "qr-code"
-            }
-          ]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-generated",
-          "signals": [
-            {
-              "kind": "c2pa",
-              "value": "example"
             }
           ]
         },
@@ -11032,7 +10332,6 @@
         "status": "temporary",
         "removalReason": "policy",
         "updatedAt": 1,
-        "safetyTest": true,
         "safetyHold": {
           "placedAt": 1,
           "reason": "suspected-illegal-content",
@@ -11098,7 +10397,7 @@
       "ordering": [
         {
           "field": "example",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ],
       "ancestors": [
@@ -11236,7 +10535,7 @@
       "ordering": [
         {
           "field": "example",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ]
     },
@@ -11356,7 +10655,7 @@
       "ordering": [
         {
           "field": "example",
-          "direction": "ASC"
+          "direction": "asc"
         }
       ]
     },
@@ -11411,7 +10710,6 @@
         {
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-          "userId": "example",
           "type": "asset.uploaded",
           "severity": "low",
           "title": "example",
@@ -11440,10 +10738,7 @@
               "value": "example"
             }
           ],
-          "notify": true,
-          "createdAt": 1767225600000,
-          "updatedAt": 1767225900000,
-          "readAt": 1
+          "createdAt": 1767225600000
         }
       ],
       "nextCursor": "example",

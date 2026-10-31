@@ -10,6 +10,46 @@ error_codes! {
     ViewerRegionRequired = "viewer/region-required", 403;
     /// `asset/regional-evidence-required` (HTTP 403): This asset needs moderation evidence for the newly served jurisdiction.
     RegionalEvidenceRequired = "asset/regional-evidence-required", 403;
+    /// `validation/invalid-type` (HTTP 400): A field has the wrong type. details.issues lists each problem.
+    InvalidType = "validation/invalid-type", 400;
+    /// `validation/too-small` (HTTP 400): A value is below its minimum. details.issues lists each problem.
+    TooSmall = "validation/too-small", 400;
+    /// `validation/too-big` (HTTP 400): A value is above its maximum. details.issues lists each problem.
+    TooBig = "validation/too-big", 400;
+    /// `validation/invalid-format` (HTTP 400): A string is not in the required format, such as an ID or URL. details.issues lists each problem.
+    InvalidFormat = "validation/invalid-format", 400;
+    /// `validation/invalid-value` (HTTP 400): A field has a value it cannot take. details.issues lists each problem.
+    InvalidValue = "validation/invalid-value", 400;
+    /// `validation/unknown-field` (HTTP 400): The request has a field this endpoint does not accept.
+    UnknownField = "validation/unknown-field", 400;
+    /// `validation/unsupported-content-type` (HTTP 415): Send the request body as application/json.
+    UnsupportedContentType = "validation/unsupported-content-type", 415;
+    /// `validation/invalid-filter` (HTTP 400): The filter has invalid syntax or names a field that can't be filtered.
+    InvalidFilter = "validation/invalid-filter", 400;
+    /// `validation/invalid-ordering-field` (HTTP 400): The list cannot be ordered by this field.
+    InvalidOrderingField = "validation/invalid-ordering-field", 400;
+    /// `misc/route-not-found` (HTTP 404): No endpoint matches this method and path.
+    RouteNotFound = "misc/route-not-found", 404;
+    /// `misc/internal-error` (HTTP 500): An internal error occurred. Retry later, and quote requestId to support.
+    InternalError = "misc/internal-error", 500;
+    /// `auth/unauthenticated` (HTTP 401): Authentication required.
+    Unauthenticated = "auth/unauthenticated", 401;
+    /// `auth/token-expired` (HTTP 401): The session token has expired. Sign in again.
+    TokenExpired = "auth/token-expired", 401;
+    /// `auth/invalid-token` (HTTP 401): The session token is invalid. Sign in again.
+    InvalidToken = "auth/invalid-token", 401;
+    /// `search/unavailable` (HTTP 503): Search is temporarily unavailable. Retry later.
+    SearchUnavailable = "search/unavailable", 503;
+    /// `asset/invalid-transform` (HTTP 400): The transform names an unknown type or is not a valid selector.
+    InvalidTransform = "asset/invalid-transform", 400;
+    /// `asset/invalid-transform-options` (HTTP 400): The transform's options are invalid for its type.
+    InvalidTransformOptions = "asset/invalid-transform-options", 400;
+    /// `asset/remote-url-redirect-limit` (HTTP 400): The remote URL redirected too many times.
+    RemoteUrlRedirectLimit = "asset/remote-url-redirect-limit", 400;
+    /// `copyright/content-held` (HTTP 409): The asset's content is held for a copyright claim and cannot be changed.
+    CopyrightContentHeld = "copyright/content-held", 409;
+    /// `asset/api-key-missing-permission` (HTTP 403): This API key needs assets:download permission for this asset's folder.
+    DownloadPermissionRequired = "asset/api-key-missing-permission", 403;
     /// `validation/invalid-cursor` (HTTP 400): The cursor is invalid or belongs to a different query.
     InvalidCursor = "validation/invalid-cursor", 400;
     /// `auth/missing-token` (HTTP 401): Authentication required. Send your project API key in the X-Api-Key header.

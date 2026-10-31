@@ -5,6 +5,26 @@ AGE_CONFIRMATION_REQUIRED = "viewer/age-confirmation-required"
 INVALID_VIEWER_REGION = "viewer/invalid-region"
 VIEWER_REGION_REQUIRED = "viewer/region-required"
 REGIONAL_EVIDENCE_REQUIRED = "asset/regional-evidence-required"
+INVALID_TYPE = "validation/invalid-type"
+TOO_SMALL = "validation/too-small"
+TOO_BIG = "validation/too-big"
+INVALID_FORMAT = "validation/invalid-format"
+INVALID_VALUE = "validation/invalid-value"
+UNKNOWN_FIELD = "validation/unknown-field"
+UNSUPPORTED_CONTENT_TYPE = "validation/unsupported-content-type"
+INVALID_FILTER = "validation/invalid-filter"
+INVALID_ORDERING_FIELD = "validation/invalid-ordering-field"
+ROUTE_NOT_FOUND = "misc/route-not-found"
+INTERNAL_ERROR = "misc/internal-error"
+UNAUTHENTICATED = "auth/unauthenticated"
+TOKEN_EXPIRED = "auth/token-expired"
+INVALID_TOKEN = "auth/invalid-token"
+SEARCH_UNAVAILABLE = "search/unavailable"
+INVALID_TRANSFORM = "asset/invalid-transform"
+INVALID_TRANSFORM_OPTIONS = "asset/invalid-transform-options"
+REMOTE_URL_REDIRECT_LIMIT = "asset/remote-url-redirect-limit"
+COPYRIGHT_CONTENT_HELD = "copyright/content-held"
+DOWNLOAD_PERMISSION_REQUIRED = "asset/api-key-missing-permission"
 INVALID_CURSOR = "validation/invalid-cursor"
 MISSING_TOKEN = "auth/missing-token"
 INVALID_API_KEY = "auth/invalid-api-key"
@@ -98,6 +118,26 @@ STATUS_BY_CODE: dict[str, int] = {
     "viewer/invalid-region": 400,
     "viewer/region-required": 403,
     "asset/regional-evidence-required": 403,
+    "validation/invalid-type": 400,
+    "validation/too-small": 400,
+    "validation/too-big": 400,
+    "validation/invalid-format": 400,
+    "validation/invalid-value": 400,
+    "validation/unknown-field": 400,
+    "validation/unsupported-content-type": 415,
+    "validation/invalid-filter": 400,
+    "validation/invalid-ordering-field": 400,
+    "misc/route-not-found": 404,
+    "misc/internal-error": 500,
+    "auth/unauthenticated": 401,
+    "auth/token-expired": 401,
+    "auth/invalid-token": 401,
+    "search/unavailable": 503,
+    "asset/invalid-transform": 400,
+    "asset/invalid-transform-options": 400,
+    "asset/remote-url-redirect-limit": 400,
+    "copyright/content-held": 409,
+    "asset/api-key-missing-permission": 403,
     "validation/invalid-cursor": 400,
     "auth/missing-token": 401,
     "auth/invalid-api-key": 401,

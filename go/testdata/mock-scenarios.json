@@ -2228,7 +2228,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -2268,7 +2268,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ],
             "cursor": {
@@ -2294,7 +2294,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -2329,7 +2329,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ],
             "cursor": {
@@ -2820,7 +2820,7 @@
               "items.length": 0,
               "hasMore": false,
               "nextCursor": null,
-              "pageSize": 10
+              "pageSize": 50
             },
             "httpStatus": 200
           }
@@ -3966,7 +3966,7 @@
       ]
     },
     {
-      "name": "list pages default to 10 items, accept 1 to 100, and a cursor only continues its own query",
+      "name": "list pages default to 50 items, accept 1 to 100, and a cursor only continues its own query",
       "mock": {},
       "steps": [
         {
@@ -3978,7 +3978,7 @@
               "type": "image/png"
             }
           },
-          "repeat": 11,
+          "repeat": 51,
           "expect": {
             "httpStatus": 200
           }
@@ -3989,17 +3989,17 @@
           "save": "first",
           "expect": {
             "result": {
-              "items.length": 10,
-              "pageSize": 10,
+              "items.length": 50,
+              "pageSize": 50,
               "hasMore": true,
               "ordering": [
                 {
                   "field": "createdAt",
-                  "direction": "DESC"
+                  "direction": "desc"
                 },
                 {
                   "field": "id",
-                  "direction": "DESC"
+                  "direction": "desc"
                 }
               ]
             },
@@ -4025,11 +4025,11 @@
         {
           "operation": "assets.iterate",
           "args": {
-            "pageSize": 4
+            "pageSize": 20
           },
           "expect": {
             "result": {
-              "length": 11,
+              "length": 51,
               "0.id": {
                 "$ref": "first.items.0.id"
               }
@@ -4074,7 +4074,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "ASC"
+                "direction": "asc"
               }
             ]
           },
@@ -4104,7 +4104,7 @@
           },
           "expect": {
             "result": {
-              "items.length": 11,
+              "items.length": 51,
               "pageSize": 100,
               "hasMore": false
             },
@@ -5501,18 +5501,16 @@
         {
           "operation": "folders.list",
           "args": {
-            "ids": [
-              {
-                "$ref": "year.id"
-              }
-            ],
-            "resolveOnly": true
+            "parentId": {
+              "$ref": "year.id"
+            }
           },
           "expect": {
             "result": {
               "items.length": 0,
               "ancestors.length": 3,
-              "hasMore": false
+              "hasMore": false,
+              "pageSize": 50
             },
             "httpStatus": 200
           }
@@ -5520,26 +5518,31 @@
         {
           "operation": "folders.list",
           "args": {
-            "search": "TRIP",
-            "searchAll": true
-          },
-          "expect": {
-            "result": {
-              "items.length": 2
-            },
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "folders.list",
-          "args": {
-            "search": "trip"
+            "search": "TRIP"
           },
           "expect": {
             "result": {
               "items.length": 1,
               "items.0.id": {
                 "$ref": "rootTrips.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "folders.list",
+          "args": {
+            "parentId": {
+              "$ref": "photos.id"
+            },
+            "search": "trip"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "trips.id"
               }
             },
             "httpStatus": 200
@@ -5585,7 +5588,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },

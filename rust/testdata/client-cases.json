@@ -250,7 +250,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -272,7 +272,7 @@
               "ordering": [
                 {
                   "field": "createdAt",
-                  "direction": "DESC"
+                  "direction": "desc"
                 }
               ]
             }
@@ -283,7 +283,7 @@
         {
           "method": "GET",
           "origin": "http://localhost:8787",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -319,7 +319,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -341,7 +341,7 @@
               "ordering": [
                 {
                   "field": "createdAt",
-                  "direction": "DESC"
+                  "direction": "desc"
                 }
               ]
             }
@@ -352,7 +352,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/p%2F1%20%C3%BC~!*'()/assets/page",
+          "path": "/v1/projects/p%2F1%20%C3%BC~!*'()/assets",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -2294,7 +2294,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -2316,7 +2316,7 @@
               "ordering": [
                 {
                   "field": "createdAt",
-                  "direction": "DESC"
+                  "direction": "desc"
                 }
               ]
             }
@@ -2327,7 +2327,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -2360,7 +2360,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -2381,11 +2381,11 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               },
               {
                 "field": "id",
-                "direction": "ASC"
+                "direction": "asc"
               }
             ]
           },
@@ -2398,7 +2398,7 @@
               "ordering": [
                 {
                   "field": "createdAt",
-                  "direction": "DESC"
+                  "direction": "desc"
                 }
               ]
             }
@@ -2409,8 +2409,8 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
-          "rawQuery": "cursor=opaque%2B%2Fcursor%3D&pageSize=50&filter=classification.moderation.status%3D%3Dblocked%3Bname%3D%3D%22a%20b%22&folderId=folder-1&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=DESC&ordering%5B1%5D%5Bfield%5D=id&ordering%5B1%5D%5Bdirection%5D=ASC",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "cursor=opaque%2B%2Fcursor%3D&pageSize=50&filter=classification.moderation.status%3D%3Dblocked%3Bname%3D%3D%22a%20b%22&folderId=folder-1&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=desc&ordering%5B1%5D%5Bfield%5D=id&ordering%5B1%5D%5Bdirection%5D=asc",
           "query": [
             [
               "cursor",
@@ -2434,7 +2434,7 @@
             ],
             [
               "ordering[0][direction]",
-              "DESC"
+              "desc"
             ],
             [
               "ordering[1][field]",
@@ -2442,7 +2442,7 @@
             ],
             [
               "ordering[1][direction]",
-              "ASC"
+              "asc"
             ]
           ],
           "headers": {
@@ -2475,7 +2475,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -2495,7 +2495,7 @@
             "ordering": [
               {
                 "field": "id",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -2508,7 +2508,7 @@
               "ordering": [
                 {
                   "field": "createdAt",
-                  "direction": "DESC"
+                  "direction": "desc"
                 }
               ]
             }
@@ -2520,7 +2520,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/children",
-          "rawQuery": "cursor=c1&pageSize=10&ordering%5B0%5D%5Bfield%5D=id&ordering%5B0%5D%5Bdirection%5D=DESC",
+          "rawQuery": "cursor=c1&pageSize=10&ordering%5B0%5D%5Bfield%5D=id&ordering%5B0%5D%5Bdirection%5D=desc",
           "query": [
             [
               "cursor",
@@ -2536,7 +2536,7 @@
             ],
             [
               "ordering[0][direction]",
-              "DESC"
+              "desc"
             ]
           ],
           "headers": {
@@ -2765,17 +2765,11 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ],
             "cursor": "opaque+/cursor=",
-            "search": "a&b",
-            "searchAll": true,
-            "ids": [
-              "folder-2",
-              "folder-3"
-            ],
-            "resolveOnly": false
+            "search": "a&b"
           },
           "expect": {
             "result": {
@@ -2793,7 +2787,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/folders",
-          "rawQuery": "parentId=folder-1&pageSize=10&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=DESC&cursor=opaque%2B%2Fcursor%3D&search=a%26b&searchAll=true&ids%5B0%5D=folder-2&ids%5B1%5D=folder-3&resolveOnly=false",
+          "rawQuery": "parentId=folder-1&pageSize=10&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=desc&cursor=opaque%2B%2Fcursor%3D&search=a%26b",
           "query": [
             [
               "parentId",
@@ -2809,7 +2803,7 @@
             ],
             [
               "ordering[0][direction]",
-              "DESC"
+              "desc"
             ],
             [
               "cursor",
@@ -2818,22 +2812,6 @@
             [
               "search",
               "a&b"
-            ],
-            [
-              "searchAll",
-              "true"
-            ],
-            [
-              "ids[0]",
-              "folder-2"
-            ],
-            [
-              "ids[1]",
-              "folder-3"
-            ],
-            [
-              "resolveOnly",
-              "false"
             ]
           ],
           "headers": {
@@ -4043,7 +4021,8 @@
           "body": {
             "code": "upload/website-rate-limit-exceeded",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -4161,7 +4140,8 @@
           "body": {
             "code": "upload/website-rate-limit-exceeded",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -4279,7 +4259,8 @@
           "body": {
             "code": "upload/website-rate-limit-exceeded",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -4300,9 +4281,7 @@
               "status": 429,
               "requestId": "req-1",
               "retryAfter": 61,
-              "details": {
-                "traceId": "trace-1"
-              }
+              "details": {}
             }
           }
         }
@@ -4342,7 +4321,8 @@
           "body": {
             "code": "upload/website-rate-limit-exceeded",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -4365,9 +4345,7 @@
               "retryAfter": {
                 "$gte": 61
               },
-              "details": {
-                "traceId": "trace-1"
-              }
+              "details": {}
             }
           }
         }
@@ -4762,10 +4740,10 @@
           "body": {
             "code": "idempotency/request-in-progress",
             "message": "A request with this Idempotency-Key is still being processed. Retry after the Retry-After delay to receive its result.",
+            "requestId": "req-1",
             "details": {
               "retryAfterSeconds": 0
-            },
-            "traceId": "trace-1"
+            }
           },
           "headers": {
             "x-request-id": "req-1",
@@ -6238,7 +6216,8 @@
           "body": {
             "code": "idempotency/key-reused",
             "message": "This Idempotency-Key was already used for a different request. Use a new key for each distinct request.",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -6263,9 +6242,7 @@
               "status": 409,
               "requestId": "req-1",
               "retryAfter": null,
-              "details": {
-                "traceId": "trace-1"
-              }
+              "details": {}
             }
           }
         }
@@ -6638,9 +6615,10 @@
         {
           "status": 500,
           "body": {
-            "code": "server/internal-error",
+            "code": "misc/internal-error",
             "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "traceId": "t"
+            "requestId": "r",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -7004,7 +6982,7 @@
       ]
     },
     {
-      "name": "an API error keeps its code, status, request ID, Retry-After and details with the trace ID",
+      "name": "an API error keeps its code, status, request ID, Retry-After and details",
       "area": "errors",
       "client": {
         "maxRetries": 0
@@ -7015,6 +6993,7 @@
           "body": {
             "code": "validation/invalid-ordering-field",
             "message": "Invalid ordering field",
+            "requestId": "req-validation",
             "details": {
               "issues": [
                 {
@@ -7023,11 +7002,11 @@
                     0,
                     "field"
                   ],
-                  "message": "Invalid"
+                  "message": "Invalid",
+                  "code": "validation/invalid-value"
                 }
               ]
-            },
-            "traceId": "trace-9"
+            }
           },
           "headers": {
             "x-request-id": "req-validation",
@@ -7056,10 +7035,10 @@
                       0,
                       "field"
                     ],
-                    "message": "Invalid"
+                    "message": "Invalid",
+                    "code": "validation/invalid-value"
                   }
-                ],
-                "traceId": "trace-9"
+                ]
               }
             }
           }
@@ -7089,7 +7068,7 @@
       ]
     },
     {
-      "name": "an API error without details or trace ID has no details",
+      "name": "an API error without an X-Request-Id header takes the request ID from its body",
       "area": "errors",
       "client": {
         "maxRetries": 0
@@ -7099,7 +7078,9 @@
           "status": 404,
           "body": {
             "code": "asset/not-found",
-            "message": "Asset not found"
+            "message": "Asset not found",
+            "requestId": "req-body",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -7119,7 +7100,7 @@
               "status": 404,
               "requestId": "req-1",
               "retryAfter": null,
-              "details": null
+              "details": {}
             }
           }
         }
@@ -7159,7 +7140,8 @@
           "body": {
             "code": "asset/not-found",
             "message": "Asset not found",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -7183,9 +7165,7 @@
               "status": 404,
               "requestId": "req-1",
               "retryAfter": null,
-              "details": {
-                "traceId": "trace-1"
-              }
+              "details": {}
             }
           }
         }
@@ -7229,7 +7209,8 @@
           "body": {
             "code": "auth/permission-denied",
             "message": "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-1",
@@ -7253,9 +7234,7 @@
               "status": 403,
               "requestId": "req-1",
               "retryAfter": null,
-              "details": {
-                "traceId": "trace-1"
-              }
+              "details": {}
             }
           }
         }
@@ -7841,10 +7820,11 @@
           "body": {
             "code": "asset/not-found",
             "message": "Asset not found",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
-            "x-request-id": "req-2",
+            "x-request-id": "req-1",
             "content-type": "application/json"
           }
         }
@@ -7859,11 +7839,9 @@
             "error": {
               "code": "asset/not-found",
               "status": 404,
-              "requestId": "req-2",
+              "requestId": "req-1",
               "retryAfter": null,
-              "details": {
-                "traceId": "trace-1"
-              }
+              "details": {}
             }
           }
         }
@@ -7987,7 +7965,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8024,7 +8002,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8103,7 +8081,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=2&filter=classification.moderation.status%3D%3Dallowed&folderId=folder-1",
           "query": [
             [
@@ -8136,7 +8114,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=2&filter=classification.moderation.status%3D%3Dallowed&folderId=folder-1&cursor=cursor-2",
           "query": [
             [
@@ -8204,7 +8182,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8244,7 +8222,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -8295,7 +8273,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8314,7 +8292,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8354,7 +8332,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -8374,7 +8352,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "cursor=cursor-2",
           "query": [
             [
@@ -8430,7 +8408,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8467,7 +8445,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8519,7 +8497,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=1",
           "query": [
             [
@@ -8544,7 +8522,7 @@
         {
           "method": "GET",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/projects/project-1/assets/page",
+          "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=1&cursor=cursor-2",
           "query": [
             [
@@ -8621,7 +8599,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8658,7 +8636,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8677,7 +8655,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "ASC"
+                "direction": "asc"
               }
             ]
           },
@@ -8743,7 +8721,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/children",
-          "rawQuery": "pageSize=2&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=ASC",
+          "rawQuery": "pageSize=2&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=asc",
           "query": [
             [
               "pageSize",
@@ -8755,7 +8733,7 @@
             ],
             [
               "ordering[0][direction]",
-              "ASC"
+              "asc"
             ]
           ],
           "headers": {
@@ -8776,7 +8754,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/children",
-          "rawQuery": "pageSize=2&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=ASC&cursor=cursor-2",
+          "rawQuery": "pageSize=2&ordering%5B0%5D%5Bfield%5D=createdAt&ordering%5B0%5D%5Bdirection%5D=asc&cursor=cursor-2",
           "query": [
             [
               "pageSize",
@@ -8788,7 +8766,7 @@
             ],
             [
               "ordering[0][direction]",
-              "ASC"
+              "asc"
             ],
             [
               "cursor",
@@ -8843,7 +8821,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8880,7 +8858,7 @@
             "ordering": [
               {
                 "field": "createdAt",
-                "direction": "DESC"
+                "direction": "desc"
               }
             ]
           },
@@ -8990,15 +8968,16 @@
                 "type": "asset.allowed",
                 "severity": "low",
                 "title": "Asset allowed",
+                "description": null,
                 "assetId": "asset-1",
+                "asset": null,
                 "facts": [
                   {
                     "key": "decided-by",
                     "value": "automated"
                   }
                 ],
-                "createdAt": 1760000000000,
-                "updatedAt": 1760000000000
+                "createdAt": 1760000000000
               },
               {
                 "id": "event-2",
@@ -9006,15 +8985,16 @@
                 "type": "asset.allowed",
                 "severity": "low",
                 "title": "Asset allowed",
+                "description": null,
                 "assetId": "asset-2",
+                "asset": null,
                 "facts": [
                   {
                     "key": "decided-by",
                     "value": "automated"
                   }
                 ],
-                "createdAt": 1760000000001,
-                "updatedAt": 1760000000001
+                "createdAt": 1760000000001
               }
             ],
             "nextCursor": "cursor-2",
@@ -9035,15 +9015,16 @@
                 "type": "asset.allowed",
                 "severity": "low",
                 "title": "Asset allowed",
+                "description": null,
                 "assetId": "asset-1",
+                "asset": null,
                 "facts": [
                   {
                     "key": "decided-by",
                     "value": "automated"
                   }
                 ],
-                "createdAt": 1760000000000,
-                "updatedAt": 1760000000000
+                "createdAt": 1760000000000
               }
             ],
             "nextCursor": "cursor-3",
@@ -9072,15 +9053,16 @@
                     "type": "asset.allowed",
                     "severity": "low",
                     "title": "Asset allowed",
+                    "description": null,
                     "assetId": "asset-1",
+                    "asset": null,
                     "facts": [
                       {
                         "key": "decided-by",
                         "value": "automated"
                       }
                     ],
-                    "createdAt": 1760000000000,
-                    "updatedAt": 1760000000000
+                    "createdAt": 1760000000000
                   },
                   {
                     "id": "event-2",
@@ -9088,15 +9070,16 @@
                     "type": "asset.allowed",
                     "severity": "low",
                     "title": "Asset allowed",
+                    "description": null,
                     "assetId": "asset-2",
+                    "asset": null,
                     "facts": [
                       {
                         "key": "decided-by",
                         "value": "automated"
                       }
                     ],
-                    "createdAt": 1760000000001,
-                    "updatedAt": 1760000000001
+                    "createdAt": 1760000000001
                   }
                 ],
                 "nextCursor": "cursor-2",
@@ -9110,15 +9093,16 @@
                     "type": "asset.allowed",
                     "severity": "low",
                     "title": "Asset allowed",
+                    "description": null,
                     "assetId": "asset-1",
+                    "asset": null,
                     "facts": [
                       {
                         "key": "decided-by",
                         "value": "automated"
                       }
                     ],
-                    "createdAt": 1760000000000,
-                    "updatedAt": 1760000000000
+                    "createdAt": 1760000000000
                   }
                 ],
                 "nextCursor": "cursor-3",
@@ -9257,15 +9241,16 @@
                 "type": "asset.allowed",
                 "severity": "low",
                 "title": "Asset allowed",
+                "description": null,
                 "assetId": "asset-1",
+                "asset": null,
                 "facts": [
                   {
                     "key": "decided-by",
                     "value": "automated"
                   }
                 ],
-                "createdAt": 1760000000000,
-                "updatedAt": 1760000000000
+                "createdAt": 1760000000000
               }
             ],
             "nextCursor": "cursor-1",
@@ -9314,15 +9299,16 @@
                     "type": "asset.allowed",
                     "severity": "low",
                     "title": "Asset allowed",
+                    "description": null,
                     "assetId": "asset-1",
+                    "asset": null,
                     "facts": [
                       {
                         "key": "decided-by",
                         "value": "automated"
                       }
                     ],
-                    "createdAt": 1760000000000,
-                    "updatedAt": 1760000000000
+                    "createdAt": 1760000000000
                   }
                 ],
                 "nextCursor": "cursor-1",
@@ -16757,7 +16743,8 @@
           "body": {
             "code": "asset/not-found",
             "message": "Asset not found",
-            "traceId": "trace-1"
+            "requestId": "req-1",
+            "details": {}
           },
           "headers": {
             "x-request-id": "req-cdn",
@@ -16779,7 +16766,7 @@
                 "x-request-id": "req-cdn",
                 "content-type": "application/json"
               },
-              "bodyBase64": "eyJjb2RlIjoiYXNzZXQvbm90LWZvdW5kIiwibWVzc2FnZSI6IkFzc2V0IG5vdCBmb3VuZCIsInRyYWNlSWQiOiJ0cmFjZS0xIn0="
+              "bodyBase64": "eyJjb2RlIjoiYXNzZXQvbm90LWZvdW5kIiwibWVzc2FnZSI6IkFzc2V0IG5vdCBmb3VuZCIsInJlcXVlc3RJZCI6InJlcS0xIiwiZGV0YWlscyI6e319"
             }
           }
         }

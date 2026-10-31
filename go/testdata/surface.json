@@ -12,7 +12,7 @@
     {
       "id": "folders.list",
       "kind": "method",
-      "description": "List a page of child folders, search folders, or resolve selected folder paths. The default is the first 100 folders at the project root.",
+      "description": "List a page of child folders, or search them by name. The default is the first page of folders at the project root.",
       "names": {
         "javascript": "folders.list",
         "python": "folders.list",
@@ -124,7 +124,7 @@
     {
       "id": "assets.list",
       "kind": "method",
-      "description": "Get a paginated list of assets for a project",
+      "description": "List a page of the project's assets, optionally in one folder or matching a filter",
       "names": {
         "javascript": "assets.list",
         "python": "assets.list",
@@ -138,7 +138,7 @@
     {
       "id": "assets.search",
       "kind": "method",
-      "description": "Search accessible assets by keyword or natural language. Images are indexed automatically; enable audio and video search in project settings to include those media types. Results are ranked and limited to 20.",
+      "description": "Search accessible assets by keyword or natural language. Images are indexed automatically; enable audio and video search in project settings to include those media types. Results are the best `limit` matches (at most 20), ranked by relevance, so this endpoint has no cursor: refine the query, or list assets with a filter, to see more.",
       "names": {
         "javascript": "assets.search",
         "python": "assets.search",
@@ -304,20 +304,6 @@
       }
     },
     {
-      "id": "ensureLens",
-      "kind": "method",
-      "description": "Create a lens or update it with a version greater than the current version",
-      "names": {
-        "javascript": "ensureLens",
-        "python": "ensure_lens",
-        "go": "EnsureLens",
-        "rust": "ensure_lens",
-        "java": "ensureLens",
-        "ruby": "ensure_lens",
-        "php": "ensureLens"
-      }
-    },
-    {
       "id": "ensureLenses",
       "kind": "method",
       "description": "Create lenses or update them with their next versions",
@@ -334,7 +320,7 @@
     {
       "id": "events.list",
       "kind": "method",
-      "description": "List project events, oldest first, after a cursor. A webhook connector delivers each event as `{ id, type, createdAt, projectId, data }`, where `data` holds the remaining event fields. Each event's `facts` are `{ key, value, url? }` entries registered for its `type` (see the event types in the webhooks guide). Omit `cursor` to get a cursor for the current time without any events, then pass each response's `nextCursor` as `cursor`. When `hasMore` is false you have caught up; keep the cursor to poll for later events. Polling receives new events without a public webhook URL, for example during local development.",
+      "description": "List project events, oldest first, after a cursor. Webhook connectors deliver each event in the same shape. Each event's `facts` are `{ key, value, url? }` entries registered for its `type` (see the event types in the webhooks guide). Omit `cursor` to get a cursor for the current time without any events, then pass each response's `nextCursor` as `cursor`. When `hasMore` is false you have caught up; keep the cursor to poll for later events. Polling receives new events without a public webhook URL, for example during local development.",
       "names": {
         "javascript": "events.list",
         "python": "events.list",
@@ -539,6 +525,20 @@
         "java": "events.pages",
         "ruby": "events.each_page",
         "php": "events->eachPage"
+      }
+    },
+    {
+      "id": "ensureLens",
+      "kind": "method",
+      "description": "Creates or updates one lens through ensureLenses (PUT /projects/:projectId/lenses), answered from the lens cache when unchanged.",
+      "names": {
+        "javascript": "ensureLens",
+        "python": "ensure_lens",
+        "go": "EnsureLens",
+        "rust": "ensure_lens",
+        "java": "ensureLens",
+        "ruby": "ensure_lens",
+        "php": "ensureLens"
       }
     },
     {
@@ -1162,7 +1162,9 @@
     },
     "body": {
       "code": "upload/website-rate-limit-exceeded",
-      "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions."
+      "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
+      "requestId": "req-surface",
+      "details": {}
     },
     "expected": {
       "code": "upload/website-rate-limit-exceeded",
@@ -1258,11 +1260,6 @@
       "retryable": true
     },
     {
-      "code": "validation/invalid-ordering-field",
-      "status": 400,
-      "retryable": false
-    },
-    {
       "code": "viewer/invalid-claims",
       "status": 400,
       "retryable": false
@@ -1284,6 +1281,106 @@
     },
     {
       "code": "asset/regional-evidence-required",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "validation/invalid-type",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/too-small",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/too-big",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/invalid-format",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/invalid-value",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/unknown-field",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/unsupported-content-type",
+      "status": 415,
+      "retryable": false
+    },
+    {
+      "code": "validation/invalid-filter",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "validation/invalid-ordering-field",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "misc/route-not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "misc/internal-error",
+      "status": 500,
+      "retryable": false
+    },
+    {
+      "code": "auth/unauthenticated",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "auth/token-expired",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "auth/invalid-token",
+      "status": 401,
+      "retryable": false
+    },
+    {
+      "code": "search/unavailable",
+      "status": 503,
+      "retryable": true
+    },
+    {
+      "code": "asset/invalid-transform",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "asset/invalid-transform-options",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "asset/remote-url-redirect-limit",
+      "status": 400,
+      "retryable": false
+    },
+    {
+      "code": "copyright/content-held",
+      "status": 409,
+      "retryable": false
+    },
+    {
+      "code": "asset/api-key-missing-permission",
       "status": 403,
       "retryable": false
     },
