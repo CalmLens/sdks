@@ -118,7 +118,7 @@ CalmLens tells your app when an image has been checked. In the portal, go to **W
 `https://<your-app>/api/webhooks/calmlens`, subscribe to `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked`, `asset.purged` and
 `asset.failed` (the status events are sent for automated decisions and for reviewer decisions made
 in the portal), and put the secret in
-`CALMLENS_WEBHOOK_SECRET`. The handler reads the asset ID from the delivery's `data.assetId`.
+`CALMLENS_WEBHOOK_SECRET`. The handler reads the asset ID from the delivery's `assetId`.
 
 For local development, forward events to the dev server with the SDK's CLI. It signs each event
 with your `CALMLENS_WEBHOOK_SECRET`, so the handler's signature check works unchanged:

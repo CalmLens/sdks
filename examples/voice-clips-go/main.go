@@ -1098,7 +1098,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	if event.Data.Facts.IsTest() {
+	if event.Facts.IsTest() {
 		a.record("", "test", event.Type)
 		a.markSeen(event.ID)
 		a.mu.Unlock()
@@ -1106,8 +1106,8 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var item *entry
-	if webhookEvents[event.Type] && event.Data.AssetID != nil {
-		item = a.find(*event.Data.AssetID)
+	if webhookEvents[event.Type] && event.AssetID != nil {
+		item = a.find(*event.AssetID)
 	}
 	a.mu.Unlock()
 	if item != nil {

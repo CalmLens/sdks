@@ -1,6 +1,5 @@
-// What a verified CalmLens webhook delivery asks the app to do. Deliveries are
-// `{ id, type, createdAt, projectId, data: { assetId, asset, facts, ... } }`; the asset ID lives
-// under `data`, not on the delivery itself.
+// What a verified CalmLens webhook delivery asks the app to do. A delivery's body is the event
+// itself, in the same shape `events.list` returns: `{ id, type, assetId, asset, facts, ... }`.
 
 /**
  * Events that can change an asset's moderation status. There is one event per status, sent for
@@ -23,7 +22,8 @@ interface WebhookFact {
 interface WebhookDelivery {
   id: string;
   type: string;
-  data?: { assetId?: string | null; facts?: WebhookFact[] } | null;
+  assetId?: string | null;
+  facts?: WebhookFact[];
 }
 
 export interface WebhookAction {
@@ -39,10 +39,11 @@ export const readWebhookDelivery = (rawBody: string): WebhookAction => {
   if (typeof delivery?.id !== "string" || typeof delivery.type !== "string") {
     throw new Error("Not a CalmLens webhook delivery");
   }
-  const data = delivery.data ?? {};
   // Test sends from the portal carry the registered `test` fact and change nothing.
-  const isTest = data.facts?.some((fact) => fact.key === "test" && fact.value === true) ?? false;
-  const assetId = typeof data.assetId === "string" && data.assetId ? data.assetId : null;
+  const isTest =
+    delivery.facts?.some((fact) => fact.key === "test" && fact.value === true) ?? false;
+  const assetId =
+    typeof delivery.assetId === "string" && delivery.assetId ? delivery.assetId : null;
   return {
     eventId: delivery.id,
     syncAssetId: !isTest && ASSET_DECISION_EVENTS.has(delivery.type) ? assetId : null,

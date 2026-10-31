@@ -672,9 +672,8 @@ module Calmthread
         timestamp: env[header_key(CalmLens::WEBHOOK_TIMESTAMP_HEADER)]
       )
       delivery = env[header_key(CalmLens::WEBHOOK_DELIVERY_HEADER)].to_s
-      # Webhook deliveries wrap the feed's event fields in `data`.
-      flat = event.data.merge('id' => event.id, 'type' => event.type, 'createdAt' => event.created_at)
-      @webhooks.push(delivery.empty? ? event.id : delivery, flat)
+      # A delivery's body is the event in the same shape as the events feed.
+      @webhooks.push(delivery.empty? ? event.id : delivery, event.payload)
       [204, SECURITY_HEADERS.dup, []]
     rescue CalmLens::WebhookVerificationError => e
       e.code == CalmLens::SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE ? text(401, 'Invalid signature') : text(400, 'Invalid event')

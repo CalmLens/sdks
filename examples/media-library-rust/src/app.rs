@@ -24,7 +24,7 @@ use axum::{middleware, Form, Router};
 use calmlens::models::{
     Asset, AssetClassificationStatus, AssetContentStatus, AssetModerationStatus, AssetPage,
     AssetReview, AssetSearchResponse, ClassificationCategory, EventFact, Folder, MetadataItem,
-    WebhookEventData, WebhookEventPayload,
+    WebhookEventPayload,
 };
 use calmlens::ErrorCode;
 use serde::de::DeserializeOwned;
@@ -561,7 +561,7 @@ impl AppState {
     /// that it is one of this library's assets.
     async fn apply_claimed(&self, payload: &WebhookEventPayload) -> Result<EventOutcome, Failure> {
         let event_type = payload.event_type.as_str();
-        let facts = &payload.data.facts;
+        let facts = &payload.facts;
         if facts
             .iter()
             .any(|fact| fact.key == "test" && fact.value == Value::Bool(true))
@@ -578,7 +578,7 @@ impl AppState {
         }
         let (Some(label), Some(asset_id)) = (
             event_label(event_type),
-            payload.data.asset_id.as_deref().filter(|id| valid_id(id)),
+            payload.asset_id.as_deref().filter(|id| valid_id(id)),
         ) else {
             return Ok(EventOutcome::Ignored);
         };
@@ -643,19 +643,17 @@ impl AppState {
             url: None,
             extra: Default::default(),
         };
-        let mut data = WebhookEventData::default();
-        data.asset_id = Some(asset_id.into());
-        data.facts = vec![
+        let mut payload = WebhookEventPayload::default();
+        payload.id = format!("demo-event-{}", random_hex(8));
+        payload.event_type = "asset.blocked".into();
+        payload.project_id = self.library.project_id().into();
+        payload.asset_id = Some(asset_id.into());
+        payload.facts = vec![
             fact("decided-by", "reviewer"),
             fact("reviewer-user-id", "demo-reviewer"),
             fact("reviewer-name", "Demo reviewer"),
             fact("note", "Simulated portal decision"),
         ];
-        let mut payload = WebhookEventPayload::default();
-        payload.id = format!("demo-event-{}", random_hex(8));
-        payload.event_type = "asset.blocked".into();
-        payload.project_id = self.library.project_id().into();
-        payload.data = data;
         self.apply_event(&payload, None).await?;
         let folder = self.library.retrieve(asset_id).await?.folder_id;
         Ok(location(

@@ -155,7 +155,7 @@ npx calmlens listen --forward-to http://127.0.0.1:6403/webhooks/calmlens
 
 The handler passes the **exact raw body** to `CalmLens.parse_webhook_event`, which
 verifies the signature and timestamp before parsing. It answers 204 straight away and applies
-the delivery's `data` afterwards, on a background thread, through the same code as the events
+the delivered event afterwards, on a background thread, through the same code as the events
 feed, so a slow CalmLens request never delays the acknowledgement. A repeated
 `x-calmlens-delivery` ID is acknowledged and skipped. If applying fails after three
 attempts, the next events-feed check applies the same event. Webhooks need live mode.

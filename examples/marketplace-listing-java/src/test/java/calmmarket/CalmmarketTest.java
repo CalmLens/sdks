@@ -111,8 +111,8 @@ class CalmmarketTest {
   }
 
   static String event(String id, String type, String assetId, String facts) {
-    return "{\"id\":\"" + id + "\",\"type\":\"" + type + "\",\"createdAt\":1760000000000,\"projectId\":\"project-1\",\"data\":{\"severity\":\"high\",\"title\":\"t\","
-        + "\"description\":null,\"assetId\":\"" + assetId + "\",\"asset\":{\"id\":\"" + assetId + "\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":" + facts + "}}";
+    return "{\"id\":\"" + id + "\",\"projectId\":\"project-1\",\"type\":\"" + type + "\",\"severity\":\"high\",\"title\":\"t\","
+        + "\"description\":null,\"assetId\":\"" + assetId + "\",\"asset\":{\"id\":\"" + assetId + "\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":" + facts + ",\"createdAt\":1760000000000}";
   }
 
   static String html(Calmmarket.Response response) { return new String(response.body(), StandardCharsets.UTF_8); }

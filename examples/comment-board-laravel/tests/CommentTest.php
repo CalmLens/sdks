@@ -90,11 +90,11 @@ final class CommentTest extends TestCase
 
     public function testWebhookVerifiesRawBodyAndDeduplicates(): void
     {
-        $event = ['id' => 'event-1', 'type' => 'asset.allowed', 'createdAt' => 1000, 'projectId' => 'project-1', 'data' => ['facts' => [['key' => 'asset-id', 'value' => 'asset-1']]]];
+        $event = ['id' => 'event-1', 'type' => 'asset.allowed', 'createdAt' => 1000, 'projectId' => 'project-1', 'facts' => [['key' => 'asset-id', 'value' => 'asset-1']]];
         $body = json_encode($event);
         $headers = ['HTTP_X_CALMLENS_SIGNATURE' => Webhooks::signatureHeader($body, time(), 'test-secret'), 'HTTP_X_CALMLENS_TIMESTAMP' => (string) time(), 'CONTENT_TYPE' => 'application/json'];
         $this->call('POST', '/api/webhooks/calmlens', [], [], [], $headers, $body)->assertNoContent();
-        self::assertSame(['id' => 'event-1', 'type' => 'asset.allowed', 'facts' => $event['data']['facts']], Cache::get('calmlens-last-event'));
+        self::assertSame(['id' => 'event-1', 'type' => 'asset.allowed', 'facts' => $event['facts']], Cache::get('calmlens-last-event'));
         Cache::forget('calmlens-last-event');
         $this->call('POST', '/api/webhooks/calmlens', [], [], [], $headers, $body)->assertNoContent();
         self::assertNull(Cache::get('calmlens-last-event'));
@@ -103,7 +103,7 @@ final class CommentTest extends TestCase
 
     public function testTestDeliveryDoesNotRecordAnEvent(): void
     {
-        $body = json_encode(['id' => 'test', 'type' => 'asset.allowed', 'createdAt' => 1000, 'projectId' => 'project-1', 'data' => ['facts' => [['key' => 'test', 'value' => true]]]]);
+        $body = json_encode(['id' => 'test', 'type' => 'asset.allowed', 'createdAt' => 1000, 'projectId' => 'project-1', 'facts' => [['key' => 'test', 'value' => true]]]);
         $headers = ['HTTP_X_CALMLENS_SIGNATURE' => Webhooks::signatureHeader($body, time(), 'test-secret'), 'HTTP_X_CALMLENS_TIMESTAMP' => (string) time(), 'CONTENT_TYPE' => 'application/json'];
         $this->call('POST', '/api/webhooks/calmlens', [], [], [], $headers, $body)->assertNoContent();
         self::assertNull(Cache::get('calmlens-last-event'));

@@ -837,7 +837,7 @@ func sign(body string) string {
 	return calmlens.SignWebhookPayload([]byte(body), webhookTimestamp, "secret")
 }
 func event(id, kind, assetID, facts string) string {
-	return fmt.Sprintf(`{ "id": %q, "type": %q, "projectId": "project", "createdAt": 1700000000000, "data": { "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"status":"allowed"}}, "content": {"status": "stored"}}, "facts": %s } }`, id, kind, assetID, assetID, facts)
+	return fmt.Sprintf(`{ "id": %q, "projectId": "project", "type": %q, "severity": "low", "title": "Asset event", "description": null, "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"status":"allowed"}}, "content": {"status": "stored"}}, "facts": %s, "createdAt": 1700000000000 }`, id, kind, assetID, assetID, facts)
 }
 func retrieves(mock *calmlenstest.MockServerClient) int {
 	n := 0

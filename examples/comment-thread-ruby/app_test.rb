@@ -457,9 +457,10 @@ class WebhookTest < Minitest::Test
   end
 
   def delivery(id, type, asset_id, facts = [], decided_by: 'reviewer')
-    JSON.generate('id' => id, 'type' => type, 'createdAt' => 1, 'projectId' => 'project-1',
-                  'data' => { 'assetId' => asset_id, 'asset' => event_asset(asset_id, 'allowed'),
-                              'facts' => decision_facts(type, facts, decided_by) })
+    JSON.generate('id' => id, 'projectId' => 'project-1', 'type' => type, 'severity' => 'low',
+                  'title' => 'Asset event', 'description' => nil, 'assetId' => asset_id,
+                  'asset' => event_asset(asset_id, 'allowed'), 'facts' => decision_facts(type, facts, decided_by),
+                  'createdAt' => 1)
   end
 
   def test_tampered_deliveries_are_rejected_and_verified_ones_are_acknowledged_before_any_request

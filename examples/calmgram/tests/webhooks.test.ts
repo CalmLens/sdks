@@ -21,11 +21,10 @@ const deliveryBody = (type: string, facts: { key: string; value: unknown }[] = [
       },
       facts,
       createdAt: 1760000000000,
-      updatedAt: 1760000000000,
     } as never),
   );
 
-test("syncs the asset named in the delivery's data for decision events", () => {
+test("syncs the asset named in the delivery for decision events", () => {
   for (const type of [
     "asset.failed",
     "asset.allowed",

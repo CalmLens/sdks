@@ -105,8 +105,7 @@ final class Demo
             }
             $this->mock->decide($assetId, $decision['outcome']);
             $event = end($this->mock->events);
-            $body = json_encode(['id' => $event['id'], 'type' => $event['type'], 'createdAt' => $event['createdAt'], 'projectId' => self::PROJECT_ID,
-                'data' => array_diff_key($event, array_flip(['id', 'type', 'createdAt', 'projectId']))], JSON_THROW_ON_ERROR);
+            $body = json_encode(CalmLensWebhooks::toPayload($event), JSON_THROW_ON_ERROR);
             $timestamp = (string) intdiv(($this->now)(), 1000);
             $webhooks->handle($body, CalmLensWebhooks::signatureHeader($body, $timestamp, self::WEBHOOK_SECRET), $timestamp);
         }

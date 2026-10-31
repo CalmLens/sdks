@@ -144,7 +144,7 @@ final class ChirpTest extends TestCase
         $post = $this->onlyPost();
         $this->mock->decide($post['image']['assetId'], $outcome);
         $type = $outcome === 'failed' ? 'asset.failed' : "asset.$outcome";
-        self::assertSame(204, $this->deliver(['id' => "delivery-$outcome", 'type' => $type, 'data' => ['assetId' => $post['image']['assetId'], 'facts' => []]])->status);
+        self::assertSame(204, $this->deliver(['id' => "delivery-$outcome", 'type' => $type, 'assetId' => $post['image']['assetId'], 'facts' => []])->status);
         return $this->onlyPost();
     }
 
@@ -301,7 +301,7 @@ final class ChirpTest extends TestCase
         $assetId = $post['image']['assetId'];
         $this->mock->assets[$assetId]['classification']['moderation']['categories'] = ['violence' => ['status' => 'evaluated', 'score' => 0.97], 'sexual' => ['status' => 'not-evaluated']];
         $this->mock->decide($assetId, 'blocked');
-        $this->deliver(['id' => 'd-1', 'type' => 'asset.blocked', 'data' => ['assetId' => $assetId, 'facts' => []]]);
+        $this->deliver(['id' => 'd-1', 'type' => 'asset.blocked', 'assetId' => $assetId, 'facts' => []]);
         self::assertStringContainsString('class="notice" role="status" data-categories="violence"', $this->request('GET', '/')->body);
     }
 
@@ -324,7 +324,7 @@ final class ChirpTest extends TestCase
         $this->request('POST', '/posts', ['text' => 'Look'], $this->image());
         $post = $this->onlyPost();
         $assetId = $post['image']['assetId'];
-        $event = ['id' => 'delivery-1', 'type' => 'asset.allowed', 'createdAt' => $this->time, 'projectId' => 'project-1', 'data' => ['assetId' => $assetId, 'facts' => []]];
+        $event = ['id' => 'delivery-1', 'type' => 'asset.allowed', 'createdAt' => $this->time, 'projectId' => 'project-1', 'assetId' => $assetId, 'facts' => []];
         $body = json_encode($event);
         $timestamp = (string) time();
         $signature = CalmLensWebhooks::signatureHeader($body, $timestamp, self::SECRET);
@@ -334,7 +334,7 @@ final class ChirpTest extends TestCase
         self::assertSame('pending', $this->onlyPost()['image']['status']);
 
         // A test send changes nothing.
-        $this->deliver(['id' => 'test', 'type' => 'asset.allowed', 'data' => ['assetId' => $assetId, 'facts' => [['key' => 'test', 'value' => true]]]]);
+        $this->deliver(['id' => 'test', 'type' => 'asset.allowed', 'assetId' => $assetId, 'facts' => [['key' => 'test', 'value' => true]]]);
         self::assertSame('pending', $this->onlyPost()['image']['status']);
 
         // Another project's delivery is refused.
@@ -358,14 +358,14 @@ final class ChirpTest extends TestCase
         $this->request('POST', '/posts', ['text' => 'Look'], $this->image());
         $assetId = $this->onlyPost()['image']['assetId'];
         $this->mock->decide($assetId, 'allowed');
-        $this->deliver(['id' => 'delivery-1', 'type' => 'asset.allowed', 'data' => ['assetId' => $assetId, 'facts' => []]]);
+        $this->deliver(['id' => 'delivery-1', 'type' => 'asset.allowed', 'assetId' => $assetId, 'facts' => []]);
         $this->mock->decide($assetId, 'blocked');
-        $this->deliver(['id' => 'delivery-1', 'type' => 'asset.allowed', 'data' => ['assetId' => $assetId, 'facts' => []]]);
+        $this->deliver(['id' => 'delivery-1', 'type' => 'asset.allowed', 'assetId' => $assetId, 'facts' => []]);
         self::assertSame('allowed', $this->onlyPost()['image']['status']);
 
         // An asset whose externalId names another post never changes this one.
         $this->mock->assets[$assetId]['externalId'] = 'post-0000000000000000';
-        $this->deliver(['id' => 'delivery-2', 'type' => 'asset.blocked', 'data' => ['assetId' => $assetId, 'facts' => []]]);
+        $this->deliver(['id' => 'delivery-2', 'type' => 'asset.blocked', 'assetId' => $assetId, 'facts' => []]);
         self::assertSame('allowed', $this->onlyPost()['image']['status']);
     }
 
@@ -376,7 +376,7 @@ final class ChirpTest extends TestCase
         $assetId = $this->onlyPost()['image']['assetId'];
         $this->mock->decide($assetId, 'blocked');
         $this->mock->enqueueJson(['code' => 'server/unavailable', 'message' => 'Try again'], 503);
-        $event = ['id' => 'delivery-1', 'type' => 'asset.blocked', 'data' => ['assetId' => $assetId, 'facts' => []]];
+        $event = ['id' => 'delivery-1', 'type' => 'asset.blocked', 'assetId' => $assetId, 'facts' => []];
         self::assertSame(503, $this->deliver($event)->status);
         self::assertSame(204, $this->deliver($event)->status);
         self::assertSame('blocked', $this->onlyPost()['image']['status']);

@@ -32,7 +32,7 @@ final class WebhookController
         }
         // Demonstrate verified delivery without publishing or altering the visitor's comments.
         Cache::put('calmlens-last-event', [
-            'id' => $event['id'], 'type' => $event['type'], 'facts' => $event['data']['facts'] ?? [],
+            'id' => $event['id'], 'type' => $event['type'], 'facts' => $event['facts'] ?? [],
         ], now()->addDay());
         return response()->noContent();
     }

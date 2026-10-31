@@ -8,8 +8,8 @@ use CalmLens\CalmLensException;
 use CalmLens\Webhooks as CalmLensWebhooks;
 
 /**
- * Applies verified CalmLens webhook deliveries. Deliveries are
- * `{id, type, createdAt, projectId, data: {assetId, asset, facts, ...}}`.
+ * Applies verified CalmLens webhook deliveries. A delivery's body is the event itself:
+ * `{id, projectId, type, assetId, asset, facts, createdAt, ...}`.
  */
 final class Webhooks
 {
@@ -41,7 +41,7 @@ final class Webhooks
         if (CalmLensWebhooks::isTest($event) || in_array($event['id'], $this->store->read()['deliveries'], true)) {
             return 204;
         }
-        $assetId = $event['data']['assetId'] ?? null;
+        $assetId = $event['assetId'] ?? null;
         if (in_array($event['type'], self::SYNC_EVENTS, true) && is_string($assetId) && $assetId !== '') {
             try {
                 // The event's snapshot may be stale by the time it arrives: fetch the asset's current state.

@@ -958,7 +958,7 @@ public final class Calmmarket {
       return ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE.equals(invalid.getCode()) ? text(401, "Invalid signature") : text(400, "Invalid event");
     }
     try {
-      apply(payload.id(), payload.type(), payload.data().assetId(), payload.data().facts());
+      apply(payload.id(), payload.type(), payload.assetId(), payload.facts());
       return new Response(204, securityHeaders(), new byte[0]);
     } catch (CalmLensException error) {
       // A failed refresh returns an error so CalmLens retries the delivery.

@@ -239,12 +239,12 @@ fn now() -> String {
 
 fn event(id: &str, event_type: &str, asset_id: &str, facts: Value) -> String {
     json!({
-        "id": id, "type": event_type, "createdAt": 1_760_000_000_000u64, "projectId": "project-1",
-        "data": {"severity": "high", "title": "t", "description": null, "assetId": asset_id,
-                 "asset": {"id": asset_id, "upload": {"status": "completed"},
-                           "classification": {"status": "completed", "moderation": {"status": "allowed"}},
-                           "content": {"status": "stored"}},
-                 "facts": facts}
+        "id": id, "projectId": "project-1", "type": event_type, "severity": "high", "title": "t",
+        "description": null, "assetId": asset_id,
+        "asset": {"id": asset_id, "upload": {"status": "completed"},
+                  "classification": {"status": "completed", "moderation": {"status": "allowed"}},
+                  "content": {"status": "stored"}},
+        "facts": facts, "createdAt": 1_760_000_000_000u64
     })
     .to_string()
 }
@@ -584,7 +584,7 @@ async fn live_listing_paginates_and_filters_the_folder() {
         .await;
     assert_eq!(response.status, StatusCode::OK);
     let list = &mock.requests()[2];
-    assert_eq!(list.path, "/v1/projects/project-1/assets/page");
+    assert_eq!(list.path, "/v1/projects/project-1/assets");
     assert_eq!(list.query_param("folderId"), Some("folder-1"));
     assert_eq!(list.query_param("cursor"), Some("previous-token"));
     assert_eq!(list.query_param("pageSize"), Some("12"));
