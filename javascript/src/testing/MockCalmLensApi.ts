@@ -1468,6 +1468,7 @@ export class MockCalmLensApi {
       },
       classification: {
         status: isOpenUpload ? "pending" : "processing",
+        failureReason: null,
         updatedAt: now,
         completedAt: null,
         moderation: { status: "pending", manualReviews: [] },
@@ -1626,6 +1627,8 @@ export class MockCalmLensApi {
       classification: {
         ...asset.classification,
         status: classificationStatus,
+        // Like the API, a failure names its reason; the mock's failures are processing errors.
+        failureReason: classificationStatus === "failed" ? "processing-error" : null,
         updatedAt: now,
         completedAt: decided ? now : null,
         moderation: { ...asset.classification.moderation, status: decided ? outcome : "pending" },

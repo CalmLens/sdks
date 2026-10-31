@@ -424,6 +424,19 @@ const ASSET_CONTENT_REMOVAL_REASON_SCHEMA = zod.enum([
 	"parent-removed",
 	"disposed"
 ]);
+/** Why an asset's processing failed. */
+const ASSET_FAILURE_REASON_SCHEMA = zod.enum([
+	"file-too-large",
+	"duration-limit",
+	"resolution-limit",
+	"unsupported-format",
+	"undecodable-content",
+	"multiple-tracks",
+	"type-mismatch",
+	"free-upload-limit",
+	"child-failed",
+	"processing-error"
+]);
 const ASSET_TYPE_SCHEMA = zod.enum([
 	"image",
 	"video",
@@ -559,6 +572,8 @@ const STORED_ASSET_SCHEMA = zod.object({
 	uploadUpdatedAt: zod.number().nullish(),
 	classificationStatus: ASSET_CLASSIFICATION_STATUS_SCHEMA,
 	classificationUpdatedAt: zod.number().nullish(),
+	/** Set with `classificationStatus: "failed"`, cleared when processing starts again. */
+	classificationFailureReason: ASSET_FAILURE_REASON_SCHEMA.nullish(),
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
 	manualReviews: zod.array(STORED_ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
 	reviewRevision: zod.number().int().default(0).meta(metaStore([backfill({ value: 0 })])),
@@ -607,6 +622,7 @@ const ASSET_MODERATION_SCHEMA = zod.object({
 })]));
 const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	status: ASSET_CLASSIFICATION_STATUS_SCHEMA,
+	failureReason: ASSET_FAILURE_REASON_SCHEMA.nullable().describe("Why processing failed, while `status` is `failed`; otherwise `null`. See [Failure reasons](/docs/guides/asset-lifecycle#failure-reasons)."),
 	updatedAt: epoch("When classification state last changed"),
 	completedAt: epoch("When classification completed"),
 	moderation: ASSET_MODERATION_SCHEMA,
@@ -680,6 +696,7 @@ STORED_ASSET_SCHEMA.pick({
 		},
 		classification: {
 			status: "completed",
+			failureReason: null,
 			updatedAt: 1767225601e3,
 			completedAt: 1767225601e3,
 			moderation: {
@@ -784,6 +801,19 @@ const PROCESSING_STATUS_LABELS = {
 	processing: msg("Processing"),
 	completed: msg("Completed"),
 	failed: msg("Failed")
+};
+/** Readable names for why an asset's processing failed, shared with the portal. */
+const ASSET_FAILURE_REASON_LABELS = {
+	"file-too-large": msg("File too large"),
+	"duration-limit": msg("Too long"),
+	"resolution-limit": msg("Resolution too high"),
+	"unsupported-format": msg("Unsupported format"),
+	"undecodable-content": msg("Can't be decoded"),
+	"multiple-tracks": msg("Multiple tracks"),
+	"type-mismatch": msg("Doesn't match asset type"),
+	"free-upload-limit": msg("Free upload limit"),
+	"child-failed": msg("Part failed"),
+	"processing-error": msg("Processing error")
 };
 const CATEGORY_LABELS = {
 	sexual: msg("Sexual"),
@@ -1021,12 +1051,19 @@ const ASSET_FAILED = defineEventType({
 			description: "The asset's processing status before it failed, such as `processing`.",
 			display: "enum",
 			valueLabels: PROCESSING_STATUS_LABELS
+		}),
+		failureReason: field(ASSET_FAILURE_REASON_SCHEMA, {
+			label: msg("Reason"),
+			description: "Why processing failed, as in the asset's `classification.failureReason`, such as `duration-limit`.",
+			display: "enum",
+			valueLabels: ASSET_FAILURE_REASON_LABELS
 		})
 	},
 	example: {
-		assetName: "beach.jpg",
-		assetType: "image",
-		previousStatus: "processing"
+		assetName: "clip.mp4",
+		assetType: "video",
+		previousStatus: "processing",
+		failureReason: "duration-limit"
 	}
 });
 const USAGE_LIMIT_REACHED = defineEventType({

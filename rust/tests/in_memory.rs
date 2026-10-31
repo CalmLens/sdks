@@ -146,11 +146,16 @@ async fn failed_processing_can_be_retried_and_deleted_content_cannot() {
         asset.classification.status,
         AssetClassificationStatus::Failed
     );
+    assert_eq!(
+        asset.classification.failure_reason,
+        Some(AssetFailureReason::ProcessingError)
+    );
     let retried = mock.assets().retry(AssetId::new(&asset.id)).await.unwrap();
     assert_eq!(
         retried.classification.status,
         AssetClassificationStatus::Processing
     );
+    assert_eq!(retried.classification.failure_reason, None);
     let error = mock
         .assets()
         .retry(AssetId::new(&asset.id))

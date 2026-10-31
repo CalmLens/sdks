@@ -1850,6 +1850,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -2405,6 +2406,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -2999,6 +3001,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -3580,6 +3583,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -4194,6 +4198,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -4759,6 +4764,7 @@
             },
             "classification": {
               "status": "pending",
+              "failureReason": "file-too-large",
               "updatedAt": 1,
               "completedAt": 1,
               "moderation": {
@@ -5330,6 +5336,7 @@
           },
           "classification": {
             "status": "pending",
+            "failureReason": "file-too-large",
             "updatedAt": 1,
             "completedAt": 1,
             "moderation": {
@@ -5907,6 +5914,7 @@
           },
           "classification": {
             "status": "pending",
+            "failureReason": "file-too-large",
             "updatedAt": 1,
             "completedAt": 1,
             "moderation": {
@@ -6478,6 +6486,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -7033,6 +7042,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -7588,6 +7598,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -8148,6 +8159,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -8703,6 +8715,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -9261,6 +9274,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {
@@ -9851,6 +9865,7 @@
       },
       "classification": {
         "status": "pending",
+        "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
         "moderation": {

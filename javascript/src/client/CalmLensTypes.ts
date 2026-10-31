@@ -50,6 +50,14 @@ import type {
 /** Where the asset is in the pipeline: `uploading`, `processing`, then `done` or `failed`. */
 export type AssetClassificationStatus = KnownAssetClassificationStatus | (string & {});
 /**
+ * Why processing failed: `file-too-large`, `duration-limit`, `resolution-limit`,
+ * `unsupported-format`, `undecodable-content`, `multiple-tracks`, `type-mismatch`,
+ * `free-upload-limit`, `child-failed` or `processing-error`.
+ */
+export type AssetClassificationFailureReason =
+  | NonNullable<SharedAssetClassification["failureReason"]>
+  | (string & {});
+/**
  * The moderation decision in force, which also decides delivery: `pending`, then `allowed`,
  * `limited` (delivered like `allowed`, but marked so your app can reduce its reach, such as
  * keeping it out of recommendations, trending and notifications, ranking it lower or collapsing
@@ -68,8 +76,13 @@ export type AssetType = KnownAssetType | (string & {});
 export type AssetVisibility = KnownAssetVisibility | (string & {});
 
 /** An asset's processing state. */
-export type AssetClassification = Omit<SharedAssetClassification, "status" | "moderation"> & {
+export type AssetClassification = Omit<
+  SharedAssetClassification,
+  "status" | "failureReason" | "moderation"
+> & {
   status: AssetClassificationStatus;
+  /** Why processing failed; `null` unless `status` is `failed`. */
+  failureReason: AssetClassificationFailureReason | null;
   moderation: AssetModeration;
 };
 /** An asset's moderation state. */

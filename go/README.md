@@ -212,7 +212,7 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 `processing`, `moderation`, `content`, ...). The state is in three nested structs:
 
 - `Upload` (`AssetUpload`): `Status` is `uploading` or `completed`; `PartsReceived` counts multipart parts while they arrive, and `UpdatedAt` records the latest upload state change.
-- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection`, `LinkDetection`, `AIGeneratedDetection`, `TextRegions` and `Labels` sit alongside `Moderation`, which holds `Status`, `Categories`, `Score`, `Timeline`, `Policy`, `HashMatches` and reviewer details. Reviewer actions do not change classification completion time.
+- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `FailureReason` (why processing failed, `nil` unless `failed`), `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection`, `LinkDetection`, `AIGeneratedDetection`, `TextRegions` and `Labels` sit alongside `Moderation`, which holds `Status`, `Categories`, `Score`, `Timeline`, `Policy`, `HashMatches` and reviewer details. Reviewer actions do not change classification completion time.
 - `Content` (`AssetContent`): `Status` is whether CalmLens holds the content
   (`ContentStatusTemporary` until processing finishes, `ContentStatusStored` or
   `ContentStatusRemoved`, with `RemovalReason`), plus `Format` (MIME type), `Extension`,
@@ -245,7 +245,7 @@ report `Labels` (`[]ClassificationLabel`) and category `Qualifiers`
 (`map[string]QualifierResult`, keyed by the `Qualifier...` constants). Enumerations such as
 the processing, moderation and content statuses, `Type`, `Visibility`,
 `Likelihood` and result `Status` are plain strings with exported constants
-(`ClassificationStatus...`, `ModerationStatus...`, `ContentStatus...`, `ContentRemovalReason...`,
+(`ClassificationStatus...`, `ModerationStatus...`, `ContentStatus...`, `ContentRemovalReason...`, `AssetFailureReason...`,
 `ModerationDecision...`, `AssetType...`, `ModerationAction...`, `Likelihood...`, `ResultEvaluated`, `Category...`), so
 values added to the API later still decode; treat an unknown status as
 "not allowed". `Asset`, reports, category results and events expose `Raw` with every field
@@ -581,7 +581,7 @@ object's ID prefix, such as `asset` or `fldr`; by default the mock mints IDs lik
 such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
 (`QueuedOutcome`, default `OutcomePending`, for `Create`; `AnalyzedOutcome`, default
 `OutcomeAllowed`, for `Classify`; each `OutcomePending`, `OutcomeAllowed`, `OutcomeLimited`,
-`OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`) and mock CDN URLs. It behaves like the API where it matters for tests:
+`OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`, which fails with `FailureReason` `processing-error`) and mock CDN URLs. It behaves like the API where it matters for tests:
 
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
   `folder/not-empty`, ...), details and error body (`{code, message, requestId, details}`), with

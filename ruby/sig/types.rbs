@@ -40,6 +40,8 @@ module CalmLens
   # Whether CalmLens holds the content: only until processing finishes, retained, or deleted.
   type asset_content_status = "temporary" | "stored" | "removed"
   type asset_content_removal_reason = "policy" | "retention" | "requested" | "parent-removed" | "disposed"
+  # Why processing failed, while the classification status is `failed`.
+  type asset_classification_failure_reason = "file-too-large" | "duration-limit" | "resolution-limit" | "unsupported-format" | "undecodable-content" | "multiple-tracks" | "type-mismatch" | "free-upload-limit" | "child-failed" | "processing-error"
   type asset_type = "image" | "video" | "audio" | "plaintext-document" | "multimedia-document" | "website" | "file"
   type asset_visibility = "public" | "private"
   # FLAGGED_CONTENT_ACTION_SCHEMA in PolicyRule.ts.
@@ -110,6 +112,8 @@ module CalmLens
   type asset_upload = { "status" => "uploading" | "completed", "updatedAt" => Integer?, "partsReceived" => Integer? }
   type asset_classification = {
     "status" => asset_classification_status,
+    # `null` unless `status` is `failed`.
+    "failureReason" => asset_classification_failure_reason?,
     "updatedAt" => Integer?,
     "completedAt" => Integer?,
     "moderation" => asset_moderation,

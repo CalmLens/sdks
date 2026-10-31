@@ -17,6 +17,7 @@ export type {
   AssetChecksums,
   AssetChildrenPage,
   AssetClassification,
+  AssetClassificationFailureReason,
   AssetClassificationStatus,
   AssetContent,
   AssetContentOptions,

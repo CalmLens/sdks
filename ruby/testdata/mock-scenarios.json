@@ -2880,6 +2880,7 @@
           "expect": {
             "result": {
               "classification.status": "failed",
+              "classification.failureReason": "processing-error",
               "classification.moderation.status": "pending",
               "content.status": "temporary"
             },
@@ -2914,6 +2915,7 @@
           "expect": {
             "result": {
               "classification.status": "processing",
+              "classification.failureReason": null,
               "classification.completedAt": null,
               "classification.moderation.status": "pending"
             },

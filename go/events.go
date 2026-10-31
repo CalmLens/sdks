@@ -49,6 +49,7 @@ const (
 	FactReviewerName        = "reviewer-name"
 	FactNote                = "note"
 	FactPreviousStatus      = "previous-status"
+	FactFailureReason       = "failure-reason"
 	FactLimit               = "limit"
 	FactUsed                = "used"
 	FactOrganisationID      = "organisation-id"
@@ -256,6 +257,8 @@ type AssetFailedFacts struct {
 	AssetType *string `json:"asset-type"`
 	// PreviousStatus is the classification status (a ClassificationStatus constant) before the failure.
 	PreviousStatus *string `json:"previous-status"`
+	// FailureReason is why processing failed (an AssetFailureReason constant).
+	FailureReason string `json:"failure-reason"`
 }
 
 // UsageLimitReachedFacts are the facts of EventUsageLimitReached. OrganisationID, the organisation

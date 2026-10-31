@@ -495,6 +495,7 @@ final class MockApi {
     moderation.add("manualReviews", new JsonArray());
     JsonObject classification = new JsonObject();
     classification.addProperty("status", last ? "processing" : "pending");
+    classification.add("failureReason", JsonNull.INSTANCE);
     classification.addProperty("updatedAt", now);
     classification.add("completedAt", JsonNull.INSTANCE);
     classification.add("moderation", moderation);
@@ -570,6 +571,8 @@ final class MockApi {
     content.add("image", image == null ? JsonNull.INSTANCE : image);
     JsonObject classification = asset.getAsJsonObject("classification");
     classification.addProperty("status", decided ? "completed" : outcome == MockCalmLensServerClient.Outcome.FAILED ? "failed" : "processing");
+    // Like the API, a failure carries its reason; the mock never decodes content, so it fails processing.
+    classification.add("failureReason", outcome == MockCalmLensServerClient.Outcome.FAILED ? new JsonPrimitive("processing-error") : JsonNull.INSTANCE);
     classification.addProperty("updatedAt", now);
     classification.add("completedAt", decided ? new JsonPrimitive(now) : JsonNull.INSTANCE);
     classification.getAsJsonObject("moderation").addProperty("status", decided ? outcome.value() : "pending");

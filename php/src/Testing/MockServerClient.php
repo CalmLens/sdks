@@ -106,7 +106,7 @@ final class MockServerClient
     /**
      * @param string $queuedOutcome outcome of `assets.create` (and queued multipart uploads):
      *   `pending` (still processing), `allowed`, `limited`, `age-restricted`, `blocked` or `purged`, or
-     *   `failed` (processing failed, retryable).
+     *   `failed` (processing failed with `failureReason` `processing-error`, retryable).
      * @param string|array|callable $analyzedOutcome outcome of `assets.classify` and `text.classify`:
      *   an outcome, fields to deep-merge into the asset (the outcome then follows their
      *   `classification.moderation.status`), or a callable that receives the asset and returns either.
@@ -662,7 +662,7 @@ final class MockServerClient
                 'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,
                 'checksums' => null, 'image' => null, 'extractedText' => null],
             'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
-            'classification' => ['status' => $final ? 'processing' : 'pending', 'updatedAt' => $now, 'completedAt' => null,
+            'classification' => ['status' => $final ? 'processing' : 'pending', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
                 'moderation' => ['status' => 'pending', 'manualReviews' => []]],
         ];
         $this->assets[$asset['id']] = $asset;
@@ -752,7 +752,9 @@ final class MockServerClient
             $asset = $this->removeContent($asset, $purge ? $purgeReason : 'retention');
         }
         $asset['upload'] = ['status' => 'completed', 'updatedAt' => $now] + $asset['upload'];
-        $asset['classification'] = ['status' => $status, 'updatedAt' => $now, 'completedAt' => $decided ? $now : null] + $asset['classification'];
+        // Like the API, a failure carries its reason; the mock never decodes content, so it fails processing.
+        $asset['classification'] = ['status' => $status, 'failureReason' => $status === 'failed' ? 'processing-error' : null,
+            'updatedAt' => $now, 'completedAt' => $decided ? $now : null] + $asset['classification'];
         $asset['classification']['moderation']['status'] = $decided ? $outcome : 'pending';
         $asset['updatedAt'] = $now;
         return $this->assets[$asset['id']] = $asset;

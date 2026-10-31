@@ -499,7 +499,8 @@ module CalmLens
                          'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'extractedText' => nil },
           # Like the API, only an open upload counts the parts received.
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
-          'classification' => { 'status' => open ? 'pending' : 'processing', 'updatedAt' => now, 'completedAt' => nil,
+          'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
+                                'completedAt' => nil,
                                 'moderation' => { 'status' => 'pending', 'manualReviews' => [] } }
         }
       end
@@ -580,10 +581,16 @@ module CalmLens
                                   'extractedText' => nil, 'image' => without_placeholder(image))
         end
         asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
-        asset['classification'].merge!('status' => processing, 'updatedAt' => now, 'completedAt' => decided ? now : nil)
-        asset['classification']['moderation']['status'] = moderation
+        update_classification(asset['classification'], processing, moderation, now)
         asset['updatedAt'] = now
         fields ? AssetRecord.deep_merge!(asset, fields) : asset
+      end
+
+      # Like the API, a failed asset says why (the mock has only `processing-error`).
+      def update_classification(classification, processing, moderation, now)
+        classification.merge!('status' => processing, 'failureReason' => processing == 'failed' ? 'processing-error' : nil,
+                              'updatedAt' => now, 'completedAt' => processing == 'completed' ? now : nil)
+        classification['moderation']['status'] = moderation
       end
 
       # Like the API, the earlier posts CalmLens used go with the stored content.

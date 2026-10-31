@@ -81,6 +81,31 @@ const (
 	ContentRemovalReasonDisposed = "disposed"
 )
 
+// Processing failure reasons of AssetClassification.FailureReason. FailureReason is a plain string
+// so reasons added later still decode.
+const (
+	// AssetFailureReasonFileTooLarge means the file is larger than processing allows.
+	AssetFailureReasonFileTooLarge = "file-too-large"
+	// AssetFailureReasonDurationLimit means the audio or video is longer than processing allows.
+	AssetFailureReasonDurationLimit = "duration-limit"
+	// AssetFailureReasonResolutionLimit means the video is larger than 4096 × 2160 pixels.
+	AssetFailureReasonResolutionLimit = "resolution-limit"
+	// AssetFailureReasonUnsupportedFormat means the file format is not supported.
+	AssetFailureReasonUnsupportedFormat = "unsupported-format"
+	// AssetFailureReasonUndecodableContent means the content could not be decoded.
+	AssetFailureReasonUndecodableContent = "undecodable-content"
+	// AssetFailureReasonMultipleTracks means the audio or video has more than one audio or video track.
+	AssetFailureReasonMultipleTracks = "multiple-tracks"
+	// AssetFailureReasonTypeMismatch means the content does not match the asset's type.
+	AssetFailureReasonTypeMismatch = "type-mismatch"
+	// AssetFailureReasonFreeUploadLimit means the upload has more text than free uploads allow before billing is set up.
+	AssetFailureReasonFreeUploadLimit = "free-upload-limit"
+	// AssetFailureReasonChildFailed means a part of the asset, such as an embedded image, failed.
+	AssetFailureReasonChildFailed = "child-failed"
+	// AssetFailureReasonProcessingError means processing failed for another reason; retrying may succeed.
+	AssetFailureReasonProcessingError = "processing-error"
+)
+
 // Asset visibility values.
 const (
 	VisibilityPrivate = "private"
@@ -154,7 +179,10 @@ type AssetUpload struct {
 
 // AssetClassification contains progress and results for each capability.
 type AssetClassification struct {
-	Status          string                 `json:"status"`
+	Status string `json:"status"`
+	// FailureReason is why processing failed (an AssetFailureReason constant) while Status is
+	// ClassificationStatusFailed; nil otherwise.
+	FailureReason   *string                `json:"failureReason"`
 	UpdatedAt       *int64                 `json:"updatedAt"`
 	CompletedAt     *int64                 `json:"completedAt"`
 	Moderation      AssetModeration        `json:"moderation"`
@@ -174,8 +202,8 @@ type AssetClassification struct {
 type AssetReview struct {
 	ID string `json:"id"`
 	// Decision is one of the ModerationDecision constants.
-	Decision       string  `json:"decision"`
-	Note           *string `json:"note"`
+	Decision string  `json:"decision"`
+	Note     *string `json:"note"`
 	// ReviewerName is the reviewer's display name, when known.
 	ReviewerName *string `json:"reviewerName,omitempty"`
 	// ReviewerEmail is the reviewer's email address, when known.
@@ -957,9 +985,9 @@ type HashList struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 	// Action is HashListActionFlag or HashListActionBlock.
-	Action          string  `json:"action"`
-	CreatedAt       int64   `json:"createdAt"`
-	UpdatedAt       *int64  `json:"updatedAt"`
+	Action    string `json:"action"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt *int64 `json:"updatedAt"`
 }
 
 // HashListEntry is one hash in a hash list.
@@ -973,7 +1001,7 @@ type HashListEntry struct {
 	Quality       *int    `json:"quality"`
 	Label         *string `json:"label"`
 	SourceAssetID *string `json:"sourceAssetId"`
-	CreatedAt       int64   `json:"createdAt"`
+	CreatedAt     int64   `json:"createdAt"`
 }
 
 // HashListPage is one page of a project's hash lists, newest first.

@@ -18,7 +18,7 @@ class ViewerClaims(TypedDict, total=False):
 
 __all__ = [
     "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore", "ReportPolicy",
-    "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
+    "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
     "TestRegionalAction", "AssetReview", "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
@@ -67,6 +67,12 @@ AssetModerationDecision = Union[Literal["allowed", "limited", "age-restricted", 
 AssetContentStatus = Union[Literal["temporary", "stored", "removed"], str]
 #: Why the content was removed (``content.removalReason``). New reasons may be added.
 AssetContentRemovalReason = Union[Literal["policy", "retention", "requested", "parent-removed", "disposed"], str]
+#: Why processing failed (``classification.failureReason``), while ``classification.status`` is
+#: ``failed``. New reasons may be added.
+AssetClassificationFailureReason = Union[Literal["file-too-large", "duration-limit", "resolution-limit",
+                                                 "unsupported-format", "undecodable-content", "multiple-tracks",
+                                                 "type-mismatch", "free-upload-limit", "child-failed",
+                                                 "processing-error"], str]
 #: Known asset types. New types may be added.
 AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "multimedia-document", "website",
                           "file"], str]
@@ -120,7 +126,7 @@ EventFactKey = Union[Literal[
     "asset-name", "asset-type", "file-format", "decided-by", "moderation-status", "flagged-categories",
     "reviewer-user-id", "reviewer-name", "note", "previous-status", "limit", "used", "organisation-id",
     "member-user-id", "member-name", "role", "invited-by-user-id", "connector-id", "connector-name",
-    "connector-type", "consecutive-failures", "last-error", "resumes-on", "reason", "preset-id", "preset-name",
+    "connector-type", "consecutive-failures", "last-error", "resumes-on", "reason", "failure-reason", "preset-id", "preset-name",
     "daily-limit", "left", "removed-by-user-id", "previous-role", "changed-by-user-id", "key-id",
     "key-name", "action", "created-by-user-id", "revoked-by-user-id", "test",
 ], str]
@@ -631,6 +637,8 @@ class AssetModeration(_AssetModerationRequired, total=False):
 
 class _AssetClassificationRequired(TypedDict):
     status: AssetClassificationStatus
+    #: Why processing failed, while ``status`` is ``failed``; otherwise ``None``.
+    failureReason: Optional[AssetClassificationFailureReason]
     updatedAt: Optional[int]
     completedAt: Optional[int]
     moderation: AssetModeration

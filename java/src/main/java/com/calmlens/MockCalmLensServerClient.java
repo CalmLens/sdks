@@ -125,7 +125,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     BLOCKED("blocked"),
     /** Processing done; moderation {@code purged}, and the content is removed. */
     PURGED("purged"),
-    /** Processing failed; the asset can be retried. */
+    /** Processing failed with {@code failureReason} {@code processing-error}; the asset can be retried. */
     FAILED("failed");
 
     private final String value;

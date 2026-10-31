@@ -60,6 +60,19 @@ func TestMockLifecycle(t *testing.T) {
 	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotRetryable {
 		t.Fatal("retried processing asset", err)
 	}
+	failing, err := NewServerClient(Options{QueuedOutcome: OutcomeFailed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed, err := failing.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "f", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("f")}})
+	if err != nil || failed.Classification.Status != calmlens.ClassificationStatusFailed || failed.Classification.FailureReason == nil ||
+		*failed.Classification.FailureReason != calmlens.AssetFailureReasonProcessingError {
+		t.Fatal(failed, err)
+	}
+	failed, err = failing.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: failed.ID})
+	if err != nil || failed.Classification.Status != calmlens.ClassificationStatusProcessing || failed.Classification.FailureReason != nil {
+		t.Fatal(failed, err)
+	}
 	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}})
 	if err != nil {
 		t.Fatal(err)

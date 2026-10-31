@@ -993,7 +993,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                         "checksums": None, "image": None, "extractedText": None},
             "upload": {"status": "completed" if final else "uploading", "updatedAt": now,
                        "partsReceived": None if final else 1},
-            "classification": {"status": "processing" if final else "pending", "updatedAt": now, "completedAt": None,
+            "classification": {"status": "processing" if final else "pending", "failureReason": None, "updatedAt": now,
+                               "completedAt": None,
                                "moderation": {"status": "pending", "manualReviews": []}},
         }
         if not final:
@@ -1048,7 +1049,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             content.update(status="removed", removalReason=purge_reason if purge else "retention", updatedAt=now,
                            extractedText=None, image=_without_placeholder(content.get("image")))
             asset["context"] = None
-        asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None)
+        asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None,
+                                       failureReason="processing-error" if outcome == "failed" else None)
         asset["classification"]["moderation"].update(status=outcome if decided else "pending")
         asset["upload"].update(status="completed", updatedAt=now)
         asset["updatedAt"] = now

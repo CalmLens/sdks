@@ -12,7 +12,7 @@ from .moderation_context import (MODERATION_CONTEXT_USED_CHARACTERS, MODERATION_
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError, WebhookVerificationError)
 from .types import (
-    ViewerClaims, AgeRange, Asset, AssetContent, AssetContentRemovalReason, AssetContentStatus, AssetIdOptions, AssetModeration,
+    ViewerClaims, AgeRange, Asset, AssetClassificationFailureReason, AssetContent, AssetContentRemovalReason, AssetContentStatus, AssetIdOptions, AssetModeration,
     AssetModerationDecision, AssetModerationStatus, AssetPage, AssetClassification, AssetUpload, AssetClassificationStatus,
     AssetSearchMatch, AssetSearchMatchField, AssetSearchResponse, AssetType, AssetUrlOptions, BinaryData, BoundingBox, CategoryResult, CdnResource, CdnTransform,
     Checksums, ClassificationCategories, ClassificationCategory, ClassificationLabel, Content,
@@ -55,7 +55,7 @@ __all__ = ["ViewerClaims",
     "verify_webhook_signature", "parse_webhook_event", "to_webhook_event_payload", "create_webhook_signature_header",
     "create_webhook_headers", "is_test_webhook_event", "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_SIGNATURE_HEADER", "WEBHOOK_TIMESTAMP_HEADER",
     "WEBHOOK_SIGNATURE_TOLERANCE_SECONDS",
-    "AgeRange", "Asset", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
+    "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
     "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",

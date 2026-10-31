@@ -799,10 +799,12 @@ describe("MockCalmLensServerClient", () => {
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
     });
     expect(asset.classification.status).toBe("failed");
+    expect(asset.classification.failureReason).toBe("processing-error");
     expect(asset.content.status).toBe("temporary");
 
     const retried = await client.assets.retry({ assetId: asset.id });
     expect(retried.classification.status).toBe("processing");
+    expect(retried.classification.failureReason).toBeNull();
     expect(retried.classification.moderation.status).toBe("pending");
     await expect(client.assets.retry({ assetId: asset.id })).rejects.toMatchObject({
       code: PUBLIC_ERROR_CODES.ASSET_NOT_RETRYABLE.getId(),

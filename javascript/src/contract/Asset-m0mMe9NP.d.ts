@@ -9207,6 +9207,18 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
     pending: "pending";
     processing: "processing";
   }>;
+  failureReason: zod.ZodNullable<zod.ZodEnum<{
+    "child-failed": "child-failed";
+    "duration-limit": "duration-limit";
+    "file-too-large": "file-too-large";
+    "free-upload-limit": "free-upload-limit";
+    "multiple-tracks": "multiple-tracks";
+    "processing-error": "processing-error";
+    "resolution-limit": "resolution-limit";
+    "type-mismatch": "type-mismatch";
+    "undecodable-content": "undecodable-content";
+    "unsupported-format": "unsupported-format";
+  }>>;
   updatedAt: zod.ZodNullable<zod.ZodNumber>;
   completedAt: zod.ZodNullable<zod.ZodNumber>;
   moderation: zod.ZodObject<{
@@ -18547,6 +18559,18 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       pending: "pending";
       processing: "processing";
     }>;
+    failureReason: zod.ZodNullable<zod.ZodEnum<{
+      "child-failed": "child-failed";
+      "duration-limit": "duration-limit";
+      "file-too-large": "file-too-large";
+      "free-upload-limit": "free-upload-limit";
+      "multiple-tracks": "multiple-tracks";
+      "processing-error": "processing-error";
+      "resolution-limit": "resolution-limit";
+      "type-mismatch": "type-mismatch";
+      "undecodable-content": "undecodable-content";
+      "unsupported-format": "unsupported-format";
+    }>>;
     updatedAt: zod.ZodNullable<zod.ZodNumber>;
     completedAt: zod.ZodNullable<zod.ZodNumber>;
     moderation: zod.ZodObject<{

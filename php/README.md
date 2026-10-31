@@ -92,7 +92,11 @@ Audio and video still process asynchronously. Watch webhooks or call
 `$client->assets->waitForDecision(['assetId' => $asset['id'], 'timeout' => 60])`.
 It returns once `classification.moderation.status` is no longer `pending` (`allowed`,
 `limited`, `age-restricted`, `blocked` or `purged`) or classification has failed, and otherwise throws
-`sdk/timeout`. A classification failure is not a decision to allow. Manual reviews in
+`sdk/timeout`. A classification failure is not a decision to allow. While
+`classification.status` is `failed`, `classification.failureReason` says why: `file-too-large`,
+`duration-limit`, `resolution-limit`, `unsupported-format`, `undecodable-content`,
+`multiple-tracks`, `type-mismatch`, `free-upload-limit`, `child-failed` or `processing-error`;
+otherwise it is `null`. Manual reviews in
 `classification.moderation.manualReviews` record their `decision` as one of those five
 statuses. Filter lists with `classification.moderation.status==allowed`.
 
@@ -321,7 +325,7 @@ $mock->decide($asset['id'], 'blocked'); // as a reviewer would; adds asset.block
 It does not classify content. `create` gives assets `queuedOutcome` (default `pending`)
 and `classify` gives them `analyzedOutcome` (default `allowed`): `pending`, `allowed`,
 `limited`, `age-restricted`, `blocked`, `purged` (which also removes the content, with reason
-`policy`) or `failed`. A classified image gets a ThumbHash, which the `placeholder` resource
+`policy`) or `failed` (with `failureReason` `processing-error`). A classified image gets a ThumbHash, which the `placeholder` resource
 serves as a PNG, and which goes with the content when it is removed.
 `analyzedOutcome` may also be fields to merge into the asset or a callable that receives
 the asset and returns either. Content is kept only with `keepContentAfterProcessing`.

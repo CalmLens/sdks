@@ -247,6 +247,32 @@ string_enum! {
 }
 
 string_enum! {
+    /// Why an asset's processing failed.
+    AssetFailureReason {
+        /// The file is larger than processing allows.
+        FileTooLarge = "file-too-large",
+        /// The audio or video is longer than processing allows.
+        DurationLimit = "duration-limit",
+        /// The video is larger than 4096 × 2160 pixels.
+        ResolutionLimit = "resolution-limit",
+        /// The file format is not supported.
+        UnsupportedFormat = "unsupported-format",
+        /// The content could not be decoded.
+        UndecodableContent = "undecodable-content",
+        /// The audio or video has more than one audio or video track.
+        MultipleTracks = "multiple-tracks",
+        /// The content does not match the asset's type.
+        TypeMismatch = "type-mismatch",
+        /// The upload has more text than free uploads allow before billing is set up.
+        FreeUploadLimit = "free-upload-limit",
+        /// A part of the asset, such as an embedded image, failed.
+        ChildFailed = "child-failed",
+        /// Processing failed for another reason; retrying may succeed.
+        ProcessingError = "processing-error",
+    }
+}
+
+string_enum! {
     /// Whether the CDN serves an asset without a signed URL.
     Visibility {
         /// Served to anyone with the URL once its moderation status is `allowed`.
@@ -1576,6 +1602,9 @@ pub struct AssetClassification {
     /// Classification or upload progress.
     #[serde(default)]
     pub status: AssetClassificationStatus,
+    /// Why processing failed, while `status` is `failed`; otherwise `None`.
+    #[serde(default)]
+    pub failure_reason: Option<AssetFailureReason>,
     /// When the state last changed, in milliseconds since the Unix epoch.
     #[serde(default)]
     pub updated_at: Option<u64>,

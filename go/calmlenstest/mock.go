@@ -86,7 +86,8 @@ const (
 	// OutcomePurged finishes processing with moderation purged and removes the content with
 	// removal reason policy.
 	OutcomePurged = "purged"
-	// OutcomeFailed fails processing (retryable) with moderation pending.
+	// OutcomeFailed fails processing (retryable) with moderation pending and failure reason
+	// processing-error.
 	OutcomeFailed = "failed"
 )
 
@@ -1213,7 +1214,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 		"extractedText": nil,
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
-	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "updatedAt": now, "completedAt": nil,
+	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil,
 		"moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}}}
 	if open {
 		uploadState["status"] = "uploading"
@@ -1373,6 +1374,7 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 	section(a, "upload")["updatedAt"] = now
 	processing["updatedAt"] = now
 	processing["completedAt"] = nil
+	processing["failureReason"] = nil
 	moderation["status"] = calmlens.ModerationStatusPending
 	switch {
 	case decided:
@@ -1381,6 +1383,8 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 		processing["completedAt"] = now
 	case outcome == OutcomeFailed:
 		processing["status"] = calmlens.ClassificationStatusFailed
+		// The mock has no content checks, so a failure is always a processing error.
+		processing["failureReason"] = calmlens.AssetFailureReasonProcessingError
 	default:
 		processing["status"] = calmlens.ClassificationStatusProcessing
 	}

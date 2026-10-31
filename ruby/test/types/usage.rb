@@ -11,6 +11,7 @@ asset = client.text.classify(text: 'Hello', name: 'greeting', external_id: 'post
                              processing_options: { flagged_content_policy: { action: 'age-restrict' } })
 status = asset['classification']['moderation']['status']
 processing = asset['classification']['status']
+failure = asset['classification']['failureReason']
 reviews = asset['classification']['moderation']['manualReviews'].map { |review| [review['decision'], review['reviewerName']] }
 removal = asset['content']['removalReason']
 format = asset['content']['format']
@@ -119,5 +120,5 @@ mock.enqueue_event(type: 'asset.allowed', asset_id: 'asset-1',
 mock.state.assets.each_value { |item| item['classification']['moderation']['status'] }
 mock.enqueue(status: 503, body: { code: 'server/unavailable' }).requests.map(&:path)
 
-[status, processing, reviews, removal, format, score, ages, names, more, children, matched, expires, lens_width, url, bytes,
+[status, processing, failure, reviews, removal, format, score, ages, names, more, children, matched, expires, lens_width, url, bytes,
  webhook_status, webhook_test, earlier, author, used, limits]

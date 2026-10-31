@@ -36,7 +36,8 @@ pub enum MockOutcome {
     Blocked,
     /// Processing completes with moderation `purged` and the content is removed (reason `policy`).
     Purged,
-    /// Processing fails (retryable) with moderation `pending`.
+    /// Processing fails (retryable) with moderation `pending` and failure reason
+    /// `processing-error`.
     Failed,
 }
 impl MockOutcome {
@@ -634,6 +635,15 @@ fn apply_outcome(
     }
     let classification = section(asset, "classification");
     classification.insert("status".into(), status.into());
+    // The mock has no content checks, so a failure is always a `processing-error`.
+    classification.insert(
+        "failureReason".into(),
+        if status == "failed" {
+            "processing-error".into()
+        } else {
+            Value::Null
+        },
+    );
     classification.insert("updatedAt".into(), now.into());
     classification.insert(
         "completedAt".into(),
@@ -1646,8 +1656,8 @@ impl Backend {
                 "partsReceived": if open { json!(part_number) } else { Value::Null },
             },
             "classification": {
-                "status": if open { "pending" } else { "processing" }, "updatedAt": now,
-                "completedAt": null, "moderation": {"status": "pending", "manualReviews": []},
+                "status": if open { "pending" } else { "processing" }, "failureReason": null,
+                "updatedAt": now, "completedAt": null, "moderation": {"status": "pending", "manualReviews": []},
             },
         });
         for key in [

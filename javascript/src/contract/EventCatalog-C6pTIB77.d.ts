@@ -732,12 +732,25 @@ declare const EVENT_TYPE_INFO: {
         pending: "pending";
         processing: "processing";
       }>>>>;
+      failureReason: EventFieldDefinition<zod.ZodEnum<{
+        "child-failed": "child-failed";
+        "duration-limit": "duration-limit";
+        "file-too-large": "file-too-large";
+        "free-upload-limit": "free-upload-limit";
+        "multiple-tracks": "multiple-tracks";
+        "processing-error": "processing-error";
+        "resolution-limit": "resolution-limit";
+        "type-mismatch": "type-mismatch";
+        "undecodable-content": "undecodable-content";
+        "unsupported-format": "unsupported-format";
+      }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       previousStatus?: "completed" | "failed" | "pending" | "processing" | null | undefined;
+      failureReason: "child-failed" | "duration-limit" | "file-too-large" | "free-upload-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "type-mismatch" | "undecodable-content" | "unsupported-format";
     }>;
     factInfo: {
       label: string;
@@ -772,6 +785,18 @@ declare const EVENT_TYPE_INFO: {
         pending: "pending";
         processing: "processing";
       }>>>;
+      failureReason: zod.ZodEnum<{
+        "child-failed": "child-failed";
+        "duration-limit": "duration-limit";
+        "file-too-large": "file-too-large";
+        "free-upload-limit": "free-upload-limit";
+        "multiple-tracks": "multiple-tracks";
+        "processing-error": "processing-error";
+        "resolution-limit": "resolution-limit";
+        "type-mismatch": "type-mismatch";
+        "undecodable-content": "undecodable-content";
+        "unsupported-format": "unsupported-format";
+      }>;
     }, zod.core.$strip>;
   };
   readonly "asset.deleted": {

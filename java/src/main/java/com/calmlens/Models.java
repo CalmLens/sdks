@@ -1749,8 +1749,25 @@ public final class Models {
   /** Receipt of source content and multipart progress. */
   public record AssetUpload(String status, @JsonAdapter(Json.EpochMillis.class) Instant updatedAt, Integer partsReceived) {}
 
-  /** Classification progress and results grouped by capability. */
-  public record AssetClassification(AssetClassificationStatus status,
+  /**
+   * Classification progress and results grouped by capability.
+   *
+   * @param status classification progress
+   * @param failureReason why processing failed: {@code file-too-large}, {@code duration-limit},
+   *     {@code resolution-limit}, {@code unsupported-format}, {@code undecodable-content}, {@code
+   *     multiple-tracks}, {@code type-mismatch}, {@code free-upload-limit}, {@code child-failed} or
+   *     {@code processing-error}; null unless {@code status} is {@code failed}
+   * @param updatedAt when classification state last changed
+   * @param completedAt when classification finished
+   * @param moderation safety findings and decisions
+   * @param personDetection person detection result
+   * @param faceDetection face detection result
+   * @param linkDetection link detection result
+   * @param aiGeneratedDetection generated-content detection result
+   * @param textRegions text found in the image
+   * @param labels labels describing the content
+   */
+  public record AssetClassification(AssetClassificationStatus status, String failureReason,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       @JsonAdapter(Json.EpochMillis.class) Instant completedAt,
       AssetModeration moderation, PersonDetectionResult personDetection,
