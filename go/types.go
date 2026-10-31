@@ -1112,7 +1112,6 @@ type Lens struct {
 	EnsureLensOptions
 	ID        string  `json:"id"`
 	ProjectID *string `json:"projectId"`
-	UserID    *string `json:"userId"`
 	CreatedAt int64   `json:"createdAt"`
 	UpdatedAt *int64  `json:"updatedAt"`
 }

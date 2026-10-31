@@ -927,7 +927,6 @@ class _LensResponseRequired(TypedDict):
 
 class Lens(_LensResponseRequired, total=False):
     projectId: Optional[str]
-    userId: Optional[str]
     description: Optional[str]
     transforms: Optional[list[LensTransform]]
     updatedAt: int

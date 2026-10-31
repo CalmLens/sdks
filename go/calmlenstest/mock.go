@@ -1046,7 +1046,7 @@ func (m *MockServerClient) ensureLenses(body calmlens.JSON, now int64) (any, err
 		id := text(definition["identifier"])
 		old := m.lenses[id]
 		if old == nil {
-			lens := calmlens.JSON{"id": m.options.CreateID("lens"), "projectId": m.options.ProjectID, "userId": nil, "createdAt": now, "updatedAt": now}
+			lens := calmlens.JSON{"id": m.options.CreateID("lens"), "projectId": m.options.ProjectID, "createdAt": now, "updatedAt": now}
 			for key, item := range definition {
 				lens[key] = item
 			}

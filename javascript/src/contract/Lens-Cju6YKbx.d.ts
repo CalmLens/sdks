@@ -286,4 +286,27 @@ declare const LENS_SCHEMA: zod.ZodObject<{
 type Lens = Omit<zod.infer<typeof LENS_SCHEMA>, "transforms"> & {
   transforms?: Array<DefaultAssetTransform | AssetTransform> | null;
 };
-export { Lens as n, LensType as r, LENS_SCHEMA as t };
+/** A lens as the public API returns it: without the account that created it, which only the portal shows. */
+declare const PUBLIC_LENS_SCHEMA: zod.ZodObject<{
+  id: zod.ZodString;
+  projectId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  version: zod.ZodDefault<zod.ZodNumber>;
+  identifier: zod.ZodString;
+  name: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
+  description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
+  type: zod.ZodEnum<{
+    audio: "audio";
+    document: "document";
+    image: "image";
+    video: "video";
+    website: "website";
+  }>;
+  active: zod.ZodBoolean;
+  transforms: zod.ZodOptional<zod.ZodNullable<zod.ZodArray<zod.ZodObject<{
+    type: zod.ZodString;
+    options: zod.ZodUnknown;
+  }, zod.core.$strip>>>>;
+  createdAt: zod.ZodNumber;
+  updatedAt: zod.ZodOptional<zod.ZodNumber>;
+}, zod.core.$strip>;
+export { LensType as n, PUBLIC_LENS_SCHEMA as r, Lens as t };

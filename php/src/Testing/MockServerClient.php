@@ -1433,7 +1433,7 @@ final class MockServerClient
             $old = $this->lenses[$definition['identifier']] ?? null;
             $now = ($this->now)();
             if ($old === null) {
-                $saved[] = $this->lenses[$definition['identifier']] = ['id' => ($this->createId)('lens'), 'projectId' => $this->projectId, 'userId' => null]
+                $saved[] = $this->lenses[$definition['identifier']] = ['id' => ($this->createId)('lens'), 'projectId' => $this->projectId]
                     + $definition + ['createdAt' => $now, 'updatedAt' => $now];
                 continue;
             }

@@ -1194,7 +1194,6 @@ impl Backend {
                     definition["createdAt"] =
                         old.map_or(now.into(), |old| old["createdAt"].clone());
                     definition["projectId"] = self.options.project_id.clone().into();
-                    definition["userId"] = Value::Null;
                     definition["updatedAt"] = now.into();
                     definition
                 }

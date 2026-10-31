@@ -1421,7 +1421,6 @@ final class MockApi {
         JsonObject lens = new JsonObject();
         lens.addProperty("id", createId("lens"));
         lens.addProperty("projectId", projectId);
-        lens.add("userId", JsonNull.INSTANCE);
         definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
         lens.addProperty("createdAt", now());
         lens.addProperty("updatedAt", now());

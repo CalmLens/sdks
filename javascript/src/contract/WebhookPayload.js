@@ -627,7 +627,7 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	status: ASSET_CONTENT_STATUS_SCHEMA.describe("Whether CalmLens holds the content (source, preview and extracted text): `temporary` until processing finishes, `stored`, or `removed`"),
 	removalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullable().describe("Why the content was removed: your `policy` purged it, `retention` because `keepContentAfterProcessing` was off, `requested` through the API or portal, `parent-removed` with its parent asset's content, or `disposed` after a safety hold. `null` while content is held."),
 	updatedAt: epoch("When the content status last changed"),
-	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullable().describe("Internal delivery restriction for suspected illegal content. Held content cannot be viewed, changed, or deleted through normal asset operations."),
+	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullable().describe("Set while CalmLens holds the asset for suspected illegal content: its content isn't delivered and the asset can't be changed or deleted until the hold ends, so such requests return `asset/safety-held`. `null` when there is no hold."),
 	format: zod.string().nullable().describe("MIME type of the content"),
 	extension: zod.string().nullable().describe("File extension of the content"),
 	sizeInBytes: zod.number().int().nullable().describe("Size of the uploaded content in bytes"),

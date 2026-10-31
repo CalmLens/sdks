@@ -2536,14 +2536,13 @@ public final class Models {
    * @param active whether the lens is active
    * @param version version
    * @param projectId owning project
-   * @param userId creating user
    * @param createdAt creation time
    * @param updatedAt last update time
    * @param description description
    * @param transforms transforms
    */
   public record Lens(String id, String identifier, String name, String type, Boolean active, Integer version,
-      String projectId, String userId,
+      String projectId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, List<Transform> transforms) {

@@ -19,7 +19,7 @@ import type {
   AssetSearchResult as SharedAssetSearchResult,
 } from "../contract/AssetSearch.js";
 import type { HashList, HashListEntry } from "../contract/HashList.js";
-import type { LENS_SCHEMA } from "../contract/Lens.js";
+import type { PUBLIC_LENS_SCHEMA } from "../contract/Lens.js";
 import type { ModerationContext } from "../contract/ModerationContext.js";
 import type { CursorPage } from "../contract/Page.js";
 import type {
@@ -241,7 +241,7 @@ export type LensTransform = ImageTransform;
 export type CdnTransform = string | LensTransform | LensTransform[];
 
 /** A named, versioned CDN transformation. */
-export type Lens = Omit<zod.infer<typeof LENS_SCHEMA>, "transforms"> & {
+export type Lens = Omit<zod.infer<typeof PUBLIC_LENS_SCHEMA>, "transforms"> & {
   transforms?: LensTransform[] | null;
 };
 

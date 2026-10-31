@@ -469,7 +469,6 @@ module CalmLens
   type lens = {
     "id" => String,
     ?"projectId" => String?,
-    ?"userId" => String?,
     "version" => Integer,
     "identifier" => String,
     "name" => String,

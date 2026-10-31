@@ -398,7 +398,7 @@ module CalmLens
         now = @now.call
         old = @state.lenses[definition['identifier']]
         unless old
-          lens = { 'id' => @create_id.call('lens'), 'projectId' => @project_id, 'userId' => nil }.merge(definition)
+          lens = { 'id' => @create_id.call('lens'), 'projectId' => @project_id }.merge(definition)
           return @state.lenses[definition['identifier']] = lens.merge('createdAt' => now, 'updatedAt' => now)
         end
 

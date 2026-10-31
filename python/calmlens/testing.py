@@ -1315,7 +1315,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         for definition in body["lenses"]:
             old = self._mock_lenses.get(definition["identifier"])
             if old is None:
-                lens = {"id": self.create_id("lens"), "projectId": self.project_id, "userId": None, **definition,
+                lens = {"id": self.create_id("lens"), "projectId": self.project_id, **definition,
                         "createdAt": now, "updatedAt": now}
             elif all(old.get(k) == definition.get(k) for k in ("name", "description", "type", "active",
                                                                   "transforms", "version")):

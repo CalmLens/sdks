@@ -185,7 +185,7 @@ export interface MockAppSession {
 }
 
 /** A lens as `ensureLenses` sends it. */
-type LensDefinition = Omit<Lens, "id" | "projectId" | "userId" | "createdAt" | "updatedAt">;
+type LensDefinition = Omit<Lens, "id" | "projectId" | "createdAt" | "updatedAt">;
 
 /** Where a client sends its requests: the API and CDN base URLs, without trailing slashes. */
 export interface MockEndpoints {
@@ -1932,7 +1932,6 @@ export class MockCalmLensApi {
       const lens: Lens = {
         id: this.createId("lens"),
         projectId: this.projectId,
-        userId: null,
         ...options,
         createdAt: now,
         updatedAt: now,
