@@ -27,8 +27,7 @@ class MockClientTest {
       ApiException error = assertThrows(ApiException.class, () -> mock.client.assets.retrieve(new Models.AssetId("a")));
       assertEquals(code, error.getCode());
       assertEquals(ErrorCodes.httpStatus(code).orElseThrow(), error.getStatus());
-      assertEquals(Map.of("traceId", "trace_mock"), error.getDetails());
-      assertEquals("trace_mock", error.getTraceId());
+      assertEquals(Map.of(), error.getDetails());
       assertTrue(error.getRequestId().startsWith("req_mock_"), error.getRequestId());
     }
     assertThrows(IllegalArgumentException.class, () -> new MockCalmLensServerClient().enqueueError("made/up"));

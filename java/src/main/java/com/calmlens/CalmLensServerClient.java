@@ -591,9 +591,6 @@ public final class CalmLensServerClient implements AutoCloseable {
               params.add(id("ordering[" + index + "][" + field.getKey() + "]") + "=" + id(field.getValue().getAsString()));
             index++;
           }
-        } else if (entry.getKey().equals("ids") && value.isJsonArray()) {
-          int index = 0;
-          for (JsonElement folderId : value.getAsJsonArray()) params.add(id("ids[" + index++ + "]") + "=" + id(folderId.getAsString()));
         } else
           params.add(id(entry.getKey()) + "=" + URLEncoder.encode(
               value.isJsonPrimitive() && value.getAsJsonPrimitive().isString() ? value.getAsString() : Json.write(value),
@@ -774,8 +771,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /**
-   * The error for a non-2xx reply: the API's code, message and details (with its {@code traceId}),
-   * or {@link ErrorCodes#SDK_HTTP_ERROR} when the body carries no code.
+   * The error for a non-2xx reply: the API's code, message, details and request ID (the {@code
+   * X-Request-Id} header, else the body's {@code requestId}), or {@link ErrorCodes#SDK_HTTP_ERROR} when the body carries no code.
    */
   private static ApiException error(Reply reply) {
     String code = errorCode(reply.json());
@@ -784,9 +781,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     Map<String, Object> details = new LinkedHashMap<>();
     if (failure.has("details") && failure.get("details").isJsonObject())
       details.putAll(Json.GSON.fromJson(failure.get("details"), new TypeToken<Map<String, Object>>() {}.getType()));
-    if (failure.get("traceId") instanceof JsonPrimitive trace && trace.isString()) details.put("traceId", trace.getAsString());
+    String requestId = failure.get("requestId") instanceof JsonPrimitive id && id.isString() ? id.getAsString() : null;
     String message = failure.get("message") instanceof JsonPrimitive text && text.isString() ? text.getAsString() : code;
-    return new ApiException(code, message, details, reply.status(), reply.headers(), null);
+    return new ApiException(code, message, details, reply.status(), reply.headers(), requestId, null);
   }
 
   /** The JSON body of a successful reply. */
@@ -1048,7 +1045,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     public Models.AssetPage list(Models.ListAssets options) {
       JsonObject query = new JsonObject();
       Models.encode(options).entrySet().forEach(entry -> query.add(entry.getKey(), entry.getValue()));
-      return decode(json("GET", project("assets/page"), query, null), Models.AssetPage.class);
+      return decode(json("GET", project("assets"), query, null), Models.AssetPage.class);
     }
 
     /**
@@ -1057,7 +1054,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @param options page size, filter and ordering
      * @return a lazy iterable
      */
-    public AutoPager<Models.Asset> iterate(Models.ListAssets options) { return pages(project("assets/page"), Models.encode(options)); }
+    public AutoPager<Models.Asset> iterate(Models.ListAssets options) { return pages(project("assets"), Models.encode(options)); }
 
     /** @param options the asset @return the asset */
     public Models.Asset retrieve(Models.AssetId options) {
@@ -1764,30 +1761,23 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /**
-   * The JSON body of the webhook delivery for an event from {@code events.list}.
+   * The JSON body of the webhook delivery for an event from {@code events.list}: the event in the
+   * same shape. Fields that are not part of that shape are left out.
    *
    * @param event the event
    * @return its delivery payload
    */
   public static Models.WebhookEventPayload toWebhookEventPayload(Models.Event event) {
     if (event.json() == null)
-      return new Models.WebhookEventPayload(event.id(), event.type(), event.createdAt(), event.projectId(),
-          new Models.WebhookEventData(event.severity(), event.title(), event.description(), event.assetId(), event.asset(), event.facts()));
+      return new Models.WebhookEventPayload(event.id(), event.projectId(), event.type(), event.severity(), event.title(),
+          event.description(), event.assetId(), event.asset(), event.facts(), event.createdAt());
     // From the event as received, so asset and fact fields this SDK version does not model are kept.
     Map<String, Object> json = event.json();
-    Map<String, Object> data = new LinkedHashMap<>();
-    data.put("severity", json.get("severity"));
-    data.put("title", json.get("title"));
-    data.put("description", json.get("description"));
-    data.put("assetId", json.get("assetId"));
-    data.put("asset", json.get("asset"));
-    data.put("facts", json.containsKey("facts") ? json.get("facts") : List.of());
     Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("id", json.get("id"));
-    payload.put("type", json.get("type"));
+    for (String key : List.of("id", "projectId", "type", "severity", "title", "description", "assetId", "asset"))
+      payload.put(key, json.get(key));
+    payload.put("facts", json.containsKey("facts") ? json.get("facts") : List.of());
     payload.put("createdAt", json.get("createdAt"));
-    payload.put("projectId", json.get("projectId"));
-    payload.put("data", data);
     return Json.GSON.fromJson(Json.WRITE.toJsonTree(payload), Models.WebhookEventPayload.class);
   }
 
@@ -1799,7 +1789,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @return whether it is a test send
    */
   public static boolean isTestWebhookEvent(Models.WebhookEventPayload event) {
-    return event != null && event.data() != null && isTestFacts(event.data().facts());
+    return event != null && isTestFacts(event.facts());
   }
 
   /**
@@ -2030,8 +2020,8 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   /**
    * Reads a verified body like the API's receiver schema: a JSON object with string {@code id},
-   * {@code type} and {@code projectId}, numeric {@code createdAt} and object {@code data} whose known
-   * fields, when present, have the API's types. Unknown fields are kept in {@code json()}.
+   * {@code type} and {@code projectId} and a numeric {@code createdAt}; the other known fields, when
+   * present, have the API's types. Unknown fields are kept in {@code json()}.
    */
   static Models.WebhookEventPayload readWebhookEvent(String payload) {
     JsonElement json;
@@ -2059,13 +2049,13 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   private static boolean isWebhookEvent(JsonElement json) {
     if (!(json instanceof JsonObject event) || !isString(event.get("id")) || !isString(event.get("type")) || !isString(event.get("projectId"))
-        || !(event.get("createdAt") instanceof JsonPrimitive createdAt && createdAt.isNumber()) || !(event.get("data") instanceof JsonObject data))
+        || !(event.get("createdAt") instanceof JsonPrimitive createdAt && createdAt.isNumber()))
       return false;
-    if (!optionalString(data, "severity", false) || !optionalString(data, "title", false)
-        || !optionalString(data, "description", true) || !optionalString(data, "assetId", true)) return false;
-    JsonElement asset = data.get("asset");
+    if (!optionalString(event, "severity", false) || !optionalString(event, "title", false)
+        || !optionalString(event, "description", true) || !optionalString(event, "assetId", true)) return false;
+    JsonElement asset = event.get("asset");
     if (asset != null && !asset.isJsonNull() && !(asset instanceof JsonObject snapshot && isString(snapshot.get("id")))) return false;
-    JsonElement facts = data.get("facts");
+    JsonElement facts = event.get("facts");
     if (facts == null) return true;
     if (!(facts instanceof JsonArray list)) return false;
     for (JsonElement fact : list)

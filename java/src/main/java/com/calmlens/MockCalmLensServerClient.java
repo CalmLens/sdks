@@ -427,8 +427,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
 
   /**
    * Queues the API's error response for {@code code}: its real HTTP status (from {@link
-   * ErrorCodes#httpStatus(String)}), the {@code {code, message, traceId}} body, an {@code
-   * X-Request-Id} and, for {@link ErrorCodes#IDEMPOTENT_REQUEST_IN_PROGRESS}, {@code Retry-After}.
+   * ErrorCodes#httpStatus(String)}), the {@code {code, message, requestId, details}} body, the
+   * same {@code X-Request-Id} and, for {@link ErrorCodes#IDEMPOTENT_REQUEST_IN_PROGRESS}, {@code Retry-After}.
    *
    * @param code a public API error code, such as {@link ErrorCodes#ASSET_NOT_FOUND}
    * @return this mock
@@ -438,10 +438,12 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     JsonObject body = new JsonObject();
     body.addProperty("code", code);
     body.addProperty("message", "Mock " + code);
-    body.addProperty("traceId", "trace_mock");
+    String requestId = requestId();
+    body.addProperty("requestId", requestId);
+    body.add("details", new JsonObject());
     byte[] json = Json.write(body).getBytes(StandardCharsets.UTF_8);
     String retryAfter = ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS.equals(code) ? "1" : null;
-    return add(null, null, new Transport.Response(status, headers("content-type", "application/json", "x-request-id", requestId(), "retry-after", retryAfter), json), null);
+    return add(null, null, new Transport.Response(status, headers("content-type", "application/json", "x-request-id", requestId, "retry-after", retryAfter), json), null);
   }
 
   /**
@@ -520,7 +522,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
       asset = api.asset(assetId);
     } catch (MockApi.Failure missing) {
       Transport.Response response = MockApi.error(missing);
-      throw new ApiException(missing.code, missing.getMessage(), Map.of("traceId", "trace_mock"), missing.status, response.headers(), null);
+      throw new ApiException(missing.code, missing.getMessage(), missing.details, missing.status, response.headers(), null);
     }
     long now = api.now();
     api.applyOutcome(asset, outcome, "requested", now);
@@ -560,7 +562,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     JsonObject event = new JsonObject();
     event.addProperty("id", api.createId("evt"));
     event.addProperty("projectId", projectId);
-    event.add("userId", null);
     event.addProperty("type", Objects.requireNonNull(type, "type"));
     event.addProperty("severity", "low");
     event.addProperty("title", type);
@@ -569,10 +570,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     JsonObject asset = assetId == null ? null : api.storage.assets.get(assetId);
     event.add("asset", asset == null ? null : MockApi.snapshot(asset));
     event.add("facts", MockApi.facts(java.util.Arrays.asList(facts)));
-    event.addProperty("notify", false);
     event.addProperty("createdAt", now);
-    event.addProperty("updatedAt", now);
-    event.add("readAt", null);
     api.storage.events.add(event);
     return Json.GSON.fromJson(event, Models.Event.class);
   }

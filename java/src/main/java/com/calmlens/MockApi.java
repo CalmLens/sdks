@@ -70,13 +70,14 @@ final class MockApi {
 
   private static final Set<String> JSON_QUERY = Set.of("metadata", "processingOptions", "context");
   private static final Set<String> INT_QUERY = Set.of("pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes");
-  private static final Set<String> BOOL_QUERY = Set.of("queue", "isFinal", "searchAll", "resolveOnly");
+  private static final Set<String> BOOL_QUERY = Set.of("queue", "isFinal");
   private static final Pattern ORDERING = Pattern.compile("ordering\\[(\\d+)]\\[(\\w+)]");
-  private static final Pattern IDS = Pattern.compile("ids\\[(\\d+)]");
   /** Like the API: 1 to 255 printable ASCII characters, without a space at either end. */
   private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[\\x21-\\x7e](?:[\\x20-\\x7e]{0,253}[\\x21-\\x7e])?");
   private static final long MIB = 1024 * 1024;
   private static final long MIN_PART_BYTES = 5 * MIB, MIN_MULTIPART_IMAGE_BYTES = 10 * MIB, MAX_IMAGE_BYTES = 20 * MIB;
+  /** Every API cursor list returns this many items unless {@code pageSize} says otherwise. */
+  private static final int DEFAULT_PAGE_SIZE = 50;
   private static final int MAX_PAGE_SIZE = 100, MAX_EVENTS_PAGE_SIZE = 100, MAX_FOLDER_PAGE_SIZE = 100;
   /**
    * The ThumbHash the mock gives every classified image, standing in for one computed from its
@@ -153,7 +154,7 @@ final class MockApi {
         case "GET hash-lists" -> Set.of("hashLists.list");
         case "POST hash-lists" -> Set.of("hashLists.create");
         case "GET assets/search" -> Set.of("assets.search");
-        case "GET assets/page" -> Set.of("assets.list", "assets.iterate");
+        case "GET assets" -> Set.of("assets.list", "assets.iterate");
         case "POST assets/batch" -> Set.of("assets.batch");
         case "POST assets" -> "false".equals(request.query().get("queue")) ? Set.of("assets.classify", "text.classify") : Set.of("assets.create");
         default -> Set.of();
@@ -233,21 +234,27 @@ final class MockApi {
   }
 
   private static Transport.Response respond(int status, String contentType, byte[] body, String... extra) {
+    return respond(MockCalmLensServerClient.requestId(), status, contentType, body, extra);
+  }
+
+  private static Transport.Response respond(String requestId, int status, String contentType, byte[] body, String... extra) {
     Map<String, List<String>> headers = new LinkedHashMap<>();
-    headers.put("X-Request-Id", List.of(MockCalmLensServerClient.requestId()));
+    headers.put("X-Request-Id", List.of(requestId));
     if (contentType != null) headers.put("Content-Type", List.of(contentType));
     headers.put("Content-Length", List.of(String.valueOf(body.length)));
     for (int i = 0; i < extra.length; i += 2) headers.put(extra[i], List.of(extra[i + 1]));
     return new Transport.Response(status, headers, body);
   }
 
+  /** The API's error body, {@code {code, message, requestId, details}}, with {@code requestId} as in the header. */
   static Transport.Response error(Failure failure) {
+    String requestId = MockCalmLensServerClient.requestId();
     JsonObject body = new JsonObject();
     body.addProperty("code", failure.code);
     body.addProperty("message", failure.getMessage());
-    if (failure.details != null && !failure.details.isEmpty()) body.add("details", Json.WRITE.toJsonTree(failure.details));
-    body.addProperty("traceId", "trace_mock");
-    return respond(failure.status, "application/json", Json.write(body).getBytes(StandardCharsets.UTF_8));
+    body.addProperty("requestId", requestId);
+    body.add("details", failure.details == null ? new JsonObject() : Json.WRITE.toJsonTree(failure.details));
+    return respond(requestId, failure.status, "application/json", Json.write(body).getBytes(StandardCharsets.UTF_8));
   }
 
   private static List<String> segments(String path) {
@@ -268,11 +275,9 @@ final class MockApi {
   private static JsonObject query(Map<String, String> raw) {
     JsonObject query = new JsonObject();
     TreeMap<Integer, JsonObject> ordering = new TreeMap<>();
-    TreeMap<Integer, String> ids = new TreeMap<>();
     raw.forEach((key, value) -> {
-      Matcher order = ORDERING.matcher(key), id = IDS.matcher(key);
+      Matcher order = ORDERING.matcher(key);
       if (order.matches()) ordering.computeIfAbsent(Integer.parseInt(order.group(1)), i -> new JsonObject()).addProperty(order.group(2), value);
-      else if (id.matches()) ids.put(Integer.parseInt(id.group(1)), value);
       else if (INT_QUERY.contains(key) && value.matches("-?\\d{1,18}")) query.addProperty(key, Long.parseLong(value));
       else if (BOOL_QUERY.contains(key) && (value.equals("true") || value.equals("false"))) query.addProperty(key, value.equals("true"));
       else if (JSON_QUERY.contains(key)) {
@@ -283,11 +288,6 @@ final class MockApi {
       JsonArray list = new JsonArray();
       ordering.values().forEach(list::add);
       query.add("ordering", list);
-    }
-    if (!ids.isEmpty()) {
-      JsonArray list = new JsonArray();
-      ids.values().forEach(list::add);
-      query.add("ids", list);
     }
     return query;
   }
@@ -346,7 +346,7 @@ final class MockApi {
         case "GET hash-lists": return page(projectHashLists(), q, Json.write(new JsonPrimitive(projectId + "/hash-lists")));
         case "POST hash-lists": return createHashList(body, now);
         case "GET assets/search": return search(q);
-        case "GET assets/page": {
+        case "GET assets": {
           String folderId = str(q, "folderId");
           String filter = str(q, "filter");
           List<JsonObject> items = projectAssets().stream().filter(asset -> folderId == null || folderId.equals(str(asset, "folderId"))).collect(Collectors.toList());
@@ -455,7 +455,6 @@ final class MockApi {
     String id = createId("asset");
     asset.addProperty("id", id);
     asset.addProperty("projectId", projectId);
-    asset.add("userId", JsonNull.INSTANCE);
     asset.add("parentId", JsonNull.INSTANCE);
     asset.add("folderId", nullable(str(o, "folderId")));
     asset.add("uploadPresetId", nullable(str(o, "uploadPresetId")));
@@ -651,7 +650,6 @@ final class MockApi {
     JsonObject event = new JsonObject();
     event.addProperty("id", createId("evt"));
     event.addProperty("projectId", projectId);
-    event.add("userId", JsonNull.INSTANCE);
     event.addProperty("type", type);
     event.addProperty("severity", severity);
     event.addProperty("title", type);
@@ -659,10 +657,7 @@ final class MockApi {
     event.add("assetId", asset == null ? JsonNull.INSTANCE : asset.get("id"));
     event.add("asset", asset == null ? JsonNull.INSTANCE : snapshot(asset));
     event.add("facts", facts(facts));
-    event.addProperty("notify", false);
     event.addProperty("createdAt", now);
-    event.addProperty("updatedAt", now);
-    event.add("readAt", JsonNull.INSTANCE);
     storage.events.add(event);
     return event;
   }
@@ -981,13 +976,13 @@ final class MockApi {
    * (the filter, folder or parent) and the ordering, so it only continues the query it came from.
    */
   private JsonObject page(List<JsonObject> items, JsonObject q, String scope) throws Failure {
-    long size = bounded(q, "pageSize", 10, MAX_PAGE_SIZE);
+    long size = bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     JsonArray ordering = new JsonArray();
     if (q.has("ordering")) q.getAsJsonArray("ordering").forEach(order -> ordering.add(order.deepCopy()));
     else {
       JsonObject newest = new JsonObject();
       newest.addProperty("field", "createdAt");
-      newest.addProperty("direction", "DESC");
+      newest.addProperty("direction", "desc");
       ordering.add(newest);
     }
     boolean byId = false;
@@ -995,7 +990,9 @@ final class MockApi {
       JsonObject order = element.getAsJsonObject();
       String field = str(order, "field");
       if (!"createdAt".equals(field) && !"id".equals(field)) throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Invalid ordering");
-      order.addProperty("direction", Objects.requireNonNullElse(str(order, "direction"), "ASC").toUpperCase(Locale.ROOT));
+      String direction = Objects.requireNonNullElse(str(order, "direction"), "asc");
+      if (!direction.equals("asc") && !direction.equals("desc")) throw Failure.validation(ErrorCodes.INVALID_VALUE, "ordering.direction");
+      order.addProperty("direction", direction);
       byId |= field.equals("id");
     }
     if (!byId) {
@@ -1008,7 +1005,7 @@ final class MockApi {
     for (JsonElement element : ordering) {
       String field = str(element.getAsJsonObject(), "field");
       Comparator<JsonObject> next = (a, b) -> compare(a.get(field), b.get(field));
-      comparator = comparator.thenComparing("DESC".equals(str(element.getAsJsonObject(), "direction")) ? next.reversed() : next);
+      comparator = comparator.thenComparing("desc".equals(str(element.getAsJsonObject(), "direction")) ? next.reversed() : next);
     }
     List<JsonObject> remaining = new ArrayList<>(items);
     remaining.sort(comparator);
@@ -1036,7 +1033,7 @@ final class MockApi {
         for (int i = 0; i < ordering.size(); i++) {
           JsonObject rule = ordering.get(i).getAsJsonObject();
           int result = compare(item.get(str(rule, "field")), boundary.get(i));
-          if (result != 0) return "DESC".equals(str(rule, "direction")) ? result < 0 : result > 0;
+          if (result != 0) return "desc".equals(str(rule, "direction")) ? result < 0 : result > 0;
         }
         return false;
       }).collect(Collectors.toList());
@@ -1135,27 +1132,26 @@ final class MockApi {
   /**
    * GET /projects/:id/folders, like the API: keyset pages ordered by {@code name} (by code point, the
    * default, ascending) or {@code createdAt}, with the folder ID breaking ties, and the ancestors
-   * needed to show the listed, selected and parent folders' paths.
+   * needed to show the listed and parent folders' paths.
    */
   private JsonObject listFolders(JsonObject q) throws Failure {
-    long size = bounded(q, "pageSize", MAX_FOLDER_PAGE_SIZE, MAX_FOLDER_PAGE_SIZE);
+    long size = bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_FOLDER_PAGE_SIZE);
     String parentId = str(q, "parentId"), search = Objects.requireNonNullElse(str(q, "search"), "").toLowerCase(Locale.ROOT);
-    boolean everywhere = bool(q, "searchAll") && !search.isEmpty(), resolveOnly = bool(q, "resolveOnly");
     JsonObject clause = new JsonObject();
     clause.addProperty("field", "name");
-    clause.addProperty("direction", "ASC");
+    clause.addProperty("direction", "asc");
     if (q.has("ordering")) {
       JsonArray requested = q.getAsJsonArray("ordering");
       if (requested.size() > 1) throw Failure.validation("validation/too-big", "ordering");
       JsonObject order = requested.get(0).getAsJsonObject();
-      String field = str(order, "field"), direction = Objects.requireNonNullElse(str(order, "direction"), "ASC");
+      String field = str(order, "field"), direction = Objects.requireNonNullElse(str(order, "direction"), "asc");
       if (!"name".equals(field) && !"createdAt".equals(field)) throw Failure.validation("validation/invalid-value", "ordering.0.field");
-      if (!direction.equals("ASC") && !direction.equals("DESC")) throw Failure.validation("validation/invalid-value", "ordering.0.direction");
+      if (!direction.equals("asc") && !direction.equals("desc")) throw Failure.validation("validation/invalid-value", "ordering.0.direction");
       clause.addProperty("field", field);
       clause.addProperty("direction", direction);
     }
     String field = str(clause, "field");
-    boolean descending = "DESC".equals(str(clause, "direction"));
+    boolean descending = "desc".equals(str(clause, "direction"));
     List<JsonObject> all = projectFolders();
     // Like the database: names compare by code point, so case matters, then IDs break ties.
     Comparator<JsonObject> order = field.equals("createdAt")
@@ -1164,13 +1160,12 @@ final class MockApi {
     order = order.thenComparing((JsonObject f) -> str(f, "id"), MockApi::byCodePoint);
     if (descending) order = order.reversed();
     List<JsonObject> found = all.stream()
-        .filter(f -> (everywhere || Objects.equals(str(f, "parentId"), parentId)) && Objects.requireNonNullElse(str(f, "name"), "").toLowerCase(Locale.ROOT).contains(search))
+        .filter(f -> Objects.equals(str(f, "parentId"), parentId) && Objects.requireNonNullElse(str(f, "name"), "").toLowerCase(Locale.ROOT).contains(search))
         .sorted(order).collect(Collectors.toList());
     JsonArray scope = new JsonArray();
     scope.add(projectId);
     scope.add(nullable(parentId));
     scope.add(search);
-    scope.add(everywhere);
     scope.add(clause);
     String cursor = str(q, "cursor");
     if (cursor != null && !cursor.isEmpty()) {
@@ -1186,10 +1181,9 @@ final class MockApi {
       Comparator<JsonObject> keyset = order;
       found = found.stream().filter(f -> keyset.compare(f, boundary) > 0).collect(Collectors.toList());
     }
-    List<JsonObject> page = resolveOnly ? List.of() : found.subList(0, (int) Math.min(size, found.size()));
-    boolean more = !resolveOnly && found.size() > size;
+    List<JsonObject> page = found.subList(0, (int) Math.min(size, found.size()));
+    boolean more = found.size() > size;
     Set<String> ids = new HashSet<>();
-    if (q.has("ids")) q.getAsJsonArray("ids").forEach(id -> ids.add(id.getAsString()));
     page.forEach(f -> ids.add(str(f, "id")));
     if (parentId != null) ids.add(parentId);
     List<String> pending = new ArrayList<>(ids);
@@ -1330,7 +1324,7 @@ final class MockApi {
         storage.hashListEntries.values().removeIf(entry -> id.equals(str(entry, "hashListId")));
         return null;
       case "GET entries": {
-        int pageSize = (int) bounded(q, "pageSize", 20, MAX_PAGE_SIZE);
+        int pageSize = (int) bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
         List<JsonObject> entries = storage.hashListEntries.values().stream().filter(entry -> id.equals(str(entry, "hashListId"))).collect(Collectors.toList());
         Collections.reverse(entries);
         String cursor = str(q, "cursor");
@@ -1355,7 +1349,7 @@ final class MockApi {
         for (String field : List.of("createdAt", "id")) {
           JsonObject order = new JsonObject();
           order.addProperty("field", field);
-          order.addProperty("direction", "DESC");
+          order.addProperty("direction", "desc");
           ordering.add(order);
         }
         page.add("ordering", ordering);
@@ -1463,7 +1457,7 @@ final class MockApi {
    * Without a cursor the page is empty and its {@code nextCursor} is the current position.
    */
   private JsonObject events(JsonObject q) throws Failure {
-    long pageSize = bounded(q, "pageSize", 50, MAX_EVENTS_PAGE_SIZE);
+    long pageSize = bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_EVENTS_PAGE_SIZE);
     List<JsonObject> feed = storage.events.stream().filter(e -> projectId.equals(str(e, "projectId"))).collect(Collectors.toList());
     int position = feed.size();
     String cursor = str(q, "cursor");

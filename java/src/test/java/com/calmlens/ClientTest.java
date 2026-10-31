@@ -68,17 +68,27 @@ class ClientTest {
   }
 
   /** The fields every SDK has are checked by errors.json and client-cases.json; these accessors are Java's own. */
-  @Test void apiErrorsExposeTheirMessageHeadersAndTraceId() {
+  @Test void apiErrorsExposeTheirMessageAndHeaders() {
     CalmLensServerClient client = client(request -> Fixtures.json(400,
-        "{\"code\":\"test/error\",\"message\":\"bad\",\"traceId\":\"trace\"}", Map.of("X-Request-Id", List.of("req_123"))));
+        "{\"code\":\"test/error\",\"message\":\"bad\",\"requestId\":\"req_123\",\"details\":{}}", Map.of("X-Request-Id", List.of("req_123"))));
     ApiException error = assertThrows(ApiException.class, () -> client.assets.retrieve(new Models.AssetId("asset")));
     assertEquals("[calmlens] bad", error.getMessage());
     assertEquals("req_123", error.getHeaders().get("x-request-id").get(0));
-    assertEquals("trace", error.getTraceId());
     assertFalse(error.isNotFound());
     ApiException missing = assertThrows(ApiException.class,
         () -> client(request -> Fixtures.json(404, "{\"code\":\"asset/not-found\"}")).assets.retrieve(new Models.AssetId("gone")));
     assertTrue(missing.isNotFound());
+  }
+
+  /** client-cases.json's body-request-ID case still sends the header, so the fallback is checked here. */
+  @Test void anApiErrorWithoutARequestIdHeaderTakesItFromItsBody() {
+    ApiException error = assertThrows(ApiException.class, () -> client(request -> Fixtures.json(404,
+        "{\"code\":\"asset/not-found\",\"message\":\"gone\",\"requestId\":\"req_body\",\"details\":{}}")).assets.retrieve(new Models.AssetId("gone")));
+    assertEquals("req_body", error.getRequestId());
+    ApiException withHeader = assertThrows(ApiException.class, () -> client(request -> Fixtures.json(404,
+        "{\"code\":\"asset/not-found\",\"message\":\"gone\",\"requestId\":\"req_body\",\"details\":{}}",
+        Map.of("X-Request-Id", List.of("req_header")))).assets.retrieve(new Models.AssetId("gone")));
+    assertEquals("req_header", withHeader.getRequestId());
   }
 
   @Test void argumentAndConfigurationErrorsHaveTheirOwnCodes() {

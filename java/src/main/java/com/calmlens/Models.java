@@ -449,7 +449,7 @@ public final class Models {
    * One ordering clause for list requests.
    *
    * @param field field name, such as {@code createdAt}
-   * @param direction {@code ASC} or {@code DESC}
+   * @param direction {@code asc} or {@code desc}
    */
   public record Order(String field, String direction) {
     /** An empty clause. */
@@ -458,7 +458,7 @@ public final class Models {
     /** @param field the field @return a copy ordering by this field */
     public Order field(String field) { return new Order(field, direction); }
 
-    /** @param direction {@code ASC} or {@code DESC} @return a copy with this direction */
+    /** @param direction {@code asc} or {@code desc} @return a copy with this direction */
     public Order direction(String direction) { return new Order(field, direction); }
   }
 
@@ -1551,25 +1551,16 @@ public final class Models {
     private Integer pageSize;
     private List<Order> ordering;
     private String search;
-    private Boolean searchAll;
-    private Boolean resolveOnly;
-    private List<String> ids;
     /** @param value lists this folder's children; unset lists the project root @return these options */
     public ListFolders parentId(String value) { parentId = value; return this; }
     /** @param value the previous page's {@code nextCursor} @return these options */
     public ListFolders cursor(String value) { cursor = value; return this; }
-    /** @param value folders per page, 1 to 100 (default 100) @return these options */
+    /** @param value folders per page, 1 to 100 (default 50) @return these options */
     public ListFolders pageSize(Integer value) { pageSize = value; return this; }
     /** @param value one clause ordering by {@code name} (the default, ascending) or {@code createdAt} @return these options */
     public ListFolders ordering(List<Order> value) { ordering = value; return this; }
     /** @param value case-insensitive text the folder name contains @return these options */
     public ListFolders search(String value) { search = value; return this; }
-    /** @param value whether {@code search} covers every folder rather than one parent's children @return these options */
-    public ListFolders searchAll(Boolean value) { searchAll = value; return this; }
-    /** @param value whether to return only the ancestors of {@code ids}, without a page of folders @return these options */
-    public ListFolders resolveOnly(Boolean value) { resolveOnly = value; return this; }
-    /** @param value folders whose paths to include in {@code ancestors} @return these options */
-    public ListFolders ids(List<String> value) { ids = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1723,7 +1714,6 @@ public final class Models {
    * @param type asset type, such as {@code image} or {@code plaintext-document}
    * @param folderId containing folder, or null at the project root
    * @param metadata metadata entries
-   * @param userId creating user, if any
    * @param parentId parent asset for derived assets such as images extracted from documents
    * @param uploadPresetId upload preset the asset was uploaded through, if any
    * @param createdAt creation time
@@ -1743,7 +1733,7 @@ public final class Models {
    */
   public record Asset(
       String id, String name, String projectId, String type, String folderId,
-      List<MetadataItem> metadata, String userId, String parentId, String uploadPresetId,
+      List<MetadataItem> metadata, String parentId, String uploadPresetId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, String externalId, String externalUrl, String authorId, ModerationContext context, List<String> tags,
@@ -1879,7 +1869,6 @@ public final class Models {
    * @param removalReason why the content was removed: {@code policy}, {@code retention}, {@code
    *     requested}, {@code parent-removed} or {@code disposed}; null while content is held
    * @param updatedAt when the content status last changed
-   * @param safetyTest whether this is a synthetic safety exercise asset
    * @param safetyHold safety hold, if any
    * @param format MIME type of the content
    * @param extension file extension of the content
@@ -1890,7 +1879,7 @@ public final class Models {
    */
   public record AssetContent(AssetContentStatus status, String removalReason,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
-      Boolean safetyTest, SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
+      SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
       AssetImage image, ExtractedText extractedText) {}
 
 
@@ -2288,7 +2277,7 @@ public final class Models {
     public ListHashLists() {}
     /** @param value the previous page's {@code nextCursor} @return these options */
     public ListHashLists cursor(String value) { cursor = value; return this; }
-    /** @param value hash lists per page, 1 to 100 (default 10) @return these options */
+    /** @param value hash lists per page, 1 to 100 (default 50) @return these options */
     public ListHashLists pageSize(Integer value) { pageSize = value; return this; }
     @Override public String toString() { return describe(this); }
   }
@@ -2428,31 +2417,25 @@ public final class Models {
   public record EventAssetContent(AssetContentStatus status) {}
 
   /**
-   * An event from the events feed.
+   * An event from the events feed. Webhook deliveries carry events in the same shape ({@link
+   * WebhookEventPayload}).
    *
    * @param id event ID; deliveries of the same event share it
-   * @param type event type, such as {@code asset.blocked}
-   * @param createdAt creation time
-   * @param updatedAt last update time
    * @param projectId owning project
-   * @param userId user who caused the event, if any
+   * @param type event type, such as {@code asset.blocked}
    * @param severity severity
    * @param title short summary
-   * @param description longer explanation
-   * @param assetId asset the event is about
-   * @param asset snapshot of the asset's decision; retrieve the asset for its current state
+   * @param description longer explanation, or null
+   * @param assetId asset the event is about, or null
+   * @param asset snapshot of the asset's decision, or null; retrieve the asset for its current state
    * @param facts registered facts (never null)
-   * @param notifies whether the event triggers portal notifications ({@code notify} in the API)
-   * @param readAt when it was marked as read in the portal
+   * @param createdAt creation time
    * @param json the event's JSON object as the API sent it, fields this SDK version does not model
    *     included; null for an event built in code
    */
-  public record Event(String id, String type,
-      @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
-      @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
-      String projectId, String userId, String severity, String title, String description,
-      String assetId, EventAsset asset, List<EventFact> facts, @SerializedName("notify") Boolean notifies,
-      @JsonAdapter(Json.EpochMillis.class) Instant readAt, Map<String, Object> json) {
+  public record Event(String id, String projectId, String type, String severity, String title, String description,
+      String assetId, EventAsset asset, List<EventFact> facts,
+      @JsonAdapter(Json.EpochMillis.class) Instant createdAt, Map<String, Object> json) {
     /** Copies facts; missing facts become an empty list. */
     public Event { facts = listOrEmpty(facts); json = json == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(json)); }
 
@@ -2460,27 +2443,23 @@ public final class Models {
      * An event built in code, without received JSON.
      *
      * @param id event ID
-     * @param type event type
-     * @param createdAt creation time
-     * @param updatedAt last update time
      * @param projectId owning project
-     * @param userId user who caused the event
+     * @param type event type
      * @param severity severity
      * @param title short summary
-     * @param description longer explanation
-     * @param assetId asset the event is about
-     * @param asset snapshot of the asset
+     * @param description longer explanation, or null
+     * @param assetId asset the event is about, or null
+     * @param asset snapshot of the asset, or null
      * @param facts registered facts
-     * @param notifies whether the event triggers portal notifications
-     * @param readAt when it was marked as read
+     * @param createdAt creation time
      */
-    public Event(String id, String type, Instant createdAt, Instant updatedAt, String projectId, String userId, String severity,
-        String title, String description, String assetId, EventAsset asset, List<EventFact> facts, Boolean notifies, Instant readAt) {
-      this(id, type, createdAt, updatedAt, projectId, userId, severity, title, description, assetId, asset, facts, notifies, readAt, null);
+    public Event(String id, String projectId, String type, String severity, String title, String description,
+        String assetId, EventAsset asset, List<EventFact> facts, Instant createdAt) {
+      this(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, null);
     }
 
     Event withJson(Map<String, Object> value) {
-      return new Event(id, type, createdAt, updatedAt, projectId, userId, severity, title, description, assetId, asset, facts, notifies, readAt, value);
+      return new Event(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, value);
     }
   }
 
@@ -2497,52 +2476,54 @@ public final class Models {
   }
 
   /**
-   * The event fields of a webhook delivery.
-   *
-   * @param severity severity
-   * @param title short summary
-   * @param description longer explanation
-   * @param assetId asset the event is about
-   * @param asset snapshot of the asset's decision; retrieve the asset for its current state
-   * @param facts registered facts (never null)
-   */
-  public record WebhookEventData(String severity, String title, String description, String assetId, EventAsset asset, List<EventFact> facts) {
-    /** Copies facts; missing facts become an empty list. */
-    public WebhookEventData { facts = listOrEmpty(facts); }
-  }
-
-  /**
-   * The JSON body of a webhook delivery. Get it from {@code CalmLensServerClient.parseWebhookEvent}.
-   * Serialized with Gson it is written as {@link #json()} when it has one, so fields this SDK
-   * version does not model survive.
+   * The JSON body of a webhook delivery: the event in the shape {@code events.list} returns it. Get
+   * it from {@code CalmLensServerClient.parseWebhookEvent}. Serialized with Gson it is written as
+   * {@link #json()} when it has one, so fields this SDK version does not model survive.
    *
    * @param id event ID; the same on every retry, so use it to skip duplicates
-   * @param type event type, such as {@code asset.blocked}
-   * @param createdAt event creation time
    * @param projectId owning project
-   * @param data event fields
+   * @param type event type, such as {@code asset.blocked}
+   * @param severity severity
+   * @param title short summary
+   * @param description longer explanation, or null
+   * @param assetId asset the event is about, or null
+   * @param asset snapshot of the asset's decision, or null; retrieve the asset for its current state
+   * @param facts registered facts (never null)
+   * @param createdAt event creation time
    * @param json the whole body as received (or as {@code toWebhookEventPayload} builds it), fields
    *     this SDK version does not model included; null for a payload built in code
    */
-  public record WebhookEventPayload(String id, String type,
-      @JsonAdapter(Json.EpochMillis.class) Instant createdAt, String projectId, WebhookEventData data, Map<String, Object> json) {
-    /** Copies the JSON object. */
-    public WebhookEventPayload { json = json == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(json)); }
+  public record WebhookEventPayload(String id, String projectId, String type, String severity, String title, String description,
+      String assetId, EventAsset asset, List<EventFact> facts,
+      @JsonAdapter(Json.EpochMillis.class) Instant createdAt, Map<String, Object> json) {
+    /** Copies facts and the JSON object; missing facts become an empty list. */
+    public WebhookEventPayload {
+      facts = listOrEmpty(facts);
+      json = json == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(json));
+    }
 
     /**
      * A payload built in code, without received JSON.
      *
      * @param id event ID
-     * @param type event type
-     * @param createdAt event creation time
      * @param projectId owning project
-     * @param data event fields
+     * @param type event type
+     * @param severity severity
+     * @param title short summary
+     * @param description longer explanation, or null
+     * @param assetId asset the event is about, or null
+     * @param asset snapshot of the asset, or null
+     * @param facts registered facts
+     * @param createdAt event creation time
      */
-    public WebhookEventPayload(String id, String type, Instant createdAt, String projectId, WebhookEventData data) {
-      this(id, type, createdAt, projectId, data, null);
+    public WebhookEventPayload(String id, String projectId, String type, String severity, String title, String description,
+        String assetId, EventAsset asset, List<EventFact> facts, Instant createdAt) {
+      this(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, null);
     }
 
-    WebhookEventPayload withJson(Map<String, Object> value) { return new WebhookEventPayload(id, type, createdAt, projectId, data, value); }
+    WebhookEventPayload withJson(Map<String, Object> value) {
+      return new WebhookEventPayload(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, value);
+    }
   }
 
   /**

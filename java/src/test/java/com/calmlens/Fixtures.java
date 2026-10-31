@@ -129,7 +129,9 @@ final class Fixtures {
     fields.add("requestId", error.getRequestId() == null ? JsonNull.INSTANCE : new JsonPrimitive(error.getRequestId()));
     java.util.Optional<java.time.Duration> retryAfter = error instanceof ApiException api ? api.getRetryAfter() : java.util.Optional.empty();
     fields.add("retryAfter", retryAfter.<JsonElement>map(delay -> new JsonPrimitive(delay.toSeconds())).orElse(JsonNull.INSTANCE));
-    fields.add("details", error.getDetails().isEmpty() ? JsonNull.INSTANCE : Json.GSON.toJsonTree(error.getDetails()));
+    // getDetails() is never null: an API error's empty details are {}, an SDK error without details has none.
+    boolean none = error.getDetails().isEmpty() && (error.getCode().startsWith("sdk/") || !(error instanceof ApiException));
+    fields.add("details", none ? JsonNull.INSTANCE : Json.GSON.toJsonTree(error.getDetails()));
     return fields;
   }
 

@@ -66,11 +66,11 @@ class StatefulMockTest {
     mock.client.assets.create(new Models.SubmitAsset("dog.png", Models.Content.bytes(PNG, "image/png")));
 
     Models.AssetPage first = mock.client.assets.list(new Models.ListAssets().folderId(folder.id()).pageSize(2)
-        .ordering(List.of(new Models.Order().field("createdAt").direction("ASC"))));
+        .ordering(List.of(new Models.Order().field("createdAt").direction("asc"))));
     assertEquals(List.of("cat-1.png", "cat-2.png"), first.items().stream().map(Models.Asset::name).toList());
     assertTrue(first.hasMore());
     Models.AssetPage second = mock.client.assets.list(new Models.ListAssets().folderId(folder.id()).pageSize(2).cursor(first.nextCursor())
-        .ordering(List.of(new Models.Order().field("createdAt").direction("ASC"))));
+        .ordering(List.of(new Models.Order().field("createdAt").direction("asc"))));
     assertEquals(List.of("cat-3.png"), second.items().stream().map(Models.Asset::name).toList());
     assertFalse(second.hasMore());
 

@@ -21,21 +21,25 @@ public class ApiException extends CalmLensException {
   private static final long serialVersionUID = 1L;
   private final int status;
   private final String requestId;
-  private final String traceId;
   private final transient Map<String, List<String>> headers;
   private final Duration retryAfter;
 
   ApiException(String code, String message, Map<String, Object> details, int status,
       Map<String, List<String>> headers, Throwable cause) {
+    this(code, message, details, status, headers, null, cause);
+  }
+
+  /** {@code bodyRequestId} is the error body's {@code requestId}, used when the response has no {@code X-Request-Id}. */
+  ApiException(String code, String message, Map<String, Object> details, int status,
+      Map<String, List<String>> headers, String bodyRequestId, Throwable cause) {
     super(code, message, details, cause);
     this.status = status;
     Map<String, List<String>> copy = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     if (headers != null)
       headers.forEach((name, values) -> { if (name != null && values != null) copy.put(name, List.copyOf(values)); });
     this.headers = Collections.unmodifiableMap(copy);
-    this.requestId = first(copy, "x-request-id");
-    Object trace = details == null ? null : details.get("traceId");
-    this.traceId = trace == null ? null : trace.toString();
+    String header = first(copy, "x-request-id");
+    this.requestId = header != null ? header : bodyRequestId;
     this.retryAfter = retryAfter(first(copy, "retry-after"));
   }
 
@@ -66,9 +70,6 @@ public class ApiException extends CalmLensException {
   @Override public int getStatus() { return status; }
 
   @Override public String getRequestId() { return requestId; }
-
-  /** @return the {@code traceId} from the error body, or null */
-  public String getTraceId() { return traceId; }
 
   /** @return the response headers, with case-insensitive names */
   public Map<String, List<String>> getHeaders() { return headers == null ? Map.of() : headers; }

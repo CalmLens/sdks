@@ -210,7 +210,7 @@ class ClientCasesTest {
             actual.remove("retryAfter");
           }
           assertEquals(want, actual, label);
-          if (expect.has("partialResult")) assertEquals(expect.get("partialResult"), Fixtures.withoutNulls(partial), label + ": yielded");
+          if (expect.has("partialResult")) assertEquals(Fixtures.withoutNulls(expect.get("partialResult")), Fixtures.withoutNulls(partial), label + ": yielded");
           break;
         }
         if (error != null) throw new AssertionError(label + ": " + error, error);

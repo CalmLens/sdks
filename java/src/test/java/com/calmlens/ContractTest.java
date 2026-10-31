@@ -197,7 +197,7 @@ class ContractTest {
           f.get("body").getAsString().getBytes(StandardCharsets.UTF_8), f.get("signature").getAsString(),
           f.get("timestamp").getAsString(), f.get("secret").getAsString(), f.get("now").getAsLong(), 300);
       assertEquals(f.get("expectedType").getAsString(), event.type());
-      assertEquals(f.get("expectedFactKey").getAsString(), event.data().facts().get(0).key());
+      assertEquals(f.get("expectedFactKey").getAsString(), event.facts().get(0).key());
     });
   }
 
@@ -212,19 +212,18 @@ class ContractTest {
   @TestFactory Stream<DynamicTest> webhookPayloadParsingContracts() throws Exception {
     return cases(array("webhooks.json", "payloads"), p -> p.getAsJsonObject("event").get("type").getAsString(), item -> {
       JsonObject expected = item.getAsJsonObject("payload");
-      JsonObject data = expected.getAsJsonObject("data");
       Models.WebhookEventPayload parsed = CalmLensServerClient.readWebhookEvent(expected.toString());
       assertEquals(expected.get("id").getAsString(), parsed.id());
-      assertEquals(expected.get("type").getAsString(), parsed.type());
-      assertEquals(Instant.ofEpochMilli(expected.get("createdAt").getAsLong()), parsed.createdAt());
       assertEquals(expected.get("projectId").getAsString(), parsed.projectId());
-      assertEquals(data.get("severity").getAsString(), parsed.data().severity());
-      assertEquals(data.get("title").getAsString(), parsed.data().title());
-      assertEquals(data.get("description").isJsonNull() ? null : data.get("description").getAsString(), parsed.data().description());
-      assertEquals(data.get("assetId").isJsonNull() ? null : data.get("assetId").getAsString(), parsed.data().assetId());
-      if (data.get("asset").isJsonNull()) assertNull(parsed.data().asset());
-      else assertEventAsset(data.getAsJsonObject("asset"), parsed.data().asset());
-      assertEquals(data.get("facts"), Json.GSON.toJsonTree(parsed.data().facts()));
+      assertEquals(expected.get("type").getAsString(), parsed.type());
+      assertEquals(expected.get("severity").getAsString(), parsed.severity());
+      assertEquals(expected.get("title").getAsString(), parsed.title());
+      assertEquals(string(expected, "description"), parsed.description());
+      assertEquals(string(expected, "assetId"), parsed.assetId());
+      if (expected.get("asset").isJsonNull()) assertNull(parsed.asset());
+      else assertEventAsset(expected.getAsJsonObject("asset"), parsed.asset());
+      assertEquals(expected.get("facts"), Json.GSON.toJsonTree(parsed.facts()));
+      assertEquals(Instant.ofEpochMilli(expected.get("createdAt").getAsLong()), parsed.createdAt());
     });
   }
 

@@ -15,6 +15,46 @@ public final class ErrorCodes {
   /** Age-restricted delivery needs confirmation (HTTP 403). */
   public static final String AGE_CONFIRMATION_REQUIRED = "viewer/age-confirmation-required";
 
+  /** {@code validation/invalid-type} (HTTP 400). */
+  public static final String INVALID_TYPE = "validation/invalid-type";
+  /** {@code validation/too-small} (HTTP 400). */
+  public static final String TOO_SMALL = "validation/too-small";
+  /** {@code validation/too-big} (HTTP 400). */
+  public static final String TOO_BIG = "validation/too-big";
+  /** {@code validation/invalid-format} (HTTP 400). */
+  public static final String INVALID_FORMAT = "validation/invalid-format";
+  /** {@code validation/invalid-value} (HTTP 400). */
+  public static final String INVALID_VALUE = "validation/invalid-value";
+  /** {@code validation/unknown-field} (HTTP 400). */
+  public static final String UNKNOWN_FIELD = "validation/unknown-field";
+  /** {@code validation/unsupported-content-type} (HTTP 415). */
+  public static final String UNSUPPORTED_CONTENT_TYPE = "validation/unsupported-content-type";
+  /** {@code validation/invalid-filter} (HTTP 400). */
+  public static final String INVALID_FILTER = "validation/invalid-filter";
+  /** {@code validation/invalid-ordering-field} (HTTP 400). */
+  public static final String INVALID_ORDERING_FIELD = "validation/invalid-ordering-field";
+  /** {@code misc/route-not-found} (HTTP 404). */
+  public static final String ROUTE_NOT_FOUND = "misc/route-not-found";
+  /** {@code misc/internal-error} (HTTP 500). */
+  public static final String INTERNAL_ERROR = "misc/internal-error";
+  /** {@code auth/unauthenticated} (HTTP 401). */
+  public static final String UNAUTHENTICATED = "auth/unauthenticated";
+  /** {@code auth/token-expired} (HTTP 401). */
+  public static final String TOKEN_EXPIRED = "auth/token-expired";
+  /** {@code auth/invalid-token} (HTTP 401). */
+  public static final String INVALID_TOKEN = "auth/invalid-token";
+  /** {@code search/unavailable} (HTTP 503). */
+  public static final String SEARCH_UNAVAILABLE = "search/unavailable";
+  /** {@code asset/invalid-transform} (HTTP 400). */
+  public static final String INVALID_TRANSFORM = "asset/invalid-transform";
+  /** {@code asset/invalid-transform-options} (HTTP 400). */
+  public static final String INVALID_TRANSFORM_OPTIONS = "asset/invalid-transform-options";
+  /** {@code asset/remote-url-redirect-limit} (HTTP 400). */
+  public static final String REMOTE_URL_REDIRECT_LIMIT = "asset/remote-url-redirect-limit";
+  /** {@code copyright/content-held} (HTTP 409). */
+  public static final String COPYRIGHT_CONTENT_HELD = "copyright/content-held";
+  /** {@code asset/api-key-missing-permission} (HTTP 403). */
+  public static final String DOWNLOAD_PERMISSION_REQUIRED = "asset/api-key-missing-permission";
   /** {@code validation/invalid-cursor} (HTTP 400). */
   public static final String INVALID_CURSOR = "validation/invalid-cursor";
 
@@ -195,6 +235,26 @@ public final class ErrorCodes {
   public static final String SDK_INVALID_WEBHOOK_PAYLOAD = "sdk/invalid-webhook-payload";
 
   private static final Map<String, Integer> STATUSES = Map.ofEntries(
+      Map.entry(INVALID_TYPE, 400),
+      Map.entry(TOO_SMALL, 400),
+      Map.entry(TOO_BIG, 400),
+      Map.entry(INVALID_FORMAT, 400),
+      Map.entry(INVALID_VALUE, 400),
+      Map.entry(UNKNOWN_FIELD, 400),
+      Map.entry(UNSUPPORTED_CONTENT_TYPE, 415),
+      Map.entry(INVALID_FILTER, 400),
+      Map.entry(INVALID_ORDERING_FIELD, 400),
+      Map.entry(ROUTE_NOT_FOUND, 404),
+      Map.entry(INTERNAL_ERROR, 500),
+      Map.entry(UNAUTHENTICATED, 401),
+      Map.entry(TOKEN_EXPIRED, 401),
+      Map.entry(INVALID_TOKEN, 401),
+      Map.entry(SEARCH_UNAVAILABLE, 503),
+      Map.entry(INVALID_TRANSFORM, 400),
+      Map.entry(INVALID_TRANSFORM_OPTIONS, 400),
+      Map.entry(REMOTE_URL_REDIRECT_LIMIT, 400),
+      Map.entry(COPYRIGHT_CONTENT_HELD, 409),
+      Map.entry(DOWNLOAD_PERMISSION_REQUIRED, 403),
       Map.entry(INVALID_CURSOR, 400),
       Map.entry(INVALID_VIEWER_CLAIMS, 400),
       Map.entry(AGE_CONFIRMATION_REQUIRED, 403),
