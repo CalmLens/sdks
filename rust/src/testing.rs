@@ -247,17 +247,17 @@ impl MockTransport {
         });
         match reply {
             Some(Reply::Response(mut response)) => {
-                if !response.headers.contains_key("x-request-id") {
+                // API errors the mock builds carry a request ID, in the header and the body;
+                // responses a test scripts are sent exactly as scripted.
+                if response.api_error && !response.headers.contains_key("x-request-id") {
                     let request_id = format!("mock-request-{number}");
-                    if response.api_error {
-                        if let Ok(Value::Object(mut error)) =
-                            serde_json::from_slice::<Value>(&response.body)
-                        {
-                            error.insert("requestId".into(), request_id.clone().into());
-                            response.body = serde_json::to_vec(&error)
-                                .expect("serializable mock response")
-                                .into();
-                        }
+                    if let Ok(Value::Object(mut error)) =
+                        serde_json::from_slice::<Value>(&response.body)
+                    {
+                        error.insert("requestId".into(), request_id.clone().into());
+                        response.body = serde_json::to_vec(&error)
+                            .expect("serializable mock response")
+                            .into();
                     }
                     response.headers.insert(
                         "x-request-id",

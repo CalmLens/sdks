@@ -7083,7 +7083,6 @@
             "details": {}
           },
           "headers": {
-            "x-request-id": "req-1",
             "content-type": "application/json"
           }
         }
@@ -7098,7 +7097,7 @@
             "error": {
               "code": "asset/not-found",
               "status": 404,
-              "requestId": "req-1",
+              "requestId": "req-body",
               "retryAfter": null,
               "details": {}
             }
