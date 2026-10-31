@@ -40,15 +40,17 @@ final class Webhooks
         ];
     }
 
-    /** The JSON body a webhook delivers for a stored event, such as one from `events->list`. */
+    /**
+     * The JSON body a webhook delivers for an event, such as one from `events->list`: the event in
+     * the same flat shape `events->list` returns it. Fields that are not part of that shape are left out.
+     */
     public static function toPayload(array $event): array
     {
         return [
-            'id' => $event['id'], 'type' => $event['type'], 'createdAt' => $event['createdAt'], 'projectId' => $event['projectId'],
-            'data' => [
-                'severity' => $event['severity'], 'title' => $event['title'], 'description' => $event['description'] ?? null,
-                'assetId' => $event['assetId'] ?? null, 'asset' => $event['asset'] ?? null, 'facts' => $event['facts'],
-            ],
+            'id' => $event['id'], 'projectId' => $event['projectId'], 'type' => $event['type'],
+            'severity' => $event['severity'], 'title' => $event['title'], 'description' => $event['description'] ?? null,
+            'assetId' => $event['assetId'] ?? null, 'asset' => $event['asset'] ?? null, 'facts' => $event['facts'],
+            'createdAt' => $event['createdAt'],
         ];
     }
 
@@ -101,30 +103,29 @@ final class Webhooks
         return json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
     }
 
-    /** The API's payload shape: required envelope fields and, when present, the types of known data fields. */
+    /** The API's event shape: the fields every event has and, when present, the types of the other known fields. */
     private static function isEvent(mixed $object): bool
     {
         if (!$object instanceof \stdClass || !is_string($object->id ?? null) || !is_string($object->type ?? null)
-            || !is_string($object->projectId ?? null) || !(is_int($object->createdAt ?? null) || is_float($object->createdAt ?? null))
-            || !($object->data ?? null) instanceof \stdClass) {
+            || !is_string($object->projectId ?? null) || !(is_int($object->createdAt ?? null) || is_float($object->createdAt ?? null))) {
             return false;
         }
-        $data = get_object_vars($object->data);
-        $nullableString = fn (string $key) => !array_key_exists($key, $data) || $data[$key] === null || is_string($data[$key]);
-        if ((array_key_exists('severity', $data) && !is_string($data['severity']))
-            || (array_key_exists('title', $data) && !is_string($data['title']))
+        $fields = get_object_vars($object);
+        $nullableString = fn (string $key) => !array_key_exists($key, $fields) || $fields[$key] === null || is_string($fields[$key]);
+        if ((array_key_exists('severity', $fields) && !is_string($fields['severity']))
+            || (array_key_exists('title', $fields) && !is_string($fields['title']))
             || !$nullableString('description') || !$nullableString('assetId')) {
             return false;
         }
-        if (array_key_exists('asset', $data) && $data['asset'] !== null
-            && (!$data['asset'] instanceof \stdClass || !is_string($data['asset']->id ?? null))) {
+        if (array_key_exists('asset', $fields) && $fields['asset'] !== null
+            && (!$fields['asset'] instanceof \stdClass || !is_string($fields['asset']->id ?? null))) {
             return false;
         }
-        if (array_key_exists('facts', $data)) {
-            if (!is_array($data['facts'])) {
+        if (array_key_exists('facts', $fields)) {
+            if (!is_array($fields['facts'])) {
                 return false;
             }
-            foreach ($data['facts'] as $fact) {
+            foreach ($fields['facts'] as $fact) {
                 if (!$fact instanceof \stdClass || !is_string($fact->key ?? null) || !property_exists($fact, 'value')
                     || (property_exists($fact, 'url') && !is_string($fact->url))) {
                     return false;
@@ -134,10 +135,10 @@ final class Webhooks
         return true;
     }
 
-    /** True for a test delivery: `data.facts` holds the fact `test` with the boolean value true. */
+    /** True for a test delivery: `facts` holds the fact `test` with the boolean value true. */
     public static function isTest(array $event): bool
     {
-        foreach ($event['data']['facts'] ?? [] as $fact) {
+        foreach ($event['facts'] ?? [] as $fact) {
             if (($fact['key'] ?? null) === 'test' && ($fact['value'] ?? null) === true) {
                 return true;
             }

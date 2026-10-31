@@ -166,20 +166,22 @@ foreach ($client->events->eachPage(['cursor' => $savedCursor]) as $page) {
 ```
 
 Every list returns a cursor page (`items`, `nextCursor`, `hasMore`): pass a page's `nextCursor`
-as `cursor` for the next one and treat it as opaque. Asset lists also take `pageSize`, `ordering`
-and `filter`. Child lists work the same way, as do hash lists (`hashLists->list`), hash list
+as `cursor` for the next one and treat it as opaque. Lists take `pageSize` (1 to 100, 50 by
+default); asset lists also take `ordering` (such as `[['field' => 'createdAt', 'direction' => 'desc']]`,
+with lowercase `asc` or `desc`) and `filter`. Child lists work the same way, as do hash lists (`hashLists->list`), hash list
 entries (`listEntries`, newest first) and folders (`folders->list`, ordered by `name` or
 `createdAt`, with the `ancestors` needed to show their paths). An event list without `cursor`
 returns no events and a `nextCursor` for the current feed position; save it to consume later
-events (`pageSize` 1 to 100, 50 by default).
+events.
 `assets->each` and `eachChild` stop at a page without a next cursor, with `hasMore` false or
 with no items, and `events->eachPage` when `hasMore` is false. Rather than loop, they throw
 `sdk/invalid-response` (with the repeated cursor in `details['cursor']`) when a page with more
 to follow returns a cursor they already sent, without yielding that page.
 
 Every error the SDK throws is a `CalmLens\CalmLensException` with `errorCode`, `status`
-(null without a response), `details`, `headers`, `requestId` (the `X-Request-Id` header;
-include it when contacting support) and the underlying exception in `getPrevious()`.
+(null without a response), `details` (the API error's details object, such as validation
+`issues`), `headers`, `requestId` (the `X-Request-Id` header, or the error body's `requestId`
+without it; include it when contacting support) and the underlying exception in `getPrevious()`.
 Helpers: `retryAfter()` (seconds from `Retry-After`, or null), `isNotFound()`,
 `isRetryable()` and `header($name)`. API error codes pass through unchanged; compare them
 with the constants in `CalmLens\ErrorCodes` (with each code's HTTP status in
@@ -257,7 +259,7 @@ $event = CalmLens\Webhooks::parseEvent(
     $_SERVER['HTTP_X_CALMLENS_TIMESTAMP'] ?? null,
     getenv('CALMLENS_WEBHOOK_SECRET'),
 );
-// Deduplicate using $event['id']; resource facts are in $event['data']['facts'].
+// Deduplicate using $event['id']; resource facts are in $event['facts'].
 ```
 
 Moderation sends `asset.classified` when classification finishes and one event per
@@ -272,14 +274,18 @@ headers verifies and a repeated timestamp does not. Verification uses the exact 
 constant-time HMAC comparison and a default timestamp tolerance of
 `Webhooks::SIGNATURE_TOLERANCE_SECONDS` (300); a tolerance of 0 accepts only the current
 second. `parseEvent` throws `sdk/invalid-webhook-payload` unless the body is an object with
-string `id`, `type` and `projectId`, a numeric `createdAt` and a `data` object whose known
-fields have the API's types. Retries of one delivery repeat its
+string `id`, `type` and `projectId` and a numeric `createdAt`, and its other known fields
+(`severity`, `title`, `description`, `assetId`, `asset` and `facts`) have the API's types. Retries of one delivery repeat its
 `x-calmlens-delivery` ID (`Webhooks::DELIVERY_HEADER`), so use it to skip duplicates. Future event types, extra fields and structured
 fact values are preserved. Test deliveries use the registered `test: true` fact;
 `Webhooks::isTest($event)` recognizes it.
 
-To test your receiver, `Webhooks::toPayload($event)` builds the body CalmLens delivers for a
-stored event (such as one from `events->list` or the mock's `enqueueEvent`), and
+A webhook body has the same flat shape as an `events->list` item: `id`, `projectId`, `type`,
+`severity`, `title`, `description`, `assetId`, `asset`, `facts` and `createdAt`, with
+`description`, `assetId` and `asset` null when absent.
+
+To test your receiver, `Webhooks::toPayload($event)` builds the body CalmLens delivers for an
+event (such as one from `events->list` or the mock's `enqueueEvent`), and
 `Webhooks::createHeaders($body, $deliveryId, $secret)` the signed headers for it.
 
 `$client->uploadTokens->sign(['uploadPresetId' => $presetId, 'externalId' => $id])`

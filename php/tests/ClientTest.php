@@ -209,7 +209,7 @@ final class ClientTest extends TestCase
         self::assertSame(['delivery-1', '1760000000'], [$headers[Webhooks::DELIVERY_HEADER], $headers[Webhooks::TIMESTAMP_HEADER]]);
         $parsed = Webhooks::parseEvent($body, null, null, 'secret', now: 1760000000, headers: $headers);
         self::assertSame(['evt_00000000000000000001', 'asset.allowed', 'project-1', 'low', 'asset.allowed', null, true],
-            [$parsed['id'], $parsed['type'], $parsed['projectId'], $parsed['data']['severity'], $parsed['data']['title'], $parsed['data']['assetId'], Webhooks::isTest($parsed)]);
+            [$parsed['id'], $parsed['type'], $parsed['projectId'], $parsed['severity'], $parsed['title'], $parsed['assetId'], Webhooks::isTest($parsed)]);
         $server = ['HTTP_X_CALMLENS_SIGNATURE' => $headers[Webhooks::SIGNATURE_HEADER], 'HTTP_X_CALMLENS_TIMESTAMP' => '1760000000'];
         self::assertTrue(Webhooks::verify($body, null, null, 'secret', now: 1760000000, headers: $server));
         $psr = ['X-CalmLens-Signature' => [$headers[Webhooks::SIGNATURE_HEADER]], 'X-CalmLens-Timestamp' => ['1760000000']];

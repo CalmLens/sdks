@@ -12,11 +12,14 @@ namespace CalmLens;
  */
 class CalmLensException extends \RuntimeException
 {
-    /** The `X-Request-Id` response header, when there was a response. Include it when contacting support. */
+    /**
+     * The request ID: the `X-Request-Id` response header, or the error body's `requestId` without
+     * it. Include it when contacting support.
+     */
     public readonly ?string $requestId;
 
     /**
-     * @param array $details extra API details, with the `traceId` when the API sent one; empty for transport errors.
+     * @param array $details the API error's `details` object, such as validation issues; empty for transport errors.
      * @param array<string, list<string>|string> $headers response headers (empty without a response).
      */
     public function __construct(

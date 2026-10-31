@@ -10,7 +10,7 @@ namespace CalmLens;
  */
 final class HashLists extends Resource
 {
-    /** One page of the project's hash lists; pass the page's `nextCursor` as `cursor` and a `pageSize` (1 to 100, 10 by default). */
+    /** One page of the project's hash lists; pass the page's `nextCursor` as `cursor` and a `pageSize` (1 to 100, 50 by default). */
     public function list(array $options = []): array
     {
         [$api, $request] = $this->split($options);

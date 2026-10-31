@@ -9,9 +9,9 @@ use CalmLens\Internal\Values;
 final class Folders extends Resource
 {
     /**
-     * One page of child folders (the project root without `parentId`), a name search, or the paths
-     * of `ids`. Pass the page's `nextCursor` as `cursor` for the next page; `pageSize` is 1 to 100
-     * (100 by default) and `ordering` one `name` (the default) or `createdAt` clause.
+     * One page of child folders (the project root without `parentId`), optionally matching a name
+     * `search`. Pass the page's `nextCursor` as `cursor` for the next page; `pageSize` is 1 to 100
+     * (50 by default) and `ordering` one `name` (the default) or `createdAt` clause.
      */
     public function list(array $options = []): array
     {

@@ -38,7 +38,7 @@ final class Assets extends Resource
     public function list(array $options = []): array
     {
         [$api, $request] = $this->split($options);
-        return $this->session->request('GET', $this->session->project('assets/page'), query: $api, options: $request);
+        return $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request);
     }
 
     public function listChildren(array $options): array

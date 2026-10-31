@@ -256,11 +256,9 @@ final class Session
         if (!is_array($data) || !is_string($data['code'] ?? null)) {
             return $this->responseError('sdk/http-error', 'HTTP ' . $response->getStatusCode(), $response);
         }
-        $details = is_array($data['details'] ?? null) ? $data['details'] : [];
-        if (is_string($data['traceId'] ?? null)) {
-            $details['traceId'] = $data['traceId'];
-        }
         return CalmLensException::create($data['code'], is_string($data['message'] ?? null) ? $data['message'] : $data['code'],
-            $response->getStatusCode(), $details, $response->getHeaders());
+            $response->getStatusCode(), is_array($data['details'] ?? null) ? $data['details'] : [], $response->getHeaders(),
+            requestId: $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id')
+                : (is_string($data['requestId'] ?? null) ? $data['requestId'] : null));
     }
 }

@@ -174,14 +174,18 @@ final class ContractTest extends TestCase
         }
     }
 
-    /** The error fields every runner compares, null where there is none. */
+    /**
+     * The error fields every runner compares, null where there is none. An API error's `details`
+     * is the body's object as sent (empty when there are none); PHP keeps an SDK error without
+     * details as an empty array too, which the fixtures write as null.
+     */
     private static function errorFields(\Throwable $error): array
     {
         self::assertInstanceOf(CalmLensException::class, $error, $error->getMessage());
         $retryAfter = $error->retryAfter();
         return ['code' => $error->errorCode, 'status' => $error->status, 'requestId' => $error->requestId,
             'retryAfter' => $retryAfter !== null && floor($retryAfter) === $retryAfter ? (int) $retryAfter : $retryAfter,
-            'details' => $error->details === [] ? null : $error->details];
+            'details' => $error->details === [] && str_starts_with($error->errorCode, 'sdk/') ? null : $error->details];
     }
 
     #[DataProvider('errors')]
@@ -286,6 +290,15 @@ final class ContractTest extends TestCase
         };
     }
 
+    /** An API error body's `details` is always an object; the decoded fixture holds an empty one as `[]`. */
+    private static function errorBody(mixed $body): mixed
+    {
+        if (is_array($body) && is_string($body['code'] ?? null) && ($body['details'] ?? null) === []) {
+            $body['details'] = new \stdClass();
+        }
+        return $body;
+    }
+
     private static function clientOptions(array $options): array
     {
         $named = ['apiKey' => $options['apiKey'], 'projectId' => $options['projectId']];
@@ -362,7 +375,7 @@ final class ContractTest extends TestCase
             }
             $status = $scripted['status'] ?? 200;
             $body = match (true) {
-                array_key_exists('body', $scripted) => json_encode($scripted['body'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                array_key_exists('body', $scripted) => json_encode(self::errorBody($scripted['body']), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                 array_key_exists('bodyBase64', $scripted) => base64_decode($scripted['bodyBase64'], true),
                 default => $scripted['bodyText'] ?? '',
             };
@@ -501,7 +514,7 @@ final class ContractTest extends TestCase
                 $event = Webhooks::parseEvent($entry['body'], $entry['signature'], $entry['timestamp'], $entry['secret'], now: $entry['now']);
                 self::assertSameJson(json_decode($entry['body'], true), $event);
                 self::assertSame($entry['expectedType'], $event['type']);
-                self::assertSame($entry['expectedFactKey'], $event['data']['facts'][0]['key']);
+                self::assertSame($entry['expectedFactKey'], $event['facts'][0]['key']);
                 return;
             case 'payloads':
                 self::assertSameJson($entry['payload'], Webhooks::toPayload($entry['event']));

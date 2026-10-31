@@ -90,6 +90,9 @@ final class MockServerClient
     private array $grants;
     private float $elapsed = 0.0;
     private int $requestCount = 0;
+    /** Every API cursor list returns this many items unless `pageSize` says otherwise. */
+    private const DEFAULT_PAGE_SIZE = 50;
+    private const MAX_PAGE_SIZE = 100;
     /** The status of the response being answered: 200, 201 for a new folder, hash list or entry, or 202 for a queued batch. */
     private int $status = 200;
     /** The status of the last response, null when the last request failed without one; the contract tests check it. */
@@ -230,7 +233,7 @@ final class MockServerClient
 
     /**
      * Adds an event to the feed returned by `events.list`. Omitted `id`, `projectId`, `severity`,
-     * `title`, `createdAt`, `updatedAt` and `facts` are filled in; when `assetId` names a stored
+     * `title`, `description`, `assetId`, `asset`, `facts` and `createdAt` are filled in; when `assetId` names a stored
      * asset, the event carries a snapshot of its status, as the API's events do. Pass the result to
      * `Webhooks::toPayload` to build a matching webhook body.
      */
@@ -241,7 +244,7 @@ final class MockServerClient
         $event += ['id' => ($this->createId)('evt'), 'projectId' => $this->projectId, 'severity' => 'low',
             'title' => $event['type'] ?? '', 'description' => null, 'assetId' => null,
             'asset' => is_string($assetId) && isset($this->assets[$assetId]) ? $this->snapshot($this->assets[$assetId]) : null,
-            'facts' => [], 'createdAt' => $now, 'updatedAt' => $now];
+            'facts' => [], 'createdAt' => $now];
         $this->events[] = $event;
         return $event;
     }
@@ -329,7 +332,7 @@ final class MockServerClient
                 'POST folders' => ['folders.create'],
                 'GET hash-lists' => ['hashLists.list'],
                 'POST hash-lists' => ['hashLists.create'],
-                'GET assets/page' => ['assets.list'],
+                'GET assets' => ['assets.list'],
                 'GET assets/search' => ['assets.search'],
                 'POST assets/batch' => ['assets.batch'],
                 'POST assets' => self::flag($query['queue'] ?? null) ? ['assets.create'] : ['assets.classify', 'text.classify'],
@@ -424,8 +427,7 @@ final class MockServerClient
     {
         if ($failure instanceof CalmLensException) {
             $status = $failure->status ?? ErrorCodes::STATUSES[$failure->errorCode] ?? 400;
-            return Create::promiseFor($this->json($status, ['code' => $failure->errorCode, 'message' => $failure->getMessage()]
-                + ($failure->details === [] ? [] : ['details' => $failure->details]), $failure->headers));
+            return Create::promiseFor($this->error($failure->errorCode, $failure->getMessage(), $status, $failure->details, $failure->headers, $failure->requestId));
         }
         if ($failure instanceof \Throwable) {
             return Create::rejectionFor($failure);
@@ -451,15 +453,19 @@ final class MockServerClient
 
     private function requestId(): string { return 'mock-request-' . ++$this->requestCount; }
 
-    private function json(int $status, mixed $data, array $headers = []): Response
+    private function json(int $status, mixed $data, array $headers = [], ?string $requestId = null): Response
     {
-        return new Response($status, ['Content-Type' => 'application/json', 'X-Request-Id' => $this->requestId()] + $headers,
+        return new Response($status, ['Content-Type' => 'application/json', 'X-Request-Id' => $requestId ?? $this->requestId()] + $headers,
             json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
-    private function error(string $code, string $message, ?int $status = null, array $details = []): Response
+    /** The API's error body: `{ code, message, requestId, details }`, `requestId` as in the `X-Request-Id` header. */
+    private function error(string $code, string $message, ?int $status = null, array $details = [], array $headers = [], ?string $requestId = null): Response
     {
-        return $this->json($status ?? ErrorCodes::STATUSES[$code] ?? 400, ['code' => $code, 'message' => $message] + ($details === [] ? [] : ['details' => $details]));
+        $requestId ??= $this->requestId();
+        $headers = array_filter($headers, fn ($name) => strcasecmp((string) $name, 'X-Request-Id') !== 0, ARRAY_FILTER_USE_KEY);
+        return $this->json($status ?? ErrorCodes::STATUSES[$code] ?? 400,
+            ['code' => $code, 'message' => $message, 'requestId' => $requestId, 'details' => (object) $details], $headers, $requestId);
     }
 
     private function api(RequestInterface $request, array $parts, array $query, array $json, string $body): ?array
@@ -478,7 +484,7 @@ final class MockServerClient
                 $route === 'POST folders' => $this->createFolder($json),
                 $route === 'GET hash-lists' => $this->page($this->hashLists, $query, $this->projectId . '/hash-lists'),
                 $route === 'POST hash-lists' => $this->createHashList($json),
-                $route === 'GET assets/page' => $this->listAssets($query),
+                $route === 'GET assets' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
                 $route === 'POST assets/batch' => $this->batch($json),
                 $route === 'POST assets' && $upload === '' => $this->createAsset($json, self::flag($query['queue'] ?? null), null, false),
@@ -644,7 +650,7 @@ final class MockServerClient
         $context = ModerationContext::select($decode('context')['items'] ?? []);
         // Fields the API returns as null when they are not set.
         $asset = [
-            'id' => ($this->createId)('asset'), 'projectId' => $this->projectId, 'userId' => null, 'parentId' => null,
+            'id' => ($this->createId)('asset'), 'projectId' => $this->projectId, 'parentId' => null,
             'folderId' => $options['folderId'] ?? null, 'uploadPresetId' => $options['uploadPresetId'] ?? null,
             'createdAt' => $now, 'updatedAt' => $now, 'name' => $options['name'] ?? null,
             'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,
@@ -768,7 +774,7 @@ final class MockServerClient
     {
         $decision = $json['decision'] ?? null;
         if (!is_string($decision) || !in_array($decision, self::DECISIONS, true)) {
-            self::invalid('validation/invalid-union', 'decision');
+            self::invalid('validation/invalid-value', 'decision');
         }
         if (!is_string($json['note'] ?? null)) {
             self::invalid('validation/invalid-type', 'note');
@@ -943,26 +949,30 @@ final class MockServerClient
      */
     private function page(array $items, array $query, string $scope): array
     {
-        $size = self::size($query, 'pageSize', 10, 100);
+        $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
         $items = array_values($items);
         if (($query['filter'] ?? '') !== '') {
             $items = array_values(array_filter($items, self::filter((string) $query['filter'])));
         }
-        $ordering = is_array($query['ordering'] ?? null) && $query['ordering'] !== [] ? array_values($query['ordering']) : [['field' => 'createdAt', 'direction' => 'DESC']];
-        foreach ($ordering as $order) {
+        $ordering = is_array($query['ordering'] ?? null) && $query['ordering'] !== [] ? array_values($query['ordering']) : [['field' => 'createdAt', 'direction' => 'desc']];
+        foreach ($ordering as $i => $order) {
             if (!in_array($order['field'] ?? null, ['createdAt', 'id'], true)) {
-                self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Invalid ordering');
+                self::fail(ErrorCodes::INVALID_ORDERING_FIELD, null, 'Invalid ordering', ['path' => "ordering.$i.field"]);
+            }
+            $ordering[$i]['direction'] ??= 'asc';
+            if (!in_array($ordering[$i]['direction'], ['asc', 'desc'], true)) {
+                self::invalid('validation/invalid-value', "ordering.$i.direction");
             }
         }
         if (!in_array('id', array_column($ordering, 'field'), true)) {
-            $ordering[] = ['field' => 'id', 'direction' => $ordering[0]['direction'] ?? 'ASC'];
+            $ordering[] = ['field' => 'id', 'direction' => $ordering[0]['direction']];
         }
         $compare = fn ($a, $b): int => is_string($a) || is_string($b) ? strcmp((string) $a, (string) $b) : $a <=> $b;
         usort($items, function (array $a, array $b) use ($ordering, $compare): int {
             foreach ($ordering as $order) {
                 $result = $compare($a[$order['field']] ?? null, $b[$order['field']] ?? null);
                 if ($result !== 0) {
-                    return strtoupper($order['direction'] ?? 'ASC') === 'DESC' ? -$result : $result;
+                    return $order['direction'] === 'desc' ? -$result : $result;
                 }
             }
             return 0;
@@ -980,7 +990,7 @@ final class MockServerClient
                 foreach ($ordering as $i => $order) {
                     $result = $compare($item[$order['field']] ?? null, $after[$i]);
                     if ($result !== 0) {
-                        return (strtoupper($order['direction'] ?? 'ASC') === 'DESC' ? -$result : $result) > 0;
+                        return ($order['direction'] === 'desc' ? -$result : $result) > 0;
                     }
                 }
                 return false;
@@ -1213,36 +1223,34 @@ final class MockServerClient
     }
 
     /**
-     * One page of a folder level (or a search) with its visible ancestors, like the API: keyset
+     * One page of a folder level (optionally matching a name search) with its visible ancestors, like the API: keyset
      * pages ordered by `name` (by code point, the default, ascending) or `createdAt`, with the
      * folder ID breaking ties. A cursor only continues the query it came from.
      */
     private function listFolders(array $query): array
     {
-        $size = self::size($query, 'pageSize', 100, 100);
+        $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
         $search = strtolower((string) ($query['search'] ?? ''));
-        $everywhere = $search !== '' && self::flag($query['searchAll'] ?? null);
         $parentId = $query['parentId'] ?? null;
-        $resolveOnly = self::flag($query['resolveOnly'] ?? null);
         $ordering = is_array($query['ordering'] ?? null) ? array_values($query['ordering']) : [];
         if (count($ordering) > 1) {
             self::invalid('validation/too-big', 'ordering');
         }
         $field = $ordering[0]['field'] ?? 'name';
-        $direction = $ordering[0]['direction'] ?? 'ASC';
+        $direction = $ordering[0]['direction'] ?? 'asc';
         if (!in_array($field, ['name', 'createdAt'], true)) {
             self::invalid('validation/invalid-value', 'ordering.0.field');
         }
-        if (!in_array($direction, ['ASC', 'DESC'], true)) {
+        if (!in_array($direction, ['asc', 'desc'], true)) {
             self::invalid('validation/invalid-value', 'ordering.0.direction');
         }
-        $sign = $direction === 'DESC' ? -1 : 1;
+        $sign = $direction === 'desc' ? -1 : 1;
         // Like the database: names compare by code point, so case matters; IDs break ties.
         $compare = fn ($a, $b, string $aId, string $bId): int => $sign * ((is_string($a) ? strcmp($a, (string) $b) : $a <=> $b) ?: strcmp($aId, $bId));
-        $found = array_values(array_filter($this->folders, fn ($folder) => ($everywhere || $folder['parentId'] === $parentId)
+        $found = array_values(array_filter($this->folders, fn ($folder) => $folder['parentId'] === $parentId
             && ($search === '' || str_contains(strtolower($folder['name']), $search))));
         usort($found, fn ($a, $b) => $compare($a[$field], $b[$field], $a['id'], $b['id']));
-        $signature = Values::json([$this->projectId, $parentId, $search, $everywhere, $field, $direction]);
+        $signature = Values::json([$this->projectId, $parentId, $search, $field, $direction]);
         if (isset($query['cursor']) && $query['cursor'] !== '') {
             $decoded = base64_decode((string) $query['cursor'], true);
             $cursor = $decoded === false ? null : json_decode($decoded, true);
@@ -1252,9 +1260,9 @@ final class MockServerClient
             }
             $found = array_values(array_filter($found, fn ($folder) => $compare($folder[$field], $cursor['value'], $folder['id'], $cursor['id']) > 0));
         }
-        $page = $resolveOnly ? [] : array_slice($found, 0, $size);
-        $more = !$resolveOnly && count($found) > $size;
-        $ids = array_fill_keys(array_merge(array_values((array) ($query['ids'] ?? [])), $parentId === null ? [] : [$parentId], array_column($page, 'id')), true);
+        $page = array_slice($found, 0, $size);
+        $more = count($found) > $size;
+        $ids = array_fill_keys(array_merge($parentId === null ? [] : [$parentId], array_column($page, 'id')), true);
         $queue = array_keys($ids);
         while ($queue !== []) {
             $parent = $this->folders[array_pop($queue)]['parentId'] ?? null;
@@ -1401,7 +1409,7 @@ final class MockServerClient
      */
     private function listEvents(array $query): array
     {
-        $size = self::size($query, 'pageSize', 50, 100);
+        $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
         if (!isset($query['cursor']) || $query['cursor'] === '') {
             return ['items' => [], 'nextCursor' => 'mock_' . count($this->events), 'hasMore' => false];
         }
