@@ -338,7 +338,7 @@ func (m *MockServerClient) recordReview(a calmlens.JSON, decision string, note a
 	moderation := section(section(a, "classification"), "moderation")
 	reviews, _ := moderation["manualReviews"].([]any)
 	moderation["manualReviews"] = append(reviews, calmlens.JSON{
-		"id": m.options.CreateID("rev"), "decision": decision, "note": note, "reviewerUserId": nil,
+		"id": m.options.CreateID("rev"), "decision": decision, "note": note,
 		"reviewerName": nil, "reviewerEmail": nil, "reviewedAt": now, "appliedToAsset": true,
 	})
 	if decision == OutcomePurged {
@@ -2245,7 +2245,7 @@ func (m *MockServerClient) createHashList(body calmlens.JSON, now int64) (any, e
 	if value, ok := body["description"].(string); ok {
 		description = value
 	}
-	list := calmlens.JSON{"id": m.options.CreateID("hl"), "projectId": m.options.ProjectID, "name": strings.TrimSpace(name), "description": description, "action": body["action"], "createdByUserId": nil, "createdAt": now, "updatedAt": now}
+	list := calmlens.JSON{"id": m.options.CreateID("hl"), "projectId": m.options.ProjectID, "name": strings.TrimSpace(name), "description": description, "action": body["action"], "createdAt": now, "updatedAt": now}
 	m.DatabaseStorage.HashLists[text(list["id"])] = list
 	return list, nil
 }
@@ -2357,7 +2357,7 @@ func (m *MockServerClient) addHashListEntry(id string, body calmlens.JSON, now i
 	if value, ok := body["label"].(string); ok {
 		label = value
 	}
-	entry := calmlens.JSON{"id": m.options.CreateID("hle"), "projectId": m.options.ProjectID, "hashListId": id, "hash": hash, "quality": quality, "label": label, "sourceAssetId": source, "createdByUserId": nil, "createdAt": now}
+	entry := calmlens.JSON{"id": m.options.CreateID("hle"), "projectId": m.options.ProjectID, "hashListId": id, "hash": hash, "quality": quality, "label": label, "sourceAssetId": source, "createdAt": now}
 	m.DatabaseStorage.HashListEntries[text(entry["id"])] = entry
 	m.status = http.StatusCreated
 	return entry, nil

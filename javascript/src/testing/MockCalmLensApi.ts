@@ -571,7 +571,6 @@ export class MockCalmLensApi {
         id: this.createId("rev"),
         decision,
         note: review?.note ?? null,
-        reviewerUserId: null,
         ...(review && { reviewerName: review.reviewerName, reviewerEmail: null }),
         reviewedAt: now,
         appliedToAsset: true,
@@ -929,7 +928,6 @@ export class MockCalmLensApi {
       name: name.trim(),
       description: typeof description === "string" ? description : null,
       action,
-      createdByUserId: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -1033,7 +1031,6 @@ export class MockCalmLensApi {
       quality,
       label: typeof body.label === "string" ? body.label : null,
       sourceAssetId: assetId ?? null,
-      createdByUserId: null,
       createdAt: this.now(),
     };
     this.hashListEntries.set(entry.id, entry);

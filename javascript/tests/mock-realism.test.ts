@@ -158,7 +158,6 @@ describe("MockCalmLensServerClient assets.decide", () => {
       expect.objectContaining({
         decision: "blocked",
         note: "Spam",
-        reviewerUserId: null,
         reviewerName: "An API key",
         appliedToAsset: true,
       }),

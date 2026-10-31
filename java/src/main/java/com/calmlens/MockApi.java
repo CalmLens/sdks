@@ -772,7 +772,6 @@ final class MockApi {
     review.addProperty("id", createId("rev"));
     review.addProperty("decision", decision);
     review.addProperty("note", note);
-    review.add("reviewerUserId", JsonNull.INSTANCE);
     review.addProperty("reviewerName", "API key");
     review.add("reviewerEmail", JsonNull.INSTANCE);
     review.addProperty("reviewedAt", now);
@@ -1300,7 +1299,6 @@ final class MockApi {
     list.addProperty("name", name.trim());
     list.add("description", nullable(str(body, "description")));
     list.addProperty("action", action);
-    list.add("createdByUserId", JsonNull.INSTANCE);
     list.addProperty("createdAt", now);
     list.addProperty("updatedAt", now);
     storage.hashLists.put(str(list, "id"), list);
@@ -1380,7 +1378,6 @@ final class MockApi {
         entry.add("quality", quality);
         entry.add("label", nullable(str(body, "label")));
         entry.add("sourceAssetId", nullable(assetId));
-        entry.add("createdByUserId", JsonNull.INSTANCE);
         entry.addProperty("createdAt", now);
         storage.hashListEntries.put(str(entry, "id"), entry);
         created = true;

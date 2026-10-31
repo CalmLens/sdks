@@ -587,7 +587,6 @@ class _AssetReviewRequired(TypedDict):
     id: str
     decision: AssetModerationDecision
     note: Optional[str]
-    reviewerUserId: Optional[str]
     reviewedAt: int
     appliedToAsset: bool
 
@@ -750,7 +749,6 @@ class _HashListRequired(TypedDict):
 class HashList(_HashListRequired, total=False):
     """A list of perceptual hashes that image uploads are compared with."""
     description: Optional[str]
-    createdByUserId: Optional[str]
     updatedAt: int
 
 
@@ -770,7 +768,6 @@ class HashListEntry(_HashListEntryRequired, total=False):
     label: Optional[str]
     #: The asset the hash was taken from, when it was added by ``assetId``.
     sourceAssetId: Optional[str]
-    createdByUserId: Optional[str]
 
 
 class HashListPage(TypedDict):

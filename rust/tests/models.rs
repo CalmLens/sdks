@@ -50,7 +50,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         "status": "completed",
         "updatedAt": 5,
         "moderation": {
-          "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "confirmed", "reviewerUserId": "user-9", "reviewedAt": 7, "appliedToAsset": true}],
+          "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "confirmed", "reviewedAt": 7, "appliedToAsset": true}],
           "status": "age-restricted",
           "categories": {
             "sexual": {
@@ -136,7 +136,6 @@ fn asset_nested_fields_decode_into_typed_models() {
             &moderation.status,
             &moderation.manual_reviews[0].decision,
             moderation.manual_reviews[0].note.as_deref(),
-            moderation.manual_reviews[0].reviewer_user_id.as_deref(),
             Some(moderation.manual_reviews[0].reviewed_at),
             asset.classification.completed_at
         ),
@@ -144,7 +143,6 @@ fn asset_nested_fields_decode_into_typed_models() {
             &AssetModerationStatus::AgeRestricted,
             &AssetModerationDecision::AgeRestricted,
             Some("confirmed"),
-            Some("user-9"),
             Some(7),
             Some(8)
         )
@@ -286,7 +284,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
       "classification": {
         "status": "paused",
         "moderation": {
-          "manualReviews": [{"id": "review-1", "decision": "deferred", "note": null, "reviewerUserId": null, "reviewedAt": 7, "appliedToAsset": true}],
+          "manualReviews": [{"id": "review-1", "decision": "deferred", "note": null, "reviewedAt": 7, "appliedToAsset": true}],
           "status": "escalated",
           "categories": {
             "spam": {

@@ -125,7 +125,6 @@ module CalmLens
     "id" => String,
     "decision" => asset_moderation_decision,
     "note" => String?,
-    "reviewerUserId" => String?,
     ?"reviewerName" => String?,
     ?"reviewerEmail" => String?,
     "reviewedAt" => Integer,
@@ -501,7 +500,6 @@ module CalmLens
     "name" => String,
     ?"description" => String?,
     "action" => hash_list_action,
-    ?"createdByUserId" => String?,
     "createdAt" => Integer,
     ?"updatedAt" => Integer
   }
@@ -524,7 +522,6 @@ module CalmLens
     "quality" => number?,
     ?"label" => String?,
     ?"sourceAssetId" => String?,
-    ?"createdByUserId" => String?,
     "createdAt" => Integer
   }
 

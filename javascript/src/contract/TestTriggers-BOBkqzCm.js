@@ -55,10 +55,9 @@ zod.object({
 	})])),
 	description: saneStringField({ type: "large" }).nullish().describe("What the list is for, such as the policy it enforces"),
 	action: HASH_LIST_ACTION_SCHEMA.describe(`What a match does: \`flag\` reports it without changing the decision, \`block\` blocks matches 16 bits apart or fewer and flags looser ones`),
-	createdByUserId: idField("user").nullish().describe("ID of the user who created the list"),
 	createdAt: createdAtField().describe("When the list was created, in milliseconds since the Unix epoch"),
 	updatedAt: updatedAtField().describe("When the list was last updated, in milliseconds since the Unix epoch")
-});
+}).extend({ createdByUserId: idField("user").nullish() });
 zod.object({
 	id: primaryIdField("hle").describe("Unique entry ID"),
 	projectId: idField("proj").describe("ID of the project that owns the entry"),
@@ -70,9 +69,8 @@ zod.object({
 	quality: zod.number().int().min(0).max(100).nullable().describe(`PDQ quality of the hash from 0 to 100, or \`null\` when it was added without one. Entries below 50 are never matched.`),
 	label: saneStringField({ type: "medium" }).nullish().describe("Your own note or reference for the entry"),
 	sourceAssetId: idField("asset").nullish().describe("ID of the asset the hash was taken from, when it was added from an asset"),
-	createdByUserId: idField("user").nullish().describe("ID of the user who added the entry"),
 	createdAt: createdAtField().describe("When the entry was added, in milliseconds since the Unix epoch")
-});
+}).extend({ createdByUserId: idField("user").nullish() });
 /**
 * Where a match came from. Project hash lists are the only source today; shared industry lists
 * join this enum as they are connected.

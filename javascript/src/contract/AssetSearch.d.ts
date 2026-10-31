@@ -125,7 +125,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             purged: "purged";
           }>;
           note: zod.ZodNullable<zod.ZodString>;
-          reviewerUserId: zod.ZodNullable<zod.ZodString>;
           reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
           reviewerEmail: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
           reviewedAt: zod.ZodNumber;

@@ -635,7 +635,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._apply_outcome(record, decision, "requested")
         now = self.now()
         review: dict[str, Any] = {"id": self.create_id("rev"), "decision": decision, "note": note,
-                                  "reviewerUserId": None, "reviewedAt": now, "appliedToAsset": True}
+                                  "reviewedAt": now, "appliedToAsset": True}
         reviewer_facts: list[dict[str, Any]] = []
         if reviewer_name is not None:
             review.update(reviewerName=reviewer_name, reviewerEmail=None)
@@ -1252,7 +1252,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "A hash list needs a name and an action of flag or block")
         hash_list = {"id": self.create_id("hl"), "projectId": self.project_id, "name": name.strip(),
                      "description": description if isinstance(description, str) else None, "action": action,
-                     "createdByUserId": None, "createdAt": now, "updatedAt": now}
+                     "createdAt": now, "updatedAt": now}
         self.database_storage.hash_lists[hash_list["id"]] = cast(HashList, hash_list)
         return hash_list
 
@@ -1305,7 +1305,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         entry = {"id": self.create_id("hle"), "projectId": self.project_id, "hashListId": hash_list["id"],
                  "hash": hash_value, "quality": quality,
                  "label": body["label"] if isinstance(body.get("label"), str) else None,
-                 "sourceAssetId": asset_id, "createdByUserId": None, "createdAt": self.now()}
+                 "sourceAssetId": asset_id, "createdAt": self.now()}
         entries[entry["id"]] = cast(HashListEntry, entry)
         return _Answer(201, entry)
 

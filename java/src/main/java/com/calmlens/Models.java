@@ -1840,7 +1840,7 @@ public final class Models {
    * @param reviewerName the reviewer's display name, when known
    * @param reviewerEmail the reviewer's email address, when known
    */
-  public record AssetReview(String id, AssetModerationDecision decision, String note, String reviewerUserId,
+  public record AssetReview(String id, AssetModerationDecision decision, String note,
       String reviewerName, String reviewerEmail,
       @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean appliedToAsset) {}
 
@@ -2230,12 +2230,10 @@ public final class Models {
    * @param name name
    * @param description description, or null
    * @param action what matches do
-   * @param createdByUserId the user who created it, or null when created with an API key
    * @param createdAt creation time
    * @param updatedAt last update time
    */
   public record HashList(String id, String projectId, String name, String description, HashListAction action,
-      String createdByUserId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt) {}
 
@@ -2249,11 +2247,10 @@ public final class Models {
    * @param quality the hash's quality from 0 to 100, or null when unknown
    * @param label label, or null
    * @param sourceAssetId the asset the hash was taken from, or null
-   * @param createdByUserId the user who added it, or null when added with an API key
    * @param createdAt when it was added
    */
   public record HashListEntry(String id, String projectId, String hashListId, String hash, Integer quality,
-      String label, String sourceAssetId, String createdByUserId,
+      String label, String sourceAssetId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt) {}
 
   /**

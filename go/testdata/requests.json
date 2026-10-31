@@ -1469,7 +1469,6 @@
           "name": "Removed images",
           "description": null,
           "action": "block",
-          "createdByUserId": null,
           "createdAt": 1760000000000,
           "updatedAt": 1760000000000
         }
@@ -1502,7 +1501,6 @@
           "name": "Removed images",
           "description": null,
           "action": "block",
-          "createdByUserId": null,
           "createdAt": 1760000000000,
           "updatedAt": 1760000000000
         }
@@ -1529,7 +1527,6 @@
       "name": "Removed images",
       "description": null,
       "action": "block",
-      "createdByUserId": null,
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -1555,7 +1552,6 @@
       "name": "Removed images",
       "description": null,
       "action": "block",
-      "createdByUserId": null,
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -1582,7 +1578,6 @@
       "name": "Removed images",
       "description": null,
       "action": "block",
-      "createdByUserId": null,
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -1626,7 +1621,6 @@
           "quality": 90,
           "label": null,
           "sourceAssetId": null,
-          "createdByUserId": null,
           "createdAt": 1760000000000
         }
       ],
@@ -1659,7 +1653,6 @@
       "quality": 90,
       "label": null,
       "sourceAssetId": null,
-      "createdByUserId": null,
       "createdAt": 1760000000000
     }
   },
@@ -1687,7 +1680,6 @@
       "quality": 90,
       "label": null,
       "sourceAssetId": null,
-      "createdByUserId": null,
       "createdAt": 1760000000000
     }
   },
@@ -1867,7 +1859,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -2423,7 +2414,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -3018,7 +3008,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -3600,7 +3589,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -4215,7 +4203,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -4781,7 +4768,6 @@
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
                     "decision": "allowed",
                     "note": "example",
-                    "reviewerUserId": "example",
                     "reviewerName": "example",
                     "reviewerEmail": "example",
                     "reviewedAt": 1,
@@ -5353,7 +5339,6 @@
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
                   "decision": "allowed",
                   "note": "example",
-                  "reviewerUserId": "example",
                   "reviewerName": "example",
                   "reviewerEmail": "example",
                   "reviewedAt": 1,
@@ -5931,7 +5916,6 @@
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
                   "decision": "allowed",
                   "note": "example",
-                  "reviewerUserId": "example",
                   "reviewerName": "example",
                   "reviewerEmail": "example",
                   "reviewedAt": 1,
@@ -6503,7 +6487,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -7059,7 +7042,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -7615,7 +7597,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -8176,7 +8157,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -8732,7 +8712,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -9291,7 +9270,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -9882,7 +9860,6 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerUserId": "example",
               "reviewerName": "example",
               "reviewerEmail": "example",
               "reviewedAt": 1,
@@ -10524,7 +10501,6 @@
           "name": "example",
           "description": "example",
           "action": "flag",
-          "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
           "createdAt": 1767225600000,
           "updatedAt": 1767225900000
         }
@@ -10558,7 +10534,6 @@
       "name": "example",
       "description": "example",
       "action": "flag",
-      "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -10585,7 +10560,6 @@
       "name": "example",
       "description": "example",
       "action": "flag",
-      "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -10613,7 +10587,6 @@
       "name": "example",
       "description": "example",
       "action": "flag",
-      "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -10645,7 +10618,6 @@
           "quality": 1,
           "label": "example",
           "sourceAssetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-          "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
           "createdAt": 1767225600000
         }
       ],
@@ -10685,7 +10657,6 @@
       "quality": 1,
       "label": "example",
       "sourceAssetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-      "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
       "createdAt": 1767225600000
     },
     "fullModel": true

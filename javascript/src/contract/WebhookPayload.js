@@ -3,7 +3,7 @@ import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM
 import "./SharedConstants-CyiUWW66.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
-import { C as msg, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, w as docPropertyInfo, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-bcNuce4c.js";
+import { C as msg, S as updatedAtField, _ as POLICY_RESTRICTION_SCHEMA, b as createdAtField, d as CLASSIFICATION_REPORT_SCHEMA, f as MODERATION_POLICY_CATEGORIES, g as POLICY_ALLOWANCE_SCHEMA, h as FLAGGED_CONTENT_ACTION_SCHEMA, m as PROCESSING_FEATURES_SCHEMA, p as MODERATION_POLICY_CATEGORY_SCHEMA, t as TEST_INPUT_KEY_PATTERN, v as getModerationQualifiers, w as docPropertyInfo, x as saneStringField, y as HASH_LIST_ACTION_SCHEMA } from "./TestTriggers-BOBkqzCm.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DjKQmOVp.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
@@ -400,12 +400,13 @@ const ASSET_REVIEW_SCHEMA = zod.object({
 	id: idField("rev"),
 	decision: ASSET_MODERATION_DECISION_SCHEMA,
 	note: zod.string().nullable(),
-	reviewerUserId: zod.string().nullable(),
 	reviewerName: zod.string().nullish(),
 	reviewerEmail: zod.string().nullish(),
 	reviewedAt: zod.number().int(),
 	appliedToAsset: zod.boolean()
 });
+/** A review as stored and shown in the portal: the API shape plus the reviewer's account. */
+const STORED_ASSET_REVIEW_SCHEMA = ASSET_REVIEW_SCHEMA.extend({ reviewerUserId: zod.string().nullable() });
 /**
 * Whether CalmLens holds the asset's content (source, preview and extracted text): kept only until
 * processing finishes (`temporary`), retained (`stored`) or deleted (`removed`).
@@ -559,7 +560,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	classificationStatus: ASSET_CLASSIFICATION_STATUS_SCHEMA,
 	classificationUpdatedAt: zod.number().nullish(),
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
-	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
+	manualReviews: zod.array(STORED_ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
 	reviewRevision: zod.number().int().default(0).meta(metaStore([backfill({ value: 0 })])),
 	completedAt: zod.number().int().nullish(),
 	contentStatus: ASSET_CONTENT_STATUS_SCHEMA,
@@ -701,6 +702,7 @@ STORED_ASSET_SCHEMA.pick({
 	}
 })])).extend({
 	userId: STORED_ASSET_SCHEMA.shape.userId,
+	classification: ASSET_CLASSIFICATION_SCHEMA.extend({ moderation: ASSET_MODERATION_SCHEMA.extend({ manualReviews: zod.array(ASSET_REVIEW_SCHEMA.extend({ reviewerUserId: zod.string().nullish() })) }) }),
 	content: ASSET_CONTENT_SCHEMA.extend({ safetyTest: zod.boolean().optional().describe("Marks a synthetic back-office safety exercise asset") })
 });
 /**

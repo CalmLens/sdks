@@ -141,7 +141,7 @@ module CalmLens
       # then (for `purged`) the content removal and its event, then `asset.<decision>`.
       def record_decision(item, decision, note, reviewer_name)
         apply_outcome(item, decision, 'requested')
-        review = { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => note, 'reviewerUserId' => nil,
+        review = { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => note,
                    'reviewedAt' => @now.call, 'appliedToAsset' => true }
         reviewer_facts = []
         if reviewer_name
@@ -797,7 +797,7 @@ module CalmLens
         now = @now.call
         item = { 'id' => @create_id.call('hl'), 'projectId' => @project_id, 'name' => name.strip,
                  'description' => json['description'].is_a?(String) ? json['description'] : nil,
-                 'action' => json['action'], 'createdByUserId' => nil, 'createdAt' => now, 'updatedAt' => now }
+                 'action' => json['action'], 'createdAt' => now, 'updatedAt' => now }
         @state.hash_lists[item['id']] = item
         # Like the API, a new hash list is 201 Created.
         respond(201, deep_copy(item))
@@ -847,7 +847,7 @@ module CalmLens
 
         entry = { 'id' => @create_id.call('hle'), 'projectId' => @project_id, 'hashListId' => list['id'], 'hash' => hash,
                   'quality' => quality, 'label' => json['label'].is_a?(String) ? json['label'] : nil,
-                  'sourceAssetId' => asset_id, 'createdByUserId' => nil, 'createdAt' => @now.call }
+                  'sourceAssetId' => asset_id, 'createdAt' => @now.call }
         @state.hash_list_entries[entry['id']] = entry
         respond(201, deep_copy(entry))
       end

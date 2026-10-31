@@ -51,7 +51,7 @@ class ModelsTest {
     "status": "completed",
     "updatedAt": 1700000000100,
     "moderation": {
-      "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "fine", "reviewerUserId": "user-2", "reviewedAt": 1700000000200, "appliedToAsset": true}],
+      "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "fine", "reviewedAt": 1700000000200, "appliedToAsset": true}],
       "status": "age-restricted",
       "categories": {
         "harassment": {
@@ -77,7 +77,6 @@ class ModelsTest {
     assertSame(Models.AssetModerationStatus.AGE_RESTRICTED, moderation.status());
     assertSame(Models.AssetModerationDecision.AGE_RESTRICTED, moderation.manualReviews().get(0).decision());
     assertEquals("fine", moderation.manualReviews().get(0).note());
-    assertEquals("user-2", moderation.manualReviews().get(0).reviewerUserId());
     assertEquals(Instant.ofEpochMilli(1700000000200L), moderation.manualReviews().get(0).reviewedAt());
     assertEquals(Instant.ofEpochMilli(1700000000300L), asset.classification().completedAt());
     assertEquals(0.7, moderation.categories().get("harassment").score());

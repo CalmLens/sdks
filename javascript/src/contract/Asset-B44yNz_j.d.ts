@@ -153,7 +153,6 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
       purged: "purged";
     }>;
     note: zod.ZodNullable<zod.ZodString>;
-    reviewerUserId: zod.ZodNullable<zod.ZodString>;
     reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     reviewerEmail: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     reviewedAt: zod.ZodNumber;
@@ -9229,7 +9228,6 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
         purged: "purged";
       }>;
       note: zod.ZodNullable<zod.ZodString>;
-      reviewerUserId: zod.ZodNullable<zod.ZodString>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       reviewerEmail: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       reviewedAt: zod.ZodNumber;
@@ -18570,7 +18568,6 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
           purged: "purged";
         }>;
         note: zod.ZodNullable<zod.ZodString>;
-        reviewerUserId: zod.ZodNullable<zod.ZodString>;
         reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         reviewerEmail: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         reviewedAt: zod.ZodNumber;

@@ -269,7 +269,7 @@ final class MockServerClient
             return $asset;
         }
         $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)('rev'), 'decision' => $outcome,
-            'note' => null, 'reviewerUserId' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
+            'note' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
         $this->assets[$assetId] = $asset;
         if ($outcome === 'purged') {
             $this->lifecycleEvent('asset.content-removed', $asset);
@@ -805,7 +805,7 @@ final class MockServerClient
         }
         $asset['classification']['moderation']['status'] = $decision;
         $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)('rev'), 'decision' => $decision,
-            'note' => $note, 'reviewerUserId' => null, 'reviewerName' => 'API key', 'reviewerEmail' => null,
+            'note' => $note, 'reviewerName' => 'API key', 'reviewerEmail' => null,
             'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
         $asset = $this->assets[$asset['id']] = $this->touch($asset);
         if ($decision === 'purged') {
@@ -1333,7 +1333,7 @@ final class MockServerClient
         $now = ($this->now)();
         $list = ['id' => ($this->createId)('hl'), 'projectId' => $this->projectId, 'name' => trim($name),
             'description' => is_string($json['description'] ?? null) ? $json['description'] : null, 'action' => $json['action'],
-            'createdByUserId' => null, 'createdAt' => $now, 'updatedAt' => $now];
+            'createdAt' => $now, 'updatedAt' => $now];
         // Like the API, a new hash list is 201 Created.
         $this->status = 201;
         return $this->hashLists[$list['id']] = $list;
@@ -1398,7 +1398,7 @@ final class MockServerClient
         }
         $entry = ['id' => ($this->createId)('hle'), 'projectId' => $this->projectId, 'hashListId' => $list['id'], 'hash' => $hash,
             'quality' => $quality, 'label' => is_string($json['label'] ?? null) ? $json['label'] : null,
-            'sourceAssetId' => $assetId, 'createdByUserId' => null, 'createdAt' => ($this->now)()];
+            'sourceAssetId' => $assetId, 'createdAt' => ($this->now)()];
         $this->status = 201;
         return $this->hashListEntries[$entry['id']] = $entry;
     }

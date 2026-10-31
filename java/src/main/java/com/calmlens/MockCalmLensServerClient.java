@@ -532,7 +532,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
       review.addProperty("id", api.createId("rev"));
       review.addProperty("decision", outcome.value());
       review.add("note", null);
-      review.add("reviewerUserId", null);
       review.addProperty("reviewedAt", now);
       review.addProperty("appliedToAsset", true);
       asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);

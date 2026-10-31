@@ -711,7 +711,7 @@ impl Backend {
             .as_array_mut()
             .expect("array")
             .push(json!({
-                "id": review_id, "decision": decision, "note": note, "reviewerUserId": null,
+                "id": review_id, "decision": decision, "note": note,
                 "reviewerName": null, "reviewerEmail": null, "reviewedAt": now,
                 "appliedToAsset": true,
             }));
@@ -1370,7 +1370,6 @@ impl Backend {
             "name": name,
             "description": body.get("description").filter(|value| value.is_string()),
             "action": action,
-            "createdByUserId": null,
             "createdAt": now,
             "updatedAt": now,
         });
@@ -1513,7 +1512,6 @@ impl Backend {
             "quality": quality,
             "label": body.get("label").filter(|value| value.is_string()),
             "sourceAssetId": asset_id,
-            "createdByUserId": null,
             "createdAt": now,
         });
         self.storage.hash_list_entries.push(entry.clone());

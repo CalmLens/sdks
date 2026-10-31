@@ -66,7 +66,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
     "status": "completed",
     "updatedAt": 1760000000500,
     "moderation": {
-      "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "Fine", "reviewerUserId": "user-1", "reviewedAt": 1760000000700, "appliedToAsset": true}],
+      "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "Fine", "reviewedAt": 1760000000700, "appliedToAsset": true}],
       "status": "age-restricted",
       "categories": {
         "sexual": {
@@ -132,7 +132,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 		t.Fatalf("processing: %+v", p)
 	}
 	if m := a.Classification.Moderation; m.Status != ModerationStatusAgeRestricted || m.ManualReviews[0].Decision != ModerationDecisionAgeRestricted ||
-		*m.ManualReviews[0].Note != "Fine" || *m.ManualReviews[0].ReviewerUserID != "user-1" || m.ManualReviews[0].ReviewedAt != 1760000000700 || *a.Classification.CompletedAt != 1760000000700 {
+		*m.ManualReviews[0].Note != "Fine" || m.ManualReviews[0].ReviewedAt != 1760000000700 || *a.Classification.CompletedAt != 1760000000700 {
 		t.Fatalf("moderation: %+v", m)
 	}
 	content := a.Content

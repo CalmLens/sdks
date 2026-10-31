@@ -176,7 +176,6 @@ type AssetReview struct {
 	// Decision is one of the ModerationDecision constants.
 	Decision       string  `json:"decision"`
 	Note           *string `json:"note"`
-	ReviewerUserID *string `json:"reviewerUserId"`
 	// ReviewerName is the reviewer's display name, when known.
 	ReviewerName *string `json:"reviewerName,omitempty"`
 	// ReviewerEmail is the reviewer's email address, when known.
@@ -959,7 +958,6 @@ type HashList struct {
 	Description *string `json:"description"`
 	// Action is HashListActionFlag or HashListActionBlock.
 	Action          string  `json:"action"`
-	CreatedByUserID *string `json:"createdByUserId"`
 	CreatedAt       int64   `json:"createdAt"`
 	UpdatedAt       *int64  `json:"updatedAt"`
 }
@@ -975,8 +973,6 @@ type HashListEntry struct {
 	Quality       *int    `json:"quality"`
 	Label         *string `json:"label"`
 	SourceAssetID *string `json:"sourceAssetId"`
-	// CreatedByUserID is the portal user who added the entry, nil for API keys.
-	CreatedByUserID *string `json:"createdByUserId"`
 	CreatedAt       int64   `json:"createdAt"`
 }
 

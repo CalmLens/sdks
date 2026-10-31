@@ -131,7 +131,7 @@ class DemoFlowTests(unittest.TestCase):
         link = board.links[0]
         stored = board.moderator.client.database_storage.assets[link["asset_id"]]
         stored["classification"]["moderation"].update(status="allowed", manualReviews=[
-            {"id": "r1", "decision": "allowed", "note": None, "reviewerUserId": "u1", "reviewedAt": 1, "appliedToAsset": True}])
+            {"id": "r1", "decision": "allowed", "note": None, "reviewedAt": 1, "appliedToAsset": True}])
         clock.now = 5 + RECHECK_SECONDS - 1
         board.refresh()
         self.assertEqual(link["status"], "blocked")

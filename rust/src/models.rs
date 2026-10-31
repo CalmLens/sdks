@@ -1619,8 +1619,6 @@ pub struct AssetReview {
     pub decision: AssetModerationDecision,
     /// The reviewer’s explanation; required for an override.
     pub note: Option<String>,
-    /// The reviewing user, or none for an API key.
-    pub reviewer_user_id: Option<String>,
     /// The reviewing user's name, when known.
     #[serde(default)]
     pub reviewer_name: Option<String>,
@@ -3653,9 +3651,6 @@ pub struct HashList {
     /// What matches do.
     #[serde(default)]
     pub action: HashListAction,
-    /// The user who created the list, or `None` for an API key.
-    #[serde(default)]
-    pub created_by_user_id: Option<String>,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub created_at: u64,
@@ -3703,9 +3698,6 @@ pub struct HashListEntry {
     /// The asset the hash was taken from.
     #[serde(default)]
     pub source_asset_id: Option<String>,
-    /// The user who added the entry, or `None` for an API key.
-    #[serde(default)]
-    pub created_by_user_id: Option<String>,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub created_at: u64,

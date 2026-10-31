@@ -691,7 +691,6 @@ impl DemoStore {
                 review.id = format!("demo-review-{}", random_hex(8));
                 review.decision = decision;
                 review.note = Some("Simulated portal decision".to_string());
-                review.reviewer_user_id = Some("demo-reviewer".to_string());
                 review.reviewer_name = Some("Demo reviewer".to_string());
                 review.reviewed_at = now_ms();
                 review.applied_to_asset = true;
