@@ -47,21 +47,20 @@ def _hmac_hex(secret: str, message: bytes) -> str:
 
 
 def to_webhook_event_payload(event: Event) -> WebhookEventPayload:
-    """The JSON body a webhook connector delivers for a stored event (e.g. one returned by
-    ``events.list``)."""
+    """The JSON body a webhook connector delivers for an event, such as one returned by
+    ``events.list``: the event in the same shape ``events.list`` returns it. Fields outside that
+    shape are left out."""
     return {
         "id": event["id"],
-        "type": event["type"],
-        "createdAt": event["createdAt"],
         "projectId": event["projectId"],
-        "data": {
-            "severity": event["severity"],
-            "title": event["title"],
-            "description": event.get("description"),
-            "assetId": event.get("assetId"),
-            "asset": event.get("asset"),
-            "facts": event["facts"],
-        },
+        "type": event["type"],
+        "severity": event["severity"],
+        "title": event["title"],
+        "description": event.get("description"),
+        "assetId": event.get("assetId"),
+        "asset": event.get("asset"),
+        "facts": event["facts"],
+        "createdAt": event["createdAt"],
     }
 
 
@@ -166,7 +165,7 @@ def parse_webhook_event(payload: str | bytes, *, signature: str | None = None, t
     :class:`WebhookVerificationError` with code ``sdk/invalid-webhook-signature`` when
     verification fails, or ``sdk/invalid-webhook-payload`` when the verified body is not a
     webhook event: a JSON object with string ``id``, ``type`` and ``projectId``, a numeric
-    ``createdAt`` and a ``data`` object whose known fields have the API's types.
+    ``createdAt``, and the API's types for its other known fields when present.
     """
     body = _raw(payload)
     if not verify_webhook_signature(body, signature=signature, timestamp=timestamp, secret=secret, headers=headers,
@@ -191,16 +190,15 @@ def _optional(data: Mapping[str, object], key: str, nullable: bool) -> bool:
 
 
 def _is_webhook_event(value: object) -> bool:
-    """Whether ``value`` is a webhook body: the envelope fields CalmLens always sends, and the
-    API's types for the known ``data`` fields when present. Unknown fields are accepted."""
+    """Whether ``value`` is a webhook body: the fields CalmLens always sends, and the API's types
+    for the other known fields when present. Unknown fields are accepted."""
     if not isinstance(value, dict) or not all(isinstance(value.get(key), str) for key in ("id", "type", "projectId")):
         return False
-    data = value.get("data")
-    if not _is_number(value.get("createdAt")) or not isinstance(data, dict):
+    if not _is_number(value.get("createdAt")):
         return False
-    asset, facts = data.get("asset"), data.get("facts", [])
-    return (_optional(data, "severity", False) and _optional(data, "title", False)
-            and _optional(data, "description", True) and _optional(data, "assetId", True)
+    asset, facts = value.get("asset"), value.get("facts", [])
+    return (_optional(value, "severity", False) and _optional(value, "title", False)
+            and _optional(value, "description", True) and _optional(value, "assetId", True)
             and (asset is None or (isinstance(asset, dict) and isinstance(asset.get("id"), str)))
             and isinstance(facts, list)
             and all(isinstance(fact, dict) and isinstance(fact.get("key"), str) and "value" in fact
@@ -210,7 +208,6 @@ def _is_webhook_event(value: object) -> bool:
 def is_test_webhook_event(event: Mapping[str, Any]) -> bool:
     """Whether a webhook event is a test send from the portal or the CLI rather than a real
     event: it carries the registered ``{"key": "test", "value": True}`` fact."""
-    data = event.get("data") if isinstance(event, Mapping) else None
-    facts = data.get("facts") if isinstance(data, Mapping) else None
+    facts = event.get("facts") if isinstance(event, Mapping) else None
     return isinstance(facts, list) and any(
         isinstance(fact, Mapping) and fact.get("key") == "test" and fact.get("value") is True for fact in facts)

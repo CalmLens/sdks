@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from calmlens import parse_webhook_event, verify_webhook_signature
+from calmlens import parse_webhook_event, to_webhook_event_payload, verify_webhook_signature
 from calmlens.webhooks import create_webhook_signature_header
 
 # Shared test vector (packages/sdk-contract/README.md).
@@ -46,6 +46,14 @@ class WebhookTests(unittest.TestCase):
     def test_arguments_after_the_payload_are_keyword_only(self):
         with self.assertRaises(TypeError):
             verify_webhook_signature(BODY, SIGNATURE, TIMESTAMP, SECRET)  # type: ignore[misc]
+
+    def test_payload_is_the_listed_event_without_other_fields(self):
+        event = {"id": "evt_1", "projectId": "project-1", "type": "asset.allowed", "severity": "low",
+                 "title": "Asset allowed", "description": None, "assetId": "asset_1", "asset": None,
+                 "facts": [{"key": "decided-by", "value": "automated"}], "createdAt": 1760000000000}
+        stored = {**event, "userId": "user-1", "notify": True, "readAt": 1, "updatedAt": 2}
+        self.assertEqual(to_webhook_event_payload(stored), event)  # type: ignore[arg-type]
+
 
 if __name__ == "__main__":
     unittest.main()

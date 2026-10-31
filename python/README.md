@@ -94,8 +94,9 @@ Every failure raises `CalmLensError` or a subclass, with a stable `code` (consta
 | `CalmLensError`           | An iterator received a page that says more follow with a cursor it had already sent; `details` has the `cursor`                                                           | `sdk/invalid-response`                                                                                                                          | `None`      |
 | `CalmLensError`           | `assets.wait_for_decision` saw no decision within its `timeout`; `details` has `assetId` and the last `classificationStatus` and `moderationStatus`                       | `sdk/timeout`                                                                                                                                   | `None`      |
 
-Each error also has `message`, `details` (the API's details, plus `traceId` when sent; empty for
-transport errors), `request_id` (the response's `X-Request-Id`, to quote to support), `headers`
+Each error also has `message`, `details` (the API error body's `details` object, such as
+validation issues; empty for transport errors), `request_id` (the response's `X-Request-Id`, or
+the error body's `requestId` without one, to quote to support), `headers`
 (lower-case names), `retry_after` (whole seconds from `Retry-After`, given in seconds or as an
 HTTP date), `is_not_found` and `is_retryable`.
 `is_retryable` depends only on `code` and `status`, so every error class agrees: it is True for
@@ -164,7 +165,7 @@ retried.
 | `createWebhookSignatureHeader`                                | `create_webhook_signature_header(payload, timestamp, secret)`                                                      |
 
 ```python
-page = client.assets.list(page_size=20, ordering=[{"field": "createdAt", "direction": "DESC"}])
+page = client.assets.list(page_size=20, ordering=[{"field": "createdAt", "direction": "desc"}])
 for asset in client.assets.iter(filter="classification.moderation.status==allowed"):  # requests pages lazily
     print(asset["id"])
 children = client.assets.list_children(asset_id=queued["id"])
@@ -216,7 +217,7 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
 `projectId`, `name`, `type`, `createdAt` and three nested objects are always present:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `personDetection`, `faceDetection`, `linkDetection`, `aiGeneratedDetection`, `textRegions` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline`, optional `hashMatches` (the hash list entries an image matched) and `manualReviews` (each with a reviewer's `decision`: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `updatedAt`, `completedAt`, optional `linkDetection`, `textRegions` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline`, optional `hashMatches` (the hash list entries an image matched) and `manualReviews` (each with a reviewer's `decision`: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
   `status` is `pending` until moderation decides, then:
   - `allowed`: show the content.
   - `limited`: delivered like `allowed`, but reduce its reach: keep it out of recommendations, trending and notifications, rank it lower or collapse it.
@@ -369,16 +370,16 @@ try:
                             secret=os.environ["CALMLENS_WEBHOOK_SECRET"])
 except WebhookVerificationError:
     ...  # respond 401
-# event["type"], event["data"]["facts"]; deduplicate with the x-calmlens-delivery header
+# event["type"], event["facts"]; deduplicate with the x-calmlens-delivery header
 ```
 
-`parse_webhook_event` verifies, then parses into a `WebhookEventPayload` dict
-(`{id, type, createdAt, projectId, data}`, with `data` holding `severity`, `title`,
-`description`, `assetId`, `asset` and `facts`); unknown fields are kept. It raises
+`parse_webhook_event` verifies, then parses into a `WebhookEventPayload` dict: the event exactly
+as [`events.list`](#events-feed) returns it, `{id, projectId, type, severity, title, description,
+assetId, asset, facts, createdAt}`. Unknown fields, event types and fact keys are kept. It raises
 `WebhookVerificationError` with code `sdk/invalid-webhook-signature`, or
 `sdk/invalid-webhook-payload` when the verified body is not an event: a JSON object with string
-`id`, `type` and `projectId`, a numeric `createdAt` and a `data` object whose known fields have
-the API's types (each fact needs a string `key` and a `value`). `verify_webhook_signature` takes
+`id`, `type` and `projectId`, a numeric `createdAt`, and the API's types for its other known
+fields when present (each fact needs a string `key` and a `value`). `verify_webhook_signature` takes
 the same keyword arguments and returns `True`/`False`. Pass `headers=` (a mapping, an
 `email.message.Message`/`http.client.HTTPMessage` or a framework's header object; names are
 matched case-insensitively and a header repeated in the request is joined with `,`), or
@@ -450,8 +451,10 @@ safe zero score and must not be treated as allowed coverage.
 
 `events.list` polls the project's event feed, the same events webhooks deliver. It
 returns an `EventsPage` dict: `{"items": [...], "nextCursor": str, "hasMore": bool}`. Each
-event has `id`, `type` (e.g. `asset.allowed`), `createdAt`, `severity`, `title`,
-`description`, `assetId`, `asset` and `facts` (a list of `{key, value, url?}`).
+event has `id`, `projectId`, `type` (e.g. `asset.allowed`), `severity`, `title`,
+`description`, `assetId`, `asset`, `facts` (a list of `{key, value, url?}`) and `createdAt`;
+`description`, `assetId` and `asset` are `None` when the event has none. Webhooks deliver the
+same events in the same shape (`to_webhook_event_payload(event)` builds one).
 
 - Calling it **without `cursor`** returns **no events** and a `nextCursor` for _now_. Save
   that cursor: the feed only returns events created after the cursor you pass.
@@ -603,7 +606,7 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   (`idempotency/invalid-key`).
 - Requests the API's schema refuses fail with `validation/<issue>` (`too-small`, `too-big`,
   `invalid-type`), HTTP 400 and the field in `details["path"]`: list `pageSize` (1 to 100, default
-  10), folder `pageSize` (1 to 100, default 100), events `pageSize` (1 to 100, default 50) and search `query` (1 to 200 characters) and
+  50, for assets, children, folders, hash lists, entries and events) and search `query` (1 to 200 characters) and
   `limit` (1 to 20, default 10).
 - `assets.search` is keyword search like the API's: the query is split on whitespace (at most
   8 distinct words, case-insensitive) and an asset matches when every word appears in its name,
@@ -656,7 +659,7 @@ process.
 
 Image moderation considers readable text directly. Optional OCR (`processingOptions.features.ocr.enabled: true` on the wire) adds a text moderation pass and stores retained text in the image’s `content.extractedText`. No separate text child is created. Read the image’s combined `classification.moderation`; removing its content also removes the extracted text.
 
-Folder listings return a cursor page like every other list: `items`, visible `ancestors`, `nextCursor`, `hasMore`, `pageSize` and `ordering`. Set `parent_id` to open a branch (omit it for the project root), and pass `nextCursor` as `cursor` to load the next page. `page_size` is 1 to 100 (default 100), and `ordering` takes one `{"field": "name" | "createdAt", "direction": "ASC" | "DESC"}` entry (default name, ascending). `search` with `search_all` finds names in unopened branches; `ids` with `resolve_only` resolves selected folder paths.
+Folder listings return a cursor page like every other list: `items`, visible `ancestors`, `nextCursor`, `hasMore`, `pageSize` and `ordering`. Set `parent_id` to open a branch (omit it for the project root), and pass `nextCursor` as `cursor` to load the next page. `page_size` is 1 to 100 (default 50), and `ordering` takes one `{"field": "name" | "createdAt", "direction": "asc" | "desc"}` entry (default name, ascending). `search` keeps the children whose names contain it.
 
 ### Viewer context for CDN delivery
 

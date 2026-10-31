@@ -837,9 +837,7 @@ class CalmLensServerClient:
 
     def _url(self, path: str, query: Mapping[str, Any] | None = None) -> str:
         params = {k: v if isinstance(v, str) else _json(v)
-                  for k, v in (query or {}).items() if v is not None and k not in ("ordering", "ids")}
-        for index, folder_id in enumerate((query or {}).get("ids") or []):
-            params[f"ids[{index}]"] = folder_id
+                  for k, v in (query or {}).items() if v is not None and k != "ordering"}
         for index, order in enumerate((query or {}).get("ordering") or []):
             for key, value in order.items():
                 params[f"ordering[{index}][{key}]"] = value
@@ -915,11 +913,11 @@ class CalmLensServerClient:
         except (ValueError, UnicodeDecodeError):
             data = None
         if isinstance(data, dict) and isinstance(data.get("code"), str):
-            details = dict(data["details"]) if isinstance(data.get("details"), dict) else {}
-            if "traceId" in data:
-                details["traceId"] = data["traceId"]
+            details = data["details"] if isinstance(data.get("details"), dict) else {}
             message = data.get("message") if isinstance(data.get("message"), str) else None
-            return CalmLensAPIError(data["code"], message, details, status, headers=headers)
+            body_request_id = data.get("requestId") if isinstance(data.get("requestId"), str) else None
+            return CalmLensAPIError(data["code"], message, details, status, headers=headers,
+                                    request_id=headers.get("x-request-id") or body_request_id)
         return CalmLensAPIError(error_codes.SDK_HTTP_ERROR, f"HTTP {status}", status=status, headers=headers)
 
     def ensure_lens(self, options: LensDefinition | None = None, /, *, identifier: str = _UNSET, name: str = _UNSET,
@@ -1055,7 +1053,7 @@ class Assets:
         e.g. ``classification.moderation.status==allowed``). Use :meth:`iter` to walk every page."""
         merged = _merge(options, cursor=cursor, page_size=page_size, ordering=ordering, filter=filter,
                         folder_id=folder_id)
-        return cast(AssetPage, self._c._request("GET", self._c._project("assets/page"), query=merged))
+        return cast(AssetPage, self._c._request("GET", self._c._project("assets"), query=merged))
 
     def iter(self, options: ListAssetsOptions | None = None, /, *, page_size: int = _UNSET,
              ordering: List[Ordering] = _UNSET, filter: str = _UNSET, folder_id: str = _UNSET) -> Iterator[Asset]:
@@ -1373,13 +1371,12 @@ class Folders:
         self._c = client
 
     def list(self, options: ListFoldersOptions | None = None, /, *, parent_id: str = _UNSET, cursor: str = _UNSET,
-             page_size: int = _UNSET, ordering: List[FolderOrdering] = _UNSET, search: str = _UNSET,
-             search_all: bool = _UNSET, ids: List[str] = _UNSET, resolve_only: bool = _UNSET) -> FolderPage:
+             page_size: int = _UNSET, ordering: List[FolderOrdering] = _UNSET, search: str = _UNSET) -> FolderPage:
         """One page of child folders (of ``parent_id``, or the project root), sorted by name unless
         ``ordering`` says otherwise, with ``ancestors`` for showing their paths. Pass the page's
         ``nextCursor`` as ``cursor`` for the next page."""
         merged = _merge(options, parent_id=parent_id, cursor=cursor, page_size=page_size, ordering=ordering,
-                        search=search, search_all=search_all, ids=ids, resolve_only=resolve_only)
+                        search=search)
         return cast(FolderPage, self._c._request("GET", self._c._project("folders"), query=merged))
 
     def retrieve(self, options: FolderIdOptions | None = None, /, *, folder_id: str = _UNSET) -> Folder:

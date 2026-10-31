@@ -131,11 +131,13 @@ def _resolve_name(root: Any, path: str) -> Any:
 
 
 def _error_fields(error: BaseException) -> dict[str, Any]:
-    """The error fields every runner compares, ``None`` where there is none (Python's empty
-    ``details`` dict is no details)."""
+    """The error fields every runner compares, ``None`` where there is none. Python's ``details``
+    is always a dict: an API error code always has the body's ``details`` object (empty or not),
+    and an empty dict on an ``sdk/*`` error is no details."""
     assert isinstance(error, CalmLensError), repr(error)
+    has_details = bool(error.details) or not error.code.startswith("sdk/")
     return {"code": error.code, "status": error.status, "requestId": error.request_id,
-            "retryAfter": error.retry_after, "details": _json(error.details) if error.details else None}
+            "retryAfter": error.retry_after, "details": _json(error.details) if has_details else None}
 
 
 class _Response(io.BytesIO):
@@ -721,7 +723,7 @@ class WebhookContractTests(unittest.TestCase):
                                              secret=case["secret"], now=case["now"])
                 self.assertEqual(parsed, json.loads(case["body"]))
                 self.assertEqual(parsed["type"], case["expectedType"])
-                self.assertEqual(parsed["data"]["facts"][0]["key"], case["expectedFactKey"])
+                self.assertEqual(parsed["facts"][0]["key"], case["expectedFactKey"])
 
     def test_signatures(self) -> None:
         for case in self.fixtures["signatures"]:

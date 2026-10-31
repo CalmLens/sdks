@@ -59,9 +59,10 @@ class CalmLensError(Exception):
     Attributes:
         code: Stable error code, e.g. ``asset/not-found`` or ``sdk/timeout``.
         message: Human-readable description (do not match on it; use ``code``).
-        details: Extra diagnostics from the API error body (``traceId`` included when sent).
+        details: Extra diagnostics from the API error body, such as validation issues.
         status: HTTP status for API errors, otherwise ``None``.
-        request_id: The response's ``X-Request-Id`` header; quote it to support.
+        request_id: The response's ``X-Request-Id`` header (the error body's ``requestId``); quote it
+            to support.
         headers: Response headers with lower-case names (empty without a response).
         retry_after: Seconds from the ``Retry-After`` header, when present.
     """

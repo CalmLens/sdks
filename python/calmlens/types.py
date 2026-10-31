@@ -42,7 +42,7 @@ __all__ = [
     "SemanticStatus", "ServeInit", "ServeOptions", "SignedUrl", "SignedUrlOptions", "StoredExtractedText",
     "SignedUploadToken", "SignUploadTokenOptions", "SubmitAssetOptions", "UpdateAssetOptions",
     "UpdateFolderOptions", "UploadPartOptions", "Visibility", "WaitForDecisionOptions",
-    "WebhookEventData", "WebhookEventPayload",
+    "WebhookEventPayload",
     "ImageTransformRedaction", "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult",
     "LinkDetectionResult", "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult",
     "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "HashMatch", "HashListAction", "HashList",
@@ -648,7 +648,7 @@ class AssetClassification(_AssetClassificationRequired, total=False):
     labels: Optional[list[ClassificationLabel]]
 
 
-class _AssetContentRequired(TypedDict):
+class AssetContent(TypedDict):
     """Content state: whether CalmLens holds the source, preview and extracted text
     (``temporary`` until processing finishes, ``stored`` or ``removed``) and its properties."""
     status: AssetContentStatus
@@ -665,10 +665,6 @@ class _AssetContentRequired(TypedDict):
     extractedText: Optional[ExtractedText]
 
 
-class AssetContent(_AssetContentRequired, total=False):
-    safetyTest: bool
-
-
 class _AssetRequired(TypedDict):
     id: str
     projectId: str
@@ -681,7 +677,6 @@ class _AssetRequired(TypedDict):
 
 
 class Asset(_AssetRequired, total=False):
-    userId: Optional[str]
     parentId: Optional[str]
     folderId: Optional[str]
     uploadPresetId: Optional[str]
@@ -699,7 +694,7 @@ class Asset(_AssetRequired, total=False):
     visibility: Union[Visibility, str, None]
 
 
-Ordering = TypedDict("Ordering", {"field": str, "direction": Literal["ASC", "DESC"]})
+Ordering = TypedDict("Ordering", {"field": str, "direction": Literal["asc", "desc"]})
 
 
 class AssetPage(TypedDict):
@@ -981,42 +976,37 @@ class EventAsset(_EventAssetRequired, total=False):
     uploadPresetId: Optional[str]
 
 
-class _EventRequired(TypedDict):
+class Event(TypedDict):
+    """An event as ``events.list`` returns it and a webhook delivers it."""
     id: str
     projectId: str
     type: EventType
     severity: EventSeverity
     title: str
+    description: Optional[str]
+    assetId: Optional[str]
+    asset: Optional[EventAsset]
     facts: list[EventFact]
     createdAt: int
 
 
-class Event(_EventRequired, total=False):
-    userId: Optional[str]
-    description: Optional[str]
-    assetId: Optional[str]
-    asset: Optional[EventAsset]
-    notify: Optional[bool]
-    updatedAt: int
-    readAt: Optional[int]
+class _WebhookEventPayloadRequired(TypedDict):
+    id: str
+    projectId: str
+    type: str
+    createdAt: int
 
 
-class WebhookEventData(TypedDict, total=False):
+class WebhookEventPayload(_WebhookEventPayloadRequired, total=False):
+    """The JSON body of a webhook delivery: the event in the shape ``events.list`` returns it.
+    ``type`` is a string so event types added later still parse; a received body may carry
+    fields this SDK doesn't know."""
     severity: str
     title: str
     description: Optional[str]
     assetId: Optional[str]
     asset: Optional[EventAsset]
     facts: list[EventFact]
-
-
-class WebhookEventPayload(TypedDict):
-    """The JSON body of a webhook delivery."""
-    id: str
-    type: str
-    createdAt: int
-    projectId: str
-    data: WebhookEventData
 
 
 class EventsPage(TypedDict):
@@ -1098,7 +1088,7 @@ class UpdateHashListOptions(HashListIdOptions, total=False):
 class ListHashListsOptions(TypedDict, total=False):
     #: The previous page's ``nextCursor``; omit for the first page.
     cursor: str
-    #: 1 to 100, default 10.
+    #: 1 to 100, default 50.
     pageSize: int
 
 
@@ -1292,7 +1282,7 @@ class ServeOptions(AssetUrlOptions, total=False):
 
 
 FolderOrdering = TypedDict("FolderOrdering", {"field": Literal["name", "createdAt"],
-                                               "direction": Literal["ASC", "DESC"]})
+                                               "direction": Literal["asc", "desc"]})
 
 
 class ListFoldersOptions(TypedDict, total=False):
@@ -1300,14 +1290,11 @@ class ListFoldersOptions(TypedDict, total=False):
     parentId: str
     #: The previous page's ``nextCursor``; omit for the first page.
     cursor: str
-    #: 1 to 100, default 100.
+    #: 1 to 100, default 50.
     pageSize: int
     #: At most one entry; the default is ``name`` ascending.
     ordering: List[FolderOrdering]
     search: str
-    searchAll: bool
-    resolveOnly: bool
-    ids: List[str]
 
 
 class FolderPage(TypedDict):
