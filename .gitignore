@@ -13,3 +13,4 @@ javascript/cjs/
 java/target/
 *.gem
 .local/
+/go/sdk-e2e
