@@ -29,7 +29,7 @@ __all__ = [
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
@@ -246,6 +246,11 @@ class ProcessingOptions(TypedDict, total=False):
     """``processingOptions`` for an upload, as stored on the asset."""
     keepContentAfterProcessing: Optional[bool]
     flaggedContentPolicy: Optional[FlaggedContentPolicy]
+    #: Overrides the project's ``storeSensitiveMetadata`` setting for this upload. When false,
+    #: embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
+    #: and ``fileMetadata`` leaves out the creator and location. When true, the image is stored as
+    #: uploaded.
+    storeSensitiveMetadata: Optional[bool]
     features: Optional[ProcessingFeatures]
 
 
@@ -582,6 +587,12 @@ class StoredExtractedText(TypedDict):
 ExtractedText = Union[InlineExtractedText, StoredExtractedText]
 
 
+class FileMetadataLocation(TypedDict):
+    """A GPS position in decimal degrees."""
+    latitude: float
+    longitude: float
+
+
 class FileMetadata(TypedDict):
     """Descriptive metadata embedded in an uploaded image. Each text field is ``None`` when the
     file doesn't record it."""
@@ -596,7 +607,8 @@ class FileMetadata(TypedDict):
     lensModel: Optional[str]
     #: Software that created or last edited the file.
     software: Optional[str]
-    #: Creator or artist the file names.
+    #: Creator or artist the file names. Sensitive: recorded only when ``storeSensitiveMetadata``
+    #: is on.
     creator: Optional[str]
     #: Copyright notice the file declares.
     copyright: Optional[str]
@@ -604,10 +616,12 @@ class FileMetadata(TypedDict):
     #: ``trainedAlgorithmicMedia`` for generated media. Files can declare any value, so treat it as
     #: a claim.
     digitalSourceType: Optional[str]
-    #: Whether the file embeds GPS coordinates. CalmLens doesn't store the coordinates or return
-    #: them in the API, and rendered images leave out embedded metadata. The ``original`` file is
-    #: served exactly as uploaded, coordinates included.
+    #: Whether the uploaded file embedded GPS coordinates, whatever ``storeSensitiveMetadata`` is
+    #: set to.
     containsLocation: bool
+    #: Where the picture was taken, from its GPS coordinates. Sensitive: recorded only when
+    #: ``storeSensitiveMetadata`` is on.
+    location: Optional[FileMetadataLocation]
 
 
 class AssetUpload(TypedDict):

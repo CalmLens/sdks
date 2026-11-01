@@ -66,6 +66,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           purge: "purge";
         }>;
       }, zod.core.$strip>>>;
+      storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
       features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
         ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
           enabled: zod.ZodBoolean;
@@ -9381,6 +9382,10 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         copyright: zod.ZodNullable<zod.ZodString>;
         digitalSourceType: zod.ZodNullable<zod.ZodString>;
         containsLocation: zod.ZodBoolean;
+        location: zod.ZodNullable<zod.ZodObject<{
+          latitude: zod.ZodNumber;
+          longitude: zod.ZodNumber;
+        }, zod.core.$strip>>;
       }, zod.core.$strip>>;
     }, zod.core.$strip>;
   }, zod.core.$strip>;

@@ -113,6 +113,7 @@ async assets.create(options: SubmitAssetOptions): Promise<Asset>
 - `part` (optional): First part of a sequential multipart upload
 - `description` (string, optional): Description of the asset
 - `processingOptions.keepContentAfterProcessing` (boolean, optional): Retain content after processing
+- `processingOptions.storeSensitiveMetadata` (boolean, optional): Overrides the project's `storeSensitiveMetadata` setting for this upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed before the image is stored, and `content.fileMetadata` leaves out the creator and location. When true, the image is stored as uploaded.
 - `processingOptions.features` (object, optional): Optional analyses to run, each turned on with `enabled: true`: `ocr`, and in beta `personDetection` and `faceDetection` (with `ageEstimation`). See [People and faces](https://calmlens.com/docs/guides/people-and-faces).
 - `visibility` (string, optional): "public" or "private"
 

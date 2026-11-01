@@ -77,6 +77,10 @@ declare const FILE_METADATA_SCHEMA: zod.ZodObject<{
   copyright: zod.ZodNullable<zod.ZodString>;
   digitalSourceType: zod.ZodNullable<zod.ZodString>;
   containsLocation: zod.ZodBoolean;
+  location: zod.ZodNullable<zod.ZodObject<{
+    latitude: zod.ZodNumber;
+    longitude: zod.ZodNumber;
+  }, zod.core.$strip>>;
 }, zod.core.$strip>;
 type FileMetadata = zod.infer<typeof FILE_METADATA_SCHEMA>;
 declare const EXTRACTED_TEXT_SCHEMA: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
@@ -116,6 +120,7 @@ declare const PROCESSING_OPTIONS_SCHEMA: zod.ZodOptional<zod.ZodNullable<zod.Zod
       purge: "purge";
     }>;
   }, zod.core.$strip>>>;
+  storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
   features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       enabled: zod.ZodBoolean;
@@ -18497,6 +18502,10 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     copyright: zod.ZodNullable<zod.ZodString>;
     digitalSourceType: zod.ZodNullable<zod.ZodString>;
     containsLocation: zod.ZodBoolean;
+    location: zod.ZodNullable<zod.ZodObject<{
+      latitude: zod.ZodNumber;
+      longitude: zod.ZodNumber;
+    }, zod.core.$strip>>;
   }, zod.core.$strip>>;
 }, zod.core.$strip>;
 type AssetContent = zod.infer<typeof ASSET_CONTENT_SCHEMA>;
@@ -18544,6 +18553,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         purge: "purge";
       }>;
     }, zod.core.$strip>>>;
+    storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
     features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
         enabled: zod.ZodBoolean;
@@ -27859,6 +27869,10 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       copyright: zod.ZodNullable<zod.ZodString>;
       digitalSourceType: zod.ZodNullable<zod.ZodString>;
       containsLocation: zod.ZodBoolean;
+      location: zod.ZodNullable<zod.ZodObject<{
+        latitude: zod.ZodNumber;
+        longitude: zod.ZodNumber;
+      }, zod.core.$strip>>;
     }, zod.core.$strip>>;
   }, zod.core.$strip>;
 }, zod.core.$strip>;

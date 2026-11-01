@@ -71,6 +71,9 @@ module CalmLens
   type processing_options_input = {
     ?keep_content_after_processing: bool?,
     ?flagged_content_policy: { action: flagged_content_action }?,
+    # Overrides the project's `storeSensitiveMetadata` setting: false removes embedded EXIF, XMP and
+    # IPTC metadata before the image is stored; true stores it as uploaded.
+    ?store_sensitive_metadata: bool?,
     ?features: processing_features_input?
   }
 
@@ -85,6 +88,7 @@ module CalmLens
   type processing_options = {
     ?"keepContentAfterProcessing" => bool?,
     ?"flaggedContentPolicy" => { "action" => flagged_content_action }?,
+    ?"storeSensitiveMetadata" => bool?,
     ?"features" => processing_features?
   }
 
@@ -110,8 +114,9 @@ module CalmLens
   type extracted_text = { "type" => "string" | "document", ?"content" => String, ?"id" => String }
   # Descriptive metadata embedded in an uploaded image. `capturedAt` is ISO 8601, with a UTC offset
   # only when the file records one. `digitalSourceType` is the IPTC code the file declares, such as
-  # `digitalCapture`. GPS coordinates are never returned; `containsLocation` says whether the file
-  # embeds them.
+  # `digitalCapture`. `containsLocation` says whether the uploaded file embedded GPS coordinates;
+  # `creator` and `location` are sensitive and recorded only when `storeSensitiveMetadata` is on.
+  type file_metadata_location = { "latitude" => number, "longitude" => number }
   type file_metadata = {
     "capturedAt" => String?,
     "cameraMake" => String?,
@@ -121,7 +126,8 @@ module CalmLens
     "creator" => String?,
     "copyright" => String?,
     "digitalSourceType" => String?,
-    "containsLocation" => bool
+    "containsLocation" => bool,
+    "location" => file_metadata_location?
   }
 
   type asset_upload = { "status" => "uploading" | "completed", "updatedAt" => Integer?, "partsReceived" => Integer? }

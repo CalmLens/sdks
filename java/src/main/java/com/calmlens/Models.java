@@ -545,20 +545,27 @@ public final class Models {
    *
    * @param keepContentAfterProcessing whether stored content is kept after classification
    * @param flaggedContentPolicy overrides the project's moderation action for this asset
+   * @param storeSensitiveMetadata overrides the project's {@code storeSensitiveMetadata} setting
+   *     for this upload: when false, embedded image metadata (EXIF, XMP and IPTC) is removed from
+   *     the file before it is stored, and {@code fileMetadata} leaves out the creator and
+   *     location; when true, the image is stored as uploaded
    * @param features optional analyses to run, such as OCR
    */
-  public record ProcessingOptions(Boolean keepContentAfterProcessing, FlaggedContentPolicy flaggedContentPolicy, ProcessingFeatures features) {
+  public record ProcessingOptions(Boolean keepContentAfterProcessing, FlaggedContentPolicy flaggedContentPolicy, Boolean storeSensitiveMetadata, ProcessingFeatures features) {
     /** No options set. */
-    public ProcessingOptions() { this(null, null, null); }
+    public ProcessingOptions() { this(null, null, null, null); }
 
     /** @param value whether to keep content @return a copy with this setting */
-    public ProcessingOptions keepContentAfterProcessing(Boolean value) { return new ProcessingOptions(value, flaggedContentPolicy, features); }
+    public ProcessingOptions keepContentAfterProcessing(Boolean value) { return new ProcessingOptions(value, flaggedContentPolicy, storeSensitiveMetadata, features); }
 
     /** @param value the policy @return a copy with this setting */
-    public ProcessingOptions flaggedContentPolicy(FlaggedContentPolicy value) { return new ProcessingOptions(keepContentAfterProcessing, value, features); }
+    public ProcessingOptions flaggedContentPolicy(FlaggedContentPolicy value) { return new ProcessingOptions(keepContentAfterProcessing, value, storeSensitiveMetadata, features); }
+
+    /** @param value whether to store embedded image metadata @return a copy with this setting */
+    public ProcessingOptions storeSensitiveMetadata(Boolean value) { return new ProcessingOptions(keepContentAfterProcessing, flaggedContentPolicy, value, features); }
 
     /** @param value optional features @return a copy with these features */
-    public ProcessingOptions features(ProcessingFeatures value) { return new ProcessingOptions(keepContentAfterProcessing, flaggedContentPolicy, value); }
+    public ProcessingOptions features(ProcessingFeatures value) { return new ProcessingOptions(keepContentAfterProcessing, flaggedContentPolicy, storeSensitiveMetadata, value); }
   }
 
   /**
@@ -2158,18 +2165,28 @@ public final class Models {
    * @param cameraModel camera or phone model, such as {@code EOS R5}
    * @param lensModel lens model
    * @param software software that created or last edited the file
-   * @param creator creator or artist the file names
+   * @param creator creator or artist the file names; sensitive, so recorded only when {@code
+   *     storeSensitiveMetadata} is on
    * @param copyright copyright notice the file declares
    * @param digitalSourceType IPTC digital source type the file declares, such as {@code
    *     digitalCapture} for a camera photo or {@code trainedAlgorithmicMedia} for generated media.
    *     Files can declare any value, so treat it as a claim
-   * @param containsLocation whether the file embeds GPS coordinates. CalmLens doesn't store the
-   *     coordinates or return them in the API, and rendered images leave out embedded metadata.
-   *     The {@code original} file is served exactly as uploaded, coordinates included
+   * @param containsLocation whether the uploaded file embedded GPS coordinates, whatever {@code
+   *     storeSensitiveMetadata} is set to
+   * @param location where the picture was taken, from its GPS coordinates; sensitive, so recorded
+   *     only when {@code storeSensitiveMetadata} is on
    */
   public record FileMetadata(String capturedAt, String cameraMake, String cameraModel,
       String lensModel, String software, String creator, String copyright,
-      String digitalSourceType, boolean containsLocation) {}
+      String digitalSourceType, boolean containsLocation, FileMetadataLocation location) {}
+
+  /**
+   * A GPS position in decimal degrees.
+   *
+   * @param latitude latitude, from -90 to 90
+   * @param longitude longitude, from -180 to 180
+   */
+  public record FileMetadataLocation(double latitude, double longitude) {}
 
   /**
    * One page of assets. Use {@code assets.iterate} to go through every page.

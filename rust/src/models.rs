@@ -611,6 +611,12 @@ pub struct ProcessingOptions {
     /// Overrides the project's moderation action for this asset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flagged_content_policy: Option<FlaggedContentPolicy>,
+    /// Overrides the project's `storeSensitiveMetadata` setting for this upload. When false,
+    /// embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
+    /// and `file_metadata` leaves out the creator and location. When true, the image is stored as
+    /// uploaded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store_sensitive_metadata: Option<bool>,
     /// Optional analyses to run, keyed by feature. Every feature is off unless enabled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub features: Option<ProcessingFeatures>,
@@ -2883,7 +2889,8 @@ pub struct FileMetadata {
     /// The software that created or last edited the file.
     #[serde(default)]
     pub software: Option<String>,
-    /// The creator or artist the file names.
+    /// The creator or artist the file names. Sensitive: recorded only when
+    /// `store_sensitive_metadata` is on.
     #[serde(default)]
     pub creator: Option<String>,
     /// The copyright notice the file declares.
@@ -2894,13 +2901,32 @@ pub struct FileMetadata {
     /// treat it as a claim.
     #[serde(default)]
     pub digital_source_type: Option<String>,
-    /// Whether the file embeds GPS coordinates. CalmLens doesn't store the coordinates or return
-    /// them in the API, and rendered images leave out embedded metadata. The `original` file is
-    /// served exactly as uploaded, coordinates included.
+    /// Whether the uploaded file embedded GPS coordinates, whatever `store_sensitive_metadata` is
+    /// set to.
     #[serde(default)]
     pub contains_location: bool,
+    /// Where the picture was taken, from its GPS coordinates. Sensitive: recorded only when
+    /// `store_sensitive_metadata` is on.
+    #[serde(default)]
+    pub location: Option<FileMetadataLocation>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<FileMetadata, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A GPS position in decimal degrees.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct FileMetadataLocation {
+    /// The latitude, from -90 to 90.
+    #[serde(default)]
+    pub latitude: f64,
+    /// The longitude, from -180 to 180.
+    #[serde(default)]
+    pub longitude: f64,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<FileMetadataLocation, _>")]
     pub extra: HashMap<String, Value>,
 }
 

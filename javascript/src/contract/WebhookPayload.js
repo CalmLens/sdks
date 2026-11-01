@@ -356,6 +356,7 @@ const PROJECT_SETTINGS_SCHEMA = zod.object({
 	moderationProfileId: zod.string().min(1).optional(),
 	metadataFields: METADATA_FIELD_DEFINITIONS_SCHEMA.optional(),
 	blockUnmoderatedAssets: zod.boolean().optional().meta({ description: "When true, the CDN refuses to serve assets whose moderation is still pending. Defaults to false, so retained content is servable while classification runs." }),
+	storeSensitiveMetadata: zod.boolean().optional().meta({ description: "When true, uploaded images are stored with their embedded metadata (EXIF, XMP and IPTC), and `fileMetadata` records the creator and GPS location. Defaults to false: the metadata is removed before the image is stored. An upload's `processingOptions.storeSensitiveMetadata` overrides it." }),
 	testInputsEnabled: zod.boolean().optional().meta({ description: "When true, the project's test images, text codes and media phrases are classified as their chosen category instead of being moderated. They carry the project's secret test input key, so only its members can make one. Defaults to true." }),
 	remoteUrlRule: REMOTE_URL_RULE_SCHEMA.nullish().meta({ description: "Restricts the domains this project accepts when content is submitted by URL, including websites. Unset or null accepts every public domain." }),
 	websiteSubmissionsPerMinute: zod.number().int().min(1).max(60).nullish().meta({ description: "Lowers how many websites this project can submit per minute. Defaults to, and cannot exceed, the platform limit." }),
@@ -461,10 +462,14 @@ const FILE_METADATA_SCHEMA = zod.object({
 	cameraModel: fileMetadataText("Camera or phone model, such as `EOS R5`"),
 	lensModel: fileMetadataText("Lens model"),
 	software: fileMetadataText("Software that created or last edited the file"),
-	creator: fileMetadataText("Creator or artist the file names"),
+	creator: fileMetadataText("Creator or artist the file names. Sensitive: recorded only when `storeSensitiveMetadata` is on."),
 	copyright: fileMetadataText("Copyright notice the file declares"),
 	digitalSourceType: fileMetadataText("IPTC digital source type the file declares, such as `digitalCapture` for a camera photo or `trainedAlgorithmicMedia` for generated media. Files can declare any value, so treat it as a claim."),
-	containsLocation: zod.boolean().describe("Whether the file embeds GPS coordinates. CalmLens doesn't store the coordinates or return them in the API, and rendered images leave out embedded metadata. The `original` file is served exactly as uploaded, coordinates included.")
+	containsLocation: zod.boolean().describe("Whether the uploaded file embedded GPS coordinates, whatever `storeSensitiveMetadata` is set to."),
+	location: zod.object({
+		latitude: zod.number().min(-90).max(90).describe("Latitude in decimal degrees"),
+		longitude: zod.number().min(-180).max(180).describe("Longitude in decimal degrees")
+	}).nullable().describe("Where the picture was taken, from its GPS coordinates. Sensitive: recorded only when `storeSensitiveMetadata` is on.")
 }).meta(metaStore([docPropertyInfo({
 	description: "Descriptive metadata embedded in an uploaded image",
 	namedType: "FileMetadata"
@@ -477,11 +482,11 @@ const EXTRACTED_TEXT_SCHEMA = zod.discriminatedUnion("type", [zod.object({
 	id: saneStringField()
 })]);
 const CHECKSUMS_SCHEMA = zod.object({
-	md5: zod.string().nullish().describe("MD5 digest of the uploaded content"),
-	sha1: zod.string().nullish().describe("SHA-1 digest of the uploaded content"),
-	sha256: zod.string().nullish().describe("SHA-256 digest of the uploaded content"),
-	sha384: zod.string().nullish().describe("SHA-384 digest of the uploaded content"),
-	sha512: zod.string().nullish().describe("SHA-512 digest of the uploaded content")
+	md5: zod.string().nullish().describe("MD5 digest of the stored content"),
+	sha1: zod.string().nullish().describe("SHA-1 digest of the stored content"),
+	sha256: zod.string().nullish().describe("SHA-256 digest of the stored content"),
+	sha384: zod.string().nullish().describe("SHA-384 digest of the stored content"),
+	sha512: zod.string().nullish().describe("SHA-512 digest of the stored content")
 });
 const IMAGE_DATA_SCHEMA = zod.object({
 	perceptualHash: zod.string().nullish().describe("PDQ perceptual hash used to match visually similar images, as 64 hexadecimal characters"),
@@ -531,6 +536,10 @@ const PROCESSING_OPTIONS_SCHEMA = zod.object({
 		description: "Override the project moderation action for this asset. Allow takes no action, limit delivers the asset normally but marks it for reduced reach, age-restrict serves the asset only with `viewerClaims.ageConfirmed: true` and any required private-asset access, block stops delivery (content is still removed after processing when `keepContentAfterProcessing` is false), and purge deletes content.",
 		defaultValue: void 0
 	})])),
+	storeSensitiveMetadata: zod.boolean().nullish().meta(metaStore([docPropertyInfo({
+		description: "Override the project's `storeSensitiveMetadata` setting for this upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored, and `fileMetadata` leaves out the creator and location. When true, the image is stored as uploaded.",
+		defaultValue: void 0
+	})])),
 	features: PROCESSING_FEATURES_SCHEMA.nullish()
 }).strict().nullish();
 /** A URL the portal links to: only ones a browser may follow, never `javascript:` or `data:`. */
@@ -549,7 +558,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	uploadPresetId: idField("preset").nullish().describe("ID of the upload preset the asset was uploaded through, if any"),
 	createdAt: createdAtField().describe("When the asset was created, in milliseconds since the Unix epoch"),
 	updatedAt: updatedAtField().describe("When the asset was last updated, in milliseconds since the Unix epoch"),
-	checksums: CHECKSUMS_SCHEMA.nullish().describe("Digests of the uploaded content"),
+	checksums: CHECKSUMS_SCHEMA.nullish().describe("Digests of the stored content"),
 	imageData: IMAGE_DATA_SCHEMA.nullish().describe("Image properties, for image assets"),
 	fileMetadata: FILE_METADATA_SCHEMA.nullish().describe("Metadata embedded in the uploaded image, read during processing"),
 	name: saneStringField({ type: "large" }).meta(metaStore([docPropertyInfo({
@@ -664,10 +673,10 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	format: zod.string().nullable().describe("MIME type of the content"),
 	extension: zod.string().nullable().describe("File extension of the content"),
 	sizeInBytes: zod.number().int().nullable().describe("Size of the uploaded content in bytes"),
-	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the uploaded content"),
+	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the content as stored: for an image, after embedded metadata is removed unless `storeSensitiveMetadata` is on"),
 	image: ASSET_IMAGE_SCHEMA.nullable().describe("The picture CalmLens serves at the rendered resource: the original image for image assets, or a generated image for documents and websites. It remains after the content is removed, so check `status` before loading it; `null` when the asset has no image."),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document"),
-	fileMetadata: FILE_METADATA_SCHEMA.nullable().describe("Metadata embedded in an uploaded image, such as its capture time, camera and software. Read-only and separate from your own `metadata`. `null` when the image declares none, for other asset types, once the content is removed and while the asset is held.")
+	fileMetadata: FILE_METADATA_SCHEMA.nullable().describe("Metadata embedded in an uploaded image, such as its capture time, camera and software, read before any of it is removed for `storeSensitiveMetadata`. Read-only and separate from your own `metadata`. `null` when the image declares none, for other asset types, once the content is removed and while the asset is held.")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
 	namedType: "AssetContent"
@@ -741,7 +750,8 @@ STORED_ASSET_SCHEMA.pick({
 				creator: null,
 				copyright: null,
 				digitalSourceType: null,
-				containsLocation: false
+				containsLocation: false,
+				location: null
 			}
 		}
 	}

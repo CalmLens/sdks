@@ -352,7 +352,8 @@ type FileMetadata struct {
 	LensModel *string `json:"lensModel"`
 	// Software is the software that created or last edited the file.
 	Software *string `json:"software"`
-	// Creator is the creator or artist the file names.
+	// Creator is the creator or artist the file names. It is sensitive, so it is recorded only when
+	// StoreSensitiveMetadata is on.
 	Creator *string `json:"creator"`
 	// Copyright is the copyright notice the file declares.
 	Copyright *string `json:"copyright"`
@@ -360,10 +361,20 @@ type FileMetadata struct {
 	// "digitalCapture" for a camera photo or "trainedAlgorithmicMedia" for generated media.
 	// Files can declare any value, so treat it as a claim.
 	DigitalSourceType *string `json:"digitalSourceType"`
-	// ContainsLocation is whether the file embeds GPS coordinates. CalmLens doesn't store the
-	// coordinates or return them in the API, and rendered images leave out embedded metadata.
-	// The original file is served exactly as uploaded, coordinates included.
+	// ContainsLocation is whether the uploaded file embedded GPS coordinates, whatever
+	// StoreSensitiveMetadata is set to.
 	ContainsLocation bool `json:"containsLocation"`
+	// Location is where the picture was taken, from its GPS coordinates. It is sensitive, so it is
+	// recorded only when StoreSensitiveMetadata is on; nil otherwise.
+	Location *FileMetadataLocation `json:"location"`
+}
+
+// FileMetadataLocation is a GPS position in decimal degrees.
+type FileMetadataLocation struct {
+	// Latitude is from -90 to 90.
+	Latitude float64 `json:"latitude"`
+	// Longitude is from -180 to 180.
+	Longitude float64 `json:"longitude"`
 }
 
 // ProcessingOptions changes how one upload is processed. Unset (nil) fields are omitted
@@ -373,6 +384,11 @@ type ProcessingOptions struct {
 	KeepContentAfterProcessing *bool `json:"keepContentAfterProcessing,omitempty"`
 	// FlaggedContentPolicy overrides the project moderation action for this asset.
 	FlaggedContentPolicy *FlaggedContentPolicy `json:"flaggedContentPolicy,omitempty"`
+	// StoreSensitiveMetadata overrides the project's storeSensitiveMetadata setting for this
+	// upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed from the file
+	// before it is stored, and FileMetadata leaves out the creator and location. When true, the
+	// image is stored as uploaded.
+	StoreSensitiveMetadata *bool `json:"storeSensitiveMetadata,omitempty"`
 	// Features turns on optional analyses. Every feature is off unless enabled here.
 	Features *ProcessingFeatures `json:"features,omitempty"`
 }
