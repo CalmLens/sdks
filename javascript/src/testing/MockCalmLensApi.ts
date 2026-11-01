@@ -1295,6 +1295,7 @@ export class MockCalmLensApi {
           removalReason: "requested",
           updatedAt: now,
           extractedText: null,
+          fileMetadata: null,
           image: withoutPlaceholder(asset.content.image),
         },
         updatedAt: now,
@@ -1459,6 +1460,7 @@ export class MockCalmLensApi {
         checksums: null,
         image: null,
         extractedText: null,
+        fileMetadata: null,
       },
       upload: {
         status: isOpenUpload ? "uploading" : "completed",
@@ -1620,6 +1622,7 @@ export class MockCalmLensApi {
             removalReason: purge ? purgeReason : "retention",
             updatedAt: now,
             extractedText: null,
+            fileMetadata: null,
             image: withoutPlaceholder(image),
           }
         : { ...asset.content, image },

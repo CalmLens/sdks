@@ -660,7 +660,7 @@ final class MockServerClient
             'visibility' => $options['visibility'] ?? 'private',
             'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
                 'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,
-                'checksums' => null, 'image' => null, 'extractedText' => null],
+                'checksums' => null, 'image' => null, 'extractedText' => null, 'fileMetadata' => null],
             'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
             'classification' => ['status' => $final ? 'processing' : 'pending', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
                 'moderation' => ['status' => 'pending', 'manualReviews' => []]],
@@ -894,7 +894,7 @@ final class MockServerClient
         unset($this->content[$asset['id']]);
         $asset['context'] = null;
         $asset['content'] = ['status' => 'removed', 'removalReason' => $reason, 'updatedAt' => ($this->now)(), 'extractedText' => null,
-            'image' => self::withoutPlaceholder($asset['content']['image'] ?? null)] + $asset['content'];
+            'fileMetadata' => null, 'image' => self::withoutPlaceholder($asset['content']['image'] ?? null)] + $asset['content'];
         return $asset;
     }
 

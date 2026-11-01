@@ -216,7 +216,8 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 - `Content` (`AssetContent`): `Status` is whether CalmLens holds the content
   (`ContentStatusTemporary` until processing finishes, `ContentStatusStored` or
   `ContentStatusRemoved`, with `RemovalReason`), plus `Format` (MIME type), `Extension`,
-  `SizeInBytes`, `Checksums`, `Image`, `SafetyHold` and `ExtractedText`.
+  `SizeInBytes`, `Checksums`, `Image`, `SafetyHold`, `ExtractedText` and `FileMetadata`
+  (metadata embedded in an uploaded image, such as its capture time, camera and software).
 
 Fields that may be missing are pointers, maps, or slices and are `nil` when absent:
 `Classification.Moderation.Categories` is `nil` until classification produces findings, and optional fields such as `Content.SizeInBytes`,

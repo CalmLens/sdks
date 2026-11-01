@@ -1744,6 +1744,11 @@ pub struct AssetContent {
     /// Text extracted from the content.
     #[serde(default)]
     pub extracted_text: Option<ExtractedText>,
+    /// Metadata embedded in an uploaded image, such as its capture time, camera and software.
+    /// Read-only and separate from the asset's own `metadata`; `None` when the image declares
+    /// none, for other asset types, once the content is removed and while the asset is held.
+    #[serde(default)]
+    pub file_metadata: Option<FileMetadata>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetContent, _>")]
     pub extra: HashMap<String, Value>,
@@ -2852,6 +2857,50 @@ pub struct ExtractedText {
     pub id: Option<String>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<ExtractedText, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Descriptive metadata embedded in an uploaded image. Each text field is `None` when the file
+/// doesn't record it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct FileMetadata {
+    /// When the picture was taken, as the file records it: an ISO 8601 date and time, such as
+    /// `2026-05-01T12:30:00+01:00`. It includes the UTC offset only when the file records one;
+    /// without it, the time is the camera's local time.
+    #[serde(default)]
+    pub captured_at: Option<String>,
+    /// The camera manufacturer, such as `Canon`.
+    #[serde(default)]
+    pub camera_make: Option<String>,
+    /// The camera or phone model, such as `EOS R5`.
+    #[serde(default)]
+    pub camera_model: Option<String>,
+    /// The lens model.
+    #[serde(default)]
+    pub lens_model: Option<String>,
+    /// The software that created or last edited the file.
+    #[serde(default)]
+    pub software: Option<String>,
+    /// The creator or artist the file names.
+    #[serde(default)]
+    pub creator: Option<String>,
+    /// The copyright notice the file declares.
+    #[serde(default)]
+    pub copyright: Option<String>,
+    /// The IPTC digital source type the file declares, such as `digitalCapture` for a camera
+    /// photo or `trainedAlgorithmicMedia` for generated media. Files can declare any value, so
+    /// treat it as a claim.
+    #[serde(default)]
+    pub digital_source_type: Option<String>,
+    /// Whether the file embeds GPS coordinates. CalmLens doesn't store the coordinates or return
+    /// them in the API, and rendered images leave out embedded metadata. The `original` file is
+    /// served exactly as uploaded, coordinates included.
+    #[serde(default)]
+    pub contains_location: bool,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<FileMetadata, _>")]
     pub extra: HashMap<String, Value>,
 }
 

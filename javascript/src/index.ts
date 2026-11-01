@@ -105,6 +105,7 @@ export type {
   AssetSafetyHold,
   AssetSafetyHoldReason,
   ExtractedText,
+  FileMetadata,
   MetadataItem,
   ProcessingOptions,
 } from "./contract/Asset.js";

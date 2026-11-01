@@ -625,6 +625,7 @@ fn apply_outcome(
         );
         stored.insert("updatedAt".into(), now.into());
         stored.insert("extractedText".into(), Value::Null);
+        stored.insert("fileMetadata".into(), Value::Null);
         stored.insert("image".into(), without_placeholder(&image));
     } else {
         stored.insert("image".into(), image);
@@ -831,6 +832,7 @@ impl Backend {
             content.insert("removalReason".into(), "requested".into());
             content.insert("updatedAt".into(), now.into());
             content.insert("extractedText".into(), Value::Null);
+            content.insert("fileMetadata".into(), Value::Null);
             asset["updatedAt"] = now.into();
         }
         asset["content"]["image"] = image;
@@ -1650,6 +1652,7 @@ impl Backend {
                 "status": if keep { "stored" } else { "temporary" }, "removalReason": null,
                 "updatedAt": now, "safetyHold": null, "format": null, "extension": null,
                 "sizeInBytes": null, "checksums": null, "image": null, "extractedText": null,
+                "fileMetadata": null,
             },
             "upload": {
                 "status": if open { "uploading" } else { "completed" }, "updatedAt": now,

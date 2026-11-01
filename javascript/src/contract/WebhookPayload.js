@@ -454,6 +454,21 @@ const ASSET_SAFETY_HOLD_SCHEMA = zod.object({
 	disposedAt: zod.number().int().nullish().describe("When the held content was disposed of, in milliseconds since the Unix epoch")
 });
 const SMALL_PLAINTEXT_DOCUMENT_MAX_BYTES = 16384;
+const fileMetadataText = (description) => zod.string().max(200).nullable().describe(description);
+const FILE_METADATA_SCHEMA = zod.object({
+	capturedAt: fileMetadataText("When the picture was taken, as the file records it: an ISO 8601 date and time, such as `2026-05-01T12:30:00+01:00`. Includes the UTC offset only when the file records one; without it, the time is the camera's local time."),
+	cameraMake: fileMetadataText("Camera manufacturer, such as `Canon`"),
+	cameraModel: fileMetadataText("Camera or phone model, such as `EOS R5`"),
+	lensModel: fileMetadataText("Lens model"),
+	software: fileMetadataText("Software that created or last edited the file"),
+	creator: fileMetadataText("Creator or artist the file names"),
+	copyright: fileMetadataText("Copyright notice the file declares"),
+	digitalSourceType: fileMetadataText("IPTC digital source type the file declares, such as `digitalCapture` for a camera photo or `trainedAlgorithmicMedia` for generated media. Files can declare any value, so treat it as a claim."),
+	containsLocation: zod.boolean().describe("Whether the file embeds GPS coordinates. CalmLens doesn't store the coordinates or return them in the API, and rendered images leave out embedded metadata. The `original` file is served exactly as uploaded, coordinates included.")
+}).meta(metaStore([docPropertyInfo({
+	description: "Descriptive metadata embedded in an uploaded image",
+	namedType: "FileMetadata"
+})]));
 const EXTRACTED_TEXT_SCHEMA = zod.discriminatedUnion("type", [zod.object({
 	type: zod.literal("string"),
 	content: zod.string().refine((value) => new TextEncoder().encode(value).byteLength <= SMALL_PLAINTEXT_DOCUMENT_MAX_BYTES, `Extracted text must be at most ${SMALL_PLAINTEXT_DOCUMENT_MAX_BYTES} bytes when stored inline`)
@@ -536,6 +551,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	updatedAt: updatedAtField().describe("When the asset was last updated, in milliseconds since the Unix epoch"),
 	checksums: CHECKSUMS_SCHEMA.nullish().describe("Digests of the uploaded content"),
 	imageData: IMAGE_DATA_SCHEMA.nullish().describe("Image properties, for image assets"),
+	fileMetadata: FILE_METADATA_SCHEMA.nullish().describe("Metadata embedded in the uploaded image, read during processing"),
 	name: saneStringField({ type: "large" }).meta(metaStore([docPropertyInfo({
 		description: "Name of the asset",
 		placeholder: "my-image.jpg",
@@ -641,7 +657,7 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	namedType: "AssetClassification"
 })]));
 const ASSET_CONTENT_SCHEMA = zod.object({
-	status: ASSET_CONTENT_STATUS_SCHEMA.describe("Whether CalmLens holds the content (source, preview and extracted text): `temporary` until processing finishes, `stored`, or `removed`"),
+	status: ASSET_CONTENT_STATUS_SCHEMA.describe("Whether CalmLens holds the content (source, preview, extracted text and file metadata): `temporary` until processing finishes, `stored`, or `removed`"),
 	removalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullable().describe("Why the content was removed: your `policy` purged it, `retention` because `keepContentAfterProcessing` was off, `requested` through the API or portal, `parent-removed` with its parent asset's content, or `disposed` after a safety hold. `null` while content is held."),
 	updatedAt: epoch("When the content status last changed"),
 	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullable().describe("Set while CalmLens holds the asset for suspected illegal content: its content isn't delivered and the asset can't be changed or deleted until the hold ends, so such requests return `asset/safety-held`. `null` when there is no hold."),
@@ -650,7 +666,8 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	sizeInBytes: zod.number().int().nullable().describe("Size of the uploaded content in bytes"),
 	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the uploaded content"),
 	image: ASSET_IMAGE_SCHEMA.nullable().describe("The picture CalmLens serves at the rendered resource: the original image for image assets, or a generated image for documents and websites. It remains after the content is removed, so check `status` before loading it; `null` when the asset has no image."),
-	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document")
+	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document"),
+	fileMetadata: FILE_METADATA_SCHEMA.nullable().describe("Metadata embedded in an uploaded image, such as its capture time, camera and software. Read-only and separate from your own `metadata`. `null` when the image declares none, for other asset types, once the content is removed and while the asset is held.")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
 	namedType: "AssetContent"
@@ -714,7 +731,18 @@ STORED_ASSET_SCHEMA.pick({
 			sizeInBytes: 245760,
 			checksums: null,
 			image: null,
-			extractedText: null
+			extractedText: null,
+			fileMetadata: {
+				capturedAt: "2026-05-01T12:30:00+01:00",
+				cameraMake: "Canon",
+				cameraModel: "EOS R5",
+				lensModel: null,
+				software: "Adobe Lightroom",
+				creator: null,
+				copyright: null,
+				digitalSourceType: null,
+				containsLocation: false
+			}
 		}
 	}
 })])).extend({

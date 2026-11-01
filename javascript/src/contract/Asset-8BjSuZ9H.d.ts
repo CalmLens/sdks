@@ -67,6 +67,18 @@ declare const ASSET_SAFETY_HOLD_SCHEMA: zod.ZodObject<{
   disposedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
 }, zod.core.$strip>;
 type AssetSafetyHold = zod.infer<typeof ASSET_SAFETY_HOLD_SCHEMA>;
+declare const FILE_METADATA_SCHEMA: zod.ZodObject<{
+  capturedAt: zod.ZodNullable<zod.ZodString>;
+  cameraMake: zod.ZodNullable<zod.ZodString>;
+  cameraModel: zod.ZodNullable<zod.ZodString>;
+  lensModel: zod.ZodNullable<zod.ZodString>;
+  software: zod.ZodNullable<zod.ZodString>;
+  creator: zod.ZodNullable<zod.ZodString>;
+  copyright: zod.ZodNullable<zod.ZodString>;
+  digitalSourceType: zod.ZodNullable<zod.ZodString>;
+  containsLocation: zod.ZodBoolean;
+}, zod.core.$strip>;
+type FileMetadata = zod.infer<typeof FILE_METADATA_SCHEMA>;
 declare const EXTRACTED_TEXT_SCHEMA: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
   type: zod.ZodLiteral<"string">;
   content: zod.ZodString;
@@ -18475,6 +18487,17 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     type: zod.ZodLiteral<"document">;
     id: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
   }, zod.core.$strip>], "type">>;
+  fileMetadata: zod.ZodNullable<zod.ZodObject<{
+    capturedAt: zod.ZodNullable<zod.ZodString>;
+    cameraMake: zod.ZodNullable<zod.ZodString>;
+    cameraModel: zod.ZodNullable<zod.ZodString>;
+    lensModel: zod.ZodNullable<zod.ZodString>;
+    software: zod.ZodNullable<zod.ZodString>;
+    creator: zod.ZodNullable<zod.ZodString>;
+    copyright: zod.ZodNullable<zod.ZodString>;
+    digitalSourceType: zod.ZodNullable<zod.ZodString>;
+    containsLocation: zod.ZodBoolean;
+  }, zod.core.$strip>>;
 }, zod.core.$strip>;
 type AssetContent = zod.infer<typeof ASSET_CONTENT_SCHEMA>;
 declare const ASSET_SCHEMA: zod.ZodObject<{
@@ -27826,7 +27849,18 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       type: zod.ZodLiteral<"document">;
       id: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
     }, zod.core.$strip>], "type">>;
+    fileMetadata: zod.ZodNullable<zod.ZodObject<{
+      capturedAt: zod.ZodNullable<zod.ZodString>;
+      cameraMake: zod.ZodNullable<zod.ZodString>;
+      cameraModel: zod.ZodNullable<zod.ZodString>;
+      lensModel: zod.ZodNullable<zod.ZodString>;
+      software: zod.ZodNullable<zod.ZodString>;
+      creator: zod.ZodNullable<zod.ZodString>;
+      copyright: zod.ZodNullable<zod.ZodString>;
+      digitalSourceType: zod.ZodNullable<zod.ZodString>;
+      containsLocation: zod.ZodBoolean;
+    }, zod.core.$strip>>;
   }, zod.core.$strip>;
 }, zod.core.$strip>;
 type Asset = zod.infer<typeof ASSET_SCHEMA>;
-export { ProcessingOptions as _, AssetContentRemovalReason as a, AssetModeration as c, AssetSafetyHoldReason as d, AssetType as f, MetadataItem as g, ExtractedText as h, AssetContent as i, AssetModerationStatus as l, AssetVisibility as m, AssetClassification as n, AssetContentStatus as o, AssetUpload as p, AssetClassificationStatus as r, AssetImage as s, Asset as t, AssetSafetyHold as u };
+export { MetadataItem as _, AssetContentRemovalReason as a, AssetModeration as c, AssetSafetyHoldReason as d, AssetType as f, FileMetadata as g, ExtractedText as h, AssetContent as i, AssetModerationStatus as l, AssetVisibility as m, AssetClassification as n, AssetContentStatus as o, AssetUpload as p, AssetClassificationStatus as r, AssetImage as s, Asset as t, AssetSafetyHold as u, ProcessingOptions as v };

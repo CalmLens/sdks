@@ -15,6 +15,7 @@ failure = asset['classification']['failureReason']
 reviews = asset['classification']['moderation']['manualReviews'].map { |review| [review['decision'], review['reviewerName']] }
 removal = asset['content']['removalReason']
 format = asset['content']['format']
+camera = asset['content']['fileMetadata']&.[]('cameraModel')
 sexual = asset.dig('moderation', 'report', 'categories', 'sexual')
 score = sexual && sexual['status'] == 'evaluated' ? sexual['score'] : nil
 faces = asset.dig('classification', 'faceDetection', 'faces') || []
@@ -120,5 +121,5 @@ mock.enqueue_event(type: 'asset.allowed', asset_id: 'asset-1',
 mock.state.assets.each_value { |item| item['classification']['moderation']['status'] }
 mock.enqueue(status: 503, body: { code: 'server/unavailable' }).requests.map(&:path)
 
-[status, processing, failure, reviews, removal, format, score, ages, names, more, children, matched, expires, lens_width, url, bytes,
- webhook_status, webhook_test, earlier, author, used, limits]
+[status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, lens_width, url,
+ bytes, webhook_status, webhook_test, earlier, author, used, limits]

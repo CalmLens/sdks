@@ -1211,7 +1211,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	content := calmlens.JSON{
 		"status": contentStatus, "removalReason": nil, "updatedAt": now, "safetyHold": nil,
 		"format": nil, "extension": nil, "sizeInBytes": nil, "checksums": nil, "image": nil,
-		"extractedText": nil,
+		"extractedText": nil, "fileMetadata": nil,
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil,
@@ -1392,7 +1392,7 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 }
 
 // removeContent deletes the asset's stored bytes and marks its content removed for reason; the
-// extracted text and the image's placeholder go with it.
+// extracted text, file metadata and the image's placeholder go with it.
 func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int64) {
 	delete(m.ImageStorage.Content, text(a["id"]))
 	a["context"] = nil
@@ -1404,6 +1404,7 @@ func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int
 	content["removalReason"] = reason
 	content["updatedAt"] = now
 	content["extractedText"] = nil
+	content["fileMetadata"] = nil
 	content["image"] = withoutPlaceholder(content["image"])
 }
 

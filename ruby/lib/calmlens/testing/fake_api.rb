@@ -496,7 +496,8 @@ module CalmLens
         {
           'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
                          'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
-                         'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'extractedText' => nil },
+                         'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'extractedText' => nil,
+                         'fileMetadata' => nil },
           # Like the API, only an open upload counts the parts received.
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
@@ -578,7 +579,7 @@ module CalmLens
         if remove
           forget_content(asset)
           asset['content'].merge!('status' => 'removed', 'removalReason' => purge ? purge_reason : 'retention', 'updatedAt' => now,
-                                  'extractedText' => nil, 'image' => without_placeholder(image))
+                                  'extractedText' => nil, 'fileMetadata' => nil, 'image' => without_placeholder(image))
         end
         asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
         update_classification(asset['classification'], processing, moderation, now)
@@ -652,7 +653,7 @@ module CalmLens
         else
           now = @now.call
           content.merge!('status' => 'removed', 'removalReason' => 'requested', 'updatedAt' => now, 'extractedText' => nil,
-                         'image' => without_placeholder(content['image']))
+                         'fileMetadata' => nil, 'image' => without_placeholder(content['image']))
           item['updatedAt'] = now
         end
         lifecycle_event('asset.content-removed', item)

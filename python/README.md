@@ -232,8 +232,9 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
   (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updatedAt`,
   `safetyHold`, `format` (MIME type), `extension`, `sizeInBytes`, `checksums`, `image` (the
   picture served at the rendered resource, with its size, ThumbHash, average colour and
-  perceptual hash with its quality) and
-  `extractedText`. Fields that don't apply are `None`.
+  perceptual hash with its quality), `extractedText` and `fileMetadata` (metadata embedded in
+  an uploaded image, such as its capture time, camera and software). Fields that don't apply
+  are `None`.
 
 `description`, `externalId`, `externalUrl`, `folderId`, `parentId`, `metadata` and `tags`
 may be missing or `None`, so use `.get()` for them.

@@ -29,7 +29,7 @@ __all__ = [
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
+    "FaceDetectionResult", "FileMetadata", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
@@ -582,6 +582,34 @@ class StoredExtractedText(TypedDict):
 ExtractedText = Union[InlineExtractedText, StoredExtractedText]
 
 
+class FileMetadata(TypedDict):
+    """Descriptive metadata embedded in an uploaded image. Each text field is ``None`` when the
+    file doesn't record it."""
+    #: When the picture was taken, as the file records it: an ISO 8601 date and time, such as
+    #: ``2026-05-01T12:30:00+01:00``. It includes the UTC offset only when the file records one;
+    #: without it, the time is the camera's local time.
+    capturedAt: Optional[str]
+    #: Camera manufacturer, such as ``Canon``.
+    cameraMake: Optional[str]
+    #: Camera or phone model, such as ``EOS R5``.
+    cameraModel: Optional[str]
+    lensModel: Optional[str]
+    #: Software that created or last edited the file.
+    software: Optional[str]
+    #: Creator or artist the file names.
+    creator: Optional[str]
+    #: Copyright notice the file declares.
+    copyright: Optional[str]
+    #: IPTC digital source type the file declares, such as ``digitalCapture`` for a camera photo or
+    #: ``trainedAlgorithmicMedia`` for generated media. Files can declare any value, so treat it as
+    #: a claim.
+    digitalSourceType: Optional[str]
+    #: Whether the file embeds GPS coordinates. CalmLens doesn't store the coordinates or return
+    #: them in the API, and rendered images leave out embedded metadata. The ``original`` file is
+    #: served exactly as uploaded, coordinates included.
+    containsLocation: bool
+
+
 class AssetUpload(TypedDict):
     """Receiving content, including multipart progress."""
     status: Literal["uploading", "completed"]
@@ -656,8 +684,9 @@ class AssetClassification(_AssetClassificationRequired, total=False):
 
 
 class AssetContent(TypedDict):
-    """Content state: whether CalmLens holds the source, preview and extracted text
-    (``temporary`` until processing finishes, ``stored`` or ``removed``) and its properties."""
+    """Content state: whether CalmLens holds the source, preview, extracted text and file
+    metadata (``temporary`` until processing finishes, ``stored`` or ``removed``) and its
+    properties."""
     status: AssetContentStatus
     removalReason: Optional[AssetContentRemovalReason]
     #: When the content status last changed, in milliseconds since the Unix epoch.
@@ -670,6 +699,10 @@ class AssetContent(TypedDict):
     checksums: Optional[Checksums]
     image: Optional[AssetImage]
     extractedText: Optional[ExtractedText]
+    #: Metadata embedded in an uploaded image, such as its capture time, camera and software.
+    #: Read-only and separate from the asset's own ``metadata``; ``None`` when the image declares
+    #: none, for other asset types, once the content is removed and while the asset is held.
+    fileMetadata: Optional[FileMetadata]
 
 
 class _AssetRequired(TypedDict):

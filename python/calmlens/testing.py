@@ -990,7 +990,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             "visibility": options.get("visibility", "private"),
             "content": {"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                         "safetyHold": None, "format": mime or None, "extension": None, "sizeInBytes": size,
-                        "checksums": None, "image": None, "extractedText": None},
+                        "checksums": None, "image": None, "extractedText": None,
+                        "fileMetadata": None},
             "upload": {"status": "completed" if final else "uploading", "updatedAt": now,
                        "partsReceived": None if final else 1},
             "classification": {"status": "processing" if final else "pending", "failureReason": None, "updatedAt": now,
@@ -1047,7 +1048,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if remove:
             self.image_storage.content.pop(asset["id"], None)
             content.update(status="removed", removalReason=purge_reason if purge else "retention", updatedAt=now,
-                           extractedText=None, image=_without_placeholder(content.get("image")))
+                           extractedText=None, fileMetadata=None, image=_without_placeholder(content.get("image")))
             asset["context"] = None
         asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None,
                                        failureReason="processing-error" if outcome == "failed" else None)
@@ -1204,7 +1205,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             content["image"] = _without_placeholder(content.get("image"))
         else:
             content.update(status="removed", removalReason="requested", updatedAt=now, extractedText=None,
-                           image=_without_placeholder(content.get("image")))
+                           fileMetadata=None, image=_without_placeholder(content.get("image")))
             asset["context"] = None
             asset["updatedAt"] = now
         self._lifecycle_event("asset.content-removed", asset)

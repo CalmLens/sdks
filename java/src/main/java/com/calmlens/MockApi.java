@@ -483,6 +483,7 @@ final class MockApi {
     content.add("checksums", JsonNull.INSTANCE);
     content.add("image", JsonNull.INSTANCE);
     content.add("extractedText", JsonNull.INSTANCE);
+    content.add("fileMetadata", JsonNull.INSTANCE);
     asset.add("content", content);
     JsonObject uploadState = new JsonObject();
     uploadState.addProperty("status", last ? "completed" : "uploading");
@@ -566,6 +567,7 @@ final class MockApi {
       asset.add("context", JsonNull.INSTANCE);
       content.addProperty("updatedAt", now);
       content.add("extractedText", JsonNull.INSTANCE);
+      content.add("fileMetadata", JsonNull.INSTANCE);
       image = withoutPlaceholder(image);
     }
     content.add("image", image == null ? JsonNull.INSTANCE : image);
@@ -734,6 +736,7 @@ final class MockApi {
       content.addProperty("removalReason", "requested");
       content.addProperty("updatedAt", now);
       content.add("extractedText", JsonNull.INSTANCE);
+      content.add("fileMetadata", JsonNull.INSTANCE);
       content.add("image", Objects.requireNonNullElse(withoutPlaceholder(content.get("image")), JsonNull.INSTANCE));
       asset.addProperty("updatedAt", now);
     } else if (content.get("image") instanceof JsonObject image && str(image, "thumbhash") != null) {

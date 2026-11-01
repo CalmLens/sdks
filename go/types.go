@@ -272,6 +272,11 @@ type AssetContent struct {
 	// Image is the picture CalmLens serves at the rendered resource, nil when the asset has none.
 	Image         *AssetImage    `json:"image"`
 	ExtractedText *ExtractedText `json:"extractedText"`
+	// FileMetadata is the metadata embedded in an uploaded image, such as its capture time,
+	// camera and software. It is read-only and separate from the asset's own Metadata; nil when
+	// the image declares none, for other asset types, once the content is removed and while the
+	// asset is held.
+	FileMetadata *FileMetadata `json:"fileMetadata"`
 }
 
 // Checksums holds digests of the uploaded content. Each is nil when not computed.
@@ -330,6 +335,35 @@ type ExtractedText struct {
 	Type    string  `json:"type"`
 	Content *string `json:"content,omitempty"`
 	ID      *string `json:"id,omitempty"`
+}
+
+// FileMetadata is the descriptive metadata embedded in an uploaded image. Each text field is
+// nil when the file doesn't record it.
+type FileMetadata struct {
+	// CapturedAt is when the picture was taken, as the file records it: an ISO 8601 date and
+	// time, such as "2026-05-01T12:30:00+01:00". It includes the UTC offset only when the file
+	// records one; without it, the time is the camera's local time.
+	CapturedAt *string `json:"capturedAt"`
+	// CameraMake is the camera manufacturer, such as "Canon".
+	CameraMake *string `json:"cameraMake"`
+	// CameraModel is the camera or phone model, such as "EOS R5".
+	CameraModel *string `json:"cameraModel"`
+	// LensModel is the lens model.
+	LensModel *string `json:"lensModel"`
+	// Software is the software that created or last edited the file.
+	Software *string `json:"software"`
+	// Creator is the creator or artist the file names.
+	Creator *string `json:"creator"`
+	// Copyright is the copyright notice the file declares.
+	Copyright *string `json:"copyright"`
+	// DigitalSourceType is the IPTC digital source type the file declares, such as
+	// "digitalCapture" for a camera photo or "trainedAlgorithmicMedia" for generated media.
+	// Files can declare any value, so treat it as a claim.
+	DigitalSourceType *string `json:"digitalSourceType"`
+	// ContainsLocation is whether the file embeds GPS coordinates. CalmLens doesn't store the
+	// coordinates or return them in the API, and rendered images leave out embedded metadata.
+	// The original file is served exactly as uploaded, coordinates included.
+	ContainsLocation bool `json:"containsLocation"`
 }
 
 // ProcessingOptions changes how one upload is processed. Unset (nil) fields are omitted

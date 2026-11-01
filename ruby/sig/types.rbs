@@ -108,6 +108,21 @@ module CalmLens
   type safety_hold = { "placedAt" => Integer, "reason" => "suspected-illegal-content", ?"disposedAt" => Integer? }
   # `type: "string"` carries the text in `content`; `type: "document"` stores it under `id`.
   type extracted_text = { "type" => "string" | "document", ?"content" => String, ?"id" => String }
+  # Descriptive metadata embedded in an uploaded image. `capturedAt` is ISO 8601, with a UTC offset
+  # only when the file records one. `digitalSourceType` is the IPTC code the file declares, such as
+  # `digitalCapture`. GPS coordinates are never returned; `containsLocation` says whether the file
+  # embeds them.
+  type file_metadata = {
+    "capturedAt" => String?,
+    "cameraMake" => String?,
+    "cameraModel" => String?,
+    "lensModel" => String?,
+    "software" => String?,
+    "creator" => String?,
+    "copyright" => String?,
+    "digitalSourceType" => String?,
+    "containsLocation" => bool
+  }
 
   type asset_upload = { "status" => "uploading" | "completed", "updatedAt" => Integer?, "partsReceived" => Integer? }
   type asset_classification = {
@@ -159,7 +174,10 @@ module CalmLens
     "sizeInBytes" => Integer?,
     "checksums" => checksums?,
     "image" => asset_image?,
-    "extractedText" => extracted_text?
+    "extractedText" => extracted_text?,
+    # Metadata embedded in an uploaded image; `null` when it declares none, for other asset types,
+    # once the content is removed and while the asset is held.
+    "fileMetadata" => file_metadata?
   }
 
   type asset = {

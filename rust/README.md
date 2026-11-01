@@ -276,7 +276,7 @@ Rust fields are snake_case; the wire JSON is camelCase. Response models are `#[n
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
 - `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `failure_reason` (`file-too-large`, `duration-limit`, `resolution-limit`, `unsupported-format`, `undecodable-content`, `multiple-tracks`, `type-mismatch`, `free-upload-limit`, `child-failed` or `processing-error`; `None` unless `status` is `failed`), `updatedAt`, `completedAt`, optional `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline` and reviewer decisions (`manual_reviews`, each with a `decision` of `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer decision does not change `completedAt`.
-- `content`: `status` (`temporary` until processing finishes, `stored` or `removed`), `removal_reason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updated_at`, `safety_hold`, `format` (the MIME type), `extension`, `size_in_bytes`, `checksums`, `image` (the picture served at the rendered resource) and `extracted_text`.
+- `content`: `status` (`temporary` until processing finishes, `stored` or `removed`), `removal_reason` (`policy`, `retention`, `requested`, `parent-removed` or `disposed`), `updated_at`, `safety_hold`, `format` (the MIME type), `extension`, `size_in_bytes`, `checksums`, `image` (the picture served at the rendered resource), `extracted_text` and `file_metadata` (metadata embedded in an uploaded image, such as its capture time, camera and software).
 
 The moderation status also decides delivery:
 

@@ -9371,6 +9371,17 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         type: zod.ZodLiteral<"document">;
         id: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
       }, zod.core.$strip>], "type">>;
+      fileMetadata: zod.ZodNullable<zod.ZodObject<{
+        capturedAt: zod.ZodNullable<zod.ZodString>;
+        cameraMake: zod.ZodNullable<zod.ZodString>;
+        cameraModel: zod.ZodNullable<zod.ZodString>;
+        lensModel: zod.ZodNullable<zod.ZodString>;
+        software: zod.ZodNullable<zod.ZodString>;
+        creator: zod.ZodNullable<zod.ZodString>;
+        copyright: zod.ZodNullable<zod.ZodString>;
+        digitalSourceType: zod.ZodNullable<zod.ZodString>;
+        containsLocation: zod.ZodBoolean;
+      }, zod.core.$strip>>;
     }, zod.core.$strip>;
   }, zod.core.$strip>;
   score: zod.ZodNumber;

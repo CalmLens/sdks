@@ -1893,11 +1893,15 @@ public final class Models {
    * @param checksums digests of the uploaded content
    * @param image the picture served at the rendered resource; null when the asset has none
    * @param extractedText text extracted from the content
+   * @param fileMetadata metadata embedded in an uploaded image, such as its capture time, camera
+   *     and software; read-only and separate from the asset's own {@code metadata}. Null when the
+   *     image declares none, for other asset types, once the content is removed and while the
+   *     asset is held
    */
   public record AssetContent(AssetContentStatus status, String removalReason,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
-      AssetImage image, ExtractedText extractedText) {}
+      AssetImage image, ExtractedText extractedText, FileMetadata fileMetadata) {}
 
 
   /**
@@ -2142,6 +2146,30 @@ public final class Models {
    * @param id extraction ID
    */
   public record ExtractedText(String type, String content, String id) {}
+
+  /**
+   * Descriptive metadata embedded in an uploaded image. Each text value is null when the file
+   * doesn't record it.
+   *
+   * @param capturedAt when the picture was taken, as the file records it: an ISO 8601 date and
+   *     time, such as {@code 2026-05-01T12:30:00+01:00}. It includes the UTC offset only when the
+   *     file records one; without it, the time is the camera's local time
+   * @param cameraMake camera manufacturer, such as {@code Canon}
+   * @param cameraModel camera or phone model, such as {@code EOS R5}
+   * @param lensModel lens model
+   * @param software software that created or last edited the file
+   * @param creator creator or artist the file names
+   * @param copyright copyright notice the file declares
+   * @param digitalSourceType IPTC digital source type the file declares, such as {@code
+   *     digitalCapture} for a camera photo or {@code trainedAlgorithmicMedia} for generated media.
+   *     Files can declare any value, so treat it as a claim
+   * @param containsLocation whether the file embeds GPS coordinates. CalmLens doesn't store the
+   *     coordinates or return them in the API, and rendered images leave out embedded metadata.
+   *     The {@code original} file is served exactly as uploaded, coordinates included
+   */
+  public record FileMetadata(String capturedAt, String cameraMake, String cameraModel,
+      String lensModel, String software, String creator, String copyright,
+      String digitalSourceType, boolean containsLocation) {}
 
   /**
    * One page of assets. Use {@code assets.iterate} to go through every page.

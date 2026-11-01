@@ -2335,6 +2335,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -2891,6 +2902,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -3486,6 +3508,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -4068,6 +4101,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -4683,6 +4727,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -5249,6 +5304,17 @@
               "extractedText": {
                 "type": "string",
                 "content": "example"
+              },
+              "fileMetadata": {
+                "capturedAt": "example",
+                "cameraMake": "example",
+                "cameraModel": "example",
+                "lensModel": "example",
+                "software": "example",
+                "creator": "example",
+                "copyright": "example",
+                "digitalSourceType": "example",
+                "containsLocation": true
               }
             }
           },
@@ -5821,6 +5887,17 @@
             "extractedText": {
               "type": "string",
               "content": "example"
+            },
+            "fileMetadata": {
+              "capturedAt": "example",
+              "cameraMake": "example",
+              "cameraModel": "example",
+              "lensModel": "example",
+              "software": "example",
+              "creator": "example",
+              "copyright": "example",
+              "digitalSourceType": "example",
+              "containsLocation": true
             }
           }
         }
@@ -6399,6 +6476,17 @@
             "extractedText": {
               "type": "string",
               "content": "example"
+            },
+            "fileMetadata": {
+              "capturedAt": "example",
+              "cameraMake": "example",
+              "cameraModel": "example",
+              "lensModel": "example",
+              "software": "example",
+              "creator": "example",
+              "copyright": "example",
+              "digitalSourceType": "example",
+              "containsLocation": true
             }
           }
         }
@@ -6971,6 +7059,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -7527,6 +7626,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -8083,6 +8193,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -8644,6 +8765,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -9200,6 +9332,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -9759,6 +9902,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
@@ -10350,6 +10504,17 @@
         "extractedText": {
           "type": "string",
           "content": "example"
+        },
+        "fileMetadata": {
+          "capturedAt": "example",
+          "cameraMake": "example",
+          "cameraModel": "example",
+          "lensModel": "example",
+          "software": "example",
+          "creator": "example",
+          "copyright": "example",
+          "digitalSourceType": "example",
+          "containsLocation": true
         }
       }
     },
