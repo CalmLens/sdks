@@ -80,7 +80,7 @@ func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 	case "folders.retrieve":
 		return decode(cmd.Options, func(o sdk.FolderIDOptions) (any, error) { return c.Folders.Retrieve(ctx, o) })
 	case "folders.list":
-		return decode(cmd.Options, func(o sdk.ListFoldersOptions) (any, error) { return c.Folders.List(ctx, o) })
+		return decode(cmd.Options, func(o sdk.ListFoldersOptions) (any, error) { return pageOutput(c.Folders.List(ctx, o)) })
 	case "folders.delete":
 		return decode(cmd.Options, func(o sdk.FolderIDOptions) (any, error) { return nil, c.Folders.Delete(ctx, o) })
 	case "cdn.serve":
@@ -100,18 +100,20 @@ func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 
 // A page as the API and the other SDKs report it: the SDK's empty NextCursor (no next page) is
 // null on the wire.
-type page struct {
-	*sdk.AssetPage
-	NextCursor *string `json:"nextCursor"`
-}
-
-func pageOutput(result *sdk.AssetPage, err error) (any, error) {
+func pageOutput[Page any](result *Page, err error) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	output := page{AssetPage: result}
-	if result.NextCursor != "" {
-		output.NextCursor = &result.NextCursor
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	var output map[string]any
+	if err := json.Unmarshal(encoded, &output); err != nil {
+		return nil, err
+	}
+	if output["nextCursor"] == "" {
+		output["nextCursor"] = nil
 	}
 	return output, nil
 }
