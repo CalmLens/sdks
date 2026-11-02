@@ -92,7 +92,6 @@ module CalmLens
         'categories' => evaluated.to_h { |category, value| [category, { 'score' => value, 'action' => action(value) }] },
         'explanationComplete' => true, 'source' => 'policy', 'automatedAction' => STATUS_ACTIONS[@status],
         'regions' => [], 'flaggedCategories' => evaluated.reject { |_, value| action(value) == 'allow' }.map(&:first) }
-
     end
 
     def inspect = "#<#{self.class.name} #{@status}>"

@@ -528,7 +528,8 @@ module CalmLens
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
                                 'completedAt' => nil,
-                                'moderation' => { 'status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => [] } }
+                                'moderation' => { 'status' => 'pending', 'manualReviews' => [],
+                                                  'flaggedCategories' => [], 'regions' => [] } }
         }
       end
 
@@ -632,7 +633,7 @@ module CalmLens
                                          'value' => item['classification']['failureReason'] || 'processing-error' }])
         end
 
-        flagged = decision.report.dig('flaggedCategories')
+        flagged = decision.report['flaggedCategories']
         add_event('type' => 'asset.classified', 'severity' => 'low', 'assetId' => item['id'], 'asset' => snapshot(item),
                   'facts' => [{ 'key' => 'flagged-categories', 'value' => flagged },
                               { 'key' => 'moderation-status', 'value' => decision.status },
