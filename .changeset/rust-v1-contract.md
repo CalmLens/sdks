@@ -1,5 +1,5 @@
 ---
-"@calmlens/sdk-rust": major
+"@calmlens/sdk-rust": minor
 ---
 
 Follows the CalmLens API v1 contract:

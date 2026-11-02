@@ -1,5 +1,5 @@
 ---
-"@calmlens/sdk-java": major
+"@calmlens/sdk-java": minor
 ---
 
 Follows the CalmLens API v1 contract:

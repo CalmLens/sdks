@@ -1,5 +1,5 @@
 ---
-"@calmlens/sdk-php": major
+"@calmlens/sdk-php": minor
 ---
 
 Follows the CalmLens API v1 contract:

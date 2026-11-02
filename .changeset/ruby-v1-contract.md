@@ -1,5 +1,5 @@
 ---
-"@calmlens/sdk-ruby": major
+"@calmlens/sdk-ruby": minor
 ---
 
 Follows the CalmLens API v1 contract:

@@ -1,5 +1,5 @@
 ---
-"@calmlens/sdk-python": major
+"@calmlens/sdk-python": minor
 ---
 
 Follows the CalmLens API v1 contract:

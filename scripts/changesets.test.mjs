@@ -55,11 +55,16 @@ test("Changesets versions all seven SDKs and generates native changelogs and a r
     execFileSync("bun", ["run", "release:check"], { cwd: root, stdio: "inherit" });
     const { releases } = JSON.parse(readFileSync(join(root, ".changeset/release.json")));
     assert.equal(releases.length, 7);
+    // The SDKs are one fixed group: each moves to the highest current version, bumped once.
+    const [major, minor, patch] = releases
+      .map(({ sdk }) =>
+        JSON.parse(readFileSync(join(original, sdk, "package.json")))
+          .version.split(".")
+          .map(Number),
+      )
+      .reduce((a, b) => ((a[0] - b[0] || a[1] - b[1] || a[2] - b[2]) >= 0 ? a : b));
     for (const { sdk, version } of releases) {
-      const before = JSON.parse(readFileSync(join(original, sdk, "package.json")))
-        .version.split(".")
-        .map(Number);
-      assert.equal(version, `${before[0]}.${before[1]}.${before[2] + 1}`);
+      assert.equal(version, `${major}.${minor}.${patch + 1}`);
       assert.match(
         readFileSync(join(root, sdk, "CHANGELOG.md"), "utf8"),
         /Exercise native release adapters/,
