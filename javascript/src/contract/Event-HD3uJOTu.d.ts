@@ -1,5 +1,5 @@
-import "./Asset-jiZCXqSF.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-C6pTIB77.js";
+import "./Asset-OVd2cGZr.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-WVNTRqs-.js";
 import "./Page-DNdKkX2B.js";
 import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
@@ -58,6 +58,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "asset.failed": "asset.failed";
     "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
+    "asset.link-flagged": "asset.link-flagged";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
     "asset.retried": "asset.retried";
@@ -144,6 +145,7 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
     "asset.failed": "asset.failed";
     "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
+    "asset.link-flagged": "asset.link-flagged";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
     "asset.retried": "asset.retried";

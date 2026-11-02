@@ -37,10 +37,7 @@ class ModelsTest {
     "extractedText": null
   },
   "processingOptions": {
-    "keepContentAfterProcessing": true,
-    "flaggedContentPolicy": {
-      "action": "purge"
-    }
+    "keepContentAfterProcessing": true
   },
   "upload": {
     "status": "completed",
@@ -98,7 +95,6 @@ class ModelsTest {
         List.of(new Models.ProvenanceSignal("c2pa", "trainedAlgorithmicMedia"))), asset.classification().aiGeneratedDetection());
     assertEquals(List.of(new Models.TextRegion(box, true)), asset.classification().textRegions());
     assertNull(content.extractedText());
-    assertEquals(new Models.FlaggedContentPolicy("purge"), asset.processingOptions().flaggedContentPolicy());
     assertEquals(Boolean.TRUE, asset.processingOptions().keepContentAfterProcessing());
   }
 
@@ -130,11 +126,6 @@ class ModelsTest {
         new Models.EventAssetUpload("completed"),
         new Models.EventAssetClassification(Models.AssetClassificationStatus.COMPLETED, new Models.EventAssetModeration(Models.AssetModerationStatus.PURGED)),
         new Models.EventAssetContent(Models.AssetContentStatus.REMOVED)), event.asset());
-  }
-
-  @Test void flaggedContentPolicyEncodesAsAnObject() {
-    Models.ProcessingOptions options = new Models.ProcessingOptions().flaggedContentPolicy(new Models.FlaggedContentPolicy("block"));
-    assertEquals(JsonParser.parseString("{\"flaggedContentPolicy\":{\"action\":\"block\"}}"), Json.GSON.toJsonTree(options));
   }
 
   @Test void lensTransformsDecodeTypedImageOptions() {
@@ -186,13 +177,13 @@ class ModelsTest {
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
     Models.ReportPolicy policy = Json.GSON.fromJson("""
-        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}
+        {"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"hash-list","action":"purge","flaggedCategories":["violence"]}}
         """, Models.ReportPolicy.class);
     Models.CategoryPolicyScore category = policy.categories().get("violence");
     assertEquals("block", category.settings().categoryAction());
     assertEquals("snapshot-rule", category.settings().restrictions().get(0).name());
     assertEquals(0, category.source().index());
-    assertEquals("asset-override", policy.decision().source());
+    assertEquals("hash-list", policy.decision().source());
     assertEquals("purge", policy.decision().action());
     assertEquals(List.of("violence"), policy.decision().flaggedCategories());
     assertEquals("all", category.settings().restrictions().get(0).match());

@@ -581,26 +581,6 @@ string_enum! {
     }
 }
 
-/// What happens to flagged content for one asset, overriding the project's moderation action.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FlaggedContentPolicy {
-    /// The action.
-    pub action: FlaggedContentAction,
-    /// Fields this SDK version does not know.
-    #[serde(flatten, deserialize_with = "extra_fields::<FlaggedContentPolicy, _>")]
-    pub extra: HashMap<String, Value>,
-}
-impl FlaggedContentPolicy {
-    /// A policy applying `action`.
-    pub fn new(action: FlaggedContentAction) -> Self {
-        Self {
-            action,
-            extra: HashMap::new(),
-        }
-    }
-}
-
 /// Processing options for an asset.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -608,9 +588,6 @@ pub struct ProcessingOptions {
     /// Keep the stored content after classification.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keep_content_after_processing: Option<bool>,
-    /// Overrides the project's moderation action for this asset.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub flagged_content_policy: Option<FlaggedContentPolicy>,
     /// Overrides the project's `storeSensitiveMetadata` setting for this upload. When false,
     /// embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
     /// and `file_metadata` leaves out the creator and location. When true, the image is stored as

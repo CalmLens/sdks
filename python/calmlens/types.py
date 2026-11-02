@@ -29,7 +29,7 @@ __all__ = [
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "FlaggedContentPolicy", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
@@ -78,8 +78,7 @@ AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "mult
                           "file"], str]
 #: Who can read retained content from the CDN (request values; responses may add others).
 Visibility = Literal["public", "private"]
-#: What happens to content that crosses a policy threshold (request values for
-#: ``processingOptions.flaggedContentPolicy``).
+#: What a moderation policy does with content that crosses its threshold.
 ModerationAction = Literal["allow", "limit", "age-restrict", "block", "purge"]
 #: Why an asset is under a safety hold. New reasons may be added.
 SafetyHoldReason = Union[Literal["suspected-illegal-content"], str]
@@ -195,14 +194,6 @@ class ModerationContext(TypedDict):
     items: list[ModerationContextItem]
 
 
-class FlaggedContentPolicy(TypedDict):
-    """Overrides the project moderation action for one asset: ``allow`` takes no action,
-    ``limit`` delivers normally but marks the asset so your app can reduce its reach,
-    ``age-restrict`` delivers only through signed URLs or API keys, ``block`` stops delivery
-    while retaining content and ``purge`` deletes content."""
-    action: ModerationAction
-
-
 class OcrFeatureOptions(TypedDict):
     """Extract image text into a child asset and classify it as text."""
     enabled: bool
@@ -245,7 +236,6 @@ class ProcessingFeatures(TypedDict, total=False):
 class ProcessingOptions(TypedDict, total=False):
     """``processingOptions`` for an upload, as stored on the asset."""
     keepContentAfterProcessing: Optional[bool]
-    flaggedContentPolicy: Optional[FlaggedContentPolicy]
     #: Overrides the project's ``storeSensitiveMetadata`` setting for this upload. When false,
     #: embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
     #: and ``fileMetadata`` leaves out the creator and location. When true, the image is stored as
@@ -504,9 +494,9 @@ class RegionalDecision(_RegionalDecisionRequired, total=False):
 class ReportPolicyDecision(TypedDict, total=False):
     rule: str
     regions: List[RegionalDecision]
-    #: ``policy``, ``asset-override``, ``children`` or ``hash-list`` (a block from a hash list
-    #: match). New sources may be added.
-    source: Union[Literal["policy", "asset-override", "children", "hash-list", "mandatory-rule"], str]
+    #: ``policy``, ``children``, ``hash-list`` (a block from a hash list match) or
+    #: ``mandatory-rule``. New sources may be added.
+    source: Union[Literal["policy", "children", "hash-list", "mandatory-rule"], str]
     action: Optional[ModerationAction]
     flaggedCategories: List[str]
 

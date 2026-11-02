@@ -155,6 +155,51 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
       unavailable: "unavailable";
     }>;
   }, zod.core.$strict>], "status">>;
+  linkSafety: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+    status: zod.ZodLiteral<"evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    links: zod.ZodArray<zod.ZodObject<{
+      url: zod.ZodString;
+      finalUrl: zod.ZodNullable<zod.ZodString>;
+      redirects: zod.ZodNumber;
+      source: zod.ZodEnum<{
+        "qr-code": "qr-code";
+        text: "text";
+      }>;
+      verdict: zod.ZodEnum<{
+        adult: "adult";
+        gambling: "gambling";
+        malware: "malware";
+        phishing: "phishing";
+        safe: "safe";
+        unresolved: "unresolved";
+      }>;
+      evidence: zod.ZodArray<zod.ZodObject<{
+        provider: zod.ZodEnum<{
+          "cloudflare-domain-intelligence": "cloudflare-domain-intelligence";
+          "google-web-risk": "google-web-risk";
+        }>;
+        status: zod.ZodEnum<{
+          checked: "checked";
+          failed: "failed";
+        }>;
+        labels: zod.ZodArray<zod.ZodString>;
+      }, zod.core.$strict>>;
+    }, zod.core.$strict>>;
+  }, zod.core.$strict>, zod.ZodObject<{
+    status: zod.ZodLiteral<"not-evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    reason: zod.ZodEnum<{
+      "not-supported": "not-supported";
+      unavailable: "unavailable";
+    }>;
+  }, zod.core.$strict>], "status">>;
   aiGeneratedDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
     stage: zod.ZodEnum<{

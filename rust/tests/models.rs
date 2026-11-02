@@ -8,9 +8,7 @@ fn asset_nested_fields_decode_into_typed_models() {
       "id": "asset-1",
       "type": "image",
       "processingOptions": {
-        "flaggedContentPolicy": {
-          "action": "purge"
-        }
+        "keepContentAfterProcessing": true
       },
       "content": {
         "status": "removed",
@@ -205,11 +203,8 @@ fn asset_nested_fields_decode_into_typed_models() {
             .processing_options
             .as_ref()
             .unwrap()
-            .flagged_content_policy
-            .as_ref()
-            .unwrap()
-            .action,
-        FlaggedContentAction::Purge
+            .keep_content_after_processing,
+        Some(true)
     );
 
     let report = &asset.classification.moderation;
@@ -351,22 +346,6 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     assert_eq!(
         reencoded["classification"]["moderation"]["categories"]["spam"]["likelihood"],
         "certain"
-    );
-}
-
-#[test]
-fn flagged_content_policy_encodes_as_an_object() {
-    let options = ProcessingOptions {
-        flagged_content_policy: Some(FlaggedContentPolicy::new(FlaggedContentAction::AgeRestrict)),
-        ..Default::default()
-    };
-    assert_eq!(
-        serde_json::to_value(options).unwrap(),
-        json!({ "flaggedContentPolicy": { "action": "age-restrict" } })
-    );
-    assert_eq!(
-        serde_json::to_value(FlaggedContentPolicy::new(FlaggedContentAction::Limit)).unwrap(),
-        json!({ "action": "limit" })
     );
 }
 
@@ -639,7 +618,7 @@ fn newer_event_types_decode_to_their_own_variants() {
 
 #[test]
 fn report_policy_snapshot_decodes_into_typed_models() {
-    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
+    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"hash-list","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
     let category = &policy.categories[&ClassificationCategory::Violence];
     let settings = category.settings.as_ref().unwrap();
     assert_eq!(settings.category_action, "block");
@@ -662,7 +641,7 @@ fn report_policy_snapshot_decodes_into_typed_models() {
     assert_eq!(evidence.status, Some(EvaluationStatus::Evaluated));
     assert_eq!(evidence.score, Some(0.8));
     let decision = policy.decision.as_ref().unwrap();
-    assert_eq!(decision.source, "asset-override");
+    assert_eq!(decision.source, "hash-list");
     assert_eq!(decision.action.as_deref(), Some("purge"));
     assert_eq!(
         decision.flagged_categories,

@@ -70,7 +70,6 @@ module CalmLens
   }
   type processing_options_input = {
     ?keep_content_after_processing: bool?,
-    ?flagged_content_policy: { action: flagged_content_action }?,
     # Overrides the project's `storeSensitiveMetadata` setting: false removes embedded EXIF, XMP and
     # IPTC metadata before the image is stored; true stores it as uploaded.
     ?store_sensitive_metadata: bool?,
@@ -87,7 +86,6 @@ module CalmLens
   # The processing options an asset was uploaded with.
   type processing_options = {
     ?"keepContentAfterProcessing" => bool?,
-    ?"flaggedContentPolicy" => { "action" => flagged_content_action }?,
     ?"storeSensitiveMetadata" => bool?,
     ?"features" => processing_features?
   }

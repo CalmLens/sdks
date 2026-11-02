@@ -44,9 +44,6 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
   },
   "processingOptions": {
     "keepContentAfterProcessing": true,
-    "flaggedContentPolicy": {
-      "action": "block"
-    },
     "features": {
       "ocr": {
         "enabled": true
@@ -153,7 +150,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 		t.Fatalf("extracted text: %+v", x)
 	}
 	o := a.ProcessingOptions
-	if !*o.KeepContentAfterProcessing || o.FlaggedContentPolicy.Action != ModerationActionBlock || !o.Features.OCR.Enabled || o.Features.PersonDetection != nil ||
+	if !*o.KeepContentAfterProcessing || !o.Features.OCR.Enabled || o.Features.PersonDetection != nil ||
 		!o.Features.FaceDetection.Enabled || *o.Features.FaceDetection.AgeEstimation {
 		t.Fatalf("processing options: %+v", o)
 	}
@@ -204,15 +201,14 @@ func TestExtractedTextInlineDecode(t *testing.T) {
 func TestProcessingOptionsEncodeOnlySetFields(t *testing.T) {
 	c, h := setup(t)
 	options := &ProcessingOptions{
-		FlaggedContentPolicy: &FlaggedContentPolicy{Action: ModerationActionPurge},
-		Features:             &ProcessingFeatures{OCR: &OCRFeatureOptions{Enabled: true}, PersonDetection: &PersonDetectionFeatureOptions{Enabled: false}},
+		Features: &ProcessingFeatures{OCR: &OCRFeatureOptions{Enabled: true}, PersonDetection: &PersonDetectionFeatureOptions{Enabled: false}},
 	}
 	_, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "n", UploadPresetID: Ptr("preset-1"), ProcessingOptions: options, Content: &Content{Type: "text/plain", PlainText: Ptr("x")}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	q := h.last().URL.Query()
-	want := `{"flaggedContentPolicy":{"action":"purge"},"features":{"ocr":{"enabled":true},"personDetection":{"enabled":false}}}`
+	want := `{"features":{"ocr":{"enabled":true},"personDetection":{"enabled":false}}}`
 	if q.Get("processingOptions") != want || q.Get("uploadPresetId") != "preset-1" {
 		t.Fatalf("got %s and %q", q.Get("processingOptions"), q.Get("uploadPresetId"))
 	}
@@ -503,7 +499,7 @@ func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 
 func TestReportPolicySnapshotDecode(t *testing.T) {
 	var policy ReportPolicy
-	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"asset-override","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
+	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"hash-list","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
 		t.Fatal(err)
 	}
 	category := policy.Categories["violence"]
@@ -522,7 +518,7 @@ func TestReportPolicySnapshotDecode(t *testing.T) {
 	if evidence.Status != "evaluated" || evidence.Score == nil || *evidence.Score != 0.8 {
 		t.Fatalf("lost condition evidence: %#v", evidence)
 	}
-	if *policy.Decision.Action != "purge" || policy.Decision.Source != "asset-override" || !reflect.DeepEqual(policy.Decision.FlaggedCategories, []string{"violence"}) {
+	if *policy.Decision.Action != "purge" || policy.Decision.Source != DecisionSourceHashList || !reflect.DeepEqual(policy.Decision.FlaggedCategories, []string{"violence"}) {
 		t.Fatalf("lost decision snapshot: %#v", policy.Decision)
 	}
 }

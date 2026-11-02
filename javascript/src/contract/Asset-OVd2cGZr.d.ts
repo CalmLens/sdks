@@ -111,15 +111,6 @@ declare const METADATA_ITEM_SCHEMA: zod.ZodObject<{
 type MetadataItem = zod.infer<typeof METADATA_ITEM_SCHEMA>;
 declare const PROCESSING_OPTIONS_SCHEMA: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
   keepContentAfterProcessing: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-  flaggedContentPolicy: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-    action: zod.ZodEnum<{
-      "age-restrict": "age-restrict";
-      allow: "allow";
-      block: "block";
-      limit: "limit";
-      purge: "purge";
-    }>;
-  }, zod.core.$strip>>>;
   storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
   features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
@@ -9119,9 +9110,9 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
     }>>;
     decision: zod.ZodOptional<zod.ZodObject<{
       source: zod.ZodEnum<{
-        "asset-override": "asset-override";
         children: "children";
         "hash-list": "hash-list";
+        "link-safety": "link-safety";
         "mandatory-rule": "mandatory-rule";
         policy: "policy";
       }>;
@@ -9170,6 +9161,37 @@ declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
         sexual: "sexual";
         violence: "violence";
       }>>;
+    }, zod.core.$strict>>;
+    linkSafety: zod.ZodOptional<zod.ZodObject<{
+      action: zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        allow: "allow";
+        block: "block";
+        limit: "limit";
+      }>;
+      links: zod.ZodArray<zod.ZodNumber>;
+      settings: zod.ZodObject<{
+        verdictActions: zod.ZodRecord<zod.ZodEnum<{
+          adult: "adult";
+          gambling: "gambling";
+          malware: "malware";
+          phishing: "phishing";
+          unresolved: "unresolved";
+        }> & zod.core.$partial, zod.ZodEnum<{
+          "age-restrict": "age-restrict";
+          allow: "allow";
+          block: "block";
+          limit: "limit";
+        }>>;
+        offPlatformLinks: zod.ZodOptional<zod.ZodObject<{
+          action: zod.ZodEnum<{
+            "age-restrict": "age-restrict";
+            block: "block";
+            limit: "limit";
+          }>;
+          allowedDomains: zod.ZodArray<zod.ZodString>;
+        }, zod.core.$strict>>;
+      }, zod.core.$strict>;
     }, zod.core.$strict>>;
   }, zod.core.$strict>>;
   hashMatches: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -18206,9 +18228,9 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
       }>>;
       decision: zod.ZodOptional<zod.ZodObject<{
         source: zod.ZodEnum<{
-          "asset-override": "asset-override";
           children: "children";
           "hash-list": "hash-list";
+          "link-safety": "link-safety";
           "mandatory-rule": "mandatory-rule";
           policy: "policy";
         }>;
@@ -18257,6 +18279,37 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
           sexual: "sexual";
           violence: "violence";
         }>>;
+      }, zod.core.$strict>>;
+      linkSafety: zod.ZodOptional<zod.ZodObject<{
+        action: zod.ZodEnum<{
+          "age-restrict": "age-restrict";
+          allow: "allow";
+          block: "block";
+          limit: "limit";
+        }>;
+        links: zod.ZodArray<zod.ZodNumber>;
+        settings: zod.ZodObject<{
+          verdictActions: zod.ZodRecord<zod.ZodEnum<{
+            adult: "adult";
+            gambling: "gambling";
+            malware: "malware";
+            phishing: "phishing";
+            unresolved: "unresolved";
+          }> & zod.core.$partial, zod.ZodEnum<{
+            "age-restrict": "age-restrict";
+            allow: "allow";
+            block: "block";
+            limit: "limit";
+          }>>;
+          offPlatformLinks: zod.ZodOptional<zod.ZodObject<{
+            action: zod.ZodEnum<{
+              "age-restrict": "age-restrict";
+              block: "block";
+              limit: "limit";
+            }>;
+            allowedDomains: zod.ZodArray<zod.ZodString>;
+          }, zod.core.$strict>>;
+        }, zod.core.$strict>;
       }, zod.core.$strict>>;
     }, zod.core.$strict>>;
     hashMatches: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -18380,6 +18433,51 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
         "qr-code": "qr-code";
         text: "text";
       }>;
+    }, zod.core.$strict>>;
+  }, zod.core.$strict>, zod.ZodObject<{
+    status: zod.ZodLiteral<"not-evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    reason: zod.ZodEnum<{
+      "not-supported": "not-supported";
+      unavailable: "unavailable";
+    }>;
+  }, zod.core.$strict>], "status">>;
+  linkSafety: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+    status: zod.ZodLiteral<"evaluated">;
+    stage: zod.ZodEnum<{
+      beta: "beta";
+      ga: "ga";
+    }>;
+    links: zod.ZodArray<zod.ZodObject<{
+      url: zod.ZodString;
+      finalUrl: zod.ZodNullable<zod.ZodString>;
+      redirects: zod.ZodNumber;
+      source: zod.ZodEnum<{
+        "qr-code": "qr-code";
+        text: "text";
+      }>;
+      verdict: zod.ZodEnum<{
+        adult: "adult";
+        gambling: "gambling";
+        malware: "malware";
+        phishing: "phishing";
+        safe: "safe";
+        unresolved: "unresolved";
+      }>;
+      evidence: zod.ZodArray<zod.ZodObject<{
+        provider: zod.ZodEnum<{
+          "cloudflare-domain-intelligence": "cloudflare-domain-intelligence";
+          "google-web-risk": "google-web-risk";
+        }>;
+        status: zod.ZodEnum<{
+          checked: "checked";
+          failed: "failed";
+        }>;
+        labels: zod.ZodArray<zod.ZodString>;
+      }, zod.core.$strict>>;
     }, zod.core.$strict>>;
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
@@ -18544,15 +18642,6 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
   tags: zod.ZodOptional<zod.ZodNullable<zod.ZodArray<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>>;
   processingOptions: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     keepContentAfterProcessing: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-    flaggedContentPolicy: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-      action: zod.ZodEnum<{
-        "age-restrict": "age-restrict";
-        allow: "allow";
-        block: "block";
-        limit: "limit";
-        purge: "purge";
-      }>;
-    }, zod.core.$strip>>>;
     storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
     features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
@@ -27574,9 +27663,9 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         }>>;
         decision: zod.ZodOptional<zod.ZodObject<{
           source: zod.ZodEnum<{
-            "asset-override": "asset-override";
             children: "children";
             "hash-list": "hash-list";
+            "link-safety": "link-safety";
             "mandatory-rule": "mandatory-rule";
             policy: "policy";
           }>;
@@ -27625,6 +27714,37 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
             sexual: "sexual";
             violence: "violence";
           }>>;
+        }, zod.core.$strict>>;
+        linkSafety: zod.ZodOptional<zod.ZodObject<{
+          action: zod.ZodEnum<{
+            "age-restrict": "age-restrict";
+            allow: "allow";
+            block: "block";
+            limit: "limit";
+          }>;
+          links: zod.ZodArray<zod.ZodNumber>;
+          settings: zod.ZodObject<{
+            verdictActions: zod.ZodRecord<zod.ZodEnum<{
+              adult: "adult";
+              gambling: "gambling";
+              malware: "malware";
+              phishing: "phishing";
+              unresolved: "unresolved";
+            }> & zod.core.$partial, zod.ZodEnum<{
+              "age-restrict": "age-restrict";
+              allow: "allow";
+              block: "block";
+              limit: "limit";
+            }>>;
+            offPlatformLinks: zod.ZodOptional<zod.ZodObject<{
+              action: zod.ZodEnum<{
+                "age-restrict": "age-restrict";
+                block: "block";
+                limit: "limit";
+              }>;
+              allowedDomains: zod.ZodArray<zod.ZodString>;
+            }, zod.core.$strict>>;
+          }, zod.core.$strict>;
         }, zod.core.$strict>>;
       }, zod.core.$strict>>;
       hashMatches: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -27748,6 +27868,51 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
           "qr-code": "qr-code";
           text: "text";
         }>;
+      }, zod.core.$strict>>;
+    }, zod.core.$strict>, zod.ZodObject<{
+      status: zod.ZodLiteral<"not-evaluated">;
+      stage: zod.ZodEnum<{
+        beta: "beta";
+        ga: "ga";
+      }>;
+      reason: zod.ZodEnum<{
+        "not-supported": "not-supported";
+        unavailable: "unavailable";
+      }>;
+    }, zod.core.$strict>], "status">>;
+    linkSafety: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+      status: zod.ZodLiteral<"evaluated">;
+      stage: zod.ZodEnum<{
+        beta: "beta";
+        ga: "ga";
+      }>;
+      links: zod.ZodArray<zod.ZodObject<{
+        url: zod.ZodString;
+        finalUrl: zod.ZodNullable<zod.ZodString>;
+        redirects: zod.ZodNumber;
+        source: zod.ZodEnum<{
+          "qr-code": "qr-code";
+          text: "text";
+        }>;
+        verdict: zod.ZodEnum<{
+          adult: "adult";
+          gambling: "gambling";
+          malware: "malware";
+          phishing: "phishing";
+          safe: "safe";
+          unresolved: "unresolved";
+        }>;
+        evidence: zod.ZodArray<zod.ZodObject<{
+          provider: zod.ZodEnum<{
+            "cloudflare-domain-intelligence": "cloudflare-domain-intelligence";
+            "google-web-risk": "google-web-risk";
+          }>;
+          status: zod.ZodEnum<{
+            checked: "checked";
+            failed: "failed";
+          }>;
+          labels: zod.ZodArray<zod.ZodString>;
+        }, zod.core.$strict>>;
       }, zod.core.$strict>>;
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;

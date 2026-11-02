@@ -998,24 +998,14 @@ type ModerationQualifier = keyof typeof MODERATION_QUALIFIER_INFO;
  * (`age-restrict`: `viewerClaims.ageConfirmed: true`), stop delivering it
  * (`block`), or stop delivering it and delete its stored content (`purge`).
  */
-declare const FLAGGED_CONTENT_ACTION_SCHEMA: z.ZodEnum<{
+declare const POLICY_ACTION_SCHEMA: z.ZodEnum<{
   "age-restrict": "age-restrict";
   allow: "allow";
   block: "block";
   limit: "limit";
   purge: "purge";
 }>;
-type FlaggedContentAction = z.infer<typeof FLAGGED_CONTENT_ACTION_SCHEMA>;
-declare const FLAGGED_CONTENT_POLICY_SCHEMA: z.ZodObject<{
-  action: z.ZodEnum<{
-    "age-restrict": "age-restrict";
-    allow: "allow";
-    block: "block";
-    limit: "limit";
-    purge: "purge";
-  }>;
-}, z.core.$strip>;
-type FlaggedContentPolicy = z.infer<typeof FLAGGED_CONTENT_POLICY_SCHEMA>;
+type PolicyAction = z.infer<typeof POLICY_ACTION_SCHEMA>;
 declare const CLASSIFICATION_CATEGORY_SCHEMA: z.ZodEnum<{
   "criminal-activity": "criminal-activity";
   harassment: "harassment";
@@ -5890,4 +5880,4 @@ declare const CLASSIFICATION_LABEL_SCHEMA: z.ZodObject<{
   knowledgeBaseId: z.ZodOptional<z.ZodNullable<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>>;
 }, z.core.$strip>;
 type ClassificationLabel = z.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
-export { ClassificationNotEvaluatedReason as a, FlaggedContentPolicy as c, EU_COUNTRIES as d, VIEWER_CLAIMS_SCHEMA as f, ClassificationLabel as i, FlaggedContentAction as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, ModerationQualifier as u };
+export { ClassificationNotEvaluatedReason as a, PolicyAction as c, VIEWER_CLAIMS_SCHEMA as d, ClassificationLabel as i, ModerationQualifier as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, EU_COUNTRIES as u };

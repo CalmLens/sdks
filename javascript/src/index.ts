@@ -149,6 +149,6 @@ export type {
   ProcessingFeatureStage,
   ProcessingFeatures,
 } from "./contract/ProcessingFeatures.js";
-export type { FlaggedContentAction, FlaggedContentPolicy } from "./contract/Project.js";
+export type { PolicyAction } from "./contract/Project.js";
 export type { GetEventsResponse as EventsPage } from "./contract/PublicApiSchemas.js";
 export type { ReceivedWebhookEventPayload as WebhookEventPayload } from "./contract/WebhookPayload.js";

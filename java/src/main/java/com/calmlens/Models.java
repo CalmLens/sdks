@@ -463,22 +463,6 @@ public final class Models {
   }
 
   /**
-   * What happens to flagged content for one asset, overriding the project's moderation action.
-   *
-   * @param action {@code allow} takes no action, {@code limit} delivers the asset normally but marks
-   *     it so your app reduces its reach, {@code age-restrict} delivers the asset only through
-   *     signed URLs or API keys, {@code block} stops delivery while keeping the content, and {@code
-   *     purge} deletes it
-   */
-  public record FlaggedContentPolicy(String action) {
-    /** No action set. */
-    public FlaggedContentPolicy() { this(null); }
-
-    /** @param value the action @return a copy with this action */
-    public FlaggedContentPolicy action(String value) { return new FlaggedContentPolicy(value); }
-  }
-
-  /**
    * Turns one optional feature on or off. Features are off unless {@code enabled} is true.
    *
    * @param enabled whether the feature runs
@@ -544,28 +528,24 @@ public final class Models {
    * Processing options for an asset.
    *
    * @param keepContentAfterProcessing whether stored content is kept after classification
-   * @param flaggedContentPolicy overrides the project's moderation action for this asset
    * @param storeSensitiveMetadata overrides the project's {@code storeSensitiveMetadata} setting
    *     for this upload: when false, embedded image metadata (EXIF, XMP and IPTC) is removed from
    *     the file before it is stored, and {@code fileMetadata} leaves out the creator and
    *     location; when true, the image is stored as uploaded
    * @param features optional analyses to run, such as OCR
    */
-  public record ProcessingOptions(Boolean keepContentAfterProcessing, FlaggedContentPolicy flaggedContentPolicy, Boolean storeSensitiveMetadata, ProcessingFeatures features) {
+  public record ProcessingOptions(Boolean keepContentAfterProcessing, Boolean storeSensitiveMetadata, ProcessingFeatures features) {
     /** No options set. */
-    public ProcessingOptions() { this(null, null, null, null); }
+    public ProcessingOptions() { this(null, null, null); }
 
     /** @param value whether to keep content @return a copy with this setting */
-    public ProcessingOptions keepContentAfterProcessing(Boolean value) { return new ProcessingOptions(value, flaggedContentPolicy, storeSensitiveMetadata, features); }
-
-    /** @param value the policy @return a copy with this setting */
-    public ProcessingOptions flaggedContentPolicy(FlaggedContentPolicy value) { return new ProcessingOptions(keepContentAfterProcessing, value, storeSensitiveMetadata, features); }
+    public ProcessingOptions keepContentAfterProcessing(Boolean value) { return new ProcessingOptions(value, storeSensitiveMetadata, features); }
 
     /** @param value whether to store embedded image metadata @return a copy with this setting */
-    public ProcessingOptions storeSensitiveMetadata(Boolean value) { return new ProcessingOptions(keepContentAfterProcessing, flaggedContentPolicy, value, features); }
+    public ProcessingOptions storeSensitiveMetadata(Boolean value) { return new ProcessingOptions(keepContentAfterProcessing, value, features); }
 
     /** @param value optional features @return a copy with these features */
-    public ProcessingOptions features(ProcessingFeatures value) { return new ProcessingOptions(keepContentAfterProcessing, flaggedContentPolicy, storeSensitiveMetadata, value); }
+    public ProcessingOptions features(ProcessingFeatures value) { return new ProcessingOptions(keepContentAfterProcessing, storeSensitiveMetadata, value); }
   }
 
   /**
@@ -1957,7 +1937,7 @@ public final class Models {
   /**
    * Final automatic action, flagged categories and decision source.
    *
-   * @param source what decided: {@code policy}, {@code asset-override}, {@code children} or {@code hash-list}
+   * @param source what decided: {@code policy}, {@code children}, {@code hash-list} or {@code mandatory-rule}
    */
   public record ReportPolicyDecision(String source, String action, List<String> flaggedCategories, String rule, List<RegionalDecision> regions) {
     public ReportPolicyDecision { flaggedCategories = list(flaggedCategories); regions = list(regions); }

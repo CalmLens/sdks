@@ -1830,9 +1830,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -2402,9 +2399,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -3013,9 +3007,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -3611,9 +3602,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -4242,9 +4230,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -4824,9 +4809,6 @@
             ],
             "processingOptions": {
               "keepContentAfterProcessing": true,
-              "flaggedContentPolicy": {
-                "action": "allow"
-              },
               "storeSensitiveMetadata": true,
               "features": {
                 "ocr": {
@@ -5412,9 +5394,6 @@
           ],
           "processingOptions": {
             "keepContentAfterProcessing": true,
-            "flaggedContentPolicy": {
-              "action": "allow"
-            },
             "storeSensitiveMetadata": true,
             "features": {
               "ocr": {
@@ -6006,9 +5985,6 @@
           ],
           "processingOptions": {
             "keepContentAfterProcessing": true,
-            "flaggedContentPolicy": {
-              "action": "allow"
-            },
             "storeSensitiveMetadata": true,
             "features": {
               "ocr": {
@@ -6594,9 +6570,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -7166,9 +7139,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -7738,9 +7708,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -8315,9 +8282,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -8887,9 +8851,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -9462,9 +9423,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {
@@ -10069,9 +10027,6 @@
       ],
       "processingOptions": {
         "keepContentAfterProcessing": true,
-        "flaggedContentPolicy": {
-          "action": "allow"
-        },
         "storeSensitiveMetadata": true,
         "features": {
           "ocr": {

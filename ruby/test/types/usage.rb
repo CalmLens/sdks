@@ -8,7 +8,7 @@ require 'calmlens/testing'
 client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', timeout: 30)
 
 asset = client.text.classify(text: 'Hello', name: 'greeting', external_id: 'post-1',
-                             processing_options: { flagged_content_policy: { action: 'age-restrict' } })
+                             processing_options: { keep_content_after_processing: true })
 status = asset['classification']['moderation']['status']
 processing = asset['classification']['status']
 failure = asset['classification']['failureReason']

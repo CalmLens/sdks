@@ -1135,6 +1135,101 @@ declare const EVENT_TYPE_INFO: {
       }>;
     }, zod.core.$strip>;
   };
+  readonly "asset.link-flagged": {
+    id: "asset.link-flagged";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      assetName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      assetType: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>>;
+      linkVerdict: EventFieldDefinition<zod.ZodEnum<{
+        adult: "adult";
+        gambling: "gambling";
+        malware: "malware";
+        phishing: "phishing";
+        safe: "safe";
+        unresolved: "unresolved";
+      }>>;
+      linkUrl: EventFieldDefinition<zod.ZodString>;
+      linkFinalUrl: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      linkAction: EventFieldDefinition<zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        block: "block";
+        limit: "limit";
+      }>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      assetName?: string | null | undefined;
+      assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      linkVerdict: "adult" | "gambling" | "malware" | "phishing" | "safe" | "unresolved";
+      linkUrl: string;
+      linkFinalUrl?: string | null | undefined;
+      linkAction: "age-restrict" | "block" | "limit";
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      assetName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      assetType: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
+        audio: "audio";
+        file: "file";
+        image: "image";
+        "multimedia-document": "multimedia-document";
+        "plaintext-document": "plaintext-document";
+        video: "video";
+        website: "website";
+      }>>>;
+      linkVerdict: zod.ZodEnum<{
+        adult: "adult";
+        gambling: "gambling";
+        malware: "malware";
+        phishing: "phishing";
+        safe: "safe";
+        unresolved: "unresolved";
+      }>;
+      linkUrl: zod.ZodString;
+      linkFinalUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      linkAction: zod.ZodEnum<{
+        "age-restrict": "age-restrict";
+        block: "block";
+        limit: "limit";
+      }>;
+    }, zod.core.$strip>;
+  };
   readonly "usage.limit-reached": {
     id: "usage.limit-reached";
     name: string;

@@ -8,7 +8,7 @@ require_relative 'app'
 require_relative 'demo'
 
 module TestHelpers
-  HOLD_POLICY = { 'keepContentAfterProcessing' => true, 'flaggedContentPolicy' => { 'action' => 'block' } }.freeze
+  HOLD_POLICY = { 'keepContentAfterProcessing' => true }.freeze
   CURSOR = { 'items' => [], 'nextCursor' => 'c0', 'hasMore' => false }.freeze
 
   def demo_app(**options)
@@ -36,7 +36,7 @@ module TestHelpers
   def asset(id, status, flagged: nil)
     classification = { 'pending' => 'processing', 'uploading' => 'pending', 'error' => 'failed' }.fetch(status, 'completed')
     moderation = { 'status' => classification == 'completed' ? status : 'pending', 'categories' => {} }
-    moderation['policy'] = { 'decision' => { 'source' => 'asset-override', 'action' => 'block', 'flaggedCategories' => flagged } } if flagged
+    moderation['policy'] = { 'decision' => { 'source' => 'policy', 'action' => 'block', 'flaggedCategories' => flagged } } if flagged
     { 'id' => id, 'upload' => { 'status' => status == 'uploading' ? 'uploading' : 'completed' },
       'classification' => { 'status' => classification, 'moderation' => moderation },
       'content' => { 'status' => 'stored' } }
@@ -96,7 +96,7 @@ end
 class SubmissionTest < Minitest::Test
   include TestHelpers
 
-  def test_every_field_of_every_reply_carries_the_hold_override_and_an_external_id
+  def test_every_field_of_every_reply_keeps_its_content_and_an_external_id
     app, mock = live_app(CURSOR, asset('name-1', 'allowed'), asset('text-1', 'allowed'),
                          asset('name-2', 'blocked'), asset('text-2', 'allowed'))
     assert_equal 303, post_reply(app).first

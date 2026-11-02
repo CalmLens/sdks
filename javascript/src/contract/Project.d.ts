@@ -1,2 +1,2 @@
-import { c as FlaggedContentPolicy, l as FlaggedContentAction } from "./Classification-CS-jrWE9.js";
-export type { FlaggedContentAction, FlaggedContentPolicy };
+import { c as PolicyAction } from "./Classification-94kSYWZw.js";
+export type { PolicyAction };

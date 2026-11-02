@@ -1,2 +1,2 @@
-import { i as EventFacts, n as EventFact } from "./EventCatalog-C6pTIB77.js";
+import { i as EventFacts, n as EventFact } from "./EventCatalog-WVNTRqs-.js";
 export type { EventFact, EventFacts };

@@ -76,13 +76,13 @@ The demo note and outcome selector disappear. Missing or partial
 credentials fail startup. `CALMLENS_API_URL` optionally points to a
 local API. Live SDK requests time out after 30 seconds. No API key is sent to the browser.
 
-Each field is moderated synchronously, with a per-asset policy override:
+Each field is moderated synchronously, with its content kept for review:
 
 ```ruby
 asset = client.text.classify(
   name: 'Calmthread reply',
   external_id: "#{reply_id}:text",
-  processing_options: { keep_content_after_processing: true, flagged_content_policy: { action: 'block' } },
+  processing_options: { keep_content_after_processing: true },
   text: text
 )
 ```
@@ -91,20 +91,15 @@ The display name goes first. If it fails or cannot be checked, the reply text is
 If the name is held, the text is still moderated so the reviewer sees the whole reply. Each
 call uses moderation quota.
 
-### Why the override is per asset
+### What holds a reply
 
-The `block` action makes a flagged asset `blocked`: CalmLens keeps its content but does not
-deliver it. Content is removed after processing unless the upload keeps it, so every field is
-sent with `keep_content_after_processing: true`: a reviewer can read a held reply in the portal,
-and the app deletes the stored text once a reviewer keeps the reply out. Setting the override
-on each asset makes this thread hold flagged replies regardless of the project-wide action,
-which may be `age-restrict` (deliver only through signed URLs or API keys) or `purge` (delete
-the content, leaving nothing to review) for the project's other uploads.
-
-The override changes only what happens to a flagged asset. Your project's moderation policy
-still decides what counts as flagged: its allowances and restrictions work as usual. With the
-override, a category whose policy score reaches 50% is held even if the project sets that
-category's action to `allow`. See the moderation policies guide in the CalmLens docs.
+Your project's moderation policy decides each field, with its allowances and restrictions. A
+field the policy allows or limits is clean; one it age-restricts, blocks or purges holds the
+reply. Content is removed after processing unless the upload keeps it, so every field is sent
+with `keep_content_after_processing: true`: a reviewer can read a held reply in the portal, and
+the app deletes the stored text once a reviewer keeps the reply out. A policy that purges a
+category leaves nothing to review, so use `block` for categories you want reviewers to see. See
+the moderation policies guide in the CalmLens docs.
 
 ## Review decisions
 
@@ -168,7 +163,7 @@ shown. Only absolute HTTP(S) fact URLs become links. A test send (fact
 
 ## Read the code
 
-- `Moderator#moderate_reply` in [app.rb](app.rb): the SDK calls, the per-asset override, the
+- `Moderator#moderate_reply` in [app.rb](app.rb): the SDK calls, the processing options, the
   external IDs and the field order. [demo.rb](demo.rb) holds the demo mode.
 - `Calmthread.decision` and `Discussion#submit`: clean, held and failed results. Held replies
   are logged without their name or text.
@@ -185,7 +180,7 @@ shown. Only absolute HTTP(S) fact URLs become links. A test send (fact
   assets. Every dynamic value goes through `h`. CalmLens
   [text test inputs](https://calmlens.com/docs/guides/testing) in a reply are shown as a short
   marker rather than their full code.
-- [app_test.rb](app_test.rb): the override on every request, holding and blocking flagged
+- [app_test.rb](app_test.rb): the processing options on every request, holding and blocking flagged
   replies, release and removal rules, content deletion, retries, replays, webhook
   tampering, test sends, fail-closed states, form tokens, request limits and the server.
 

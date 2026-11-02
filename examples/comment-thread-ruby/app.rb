@@ -25,11 +25,11 @@ module Calmthread
   DEFAULT_HOST = '127.0.0.1'
   DEFAULT_PORT = 6403
 
-  # Sent with every field of every reply. `block` overrides the project's action for a flagged
-  # field: the asset becomes `blocked`, so it is not delivered but its content is kept. Content is
-  # kept after processing so a reviewer can read a held reply; the app deletes it once a reviewer
-  # decides the reply stays out of the thread.
-  PROCESSING_OPTIONS = { keep_content_after_processing: true, flagged_content_policy: { action: 'block' } }.freeze
+  # Sent with every field of every reply. The project's moderation policy decides each field, and
+  # any field it doesn't allow or limit holds the reply. Content is kept after processing so a
+  # reviewer can read a held reply; the app deletes it once a reviewer decides the reply stays out
+  # of the thread.
+  PROCESSING_OPTIONS = { keep_content_after_processing: true }.freeze
 
   DEMO_RESULTS = {
     'clean' => 'Allowed',

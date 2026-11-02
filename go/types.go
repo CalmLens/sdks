@@ -123,8 +123,7 @@ const (
 	AssetTypeFile               = "file"
 )
 
-// Policy action values of FlaggedContentPolicy.Action, CategoryPolicyScore.Action and policy
-// rules. ReportPolicyDecision.Action is ModerationActionLimit, ModerationActionAgeRestrict,
+// Policy action values of CategoryPolicyScore.Action and policy rules. ReportPolicyDecision.Action is ModerationActionLimit, ModerationActionAgeRestrict,
 // ModerationActionBlock or ModerationActionPurge, or nil when nothing was acted on.
 const (
 	ModerationActionAllow       = "allow"
@@ -382,8 +381,6 @@ type FileMetadataLocation struct {
 type ProcessingOptions struct {
 	// KeepContentAfterProcessing keeps the content after processing (default false).
 	KeepContentAfterProcessing *bool `json:"keepContentAfterProcessing,omitempty"`
-	// FlaggedContentPolicy overrides the project moderation action for this asset.
-	FlaggedContentPolicy *FlaggedContentPolicy `json:"flaggedContentPolicy,omitempty"`
 	// StoreSensitiveMetadata overrides the project's storeSensitiveMetadata setting for this
 	// upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed from the file
 	// before it is stored, and FileMetadata leaves out the creator and location. When true, the
@@ -391,14 +388,6 @@ type ProcessingOptions struct {
 	StoreSensitiveMetadata *bool `json:"storeSensitiveMetadata,omitempty"`
 	// Features turns on optional analyses. Every feature is off unless enabled here.
 	Features *ProcessingFeatures `json:"features,omitempty"`
-}
-
-// FlaggedContentPolicy is what happens when the asset is flagged. Action is one of the
-// ModerationAction constants: allow takes no action, limit delivers the asset normally but marks it
-// so your app can reduce its reach, age-restrict delivers the asset only through signed URLs or
-// API keys, block stops delivery while retaining content and purge deletes content.
-type FlaggedContentPolicy struct {
-	Action string `json:"action"`
 }
 
 // ProcessingFeatures holds the optional analyses to run, keyed by feature. A nil feature is
@@ -500,9 +489,8 @@ type CategoryPolicySettingsSnapshot struct {
 // Values of ReportPolicyDecision.Source. Source is a plain string so sources added later
 // still decode.
 const (
-	DecisionSourcePolicy        = "policy"
-	DecisionSourceAssetOverride = "asset-override"
-	DecisionSourceChildren      = "children"
+	DecisionSourcePolicy   = "policy"
+	DecisionSourceChildren = "children"
 	// DecisionSourceHashList is a block from a hash list match.
 	DecisionSourceHashList      = "hash-list"
 	DecisionSourceMandatoryRule = "mandatory-rule"

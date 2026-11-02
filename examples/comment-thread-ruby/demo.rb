@@ -106,10 +106,10 @@ module Calmthread
         outcome = OUTCOMES.fetch(choice, OUTCOMES['clean'])[field == 'name' ? 0 : 1]
         return outcome if outcome == 'failed'
 
-        # A blocked field is one the `block` policy acted on; the report names the flagged category.
+        # A blocked field is one the project's policy blocked; the report names the flagged category.
         flagged = outcome == 'blocked' ? [FLAGGED.fetch(choice)] : []
         { 'classification' => { 'moderation' => { 'status' => outcome, 'categories' => {},
-                                                   'policy' => { 'decision' => { 'source' => 'asset-override', 'action' => 'block',
+                                                   'policy' => { 'decision' => { 'source' => 'policy', 'action' => 'block',
                                                                                  'flaggedCategories' => flagged } } } } }
       end
     end

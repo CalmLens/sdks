@@ -263,7 +263,6 @@ asset, err := client.Assets.Classify(ctx, calmlens.SubmitAssetOptions{
     Content: &calmlens.Content{Data: file, Type: "image/jpeg"},
     ProcessingOptions: &calmlens.ProcessingOptions{
         KeepContentAfterProcessing: calmlens.Ptr(true),
-        FlaggedContentPolicy:       &calmlens.FlaggedContentPolicy{Action: calmlens.ModerationActionBlock},
         Features: &calmlens.ProcessingFeatures{
             FaceDetection: &calmlens.FaceDetectionFeatureOptions{Enabled: true, AgeEstimation: calmlens.Ptr(true)},
         },
