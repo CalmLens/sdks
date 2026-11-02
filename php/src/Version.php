@@ -6,7 +6,7 @@ namespace CalmLens;
 
 final class Version
 {
-    public const VERSION = '0.17.0';
+    public const VERSION = '0.17.1';
 
     /** The `User-Agent` the SDK sends, e.g. `calmlens-php/0.1.0 (php/8.4.1)`. */
     public static function userAgent(): string

@@ -1,5 +1,11 @@
 # @calmlens/sdk-java
 
+## 0.17.1
+
+### Patch Changes
+
+- edb65a0: Every SDK is released at the same version.
+
 ## 0.17.0
 
 ### Minor Changes
