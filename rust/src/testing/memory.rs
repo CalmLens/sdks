@@ -663,7 +663,7 @@ fn apply_outcome(
     );
     let moderation = classification
         .entry("moderation")
-        .or_insert_with(|| json!({"manualReviews": []}));
+        .or_insert_with(|| json!({"manualReviews": [], "flaggedCategories": [], "regions": []}));
     moderation["status"] = if decided { outcome } else { "pending" }.into();
     let upload = section(asset, "upload");
     upload.insert("status".into(), "completed".into());
@@ -1847,7 +1847,7 @@ impl Backend {
             },
             "classification": {
                 "status": if open { "pending" } else { "processing" }, "failureReason": null,
-                "updatedAt": now, "completedAt": null, "moderation": {"status": "pending", "manualReviews": []},
+                "updatedAt": now, "completedAt": null, "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []},
             },
         });
         for key in [
@@ -1985,11 +1985,11 @@ impl Backend {
                 }
                 if body.get("rerun") != Some(&Value::Bool(true)) {
                     // The evidence is completed and every action stays as decided.
-                    let evidence = "/classification/moderation/policy/evidence";
-                    if asset.pointer(evidence) != Some(&json!("decision")) {
+                    let evidence = "/classification/moderation/explanationComplete";
+                    if asset.pointer(evidence) != Some(&json!(false)) {
                         return Ok(asset);
                     }
-                    *asset.pointer_mut(evidence).expect("evidence") = "full".into();
+                    *asset.pointer_mut(evidence).expect("evidence") = true.into();
                     asset["updatedAt"] = now.into();
                 } else {
                     let reviews = &asset["classification"]["moderation"]["manualReviews"];

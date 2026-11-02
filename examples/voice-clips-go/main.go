@@ -449,8 +449,8 @@ func (a *app) refreshDecision(ctx context.Context, item *entry) (bool, error) {
 	before := item.Status
 	item.Status = clipStatus(asset)
 	item.Duration, item.Segments = 0, nil
-	if report := asset.Classification.Moderation; report.Timeline != nil {
-		item.Duration, item.Segments = timeline(report.Timeline)
+	if report := asset.Classification.Moderation; report.Raw != nil && report.Raw.Timeline != nil {
+		item.Duration, item.Segments = timeline(report.Raw.Timeline)
 	}
 	item.Error = ""
 	if !playable(item.Status) {
@@ -491,7 +491,7 @@ func clipStatus(asset *calmlens.Asset) string {
 	}
 }
 
-// timeline converts report.media into segment rows with the categories that scored in each.
+// timeline converts raw.timeline into segment rows with the categories that scored in each.
 func timeline(media *calmlens.MediaClassificationReport) (float64, []segment) {
 	duration := media.DurationSeconds
 	rows := []segment{}

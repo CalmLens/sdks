@@ -89,7 +89,7 @@ func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) 
 }
 
 // Explain completes the policy evidence behind a decided asset's moderation decision: the report's
-// Policy.Evidence becomes PolicyEvidenceFull and every action stays as decided. With Rerun the
+// ExplanationComplete becomes true and every action stays as decided. With Rerun the
 // asset is moderated again with the project's current policy and returns in
 // ClassificationStatusProcessing; use it when the policy changed since the decision
 // (CodeAssetPolicyChanged).

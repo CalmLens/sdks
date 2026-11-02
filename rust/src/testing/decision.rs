@@ -123,7 +123,7 @@ struct Flag {
 /// `sdk/invalid-argument` for one CalmLens doesn't have.
 ///
 /// A decided status fills the asset's report as the API would: every category (those not
-/// flagged evaluated with score 0), the highest score, and the policy's actions and
+/// flagged evaluated with score 0), the policy's actions and
 /// `flagged_categories`. The policy acts on a category at 0.5 and above, so a flagged category
 /// at 0.5 or more is listed there unless the status is `allowed`.
 ///
@@ -262,17 +262,13 @@ impl MockDecision {
             .filter(|category| !self.not_evaluated.contains(category))
             .map(|category| (*category, self.score_of(category)))
             .collect();
-        let score = evaluated
-            .iter()
-            .map(|(_, score)| *score)
-            .fold(0.0, f64::max);
         let mut categories = Map::new();
         for category in CATEGORIES {
             let result = if self.not_evaluated.contains(category) {
                 json!({"status": "not-evaluated", "reason": "not-supported"})
             } else {
+                let score = self.score_of(category);
                 let flag = self.flags.iter().find(|flag| flag.category == *category);
-                let score = flag.map_or(0.0, |flag| flag.score);
                 let mut result = json!({
                     "status": "evaluated", "likelihood": likelihood(score), "score": score,
                 });
@@ -304,20 +300,14 @@ impl MockDecision {
                 )
             })
             .collect();
-        let action = (self.status != MockOutcome::Allowed).then(|| self.status.action());
-        let policy = json!({
-            "score": score,
-            "categories": policy_categories,
-            "evidence": "full",
-            "decision": {
-                "source": "policy", "action": action, "regions": [],
-                "flaggedCategories": self.flagged_categories(),
-            },
-        });
         let mut report = Map::new();
-        report.insert("categories".into(), categories.into());
-        report.insert("score".into(), score.into());
-        report.insert("policy".into(), policy);
+        report.insert("raw".into(), json!({"categories": categories}));
+        report.insert("categories".into(), policy_categories.into());
+        report.insert("explanationComplete".into(), true.into());
+        report.insert("source".into(), "policy".into());
+        report.insert("automatedAction".into(), self.status.action().into());
+        report.insert("regions".into(), json!([]));
+        report.insert("flaggedCategories".into(), json!(self.flagged_categories()));
         Some(report)
     }
 }

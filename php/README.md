@@ -337,7 +337,7 @@ returns a status (`pending`, `failed`, `allowed`, `limited`, `age-restricted`, `
 `processing-error`) or a decision from `MockDecision::of($status)`, whose chainable
 `flag($category, $score, $qualifiers)` and `notEvaluated($category)` record findings. A decided
 asset gets a complete report: every category (unflagged ones evaluated with score 0), the
-highest score and the policy's actions and `flaggedCategories`. Unknown names, scores outside 0
+policy's actions and `flaggedCategories`. Unknown names, scores outside 0
 to 1, repeated categories and findings on `pending` or `failed` throw `sdk/invalid-argument`.
 Without `moderate`, queued work stays `pending` and everything else is `allowed`.
 `completeProcessing($assetId, $decision)` finishes a processing asset with that decision, or

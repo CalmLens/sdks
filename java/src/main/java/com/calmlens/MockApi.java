@@ -513,6 +513,8 @@ final class MockApi {
     JsonObject moderation = new JsonObject();
     moderation.addProperty("status", "pending");
     moderation.add("manualReviews", new JsonArray());
+    moderation.add("flaggedCategories", new JsonArray());
+    moderation.add("regions", new JsonArray());
     JsonObject classification = new JsonObject();
     classification.addProperty("status", last ? "processing" : "pending");
     classification.add("failureReason", JsonNull.INSTANCE);
@@ -923,8 +925,8 @@ final class MockApi {
         JsonObject moderation = asset.getAsJsonObject("classification").getAsJsonObject("moderation");
         if (body == null || !bool(body, "rerun")) {
           // Like the API: the evidence is completed and every action stays as decided.
-          if (moderation.get("policy") instanceof JsonObject policy && "decision".equals(str(policy, "evidence"))) {
-            policy.addProperty("evidence", "full");
+          if (moderation.has("explanationComplete") && !moderation.get("explanationComplete").getAsBoolean()) {
+            moderation.addProperty("explanationComplete", true);
             asset.addProperty("updatedAt", now);
           }
           return asset;

@@ -1154,7 +1154,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * Completes the policy evidence behind a decided asset's moderation decision: the report's
-     * {@code classification.moderation.policy.evidence} becomes {@code full} and every action stays as
+     * {@code classification.moderation.explanationComplete} becomes {@code true} and every action stays as
      * decided. With {@code rerun} the asset is moderated again with the project's current policy and
      * returns in {@code processing}; use it when the policy changed since the decision
      * ({@code asset/policy-changed}).

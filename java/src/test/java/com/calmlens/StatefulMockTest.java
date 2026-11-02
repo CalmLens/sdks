@@ -29,9 +29,9 @@ class StatefulMockTest {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input -> MockDecision.of(input.queued() ? "pending" : "blocked")));
     Models.Asset asset = mock.client.assets.classify(kept("photo.png"));
     mock.withStorage(storage -> storage.assets.get(asset.id()).getAsJsonObject("classification").getAsJsonObject("moderation")
-        .add("policy", JsonParser.parseString("{\"score\":0.9,\"categories\":{},\"evidence\":\"decision\"}")));
+        .addProperty("explanationComplete", false));
     Models.Asset explained = mock.client.assets.explain(new Models.ExplainAsset(asset.id()));
-    assertEquals("full", explained.classification().moderation().policy().evidence());
+    assertEquals(true, explained.classification().moderation().explanationComplete());
     assertEquals(Models.AssetModerationStatus.BLOCKED, explained.classification().moderation().status());
 
     Models.Asset rerun = mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));

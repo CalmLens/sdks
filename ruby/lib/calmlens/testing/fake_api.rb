@@ -528,7 +528,7 @@ module CalmLens
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
                                 'completedAt' => nil,
-                                'moderation' => { 'status' => 'pending', 'manualReviews' => [] } }
+                                'moderation' => { 'status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => [] } }
         }
       end
 
@@ -632,7 +632,7 @@ module CalmLens
                                          'value' => item['classification']['failureReason'] || 'processing-error' }])
         end
 
-        flagged = decision.report.dig('policy', 'decision', 'flaggedCategories')
+        flagged = decision.report.dig('flaggedCategories')
         add_event('type' => 'asset.classified', 'severity' => 'low', 'assetId' => item['id'], 'asset' => snapshot(item),
                   'facts' => [{ 'key' => 'flagged-categories', 'value' => flagged },
                               { 'key' => 'moderation-status', 'value' => decision.status },
@@ -766,10 +766,9 @@ module CalmLens
         moderation = item['classification']['moderation']
         unless rerun
           # Like the API: the evidence is completed and every action stays as decided.
-          policy = moderation['policy']
-          return item unless policy.is_a?(Hash) && policy['evidence'] == 'decision'
+          return item unless moderation['explanationComplete'] == false
 
-          policy['evidence'] = 'full'
+          moderation['explanationComplete'] = true
           return touch(item)
         end
         fail!(ErrorCodes::ASSET_REVIEWED) unless moderation.fetch('manualReviews', []).empty?

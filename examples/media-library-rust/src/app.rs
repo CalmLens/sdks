@@ -1301,13 +1301,7 @@ pub(crate) fn category_label(category: &ClassificationCategory) -> &str {
 
 /// The categories behind the automatic decision, from the asset's moderation report.
 pub(crate) fn flagged_categories(asset: &Asset) -> &[ClassificationCategory] {
-    asset
-        .classification
-        .moderation
-        .policy
-        .as_ref()
-        .and_then(|policy| policy.decision.as_ref())
-        .map_or(&[], |decision| decision.flagged_categories.as_slice())
+    &asset.classification.moderation.flagged_categories
 }
 
 /// The latest reviewer decision that changed the asset's status, if a reviewer decided it.

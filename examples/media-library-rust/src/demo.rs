@@ -16,7 +16,7 @@ use calmlens::models::{
     Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus, AssetImage,
     AssetModerationDecision, AssetModerationStatus, AssetPage, AssetReview, AssetSearchMatch,
     AssetSearchResponse, ClassificationCategory, Folder, MetadataItem, ProcessingOptions,
-    ReportPolicy, ReportPolicyDecision, SearchMatchField, Visibility,
+    SearchMatchField, Visibility,
 };
 use calmlens::{Bytes, Error, ErrorCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -111,9 +111,9 @@ impl DemoStore {
                 if let Some(status) = status {
                     asset.classification.moderation.status = status;
                     asset.classification.completed_at = Some(now_ms());
-                    let mut decision = ReportPolicyDecision::default();
-                    decision.source = "policy".into();
-                    decision.action = Some(
+                    let moderation = &mut asset.classification.moderation;
+                    moderation.source = Some("policy".into());
+                    moderation.automated_action = Some(
                         match entry.outcome {
                             Decision::Limited => "limit",
                             Decision::AgeRestricted => "age-restrict",
@@ -123,11 +123,9 @@ impl DemoStore {
                         }
                         .into(),
                     );
-                    decision.flagged_categories =
+                    moderation.flagged_categories =
                         demo_category(entry.outcome).into_iter().collect();
-                    let mut policy = ReportPolicy::default();
-                    policy.decision = Some(decision);
-                    asset.classification.moderation.policy = Some(policy);
+                    moderation.explanation_complete = Some(true);
                 }
                 // Like CalmLens, purging deletes the stored file; the record stays.
                 if entry.outcome == Decision::Purged {

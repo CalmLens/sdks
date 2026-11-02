@@ -219,9 +219,9 @@ class LiveTests(unittest.TestCase):
         board.submit("https://example.com/", "Hello")
         stored = client.database_storage.assets[board.links[0]["asset_id"]]
         stored["classification"]["status"] = "completed"
-        stored["classification"]["moderation"].update(status="blocked", categories={
-            "hate": {"status": "evaluated", "score": 0.81}, "sexual": {"status": "not-evaluated", "reason": "unavailable"}},
-            policy={"score": 0.81, "categories": {}, "decision": {"source": "policy", "action": "block", "flaggedCategories": ["hate"]}})
+        stored["classification"]["moderation"].update(status="blocked", raw={"categories": {
+            "hate": {"status": "evaluated", "score": 0.81}, "sexual": {"status": "not-evaluated", "reason": "unavailable"}}},
+            source="policy", flaggedCategories=["hate"], automatedAction="block")
         board.refresh()
         self.assertEqual(board.links[0]["reason"], {"source": "policy", "found": [("hate", 0.81)], "unknown": ["sexual"]})
 
@@ -255,9 +255,9 @@ class StartupTests(unittest.TestCase):
 
 class UnitTests(unittest.TestCase):
     def test_not_evaluated_is_unknown_not_zero(self):
-        result = explain({"categories": {"hate": {"status": "not-evaluated", "reason": "unavailable"},
+        result = explain({"raw": {"categories": {"hate": {"status": "not-evaluated", "reason": "unavailable"},
                                          "violence": {"status": "partial", "score": 0.5},
-                                         "sexual": {"status": "evaluated", "score": 0}}})
+                                         "sexual": {"status": "evaluated", "score": 0}}}})
         self.assertEqual(result, {"found": [("violence", 0.5)], "unknown": ["hate"]})
         self.assertEqual(explain(None), {"found": [], "unknown": []})
 

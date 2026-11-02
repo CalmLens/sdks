@@ -25,10 +25,12 @@ test("preserves pending and failed decisions without inventing safe scores", () 
         status: processing,
         moderation: {
           status: moderation,
-          categories: {
-            violence: { status: "not-evaluated" },
-            harassment: { status: "evaluated", score: 0.8 },
-            sexual: { status: "partial", score: 0.4 },
+          raw: {
+            categories: {
+              violence: { status: "not-evaluated" },
+              harassment: { status: "evaluated", score: 0.8 },
+              sexual: { status: "partial", score: 0.4 },
+            },
           },
         },
       },
@@ -62,7 +64,7 @@ test("waits for CalmLens's decision, and reports a post still pending when none 
           status: decided ? "completed" : "processing",
           moderation: {
             status,
-            categories: decided ? { violence: { status: "evaluated", score: 0.9 } } : {},
+            raw: { categories: decided ? { violence: { status: "evaluated", score: 0.9 } } : {} },
           },
         },
       });

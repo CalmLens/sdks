@@ -34,7 +34,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -64,7 +66,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -173,7 +177,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -203,7 +209,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -624,7 +632,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -674,7 +684,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -768,7 +780,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -802,7 +816,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -866,7 +882,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -900,7 +918,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -964,7 +984,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1000,7 +1022,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1064,7 +1088,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1101,7 +1127,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1165,7 +1193,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1201,7 +1231,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1261,7 +1293,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1296,7 +1330,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1360,7 +1396,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1412,7 +1450,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1485,7 +1525,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1516,7 +1558,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1571,7 +1615,9 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1613,7 +1659,9 @@
               "classification": {
                 "status": "pending",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1686,7 +1734,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1721,7 +1771,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1793,7 +1845,9 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1835,7 +1889,9 @@
               "classification": {
                 "status": "pending",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1895,7 +1951,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -1932,7 +1990,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -1991,7 +2051,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -2027,7 +2089,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -2086,7 +2150,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -2127,7 +2193,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -2205,7 +2273,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -2235,7 +2305,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -2961,7 +3033,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -3006,7 +3080,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -3069,7 +3145,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -3100,7 +3178,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -3258,7 +3338,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -3289,7 +3371,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -3584,7 +3668,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -3614,7 +3700,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -3726,7 +3814,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -3756,7 +3846,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -4045,7 +4137,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -4075,7 +4169,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -4164,7 +4260,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -4194,7 +4292,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -4398,7 +4498,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -4428,7 +4530,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -4590,7 +4694,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -4620,7 +4726,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -4766,7 +4874,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -4800,7 +4910,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -4914,7 +5026,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -4949,7 +5063,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -5053,7 +5169,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -5084,7 +5202,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -5183,7 +5303,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -5218,7 +5340,9 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -6494,7 +6618,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             },
             "description": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -7398,7 +7524,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "blocked"
+                "status": "blocked",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -7428,7 +7556,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "blocked"
+                  "status": "blocked",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -7477,7 +7607,9 @@
             "classification": {
               "status": "failed",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -7507,7 +7639,9 @@
               "classification": {
                 "status": "failed",
                 "moderation": {
-                  "status": "pending"
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -7556,7 +7690,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -7580,7 +7716,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -7604,7 +7742,9 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed"
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -7635,7 +7775,9 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed"
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
                 }
               }
             }
@@ -7728,7 +7870,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -7805,7 +7949,9 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending"
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
               }
             }
           },
@@ -7936,7 +8082,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               },
@@ -7953,7 +8101,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -7990,7 +8140,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8034,7 +8186,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               },
@@ -8051,7 +8205,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               },
@@ -8068,7 +8224,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8170,7 +8328,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8209,7 +8369,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8261,7 +8423,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8319,7 +8483,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8396,7 +8562,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8433,7 +8601,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8484,7 +8654,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8570,7 +8742,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               },
@@ -8587,7 +8761,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8624,7 +8800,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8673,7 +8851,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               },
@@ -8690,7 +8870,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               },
@@ -8707,7 +8889,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8809,7 +8993,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8846,7 +9032,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }
@@ -8897,7 +9085,9 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed"
+                    "status": "allowed",
+                    "flaggedCategories": [],
+                    "regions": []
                   }
                 }
               }

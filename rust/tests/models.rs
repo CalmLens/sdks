@@ -4,119 +4,7 @@ use serde_json::json;
 
 #[test]
 fn asset_nested_fields_decode_into_typed_models() {
-    let wire = json!({
-      "id": "asset-1",
-      "type": "image",
-      "processingOptions": {
-        "keepContentAfterProcessing": true
-      },
-      "content": {
-        "status": "removed",
-        "removalReason": "parent-removed",
-        "updatedAt": 6,
-        "format": "image/png",
-        "extension": "png",
-        "sizeInBytes": 42,
-        "checksums": {
-          "sha256": "abc",
-          "md5": null
-        },
-        "image": {
-          "width": 10,
-          "height": 20,
-          "thumbhash": "th",
-          "averageColor": "#000",
-          "perceptualHash": "ph",
-          "perceptualHashQuality": 87
-        },
-        "safetyHold": {
-          "placedAt": 1,
-          "reason": "suspected-illegal-content",
-          "disposedAt": null
-        },
-        "extractedText": {
-          "type": "document",
-          "id": "doc-1"
-        }
-      },
-      "upload": {
-        "status": "completed",
-        "updatedAt": 5,
-        "partsReceived": 3
-      },
-      "classification": {
-        "status": "completed",
-        "updatedAt": 5,
-        "moderation": {
-          "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "confirmed", "reviewedAt": 7, "appliedToAsset": true}],
-          "status": "age-restricted",
-          "categories": {
-            "sexual": {
-              "status": "evaluated",
-              "likelihood": "likely",
-              "score": 0.9,
-              "qualifiers": {
-                "sexual-nudity": {
-                  "status": "evaluated",
-                  "score": 0.8,
-                  "likelihood": "possible"
-                },
-                "sexual-fictional": {
-                  "status": "not-evaluated",
-                  "reason": "unavailable"
-                }
-              }
-            },
-            "violence": {
-              "status": "not-evaluated",
-              "reason": "not-supported"
-            }
-          },
-          "score": 0.9,
-          "hashMatches": [{"source": "hash-list", "listId": "list-1", "entryId": "entry-1", "distance": 4, "action": "block"}],
-          "timeline": {
-            "durationSeconds": 3,
-            "sampledFrames": 1,
-            "audioTranscribed": false,
-            "segments": [
-              {
-                "source": "frame-text",
-                "startSeconds": 0,
-                "endSeconds": 1,
-                "categories": {
-                  "hate": {
-                    "status": "partial",
-                    "likelihood": "unlikely",
-                    "score": 0.1
-                  }
-                }
-              }
-            ]
-          }
-        },
-        "completedAt": 8,
-        "linkDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "qrCodes": [{"value": "https://example.com", "box": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.4}}],
-          "links": [{"url": "https://example.com", "source": "qr-code"}]
-        },
-        "aiGeneratedDetection": {
-          "status": "evaluated",
-          "stage": "beta",
-          "provenance": "ai-edited",
-          "signals": [{"kind": "c2pa", "value": "trainedAlgorithmicMedia"}]
-        },
-        "textRegions": [{"box": {"left": 0.5, "top": 0.5, "width": 0.1, "height": 0.1}, "personalInformation": true}],
-        "labels": [
-          {
-            "description": "beach",
-            "score": 0.7,
-            "likelihood": "very-likely"
-          }
-        ]
-      }
-    });
+    let wire = json!({"id":"asset-1","type":"image","processingOptions":{"keepContentAfterProcessing":true},"content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"image":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000","perceptualHash":"ph","perceptualHashQuality":87},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","reviewedAt":7,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"timeline":{"durationSeconds":3,"sampledFrames":1,"audioTranscribed":false,"segments":[{"source":"frame-text","startSeconds":0,"endSeconds":1,"categories":{"hate":{"status":"partial","likelihood":"unlikely","score":0.1}}}]},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"labels":[{"description":"beach","score":0.7,"likelihood":"very-likely"}]}});
     let asset: Asset = serde_json::from_value(wire).unwrap();
 
     assert_eq!(asset.asset_type, Some(AssetType::Image));
@@ -207,7 +95,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         Some(true)
     );
 
-    let report = &asset.classification.moderation;
+    let report = asset.classification.moderation.raw.as_ref().unwrap();
     let sexual = &report.categories[&ClassificationCategory::Sexual];
     assert_eq!(sexual.status, Some(EvaluationStatus::Evaluated));
     assert_eq!(sexual.likelihood, Some(Likelihood::Likely));
@@ -266,42 +154,7 @@ fn asset_nested_fields_decode_into_typed_models() {
 
 #[test]
 fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
-    let wire = json!({
-      "id": "asset-1",
-      "type": "hologram",
-      "content": {
-        "status": "archived",
-        "removalReason": "expired"
-      },
-      "upload": {
-        "status": "completed"
-      },
-      "classification": {
-        "status": "paused",
-        "moderation": {
-          "manualReviews": [{"id": "review-1", "decision": "deferred", "note": null, "reviewedAt": 7, "appliedToAsset": true}],
-          "status": "escalated",
-          "categories": {
-            "spam": {
-              "status": "skipped",
-              "likelihood": "certain",
-              "qualifiers": {
-                "bots": {
-                  "status": "evaluated"
-                }
-              }
-            }
-          }
-        },
-        "labels": [
-          {
-            "description": "x",
-            "score": 1,
-            "likelihood": "certain"
-          }
-        ]
-      }
-    });
+    let wire = json!({"id":"asset-1","type":"hologram","content":{"status":"archived","removalReason":"expired"},"upload":{"status":"completed"},"classification":{"status":"paused","moderation":{"manualReviews":[{"id":"review-1","decision":"deferred","note":null,"reviewedAt":7,"appliedToAsset":true}],"status":"escalated","flaggedCategories":[],"regions":[],"raw":{"categories":{"spam":{"status":"skipped","likelihood":"certain","qualifiers":{"bots":{"status":"evaluated"}}}}}},"labels":[{"description":"x","score":1,"likelihood":"certain"}]}});
     let asset: Asset = serde_json::from_value(wire.clone()).unwrap();
     assert_eq!(
         asset.asset_type,
@@ -325,8 +178,13 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     );
     // Any status other than `pending` is a decision, even one this SDK version does not know.
     assert!(asset.is_decided());
-    let spam = &&asset.classification.moderation.categories
-        [&ClassificationCategory::Unknown("spam".into())];
+    let spam = &&asset
+        .classification
+        .moderation
+        .raw
+        .as_ref()
+        .unwrap()
+        .categories[&ClassificationCategory::Unknown("spam".into())];
     assert_eq!(
         spam.status,
         Some(EvaluationStatus::Unknown("skipped".into()))
@@ -344,7 +202,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     );
     assert_eq!(reencoded["content"]["removalReason"], "expired");
     assert_eq!(
-        reencoded["classification"]["moderation"]["categories"]["spam"]["likelihood"],
+        reencoded["classification"]["moderation"]["raw"]["categories"]["spam"]["likelihood"],
         "certain"
     );
 }
@@ -618,7 +476,7 @@ fn newer_event_types_decode_to_their_own_variants() {
 
 #[test]
 fn report_policy_snapshot_decodes_into_typed_models() {
-    let policy: ReportPolicy = serde_json::from_str(r#"{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"hash-list","action":"purge","flaggedCategories":["violence"]}}"#).unwrap();
+    let policy: AssetModeration = serde_json::from_str(r#"{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedAction":"purge"}"#).unwrap();
     let category = &policy.categories[&ClassificationCategory::Violence];
     let settings = category.settings.as_ref().unwrap();
     assert_eq!(settings.category_action, "block");
@@ -640,9 +498,9 @@ fn report_policy_snapshot_decodes_into_typed_models() {
     let evidence = &finding.policy_conditions.as_ref().unwrap()["some:opaque"];
     assert_eq!(evidence.status, Some(EvaluationStatus::Evaluated));
     assert_eq!(evidence.score, Some(0.8));
-    let decision = policy.decision.as_ref().unwrap();
-    assert_eq!(decision.source, "hash-list");
-    assert_eq!(decision.action.as_deref(), Some("purge"));
+    let decision = &policy;
+    assert_eq!(decision.source.as_deref(), Some("hash-list"));
+    assert_eq!(decision.automated_action.as_deref(), Some("purge"));
     assert_eq!(
         decision.flagged_categories,
         vec![ClassificationCategory::Violence]

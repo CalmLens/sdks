@@ -102,15 +102,11 @@ final class MockDecision
                 $categories[$category]['qualifiers'][$qualifier] = ['status' => 'evaluated', 'someScore' => $someScore, 'likelihood' => self::likelihood($someScore)];
             }
         }
-        $score = max([0, ...array_values($evaluated)]);
         $flagged = array_keys(array_filter($evaluated, fn ($score) => $action($score) !== 'allow'));
-        return ['categories' => $categories, 'score' => $score, 'policy' => [
-            'score' => $score,
+        return ['raw' => ['categories' => $categories],
             'categories' => array_map(fn ($score) => ['score' => $score, 'action' => $action($score)], $evaluated),
-            'evidence' => 'full',
-            'decision' => ['source' => 'policy', 'action' => $status === 'allowed' ? null : self::ACTIONS[$status],
-                'regions' => [], 'flaggedCategories' => $flagged],
-        ]];
+            'explanationComplete' => true, 'source' => 'policy', 'automatedAction' => self::ACTIONS[$status],
+            'regions' => [], 'flaggedCategories' => $flagged];
     }
 
     /** The likelihood the API reports for a score. */

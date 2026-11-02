@@ -436,7 +436,7 @@ export default class CalmLensServerClient {
 
       /**
        * Completes the policy evidence behind a decided asset's moderation decision: the report's
-       * `classification.moderation.policy.evidence` becomes `full` and every action stays as
+       * `classification.moderation.evidence` becomes `full` and every action stays as
        * decided. With `rerun: true` the asset is moderated again with the project's current policy
        * and returns in `processing`; use it when the policy has changed since the decision
        * (`asset/policy-changed`).

@@ -51,7 +51,7 @@ const toStatus = (asset: Asset): ModerationStatus => {
 };
 
 export const toOutcome = (asset: Asset): ModerationOutcome => {
-  const findings = Object.entries(asset.classification.moderation?.categories ?? {})
+  const findings = Object.entries(asset.classification.moderation.raw?.categories ?? {})
     .flatMap(([category, result]) =>
       // `not-evaluated` means "unknown", not "safe" — never treat it as a zero score.
       result &&

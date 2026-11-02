@@ -217,7 +217,7 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
 `projectId`, `name`, `type`, `createdAt` and three nested objects are always present:
 
 - `upload`: receipt of source content, with `status` (`uploading` or `completed`), `updatedAt` and `partsReceived` for multipart uploads.
-- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `failureReason` (why processing failed, while `status` is `failed`; otherwise `None`: `file-too-large`, `duration-limit`, `resolution-limit`, `unsupported-format`, `undecodable-content`, `multiple-tracks`, `type-mismatch`, `free-upload-limit`, `child-failed` or `processing-error`), `updatedAt`, `completedAt`, optional `linkDetection`, `textRegions` and `labels`, and `moderation`. The moderation section contains `status`, category scores, policy assessment, an optional `timeline`, optional `hashMatches` (the hash list entries an image matched) and `manualReviews` (each with a reviewer's `decision`: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
+- `classification`: `status` (`pending`, `processing`, `completed` or `failed`), `failureReason` (why processing failed, while `status` is `failed`; otherwise `None`: `file-too-large`, `duration-limit`, `resolution-limit`, `unsupported-format`, `undecodable-content`, `multiple-tracks`, `type-mismatch`, `free-upload-limit`, `child-failed` or `processing-error`), `updatedAt`, `completedAt`, optional `linkDetection`, `textRegions` and `labels`, and `moderation`. The moderation section contains `status`, policy-adjusted `categories`, `automatedAction`, `flaggedCategories`, `explanationComplete`, and `raw` findings with an optional `timeline`, optional `hashMatches` (the hash list entries an image matched) and `manualReviews` (each with a reviewer's `decision`: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`). A reviewer's decision takes precedence over the automated one and does not change `completedAt`.
   `status` is `pending` until moderation decides, then:
   - `allowed`: show the content.
   - `limited`: delivered like `allowed`, but reduce its reach: keep it out of recommendations, trending and notifications, rank it lower or collapse it.
@@ -225,7 +225,7 @@ the asset as a plain `dict` (typed as `calmlens.types.Asset`) with the API's
   - `blocked`: not delivered, content kept; don't show it.
   - `purged`: not delivered and stored content deleted; don't show it.
 
-  `categories` maps category names to `{status, score, likelihood, ...}`; a
+  `raw.categories` maps category names to `{status, score, likelihood, ...}`; a
   `not-evaluated` category has no score.
 - `content`: `status` (`temporary` while CalmLens holds the content only until processing
   finishes, `stored` when `keepContentAfterProcessing` is on, or `removed`), `removalReason`
@@ -535,7 +535,7 @@ def moderate(moderation: MockModerationInput):
 
 client = MockCalmLensServerClient(mock_options={"moderate": moderate})
 comment = client.text.classify(text="I will kill you")
-assert comment["classification"]["moderation"]["policy"]["decision"]["flaggedCategories"] == ["violence"]
+assert comment["classification"]["moderation"]["flaggedCategories"] == ["violence"]
 
 photo = client.assets.create(name="photo.png", content={"data": b"png", "type": "image/png"})  # pending
 client.complete_processing(photo["id"], mock_decision("age-restricted").flag("sexual", 0.8))

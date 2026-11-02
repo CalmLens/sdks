@@ -848,12 +848,12 @@ describe("MockCalmLensServerClient", () => {
       ...asset,
       classification: {
         ...asset.classification,
-        moderation: { ...moderation, policy: { score: 0.9, categories: {}, evidence: "decision" } },
+        moderation: { ...moderation, explanationComplete: false },
       },
     });
 
     const explained = await client.assets.explain({ assetId: asset.id });
-    expect(explained.classification.moderation.policy?.evidence).toBe("full");
+    expect(explained.classification.moderation?.explanationComplete).toBe(true);
     expect(explained.classification.moderation.status).toBe("blocked");
 
     await databaseStorage.updateAsset({

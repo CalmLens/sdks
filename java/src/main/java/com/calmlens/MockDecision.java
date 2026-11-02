@@ -23,7 +23,7 @@ import java.util.Set;
  * }</pre>
  *
  * <p>A decided status fills the asset's {@code classification.moderation} report as the API does:
- * every category (unflagged ones evaluated with score 0), the highest score, and the policy's
+ * every category (unflagged ones evaluated with score 0), the policy's
  * actions and {@code flaggedCategories}. Each call checks its names and scores and throws {@link
  * ErrorCodes#SDK_INVALID_ARGUMENT} for one CalmLens does not have.
  */
@@ -137,7 +137,6 @@ public final class MockDecision {
     if (!decided()) return null;
     JsonObject categories = new JsonObject(), policyCategories = new JsonObject();
     JsonArray flagged = new JsonArray();
-    double highest = 0;
     for (String category : MockClassification.CATEGORIES) {
       JsonObject result = new JsonObject();
       if (notEvaluated.contains(category)) {
@@ -148,7 +147,6 @@ public final class MockDecision {
       }
       Flag flag = flags.get(category);
       double score = flag == null ? 0 : flag.score();
-      highest = Math.max(highest, score);
       result.addProperty("status", "evaluated");
       result.addProperty("likelihood", likelihood(score));
       result.addProperty("score", score);
@@ -170,20 +168,16 @@ public final class MockDecision {
       policyCategories.add(category, policyCategory);
       if (!action(score).equals("allow")) flagged.add(category);
     }
-    JsonObject decision = new JsonObject();
-    decision.addProperty("source", "policy");
-    decision.add("action", status == MockCalmLensServerClient.Outcome.ALLOWED ? JsonNull.INSTANCE : new com.google.gson.JsonPrimitive(STATUS_ACTION.get(status)));
-    decision.add("regions", new JsonArray());
-    decision.add("flaggedCategories", flagged);
-    JsonObject policy = new JsonObject();
-    policy.addProperty("score", highest);
-    policy.add("categories", policyCategories);
-    policy.addProperty("evidence", "full");
-    policy.add("decision", decision);
     JsonObject report = new JsonObject();
-    report.add("categories", categories);
-    report.addProperty("score", highest);
-    report.add("policy", policy);
+    report.addProperty("source", "policy");
+    report.addProperty("automatedAction", STATUS_ACTION.get(status));
+    report.add("regions", new JsonArray());
+    report.add("flaggedCategories", flagged);
+    report.add("categories", policyCategories);
+    report.addProperty("explanationComplete", true);
+    JsonObject raw = new JsonObject();
+    raw.add("categories", categories);
+    report.add("raw", raw);
     return report;
   }
 
@@ -191,7 +185,7 @@ public final class MockDecision {
   List<String> flaggedCategories() {
     JsonObject report = report();
     List<String> flagged = new ArrayList<>();
-    if (report != null) report.getAsJsonObject("policy").getAsJsonObject("decision").getAsJsonArray("flaggedCategories").forEach(c -> flagged.add(c.getAsString()));
+    if (report != null) report.getAsJsonArray("flaggedCategories").forEach(c -> flagged.add(c.getAsString()));
     return flagged;
   }
 

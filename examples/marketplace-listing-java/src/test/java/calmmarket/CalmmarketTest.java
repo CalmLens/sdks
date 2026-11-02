@@ -128,7 +128,7 @@ class CalmmarketTest {
   static Map<String, Object> notEvaluated(String reason) { return Map.of("status", "not-evaluated", "reason", reason); }
 
   static Map<String, Object> report(Map<String, Map<String, Object>> categories) {
-    return Map.of("categories", categories);
+    return Map.of("raw", Map.of("categories", categories));
   }
 
   /**
@@ -265,7 +265,9 @@ class CalmmarketTest {
   @Test
   void flaggedCategoriesComeFromThePolicyDecision() {
     Map<String, Object> flagged = new LinkedHashMap<>(report(Map.of("criminal-activity", evaluated(0.95), "profanity", evaluated(0.4))));
-    flagged.put("policy", Map.of("decision", Map.of("source", "policy", "action", "block", "flaggedCategories", List.of("criminal-activity"))));
+    flagged.put("source", "policy");
+    flagged.put("automatedAction", "block");
+    flagged.put("flaggedCategories", List.of("criminal-activity"));
     assertEquals(List.of("criminal-activity"), Calmmarket.flaggedCategories(model(flagged, AssetModeration.class)));
     assertEquals(List.of(), Calmmarket.flaggedCategories(model(report(Map.of("violence", evaluated(0.9))), AssetModeration.class)), "no policy decision, no flagged categories");
     assertEquals(List.of(), Calmmarket.flaggedCategories(null));

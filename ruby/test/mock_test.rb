@@ -159,7 +159,7 @@ class MockTest < Minitest::Test
   def test_decisions_take_symbol_qualifiers_and_refuse_scores_that_are_not_finite
     decision = CalmLens::MockDecision.of('blocked').flag(:violence, 0.9, 'violence-threat': 0.7)
     assert_equal({ 'violence-threat' => { 'status' => 'evaluated', 'someScore' => 0.7, 'likelihood' => 'likely' } },
-                 decision.report.dig('categories', 'violence', 'qualifiers'))
+                 decision.report.dig('raw', 'categories', 'violence', 'qualifiers'))
     [Float::NAN, Float::INFINITY, '0.5', Complex(0.5, 0)].each do |score|
       error = assert_raises(CalmLens::InvalidArgumentError, score.inspect) { CalmLens::MockDecision.of('blocked').flag('hate', score) }
       assert_equal 'sdk/invalid-argument', error.code

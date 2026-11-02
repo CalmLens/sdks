@@ -212,7 +212,7 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
 `processing`, `moderation`, `content`, ...). The state is in three nested structs:
 
 - `Upload` (`AssetUpload`): `Status` is `uploading` or `completed`; `PartsReceived` counts multipart parts while they arrive, and `UpdatedAt` records the latest upload state change.
-- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `FailureReason` (why processing failed, `nil` unless `failed`), `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection`, `LinkDetection`, `AIGeneratedDetection`, `TextRegions` and `Labels` sit alongside `Moderation`, which holds `Status`, `Categories`, `Score`, `Timeline`, `Policy`, `HashMatches` and reviewer details. Reviewer actions do not change classification completion time.
+- `Classification` (`AssetClassification`): `Status` is `pending`, `processing`, `completed` or `failed`, with `FailureReason` (why processing failed, `nil` unless `failed`), `UpdatedAt` and `CompletedAt`. Optional `PersonDetection`, `FaceDetection`, `LinkDetection`, `AIGeneratedDetection`, `TextRegions` and `Labels` sit alongside `Moderation`, which holds `Status`, `AutomatedAction`, `FlaggedCategories`, policy-adjusted `Categories`, `ExplanationComplete`, `Raw` findings and reviewer details. Reviewer actions do not change classification completion time.
 - `Content` (`AssetContent`): `Status` is whether CalmLens holds the content
   (`ContentStatusTemporary` until processing finishes, `ContentStatusStored` or
   `ContentStatusRemoved`, with `RemovalReason`), plus `Format` (MIME type), `Extension`,
@@ -220,9 +220,9 @@ for asset, err := range client.Assets.ListAll(options).All(ctx) {
   (metadata embedded in an uploaded image, such as its capture time, camera and software).
 
 Fields that may be missing are pointers, maps, or slices and are `nil` when absent:
-`Classification.Moderation.Categories` is `nil` until classification produces findings, and optional fields such as `Content.SizeInBytes`,
+`Classification.Moderation.Raw` is `nil` until classification produces findings, and optional fields such as `Content.SizeInBytes`,
 `FolderID`, `ExternalID` and `Description` are `nil`
-when unset. Inside a report, `Categories` is keyed by category name and each
+when unset. Inside `Raw`, `Categories` is keyed by category name and each
 `CategoryResult.Score` is `*float64`:
 
 ```go
@@ -606,7 +606,7 @@ mock, err := calmlenstest.NewServerClient(calmlenstest.Options{
 ```
 
 A decided asset's report lists every category (those not flagged are evaluated with score 0),
-the highest score, the policy's actions per category and its `flaggedCategories` (categories
+the policy's actions per category and its `flaggedCategories` (categories
 scoring 0.5 or more, unless the status is allowed). An unknown status, category or qualifier, a
 score outside 0 to 1, a category added twice, or findings on a pending or failed decision make
 the decision's `Err` an `sdk/invalid-argument` error, which the request or call using it

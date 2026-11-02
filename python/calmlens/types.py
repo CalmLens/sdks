@@ -17,9 +17,9 @@ class ViewerClaims(TypedDict, total=False):
 
 
 __all__ = [
-    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "ReportPolicyDecision", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore", "ReportPolicy",
+    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore",
     "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "TestRegionalAction", "AssetReview", "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
+    "TestRegionalAction", "AssetReview", "AssetModeration", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
@@ -491,16 +491,6 @@ class RegionalDecision(_RegionalDecisionRequired, total=False):
     category: str
 
 
-class ReportPolicyDecision(TypedDict, total=False):
-    rule: str
-    regions: List[RegionalDecision]
-    #: ``policy``, ``children``, ``hash-list`` (a block from a hash list match) or
-    #: ``mandatory-rule``. New sources may be added.
-    source: Union[Literal["policy", "children", "hash-list", "mandatory-rule"], str]
-    action: Optional[ModerationAction]
-    flaggedCategories: List[str]
-
-
 class _CategoryPolicyScoreRequired(TypedDict):
     """How strongly a category meets the policy (``score``) and what the policy does with it."""
     score: float
@@ -510,20 +500,6 @@ class _CategoryPolicyScoreRequired(TypedDict):
 class CategoryPolicyScore(_CategoryPolicyScoreRequired, total=False):
     source: CategoryPolicySource
     settings: CategoryPolicySettingsSnapshot
-
-
-class _ReportPolicyRequired(TypedDict):
-    """What the project's policy made of the report when the asset was decided."""
-    score: float
-    categories: Dict[str, CategoryPolicyScore]
-
-
-class ReportPolicy(_ReportPolicyRequired, total=False):
-    #: ``decision`` when questions that could not change any action were skipped (every action is
-    #: final, but a category's policy score and the rule credited with its action can differ from a
-    #: complete report); ``full`` when every question was answered. ``assets.explain`` completes it.
-    evidence: Literal["decision", "full"]
-    decision: ReportPolicyDecision
 
 
 # ---- Assets -----------------------------------------------------------------------------------
@@ -649,22 +625,32 @@ class HashMatch(TypedDict):
 class _AssetModerationRequired(TypedDict):
     manualReviews: List[AssetReview]
     status: AssetModerationStatus
+    flaggedCategories: List[str]
+    regions: List[RegionalDecision]
 
 class TestRegionalAction(TypedDict):
     region: str
     action: str
 
 
+class _ModerationRawRequired(TypedDict):
+    categories: ClassificationCategories
+
+
+class ModerationRaw(_ModerationRawRequired, total=False):
+    timeline: MediaClassificationReport
+    hashMatches: List[HashMatch]
+
+
 class AssetModeration(_AssetModerationRequired, total=False):
     testCategoryActions: Dict[str, str]
     testRegionalActions: List[TestRegionalAction]
-    categories: ClassificationCategories
-    score: float
-    timeline: MediaClassificationReport
-    policy: ReportPolicy
-    #: Hash list entries the image matched, blocking matches first and then the closest. Absent
-    #: when nothing matched.
-    hashMatches: List[HashMatch]
+    automatedAction: ModerationAction
+    source: str
+    rule: str
+    explanationComplete: bool
+    categories: Dict[str, CategoryPolicyScore]
+    raw: ModerationRaw
 
 
 class _AssetClassificationRequired(TypedDict):

@@ -35,8 +35,7 @@ module TestHelpers
   # `flagged` lists the categories the report's policy decision flagged.
   def asset(id, status, flagged: nil)
     classification = { 'pending' => 'processing', 'uploading' => 'pending', 'error' => 'failed' }.fetch(status, 'completed')
-    moderation = { 'status' => classification == 'completed' ? status : 'pending', 'categories' => {} }
-    moderation['policy'] = { 'decision' => { 'source' => 'policy', 'action' => 'block', 'flaggedCategories' => flagged } } if flagged
+    moderation = { 'status' => classification == 'completed' ? status : 'pending', 'raw' => { 'categories' => {} }, 'flaggedCategories' => flagged || [], 'regions' => [] }
     { 'id' => id, 'upload' => { 'status' => status == 'uploading' ? 'uploading' : 'completed' },
       'classification' => { 'status' => classification, 'moderation' => moderation },
       'content' => { 'status' => 'stored' } }

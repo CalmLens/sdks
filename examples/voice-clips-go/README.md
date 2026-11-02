@@ -119,7 +119,7 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   an upload) and the server calls `Assets.Retrieve`; verified webhooks update a clip
   sooner. The **Activity** panel lists each decision the app picked up and whether it came
   from a status check or a webhook.
-- **Timeline.** `classification.moderation.timeline` provides `durationSeconds` and `segments`. Native analysis
+- **Timeline.** `classification.moderation.raw.timeline` provides `durationSeconds` and `segments`. Native analysis
   uses overlapping 30-second chunks (`source: "clip"`). Each segment lists the categories
   that were evaluated (or partially evaluated) with a score of at least 0.4 ("possible").
   A `not-evaluated` category is never shown as a zero score. Ranges are approximate. Segments
@@ -185,7 +185,7 @@ listed in the Activity panel and changes nothing.
 - [upload.js](upload.js): the browser upload through the preset, single-request or
   multipart, with per-part progress.
 - `upload` and `send`: the demo's simulated server upload.
-- `refresh` and `timeline`: SDK retrieval and turning `classification.moderation.timeline` into segment rows;
+- `refresh` and `timeline`: SDK retrieval and turning `classification.moderation.raw.timeline` into segment rows;
   `Flagged` and `Reasons` summarise them.
 - `media`: fresh status check, the signed URL cache, live short-lived signed playback
   and streamed demo playback.

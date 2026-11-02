@@ -89,7 +89,7 @@ final class MockServerClientTest extends TestCase
         $mock->events = [];
         $retried = $client->assets->retry(['assetId' => $asset['id']]);
         self::assertSame(['completed', 'blocked', ['violence']], [$retried['classification']['status'],
-            $retried['classification']['moderation']['status'], $retried['classification']['moderation']['policy']['decision']['flaggedCategories']]);
+            $retried['classification']['moderation']['status'], $retried['classification']['moderation']['flaggedCategories']]);
         self::assertSame(['asset.retried', 'asset.classified', 'asset.blocked'], array_column($mock->events, 'type'));
     }
 
@@ -273,9 +273,9 @@ final class MockServerClientTest extends TestCase
         $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->trigger === 'upload' ? 'blocked' : 'pending');
         $client = $mock->client();
         $asset = self::image($mock);
-        $mock->assets[$asset['id']]['classification']['moderation']['policy'] = ['score' => 0.9, 'categories' => [], 'evidence' => 'decision'];
+        $mock->assets[$asset['id']]['classification']['moderation']['explanationComplete'] = false;
         $explained = $client->assets->explain(['assetId' => $asset['id']]);
-        self::assertSame(['full', 'blocked'], [$explained['classification']['moderation']['policy']['evidence'],
+        self::assertSame([true, 'blocked'], [$explained['classification']['moderation']['explanationComplete'],
             $explained['classification']['moderation']['status']]);
         $mock->assets[$asset['id']]['classification']['moderation']['manualReviews'] = [['decision' => 'blocked']];
         self::assertSame(ErrorCodes::ASSET_REVIEWED, self::code(fn () => $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true])));

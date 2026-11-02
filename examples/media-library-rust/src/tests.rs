@@ -1416,10 +1416,9 @@ async fn undelivered_images_show_the_flagged_categories_from_the_report() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
     let mut blocked = asset("asset-1", "blocked");
-    blocked["classification"]["moderation"]["policy"] = json!({
-        "score": 0.95,
-        "decision": {"source": "policy", "action": "block", "flaggedCategories": ["violence", "hate"]}
-    });
+    blocked["classification"]["moderation"]["source"] = json!("policy");
+    blocked["classification"]["moderation"]["automatedAction"] = json!("block");
+    blocked["classification"]["moderation"]["flaggedCategories"] = json!(["violence", "hate"]);
     mock.enqueue(
         200,
         json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),

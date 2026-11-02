@@ -79,9 +79,9 @@ def demo_report(category: str | None = None, score: float = 0.0) -> dict:
     categories = {name: {"status": "evaluated", "score": 0.02, "likelihood": "very-unlikely"} for name in CATEGORIES}
     if category:
         categories[category] = {"status": "evaluated", "score": score, "likelihood": "very-likely"}
-    return {"score": score if category else 0.02, "categories": categories,
-            "policy": {"score": score if category else 0.02, "categories": {},
-                       "decision": {"source": "policy", "action": None, "flaggedCategories": [category] if category else []}}}
+    return {"raw": {"categories": categories}, "categories": {}, "source": "policy",
+            "automatedAction": "allow", "flaggedCategories": [category] if category else [],
+            "regions": [], "explanationComplete": True}
 
 
 def decide(asset: dict, status: str, report: dict):
@@ -89,6 +89,7 @@ def decide(asset: dict, status: str, report: dict):
     now = int(time.time() * 1000)
     asset["classification"]["status"] = "completed"
     asset["classification"]["moderation"].update(status=status, **report)
+    asset["classification"]["moderation"]["automatedAction"] = {"allowed": "allow", "limited": "limit", "age-restricted": "age-restrict", "blocked": "block", "purged": "purge"}[status]
     asset["classification"]["completedAt"] = now
     if status == "purged":
         asset["content"].update(status="removed", removalReason="policy", updatedAt=now)
@@ -96,8 +97,8 @@ def decide(asset: dict, status: str, report: dict):
 
 def page_report() -> dict:
     """A website's own report when its parts decided it: its categories are not evaluated."""
-    return {"score": 0, "categories": {name: {"status": "not-evaluated", "reason": "unavailable"} for name in CATEGORIES},
-            "policy": {"score": 0, "categories": {}, "decision": {"source": "children", "action": None, "flaggedCategories": []}}}
+    return {"raw": {"categories": {name: {"status": "not-evaluated", "reason": "unavailable"} for name in CATEGORIES}},
+            "categories": {}, "source": "children", "automatedAction": "allow", "flaggedCategories": [], "regions": [], "explanationComplete": True}
 
 
 class DemoModerator(Moderator):

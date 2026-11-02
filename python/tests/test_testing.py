@@ -95,10 +95,10 @@ class MockTests(unittest.TestCase):
         asset = c.assets.classify(name="a.txt", content={"plainText": "no", "type": "text/plain"},
                                   processing_options={"keepContentAfterProcessing": True})
         moderation = c.database_storage.assets[asset["id"]]["classification"]["moderation"]
-        moderation["policy"] = {"score": 0.9, "categories": {}, "evidence": "decision"}
+        moderation["explanationComplete"] = False
         explained = c.assets.explain(asset_id=asset["id"])
-        self.assertEqual((explained["classification"]["moderation"]["policy"]["evidence"],
-                          explained["classification"]["moderation"]["status"]), ("full", "blocked"))
+        self.assertEqual((explained["classification"]["moderation"]["explanationComplete"],
+                          explained["classification"]["moderation"]["status"]), (True, "blocked"))
         moderation["manualReviews"] = [{"decision": "blocked"}]
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.explain(asset_id=asset["id"], rerun=True)

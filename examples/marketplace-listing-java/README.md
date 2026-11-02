@@ -18,7 +18,7 @@ An `evaluated` or `partial` category has a score. A `not-evaluated` result has a
 
 - **Browse** (`/`): the live listings, then **Your listings**, where each listing shows the
   decision for its title, description and every photo. Listings that need attention come first;
-  a rejected photo shows the categories the policy acted on (`classification.moderation.policy.decision.flaggedCategories`)
+  a rejected photo shows the categories the policy acted on (`classification.moderation.flaggedCategories`)
   and the text read from it. The **Activity** panel lists submissions and review decisions.
 - **Listing** (`/listings/<id>`): the approved photos, and a check per part with the photo's
   extracted text and its combined moderation report. Withdraw the listing from here.

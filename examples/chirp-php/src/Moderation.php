@@ -106,7 +106,7 @@ final class Moderation
         $classification = $asset['classification'] ?? [];
         $status = $classification['moderation']['status'] ?? null;
         $findings = [];
-        foreach ($classification['moderation']['categories'] ?? [] as $category => $result) {
+        foreach ($classification['moderation']['raw']['categories'] ?? [] as $category => $result) {
             // `not-evaluated` means unknown, not safe: never read it as a zero score.
             if (is_array($result) && in_array($result['status'] ?? null, ['evaluated', 'partial'], true) && is_numeric($result['score'] ?? null)) {
                 $findings[] = ['category' => (string) $category, 'score' => (float) $result['score']];

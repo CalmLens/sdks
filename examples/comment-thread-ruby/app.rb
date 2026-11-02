@@ -139,8 +139,7 @@ module Calmthread
 
   # The categories the policy flagged, from the moderation report's policy decision.
   def self.flagged_categories(asset)
-    decision = section(section(section(asset, 'classification'), 'moderation'), 'policy')['decision']
-    categories = decision.is_a?(Hash) ? decision['flaggedCategories'] : nil
+    categories = section(section(asset, 'classification'), 'moderation')['flaggedCategories']
     Array(categories).grep(String).map { |category| category[0, 40] }
   end
 

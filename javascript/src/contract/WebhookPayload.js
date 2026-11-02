@@ -475,8 +475,7 @@ const CATEGORIES_SCHEMA = zod.object({
 	profanity: CLASSIFICATION_CATEGORY_REPORT_SCHEMA
 }).strict();
 /** What the project's policy made of the report when the asset was decided. */
-const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
-	score: zod.number().min(0).max(1).describe("The highest category policy score."),
+const MODERATION_ASSESSMENT_FIELDS_SCHEMA = zod.object({
 	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, zod.object({
 		score: zod.number().min(0).max(1).describe("How strongly the content meets the policy, from 0 to 1: the category score, lowered by allowances that cover the content and raised to the presence score of a restriction."),
 		action: POLICY_ACTION_SCHEMA.describe("What the policy does with this category. `allow` when the policy score is below 0.5."),
@@ -500,34 +499,34 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 			restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
 		}).strict().optional().describe("The category's default action and rules in force at decision time.")
 	}).strict()).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
-	evidence: zod.enum(["decision", "full"]).optional().describe("`decision` when questions that could not change any action were skipped: every action is final, but a category's policy score and the rule credited with its action can differ from a detailed report. `full` (or absent) when every question was answered. Request a detailed report to answer the rest."),
-	decision: zod.object({
-		source: zod.enum([
-			"policy",
-			"children",
-			"hash-list",
-			"mandatory-rule",
-			"link-safety"
-		]),
-		action: POLICY_ACTION_SCHEMA.exclude(["allow"]).nullable(),
-		rule: zod.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).optional(),
-		regions: zod.array(zod.object({
-			region: JURISDICTION_SCHEMA.exclude(["global"]),
-			action: POLICY_ACTION_SCHEMA.exclude(["allow"]),
-			rule: zod.string(),
-			category: CLASSIFICATION_CATEGORY_SCHEMA.optional()
-		}).strict()),
-		flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA)
-	}).strict().refine((decision) => decision.source === "mandatory-rule" ? Boolean(decision.rule) : decision.rule === void 0, {
-		message: "decision/rule-required",
-		path: ["rule"]
-	}).optional().describe("The base asset decision and stricter outcomes in served jurisdictions. Mandatory-rule decisions identify the matching rule; global mandatory rules apply in every policy."),
+	explanationComplete: zod.boolean().describe("Whether all questions needed for a complete explanation of this decision were answered. False means questions that could not change any action were skipped; the actions are still final."),
+	source: zod.enum([
+		"policy",
+		"children",
+		"hash-list",
+		"mandatory-rule",
+		"link-safety"
+	]),
+	automatedAction: POLICY_ACTION_SCHEMA.describe("The original automated action. Manual reviews can change the current moderation status without changing this action."),
+	rule: zod.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).optional(),
+	regions: zod.array(zod.object({
+		region: JURISDICTION_SCHEMA.exclude(["global"]),
+		action: POLICY_ACTION_SCHEMA.exclude(["allow"]),
+		rule: zod.string(),
+		category: CLASSIFICATION_CATEGORY_SCHEMA.optional()
+	}).strict()),
+	flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA).describe("Categories acted on by the automated decision. Empty when none were acted on; manual reviews do not change this list."),
 	linkSafety: zod.object({
 		action: LINK_SAFETY_ACTION_SCHEMA.describe("The strongest action the asset's links take under the policy's link-safety settings."),
 		links: zod.array(zod.number().int().nonnegative()).describe("Indexes into `linkSafety.links` of the links that take that action."),
 		settings: LINK_SAFETY_SETTINGS_SCHEMA
 	}).strict().optional().describe("Preview. What the policy's link-safety section made of the asset's links. Absent when the policy doesn't act on links.")
 }).strict().omit({});
+const hasValidModerationRule = (assessment) => assessment.source === "mandatory-rule" ? Boolean(assessment.rule) : assessment.rule === void 0;
+const MODERATION_ASSESSMENT_SCHEMA = MODERATION_ASSESSMENT_FIELDS_SCHEMA.refine(hasValidModerationRule, {
+	message: "moderation/rule-required",
+	path: ["rule"]
+});
 const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	description: saneStringField(),
 	score: zod.number(),
@@ -544,31 +543,35 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	])).optional().describe("Explicit category outcomes from an authenticated test scenario; bypass policy evaluation."),
 	testRegionalActions: TEST_REGIONAL_ACTIONS_SCHEMA.optional().describe("Explicit regional restrictions from an authenticated test input."),
 	processedAt: zod.number(),
-	categories: CATEGORIES_SCHEMA,
-	score: zod.number(),
-	media: zod.object({
-		durationSeconds: zod.number().positive(),
-		frameIntervalSeconds: zod.number().positive().optional(),
-		sampledFrames: zod.number().int().nonnegative(),
-		audioTranscribed: zod.boolean(),
-		segments: zod.array(zod.object({
-			source: zod.enum([
-				"frame",
-				"speech",
-				"frame-text",
-				"clip"
-			]),
-			startSeconds: zod.number().nonnegative(),
-			endSeconds: zod.number().nonnegative(),
-			categories: CATEGORIES_SCHEMA
-		}).strict())
-	}).strict().optional(),
+	...MODERATION_ASSESSMENT_FIELDS_SCHEMA.partial().shape,
+	raw: zod.object({
+		categories: CATEGORIES_SCHEMA,
+		timeline: zod.object({
+			durationSeconds: zod.number().positive(),
+			frameIntervalSeconds: zod.number().positive().optional(),
+			sampledFrames: zod.number().int().nonnegative(),
+			audioTranscribed: zod.boolean(),
+			segments: zod.array(zod.object({
+				source: zod.enum([
+					"frame",
+					"speech",
+					"frame-text",
+					"clip"
+				]),
+				startSeconds: zod.number().nonnegative(),
+				endSeconds: zod.number().nonnegative(),
+				categories: CATEGORIES_SCHEMA
+			}).strict())
+		}).strict().optional(),
+		hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched.")
+	}).strict().describe("Detection findings before policy evaluation."),
 	labels: zod.array(CLASSIFICATION_LABEL_SCHEMA).nullish(),
 	features: PROCESSING_FEATURE_RESULTS_SCHEMA.optional(),
-	textRegions: zod.array(TEXT_REGION_SCHEMA).max(200).optional().describe("Where OCR found text, and personal information within it, in an image. Redaction transforms blur these regions."),
-	hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched."),
-	policy: CLASSIFICATION_REPORT_POLICY_SCHEMA.optional().describe("What the project's moderation policy made of this report when the asset was decided. Absent until then.")
-}).strict();
+	textRegions: zod.array(TEXT_REGION_SCHEMA).max(200).optional().describe("Where OCR found text, and personal information within it, in an image. Redaction transforms blur these regions.")
+}).strict().refine(hasValidModerationRule, {
+	message: "moderation/rule-required",
+	path: ["rule"]
+});
 // packages/shared/src/ModerationContext.ts
 const MODERATION_AUTHOR_ID_SCHEMA = zod.string().min(1).max(256).meta(metaStore([docPropertyInfo({
 	description: `Your identifier for who wrote the content, up to 256 characters. CalmLens only compares it with the author IDs in \`context\`, to tell which posts share a speaker, so any stable opaque value works. See [Threaded moderation](/docs/guides/threaded-moderation).`,
@@ -843,13 +846,15 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 const ASSET_MODERATION_SCHEMA = zod.object({
 	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only with `viewerClaims.ageConfirmed: true` and any required private-asset access), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
-	categories: CLASSIFICATION_REPORT_SCHEMA.shape.categories.optional(),
-	score: CLASSIFICATION_REPORT_SCHEMA.shape.score.optional(),
-	timeline: CLASSIFICATION_REPORT_SCHEMA.shape.media,
-	policy: CLASSIFICATION_REPORT_SCHEMA.shape.policy,
-	hashMatches: CLASSIFICATION_REPORT_SCHEMA.shape.hashMatches,
+	...MODERATION_ASSESSMENT_FIELDS_SCHEMA.partial().shape,
+	flaggedCategories: MODERATION_ASSESSMENT_SCHEMA.shape.flaggedCategories,
+	regions: MODERATION_ASSESSMENT_SCHEMA.shape.regions,
+	raw: CLASSIFICATION_REPORT_SCHEMA.shape.raw.optional(),
 	testCategoryActions: CLASSIFICATION_REPORT_SCHEMA.shape.testCategoryActions,
 	testRegionalActions: CLASSIFICATION_REPORT_SCHEMA.shape.testRegionalActions
+}).refine(hasValidModerationRule, {
+	message: "moderation/rule-required",
+	path: ["rule"]
 }).meta(metaStore([docPropertyInfo({
 	description: "Moderation findings and decision",
 	namedType: "AssetModeration"
@@ -937,7 +942,9 @@ STORED_ASSET_SCHEMA.pick({
 			completedAt: 1767225601e3,
 			moderation: {
 				status: "allowed",
-				manualReviews: []
+				manualReviews: [],
+				flaggedCategories: [],
+				regions: []
 			}
 		},
 		content: {
@@ -967,7 +974,7 @@ STORED_ASSET_SCHEMA.pick({
 	}
 })])).extend({
 	userId: STORED_ASSET_SCHEMA.shape.userId,
-	classification: ASSET_CLASSIFICATION_SCHEMA.extend({ moderation: ASSET_MODERATION_SCHEMA.extend({ manualReviews: zod.array(ASSET_REVIEW_SCHEMA.extend({ reviewerUserId: zod.string().nullish() })) }) }),
+	classification: ASSET_CLASSIFICATION_SCHEMA.extend({ moderation: ASSET_MODERATION_SCHEMA.safeExtend({ manualReviews: zod.array(ASSET_REVIEW_SCHEMA.extend({ reviewerUserId: zod.string().nullish() })) }) }),
 	content: ASSET_CONTENT_SCHEMA.extend({ safetyTest: zod.boolean().optional().describe("Marks a synthetic back-office safety exercise asset") })
 });
 /**

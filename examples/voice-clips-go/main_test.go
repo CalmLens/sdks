@@ -395,7 +395,7 @@ func TestTimelineFromReportMedia(t *testing.T) {
 	item := liveClip(t, a, mock)
 	stored := mock.DatabaseStorage.Assets[item.ID]
 	decideAsset(stored, calmlens.ModerationStatusBlocked)
-	demo.Section(demo.Section(stored, "classification"), "moderation")["timeline"] = calmlens.JSON{
+	demo.Section(demo.Section(demo.Section(stored, "classification"), "moderation"), "raw")["timeline"] = calmlens.JSON{
 		"durationSeconds": 60, "sampledFrames": 0, "audioTranscribed": false,
 		"segments": []any{
 			calmlens.JSON{"source": "clip", "startSeconds": 29, "endSeconds": 60, "categories": calmlens.JSON{

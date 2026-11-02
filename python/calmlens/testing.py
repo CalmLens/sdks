@@ -126,7 +126,7 @@ class MockDecision:
 
     def report(self) -> dict[str, Any] | None:
         """The report a decided asset gets, as the API sends it: every category (unflagged ones
-        evaluated with score 0), the highest score, and the policy's actions and
+        evaluated with score 0), the policy's actions and
         ``flaggedCategories``. ``None`` for ``pending`` and ``failed``."""
         status = self.status
         if status in ("pending", "failed"):
@@ -136,7 +136,6 @@ class MockDecision:
             return _STATUS_ACTION[status] if status != "allowed" and score >= 0.5 else "allow"
         evaluated = [(category, self._flags[category][0] if category in self._flags else 0)
                      for category in CATEGORIES if category not in self._not_evaluated]
-        score = max([0, *(value for _, value in evaluated)])
         categories: dict[str, Any] = {}
         for category in CATEGORIES:
             if category in self._not_evaluated:
@@ -148,14 +147,11 @@ class MockDecision:
                 categories[category]["qualifiers"] = {
                     qualifier: {"status": "evaluated", "someScore": some, "likelihood": _score_to_likelihood(some)}
                     for qualifier, some in qualifiers}
-        return {"categories": categories, "score": score, "policy": {
-            "score": score,
+        return {"raw": {"categories": categories},
             "categories": {category: {"score": value, "action": action(value)} for category, value in evaluated},
-            "evidence": "full",
-            "decision": {"source": "policy", "action": None if status == "allowed" else _STATUS_ACTION[status],
-                         "regions": [],
-                         "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]},
-        }}
+            "explanationComplete": True, "source": "policy", "automatedAction": _STATUS_ACTION[status],
+            "regions": [], "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]}
+
 
 
 def mock_decision(status: MockAssetOutcome) -> MockDecision:
@@ -1241,7 +1237,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                        "partsReceived": None if final else 1},
             "classification": {"status": "processing" if final else "pending", "failureReason": None, "updatedAt": now,
                                "completedAt": None,
-                               "moderation": {"status": "pending", "manualReviews": []}},
+                               "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []}},
         }
         if not final:
             self._uploads[asset["id"]] = {"queue": queue, "total": total}
@@ -1324,7 +1320,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 {"key": "failure-reason", "value": asset["classification"].get("failureReason") or "processing-error"}]))
             return
         report = decision.report() or {}
-        flagged = list(report["policy"]["decision"]["flaggedCategories"]) if report else []
+        flagged = list(report["flaggedCategories"]) if report else []
         self.enqueue_event("asset.classified", asset_id=asset["id"], facts=cast(list[EventFact], [
             {"key": "flagged-categories", "value": flagged}, {"key": "moderation-status", "value": status},
             {"key": "asset-type", "value": asset["type"]}, _asset_name_fact(asset)]))
@@ -1445,9 +1441,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             moderation = asset["classification"]["moderation"]
             if not body.get("rerun"):
                 # Like the API: the evidence is completed and every action stays as decided.
-                policy = moderation.get("policy")
-                if policy and policy.get("evidence") == "decision":
-                    policy["evidence"] = "full"
+                if moderation.get("explanationComplete") is False:
+                    moderation["explanationComplete"] = True
                     asset["updatedAt"] = now
                 return asset
             if moderation.get("manualReviews"):

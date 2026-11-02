@@ -161,7 +161,7 @@ module CalmLens
     end
 
     # Completes the policy evidence behind a decided asset's moderation decision: the report's
-    # `classification.moderation.policy.evidence` becomes `full` and every action stays as decided.
+    # `classification.moderation.explanationComplete` becomes `true` and every action stays as decided.
     # With `rerun: true` the asset is moderated again with the project's current policy and returns
     # in `processing`; use it when the policy changed since the decision (`asset/policy-changed`).
     # @option options [String] :asset_id

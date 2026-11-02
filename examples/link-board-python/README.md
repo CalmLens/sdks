@@ -24,7 +24,7 @@ including the text and images it finds there, before anyone can click the link.
    for allowed, limited and age-restricted pages (a blocked page shows only its host).
 5. For a page the policy acted on, the board explains the decision from the classification
    results (`classification.moderation`). A website is usually decided by its parts
-   (`policy.decision.source` is `children`): its own categories are then not evaluated, and the
+   (`source` is `children`): its own categories are then not evaluated, and the
    board shows each part with the categories that scored at least 40%, so you can see whether
    the page text or an image carried the finding. When the page's own scores decided it, the
    board shows those, and categories that were **not evaluated** as unknown, never as zero.

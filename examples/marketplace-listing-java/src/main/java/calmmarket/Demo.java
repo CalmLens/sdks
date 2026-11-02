@@ -182,16 +182,15 @@ final class Demo implements Calmmarket.Backend {
   /** A synthetic report: every category evaluated at a low score unless overridden. */
   private static Map<String, Object> report(Map<String, Map<String, Object>> overrides) {
     Map<String, Object> categories = new LinkedHashMap<>();
-    double highest = 0;
     for (String key : Calmmarket.CATEGORIES) {
       Map<String, Object> result = overrides.getOrDefault(key, evaluated(0.02));
       categories.put(key, result);
-      if (result.get("score") instanceof Double score) highest = Math.max(highest, score);
     }
     // The simulated policy acts on every overridden category, as a real report's policy decision names them.
     List<String> flagged = overrides.keySet().stream().sorted().toList();
-    Map<String, Object> decision = Map.of("source", "policy", "action", flagged.isEmpty() ? "allow" : "block", "flaggedCategories", flagged);
-    return Map.of("categories", categories, "score", highest, "policy", Map.of("decision", decision), "processedAt", System.currentTimeMillis());
+    return Map.of("raw", Map.of("categories", categories), "categories", Map.of(),
+        "source", "policy", "automatedAction", flagged.isEmpty() ? "allow" : "block",
+        "flaggedCategories", flagged, "regions", List.of(), "explanationComplete", true);
   }
 
   private static Map<String, Object> evaluated(double score) {

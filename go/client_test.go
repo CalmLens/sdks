@@ -263,12 +263,12 @@ func TestLocalFailuresAreSDKErrors(t *testing.T) {
 
 func TestResponsesKeepUnknownFieldsAndIntegerPrecision(t *testing.T) {
 	c, h := setup(t)
-	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"status": "future-status", "categories": JSON{"x": JSON{"status": "future-status"}}}}}
+	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"status": "future-status", "raw": JSON{"categories": JSON{"x": JSON{"status": "future-status"}}}}}}
 	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Classification.Moderation.Status != "future-status" || asset.Classification.Moderation.Categories["x"].Status != "future-status" {
+	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Classification.Moderation.Status != "future-status" || asset.Classification.Moderation.Raw.Categories["x"].Status != "future-status" {
 		t.Fatalf("%#v", asset.Raw)
 	}
 }
@@ -435,54 +435,15 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 }
 func TestUnknownCoverageAndReportFields(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"classification": {"moderation": {"provider":"x","categories": {"violence": {"status": "not-evaluated", "reason": "unsupported"}}}}}`), &a)
-	if err != nil || a.Classification.Moderation.Categories["violence"].Score != nil || a.Classification.Moderation.Raw["provider"] != "x" {
+	err := json.Unmarshal([]byte(`{"classification":{"moderation":{"provider":"x","flaggedCategories":[],"regions":[],"raw":{"categories":{"violence":{"status":"not-evaluated","reason":"unsupported"}}}}}}`), &a)
+	if err != nil || a.Classification.Moderation.Raw.Categories["violence"].Score != nil || a.Classification.Moderation.Extra["provider"] != "x" {
 		t.Fatal(a, err)
 	}
 }
 
 func TestReportFeatureResultsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{
-  "classification": {
-    "moderation": {
-      "categories": {}
-    },
-    "personDetection": {
-      "status": "not-evaluated",
-      "stage": "beta",
-      "reason": "unavailable"
-    },
-    "faceDetection": {
-      "status": "evaluated",
-      "stage": "beta",
-      "faces": [
-        {
-          "box": {
-            "left": -0.01,
-            "top": 0.2,
-            "width": 0.3,
-            "height": 0.4
-          },
-          "confidence": 0.99,
-          "ageRange": {
-            "low": 21,
-            "high": 30
-          }
-        },
-        {
-          "box": {
-            "left": 0.5,
-            "top": 0.5,
-            "width": 0.1,
-            "height": 0.1
-          },
-          "confidence": 0.8
-        }
-      ]
-    }
-  }
-}`), &a)
+	err := json.Unmarshal([]byte(`{"classification":{"moderation":{"flaggedCategories":[],"regions":[],"raw":{"categories":{}}},"personDetection":{"status":"not-evaluated","stage":"beta","reason":"unavailable"},"faceDetection":{"status":"evaluated","stage":"beta","faces":[{"box":{"left":-0.01,"top":0.2,"width":0.3,"height":0.4},"confidence":0.99,"ageRange":{"low":21,"high":30}},{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"confidence":0.8}]}}}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}

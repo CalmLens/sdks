@@ -156,14 +156,14 @@ asset.classification.status; // "pending" | "processing" | "completed" | "failed
 asset.classification.failureReason; // "file-too-large" | "duration-limit" | "processing-error" | ... | null; set only when processing failed
 asset.classification.moderation.status; // "pending" | "allowed" | "limited" | "age-restricted" | "blocked" | "purged"
 asset.classification.moderation?.score; // number, the overall score
-asset.classification.moderation.categories?.harassment.status; // "evaluated" | "partial" | "not-evaluated"
+asset.classification.moderation.raw?.categories.harassment.status; // "evaluated" | "partial" | "not-evaluated"
 asset.content.status; // "temporary" | "stored" | "removed"
 asset.content.removalReason; // "policy" | "retention" | "requested" | "parent-removed" | "disposed" | null
 asset.type; // "plaintext-document" for text
 asset.createdAt; // milliseconds since the Unix epoch
 ```
 
-Always present: `id`, `projectId`, `name`, `type`, `createdAt`, `updatedAt`, `upload`, `classification` and `content`. Classification contains its progress, completion time and results grouped by capability. `classification.moderation.categories` and `score` are absent until findings are available; optional detections appear only when requested. Moderation decisions and reviewer details sit under `classification.moderation`. Content is removed after classification unless `processingOptions.keepContentAfterProcessing` is enabled. Check each category’s evaluation `status` before reading its score.
+Always present: `id`, `projectId`, `name`, `type`, `createdAt`, `updatedAt`, `upload`, `classification` and `content`. Classification contains its progress, completion time and results grouped by capability. `classification.moderation.raw` is absent until findings are available; optional detections appear only when requested. Moderation decisions and reviewer details sit under `classification.moderation`. Content is removed after classification unless `processingOptions.keepContentAfterProcessing` is enabled. Check each category’s evaluation `status` before reading its score.
 
 ###### Replies in a conversation
 
@@ -335,9 +335,9 @@ const asset = await client.assets.retry({ assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c" 
 
 Complete the policy evidence behind a decided asset's moderation decision. To decide quickly,
 moderation can skip questions whose answers could not change any action, so a report with
-`classification.moderation.policy.evidence` `decision` can credit a different rule, or show a
+`classification.moderation.explanationComplete` `decision` can credit a different rule, or show a
 different policy score, than a complete one. Explaining answers those questions and returns the asset
-with `policy.evidence` `full`; every action stays as decided. It throws `asset/not-decided` for an
+with `moderation.explanationComplete` `full`; every action stays as decided. It throws `asset/not-decided` for an
 asset without a decision, and `asset/policy-changed` when the project's policy has changed since
 the decision: pass `rerun: true` to moderate the asset again with the current policy instead. A
 re-run returns the asset in `processing` and can reach a different decision; it throws
@@ -345,7 +345,7 @@ re-run returns the asset in `processing` and can reach a different decision; it 
 
 ```typescript
 const asset = await client.assets.explain({ assetId: "asset_5Gm2Rk8XqT3wLp9VbN4c" });
-// asset.classification.moderation.policy?.evidence === "full"
+// asset.classification.moderation.explanationComplete === true
 ```
 
 ##### assets.decide(options)
@@ -725,12 +725,12 @@ Upload, classification and content each have a status; moderation has its own de
 
 ## Moderation Reports
 
-Completed reports always contain the eight parent categories: `sexual`, `violence`, `self-harm`, `harassment`, `hate`, `criminal-activity`, `personal-information`, and `profanity`. Category-specific detail is nested under `qualifiers`, for example `classification.moderation.categories.violence.qualifiers["violence-graphic"]`. Reports have no `subcategories` field or dedicated minor-safety placeholder. Retired generic qualifier IDs are rejected.
+Completed reports always contain the eight parent categories: `sexual`, `violence`, `self-harm`, `harassment`, `hate`, `criminal-activity`, `personal-information`, and `profanity`. Category-specific detail is nested under `qualifiers`, for example `classification.moderation.raw.categories.violence.qualifiers["violence-graphic"]`. Reports have no `subcategories` field or dedicated minor-safety placeholder. Retired generic qualifier IDs are rejected.
 
 Always narrow on a category's `status` before reading `score`. An `evaluated` or `partial` result includes `score` and `likelihood`; a `not-evaluated` result includes a reason and represents unknown coverage, not a safe zero score.
 
 ```typescript
-const violence = asset.classification.moderation.categories?.violence;
+const violence = asset.classification.moderation.raw?.categories.violence;
 if (violence?.status === "evaluated" || violence?.status === "partial") {
   console.log(violence.score);
 }
@@ -829,7 +829,7 @@ Like the API, the mock gives each new object an ID with its kind's prefix, an un
 
 The in-memory API behaves like CalmLens where tests depend on it: `assets.list` applies `ordering`, `folderId` and `filter` expressions (comparisons joined by `;`, which binds tighter than `,`, and grouped with parentheses; anything else throws `sdk/invalid-argument` rather than returning wrong results), with cursors that resume after the last asset returned and only continue the query they came from; `assets.search` runs the API's keyword search, where every word must appear in the name, ID, external ID, description, tags, type, content format or extension, or moderation status, with the API's scores and `matchedFields`; assets created in a row get increasing `createdAt` values; multipart parts must arrive in order, every part but the last is at least 5 MiB, images total 10 MiB to 20 MiB, parts add up to any declared `totalSizeInBytes`, and the queue mode chosen at the start applies to the final part; out-of-range `pageSize`, `limit` and search queries fail with the API's `validation/too-small` or `validation/too-big`; unset asset fields are `null`, as the API returns them; a `failed` decision sets `classification.failureReason` to `processing-error`; content is removed with reason `retention` once processing is done unless `keepContentAfterProcessing` is set, an automated `purged` outcome removes it with reason `policy`, and `assets.deleteContent` and a reviewer's `purged` decision remove it with reason `requested`; a reused `idempotencyKey` replays the first response; and `cdn.serve` returns CDN-like responses with JSON error bodies: blocked, purged and failed assets and removed content get `403` `asset/not-available` whatever the key, then private assets get `403` `asset/api-key-missing-permission` unless the key has `assets:download` (keys from `createMockApiKey()` have no grants); a classified image's `placeholder` is a PNG, public for every asset whatever its visibility or status, and refused once the asset is purged or its content removed. Originals carry the CDN's `Cache-Control`, `Cache-Tag` and protection headers, and images an `ETag` and `Expires`. `client.setApiKeyGrants(grants)` changes the key's grants mid-test. `client.decide(assetId, decision)` applies a reviewer's decision (`allowed`, `limited`, `age-restricted`, `blocked` or `purged`) and adds the matching `asset.<decision>` event with a `decided-by: reviewer` fact; `assets.decide` checks decisions like the API (`asset/processing` while an upload is open or still processing, `asset/decision-not-allowed`, `asset/decision-unchanged`, `asset/content-purged`) and records its note with the reviewer `An API key`; `folders.list` and `hashLists.list` return cursor pages like the API; `assets.delete`, `assets.deleteContent` and `assets.retry` add `asset.deleted`, `asset.content-removed` and `asset.retried` events; and every upload records `asset.uploaded`, then `asset.classified` and the automated `asset.<status>` once it is decided, or `asset.failed`. `await client.enqueueEvent({ type, ... })` adds an event that `events.list` and `events.pages` then return; one about an asset carries the asset as it is.
 
-`mockOptions.moderate` decides each asset the mock moderates. It receives the stored `asset`, its `content` (`bytes`, and `text` for a plain-text upload), the `trigger` (`upload`, `retry`, `rerun` or `complete`) and whether the API would `queued` the work, and returns a status (`pending`, `failed`, `allowed`, `limited`, `age-restricted`, `blocked` or `purged`) or a decision built with `mockDecision`. A decision fills the asset's report as CalmLens does: every category (unflagged ones evaluated with score 0), the highest score, and the policy's actions and `flaggedCategories`. Without `moderate`, queued uploads, retries and reruns stay `pending` and everything else is `allowed`. `client.completeProcessing(assetId, decision?)` finishes a pending asset as the pipeline would, with the decision given or the one `moderate` returns for `complete`:
+`mockOptions.moderate` decides each asset the mock moderates. It receives the stored `asset`, its `content` (`bytes`, and `text` for a plain-text upload), the `trigger` (`upload`, `retry`, `rerun` or `complete`) and whether the API would `queued` the work, and returns a status (`pending`, `failed`, `allowed`, `limited`, `age-restricted`, `blocked` or `purged`) or a decision built with `mockDecision`. A decision fills the asset's report as CalmLens does: every category (unflagged ones evaluated with score 0), the policy's actions and `flaggedCategories`. Without `moderate`, queued uploads, retries and reruns stay `pending` and everything else is `allowed`. `client.completeProcessing(assetId, decision?)` finishes a pending asset as the pipeline would, with the decision given or the one `moderate` returns for `complete`:
 
 ```typescript
 import { MockCalmLensServerClient, createMockApiKey, mockDecision } from "@calmlens/sdk/testing";
@@ -846,7 +846,7 @@ const client = new MockCalmLensServerClient({
 });
 
 const comment = await client.text.classify({ text: "I will kill you" });
-expect(comment.classification.moderation.categories?.violence).toMatchObject({ score: 0.92 });
+expect(comment.classification.moderation.raw?.categories.violence).toMatchObject({ score: 0.92 });
 ```
 
 A `moderate` callback decides queued uploads straight away too; return `pending` for them (`queued && trigger === "upload"`) to finish them later. With the default, a queued upload stays pending until you finish it:

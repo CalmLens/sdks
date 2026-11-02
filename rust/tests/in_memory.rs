@@ -103,16 +103,18 @@ async fn explain_completes_evidence_and_rerun_moderates_again() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let asset = mock.assets().classify(kept("e.png", b"png")).await.unwrap();
     mock.with_storage(|storage| {
-        storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]["policy"] =
-            json!({"score": 0.1, "categories": {}, "evidence": "decision"});
+        storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]
+            ["explanationComplete"] = json!(false);
     });
     let explain = |rerun| ExplainAsset {
         asset_id: asset.id.clone(),
         rerun,
     };
     let explained = mock.assets().explain(explain(false)).await.unwrap();
-    let policy = explained.classification.moderation.policy.unwrap();
-    assert_eq!(policy.evidence.as_deref(), Some("full"));
+    assert_eq!(
+        explained.classification.moderation.explanation_complete,
+        Some(true)
+    );
     assert_eq!(
         explained.classification.status,
         AssetClassificationStatus::Completed

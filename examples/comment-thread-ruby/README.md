@@ -11,7 +11,7 @@ held for a person to review before anyone sees it.
 - A reply with any field `blocked`, `age-restricted` or `purged` is **held**. The thread has no
   age check, so it holds age-restricted fields too. Only its author (the browser that posted it)
   sees a held reply, marked as awaiting review with the categories the moderation report's
-  policy decision flagged (`classification.moderation.policy.decision.flaggedCategories`).
+  policy decision flagged (`classification.moderation.flaggedCategories`).
   Everyone else sees nothing until it is approved. The **Review queue** beside the thread lists
   held replies by their flagged categories, without their name or text.
 - A moderator reviews held assets in the CalmLens portal. Allowing or limiting a held asset

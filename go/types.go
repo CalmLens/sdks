@@ -123,8 +123,7 @@ const (
 	AssetTypeFile               = "file"
 )
 
-// Policy action values of CategoryPolicyScore.Action and policy rules. ReportPolicyDecision.Action is ModerationActionLimit, ModerationActionAgeRestrict,
-// ModerationActionBlock or ModerationActionPurge, or nil when nothing was acted on.
+// Policy action values for category results, policy rules and AssetModeration.AutomatedAction.
 const (
 	ModerationActionAllow       = "allow"
 	ModerationActionLimit       = "limit"
@@ -219,19 +218,26 @@ type TestRegionalAction struct {
 
 // AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	TestCategoryActions map[string]string    `json:"testCategoryActions,omitempty"`
-	TestRegionalActions []TestRegionalAction `json:"testRegionalActions,omitempty"`
-	ManualReviews       []AssetReview        `json:"manualReviews"`
-	// Status is one of the ModerationStatus constants.
-	Status     string                     `json:"status"`
-	Categories map[string]CategoryResult  `json:"categories,omitempty"`
-	Score      *float64                   `json:"score,omitempty"`
-	Timeline   *MediaClassificationReport `json:"timeline,omitempty"`
-	Policy     *ReportPolicy              `json:"policy,omitempty"`
-	// HashMatches are the hash list entries the image matched, blocking matches first and then
-	// the closest. Empty when nothing matched.
-	HashMatches []HashMatch `json:"hashMatches,omitempty"`
-	Raw         JSON        `json:"-"`
+	TestCategoryActions map[string]string              `json:"testCategoryActions,omitempty"`
+	TestRegionalActions []TestRegionalAction           `json:"testRegionalActions,omitempty"`
+	ManualReviews       []AssetReview                  `json:"manualReviews"`
+	Status              string                         `json:"status"`
+	AutomatedAction     *string                        `json:"automatedAction,omitempty"`
+	Source              *string                        `json:"source,omitempty"`
+	Rule                *string                        `json:"rule,omitempty"`
+	FlaggedCategories   []string                       `json:"flaggedCategories"`
+	Regions             []RegionalDecision             `json:"regions"`
+	ExplanationComplete *bool                          `json:"explanationComplete,omitempty"`
+	Categories          map[string]CategoryPolicyScore `json:"categories,omitempty"`
+	Raw                 *ModerationRaw                 `json:"raw,omitempty"`
+	Extra               JSON                           `json:"-"`
+}
+
+// ModerationRaw contains detection findings before policy evaluation.
+type ModerationRaw struct {
+	Categories  map[string]CategoryResult  `json:"categories"`
+	Timeline    *MediaClassificationReport `json:"timeline,omitempty"`
+	HashMatches []HashMatch                `json:"hashMatches,omitempty"`
 }
 
 // HashMatchSourceHashList is the HashMatch.Source of a match against a project hash list.
@@ -434,26 +440,6 @@ type MetadataItem struct {
 	Value any    `json:"value"`
 }
 
-// ReportPolicy holds each assessed category's policy score and action, and the highest score.
-type ReportPolicy struct {
-	Score      float64                        `json:"score"`
-	Categories map[string]CategoryPolicyScore `json:"categories"`
-	// Evidence is PolicyEvidenceDecision when questions that could not change any action were
-	// skipped, and PolicyEvidenceFull (or empty) when every question was answered.
-	// AssetsService.Explain completes it.
-	Evidence string                `json:"evidence,omitempty"`
-	Decision *ReportPolicyDecision `json:"decision,omitempty"`
-}
-
-// Values of ReportPolicy.Evidence.
-const (
-	// PolicyEvidenceDecision means every action is final, but a category's policy score and the
-	// rule credited with its action can differ from a complete report.
-	PolicyEvidenceDecision = "decision"
-	// PolicyEvidenceFull means every question was answered.
-	PolicyEvidenceFull = "full"
-)
-
 // CategoryPolicyScore is how strongly a category meets the policy, from 0 to 1, and the action
 // the policy takes: allow, limit, age-restrict, block or purge.
 type CategoryPolicyScore struct {
@@ -486,8 +472,7 @@ type CategoryPolicySettingsSnapshot struct {
 	Restrictions   []PolicyRuleSnapshot `json:"restrictions"`
 }
 
-// Values of ReportPolicyDecision.Source. Source is a plain string so sources added later
-// still decode.
+// Values of AssetModeration.Source. New source strings still decode.
 const (
 	DecisionSourcePolicy   = "policy"
 	DecisionSourceChildren = "children"
@@ -496,21 +481,12 @@ const (
 	DecisionSourceMandatoryRule = "mandatory-rule"
 )
 
-// ReportPolicyDecision records the automatic action and what triggered it.
+// RegionalDecision records a stricter outcome in a served jurisdiction.
 type RegionalDecision struct {
 	Region   string `json:"region"`
 	Action   string `json:"action"`
 	Rule     string `json:"rule"`
 	Category string `json:"category,omitempty"`
-}
-
-type ReportPolicyDecision struct {
-	Rule    *string            `json:"rule,omitempty"`
-	Regions []RegionalDecision `json:"regions"`
-	// Source is one of the DecisionSource constants.
-	Source            string   `json:"source"`
-	Action            *string  `json:"action"`
-	FlaggedCategories []string `json:"flaggedCategories"`
 }
 
 // Processing feature stages. Beta results may change shape.
@@ -1330,10 +1306,10 @@ func (a *Asset) UnmarshalJSON(data []byte) error {
 	return withRaw(data, (*plain)(a), &a.Raw)
 }
 
-// UnmarshalJSON decodes the report and keeps every field in Raw.
+// UnmarshalJSON decodes moderation and keeps every field in Extra.
 func (r *AssetModeration) UnmarshalJSON(data []byte) error {
 	type plain AssetModeration
-	return withRaw(data, (*plain)(r), &r.Raw)
+	return withRaw(data, (*plain)(r), &r.Extra)
 }
 
 // UnmarshalJSON decodes the category result and keeps every field in Raw.

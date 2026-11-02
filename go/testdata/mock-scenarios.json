@@ -86,91 +86,87 @@
               "classification.moderation.status": "blocked",
               "classification.moderation.categories": {
                 "sexual": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "violence": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "self-harm": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "harassment": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "hate": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "criminal-activity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "personal-information": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "profanity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 }
               },
-              "classification.moderation.score": 0,
-              "classification.moderation.policy": {
-                "score": 0,
+              "classification.moderation.raw": {
                 "categories": {
                   "sexual": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "violence": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "self-harm": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "harassment": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "hate": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "criminal-activity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "personal-information": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "profanity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   }
-                },
-                "evidence": "full",
-                "decision": {
-                  "source": "policy",
-                  "action": "block",
-                  "regions": [],
-                  "flaggedCategories": []
                 }
-              }
+              },
+              "classification.moderation.automatedAction": "block",
+              "classification.moderation.flaggedCategories": [],
+              "classification.moderation.regions": [],
+              "classification.moderation.source": "policy",
+              "classification.moderation.explanationComplete": true
             },
             "httpStatus": 200
           }
@@ -186,91 +182,87 @@
               "classification.moderation.status": "blocked",
               "classification.moderation.categories": {
                 "sexual": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "violence": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "self-harm": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "harassment": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "hate": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "criminal-activity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "personal-information": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "profanity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 }
               },
-              "classification.moderation.score": 0,
-              "classification.moderation.policy": {
-                "score": 0,
+              "classification.moderation.raw": {
                 "categories": {
                   "sexual": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "violence": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "self-harm": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "harassment": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "hate": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "criminal-activity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "personal-information": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "profanity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   }
-                },
-                "evidence": "full",
-                "decision": {
-                  "source": "policy",
-                  "action": "block",
-                  "regions": [],
-                  "flaggedCategories": []
                 }
-              }
+              },
+              "classification.moderation.automatedAction": "block",
+              "classification.moderation.flaggedCategories": [],
+              "classification.moderation.regions": [],
+              "classification.moderation.source": "policy",
+              "classification.moderation.explanationComplete": true
             },
             "httpStatus": 200
           }
@@ -290,91 +282,87 @@
               "classification.moderation.status": "allowed",
               "classification.moderation.categories": {
                 "sexual": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "violence": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "self-harm": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "harassment": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "hate": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "criminal-activity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "personal-information": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "profanity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 }
               },
-              "classification.moderation.score": 0,
-              "classification.moderation.policy": {
-                "score": 0,
+              "classification.moderation.raw": {
                 "categories": {
                   "sexual": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "violence": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "self-harm": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "harassment": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "hate": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "criminal-activity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "personal-information": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "profanity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   }
-                },
-                "evidence": "full",
-                "decision": {
-                  "source": "policy",
-                  "action": null,
-                  "regions": [],
-                  "flaggedCategories": []
                 }
-              }
+              },
+              "classification.moderation.automatedAction": "allow",
+              "classification.moderation.flaggedCategories": [],
+              "classification.moderation.regions": [],
+              "classification.moderation.source": "policy",
+              "classification.moderation.explanationComplete": true
             },
             "httpStatus": 200
           }
@@ -433,96 +421,92 @@
               "classification.status": "completed",
               "classification.moderation.status": "blocked",
               "classification.moderation.categories": {
-                "sexual": {
-                  "status": "not-evaluated",
-                  "reason": "not-supported"
-                },
                 "violence": {
-                  "status": "evaluated",
-                  "likelihood": "very-likely",
                   "score": 0.92,
-                  "qualifiers": {
-                    "violence-threat": {
-                      "status": "evaluated",
-                      "someScore": 0.9,
-                      "likelihood": "very-likely"
-                    }
-                  }
+                  "action": "block"
                 },
                 "self-harm": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "harassment": {
-                  "status": "evaluated",
-                  "likelihood": "unlikely",
-                  "score": 0.3
+                  "score": 0.3,
+                  "action": "allow"
                 },
                 "hate": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "criminal-activity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "personal-information": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "profanity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 }
               },
-              "classification.moderation.score": 0.92,
-              "classification.moderation.policy": {
-                "score": 0.92,
+              "classification.moderation.raw": {
                 "categories": {
+                  "sexual": {
+                    "status": "not-evaluated",
+                    "reason": "not-supported"
+                  },
                   "violence": {
+                    "status": "evaluated",
+                    "likelihood": "very-likely",
                     "score": 0.92,
-                    "action": "block"
+                    "qualifiers": {
+                      "violence-threat": {
+                        "status": "evaluated",
+                        "someScore": 0.9,
+                        "likelihood": "very-likely"
+                      }
+                    }
                   },
                   "self-harm": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "harassment": {
-                    "score": 0.3,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "unlikely",
+                    "score": 0.3
                   },
                   "hate": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "criminal-activity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "personal-information": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "profanity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   }
-                },
-                "evidence": "full",
-                "decision": {
-                  "source": "policy",
-                  "action": "block",
-                  "regions": [],
-                  "flaggedCategories": [
-                    "violence"
-                  ]
                 }
-              }
+              },
+              "classification.moderation.automatedAction": "block",
+              "classification.moderation.flaggedCategories": [
+                "violence"
+              ],
+              "classification.moderation.regions": [],
+              "classification.moderation.source": "policy",
+              "classification.moderation.explanationComplete": true
             },
             "httpStatus": 200
           }
@@ -542,93 +526,89 @@
               "classification.moderation.status": "limited",
               "classification.moderation.categories": {
                 "sexual": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "violence": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "self-harm": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "harassment": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "hate": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "criminal-activity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "personal-information": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "profanity": {
-                  "status": "evaluated",
-                  "likelihood": "likely",
-                  "score": 0.7
+                  "score": 0.7,
+                  "action": "limit"
                 }
               },
-              "classification.moderation.score": 0.7,
-              "classification.moderation.policy": {
-                "score": 0.7,
+              "classification.moderation.raw": {
                 "categories": {
                   "sexual": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "violence": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "self-harm": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "harassment": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "hate": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "criminal-activity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "personal-information": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "profanity": {
-                    "score": 0.7,
-                    "action": "limit"
+                    "status": "evaluated",
+                    "likelihood": "likely",
+                    "score": 0.7
                   }
-                },
-                "evidence": "full",
-                "decision": {
-                  "source": "policy",
-                  "action": "limit",
-                  "regions": [],
-                  "flaggedCategories": [
-                    "profanity"
-                  ]
                 }
-              }
+              },
+              "classification.moderation.automatedAction": "limit",
+              "classification.moderation.flaggedCategories": [
+                "profanity"
+              ],
+              "classification.moderation.regions": [],
+              "classification.moderation.source": "policy",
+              "classification.moderation.explanationComplete": true
             },
             "httpStatus": 200
           }
@@ -7763,93 +7743,89 @@
               "classification.moderation.status": "age-restricted",
               "classification.moderation.categories": {
                 "sexual": {
-                  "status": "evaluated",
-                  "likelihood": "very-likely",
-                  "score": 0.8
+                  "score": 0.8,
+                  "action": "age-restrict"
                 },
                 "violence": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "self-harm": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "harassment": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "hate": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "criminal-activity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "personal-information": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "profanity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 }
               },
-              "classification.moderation.score": 0.8,
-              "classification.moderation.policy": {
-                "score": 0.8,
+              "classification.moderation.raw": {
                 "categories": {
                   "sexual": {
-                    "score": 0.8,
-                    "action": "age-restrict"
+                    "status": "evaluated",
+                    "likelihood": "very-likely",
+                    "score": 0.8
                   },
                   "violence": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "self-harm": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "harassment": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "hate": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "criminal-activity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "personal-information": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "profanity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   }
-                },
-                "evidence": "full",
-                "decision": {
-                  "source": "policy",
-                  "action": "age-restrict",
-                  "regions": [],
-                  "flaggedCategories": [
-                    "sexual"
-                  ]
                 }
               },
+              "classification.moderation.automatedAction": "age-restrict",
+              "classification.moderation.flaggedCategories": [
+                "sexual"
+              ],
+              "classification.moderation.regions": [],
+              "classification.moderation.source": "policy",
+              "classification.moderation.explanationComplete": true,
               "classification.moderation.manualReviews": []
             }
           }
@@ -7937,91 +7913,87 @@
               "classification.moderation.status": "allowed",
               "classification.moderation.categories": {
                 "sexual": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "violence": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "self-harm": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "harassment": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "hate": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "criminal-activity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "personal-information": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 },
                 "profanity": {
-                  "status": "evaluated",
-                  "likelihood": "very-unlikely",
-                  "score": 0
+                  "score": 0,
+                  "action": "allow"
                 }
               },
-              "classification.moderation.score": 0,
-              "classification.moderation.policy": {
-                "score": 0,
+              "classification.moderation.raw": {
                 "categories": {
                   "sexual": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "violence": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "self-harm": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "harassment": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "hate": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "criminal-activity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "personal-information": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   },
                   "profanity": {
-                    "score": 0,
-                    "action": "allow"
+                    "status": "evaluated",
+                    "likelihood": "very-unlikely",
+                    "score": 0
                   }
-                },
-                "evidence": "full",
-                "decision": {
-                  "source": "policy",
-                  "action": null,
-                  "regions": [],
-                  "flaggedCategories": []
                 }
-              }
+              },
+              "classification.moderation.automatedAction": "allow",
+              "classification.moderation.flaggedCategories": [],
+              "classification.moderation.regions": [],
+              "classification.moderation.source": "policy",
+              "classification.moderation.explanationComplete": true
             }
           }
         },

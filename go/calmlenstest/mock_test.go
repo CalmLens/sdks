@@ -366,9 +366,9 @@ func TestMockExplainCompletesEvidenceOrReruns(t *testing.T) {
 		t.Fatal(err)
 	}
 	moderation := c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)
-	moderation["policy"] = calmlens.JSON{"score": 0.1, "categories": calmlens.JSON{}, "evidence": calmlens.PolicyEvidenceDecision}
+	moderation["explanationComplete"] = false
 	explained, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID})
-	if err != nil || explained.Classification.Moderation.Policy.Evidence != calmlens.PolicyEvidenceFull || explained.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
+	if err != nil || explained.Classification.Moderation.ExplanationComplete == nil || !*explained.Classification.Moderation.ExplanationComplete || explained.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
 		t.Fatal(explained, err)
 	}
 	moderation["manualReviews"] = []any{calmlens.JSON{"status": "allowed"}}

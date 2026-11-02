@@ -19,7 +19,7 @@ export interface MediaAsset {
   classification?: {
     moderation?: {
       status?: AssetModerationStatus | null;
-      policy?: { decision?: { regions?: { region: string; action: string }[] } };
+      regions?: { region: string; action: string }[];
     } | null;
   } | null;
   content?: {
@@ -169,7 +169,7 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
   const { asset } = props;
   if (!asset) return props as T & { projectId: string; assetId: string };
   const preview = asset.content?.image;
-  const regionEntries = asset.classification?.moderation?.policy?.decision?.regions ?? [];
+  const regionEntries = asset.classification?.moderation?.regions ?? [];
   const ranks: Record<string, number> = {
     pending: 0,
     allowed: 0,

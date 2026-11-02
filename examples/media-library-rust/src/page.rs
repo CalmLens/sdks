@@ -724,10 +724,8 @@ fn automatic_outcome(asset: &Asset) -> &str {
     asset
         .classification
         .moderation
-        .policy
-        .as_ref()
-        .and_then(|policy| policy.decision.as_ref())
-        .and_then(|decision| decision.action.as_deref())
+        .automated_action
+        .as_deref()
         .map(|action| match action {
             "allow" => "allowed",
             "limit" => "limited",

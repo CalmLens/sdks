@@ -599,10 +599,10 @@ final class MockServerClient
                 }
                 if (empty($json['rerun'])) {
                     // Like the API: the evidence is completed and every action stays as decided.
-                    if (($asset['classification']['moderation']['policy']['evidence'] ?? null) !== 'decision') {
+                    if (($asset['classification']['moderation']['explanationComplete'] ?? null) !== false) {
                         return $asset;
                     }
-                    $asset['classification']['moderation']['policy']['evidence'] = 'full';
+                    $asset['classification']['moderation']['explanationComplete'] = true;
                     return $this->assets[$id] = $this->touch($asset);
                 }
                 if (($asset['classification']['moderation']['manualReviews'] ?? []) !== []) {
@@ -710,7 +710,7 @@ final class MockServerClient
                 'checksums' => null, 'image' => null, 'extractedText' => null, 'fileMetadata' => null],
             'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
             'classification' => ['status' => $final ? 'processing' : 'pending', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
-                'moderation' => ['status' => 'pending', 'manualReviews' => []]],
+                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => []]],
         ];
         $this->assets[$asset['id']] = $asset;
         if ($bytes !== null) {
@@ -787,7 +787,7 @@ final class MockServerClient
                 ['key' => 'failure-reason', 'value' => $asset['classification']['failureReason'] ?? 'processing-error']]]);
             return;
         }
-        $flagged = $decision->report()['policy']['decision']['flaggedCategories'];
+        $flagged = $decision->report()['flaggedCategories'];
         $this->enqueueEvent($event + ['type' => 'asset.classified', 'severity' => 'low', 'facts' => [
             ['key' => 'flagged-categories', 'value' => $flagged], ['key' => 'moderation-status', 'value' => $status],
             ['key' => 'asset-type', 'value' => $asset['type']], self::nameFact($asset)]]);

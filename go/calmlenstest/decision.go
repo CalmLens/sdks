@@ -201,7 +201,7 @@ func scoreToLikelihood(score float64) string {
 func decided(status string) bool { return status != OutcomePending && status != OutcomeFailed }
 
 // report is the moderation report fields a decided asset gets, as the API sends them: every
-// category (unflagged ones evaluated with score 0), the highest score, and the policy's actions
+// category (unflagged ones evaluated with score 0), the policy's actions
 // and flaggedCategories. It is nil for pending and failed decisions.
 func (d *Decision) report() calmlens.JSON {
 	if !decided(d.status) {
@@ -216,14 +216,12 @@ func (d *Decision) report() calmlens.JSON {
 	categories := calmlens.JSON{}
 	policyCategories := calmlens.JSON{}
 	flagged := []any{}
-	highest := 0.0
 	for _, category := range mockCategories {
 		if d.notEvaluated[category] {
 			categories[category] = calmlens.JSON{"status": "not-evaluated", "reason": "not-supported"}
 			continue
 		}
 		entry := d.flags[category]
-		highest = max(highest, entry.score)
 		evaluated := calmlens.JSON{"status": "evaluated", "likelihood": scoreToLikelihood(entry.score), "score": entry.score}
 		if len(entry.qualifiers) > 0 {
 			qualifiers := calmlens.JSON{}
@@ -238,29 +236,19 @@ func (d *Decision) report() calmlens.JSON {
 			flagged = append(flagged, category)
 		}
 	}
-	var decisionAction any
-	if d.status != OutcomeAllowed {
-		decisionAction = statusAction[d.status]
-	}
 	return calmlens.JSON{
-		"categories": categories,
-		"score":      highest,
-		"policy": calmlens.JSON{
-			"score":      highest,
-			"categories": policyCategories,
-			"evidence":   calmlens.PolicyEvidenceFull,
-			"decision": calmlens.JSON{
-				"source": "policy", "action": decisionAction, "regions": []any{}, "flaggedCategories": flagged,
-			},
-		},
+		"raw":                 calmlens.JSON{"categories": categories},
+		"categories":          policyCategories,
+		"explanationComplete": true,
+		"source":              "policy", "automatedAction": statusAction[d.status], "regions": []any{}, "flaggedCategories": flagged,
 	}
 }
 
-// flaggedCategories is the report's policy.decision.flaggedCategories, empty when undecided.
+// flaggedCategories is the report's flaggedCategories, empty when undecided.
 func (d *Decision) flaggedCategories() []any {
 	report := d.report()
 	if report == nil {
 		return []any{}
 	}
-	return report["policy"].(calmlens.JSON)["decision"].(calmlens.JSON)["flaggedCategories"].([]any)
+	return report["flaggedCategories"].([]any)
 }

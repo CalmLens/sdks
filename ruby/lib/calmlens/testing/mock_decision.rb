@@ -82,21 +82,17 @@ module CalmLens
     end
 
     # The report a decided asset gets, as the API sends it: every category (unflagged ones
-    # evaluated with score 0), the highest score, and the policy's actions and `flaggedCategories`.
+    # evaluated with score 0), the policy's actions and `flaggedCategories`.
     # @return [Hash{String => Object}, nil] `categories`, `score` and `policy`; nil for `pending` and `failed`
     def report
       return if undecided?
 
       evaluated = (MockClassification::CATEGORIES - @not_evaluated).map { |category| [category, @flags.dig(category, :score) || 0] }
-      score = [0, *evaluated.map(&:last)].max
-      { 'categories' => MockClassification::CATEGORIES.to_h { |category| [category, category_report(category)] },
-        'score' => score,
-        'policy' => { 'score' => score,
-                      'categories' => evaluated.to_h { |category, value| [category, { 'score' => value, 'action' => action(value) }] },
-                      'evidence' => 'full',
-                      'decision' => { 'source' => 'policy', 'action' => @status == 'allowed' ? nil : STATUS_ACTIONS[@status],
-                                      'regions' => [],
-                                      'flaggedCategories' => evaluated.reject { |_, value| action(value) == 'allow' }.map(&:first) } } }
+      { 'raw' => { 'categories' => MockClassification::CATEGORIES.to_h { |category| [category, category_report(category)] } },
+        'categories' => evaluated.to_h { |category, value| [category, { 'score' => value, 'action' => action(value) }] },
+        'explanationComplete' => true, 'source' => 'policy', 'automatedAction' => STATUS_ACTIONS[@status],
+        'regions' => [], 'flaggedCategories' => evaluated.reject { |_, value| action(value) == 'allow' }.map(&:first) }
+
     end
 
     def inspect = "#<#{self.class.name} #{@status}>"

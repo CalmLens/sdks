@@ -14,7 +14,7 @@ moderation:
   the prefix `calmlibrary:` (for example `calmlibrary:CAM-2026-014`). A reused catalogue ID
   shows `asset/duplicate-external-id`.
 - **Status and reasons.** Each image shows its status. An undelivered image shows why: the
-  categories in its moderation report (`classification.moderation.policy.decision.flaggedCategories`),
+  categories in its moderation report (`classification.moderation.flaggedCategories`),
   the reviewer and note from its latest applied review (`manualReviews`), or why its file was
   removed (`content.removalReason`). The details panel also lists its upload, automatic decision
   and review history.

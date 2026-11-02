@@ -654,22 +654,22 @@ public final class Calmmarket {
   }
 
   static List<CategoryRow> explain(AssetModeration merged) {
-    if (merged == null || merged.categories() == null) return List.of();
+    if (merged == null || merged.raw() == null || merged.raw().categories() == null) return List.of();
     LinkedHashSet<String> keys = new LinkedHashSet<>(CATEGORIES);
-    keys.addAll(new TreeSet<>(merged.categories().keySet()));
+    keys.addAll(new TreeSet<>(merged.raw().categories().keySet()));
     List<CategoryRow> rows = new ArrayList<>();
     for (String key : keys) {
-      CategoryResult result = merged.categories().get(key);
+      CategoryResult result = merged.raw().categories().get(key);
       rows.add(new CategoryRow(key, result == null || result.status() == null ? "missing" : result.status(),
           scoreOf(result), result == null ? null : result.reason()));
     }
     return rows;
   }
 
-  /** The categories the policy acted on: the report's {@code policy.decision.flaggedCategories}. */
+  /** The categories the policy acted on: the report's {@code flaggedCategories}. */
   static List<String> flaggedCategories(AssetModeration report) {
-    if (report == null || report.policy() == null || report.policy().decision() == null) return List.of();
-    return report.policy().decision().flaggedCategories();
+    if (report == null) return List.of();
+    return report.flaggedCategories();
   }
 
   static Double scoreOf(CategoryResult result) {

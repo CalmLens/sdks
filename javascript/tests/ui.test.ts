@@ -618,10 +618,7 @@ test("regional media uses the viewer country and forwards it on responsive URLs"
     id: "asset-region",
     projectId: "project-region",
     classification: {
-      moderation: {
-        status: "allowed" as const,
-        policy: { decision: { regions: [{ region: "DE", action: "block" }] } },
-      },
+      moderation: { status: "allowed" as const, regions: [{ region: "DE", action: "block" }] },
     },
   };
   const inferred = getMediaState({ asset });

@@ -1266,8 +1266,8 @@ export class MockCalmLensApi {
     }
     if (!body.rerun) {
       // Like the API: the evidence is completed and every action stays as decided.
-      const policy = asset.classification.moderation.policy;
-      if (policy?.evidence !== "decision") return asset;
+      const policy = asset.classification.moderation;
+      if (policy?.explanationComplete !== false) return asset;
       return this.databaseStorage.updateAsset({
         ...asset,
         updatedAt: this.now(),
@@ -1275,7 +1275,7 @@ export class MockCalmLensApi {
           ...asset.classification,
           moderation: {
             ...asset.classification.moderation,
-            policy: { ...policy, evidence: "full" },
+            explanationComplete: true,
           },
         },
       });
@@ -1531,7 +1531,7 @@ export class MockCalmLensApi {
         failureReason: null,
         updatedAt: now,
         completedAt: null,
-        moderation: { status: "pending", manualReviews: [] },
+        moderation: { status: "pending", manualReviews: [], flaggedCategories: [], regions: [] },
       },
     } as Asset;
 
@@ -1731,7 +1731,7 @@ export class MockCalmLensApi {
       } as MockEventInput);
       return;
     }
-    const flaggedCategories = decision.report()?.policy?.decision?.flaggedCategories ?? [];
+    const flaggedCategories = decision.report()?.flaggedCategories ?? [];
     this.pushEvent({
       ...event,
       type: "asset.classified",

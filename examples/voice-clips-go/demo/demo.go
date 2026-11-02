@@ -107,11 +107,9 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 		start, end := scenario.Range(i)
 		segments = append(segments, calmlens.JSON{"source": "clip", "startSeconds": start, "endSeconds": end, "categories": categories})
 	}
-	top := 0.0
 	categories := calmlens.JSON{}
 	for id, score := range overall {
 		categories[id] = categoryResult(score)
-		top = max(top, score)
 	}
 	media := calmlens.JSON{"durationSeconds": scenario.Duration, "sampledFrames": 0, "audioTranscribed": false, "segments": segments}
 	if video {
@@ -122,9 +120,13 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 	processing["status"] = calmlens.ClassificationStatusCompleted
 	moderation["status"] = choice
 	processing["completedAt"] = time.Now().UnixMilli()
-	moderation["score"] = top
-	moderation["categories"] = categories
-	moderation["timeline"] = media
+	moderation["raw"] = calmlens.JSON{"categories": categories, "timeline": media}
+	moderation["categories"] = calmlens.JSON{}
+	moderation["automatedAction"] = map[string]string{"allowed": "allow", "limited": "limit", "age-restricted": "age-restrict", "blocked": "block", "purged": "purge"}[choice]
+	moderation["source"] = "policy"
+	moderation["flaggedCategories"] = []any{}
+	moderation["regions"] = []any{}
+	moderation["explanationComplete"] = true
 }
 
 func categoryResult(score float64) calmlens.JSON {

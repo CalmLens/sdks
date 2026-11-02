@@ -1860,10 +1860,17 @@ public final class Models {
    * @param status the moderation decision in force, which also decides delivery
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
-      Map<String, CategoryResult> categories, Double score,
-      MediaClassificationReport timeline, ReportPolicy policy, List<HashMatch> hashMatches,
+      String automatedAction, String source, String rule, List<String> flaggedCategories,
+      List<RegionalDecision> regions, Boolean explanationComplete,
+      Map<String, CategoryPolicyScore> categories, ModerationRaw raw,
       Map<String, String> testCategoryActions, List<TestRegionalAction> testRegionalActions) {
-    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); hashMatches = list(hashMatches); testCategoryActions = map(testCategoryActions); testRegionalActions = list(testRegionalActions); }
+    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); flaggedCategories = listOrEmpty(flaggedCategories); regions = listOrEmpty(regions); testCategoryActions = map(testCategoryActions); testRegionalActions = list(testRegionalActions); }
+  }
+
+  /** Detection findings before policy evaluation. */
+  public record ModerationRaw(Map<String, CategoryResult> categories,
+      MediaClassificationReport timeline, List<HashMatch> hashMatches) {
+    public ModerationRaw { categories = map(categories); hashMatches = list(hashMatches); }
   }
 
   /**
@@ -1892,23 +1899,6 @@ public final class Models {
 
 
   /**
-   * Each assessed category's policy score and action, and the highest policy score.
-   *
-   * @param score the highest category policy score
-   * @param categories policy results by category
-   */
-  /**
-   * What the project's policy made of the report. {@code evidence} is {@code decision} when
-   * questions that could not change any action were skipped (every action is final, but a
-   * category's policy score and the rule credited with its action can differ from a complete
-   * report) and {@code full} when every question was answered; {@code assets.explain} completes it.
-   */
-  public record ReportPolicy(Double score, Map<String, CategoryPolicyScore> categories, String evidence, ReportPolicyDecision decision) {
-    /** Copies collections so the record stays immutable. */
-    public ReportPolicy { categories = map(categories); }
-  }
-
-  /**
    * How strongly a category meets the policy and what the policy does with it.
    *
    * @param score policy score from 0 to 1
@@ -1934,15 +1924,6 @@ public final class Models {
   }
 
   public record RegionalDecision(String region, String action, String rule, String category) {}
-  /**
-   * Final automatic action, flagged categories and decision source.
-   *
-   * @param source what decided: {@code policy}, {@code children}, {@code hash-list} or {@code mandatory-rule}
-   */
-  public record ReportPolicyDecision(String source, String action, List<String> flaggedCategories, String rule, List<RegionalDecision> regions) {
-    public ReportPolicyDecision { flaggedCategories = list(flaggedCategories); regions = list(regions); }
-  }
-
   /**
    * One category result. {@code score} is set only for {@code evaluated} and {@code partial}.
    *

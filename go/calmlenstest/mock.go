@@ -1282,7 +1282,7 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil,
-		"moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}}}
+		"moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}, "flaggedCategories": []any{}, "regions": []any{}}}
 	if open {
 		uploadState["status"] = "uploading"
 		uploadState["partsReceived"] = 1
@@ -1779,8 +1779,8 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		moderation := section(classification, "moderation")
 		if body["rerun"] != true {
 			// Like the API: the evidence is completed and every action stays as decided.
-			if policy, ok := moderation["policy"].(map[string]any); ok && policy["evidence"] == calmlens.PolicyEvidenceDecision {
-				policy["evidence"] = calmlens.PolicyEvidenceFull
+			if moderation["explanationComplete"] == false {
+				moderation["explanationComplete"] = true
 				a["updatedAt"] = now
 			}
 			break

@@ -1661,21 +1661,30 @@ pub struct AssetModeration {
     /// taking precedence.
     #[serde(default)]
     pub status: AssetModerationStatus,
-    /// Content-safety category scores and qualifiers.
+    /// The original automated action, before manual reviews.
     #[serde(default)]
-    pub categories: HashMap<ClassificationCategory, CategoryResult>,
-    /// The highest category score.
+    pub automated_action: Option<String>,
+    /// What determined the automated action.
     #[serde(default)]
-    pub score: Option<f64>,
-    /// Timed moderation evidence from audio or video.
+    pub source: Option<String>,
+    /// Mandatory rule that determined the automated action.
     #[serde(default)]
-    pub timeline: Option<MediaClassificationReport>,
-    /// The saved policy assessment and settings snapshot.
+    pub rule: Option<String>,
+    /// Categories acted on by automation.
     #[serde(default)]
-    pub policy: Option<ReportPolicy>,
-    /// Hash list entries the image matched.
+    pub flagged_categories: Vec<ClassificationCategory>,
+    /// Stricter regional outcomes.
     #[serde(default)]
-    pub hash_matches: Option<Vec<HashMatch>>,
+    pub regions: Vec<RegionalDecision>,
+    /// Whether the saved decision has a complete explanation.
+    #[serde(default)]
+    pub explanation_complete: Option<bool>,
+    /// Policy-adjusted category results.
+    #[serde(default)]
+    pub categories: HashMap<ClassificationCategory, CategoryPolicyScore>,
+    /// Detection findings before policy evaluation.
+    #[serde(default)]
+    pub raw: Option<ModerationRaw>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetModeration, _>")]
     pub extra: HashMap<String, Value>,
@@ -1737,26 +1746,20 @@ pub struct AssetContent {
     pub extra: HashMap<String, Value>,
 }
 
-/// Each assessed category's policy score and action, and the highest policy score.
+/// Detection findings before policy evaluation.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct ReportPolicy {
-    /// The highest category policy score.
+pub struct ModerationRaw {
+    /// Raw category scores, qualifiers and conditions.
     #[serde(default)]
-    pub score: f64,
-    /// Policy results by category.
+    pub categories: HashMap<ClassificationCategory, CategoryResult>,
+    /// Timed findings from audio or video.
     #[serde(default)]
-    pub categories: HashMap<ClassificationCategory, CategoryPolicyScore>,
-    /// `decision` when questions that could not change any action were skipped (every action is
-    /// final, but a category's policy score and the rule credited with its action can differ from a
-    /// complete report); `full` when every question was answered. See
-    /// [`AssetsClient::explain`](crate::AssetsClient::explain).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evidence: Option<String>,
-    /// The final automatic asset decision.
+    pub timeline: Option<MediaClassificationReport>,
+    /// Matches against project hash lists.
     #[serde(default)]
-    pub decision: Option<ReportPolicyDecision>,
+    pub hash_matches: Option<Vec<HashMatch>>,
 }
 
 /// How strongly a category meets the policy, from 0 to 1, and what the policy does with it.
@@ -1847,28 +1850,6 @@ pub struct RegionalDecision {
     /// Category matched by the rule; absent for explicit test regional outcomes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub category: Option<ClassificationCategory>,
-}
-
-/// The automatic moderation decision and stricter regional outcomes.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct ReportPolicyDecision {
-    /// Mandatory rule responsible for the action, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule: Option<String>,
-    /// Stricter outcomes in opted-in jurisdictions.
-    #[serde(default)]
-    pub regions: Vec<RegionalDecision>,
-    /// Saved source, such as `policy`, `lens` or `hash-list`.
-    #[serde(default)]
-    pub source: String,
-    /// Saved action.
-    #[serde(default)]
-    pub action: Option<String>,
-    /// Saved flagged categories.
-    #[serde(default)]
-    pub flagged_categories: Vec<ClassificationCategory>,
 }
 
 /// One category's result.

@@ -160,12 +160,12 @@ module CalmLens
     ?"testRegionalActions" => Array[test_regional_action],
     "manualReviews" => Array[asset_review],
     "status" => asset_moderation_status,
-    ?"categories" => classification_categories,
-    ?"score" => number,
-    ?"timeline" => media_report,
-    ?"policy" => report_policy,
-    # Hash list entries the image matched, blocking matches first; absent when nothing matched.
-    ?"hashMatches" => Array[hash_match]
+    ?"automatedAction" => flagged_content_action,
+    ?"source" => String, ?"rule" => String,
+    "flaggedCategories" => Array[String], "regions" => Array[regional_decision],
+    ?"explanationComplete" => bool,
+    ?"categories" => Hash[String, category_policy_score],
+    ?"raw" => moderation_raw
   }
   # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
   type asset_content = {
@@ -334,9 +334,10 @@ module CalmLens
     "score" => number, "action" => flagged_content_action,
     ?"source" => category_policy_source, ?"settings" => category_policy_settings_snapshot
   }
-  type report_policy = {
-    "score" => number, "categories" => Hash[String, category_policy_score], ?"evidence" => "decision" | "full",
-    ?"decision" => { "source" => String, "action" => flagged_content_action?, "flaggedCategories" => Array[String], ?"rule" => String, "regions" => Array[regional_decision] }
+  type moderation_raw = {
+    "categories" => classification_categories,
+    ?"timeline" => media_report,
+    ?"hashMatches" => Array[hash_match]
   }
 
   # ---- Pages and search (Page.ts, AssetSearch.ts) --------------------------------------------

@@ -119,7 +119,7 @@ def explain(report: AssetModeration | None) -> dict:
     status this app doesn't know) is unknown, never zero."""
     found: list[tuple[str, float]] = []
     unknown: list[str] = []
-    for category, result in sorted(((report or {}).get("categories") or {}).items()):
+    for category, result in sorted(((report or {}).get("raw", {}).get("categories") or {}).items()):
         if result["status"] in ("evaluated", "partial"):
             if result["score"] >= SHOWN_SCORE:
                 found.append((category, result["score"]))
@@ -132,7 +132,7 @@ def explain(report: AssetModeration | None) -> dict:
 def decision_source(report: AssetModeration | None) -> str | None:
     """Where the decision came from: ``children`` when the page's parts decided it, ``policy``
     when the page's own scores did, or a reviewer's or hash list's decision."""
-    return (((report or {}).get("policy") or {}).get("decision") or {}).get("source")
+    return (report or {}).get("source")
 
 
 def latest_review(report: AssetModeration | None) -> str | None:

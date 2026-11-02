@@ -10,118 +10,7 @@ import (
 
 func TestAssetTypedFieldsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{
-  "id": "a",
-  "uploadPresetId": "preset-1",
-  "content": {
-    "status": "removed",
-    "removalReason": "policy",
-    "updatedAt": 1760000000600,
-    "format": "image/png",
-    "extension": "png",
-    "sizeInBytes": 2048,
-    "checksums": {
-      "sha256": "abc",
-      "md5": null
-    },
-    "image": {
-      "width": 640,
-      "height": 480,
-      "thumbhash": "th",
-      "averageColor": "#fff",
-      "perceptualHash": "ph",
-      "perceptualHashQuality": 88
-    },
-    "safetyHold": {
-      "placedAt": 1760000000000,
-      "reason": "suspected-illegal-content",
-      "disposedAt": null
-    },
-    "extractedText": {
-      "type": "document",
-      "id": "doc-1"
-    }
-  },
-  "processingOptions": {
-    "keepContentAfterProcessing": true,
-    "features": {
-      "ocr": {
-        "enabled": true
-      },
-      "faceDetection": {
-        "enabled": true,
-        "ageEstimation": false
-      }
-    }
-  },
-  "upload": {
-    "status": "completed",
-    "updatedAt": 1760000000500,
-    "partsReceived": 3
-  },
-  "classification": {
-    "status": "completed",
-    "updatedAt": 1760000000500,
-    "moderation": {
-      "manualReviews": [{"id": "review-1", "decision": "age-restricted", "note": "Fine", "reviewedAt": 1760000000700, "appliedToAsset": true}],
-      "status": "age-restricted",
-      "categories": {
-        "sexual": {
-          "status": "evaluated",
-          "score": 0.9,
-          "likelihood": "very-likely",
-          "qualifiers": {
-            "sexual-nudity": {
-              "status": "evaluated",
-              "someScore": 0.8,
-              "allScore": 0.5,
-              "likelihood": "likely"
-            },
-            "sexual-fictional": {
-              "status": "not-evaluated",
-              "reason": "not-supported"
-            }
-          }
-        },
-        "hate": {
-          "status": "not-evaluated",
-          "reason": "unavailable"
-        }
-      },
-      "score": 0.9,
-      "hashMatches": [{"source": "hash-list", "listId": "list-1", "entryId": "entry-1", "distance": 4, "action": "block"}],
-      "policy": {"score": 1, "categories": {}, "decision": {"source": "hash-list", "action": "block", "flaggedCategories": []}}
-    },
-    "linkDetection": {
-      "status": "evaluated",
-      "stage": "beta",
-      "qrCodes": [{"value": "https://example.com", "box": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.4}}],
-      "links": [{"url": "https://example.com", "source": "qr-code"}]
-    },
-    "aiGeneratedDetection": {
-      "status": "evaluated",
-      "stage": "beta",
-      "provenance": "ai-generated",
-      "signals": [{"kind": "c2pa", "value": "trainedAlgorithmicMedia"}]
-    },
-    "textRegions": [{"box": {"left": 0.5, "top": 0.5, "width": 0.1, "height": 0.1}, "personalInformation": true}],
-    "completedAt": 1760000000700,
-    "labels": [
-      {
-        "description": "Beach",
-        "score": 0.7,
-        "topicalityScore": 0.6,
-        "likelihood": "likely",
-        "knowledgeBaseId": "/m/0b3yr"
-      },
-      {
-        "description": "Sky",
-        "score": 0.5,
-        "likelihood": "possible"
-      }
-    ]
-  }
-}`), &a)
+	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"image":{"width":640,"height":480,"thumbhash":"th","averageColor":"#fff","perceptualHash":"ph","perceptualHashQuality":88},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"processingOptions":{"keepContentAfterProcessing":true,"features":{"ocr":{"enabled":true},"faceDetection":{"enabled":true,"ageEstimation":false}}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","reviewedAt":1760000000700,"appliedToAsset":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedAction":"allow","regions":[],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"completedAt":1760000000700,"labels":[{"description":"Beach","score":0.7,"topicalityScore":0.6,"likelihood":"likely","knowledgeBaseId":"/m/0b3yr"},{"description":"Sky","score":0.5,"likelihood":"possible"}]}}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +44,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 		t.Fatalf("processing options: %+v", o)
 	}
 	report := a.Classification.Moderation
-	sexual := report.Categories[CategorySexual]
+	sexual := report.Raw.Categories[CategorySexual]
 	nudity, fictional := sexual.Qualifiers[QualifierSexualNudity], sexual.Qualifiers[QualifierSexualFictional]
 	if nudity.Status != ResultEvaluated || *nudity.SomeScore != 0.8 || *nudity.AllScore != 0.5 || nudity.Likelihood != LikelihoodLikely {
 		t.Fatalf("nudity: %+v", nudity)
@@ -163,12 +52,12 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if fictional.Status != ResultNotEvaluated || fictional.Reason != ReasonNotSupported || fictional.SomeScore != nil {
 		t.Fatalf("fictional: %+v", fictional)
 	}
-	if hate := report.Categories[CategoryHate]; hate.Reason != ReasonUnavailable || hate.Score != nil || hate.Qualifiers != nil {
+	if hate := report.Raw.Categories[CategoryHate]; hate.Reason != ReasonUnavailable || hate.Score != nil || hate.Qualifiers != nil {
 		t.Fatalf("hate: %+v", hate)
 	}
-	if !reflect.DeepEqual(report.HashMatches, []HashMatch{{Source: HashMatchSourceHashList, ListID: "list-1", EntryID: "entry-1", Distance: 4, Action: HashListActionBlock}}) ||
-		report.Policy.Decision.Source != DecisionSourceHashList {
-		t.Fatalf("hash matches: %+v, decision %+v", report.HashMatches, report.Policy.Decision)
+	if !reflect.DeepEqual(report.Raw.HashMatches, []HashMatch{{Source: HashMatchSourceHashList, ListID: "list-1", EntryID: "entry-1", Distance: 4, Action: HashListActionBlock}}) ||
+		*report.Source != DecisionSourceHashList {
+		t.Fatalf("hash matches: %+v, decision %+v", report.Raw.HashMatches, report)
 	}
 	links := a.Classification.LinkDetection
 	if links.Status != ResultEvaluated || !reflect.DeepEqual(links.QRCodes, []DetectedQRCode{{Value: "https://example.com", Box: BoundingBox{Left: 0.1, Top: 0.2, Width: 0.3, Height: 0.4}}}) ||
@@ -498,8 +387,8 @@ func TestEventFactsDecodeAssetDecisions(t *testing.T) {
 }
 
 func TestReportPolicySnapshotDecode(t *testing.T) {
-	var policy ReportPolicy
-	if err := json.Unmarshal([]byte(`{"score":0.9,"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"decision":{"source":"hash-list","action":"purge","flaggedCategories":["violence"]}}`), &policy); err != nil {
+	var policy AssetModeration
+	if err := json.Unmarshal([]byte(`{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedAction":"purge"}`), &policy); err != nil {
 		t.Fatal(err)
 	}
 	category := policy.Categories["violence"]
@@ -518,7 +407,7 @@ func TestReportPolicySnapshotDecode(t *testing.T) {
 	if evidence.Status != "evaluated" || evidence.Score == nil || *evidence.Score != 0.8 {
 		t.Fatalf("lost condition evidence: %#v", evidence)
 	}
-	if *policy.Decision.Action != "purge" || policy.Decision.Source != DecisionSourceHashList || !reflect.DeepEqual(policy.Decision.FlaggedCategories, []string{"violence"}) {
-		t.Fatalf("lost decision snapshot: %#v", policy.Decision)
+	if *policy.AutomatedAction != "purge" || *policy.Source != DecisionSourceHashList || !reflect.DeepEqual(policy.FlaggedCategories, []string{"violence"}) {
+		t.Fatalf("lost decision snapshot: %#v", policy)
 	}
 }

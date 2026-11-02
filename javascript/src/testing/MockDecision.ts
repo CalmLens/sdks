@@ -1,5 +1,5 @@
 import { invalidArgument } from "../client/CalmLensError";
-import type { Asset } from "../client/CalmLensTypes";
+import type { Asset, AssetModeration } from "../client/CalmLensTypes";
 import { MOCK_CATEGORIES, MOCK_QUALIFIERS } from "./MockClassification";
 
 /**
@@ -121,12 +121,10 @@ export class MockDecision {
 
   /**
    * The report a decided asset gets, as the API sends it: every category (unflagged ones
-   * evaluated with score 0), the highest score, and the policy's actions and
+   * evaluated with score 0), policy-adjusted results and the automated action and
    * `flaggedCategories`. `undefined` for `pending` and `failed`.
    */
-  report():
-    | Pick<Asset["classification"]["moderation"], "categories" | "score" | "policy">
-    | undefined {
+  report(): Omit<AssetModeration, "status" | "manualReviews"> | undefined {
     const status = this.status;
     if (status === "pending" || status === "failed") return undefined;
     const action = (score: number) =>
@@ -134,7 +132,6 @@ export class MockDecision {
     const evaluated = MOCK_CATEGORIES.filter((category) => !this.#notEvaluated.has(category)).map(
       (category) => [category, this.#flags.get(category)?.score ?? 0] as const,
     );
-    const score = Math.max(0, ...evaluated.map(([, score]) => score));
     const categories = Object.fromEntries(
       MOCK_CATEGORIES.map((category) => {
         if (this.#notEvaluated.has(category)) {
@@ -161,24 +158,18 @@ export class MockDecision {
       }),
     );
     return {
-      categories,
-      score,
-      policy: {
-        score,
-        categories: Object.fromEntries(
-          evaluated.map(([category, score]) => [category, { score, action: action(score) }]),
-        ),
-        evidence: "full",
-        decision: {
-          source: "policy",
-          action: status === "allowed" ? null : STATUS_ACTION[status],
-          regions: [],
-          flaggedCategories: evaluated
-            .filter(([, score]) => action(score) !== "allow")
-            .map(([category]) => category),
-        },
-      },
-    } as Pick<Asset["classification"]["moderation"], "categories" | "score" | "policy">;
+      categories: Object.fromEntries(
+        evaluated.map(([category, score]) => [category, { score, action: action(score) }]),
+      ),
+      explanationComplete: true,
+      source: "policy",
+      automatedAction: STATUS_ACTION[status],
+      regions: [],
+      flaggedCategories: evaluated
+        .filter(([, score]) => action(score) !== "allow")
+        .map(([category]) => category),
+      raw: { categories: categories as NonNullable<AssetModeration["raw"]>["categories"] },
+    };
   }
 }
 
