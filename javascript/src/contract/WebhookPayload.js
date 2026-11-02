@@ -126,7 +126,7 @@ const LINK_SAFETY_SETTINGS_SCHEMA = zod.object({
 	namedType: "LinkSafetySettings"
 })]));
 const LINK_SAFETY_EVIDENCE_SCHEMA = zod.object({
-	provider: zod.enum(["cloudflare-domain-intelligence", "google-web-risk"]).describe("Which check this is: the destination domain's categories, or a threat-list lookup of the destination URL"),
+	check: zod.enum(["domain-categories", "threat-lists"]).describe("Which check this is: the destination domain's categories, or a threat-list lookup of the destination URL"),
 	status: zod.enum(["checked", "failed"]).describe("`failed` when the check could not answer, which makes the link `unresolved`"),
 	labels: zod.array(zod.string()).describe("What the check reported, such as the domain's content categories and security risks or the threat types listed")
 }).strict().meta(metaStore([docPropertyInfo({
@@ -525,7 +525,7 @@ const CLASSIFICATION_REPORT_POLICY_SCHEMA = zod.object({
 	linkSafety: zod.object({
 		action: LINK_SAFETY_ACTION_SCHEMA.describe("The strongest action the asset's links take under the policy's link-safety settings."),
 		links: zod.array(zod.number().int().nonnegative()).describe("Indexes into `linkSafety.links` of the links that take that action."),
-		settings: LINK_SAFETY_SETTINGS_SCHEMA.describe("The link-safety settings in force at decision time.")
+		settings: LINK_SAFETY_SETTINGS_SCHEMA
 	}).strict().optional().describe("Preview. What the policy's link-safety section made of the asset's links. Absent when the policy doesn't act on links.")
 }).strict().omit({});
 const CLASSIFICATION_LABEL_SCHEMA = zod.object({

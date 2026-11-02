@@ -9318,9 +9318,9 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             unresolved: "unresolved";
           }>;
           evidence: zod.ZodArray<zod.ZodObject<{
-            provider: zod.ZodEnum<{
-              "cloudflare-domain-intelligence": "cloudflare-domain-intelligence";
-              "google-web-risk": "google-web-risk";
+            check: zod.ZodEnum<{
+              "domain-categories": "domain-categories";
+              "threat-lists": "threat-lists";
             }>;
             status: zod.ZodEnum<{
               checked: "checked";
