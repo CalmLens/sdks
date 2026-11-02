@@ -184,7 +184,7 @@ test("regional blocks use explicit viewer claims and request no media", async ({
       classification: {
         moderation: {
           status: "allowed",
-          policy: { decision: { regions: [{ region: "DE", action: "block" }] } },
+          regions: [{ region: "DE", action: "block" }],
         },
       },
     };
