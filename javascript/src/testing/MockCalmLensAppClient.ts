@@ -1,13 +1,14 @@
 import CalmLensAppClient from "../client/CalmLensAppClient";
-import type { Asset, CalmLensAppClientOptions } from "../client/CalmLensTypes";
+import type { CalmLensAppClientOptions } from "../client/CalmLensTypes";
 import { validateAppClientOptions } from "../client/CalmLensUtils";
 import { createMockApiKey } from "./MockApiKey";
-import type { MockAssetOutcome, MockEndpoints, MockUploadPreset } from "./MockCalmLensApi";
+import type { MockEndpoints, MockUploadPreset } from "./MockCalmLensApi";
 import {
   getMockApi,
   MockCalmLensServerClient,
   mockClientOptions,
 } from "./MockCalmLensServerClient";
+import type { MockModerate } from "./MockDecision";
 
 export type { MockUploadPreset } from "./MockCalmLensApi";
 
@@ -20,10 +21,8 @@ export interface MockCalmLensAppClientOptions extends CalmLensAppClientOptions {
      */
     server?: MockCalmLensServerClient;
     preset?: MockUploadPreset;
-    /** Where uploads end up when the client creates its own server. Defaults to `pending`. */
-    queuedOutcome?: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
-    /** Where `assets.classify` uploads end up when the client creates its own server. */
-    analyzedOutcome?: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
+    /** The server's `mockOptions.moderate` when the client creates its own server. */
+    moderate?: MockModerate;
   };
 }
 
@@ -55,10 +54,7 @@ export class MockCalmLensAppClient extends CalmLensAppClient {
           },
         ]),
         projectId: MOCK_PROJECT_ID,
-        mockOptions: {
-          queuedOutcome: mockOptions.queuedOutcome,
-          analyzedOutcome: mockOptions.analyzedOutcome,
-        },
+        mockOptions: { moderate: mockOptions.moderate },
       });
     let endpoints: MockEndpoints | undefined;
     const { cdnFetch: _cdnFetch, ...requestOptions } = mockClientOptions(

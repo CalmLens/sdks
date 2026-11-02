@@ -133,6 +133,24 @@ final class MockApi {
   /** Whether a request is for the CDN rather than the API. */
   boolean isCdn(String url) { return url.split("\\?", 2)[0].startsWith(cdnBase + "/assets/"); }
 
+  /** Every client method that sends a request, by its JavaScript method path, for {@code failNextRequest}. */
+  static final Set<String> OPERATIONS = Set.of(
+      "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
+      "assets.listChildren", "assets.iterateChildren", "assets.create", "assets.classify", "assets.uploadPart",
+      "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.deleteContent",
+      "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list", "events.pages", "folders.list",
+      "folders.retrieve", "folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
+      "hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete", "hashLists.listEntries",
+      "hashLists.addEntry", "hashLists.removeEntry", "ensureLens", "ensureLenses");
+
+  /** A request URL's path after the API or CDN base URL, with its segments decoded. */
+  String relativePath(String url) {
+    String path = url.split("\\?", 2)[0];
+    String base = isCdn(path) ? cdnBase : path.startsWith(apiBase + "/") ? apiBase : null;
+    if (base == null) return java.net.URI.create(url).getRawPath();
+    return "/" + String.join("/", segments(path.substring(base.length())));
+  }
+
   /**
    * The client operations a request can come from, by their JavaScript method paths, for {@code
    * failNextRequest}. A request answers both a method and the helper that calls it, such as {@code
@@ -170,6 +188,7 @@ final class MockApi {
       case "assets DELETE content" -> Set.of("assets.deleteContent");
       case "assets POST retry" -> Set.of("assets.retry");
       case "assets POST explain" -> Set.of("assets.explain");
+      case "assets POST decision" -> Set.of("assets.decide");
       case "assets POST move" -> Set.of("assets.move");
       case "assets POST part" -> Set.of("assets.uploadPart");
       case "assets POST signed-url" -> Set.of("assets.createSignedUrl");
@@ -502,7 +521,6 @@ final class MockApi {
     classification.add("moderation", moderation);
     asset.add("classification", classification);
 
-    storage.assets.put(id, asset);
     if (rawUpload && raw != null) {
       TreeMap<Integer, byte[]> parts = new TreeMap<>();
       parts.put(1, raw.clone());
@@ -513,10 +531,90 @@ final class MockApi {
       open.addProperty("queue", queue);
       if (q.has("totalSizeInBytes")) open.add("total", q.get("totalSizeInBytes"));
       uploads.put(id, open);
-    } else {
-      applyOutcome(asset, options.outcome(asset, queue), "policy", now());
+      storage.assets.put(id, asset);
+      return asset;
     }
+    MockDecision decision;
+    try {
+      decision = decisionFor(asset, MockCalmLensServerClient.Trigger.UPLOAD, queue);
+    } catch (RuntimeException failed) {
+      storage.content.remove(id);
+      throw failed;
+    }
+    storage.assets.put(id, asset);
+    finishUpload(asset, decision);
     return asset;
+  }
+
+  /**
+   * Records {@code asset.uploaded} for a completed upload, with the asset before moderation, then
+   * settles it with {@code decision}.
+   */
+  private void finishUpload(JsonObject asset, MockDecision decision) {
+    JsonObject uploaded = asset.deepCopy();
+    if (decision.status() != MockCalmLensServerClient.Outcome.PENDING) decided(asset, decision);
+    // UploadAssetUtils.ts records the upload before the pipeline's events.
+    recordEvent("asset.uploaded", "low", uploaded, java.util.Arrays.asList(
+        new Models.EventFact("asset-type", str(uploaded, "type"), null), assetNameFact(uploaded),
+        new Models.EventFact("file-format", str(uploaded.getAsJsonObject("content"), "format"), null)));
+    recordProcessingEvents(asset, decision);
+  }
+
+  /** An asset's portal link, as event facts carry it. */
+  private static Models.EventFact assetNameFact(JsonObject asset) {
+    return new Models.EventFact("asset-name", str(asset, "name"), "https://calmlens.com/go/asset/" + str(asset, "id"));
+  }
+
+  /**
+   * Asks {@code moderate} how to decide a processing asset, with its stored content (none once
+   * the content is removed).
+   */
+  private MockDecision decisionFor(JsonObject asset, MockCalmLensServerClient.Trigger trigger, boolean queued) {
+    MockCalmLensServerClient.StoredContent stored = "removed".equals(str(asset.getAsJsonObject("content"), "status")) ? null : storage.content.get(str(asset, "id"));
+    byte[] bytes = stored == null ? null : stored.bytes();
+    String text = bytes != null && "plaintext-document".equals(str(asset, "type")) ? new String(bytes, StandardCharsets.UTF_8) : null;
+    Models.Asset copy = Json.GSON.fromJson(asset, Models.Asset.class);
+    return options.decide(new MockCalmLensServerClient.ModerationInput(copy, new MockCalmLensServerClient.Content(bytes, text), trigger, queued));
+  }
+
+  /** Applies a decided or failed {@code decision} and its report. */
+  private void decided(JsonObject asset, MockDecision decision) {
+    applyOutcome(asset, decision.status(), "policy", now(), decision.report());
+  }
+
+  /**
+   * Asks {@code moderate} (unless {@code decision} is given) and settles a processing asset with
+   * its events; a {@code pending} decision leaves it processing.
+   */
+  void moderateStored(JsonObject asset, MockCalmLensServerClient.Trigger trigger, MockDecision decision) {
+    MockDecision settled = decision != null ? decision : decisionFor(asset, trigger, true);
+    if (settled.status() == MockCalmLensServerClient.Outcome.PENDING) return;
+    decided(asset, settled);
+    recordProcessingEvents(asset, settled);
+  }
+
+  /**
+   * The events the pipeline records when it settles an asset (AssetClassification.ts and
+   * AssetErrorAlert.ts): {@code asset.classified} and the automated {@code asset.<status>}, or
+   * {@code asset.failed}.
+   */
+  private void recordProcessingEvents(JsonObject asset, MockDecision decision) {
+    MockCalmLensServerClient.Outcome status = decision.status();
+    if (status == MockCalmLensServerClient.Outcome.PENDING) return;
+    String type = str(asset, "type");
+    if (status == MockCalmLensServerClient.Outcome.FAILED) {
+      String reason = str(asset.getAsJsonObject("classification"), "failureReason");
+      recordEvent("asset.failed", "high", asset, List.of(assetNameFact(asset), new Models.EventFact("asset-type", type, null),
+          new Models.EventFact("previous-status", "processing", null), new Models.EventFact("failure-reason", reason == null ? "processing-error" : reason, null)));
+      return;
+    }
+    List<String> flagged = decision.flaggedCategories();
+    recordEvent("asset.classified", "low", asset, List.of(new Models.EventFact("flagged-categories", flagged, null),
+        new Models.EventFact("moderation-status", status.value(), null), new Models.EventFact("asset-type", type, null), assetNameFact(asset)));
+    // Like the event catalog: only allowing and limiting are low severity.
+    recordEvent("asset." + status.value(), status == MockCalmLensServerClient.Outcome.ALLOWED || status == MockCalmLensServerClient.Outcome.LIMITED ? "low" : "high", asset,
+        List.of(new Models.EventFact("decided-by", "automated", null), new Models.EventFact("flagged-categories", flagged, null),
+            new Models.EventFact("asset-type", type, null), assetNameFact(asset)));
   }
 
   /** The earlier posts CalmLens uses from a request's {@code context}, or null when there are none. */
@@ -540,7 +638,7 @@ final class MockApi {
    * processing removes content held only temporarily. A classified image gets a ThumbHash for its
    * placeholder, which goes with removed content.
    */
-  void applyOutcome(JsonObject asset, MockCalmLensServerClient.Outcome outcome, String purgeReason, long now) {
+  void applyOutcome(JsonObject asset, MockCalmLensServerClient.Outcome outcome, String purgeReason, long now, JsonObject report) {
     boolean decided = outcome != MockCalmLensServerClient.Outcome.PENDING && outcome != MockCalmLensServerClient.Outcome.FAILED;
     JsonObject content = asset.getAsJsonObject("content");
     String contentStatus = str(content, "status");
@@ -577,7 +675,9 @@ final class MockApi {
     classification.add("failureReason", outcome == MockCalmLensServerClient.Outcome.FAILED ? new JsonPrimitive("processing-error") : JsonNull.INSTANCE);
     classification.addProperty("updatedAt", now);
     classification.add("completedAt", decided ? new JsonPrimitive(now) : JsonNull.INSTANCE);
-    classification.getAsJsonObject("moderation").addProperty("status", decided ? outcome.value() : "pending");
+    JsonObject moderation = classification.getAsJsonObject("moderation");
+    moderation.addProperty("status", decided ? outcome.value() : "pending");
+    if (report != null) report.entrySet().forEach(entry -> moderation.add(entry.getKey(), entry.getValue().deepCopy()));
     asset.getAsJsonObject("upload").addProperty("status", "completed");
     asset.getAsJsonObject("upload").addProperty("updatedAt", now);
     asset.addProperty("updatedAt", now);
@@ -623,7 +723,8 @@ final class MockApi {
     if (last) {
       boolean queue = q.has("queue") ? bool(q, "queue") : bool(open, "queue");
       uploads.remove(id);
-      applyOutcome(asset, options.outcome(asset, queue), "policy", now());
+      applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now(), null);
+      finishUpload(asset, decisionFor(asset, MockCalmLensServerClient.Trigger.UPLOAD, queue));
     }
   }
 
@@ -812,8 +913,9 @@ final class MockApi {
           throw new Failure(ErrorCodes.ASSET_NOT_RETRYABLE);
         if ("removed".equals(str(asset.getAsJsonObject("content"), "status"))) throw new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE);
         // Like the API: back to processing, to be moderated again, with an asset.retried event.
-        applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now);
+        applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now, null);
         lifecycle("asset.retried", asset);
+        moderateStored(asset, MockCalmLensServerClient.Trigger.RETRY, null);
         return asset;
       case "POST decision": return decide(asset, body, now);
       case "POST explain": {
@@ -831,7 +933,8 @@ final class MockApi {
         if (reviews != null && reviews.isJsonArray() && !reviews.getAsJsonArray().isEmpty()) throw new Failure(ErrorCodes.ASSET_REVIEWED);
         if ("removed".equals(str(asset.getAsJsonObject("content"), "status"))) throw new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE);
         // Like the API: back to processing, to be moderated again under the current policy.
-        applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now);
+        applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now, null);
+        moderateStored(asset, MockCalmLensServerClient.Trigger.RERUN, null);
         return asset;
       }
       case "POST move": {

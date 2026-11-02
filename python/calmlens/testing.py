@@ -9,7 +9,9 @@ Keep this module out of production code paths.
 from __future__ import annotations
 
 import base64
+import builtins
 import copy
+import dataclasses
 import email.utils
 import fnmatch
 import hashlib
@@ -29,6 +31,7 @@ from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from urllib.request import Request
 
 from . import error_codes
+from ._mock_classification import CATEGORIES, QUALIFIERS
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_TIMEOUT, CalmLensServerClient,
                      _invalid, _json, _merge, _sign_upload_token)
 from .errors import CalmLensError
@@ -36,21 +39,170 @@ from .moderation_context import select_moderation_context_items
 from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, HashList, HashListEntry,
                     SignedUploadToken, SignUploadTokenOptions)
 
-__all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetOutcome", "MockAssetOutcomeOption",
-           "MockApiKeyGrant",
-           "MockFailure", "StoredContent",
-           "InMemoryMockDatabaseStorage", "InMemoryMockImageStorage", "create_mock_api_key", "sign_upload_token"]
+__all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetOutcome", "MockDecision",
+           "MockModerationContent", "MockModerationInput", "MockModerationTrigger", "MockModerate",
+           "MockApiKeyGrant", "MockFailure", "StoredContent",
+           "InMemoryMockDatabaseStorage", "InMemoryMockImageStorage", "create_mock_api_key", "default_moderate",
+           "mock_decision", "sign_upload_token"]
 
-_MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "queued_outcome",
-                 "analyzed_outcome", "signed_url_base_url"}
-_MOCK_OUTCOMES = ("pending", "allowed", "limited", "age-restricted", "blocked", "purged", "failed")
+_MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "moderate", "signed_url_base_url"}
+_MOCK_OUTCOMES = ("pending", "failed", "allowed", "limited", "age-restricted", "blocked", "purged")
 
-#: Where a mock upload ends up: ``pending`` (still processing), ``allowed``, ``limited``, ``age-restricted``,
-#: ``blocked`` or ``purged`` (processing done with that moderation status; ``purged`` also removes
-#: the content) or ``failed`` (processing failed, retryable).
-MockAssetOutcome = Literal["pending", "allowed", "limited", "age-restricted", "blocked", "purged", "failed"]
-#: A mock outcome, or a function choosing one from the uploaded asset.
-MockAssetOutcomeOption = Union[MockAssetOutcome, Callable[[Asset], MockAssetOutcome]]
+#: Where the mock's moderation leaves an upload: ``pending`` (still processing), ``failed``
+#: (processing failed, retryable), or a decision with that moderation status (``purged`` also
+#: removes the content).
+MockAssetOutcome = Literal["pending", "failed", "allowed", "limited", "age-restricted", "blocked", "purged"]
+#: Why the mock is moderating an asset: ``upload`` (``assets.create``, ``assets.classify``,
+#: ``text.classify`` or a final multipart part), ``retry`` (``assets.retry``), ``rerun``
+#: (``assets.explain`` with ``rerun=True``) or ``complete`` (``complete_processing`` without a
+#: decision of its own).
+MockModerationTrigger = Literal["upload", "retry", "rerun", "complete"]
+
+#: The policy action that gives each decided status.
+_STATUS_ACTION = {"allowed": "allow", "limited": "limit", "age-restricted": "age-restrict", "blocked": "block",
+                  "purged": "purge"}
+
+
+def _score_to_likelihood(score: float) -> str:
+    """The likelihood the API reports for a score."""
+    if score >= 0.8:
+        return "very-likely"
+    if score >= 0.6:
+        return "likely"
+    if score >= 0.4:
+        return "possible"
+    if score >= 0.2:
+        return "unlikely"
+    return "very-unlikely"
+
+
+def _is_score(score: object) -> bool:
+    return isinstance(score, (int, float)) and not isinstance(score, bool) and math.isfinite(score) \
+        and 0 <= score <= 1
+
+
+class MockDecision:
+    """A moderation decision for ``mock_options["moderate"]`` or ``complete_processing``, built
+    with ``mock_decision(status)``: flag the categories it found, with their scores and
+    qualifiers, and mark the categories it couldn't assess. Each call checks its names and scores
+    and raises ``sdk/invalid-argument`` for one CalmLens doesn't have."""
+
+    def __init__(self, status: MockAssetOutcome):
+        if status not in _MOCK_OUTCOMES:
+            raise _invalid(f"status must be one of {', '.join(_MOCK_OUTCOMES)}")
+        self.status: MockAssetOutcome = status
+        self._flags: dict[str, tuple[float, list[tuple[str, float]]]] = {}
+        self._not_evaluated: set[str] = set()
+
+    def flag(self, category: str, score: float, qualifiers: Mapping[str, float] | None = None) -> MockDecision:
+        """Record findings in ``category`` with its ``score`` (0 to 1) and, optionally, scores for
+        its qualifiers, such as ``{"violence-threat": 0.9}``. The policy acts on a category at 0.5
+        and above, so ``flaggedCategories`` lists it there unless the status is ``allowed``."""
+        self._check_finding(category)
+        if not _is_score(score):
+            raise _invalid(f"{category}'s score must be from 0 to 1")
+        known = QUALIFIERS[category]
+        for qualifier, qualifier_score in (qualifiers or {}).items():
+            if qualifier not in known:
+                raise _invalid(f"{qualifier} is not a qualifier of {category}")
+            if not _is_score(qualifier_score):
+                raise _invalid(f"{qualifier}'s score must be from 0 to 1")
+        self._flags[category] = (score, list((qualifiers or {}).items()))
+        return self
+
+    def not_evaluated(self, category: str) -> MockDecision:
+        """Mark ``category`` as not assessed (``not-evaluated`` for reason ``not-supported``)."""
+        self._check_finding(category)
+        self._not_evaluated.add(category)
+        return self
+
+    def _check_finding(self, category: str) -> None:
+        if category not in CATEGORIES:
+            raise _invalid(f"{category} is not a CalmLens category")
+        if self.status in ("pending", "failed"):
+            raise _invalid(f"a {self.status} decision has no findings")
+        if category in self._flags or category in self._not_evaluated:
+            raise _invalid(f"{category} is already in this decision")
+
+    def report(self) -> dict[str, Any] | None:
+        """The report a decided asset gets, as the API sends it: every category (unflagged ones
+        evaluated with score 0), the highest score, and the policy's actions and
+        ``flaggedCategories``. ``None`` for ``pending`` and ``failed``."""
+        status = self.status
+        if status in ("pending", "failed"):
+            return None
+
+        def action(score: float) -> str:
+            return _STATUS_ACTION[status] if status != "allowed" and score >= 0.5 else "allow"
+        evaluated = [(category, self._flags[category][0] if category in self._flags else 0)
+                     for category in CATEGORIES if category not in self._not_evaluated]
+        score = max([0, *(value for _, value in evaluated)])
+        categories: dict[str, Any] = {}
+        for category in CATEGORIES:
+            if category in self._not_evaluated:
+                categories[category] = {"status": "not-evaluated", "reason": "not-supported"}
+                continue
+            value, qualifiers = self._flags.get(category, (0, []))
+            categories[category] = {"status": "evaluated", "likelihood": _score_to_likelihood(value), "score": value}
+            if qualifiers:
+                categories[category]["qualifiers"] = {
+                    qualifier: {"status": "evaluated", "someScore": some, "likelihood": _score_to_likelihood(some)}
+                    for qualifier, some in qualifiers}
+        return {"categories": categories, "score": score, "policy": {
+            "score": score,
+            "categories": {category: {"score": value, "action": action(value)} for category, value in evaluated},
+            "evidence": "full",
+            "decision": {"source": "policy", "action": None if status == "allowed" else _STATUS_ACTION[status],
+                         "regions": [],
+                         "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]},
+        }}
+
+
+def mock_decision(status: MockAssetOutcome) -> MockDecision:
+    """Start a moderation decision with this status; see :class:`MockDecision`."""
+    return MockDecision(status)
+
+
+@dataclass(frozen=True)
+class MockModerationContent:
+    """An asset's content as ``moderate`` receives it: the uploaded ``bytes`` (multipart parts
+    joined in order; ``None`` without stored content, such as a website or removed content) and
+    the ``text`` of a ``plaintext-document`` (``None`` otherwise)."""
+    bytes: builtins.bytes | None
+    text: str | None
+
+
+@dataclass(frozen=True)
+class MockModerationInput:
+    """What ``mock_options["moderate"]`` receives for each asset the mock moderates."""
+    #: A copy of the asset as stored, still processing.
+    asset: Asset
+    content: MockModerationContent
+    trigger: MockModerationTrigger
+    #: True when the API would queue the work rather than answer with the decision: queued
+    #: uploads, retries, reruns and ``complete_processing``.
+    queued: bool
+
+
+#: Decides an asset the mock moderates: a status or a ``mock_decision(...)``.
+MockModerate = Callable[[MockModerationInput], Union[MockAssetOutcome, MockDecision]]
+
+
+def default_moderate(moderation: MockModerationInput) -> MockAssetOutcome:
+    """The default ``moderate``: queued work stays ``pending`` until ``complete_processing``,
+    which allows it, and everything else is ``allowed``."""
+    return "pending" if moderation.queued and moderation.trigger != "complete" else "allowed"
+
+
+def _to_decision(value: object) -> MockDecision:
+    """A ``moderate`` answer or ``complete_processing`` decision as a checked ``MockDecision``."""
+    if isinstance(value, MockDecision):
+        return value
+    if isinstance(value, str):
+        return MockDecision(cast(MockAssetOutcome, value))
+    raise _invalid("a decision must be a status or a mock_decision(...)")
+
+
 _INT_QUERY = {"pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal"}
 _JSON_QUERY = {"metadata", "processingOptions", "context"}
@@ -135,10 +287,12 @@ class _Failure(Exception):
 class MockRequest:
     """A request received by ``MockCalmLensServerClient``.
 
-    ``path`` is relative to ``base_url`` for API calls (``/projects/<id>/assets``) and to
-    ``cdn_base_url`` for ``cdn.serve``. ``query`` holds the decoded query values (numbers,
-    booleans and JSON values decoded); ``body`` is the JSON body as Python objects, the raw
-    bytes of an upload, or None. ``headers`` has the API key redacted from ``repr``.
+    ``path`` is relative to ``base_url`` for API calls and to ``cdn_base_url`` for
+    ``cdn.serve``, with each segment decoded, such as ``/projects/<id>/assets`` or
+    ``/assets/<id>``. ``query`` holds the decoded query values (numbers, booleans and JSON values
+    decoded); ``body`` is the JSON body as Python objects, the raw bytes of an upload, or None.
+    ``headers`` has the API key redacted from ``repr``. ``status`` is the HTTP status the mock
+    answered with, or None when the request failed without a response.
     """
     method: str
     url: str
@@ -147,6 +301,16 @@ class MockRequest:
     query: dict[str, Any] = field(default_factory=dict)
     body: Any = None
     headers: dict[str, str] = field(default_factory=dict, repr=False)
+    status: int | None = None
+
+
+@dataclass(frozen=True)
+class _PendingFailure:
+    """A failure queued with ``fail_next_request``."""
+    failure: MockFailure
+    operation: str | None
+    details: dict[str, Any]
+    retry_after: int | None
 
 
 def _decode_query(pairs: Iterable[tuple[str, str]]) -> dict[str, Any]:
@@ -325,12 +489,12 @@ class MockOptions(TypedDict, total=False):
     #: have increasing ``createdAt`` values and orderings by ``createdAt`` don't depend on IDs.
     #: A clock you pass is used as is.
     now: Callable[[], int]
-    #: Outcome of assets submitted with ``create`` (and queued multipart uploads). Defaults to
-    #: ``pending``. Pass a function of the asset to choose per upload, for example from its name.
-    queued_outcome: MockAssetOutcomeOption
-    #: Outcome of assets submitted with ``classify`` and ``text.classify``. Defaults to
-    #: ``allowed``. Also accepts a function of the asset.
-    analyzed_outcome: MockAssetOutcomeOption
+    #: Decides each asset the mock moderates, given a :class:`MockModerationInput`: return a
+    #: status or a ``mock_decision(...)``. Called when an upload completes (trigger ``upload``),
+    #: on ``assets.retry`` (``retry``), ``assets.explain`` with ``rerun=True`` (``rerun``) and
+    #: ``complete_processing`` without a decision (``complete``). Defaults to
+    #: :func:`default_moderate`: queued work stays ``pending`` and everything else is ``allowed``.
+    moderate: MockModerate
     signed_url_base_url: str
 
 
@@ -356,6 +520,17 @@ _ACTIVE_CONTENT_TYPES = {"image/svg+xml", "application/xhtml+xml", "text/html", 
 #: ``transport-error`` (``sdk/transport-error``), ``timeout`` (``sdk/timeout``), an API error code
 #: such as ``upload/limit-exceeded`` (that error with its HTTP status) or an exception to raise.
 MockFailure = Union[str, BaseException]
+
+#: The client methods ``fail_next_request`` can target, as JavaScript-style method paths.
+_OPERATIONS = frozenset({
+    "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
+    "assets.listChildren", "assets.iterateChildren", "assets.create", "assets.classify", "assets.uploadPart",
+    "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide",
+    "assets.deleteContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list",
+    "events.pages", "folders.list", "folders.retrieve", "folders.create", "folders.update", "folders.delete",
+    "folders.move", "hashLists.list", "hashLists.retrieve", "hashLists.create", "hashLists.update",
+    "hashLists.delete", "hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "ensureLens",
+    "ensureLenses"})
 
 
 def _thumbhash_png(hash_base64: str) -> bytes:
@@ -439,6 +614,11 @@ def _event_asset(asset: Mapping[str, Any]) -> EventAsset:
             "content": {"status": asset["content"]["status"]}}
 
 
+def _asset_name_fact(asset: Mapping[str, Any]) -> dict[str, Any]:
+    """An asset's portal link, as event facts carry it."""
+    return {"key": "asset-name", "value": asset["name"], "url": f"https://calmlens.com/go/asset/{asset['id']}"}
+
+
 def _grants_of(api_key: str) -> list[dict[str, Any]]:
     try:
         raw = api_key.removeprefix("sk_test_")
@@ -520,7 +700,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._state_lock = threading.RLock()
         self._requests: list[MockRequest] = []
         self._errors: list[BaseException] = []
-        self._pending_failures: list[tuple[MockFailure, str | None]] = []
+        self._pending_failures: list[_PendingFailure] = []
         self._grants = _grants_of(self.api_key)
         self._idempotent: dict[str, tuple[str, int, bytes]] = {}
         self._uploads: dict[str, dict[str, Any]] = {}
@@ -531,11 +711,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self.image_storage = options.get("image_storage") or InMemoryMockImageStorage()
         self.create_id: Callable[[str], str] = options.get("create_id", _new_id)
         self.now: Callable[[], int] = options.get("now") or _monotonic_clock()
-        self.queued_outcome: MockAssetOutcomeOption = options.get("queued_outcome", "pending")
-        self.analyzed_outcome: MockAssetOutcomeOption = options.get("analyzed_outcome", "allowed")
-        for outcome in (self.queued_outcome, self.analyzed_outcome):
-            if not callable(outcome) and outcome not in _MOCK_OUTCOMES:
-                raise _invalid(f"Unknown mock outcome {outcome!r}", error_codes.SDK_INVALID_CONFIG)
+        self.moderate: MockModerate = options.get("moderate") or default_moderate
+        if not callable(self.moderate):
+            raise _invalid("mock_options['moderate'] must be a function", error_codes.SDK_INVALID_CONFIG)
         self.signed_url_base_url: str = options.get("signed_url_base_url", "https://mock.calmlens.invalid")
         # Waits (retry backoff, ``assets.wait_for_decision``) take no real time: sleeping only
         # advances this client's clock, so a pending asset times out at once.
@@ -549,9 +727,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     @property
     def requests(self) -> list[MockRequest]:
-        """Copies of every request received so far, oldest first."""
+        """Copies of every request received since the mock was created or last cleared, oldest
+        first."""
         with self._state_lock:
             return copy.deepcopy(self._requests)
+
+    def clear_requests(self) -> None:
+        """Forget the requests recorded so far."""
+        with self._state_lock:
+            self._requests.clear()
 
     def enqueue_error(self, error: BaseException) -> MockCalmLensServerClient:
         """Fail the next request (API call or ``cdn.serve``) with ``error``. Queued errors are
@@ -570,22 +754,50 @@ class MockCalmLensServerClient(CalmLensServerClient):
             self._errors.append(error)
         return self
 
-    def fail_next_request(self, failure: MockFailure = "transport-error", *,
-                          operation: str | None = None) -> MockCalmLensServerClient:
+    def fail_next_request(self, failure: MockFailure = "transport-error", *, operation: str | None = None,
+                          details: Mapping[str, Any] | None = None,
+                          retry_after: int | None = None) -> MockCalmLensServerClient:
         """Make the next request (or the next one to ``operation``, a JavaScript-style method path
         such as ``assets.create`` or ``cdn.serve``) fail without running, as if it never
         completed. ``failure`` is ``transport-error`` (``sdk/transport-error``), ``timeout``
-        (``sdk/timeout``), an API error code (that error with its HTTP status) or an exception
-        to raise. Each queued failure is used once.
+        (``sdk/timeout``), an API error code (that error with its HTTP status, ``details`` as its
+        details and ``retry_after`` whole seconds as its ``Retry-After`` header) or an exception
+        to raise. Each queued failure fails one request, so a client retry takes the next queued
+        failure or reaches the API.
 
-        Operations are told apart by their requests, so ``text.classify`` counts as
-        ``assets.classify`` and ``ensureLens`` as ``ensureLenses``."""
+        A request counts for every method that sends it: ``text.classify`` uploads also count as
+        ``assets.classify``, ``ensureLens`` as ``ensureLenses``, ``assets.waitForDecision`` polls
+        as ``assets.retrieve`` and ``assets.iterate`` pages as ``assets.list``. An unknown
+        operation raises ``sdk/invalid-argument``."""
         if isinstance(failure, str) and failure not in ("transport-error", "timeout") \
                 and failure not in error_codes.STATUS_BY_CODE:
             raise _invalid(f"Unknown failure {failure!r}: use transport-error, timeout or an API error code")
+        if operation is not None and operation not in _OPERATIONS:
+            raise _invalid(f"Unknown operation {operation!r}: use a client method path such as assets.create")
+        if retry_after is not None and (isinstance(retry_after, bool) or not isinstance(retry_after, int)
+                                        or retry_after < 0):
+            raise _invalid("retry_after must be a whole number of seconds")
         with self._state_lock:
-            self._pending_failures.append((failure, operation))
+            self._pending_failures.append(_PendingFailure(failure, operation, dict(details or {}), retry_after))
         return self
+
+    def complete_processing(self, asset_id: str, decision: MockAssetOutcome | MockDecision | None = None) -> Asset:
+        """Finish processing an asset as the pipeline would: with ``decision`` (a status or a
+        ``mock_decision(...)``), or else what ``moderate`` returns for the ``complete`` trigger.
+        A decided asset gets its report and the ``asset.classified`` and ``asset.<status>``
+        events; ``failed`` records ``asset.failed``. No manual review is recorded. Raises
+        ``asset/not-found`` for an unknown asset and ``sdk/invalid-argument`` for one that isn't
+        processing."""
+        with self._state_lock:
+            asset = self.database_storage.assets.get(asset_id)
+            if not asset or asset["projectId"] != self.project_id:
+                raise CalmLensError(error_codes.ASSET_NOT_FOUND, "Asset not found",
+                                    status=error_codes.STATUS_BY_CODE[error_codes.ASSET_NOT_FOUND])
+            if asset["classification"]["status"] != "processing":
+                raise _invalid(f"asset {asset_id} isn't processing")
+            settled = None if decision is None else _to_decision(decision)
+            self._moderate_stored(cast(dict[str, Any], asset), "complete", settled)
+            return copy.deepcopy(asset)
 
     def set_api_key_grants(self, grants: list[MockApiKeyGrant]) -> None:
         """Change the grants of the mock's API key, as editing the key in the portal would: later
@@ -724,36 +936,54 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return self._respond(status, body, headers)
 
     @staticmethod
-    def _operation(method: str, parts: list[str], query: Mapping[str, Any], upload: str, cdn: bool) -> str:
-        """The JavaScript client method a request comes from, for ``fail_next_request``."""
+    def _operations(method: str, parts: list[str], query: Mapping[str, Any], headers: Mapping[str, str],
+                    cdn: bool) -> list[str]:
+        """The JavaScript client methods that send a request, the one it is recorded under first,
+        for ``fail_next_request``."""
         if cdn:
-            return "cdn.serve"
+            return ["cdn.serve"]
         if parts[0] == "projects":
-            resource = parts[2] if len(parts) > 2 else ""
-            suffix = parts[3] if len(parts) > 3 else ""
-            if resource == "assets":
-                if suffix:
-                    return {"search": "assets.search"}.get(suffix, "assets." + suffix)
+            route = "/".join(parts[2:])
+            if route == "events":
+                return ["events.list", "events.pages"]
+            if route == "lenses":
+                return ["ensureLenses", "ensureLens"]
+            if route in ("folders", "hash-lists"):
+                kind = "folders" if route == "folders" else "hashLists"
+                return [f"{kind}.list" if method == "GET" else f"{kind}.create"]
+            if route in ("assets/search", "assets/batch"):
+                return ["assets." + parts[3]]
+            if route == "assets":
                 if method == "GET":
-                    return "assets.list"
-                return "assets.create" if query.get("queue") else "assets.classify"
-            if resource == "folders":
-                return "folders.list" if method == "GET" else "folders.create"
-            if resource == "hash-lists":
-                return "hashLists.list" if method == "GET" else "hashLists.create"
-            return {"events": "events.list", "lenses": "ensureLenses"}.get(resource, resource)
+                    return ["assets.list", "assets.iterate"]
+                if query.get("queue"):
+                    return ["assets.create"]
+                lower = {key.lower(): value for key, value in headers.items()}
+                text = lower.get("x-calmlens-upload") == "content" and lower.get("content-type") == "text/plain"
+                return ["assets.classify", "text.classify"] if text else ["assets.classify"]
+            return []
         resource = parts[0]
         suffix = parts[2] if len(parts) > 2 else ""
-        if resource == "hash-list-entries":
-            return "hashLists.removeEntry"
+        by_method = {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}
+        if len(parts) < 2:
+            return []
+        if resource == "folders":
+            return ["folders.move"] if suffix == "move" else ["folders." + by_method.get(method, "")]
         if resource == "hash-lists":
             if suffix == "entries":
-                return "hashLists.listEntries" if method == "GET" else "hashLists.addEntry"
-            return "hashLists." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, method.lower())
-        if suffix:
-            return {"children": "assets.listChildren", "part": "assets.uploadPart", "signed-url": "assets.createSignedUrl",
-                    "content": "assets.deleteContent", "decision": "assets.decide"}.get(suffix, f"{resource}.{suffix}")
-        return f"{resource}." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, method.lower())
+                return ["hashLists.listEntries" if method == "GET" else "hashLists.addEntry"]
+            return ["hashLists." + by_method.get(method, "")]
+        if resource == "hash-list-entries":
+            return ["hashLists.removeEntry"]
+        if resource != "assets":
+            return []
+        if not suffix:
+            return ["assets.retrieve", "assets.waitForDecision"] if method == "GET" \
+                else ["assets." + by_method.get(method, "")]
+        return {"content": ["assets.deleteContent"], "children": ["assets.listChildren", "assets.iterateChildren"],
+                "signed-url": ["assets.createSignedUrl"], "part": ["assets.uploadPart"], "move": ["assets.move"],
+                "retry": ["assets.retry"], "explain": ["assets.explain"],
+                "decision": ["assets.decide"]}.get(suffix, [])
 
     def _serve(self, request: Request, timeout: float) -> _Response:
         data: Any = request.data
@@ -764,43 +994,58 @@ class MockCalmLensServerClient(CalmLensServerClient):
         url = urlsplit(relative)
         query = _decode_query(parse_qsl(url.query, keep_blank_values=True))
         content_type = next((v for k, v in headers.items() if k.lower() == "content-type"), "")
-        upload = next((v for k, v in headers.items() if k.lower() == "x-calmlens-upload"), "")
         body: Any = raw
         if raw is not None and content_type == "application/json":
             body = json.loads(raw)
         parts = [unquote(p) for p in url.path.strip("/").split("/")]
-        operation = self._operation(request.get_method(), parts, query, upload, cdn)
+        operations = self._operations(request.get_method(), parts, query, headers, cdn)
+        recorded = MockRequest(method=request.get_method(), url=request.full_url, path="/" + "/".join(parts),
+                               query=copy.deepcopy(query), body=copy.deepcopy(body), headers=copy.deepcopy(headers))
         with self._state_lock:
-            self._requests.append(MockRequest(method=request.get_method(), url=request.full_url, path=url.path,
-                                              query=copy.deepcopy(query), body=copy.deepcopy(body),
-                                              headers=copy.deepcopy(headers)))
+            self._requests.append(recorded)
             error = self._errors.pop(0) if self._errors else None
-            failure: MockFailure | None = None
+            pending: _PendingFailure | None = None
             if error is None:
-                index = next((i for i, (_, target) in enumerate(self._pending_failures)
-                              if target is None or target == operation), None)
+                index = next((i for i, queued in enumerate(self._pending_failures)
+                              if queued.operation is None or queued.operation in operations), None)
                 if index is not None:
-                    failure = self._pending_failures.pop(index)[0]
+                    pending = self._pending_failures.pop(index)
         if isinstance(error, CalmLensError):
-            return self._failure_response(error, error.retry_after)
-        if error is not None:
+            response = self._failure_response(error, error.retry_after)
+        elif error is not None:
             raise error
-        if failure == "transport-error":
-            raise ConnectionResetError("Simulated network failure")
-        if failure == "timeout":
-            raise TimeoutError("The operation timed out.")
-        if isinstance(failure, str):
-            return self._failure_response(_Failure(failure))
-        if failure is not None:
-            raise failure
-        if cdn:
-            return self._serve_cdn(request.get_method(), url.path, query)
+        elif pending is not None:
+            failure = pending.failure
+            if failure == "transport-error":
+                raise ConnectionResetError("Simulated network failure")
+            if failure == "timeout":
+                raise TimeoutError("The operation timed out.")
+            if not isinstance(failure, str):
+                raise failure
+            response = self._failure_response(_Failure(failure, details=pending.details), pending.retry_after)
+        elif cdn:
+            response = self._serve_cdn(request.get_method(), url.path, query)
+        else:
+            response = self._answer(request, raw, headers, url.path, query, body, parts,
+                                    operations[0] if operations else "")
+        with self._state_lock:
+            # The recorded request gets the status it was answered with, unless it was cleared.
+            for index, sent in enumerate(self._requests):
+                if sent is recorded:
+                    self._requests[index] = dataclasses.replace(recorded, status=response.status)
+        return response
+
+    def _answer(self, request: Request, raw: bytes | None, headers: Mapping[str, str], path: str,
+                query: dict[str, Any], body: Any, parts: list[str], operation: str) -> _Response:
+        """Answer an API request: idempotency, then the route."""
+        content_type = next((v for k, v in headers.items() if k.lower() == "content-type"), "")
+        upload = next((v for k, v in headers.items() if k.lower() == "x-calmlens-upload"), "")
         key = next((v for k, v in headers.items() if k.lower() == "idempotency-key"), None)
         if key is not None:
             # HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
             key = key.strip(" \t\r\n")
         # Like the API: raw uploads are told apart by their query, type and length, not their bytes.
-        fingerprint = _json([request.get_method(), url.path, sorted(([k, v] for k, v in query.items()), key=str),
+        fingerprint = _json([request.get_method(), path, sorted(([k, v] for k, v in query.items()), key=str),
                              content_type, upload, len(raw or b"") if upload else body])
         with self._state_lock:
             if key is not None:
@@ -1000,11 +1245,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
         }
         if not final:
             self._uploads[asset["id"]] = {"queue": queue, "total": total}
+            self.database_storage.assets[asset["id"]] = cast(Asset, asset)
+            self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: raw or b""}}
+            return asset
+        # Like the API: moderated as uploaded, then stored and recorded as uploaded and decided.
+        decision = self._decision_for(asset, "upload", queue, (raw or b"") if raw_upload else None)
+        uploaded = _event_asset(asset)
         self.database_storage.assets[asset["id"]] = cast(Asset, asset)
         if raw_upload and raw is not None:
             self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: raw}}
-        if final:
-            self._apply_outcome(asset, self._outcome_for(asset, queue))
+        if decision.status != "pending":
+            self._decided(asset, decision)
+        self._record_uploaded(asset, uploaded)
+        self._record_processing_events(asset, decision)
         return asset
 
     @staticmethod
@@ -1023,11 +1276,68 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return None
         return error_codes.UPLOAD_SIZE_MISMATCH if received > total or (final and received != total) else None
 
-    def _outcome_for(self, asset: dict[str, Any], queue: bool) -> str:
-        outcome: Any = self.queued_outcome if queue else self.analyzed_outcome
-        return str(outcome(cast(Asset, copy.deepcopy(asset))) if callable(outcome) else outcome)
+    def _decision_for(self, asset: dict[str, Any], trigger: MockModerationTrigger, queued: bool,
+                      data: bytes | None | Literal[False] = False) -> MockDecision:
+        """Ask ``moderate`` how to decide ``asset``, with its content: ``data`` when the caller has
+        it, otherwise the stored parts in order (none once the content is removed)."""
+        if data is False:
+            stored = None if asset["content"]["status"] == "removed" else self.image_storage.content.get(asset["id"])
+            data = b"".join(part for _, part in sorted(stored["parts"].items())) if stored else None
+        text = data.decode("utf-8", "replace") if data is not None and asset["type"] == "plaintext-document" else None
+        moderation = MockModerationInput(asset=cast(Asset, copy.deepcopy(asset)),
+                                         content=MockModerationContent(bytes=data, text=text),
+                                         trigger=trigger, queued=queued)
+        return _to_decision(self.moderate(moderation))
 
-    def _apply_outcome(self, asset: dict[str, Any], outcome: str, purge_reason: str = "policy") -> None:
+    def _decided(self, asset: dict[str, Any], decision: MockDecision) -> None:
+        """Decide ``asset`` as ``decision`` says, with its report."""
+        self._apply_outcome(asset, decision.status, "policy", decision.report())
+
+    def _moderate_stored(self, asset: dict[str, Any], trigger: MockModerationTrigger,
+                         decision: MockDecision | None = None) -> None:
+        """Ask ``moderate`` (unless ``decision`` is given) and settle a processing asset: a decision
+        gets its report and events, and ``pending`` leaves it processing."""
+        settled = decision if decision is not None else self._decision_for(asset, trigger, True)
+        if settled.status == "pending":
+            return
+        self._decided(asset, settled)
+        self._record_processing_events(asset, settled)
+
+    def _record_uploaded(self, asset: Mapping[str, Any], snapshot: EventAsset) -> None:
+        """``asset.uploaded``, as the API records it when an upload completes, with the asset as
+        it was before moderation."""
+        self.enqueue_event("asset.uploaded", asset_id=asset["id"], facts=cast(list[EventFact], [
+            {"key": "asset-type", "value": asset["type"]}, _asset_name_fact(asset),
+            {"key": "file-format", "value": asset["content"].get("format")}]))
+        self.database_storage.events[-1]["asset"] = snapshot
+
+    def _record_processing_events(self, asset: Mapping[str, Any], decision: MockDecision) -> None:
+        """The events the pipeline records when it settles an asset: ``asset.classified`` and the
+        automated ``asset.<status>``, or ``asset.failed``."""
+        status = decision.status
+        if status == "pending":
+            return
+        if status == "failed":
+            self.enqueue_event("asset.failed", asset_id=asset["id"], severity="high", facts=cast(list[EventFact], [
+                _asset_name_fact(asset), {"key": "asset-type", "value": asset["type"]},
+                {"key": "previous-status", "value": "processing"},
+                {"key": "failure-reason", "value": asset["classification"].get("failureReason") or "processing-error"}]))
+            return
+        report = decision.report() or {}
+        flagged = list(report["policy"]["decision"]["flaggedCategories"]) if report else []
+        self.enqueue_event("asset.classified", asset_id=asset["id"], facts=cast(list[EventFact], [
+            {"key": "flagged-categories", "value": flagged}, {"key": "moderation-status", "value": status},
+            {"key": "asset-type", "value": asset["type"]}, _asset_name_fact(asset)]))
+        # Like the event catalog: only allowing and limiting are low severity.
+        self.enqueue_event("asset." + status, asset_id=asset["id"],
+                           severity="low" if status in ("allowed", "limited") else "high",
+                           facts=cast(list[EventFact], [
+                               {"key": "decided-by", "value": "automated"},
+                               {"key": "flagged-categories", "value": list(flagged)},
+                               {"key": "asset-type", "value": asset["type"]}, _asset_name_fact(asset)]))
+
+    def _apply_outcome(self, asset: dict[str, Any], outcome: str, purge_reason: str = "policy",
+                       report: Mapping[str, Any] | None = None) -> None:
         """Move ``asset`` to ``outcome`` like the pipeline would: a decision finishes processing,
         ``purged`` deletes the content (``purge_reason``: ``policy`` for the pipeline, ``requested``
         for a reviewer), and finished processing removes content kept only temporarily. A classified
@@ -1052,7 +1362,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             asset["context"] = None
         asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None,
                                        failureReason="processing-error" if outcome == "failed" else None)
-        asset["classification"]["moderation"].update(status=outcome if decided else "pending")
+        asset["classification"]["moderation"].update(status=outcome if decided else "pending", **(report or {}))
         asset["upload"].update(status="completed", updatedAt=now)
         asset["updatedAt"] = now
 
@@ -1084,7 +1394,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if final:
             queue = query["queue"] if "queue" in query else upload["queue"]
             del self._uploads[asset["id"]]
-            self._apply_outcome(asset, self._outcome_for(asset, queue))
+            self._apply_outcome(asset, "pending")
+            uploaded = _event_asset(asset)
+            decision = self._decision_for(asset, "upload", queue)
+            if decision.status != "pending":
+                self._decided(asset, decision)
+            self._record_uploaded(asset, uploaded)
+            self._record_processing_events(asset, decision)
 
     def _dispatch_asset(self, method: str, identifier: str, suffix: str, query: dict[str, Any],
                         body: dict[str, Any], raw: bytes | None) -> Any:
@@ -1119,6 +1435,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             # Like the API: back to processing, to be moderated again, with an asset.retried event.
             self._apply_outcome(asset, "pending")
             self._lifecycle_event("asset.retried", asset)
+            self._moderate_stored(asset, "retry")
             return asset
         if suffix == "decision":
             return self._decide_request(asset, body)
@@ -1139,6 +1456,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 raise _Failure(error_codes.ASSET_CONTENT_UNAVAILABLE)
             # Like the API: back to processing, to be moderated again under the current policy.
             self._apply_outcome(asset, "pending")
+            self._moderate_stored(asset, "rerun")
             return asset
         if suffix == "move":
             if body["folderId"]:

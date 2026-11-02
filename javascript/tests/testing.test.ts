@@ -777,7 +777,9 @@ describe("MockCalmLensServerClient", () => {
       details: { classificationStatus: "processing", moderationStatus: "pending" },
     });
 
-    const decidedClient = createClient({ queuedOutcome: "failed" });
+    const decidedClient = createClient({
+      moderate: ({ trigger }) => (trigger === "upload" ? "failed" : "pending"),
+    });
     const queued = await decidedClient.assets.create({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
@@ -793,7 +795,9 @@ describe("MockCalmLensServerClient", () => {
   });
 
   it("retries failed assets, and only failed ones", async () => {
-    const client = createClient({ queuedOutcome: "failed" });
+    const client = createClient({
+      moderate: ({ trigger }) => (trigger === "upload" ? "failed" : "pending"),
+    });
     const asset = await client.assets.create({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
@@ -815,7 +819,9 @@ describe("MockCalmLensServerClient", () => {
   });
 
   it("refuses to retry a failed asset whose content was removed", async () => {
-    const client = createClient({ queuedOutcome: "failed" });
+    const client = createClient({
+      moderate: ({ trigger }) => (trigger === "upload" ? "failed" : "pending"),
+    });
     const asset = await client.assets.create({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
@@ -828,7 +834,10 @@ describe("MockCalmLensServerClient", () => {
 
   it("explains a decided asset's evidence, or moderates it again with rerun", async () => {
     const databaseStorage = new InMemoryMockDatabaseStorage();
-    const client = createClient({ databaseStorage, analyzedOutcome: "blocked" });
+    const client = createClient({
+      databaseStorage,
+      moderate: ({ trigger }) => (trigger === "upload" ? "blocked" : "pending"),
+    });
     const asset = await client.assets.classify({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
@@ -868,7 +877,7 @@ describe("MockCalmLensServerClient", () => {
   });
 
   it("removes content but keeps the record, and deletes assets", async () => {
-    const client = createClient({ analyzedOutcome: "allowed", now: () => 1_700_000_000_000 });
+    const client = createClient({ now: () => 1_700_000_000_000 });
     const asset = await client.assets.classify({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
@@ -1103,7 +1112,7 @@ describe("MockCalmLensAppClient", () => {
     const app = new MockCalmLensAppClient({
       uploadPresetId: PRESET,
       mockOptions: {
-        queuedOutcome: (asset) => (asset.name.includes("bad") ? "blocked" : "allowed"),
+        moderate: ({ asset }) => (asset.name.includes("bad") ? "blocked" : "allowed"),
       },
     });
     const good = await app.assets.create({ name: "good.png", content: photo });
@@ -1153,7 +1162,7 @@ describe("MockCalmLensAppClient", () => {
   it("hides decisions when the preset doesn't show them, and checks only its own uploads", async () => {
     const app = new MockCalmLensAppClient({
       uploadPresetId: PRESET,
-      mockOptions: { queuedOutcome: "allowed", preset: { showDecisions: false } },
+      mockOptions: { moderate: () => "allowed", preset: { showDecisions: false } },
     });
     const upload = await app.assets.create({ name: "a.png", content: photo });
     expect(upload.status).toBeUndefined();

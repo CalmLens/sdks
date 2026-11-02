@@ -115,7 +115,7 @@ fn blocking_wait_for_decision_returns_a_failed_asset_as_decided() {
     assert!(mock
         .requests()
         .iter()
-        .all(|request| request.path == "/v1/assets/asset-1"));
+        .all(|request| request.path == "/assets/asset-1"));
 }
 
 #[test]

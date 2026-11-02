@@ -63,10 +63,12 @@
       ]
     },
     {
-      "name": "classify uses analyzedOutcome and create uses queuedOutcome",
+      "name": "moderate decides queued and moderated uploads, and a status alone evaluates every category",
       "mock": {
-        "queuedOutcome": "allowed",
-        "analyzedOutcome": "blocked"
+        "moderate": {
+          "queued": "allowed",
+          "analyzed": "blocked"
+        }
       },
       "steps": [
         {
@@ -81,7 +83,94 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "blocked"
+              "classification.moderation.status": "blocked",
+              "classification.moderation.categories": {
+                "sexual": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "violence": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "self-harm": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "harassment": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "hate": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "criminal-activity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "personal-information": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "profanity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                }
+              },
+              "classification.moderation.score": 0,
+              "classification.moderation.policy": {
+                "score": 0,
+                "categories": {
+                  "sexual": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "violence": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "self-harm": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "harassment": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "hate": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "criminal-activity": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "personal-information": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "profanity": {
+                    "score": 0,
+                    "action": "allow"
+                  }
+                },
+                "evidence": "full",
+                "decision": {
+                  "source": "policy",
+                  "action": "block",
+                  "regions": [],
+                  "flaggedCategories": []
+                }
+              }
             },
             "httpStatus": 200
           }
@@ -93,7 +182,95 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "blocked"
+              "classification.status": "completed",
+              "classification.moderation.status": "blocked",
+              "classification.moderation.categories": {
+                "sexual": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "violence": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "self-harm": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "harassment": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "hate": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "criminal-activity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "personal-information": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "profanity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                }
+              },
+              "classification.moderation.score": 0,
+              "classification.moderation.policy": {
+                "score": 0,
+                "categories": {
+                  "sexual": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "violence": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "self-harm": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "harassment": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "hate": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "criminal-activity": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "personal-information": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "profanity": {
+                    "score": 0,
+                    "action": "allow"
+                  }
+                },
+                "evidence": "full",
+                "decision": {
+                  "source": "policy",
+                  "action": "block",
+                  "regions": [],
+                  "flaggedCategories": []
+                }
+              }
             },
             "httpStatus": 200
           }
@@ -110,9 +287,555 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "allowed"
+              "classification.moderation.status": "allowed",
+              "classification.moderation.categories": {
+                "sexual": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "violence": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "self-harm": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "harassment": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "hate": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "criminal-activity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "personal-information": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "profanity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                }
+              },
+              "classification.moderation.score": 0,
+              "classification.moderation.policy": {
+                "score": 0,
+                "categories": {
+                  "sexual": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "violence": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "self-harm": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "harassment": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "hate": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "criminal-activity": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "personal-information": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "profanity": {
+                    "score": 0,
+                    "action": "allow"
+                  }
+                },
+                "evidence": "full",
+                "decision": {
+                  "source": "policy",
+                  "action": null,
+                  "regions": [],
+                  "flaggedCategories": []
+                }
+              }
             },
             "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "moderate is called with each upload's content and its decision fills the report",
+      "mock": {
+        "moderate": {
+          "byName": {
+            "threat.txt": {
+              "status": "blocked",
+              "flags": [
+                {
+                  "category": "violence",
+                  "score": 0.92,
+                  "qualifiers": {
+                    "violence-threat": 0.9
+                  }
+                },
+                {
+                  "category": "harassment",
+                  "score": 0.3
+                }
+              ],
+              "notEvaluated": [
+                "sexual"
+              ]
+            },
+            "edgy.txt": {
+              "status": "limited",
+              "flags": [
+                {
+                  "category": "profanity",
+                  "score": 0.7
+                }
+              ]
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "threat.txt",
+            "content": {
+              "plainText": "I will find you",
+              "type": "text/plain"
+            }
+          },
+          "save": "threat",
+          "expect": {
+            "result": {
+              "classification.status": "completed",
+              "classification.moderation.status": "blocked",
+              "classification.moderation.categories": {
+                "sexual": {
+                  "status": "not-evaluated",
+                  "reason": "not-supported"
+                },
+                "violence": {
+                  "status": "evaluated",
+                  "likelihood": "very-likely",
+                  "score": 0.92,
+                  "qualifiers": {
+                    "violence-threat": {
+                      "status": "evaluated",
+                      "someScore": 0.9,
+                      "likelihood": "very-likely"
+                    }
+                  }
+                },
+                "self-harm": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "harassment": {
+                  "status": "evaluated",
+                  "likelihood": "unlikely",
+                  "score": 0.3
+                },
+                "hate": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "criminal-activity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "personal-information": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "profanity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                }
+              },
+              "classification.moderation.score": 0.92,
+              "classification.moderation.policy": {
+                "score": 0.92,
+                "categories": {
+                  "violence": {
+                    "score": 0.92,
+                    "action": "block"
+                  },
+                  "self-harm": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "harassment": {
+                    "score": 0.3,
+                    "action": "allow"
+                  },
+                  "hate": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "criminal-activity": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "personal-information": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "profanity": {
+                    "score": 0,
+                    "action": "allow"
+                  }
+                },
+                "evidence": "full",
+                "decision": {
+                  "source": "policy",
+                  "action": "block",
+                  "regions": [],
+                  "flaggedCategories": [
+                    "violence"
+                  ]
+                }
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "edgy.txt",
+            "content": {
+              "plainText": "damn",
+              "type": "text/plain"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "completed",
+              "classification.moderation.status": "limited",
+              "classification.moderation.categories": {
+                "sexual": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "violence": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "self-harm": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "harassment": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "hate": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "criminal-activity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "personal-information": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "profanity": {
+                  "status": "evaluated",
+                  "likelihood": "likely",
+                  "score": 0.7
+                }
+              },
+              "classification.moderation.score": 0.7,
+              "classification.moderation.policy": {
+                "score": 0.7,
+                "categories": {
+                  "sexual": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "violence": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "self-harm": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "harassment": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "hate": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "criminal-activity": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "personal-information": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "profanity": {
+                    "score": 0.7,
+                    "action": "limit"
+                  }
+                },
+                "evidence": "full",
+                "decision": {
+                  "source": "policy",
+                  "action": "limit",
+                  "regions": [],
+                  "flaggedCategories": [
+                    "profanity"
+                  ]
+                }
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "photo.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "photo",
+          "expect": {
+            "result": {
+              "classification.status": "processing",
+              "classification.moderation.status": "pending"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.moderateCalls",
+          "expect": {
+            "result": {
+              "length": 3,
+              "0.trigger": "upload",
+              "0.queued": false,
+              "0.assetId": {
+                "$ref": "threat.id"
+              },
+              "0.name": "threat.txt",
+              "0.text": "I will find you",
+              "0.bytesBase64": "SSB3aWxsIGZpbmQgeW91",
+              "1.text": "damn",
+              "2.trigger": "upload",
+              "2.queued": true,
+              "2.assetId": {
+                "$ref": "photo.id"
+              },
+              "2.text": null,
+              "2.bytesBase64": "aGVsbG8="
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the decision builder refuses unknown categories and qualifiers, scores outside 0 to 1, and findings without a decision",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "blocked",
+            "flags": [
+              {
+                "category": "spam",
+                "score": 0.9
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "blocked",
+            "flags": [
+              {
+                "category": "violence",
+                "score": 0.9,
+                "qualifiers": {
+                  "sexual-pornographic-media": 0.9
+                }
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "blocked",
+            "flags": [
+              {
+                "category": "violence",
+                "score": 1.5
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "blocked",
+            "flags": [
+              {
+                "category": "violence",
+                "score": 0.9,
+                "qualifiers": {
+                  "violence-threat": -0.1
+                }
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "maybe"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "pending",
+            "flags": [
+              {
+                "category": "violence",
+                "score": 0.9
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "blocked",
+            "flags": [
+              {
+                "category": "violence",
+                "score": 0.9
+              }
+            ],
+            "notEvaluated": [
+              "violence"
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "blocked",
+            "flags": [
+              {
+                "category": "violence",
+                "score": 0.9
+              },
+              {
+                "category": "violence",
+                "score": 0.4
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "failed"
           }
         }
       ]
@@ -261,7 +984,9 @@
     {
       "name": "assets.decide can only block or purge an asset whose processing failed",
       "mock": {
-        "queuedOutcome": "failed"
+        "moderate": {
+          "queued": "failed"
+        }
       },
       "steps": [
         {
@@ -337,18 +1062,6 @@
       },
       "steps": [
         {
-          "operation": "events.list",
-          "args": {},
-          "save": "feed",
-          "expect": {
-            "result": {
-              "items.length": 0,
-              "hasMore": false
-            },
-            "httpStatus": 200
-          }
-        },
-        {
           "operation": "assets.classify",
           "args": {
             "name": "blocked.png",
@@ -385,6 +1098,18 @@
           },
           "save": "other",
           "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "result": {
+              "items.length": 0,
+              "hasMore": false
+            },
             "httpStatus": 200
           }
         },
@@ -565,7 +1290,9 @@
             "includeSubfolders": true
           }
         ],
-        "queuedOutcome": "purged"
+        "moderate": {
+          "queued": "purged"
+        }
       },
       "steps": [
         {
@@ -930,7 +1657,9 @@
             "includeSubfolders": true
           }
         ],
-        "analyzedOutcome": "age-restricted"
+        "moderate": {
+          "analyzed": "age-restricted"
+        }
       },
       "steps": [
         {
@@ -1003,7 +1732,9 @@
     {
       "name": "a public age-restricted asset is served without a grant only with ageConfirmed",
       "mock": {
-        "analyzedOutcome": "age-restricted"
+        "moderate": {
+          "analyzed": "age-restricted"
+        }
       },
       "steps": [
         {
@@ -1104,7 +1835,9 @@
     {
       "name": "a limited asset is served from its public URL like an allowed one",
       "mock": {
-        "analyzedOutcome": "limited"
+        "moderate": {
+          "analyzed": "limited"
+        }
       },
       "steps": [
         {
@@ -2077,7 +2810,9 @@
     {
       "name": "filters group with parentheses, and ; binds tighter than ,",
       "mock": {
-        "queuedOutcome": "blocked"
+        "moderate": {
+          "queued": "blocked"
+        }
       },
       "steps": [
         {
@@ -2394,6 +3129,17 @@
                 "value": "allowed"
               }
             ]
+          },
+          "expect": {
+            "result": {
+              "assetId": {
+                "$ref": "queued.id"
+              },
+              "asset.id": {
+                "$ref": "queued.id"
+              },
+              "asset.classification.moderation.status": "pending"
+            }
           }
         },
         {
@@ -2856,7 +3602,9 @@
     {
       "name": "retry processes a failed asset again only while it still has content",
       "mock": {
-        "queuedOutcome": "failed"
+        "moderate": {
+          "queued": "failed"
+        }
       },
       "steps": [
         {
@@ -3024,24 +3772,37 @@
           },
           "expect": {
             "result": {
-              "items.length": 2,
-              "items.0.type": "asset.retried",
-              "items.0.severity": "low",
-              "items.0.assetId": {
+              "items.length": 9,
+              "items.0.type": "asset.uploaded",
+              "items.1.type": "asset.failed",
+              "items.1.assetId": {
                 "$ref": "failed.id"
               },
-              "items.0.asset.classification.status": "processing",
-              "items.0.facts": {
+              "items.2.type": "asset.retried",
+              "items.2.severity": "low",
+              "items.2.assetId": {
+                "$ref": "failed.id"
+              },
+              "items.2.asset.classification.status": "processing",
+              "items.2.facts": {
                 "$contains": {
                   "key": "asset-type",
                   "value": "image"
                 }
               },
-              "items.1.type": "asset.content-removed",
-              "items.1.assetId": {
+              "items.3.type": "asset.uploaded",
+              "items.4.type": "asset.classified",
+              "items.5.type": "asset.allowed",
+              "items.5.assetId": {
+                "$ref": "allowed.id"
+              },
+              "items.6.type": "asset.uploaded",
+              "items.7.type": "asset.failed",
+              "items.8.type": "asset.content-removed",
+              "items.8.assetId": {
                 "$ref": "emptied.id"
               },
-              "items.1.asset.content.status": "removed"
+              "items.8.asset.content.status": "removed"
             },
             "httpStatus": 200
           }
@@ -3245,14 +4006,6 @@
       "mock": {},
       "steps": [
         {
-          "operation": "events.list",
-          "args": {},
-          "save": "feed",
-          "expect": {
-            "httpStatus": 200
-          }
-        },
-        {
           "operation": "assets.classify",
           "args": {
             "name": "kept.png",
@@ -3265,6 +4018,14 @@
             }
           },
           "save": "kept",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
           "expect": {
             "httpStatus": 200
           }
@@ -4378,8 +5139,10 @@
     {
       "name": "multipart parts arrive in order, need 5 MiB until the last, and finish with the saved queue mode",
       "mock": {
-        "queuedOutcome": "blocked",
-        "analyzedOutcome": "allowed"
+        "moderate": {
+          "queued": "blocked",
+          "analyzed": "allowed"
+        }
       },
       "steps": [
         {
@@ -6702,6 +7465,878 @@
                 },
                 "X-Content-Type-Options": "nosniff"
               }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a decided upload records asset.uploaded, asset.classified and the automated decision",
+      "mock": {
+        "moderate": {
+          "analyzed": {
+            "status": "blocked",
+            "flags": [
+              {
+                "category": "hate",
+                "score": 0.9
+              }
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "flyer.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "flyer",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 3,
+              "items.0.type": "asset.uploaded",
+              "items.0.severity": "low",
+              "items.0.assetId": {
+                "$ref": "flyer.id"
+              },
+              "items.0.facts": [
+                {
+                  "key": "asset-type",
+                  "value": "image"
+                },
+                {
+                  "key": "asset-name",
+                  "value": "flyer.png",
+                  "url": {
+                    "$concat": [
+                      "https://calmlens.com/go/asset/",
+                      {
+                        "$ref": "flyer.id"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": "file-format",
+                  "value": "image/png"
+                }
+              ],
+              "items.1.type": "asset.classified",
+              "items.1.severity": "low",
+              "items.1.facts": [
+                {
+                  "key": "flagged-categories",
+                  "value": [
+                    "hate"
+                  ]
+                },
+                {
+                  "key": "moderation-status",
+                  "value": "blocked"
+                },
+                {
+                  "key": "asset-type",
+                  "value": "image"
+                },
+                {
+                  "key": "asset-name",
+                  "value": "flyer.png",
+                  "url": {
+                    "$concat": [
+                      "https://calmlens.com/go/asset/",
+                      {
+                        "$ref": "flyer.id"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "items.2.type": "asset.blocked",
+              "items.2.severity": "high",
+              "items.2.asset.classification.moderation.status": "blocked",
+              "items.2.facts": [
+                {
+                  "key": "decided-by",
+                  "value": "automated"
+                },
+                {
+                  "key": "flagged-categories",
+                  "value": [
+                    "hate"
+                  ]
+                },
+                {
+                  "key": "asset-type",
+                  "value": "image"
+                },
+                {
+                  "key": "asset-name",
+                  "value": "flyer.png",
+                  "url": {
+                    "$concat": [
+                      "https://calmlens.com/go/asset/",
+                      {
+                        "$ref": "flyer.id"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failed upload records asset.uploaded and asset.failed with its reason",
+      "mock": {
+        "moderate": {
+          "queued": "failed"
+        }
+      },
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "broken.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "broken",
+          "expect": {
+            "result": {
+              "classification.status": "failed",
+              "classification.failureReason": "processing-error",
+              "classification.moderation.status": "pending"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.type": "asset.uploaded",
+              "items.1.type": "asset.failed",
+              "items.1.severity": "high",
+              "items.1.facts": [
+                {
+                  "key": "asset-name",
+                  "value": "broken.png",
+                  "url": {
+                    "$concat": [
+                      "https://calmlens.com/go/asset/",
+                      {
+                        "$ref": "broken.id"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": "asset-type",
+                  "value": "image"
+                },
+                {
+                  "key": "previous-status",
+                  "value": "processing"
+                },
+                {
+                  "key": "failure-reason",
+                  "value": "processing-error"
+                }
+              ]
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "completeProcessing decides a pending asset like the pipeline, and refuses one that isn't processing",
+      "mock": {
+        "moderate": {}
+      },
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "queued",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "timeoutMs": 1000
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/timeout",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.completeProcessing",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "decision": {
+              "status": "age-restricted",
+              "flags": [
+                {
+                  "category": "sexual",
+                  "score": 0.8
+                }
+              ]
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "completed",
+              "classification.moderation.status": "age-restricted",
+              "classification.moderation.categories": {
+                "sexual": {
+                  "status": "evaluated",
+                  "likelihood": "very-likely",
+                  "score": 0.8
+                },
+                "violence": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "self-harm": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "harassment": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "hate": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "criminal-activity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "personal-information": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "profanity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                }
+              },
+              "classification.moderation.score": 0.8,
+              "classification.moderation.policy": {
+                "score": 0.8,
+                "categories": {
+                  "sexual": {
+                    "score": 0.8,
+                    "action": "age-restrict"
+                  },
+                  "violence": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "self-harm": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "harassment": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "hate": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "criminal-activity": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "personal-information": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "profanity": {
+                    "score": 0,
+                    "action": "allow"
+                  }
+                },
+                "evidence": "full",
+                "decision": {
+                  "source": "policy",
+                  "action": "age-restrict",
+                  "regions": [],
+                  "flaggedCategories": [
+                    "sexual"
+                  ]
+                }
+              },
+              "classification.moderation.manualReviews": []
+            }
+          }
+        },
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "timeoutMs": 1000
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "age-restricted"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.type": "asset.classified",
+              "items.0.facts.0": {
+                "key": "flagged-categories",
+                "value": [
+                  "sexual"
+                ]
+              },
+              "items.1.type": "asset.age-restricted",
+              "items.1.facts.0": {
+                "key": "decided-by",
+                "value": "automated"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.completeProcessing",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "assets.explain",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "rerun": true
+          },
+          "expect": {
+            "result": {
+              "classification.status": "processing"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.completeProcessing",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "completed",
+              "classification.moderation.status": "allowed",
+              "classification.moderation.categories": {
+                "sexual": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "violence": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "self-harm": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "harassment": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "hate": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "criminal-activity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "personal-information": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                },
+                "profanity": {
+                  "status": "evaluated",
+                  "likelihood": "very-unlikely",
+                  "score": 0
+                }
+              },
+              "classification.moderation.score": 0,
+              "classification.moderation.policy": {
+                "score": 0,
+                "categories": {
+                  "sexual": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "violence": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "self-harm": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "harassment": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "hate": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "criminal-activity": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "personal-information": {
+                    "score": 0,
+                    "action": "allow"
+                  },
+                  "profanity": {
+                    "score": 0,
+                    "action": "allow"
+                  }
+                },
+                "evidence": "full",
+                "decision": {
+                  "source": "policy",
+                  "action": null,
+                  "regions": [],
+                  "flaggedCategories": []
+                }
+              }
+            }
+          }
+        },
+        {
+          "operation": "mock.moderateCalls",
+          "expect": {
+            "result": {
+              "length": 3,
+              "0.trigger": "upload",
+              "0.queued": true,
+              "1.trigger": "rerun",
+              "1.queued": true,
+              "2.trigger": "complete",
+              "2.queued": true,
+              "2.assetId": {
+                "$ref": "queued.id"
+              },
+              "2.bytesBase64": "aGVsbG8="
+            }
+          }
+        },
+        {
+          "operation": "mock.completeProcessing",
+          "args": {
+            "assetId": "asset_00000000000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a reviewer decision is only a test hook for decisions, not pending or failed",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "outcome": "pending"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "outcome": "failed"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "without maxRetries a queued failure fails the call once, and the next call succeeds",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error"
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a queued failure fails one request, so a retry gets the next failure or the API's answer",
+      "mock": {
+        "maxRetries": 1
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.clearRequests"
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error"
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.requests",
+          "expect": {
+            "result": {
+              "length": 2,
+              "0.method": "GET",
+              "0.path": {
+                "$concat": [
+                  "/assets/",
+                  {
+                    "$ref": "a.id"
+                  }
+                ]
+              },
+              "0.status": null,
+              "1.path": {
+                "$concat": [
+                  "/assets/",
+                  {
+                    "$ref": "a.id"
+                  }
+                ]
+              },
+              "1.status": 200
+            }
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error"
+          },
+          "repeat": 2
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.clearRequests"
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "upload/website-rate-limit-exceeded",
+            "retryAfter": 1
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "pageSize": 5,
+            "filter": "name==a.png"
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.requests",
+          "expect": {
+            "result": {
+              "length": 2,
+              "0.status": 429,
+              "1.method": "GET",
+              "1.path": "/projects/project-1/assets",
+              "1.query": {
+                "pageSize": "5",
+                "filter": "name==a.png"
+              },
+              "1.status": 200
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an injected API error carries the given details and Retry-After",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "upload/spend-limit-reached",
+            "details": {
+              "reason": "spend-limit"
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/spend-limit-reached",
+              "status": 402,
+              "details": {
+                "reason": "spend-limit"
+              }
+            }
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "upload/website-rate-limit-exceeded",
+            "retryAfter": 30
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "error": {
+              "code": "upload/website-rate-limit-exceeded",
+              "status": 429,
+              "retryAfter": 30
             }
           }
         }

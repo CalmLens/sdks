@@ -61,7 +61,12 @@ type ScenarioStep = {
     result?: Record<string, unknown>;
     sameAs?: string;
     httpStatus?: number;
-    error?: { code: string; status: number | null; details?: Record<string, unknown> };
+    error?: {
+      code: string;
+      status: number | null;
+      details?: Record<string, unknown>;
+      retryAfter?: number;
+    };
     cdn?: {
       status: number;
       code?: string;
@@ -72,9 +77,25 @@ type ScenarioStep = {
     };
   };
 };
+/** A decision as the builder makes it: a status, or a status with `flag` and `notEvaluated` calls. */
+type DecisionSpec =
+  | string
+  | {
+      status: string;
+      flags?: { category: string; score: number; qualifiers?: Record<string, number> }[];
+      notEvaluated?: string[];
+    };
 type Scenario = {
   name: string;
-  mock: { queuedOutcome?: string; analyzedOutcome?: string; apiKeyGrants?: unknown[] };
+  mock: {
+    moderate?: {
+      queued?: DecisionSpec;
+      analyzed?: DecisionSpec;
+      byName?: Record<string, DecisionSpec>;
+    };
+    apiKeyGrants?: unknown[];
+    maxRetries?: number;
+  };
   steps: ScenarioStep[];
 };
 const { scenarios }: { scenarios: Scenario[] } = testdata("mock-scenarios.json");
@@ -115,6 +136,17 @@ const resolveRefs = (value: unknown, saved: Record<string, unknown>): unknown =>
   return value;
 };
 
+/** Builds `spec` with the decision builder, in the order the fixture lists its calls. */
+const buildDecision = (spec: DecisionSpec) => {
+  if (typeof spec === "string") return testing.mockDecision(spec as never);
+  const decision = testing.mockDecision(spec.status as never);
+  for (const { category, score, qualifiers } of spec.flags ?? []) {
+    decision.flag(category as never, score, qualifiers);
+  }
+  for (const category of spec.notEvaluated ?? []) decision.notEvaluated(category as never);
+  return decision;
+};
+
 /** What a `cdn.serve` step returns: the response's status, error code, bytes and headers. */
 type ServedResponse = { status: number; code?: string; bytes: Uint8Array; headers: Headers };
 
@@ -128,8 +160,33 @@ const runScenarioStep = async (
   client: MockCalmLensServerClient,
   operation: string,
   args: Record<string, unknown>,
+  moderateCalls: unknown[],
 ): Promise<unknown> => {
   switch (operation) {
+    case "mock.completeProcessing":
+      return JSON.parse(
+        JSON.stringify(
+          await client.completeProcessing(
+            args.assetId as string,
+            args.decision === undefined ? undefined : buildDecision(args.decision as DecisionSpec),
+          ),
+        ),
+      );
+    case "mock.moderateCalls":
+      return moderateCalls;
+    case "mock.buildDecision":
+      buildDecision(args as DecisionSpec);
+      return null;
+    case "mock.requests":
+      return client.calls.map(({ method, path, query, status }) => ({
+        method,
+        path,
+        query,
+        status: status ?? null,
+      }));
+    case "mock.clearRequests":
+      client.clearCalls();
+      return null;
     case "mock.decide":
       return client.decide(args.assetId as string, args.outcome as never);
     case "mock.enqueueEvent":
@@ -138,10 +195,11 @@ const runScenarioStep = async (
       client.setApiKeyGrants(args.grants as never);
       return null;
     case "mock.failNext":
-      client.failNextRequest(
-        args.failure as never,
-        args.operation === undefined ? {} : { operation: args.operation as never },
-      );
+      client.failNextRequest(args.failure as never, {
+        ...(args.operation !== undefined && { operation: args.operation as never }),
+        ...(args.details !== undefined && { details: args.details as Record<string, unknown> }),
+        ...(args.retryAfter !== undefined && { retryAfter: args.retryAfter as number }),
+      });
       return null;
     case "cdn.serve": {
       const response = await client.cdn.serve(args as never);
@@ -214,12 +272,31 @@ const checkCdnExpectation = (
 describe("shared mock scenarios", () => {
   for (const scenario of scenarios) {
     it(scenario.name, async () => {
+      const { moderate } = scenario.mock;
+      // Records what `moderate` was given, and answers by name, then by queue mode for uploads.
+      const moderateCalls: unknown[] = [];
       const client = new MockCalmLensServerClient({
         apiKey: createMockApiKey((scenario.mock.apiKeyGrants ?? []) as never),
         projectId: "project-1",
-        mockOptions: {
-          queuedOutcome: scenario.mock.queuedOutcome as never,
-          analyzedOutcome: scenario.mock.analyzedOutcome as never,
+        ...(scenario.mock.maxRetries !== undefined && { maxRetries: scenario.mock.maxRetries }),
+        mockOptions: moderate && {
+          moderate: (input) => {
+            const { asset, content, trigger, queued } = input;
+            moderateCalls.push({
+              trigger,
+              queued,
+              assetId: asset.id,
+              name: asset.name,
+              text: content.text,
+              bytesBase64: content.bytes && Buffer.from(content.bytes).toString("base64"),
+            });
+            const spec =
+              moderate.byName?.[asset.name] ??
+              (trigger === "upload" ? (queued ? moderate.queued : moderate.analyzed) : undefined);
+            // Otherwise the mock's default: queued work stays pending until completeProcessing.
+            if (spec !== undefined) return buildDecision(spec);
+            return queued && trigger !== "complete" ? "pending" : "allowed";
+          },
         },
       });
       const saved: Record<string, unknown> = {};
@@ -231,15 +308,18 @@ describe("shared mock scenarios", () => {
           let result: unknown;
           let error: unknown;
           try {
-            result = await runScenarioStep(client, step.operation, args);
+            result = await runScenarioStep(client, step.operation, args, moderateCalls);
           } catch (caught) {
             error = caught;
           }
           if (step.expect?.error) {
             expect(error, label).toBeInstanceOf(CalmLensError);
-            const { code, status, details } = error as CalmLensError;
-            const { details: wantDetails, ...want } = step.expect.error;
+            const { code, status, details, retryAfter } = error as CalmLensError;
+            const { details: wantDetails, retryAfter: wantRetryAfter, ...want } = step.expect.error;
             expect({ code, status: status ?? null }, label).toEqual(want);
+            if (wantRetryAfter !== undefined) {
+              expect(retryAfter, `${label}: retryAfter`).toBe(wantRetryAfter);
+            }
             // `details` lists only the keys to compare.
             for (const [key, value] of Object.entries(wantDetails ?? {})) {
               expect(details?.[key], `${label}: details.${key}`).toEqual(resolveRefs(value, saved));
@@ -337,20 +417,17 @@ const raisedError = async () => {
   );
 };
 
+/** The status a mock option gives an upload: `moderate` answering `blocked`. */
 const mockOutcome = async (option: string) => {
   const mock = new testing.MockCalmLensServerClient({
     apiKey: testing.createMockApiKey(),
     projectId: "project-1",
-    mockOptions: { [option]: "blocked" },
+    mockOptions: { [option]: () => "blocked" },
   });
-  const content = {
+  const asset = await mock.assets.classify({
     name: "note.txt",
     content: { plainText: "hello", type: "text/plain" },
-  } as const;
-  const asset =
-    option === "queuedOutcome"
-      ? await mock.assets.create(content)
-      : await mock.assets.classify(content);
+  });
   return asset.classification.moderation.status;
 };
 

@@ -50,7 +50,7 @@ const mockServer = new MockCalmLensServerClient({
   ]),
   projectId: MOCK_PROJECT_ID,
   mockOptions: {
-    queuedOutcome: ({ name }) =>
+    moderate: ({ asset: { name } }) =>
       /blocked/i.test(name) ? "blocked" : /sensitive/i.test(name) ? "age-restricted" : "allowed",
   },
 });

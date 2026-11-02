@@ -17,7 +17,7 @@ module TestHelpers
 
   # A "live" app whose SDK client is the offline mock. Queued responses answer first, in order.
   def live_app(*responses, **options)
-    mock = CalmLens::MockServerClient.new(max_retries: 0)
+    mock = CalmLens::MockServerClient.new
     responses.each { |body| mock.enqueue(body: body) }
     [Calmthread::App.new(Calmthread::Discussion.new(Calmthread::Moderator.new(client: mock)), webhooks: :manual, **options), mock]
   end
@@ -400,7 +400,7 @@ class ReviewTest < Minitest::Test
   def test_a_running_check_never_blocks_another
     entered = Queue.new
     release = Queue.new
-    mock = CalmLens::MockServerClient.new(max_retries: 0)
+    mock = CalmLens::MockServerClient.new
     gate = Object.new
     gate.define_singleton_method(:events) { entered << true; release.pop; mock.events }
     feed = Calmthread::ReviewFeed.new(Calmthread::Discussion.new(Calmthread::Moderator.new(client: mock)), cursor: 'mock_0')

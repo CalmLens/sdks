@@ -45,9 +45,11 @@ final class MockTransport
         return new ServerClient('test-key', $projectId, maxRetries: 0, httpClient: new Client(['handler' => $stack]));
     }
 
+    /** @return list<RecordedRequest> every request sent, oldest first, with the status it was answered with. */
     public function requests(): array
     {
-        return array_column($this->history, 'request');
+        return array_map(fn (array $entry) => RecordedRequest::of($entry['request'], $entry['response']?->getStatusCode(),
+            ServerClient::DEFAULT_BASE_URL, ServerClient::DEFAULT_CDN_BASE_URL), $this->history);
     }
 
     public function pending(): int { return count($this->handler); }

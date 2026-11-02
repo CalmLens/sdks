@@ -9,7 +9,7 @@ class MockTest < Minitest::Test
   DOWNLOAD = CalmLens::MockServerClient.create_api_key([{ actions: ['assets:download'], folder_id: nil, include_subfolders: true }])
 
   def test_blocked_assets_keep_content_but_are_not_served
-    mock = CalmLens::MockServerClient.new(analyzed_outcome: { 'classification' => { 'moderation' => { 'status' => 'blocked' } } })
+    mock = CalmLens::MockServerClient.new(moderate: ->(_input) { 'blocked' })
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
     assert_equal %w[completed blocked stored],
                  [asset.dig('classification', 'status'), asset.dig('classification', 'moderation', 'status'),
@@ -88,8 +88,8 @@ class MockTest < Minitest::Test
 
   def test_filters_ordering_and_pagination_are_applied
     clock = 0
-    mock = CalmLens::MockServerClient.new(now: -> { clock += 1 }, analyzed_outcome: lambda { |asset|
-      asset['name'].start_with?('bad') ? 'blocked' : 'allowed'
+    mock = CalmLens::MockServerClient.new(now: -> { clock += 1 }, moderate: lambda { |input|
+      input.asset['name'].start_with?('bad') ? 'blocked' : 'allowed'
     })
     %w[good-b bad-a good-a good-c].each { |name| mock.assets.classify(name: name, content: { plain_text: name, type: 'text/plain' }) }
 
@@ -130,7 +130,7 @@ class MockTest < Minitest::Test
   end
 
   def test_queued_responses_come_first_then_the_fake_answers
-    mock = CalmLens::MockServerClient.new(max_retries: 0)
+    mock = CalmLens::MockServerClient.new
     mock.enqueue(status: 503, body: { code: 'server/unavailable', message: 'Busy' }, headers: { 'x-request-id' => 'req-1' })
     error = assert_raises(CalmLens::ServerError) { mock.assets.list }
     assert_equal ['server/unavailable', 503, 'req-1', '[calmlens] Busy'], [error.code, error.status, error.request_id, error.message]
@@ -138,10 +138,45 @@ class MockTest < Minitest::Test
   end
 
   def test_enqueued_errors_are_wrapped_like_network_failures
-    mock = CalmLens::MockServerClient.new(max_retries: 0).enqueue_error(Net::ReadTimeout.new).enqueue_error(Errno::ECONNREFUSED.new)
+    mock = CalmLens::MockServerClient.new.enqueue_error(Net::ReadTimeout.new).enqueue_error(Errno::ECONNREFUSED.new)
     assert_equal 'sdk/timeout', assert_raises(CalmLens::TimeoutError) { mock.events.list }.code
     assert_equal 'sdk/transport-error', assert_raises(CalmLens::ConnectionError) { mock.events.list }.code
     assert_equal 2, mock.requests.size
+  end
+
+  def test_a_moderate_answer_that_is_not_a_decision_is_refused
+    [nil, 'maybe', :blocked].each do |answer|
+      mock = CalmLens::MockServerClient.new(moderate: ->(_input) { answer })
+      error = assert_raises(CalmLens::InvalidArgumentError, answer.inspect) do
+        mock.assets.classify(name: 'note.txt', content: { plain_text: 'hi', type: 'text/plain' })
+      end
+      assert_equal 'sdk/invalid-argument', error.code
+    end
+    error = assert_raises(CalmLens::InvalidArgumentError) { CalmLens::MockServerClient.new(moderate: 'blocked') }
+    assert_equal 'sdk/invalid-argument', error.code
+  end
+
+  def test_decisions_take_symbol_qualifiers_and_refuse_scores_that_are_not_finite
+    decision = CalmLens::MockDecision.of('blocked').flag(:violence, 0.9, 'violence-threat': 0.7)
+    assert_equal({ 'violence-threat' => { 'status' => 'evaluated', 'someScore' => 0.7, 'likelihood' => 'likely' } },
+                 decision.report.dig('categories', 'violence', 'qualifiers'))
+    [Float::NAN, Float::INFINITY, '0.5', Complex(0.5, 0)].each do |score|
+      error = assert_raises(CalmLens::InvalidArgumentError, score.inspect) { CalmLens::MockDecision.of('blocked').flag('hate', score) }
+      assert_equal 'sdk/invalid-argument', error.code
+    end
+  end
+
+  def test_fail_next_request_refuses_unknown_operations_and_partial_seconds
+    mock = CalmLens::MockServerClient.new
+    [-> { mock.fail_next_request('timeout', operation: 'assets.frobnicate') },
+     -> { mock.fail_next_request('upload/website-rate-limit-exceeded', retry_after: 1.5) },
+     -> { mock.fail_next_request('upload/website-rate-limit-exceeded', retry_after: -1) }].each do |queue|
+      assert_equal 'sdk/invalid-argument', assert_raises(CalmLens::InvalidArgumentError) { queue.call }.code
+    end
+    # Nothing was queued, so the next request reaches the API.
+    assert_empty mock.assets.list['items']
+    mock.fail_next_request('timeout', operation: 'assets.upload_part')
+    assert_empty mock.assets.list['items']
   end
 
   def test_requests_are_snapshots

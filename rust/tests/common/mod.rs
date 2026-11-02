@@ -94,7 +94,9 @@ pub fn describe(request: &calmlens::testing::Request) -> Value {
     } else {
         serde_json::json!(String::from_utf8(request.body.clone()).unwrap())
     };
-    serde_json::json!({"method": request.method, "path": request.path, "query": query, "body": body})
+    // The fixtures name the path as sent, under the base URL's `/v1`.
+    let path = reqwest::Url::parse(&request.url).unwrap().path().to_owned();
+    serde_json::json!({"method": request.method, "path": path, "query": query, "body": body})
 }
 
 /// `value` with whole floats as integers: typed `f64` fields serialize `950` as `950.0`, and JSON

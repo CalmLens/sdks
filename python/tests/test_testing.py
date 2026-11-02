@@ -4,7 +4,7 @@ import http.client
 import unittest
 
 from calmlens import CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError, error_codes
-from calmlens.testing import MockCalmLensServerClient, create_mock_api_key
+from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, default_moderate
 
 DOWNLOAD = create_mock_api_key([{"actions": ["assets:download"], "folderId": None, "includeSubfolders": True}])
 
@@ -68,21 +68,30 @@ class MockTests(unittest.TestCase):
             c.hash_lists.remove_entry(entry_id=added["id"])
         self.assertEqual(raised.exception.code, error_codes.HASH_LIST_ENTRY_NOT_FOUND)
 
-    def test_unknown_mock_options_and_outcomes_are_configuration_errors(self):
-        for options in ({"queued_outcome": "error"}, {"queued_status": "pending"}):
+    def test_unknown_mock_options_and_a_moderate_that_is_not_a_function_are_configuration_errors(self):
+        for options in ({"moderate": "blocked"}, {"queued_outcome": "pending"}):
             with self.assertRaises(CalmLensError) as raised:
                 MockCalmLensServerClient(mock_options=options)
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_CONFIG)
 
-    def test_outcomes_can_be_chosen_per_upload(self):
-        c = MockCalmLensServerClient(mock_options={
-            "analyzed_outcome": lambda asset: "blocked" if asset["name"].startswith("bad") else "allowed"})
-        statuses = [c.assets.classify(name=name, content={"plainText": "x", "type": "text/plain"})
-                    ["classification"]["moderation"]["status"] for name in ("bad.txt", "good.txt")]
-        self.assertEqual(statuses, ["blocked", "allowed"])
+    def test_a_moderate_answer_that_is_not_a_decision_fails_the_upload_and_stores_nothing(self):
+        c = MockCalmLensServerClient(mock_options={"moderate": lambda moderation: "maybe"})
+        with self.assertRaises(CalmLensError) as raised:
+            c.assets.classify(name="a.txt", content={"plainText": "x", "type": "text/plain"})
+        self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
+        self.assertEqual((c.database_storage.assets, c.database_storage.events), ({}, []))
+
+    def test_fail_next_request_refuses_unknown_operations_and_fractional_retry_after(self):
+        for options in ({"operation": "assets.nope"}, {"retry_after": 1.5}):
+            with self.assertRaises(CalmLensError) as raised:
+                self.client.fail_next_request("asset/not-found", **options)
+            self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
+        # Nothing was queued, so the next request reaches the API.
+        self.assertEqual(self.client.events.list()["items"], [])
 
     def test_explaining_completes_evidence_and_rerun_moderates_again(self):
-        c = MockCalmLensServerClient(mock_options={"now": lambda: 7, "analyzed_outcome": "blocked"})
+        c = MockCalmLensServerClient(mock_options={"now": lambda: 7, "moderate": lambda moderation: (
+            "blocked" if moderation.trigger == "upload" else default_moderate(moderation))})
         asset = c.assets.classify(name="a.txt", content={"plainText": "no", "type": "text/plain"},
                                   processing_options={"keepContentAfterProcessing": True})
         moderation = c.database_storage.assets[asset["id"]]["classification"]["moderation"]
@@ -152,7 +161,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c.events.list(cursor="mock_0", page_size=5)
         c.cdn.serve({"assetIdentifier": "a1", "lens": "thumb"}).close()
         upload, update, events, serve = c.requests
-        self.assertEqual((upload.method, upload.path), ("POST", "/projects/p1/assets"))
+        self.assertEqual((upload.method, upload.path, upload.status), ("POST", "/projects/p1/assets", 200))
         self.assertEqual(upload.headers["X-calmlens-upload"], "content")
         self.assertEqual(upload.query["externalId"], "e1")
         self.assertIs(upload.query["queue"], False)

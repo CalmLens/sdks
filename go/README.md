@@ -578,10 +578,46 @@ over an in-memory transport. Its `Options` accept the same `APIKey`, `ProjectID`
 `BaseURL`, `CDNBaseURL`, `Timeout` and `MaxRetries` as `calmlens.Options` (validated the
 same way), plus database/content storage, deterministic IDs/timestamps (`CreateID` receives the
 object's ID prefix, such as `asset` or `fldr`; by default the mock mints IDs like the API's,
-such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
-(`QueuedOutcome`, default `OutcomePending`, for `Create`; `AnalyzedOutcome`, default
-`OutcomeAllowed`, for `Classify`; each `OutcomePending`, `OutcomeAllowed`, `OutcomeLimited`,
-`OutcomeAgeRestricted`, `OutcomeBlocked`, `OutcomePurged` or `OutcomeFailed`, which fails with `FailureReason` `processing-error`) and mock CDN URLs. It behaves like the API where it matters for tests:
+such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), a `Moderate` callback and mock CDN URLs.
+
+`Moderate` decides every asset the mock moderates. It receives a `ModerationInput`: the stored
+`Asset` (still processing), its `Content` (`Bytes`, the uploaded bytes with parts joined in order
+or `nil` for websites and removed content, and `Text`, the bytes as a string for plain-text
+documents), the `Trigger` (`TriggerUpload`, `TriggerRetry`, `TriggerRerun` or `TriggerComplete`)
+and `Queued`, true when the API would queue the work (queued uploads, retries, reruns and
+`CompleteProcessing`). It returns a `*Decision` built with `calmlenstest.NewDecision(status)`,
+where status is `OutcomePending`, `OutcomeFailed` (failure reason `processing-error`),
+`OutcomeAllowed`, `OutcomeLimited`, `OutcomeAgeRestricted`, `OutcomeBlocked` or `OutcomePurged`.
+`Flag(category, score, qualifiers)` and `NotEvaluated(category)` chain on it to shape the
+report. Returning `nil`, or leaving `Moderate` unset, uses `DefaultModerate`: queued work stays
+pending and everything else is allowed.
+
+```go
+mock, err := calmlenstest.NewServerClient(calmlenstest.Options{
+    Moderate: func(input calmlenstest.ModerationInput) *calmlenstest.Decision {
+        if input.Content.Text != nil && strings.Contains(*input.Content.Text, "threat") {
+            return calmlenstest.NewDecision(calmlenstest.OutcomeBlocked).
+                Flag("violence", 0.92, map[string]float64{"violence-threat": 0.9}).
+                NotEvaluated("sexual")
+        }
+        return nil
+    },
+})
+```
+
+A decided asset's report lists every category (those not flagged are evaluated with score 0),
+the highest score, the policy's actions per category and its `flaggedCategories` (categories
+scoring 0.5 or more, unless the status is allowed). An unknown status, category or qualifier, a
+score outside 0 to 1, a category added twice, or findings on a pending or failed decision make
+the decision's `Err` an `sdk/invalid-argument` error, which the request or call using it
+returns. `Moderate` runs while the mock answers a request, so it must not call the mock.
+
+`mock.CompleteProcessing(assetID, decision)` finishes an asset that is still processing, as the
+pipeline would: with `decision`, or with `Moderate`'s answer for `TriggerComplete` when it is
+`nil`. It returns `asset/not-found` for an unknown asset and `sdk/invalid-argument` for one that
+isn't processing.
+
+The mock behaves like the API where it matters for tests:
 
 - Errors use the API's codes, HTTP statuses (404 for `asset/not-found`, 409 for
   `folder/not-empty`, ...), details and error body (`{code, message, requestId, details}`), with
@@ -602,12 +638,15 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
   increasing `createdAt` values; a `Now` you supply is used as is.
 - A decided upload finishes processing (`completed`); like the API, its content is then removed
   (`Content.Status` `removed`, `RemovalReason` `retention`) and no longer served unless the
-  upload set `KeepContentAfterProcessing`. `OutcomePurged` always removes the content, with
+  upload set `KeepContentAfterProcessing`. A purged decision always removes the content, with
   `RemovalReason` `policy`. A classified image gets a ThumbHash, which the `placeholder`
   resource serves as a PNG and which goes with its content. Fields that are not set are `null`.
-  `Retry` needs failed processing and content that was not removed.
-- Like the API, retrying an asset records an `asset.retried` event, removing its content an
-  `asset.content-removed` event and deleting it an `asset.deleted` event.
+  `Retry` needs failed processing and content that was not removed; it and `Explain` with
+  `Rerun` move the asset back to processing, then ask `Moderate` again.
+- Like the API, a completed upload records an `asset.uploaded` event, then, once decided,
+  `asset.classified` and the automated `asset.<status>`, or `asset.failed`. Retrying an asset
+  records an `asset.retried` event, removing its content an `asset.content-removed` event and
+  deleting it an `asset.deleted` event.
 - Multipart uploads keep the queue mode chosen at the start, check part numbers
   (`details.expectedPartNumber` and `receivedPartNumber`), image totals (10 to 20 MiB) and
   `TotalSizeInBytes`.
@@ -624,7 +663,8 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
   `AssetID` (`hash-list/asset-not-hashed` without one), and deleting a list deletes its
   entries. Uploads are not matched against the lists.
 - `EnqueueEvent` adds events to the feed, and returns them as stored, which `Events.List` and
-  `ListAll` return after cursors taken earlier (50 per page by default).
+  `ListAll` return after cursors taken earlier (50 per page by default). An event with the
+  `AssetID` of a stored asset carries that asset's snapshot.
 - `CDN.Serve` answers with content type and length, and `Cache-Control` as the CDN sets it
   (`public` only when anyone may see the asset, otherwise `private`; `max-age=31536000, immutable`
   for images, `max-age=3600` otherwise), `Cache-Tag`, `X-Content-Type-Options: nosniff`,
@@ -644,7 +684,7 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
 - `Decide(assetID, OutcomeBlocked)` (or `OutcomeAllowed`, `OutcomeLimited`, `OutcomeAgeRestricted`,
   `OutcomePurged`) applies a reviewer's decision and adds the matching `asset.<decision>` event
   with a `decided-by: reviewer` fact; purging removes the content with `RemovalReason`
-  `requested` and records `asset.content-removed` first.
+  `requested` and records `asset.content-removed` first. The moderation report stays as it was.
 - Waits take no real time: retry backoff and `Assets.WaitForDecision` only advance the mock
   client's clock, so `WaitForDecision` returns `sdk/timeout` straight away for an asset whose
   moderation stays pending.
@@ -652,24 +692,32 @@ such as `asset_5Gm2Rk8XqT3wLp9VbN4c`), upload outcomes
 It does not classify content, transform media or fetch URLs, and its signed URLs are not
 production URLs. Inspect or seed `DatabaseStorage` and `ImageStorage` between calls, or
 use `WithStorage` to change them while other goroutines send requests. `CreateMockAPIKey`
-accepts grants for private and age-restricted CDN permission tests. Retries are off by default in the mock
-(`MaxRetries` 0) so that `FailNext` fails exactly one call.
+accepts grants for private and age-restricted CDN permission tests.
 
-Every request is captured, decoded, for assertions; `FailNext` queues transport
-failures, and `FailNextRequest(failure, operation)` fails the next request (or the next one of
-`operation`, such as `"assets.create"` or `"cdn.serve"`) with `calmlenstest.FailureTransportError`,
-`FailureTimeout` or an API error code, so you can test error handling without a network:
+Every request is captured, decoded, for assertions, and `FailNextRequest` queues failures, so
+you can test error handling without a network. Each `RequestFailure` fails exactly one request
+(the next one, or the next of its `Operation`, such as `"assets.create"` or `"cdn.serve"`) with
+its `Code`, `calmlenstest.FailureTransportError`, `FailureTimeout` or an API error code answered
+with its HTTP status, `Details` and a `RetryAfter` of whole seconds as the `Retry-After` header,
+or with its transport error `Err`. Retries are off by default in the mock (`MaxRetries` 0); with
+retries on, a retry takes the next queued failure or reaches the mock. `FailNextRequest` returns
+`sdk/invalid-argument`, queueing nothing, for an unknown code or operation.
 
 ```go
-mock.FailNext(errors.New("connection reset"), context.DeadlineExceeded)
+err = mock.FailNextRequest(
+    calmlenstest.RequestFailure{Err: errors.New("connection reset")},
+    calmlenstest.RequestFailure{Code: calmlenstest.FailureTimeout},
+    calmlenstest.RequestFailure{Code: calmlens.CodeUploadLimitExceeded, Operation: "assets.create", RetryAfter: calmlens.Ptr(30 * time.Second)},
+)
 _, err = mock.Folders.List(ctx, ListFoldersOptions{}) // *calmlens.Error, Code "sdk/transport-error"
 _, err = mock.Folders.List(ctx, ListFoldersOptions{}) // *calmlens.Error, Code "sdk/timeout"
 
 for _, req := range mock.Requests() {
     // Method "POST", Path "/projects/project/assets" (relative to BaseURL,
     // unescaped), Query url.Values, Header, Body calmlens.JSON (decoded JSON bodies),
-    // RawBody []byte (exact bytes, including uploads), CDN bool.
-    fmt.Println(req.Method, req.Path, req.Query.Get("queue"), req.Body)
+    // RawBody []byte (exact bytes, including uploads), CDN bool, Status int (the HTTP
+    // status answered, 0 when the request failed without a response).
+    fmt.Println(req.Method, req.Path, req.Query.Get("queue"), req.Status)
 }
 mock.ClearRequests()
 ```

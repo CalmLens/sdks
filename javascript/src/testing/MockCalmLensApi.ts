@@ -30,6 +30,12 @@ import {
   MIN_MULTIPART_IMAGE_UPLOAD_BYTES,
 } from "../contract/SharedConstants.js";
 import { isFileAccepted } from "../ui/UploadController";
+import {
+  type MockAssetOutcome,
+  MockDecision,
+  type MockModerate,
+  type MockModerationTrigger,
+} from "./MockDecision";
 import type { MockDatabaseStorage, MockImageStorage } from "./MockStorage";
 import { createPage, DEFAULT_PAGE_SIZE, filterAssets, searchAssets } from "./MockUtils";
 
@@ -37,19 +43,7 @@ import { createPage, DEFAULT_PAGE_SIZE, filterAssets, searchAssets } from "./Moc
 // whose `fetch` is `MockCalmLensApi.handle`: every request is answered here with the API's
 // statuses, JSON bodies, error bodies and headers.
 
-/**
- * Where a mock upload ends up: `pending` (still processing), `allowed`, `limited`, `age-restricted`,
- * `blocked` or `purged` (processing done with that moderation status; `purged` also removes the content),
- * or `failed` (processing failed, retryable).
- */
-export type MockAssetOutcome =
-  | "pending"
-  | "allowed"
-  | "limited"
-  | "age-restricted"
-  | "blocked"
-  | "purged"
-  | "failed";
+export type { MockAssetOutcome } from "./MockDecision";
 
 /** A reviewer's decision for `decide`: the moderation status it gives the asset. */
 export type MockReviewDecision = "allowed" | "limited" | "age-restricted" | "blocked" | "purged";
@@ -142,6 +136,15 @@ export interface MockCalmLensCall {
  */
 export type MockRequestFailure = "transport-error" | "timeout" | ApiErrorCode | Error;
 
+/** Options for a simulated API error: its `details` and the `Retry-After` it answers with. */
+export interface MockFailureOptions {
+  operation?: MockCalmLensOperation;
+  /** The error's `details`, for an API error code. */
+  details?: Record<string, unknown>;
+  /** Seconds for the `Retry-After` header, for an API error code. */
+  retryAfter?: number;
+}
+
 /** An event to add to the mock feed; omitted fields get defaults. */
 export type MockEventInput = Partial<Omit<TypedEvent, "type">> & { type: TypedEvent["type"] };
 
@@ -170,8 +173,7 @@ export interface MockCalmLensApiOptions {
   /** A new ID for an object of the kind `prefix` names, such as `asset`. */
   createId: (prefix: IdPrefix) => string;
   now: () => number;
-  queuedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
-  analyzedOutcome: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
+  moderate: MockModerate;
   signedUrlBaseUrl: string;
 }
 
@@ -237,6 +239,20 @@ const toEventAsset = (asset: Asset) => ({
     moderation: { status: asset.classification.moderation.status },
   },
   content: { status: asset.content.status },
+});
+
+/** A `moderate` answer or `completeProcessing` decision as a checked `MockDecision`. */
+const toDecision = (value: unknown): MockDecision => {
+  if (value instanceof MockDecision) return value;
+  if (typeof value === "string") return new MockDecision(value as MockAssetOutcome);
+  throw invalidArgument("a decision must be a status or a mockDecision(...)");
+};
+
+/** An asset's portal link, as event facts carry it. */
+const assetNameFact = (asset: Asset) => ({
+  key: "asset-name",
+  value: asset.name,
+  url: `https://calmlens.com/go/asset/${asset.id}`,
 });
 
 /** Removing content removes the placeholder and average colour with it. */
@@ -449,10 +465,8 @@ export class MockCalmLensApi {
     string,
     { fingerprint: string; status: number; body: string }
   >();
-  private readonly pendingFailures: Array<{
-    failure: MockRequestFailure;
-    operation?: MockCalmLensOperation;
-  }> = [];
+  private readonly pendingFailures: Array<{ failure: MockRequestFailure } & MockFailureOptions> =
+    [];
   private requestCount = 0;
   /** Time the clients have spent waiting: mock waits advance it instead of sleeping. */
   waitedMs = 0;
@@ -469,8 +483,14 @@ export class MockCalmLensApi {
   }
 
   /** Queues a failure for the next request, or the next one `operation` sends. */
-  failNextRequest(failure: MockRequestFailure, operation?: MockCalmLensOperation): void {
-    this.pendingFailures.push({ failure, operation });
+  failNextRequest(failure: MockRequestFailure, options: MockFailureOptions = {}): void {
+    if (
+      options.retryAfter !== undefined &&
+      !(Number.isInteger(options.retryAfter) && options.retryAfter >= 0)
+    ) {
+      throw invalidArgument("retryAfter must be a whole number of seconds");
+    }
+    this.pendingFailures.push({ failure, ...options });
   }
 
   /** A `fetch` that answers a client's requests from memory; app clients pass their session. */
@@ -485,7 +505,19 @@ export class MockCalmLensApi {
    * Adds an event to the feed `events.list` reads, as if CalmLens had recorded it, and returns
    * the stored event.
    */
-  enqueueEvent(input: MockEventInput): TypedEvent {
+  async enqueueEvent(input: MockEventInput): Promise<TypedEvent> {
+    // Like the API's events, one about an asset carries the asset as it is now.
+    const asset =
+      input.asset === undefined && input.assetId
+        ? await this.databaseStorage.getAsset(input.assetId)
+        : undefined;
+    return this.pushEvent(
+      asset ? ({ ...input, asset: toEventAsset(asset) } as MockEventInput) : input,
+    );
+  }
+
+  /** Adds an event to the feed, filling the fields the API always sets. */
+  private pushEvent(input: MockEventInput): TypedEvent {
     const now = this.now();
     const event = {
       id: this.createId("evt"),
@@ -515,6 +547,28 @@ export class MockCalmLensApi {
       throw this.toError(failure);
     }
     return structuredClone(await this.recordDecision(asset, decision));
+  }
+
+  /**
+   * Finishes processing a pending asset as the pipeline would (see
+   * `MockCalmLensServerClient.completeProcessing`): with `decision`, or else what `moderate`
+   * returns for the `complete` trigger.
+   */
+  async completeProcessing(
+    assetId: string,
+    decision?: MockAssetOutcome | MockDecision,
+  ): Promise<Asset> {
+    let asset: Asset;
+    try {
+      asset = await this.findOwnAsset(assetId);
+    } catch (failure) {
+      throw this.toError(failure);
+    }
+    if (asset.classification.status !== "processing") {
+      throw invalidArgument(`asset ${assetId} isn't processing`);
+    }
+    const settled = decision === undefined ? undefined : toDecision(decision);
+    return structuredClone(await this.moderateStored(asset, "complete", settled));
   }
 
   /**
@@ -578,7 +632,7 @@ export class MockCalmLensApi {
     ];
     const stored = await this.databaseStorage.updateAsset(decided);
     if (decision === "purged") this.recordLifecycleEvent("asset.content-removed", stored);
-    this.enqueueEvent({
+    this.pushEvent({
       type: `asset.${decision}`,
       // Like the event catalog: only allowing and limiting are low severity.
       severity: decision === "allowed" || decision === "limited" ? "low" : "high",
@@ -667,11 +721,14 @@ export class MockCalmLensApi {
       (pending) => pending.operation === undefined || operations.includes(pending.operation),
     );
     if (index !== -1) {
-      const [{ failure }] = this.pendingFailures.splice(index, 1) as [
-        { failure: MockRequestFailure },
+      const [{ failure, details, retryAfter }] = this.pendingFailures.splice(index, 1) as [
+        { failure: MockRequestFailure } & MockFailureOptions,
       ];
       if (typeof failure === "string" && failure in API_ERROR_DEFINITIONS) {
-        return this.answered(call, this.failureResponse(fail(failure as ApiErrorCode), url));
+        return this.answered(
+          call,
+          this.failureResponse(fail(failure as ApiErrorCode, { details }), url, retryAfter),
+        );
       }
       throw this.toFailureError(failure as Exclude<MockRequestFailure, ApiErrorCode>);
     }
@@ -744,7 +801,7 @@ export class MockCalmLensApi {
   }
 
   /** The API's error body: `{ code, message, requestId, details }`, `requestId` as in the header. */
-  private failureResponse(failure: ApiFailure, url: string): Response {
+  private failureResponse(failure: ApiFailure, url: string, retryAfter?: number): Response {
     const requestId = `mock-request-${++this.requestCount}`;
     return this.jsonResponse(
       failure.status,
@@ -755,7 +812,7 @@ export class MockCalmLensApi {
         details: failure.details ?? {},
       },
       url,
-      {},
+      retryAfter === undefined ? {} : { "Retry-After": String(retryAfter) },
       requestId,
     );
   }
@@ -1199,7 +1256,7 @@ export class MockCalmLensApi {
       await this.applyOutcome(asset, "pending"),
     );
     this.recordLifecycleEvent("asset.retried", retried);
-    return retried;
+    return this.moderateStored(retried, "retry");
   }
 
   private async explainAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
@@ -1230,7 +1287,8 @@ export class MockCalmLensApi {
       throw fail(API_ERROR_CODES.ASSET_CONTENT_UNAVAILABLE);
     }
     // Like the API: back to processing, to be moderated again under the current policy.
-    return this.databaseStorage.updateAsset(await this.applyOutcome(asset, "pending"));
+    const rerun = await this.databaseStorage.updateAsset(await this.applyOutcome(asset, "pending"));
+    return this.moderateStored(rerun, "rerun");
   }
 
   /**
@@ -1491,9 +1549,14 @@ export class MockCalmLensApi {
       await this.imageStorage.putContent(id, { uint8Array: bytes, type: contentType ?? "" });
     }
 
-    return this.databaseStorage.createAsset(
-      isOpenUpload ? asset : await this.applyOutcome(asset, this.outcomeFor(asset, queue)),
+    if (isOpenUpload) return this.databaseStorage.createAsset(asset);
+    const decision = await this.decisionFor(asset, "upload", queue, hasContent ? bytes : null);
+    const stored = await this.databaseStorage.createAsset(
+      decision.status === "pending" ? asset : await this.decided(asset, decision),
     );
+    this.recordUploaded(asset);
+    this.recordProcessingEvents(stored, decision);
+    return stored;
   }
 
   /** Continues a multipart upload: parts must arrive in order while it is `uploading`. */
@@ -1535,9 +1598,15 @@ export class MockCalmLensApi {
       // Like the API, a completed upload no longer counts parts.
       upload: { ...asset.upload, updatedAt: now, partsReceived: isFinal ? null : partNumber },
     };
-    return this.databaseStorage.updateAsset(
-      isFinal ? await this.applyOutcome(next, this.outcomeFor(next, queue)) : next,
+    if (!isFinal) return this.databaseStorage.updateAsset(next);
+    const processing = await this.applyOutcome(next, "pending");
+    const decision = await this.decisionFor(processing, "upload", queue);
+    const stored = await this.databaseStorage.updateAsset(
+      decision.status === "pending" ? processing : await this.decided(processing, decision),
     );
+    this.recordUploaded(processing);
+    this.recordProcessingEvents(stored, decision);
+    return stored;
   }
 
   /** Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB. */
@@ -1567,9 +1636,125 @@ export class MockCalmLensApi {
       : undefined;
   }
 
-  private outcomeFor(asset: Asset, queue: boolean): MockAssetOutcome {
-    const outcome = queue ? this.options.queuedOutcome : this.options.analyzedOutcome;
-    return typeof outcome === "function" ? outcome(structuredClone(asset)) : outcome;
+  /**
+   * Asks `moderate` how to decide `asset`, with its content: `bytes` when the caller has them,
+   * otherwise the stored parts in order (none once the content is removed).
+   */
+  private async decisionFor(
+    asset: Asset,
+    trigger: MockModerationTrigger,
+    queued: boolean,
+    bytes?: Uint8Array | null,
+  ): Promise<MockDecision> {
+    let data = bytes;
+    if (data === undefined) {
+      const stored =
+        asset.content.status === "removed"
+          ? undefined
+          : await this.imageStorage.getContent(asset.id);
+      const parts = stored
+        ? [...stored.parts].sort(([a], [b]) => a - b).map(([, part]) => part)
+        : [];
+      data = stored ? new Uint8Array(await new Blob(parts as BlobPart[]).arrayBuffer()) : null;
+    }
+    const content = {
+      bytes: data,
+      text: data && asset.type === "plaintext-document" ? new TextDecoder().decode(data) : null,
+    };
+    return toDecision(
+      await this.options.moderate({ asset: structuredClone(asset), content, trigger, queued }),
+    );
+  }
+
+  /** `asset` decided as `decision` says, with its report. */
+  private decided(asset: Asset, decision: MockDecision): Promise<Asset> {
+    return this.applyOutcome(asset, decision.status, "policy", decision.report());
+  }
+
+  /**
+   * Stores a processing asset's `decision` and records its events; a `pending` decision leaves it
+   * processing.
+   */
+  private async settle(asset: Asset, decision: MockDecision): Promise<Asset> {
+    if (decision.status === "pending") return asset;
+    const stored = await this.databaseStorage.updateAsset(await this.decided(asset, decision));
+    this.recordProcessingEvents(stored, decision);
+    return stored;
+  }
+
+  /** Asks `moderate` (unless `decision` is given) and settles a processing asset. */
+  private async moderateStored(
+    asset: Asset,
+    trigger: MockModerationTrigger,
+    decision?: MockDecision,
+  ): Promise<Asset> {
+    return this.settle(asset, decision ?? (await this.decisionFor(asset, trigger, true)));
+  }
+
+  /** `asset.uploaded`, as the API records it when an upload completes (UploadAssetUtils.ts). */
+  private recordUploaded(asset: Asset): void {
+    this.pushEvent({
+      type: "asset.uploaded",
+      severity: "low",
+      assetId: asset.id,
+      asset: toEventAsset(asset),
+      facts: [
+        { key: "asset-type", value: asset.type },
+        assetNameFact(asset),
+        { key: "file-format", value: asset.content.format ?? null },
+      ],
+    } as MockEventInput);
+  }
+
+  /**
+   * The events the pipeline records when it settles an asset (AssetClassification.ts and
+   * AssetErrorAlert.ts): `asset.classified` and the automated `asset.<status>`, or
+   * `asset.failed`.
+   */
+  private recordProcessingEvents(asset: Asset, decision: MockDecision): void {
+    if (decision.status === "pending") return;
+    const event = { assetId: asset.id, asset: toEventAsset(asset) };
+    if (decision.status === "failed") {
+      this.pushEvent({
+        ...event,
+        type: "asset.failed",
+        severity: "high",
+        facts: [
+          assetNameFact(asset),
+          { key: "asset-type", value: asset.type },
+          { key: "previous-status", value: "processing" },
+          {
+            key: "failure-reason",
+            value: asset.classification.failureReason ?? "processing-error",
+          },
+        ],
+      } as MockEventInput);
+      return;
+    }
+    const flaggedCategories = decision.report()?.policy?.decision?.flaggedCategories ?? [];
+    this.pushEvent({
+      ...event,
+      type: "asset.classified",
+      severity: "low",
+      facts: [
+        { key: "flagged-categories", value: flaggedCategories },
+        { key: "moderation-status", value: decision.status },
+        { key: "asset-type", value: asset.type },
+        assetNameFact(asset),
+      ],
+    } as MockEventInput);
+    this.pushEvent({
+      ...event,
+      type: `asset.${decision.status}`,
+      // Like the event catalog: only allowing and limiting are low severity.
+      severity: decision.status === "allowed" || decision.status === "limited" ? "low" : "high",
+      facts: [
+        { key: "decided-by", value: "automated" },
+        { key: "flagged-categories", value: flaggedCategories },
+        { key: "asset-type", value: asset.type },
+        assetNameFact(asset),
+      ],
+    } as MockEventInput);
   }
 
   /**
@@ -1582,6 +1767,7 @@ export class MockCalmLensApi {
     asset: Asset,
     outcome: MockAssetOutcome,
     purgeReason: "policy" | "requested" = "policy",
+    report?: ReturnType<MockDecision["report"]>,
   ): Promise<Asset> {
     const now = this.now();
     const decided = outcome !== "pending" && outcome !== "failed";
@@ -1634,7 +1820,11 @@ export class MockCalmLensApi {
         failureReason: classificationStatus === "failed" ? "processing-error" : null,
         updatedAt: now,
         completedAt: decided ? now : null,
-        moderation: { ...asset.classification.moderation, status: decided ? outcome : "pending" },
+        moderation: {
+          ...asset.classification.moderation,
+          status: decided ? outcome : "pending",
+          ...report,
+        },
       },
     };
   }
@@ -1644,7 +1834,7 @@ export class MockCalmLensApi {
     type: "asset.deleted" | "asset.content-removed" | "asset.retried",
     asset: Asset,
   ): void {
-    this.enqueueEvent({
+    this.pushEvent({
       type,
       severity: "low",
       assetId: asset.id,

@@ -307,6 +307,8 @@ module CalmLens
       attr_accessor query: Hash[String, String]
       attr_accessor headers: Hash[String, String]
       attr_accessor body: String?
+      # The HTTP status the mock answered with; nil when the request failed without a response.
+      attr_accessor status: Integer?
       def json: () -> json_value
     end
 
@@ -319,17 +321,9 @@ module CalmLens
       def call: (String prefix) -> String
     end
 
-    # Where a mock upload ends up: `pending` (still processing), `allowed`, `limited`, `age-restricted`,
-    # `blocked` or `purged` (processing done with that moderation status; `purged` also removes the content),
-    # or `failed` (processing failed, retryable).
-    type outcome = "pending" | asset_moderation_decision | "failed"
-
-    # An outcome, fields to deep-merge into the asset, or a callable that receives a copy of the
-    # asset and returns either.
-    type analyzed_outcome = outcome | Hash[String, json_input] | _AnalyzedOutcome
-
-    interface _AnalyzedOutcome
-      def call: (asset asset) -> (String | Hash[String, json_input])
+    # Decides each asset the mock moderates: a status or a MockDecision.
+    interface _Moderate
+      def call: (MockModerationInput input) -> (MockDecision::status | MockDecision)
     end
 
     API_KEY_PREFIX: String
@@ -342,14 +336,15 @@ module CalmLens
     REQUEST_FAILURES: Array[String]
 
     def initialize: (?project_id: String, ?api_key: String, ?base_url: String, ?cdn_base_url: String, ?now: _Clock, ?create_id: _IdFactory,
-                     ?queued_outcome: outcome, ?analyzed_outcome: analyzed_outcome, ?timeout: number,
+                     ?moderate: _Moderate?, ?timeout: number,
                      ?open_timeout: number, ?upload_timeout: number?, ?max_retries: Integer, ?retry_base_delay: number,
                      ?max_response_bytes: Integer) -> void
     # Replaces the mock API key's grants for later requests; the key stays the same.
     def api_key_grants=: (Array[Hash[Symbol | String, untyped]] grants) -> Array[Hash[Symbol | String, untyped]]
-    # Fails the next call (or the next call to `operation`) with `transport-error`, `timeout`, an API
-    # error code or an exception.
-    def fail_next_request: (?(String | Exception) failure, ?operation: String?) -> self
+    # Fails the next request (or the next one `operation` sends) with `transport-error`, `timeout`, an
+    # API error code (with optional `details` and `Retry-After` seconds) or an exception.
+    def fail_next_request: (?(String | Exception) failure, ?operation: String?, ?details: Hash[String | Symbol, untyped]?,
+                            ?retry_after: Integer?) -> self
     def state: () -> Testing::State
     # `body` is any JSON value, encoded as the response body.
     def enqueue: (body: json_input, ?status: Integer, ?headers: Hash[String, String]) -> self
@@ -358,7 +353,50 @@ module CalmLens
     def enqueue_event: (mock_event_input event) -> event
     # Applies a reviewer's decision and adds the matching `asset.<decision>` event.
     def decide: (String asset_id, asset_moderation_decision decision) -> asset
+    # Finishes processing an asset as the moderation pipeline would, with `decision` or else `moderate`'s answer.
+    def complete_processing: (String asset_id, ?(MockDecision::status | MockDecision)? decision) -> asset
     def requests: () -> Array[Request]
+    def clear_requests: () -> self
     def remaining_responses: () -> Integer
+  end
+
+  # A moderation decision for MockServerClient's `moderate:` option or `complete_processing`.
+  class MockDecision
+    # `pending`, `failed` or a decided moderation status.
+    type status = "pending" | "failed" | asset_moderation_decision
+
+    STATUSES: Array[String]
+
+    def self.of: (status status) -> MockDecision
+    def initialize: (status status) -> void
+    def status: () -> status
+    # Flags `category` with a score from 0 to 1 and optional qualifier scores.
+    def flag: (String | Symbol category, Numeric score, ?Hash[String | Symbol, Numeric] qualifiers) -> self
+    def not_evaluated: (String | Symbol category) -> self
+    # The `categories`, `score` and `policy` a decided asset gets; nil for `pending` and `failed`.
+    def report: () -> Hash[String, json_value]?
+  end
+
+  # What MockServerClient's `moderate:` callback receives.
+  class MockModerationInput < Struct[untyped]
+    class Content < Struct[untyped]
+      # The uploaded bytes; nil without stored content.
+      attr_accessor bytes: String?
+      # The bytes as UTF-8 text, for a `plaintext-document`.
+      attr_accessor text: String?
+    end
+
+    # The stored asset, still processing.
+    attr_accessor asset: asset
+    attr_accessor content: Content
+    attr_accessor trigger: "upload" | "retry" | "rerun" | "complete"
+    attr_accessor queued: bool
+    def queued?: () -> bool
+  end
+
+  # The categories and qualifiers MockDecision accepts.
+  module MockClassification
+    CATEGORIES: Array[String]
+    QUALIFIERS: Hash[String, Array[String]]
   end
 end

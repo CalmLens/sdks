@@ -1,22 +1,30 @@
 //! An offline, programmable client for tests (the `testing` feature).
 //!
-//! [`MockServerClient`] answers requests from a FIFO queue and records them. It uses the real
-//! client's validation, request encoding, retries and error mapping; only the network is
-//! replaced, and no HTTP client is created. [`MockServerClient::in_memory`] adds an in-memory
-//! API behind the queue: uploads create assets with a chosen [`MockOutcome`], and assets,
-//! folders, hash lists, events and CDN downloads behave like the API's. Enable the feature in
-//! `[dev-dependencies]`:
+//! [`MockServerClient`] records every request and answers it from a FIFO queue of scripted
+//! replies. It uses the real client's validation, request encoding, retries and error mapping;
+//! only the network is replaced, and no HTTP client is created. [`MockServerClient::in_memory`]
+//! adds an in-memory API behind the queue: uploads create assets that a `moderate` callback
+//! ([`MockOptions::moderate`]) decides with a [`MockDecision`], and assets, folders, hash lists,
+//! events and CDN downloads behave like the API's. Enable the feature in `[dev-dependencies]`:
 //!
 //! ```toml
 //! [dev-dependencies]
 //! calmlens = { version = "0.1", features = ["testing"] }
 //! ```
+// Generated, one line per list (packages/sdk-contract/mockClassification.ts).
+#[rustfmt::skip]
+mod classification;
+mod decision;
 mod memory;
 mod placeholder;
 
+pub use decision::{
+    IntoMockDecision, MockDecision, MockModerationContent, MockModerationInput,
+    MockModerationTrigger, MockOutcome,
+};
 pub use memory::{
-    create_mock_api_key, MockApiKeyGrant, MockFailure, MockOptions, MockOutcome, MockStorage,
-    StoredContent,
+    create_mock_api_key, MockApiKeyGrant, MockFailure, MockFailureOptions, MockOptions,
+    MockStorage, StoredContent,
 };
 
 use crate::error::ErrorCode;
@@ -42,7 +50,9 @@ pub struct Request {
     pub method: String,
     /// Full request URL, including the configured base URL and query string.
     pub url: String,
-    /// URL path, e.g. `/v1/projects/project-1/assets`.
+    /// The path relative to the API (or CDN) base URL, each segment decoded, e.g.
+    /// `/projects/project-1/assets` or `/assets/asset_5Gm2Rk8XqT3wLp9VbN4c`. A request to
+    /// neither base URL keeps its whole decoded URL path.
     pub path: String,
     /// Decoded query parameters in request order.
     pub query: Vec<(String, String)>,
@@ -146,6 +156,8 @@ struct State {
     elapsed: Duration,
     /// Each wait between attempts and polls, in order.
     sleeps: Vec<Duration>,
+    /// The API and CDN base URLs, which recorded paths are relative to.
+    base_urls: [String; 2],
 }
 pub(crate) struct MockTransport {
     state: Mutex<State>,
@@ -205,34 +217,42 @@ impl MockTransport {
         let reply = match state.replies.pop_front() {
             Some(reply) => Some(reply),
             None => state.backend.as_mut().map(|backend| {
-                match backend.take_failure(&attempt.method, url, &attempt.headers) {
-                    Some(MockFailure::TransportError) => Reply::Error(io_failure(
+                let Some(queued) = backend.take_failure(&attempt.method, url) else {
+                    return match backend.handle(&attempt.method, url, &attempt.headers, &body) {
+                        Ok(response) => Reply::Response(response),
+                        Err(error) => Reply::Error(error),
+                    };
+                };
+                match queued.failure {
+                    MockFailure::TransportError => Reply::Error(io_failure(
                         ErrorCode::TransportError,
                         io::ErrorKind::ConnectionReset,
                         "connection reset",
                     )),
-                    Some(MockFailure::Timeout) => Reply::Error(io_failure(
+                    MockFailure::Timeout => Reply::Error(io_failure(
                         ErrorCode::Timeout,
                         io::ErrorKind::TimedOut,
                         "operation timed out",
                     )),
-                    Some(MockFailure::Api(code)) => {
+                    MockFailure::Api(code) => {
                         let message = format!("Injected {code} failure");
-                        Reply::Response(MockResponse::api_error(code, message))
+                        let status = code.http_status().unwrap_or(400);
+                        let details = Value::Object(queued.options.details);
+                        let mut response =
+                            MockResponse::api_error_body(status, code.as_str(), message, details);
+                        if let Some(seconds) = queued.options.retry_after {
+                            response = response.header("retry-after", &seconds.to_string());
+                        }
+                        Reply::Response(response)
                     }
-                    None => Reply::Response(backend.handle(
-                        &attempt.method,
-                        url,
-                        &attempt.headers,
-                        &body,
-                    )),
                 }
             }),
         };
+        let path = relative_path(url, &state.base_urls);
         state.requests.push(Request {
             method: attempt.method.to_string(),
             url: url.to_string(),
-            path: url.path().to_string(),
+            path,
             query: url.query_pairs().into_owned().collect(),
             headers: attempt
                 .headers
@@ -291,7 +311,9 @@ impl MockTransport {
     }
 }
 
-/// An offline client that answers requests from a FIFO queue. Dereferences to [`ServerClient`].
+/// An offline client that records requests and answers them from a FIFO queue of scripted
+/// replies, then, when created with [`in_memory`](Self::in_memory), from an in-memory API.
+/// Dereferences to [`ServerClient`].
 ///
 /// Waits take no real time: retry backoff and `wait_for_decision` advance a virtual clock
 /// ([`elapsed`](Self::elapsed)), so a decision that never comes times out at once.
@@ -337,10 +359,13 @@ impl MockServerClient {
     /// A mock backed by an in-memory API, configured by `options`. Queued replies are still
     /// used first, in order; once the queue is empty, requests reach the in-memory API.
     ///
-    /// Uploads create assets: `assets().create` (and queued multipart uploads) get
-    /// [`MockOptions::queued_outcome`], `assets().classify` and `text().classify`
-    /// [`MockOptions::analyzed_outcome`]. Finished processing removes the content unless the
-    /// upload set `keep_content_after_processing`; `purged` removes it with reason `policy`.
+    /// Uploads create assets, which [`MockOptions::moderate`] decides (by default queued
+    /// uploads, from `assets().create` or a queued multipart upload, stay `pending` until
+    /// [`complete_processing`](Self::complete_processing), and the rest are `allowed`). A decided
+    /// asset gets a full report, and the events feed records `asset.uploaded`, then
+    /// `asset.classified` and the automated `asset.<status>`, or `asset.failed`. Finished
+    /// processing removes the content unless the upload set `keep_content_after_processing`;
+    /// `purged` removes it with reason `policy`.
     /// Retrieve, list (RSQL filter, ordering, folder, cursor), children, update, move, delete,
     /// delete content, retry, keyword search, signed URLs, folders, hash lists, lenses and the
     /// events feed read and change that storage, with the API's error codes, statuses and idempotent
@@ -359,7 +384,7 @@ impl MockServerClient {
     /// let mock = MockServerClient::in_memory(MockOptions::new())?;
     /// let asset = mock.assets().create(SubmitAsset::text("hello")).await?;
     /// assert_eq!(asset.classification.moderation.status, AssetModerationStatus::Pending);
-    /// mock.decide(&asset.id, AssetModerationDecision::Blocked)?;
+    /// mock.complete_processing(&asset.id, Some(MockOutcome::Blocked.into()))?;
     /// let asset = mock.assets().retrieve(AssetId::new(&asset.id)).await?;
     /// assert_eq!(asset.classification.moderation.status, AssetModerationStatus::Blocked);
     /// # Ok(()) }
@@ -378,6 +403,7 @@ impl MockServerClient {
         }
         let transport = Arc::new(MockTransport::new(State {
             backend: Some(memory::Backend::new(options)),
+            base_urls: builder.base_urls(),
             ..State::default()
         }));
         let client = builder.clone().build_mock(transport.clone())?;
@@ -406,19 +432,44 @@ impl MockServerClient {
     /// Applies a reviewer decision to a stored asset, as the portal would: the moderation
     /// status changes (`purged` removes the content), the review is added to `manual_reviews`,
     /// and an `asset.<status>` event with a `decided-by: reviewer` fact joins the events feed.
-    /// Fails with `asset/not-found` (status 404) for an unknown asset.
+    /// The report stays as moderation left it. Fails with `sdk/invalid-argument` for a decision
+    /// that is not `allowed`, `limited`, `age-restricted`, `blocked` or `purged`, and with
+    /// `asset/not-found` (status 404) for an unknown asset.
     ///
     /// # Panics
     ///
     /// When the mock was not created with [`MockServerClient::in_memory`].
     pub fn decide(&self, asset_id: &str, decision: AssetModerationDecision) -> Result<Asset> {
+        if matches!(decision, AssetModerationDecision::Unknown(_)) {
+            return Err(Error::new(
+                ErrorCode::InvalidArgument,
+                "decision must be one of allowed, limited, age-restricted, blocked, purged",
+            ));
+        }
         let asset = self
             .backend(|backend| backend.decide(asset_id, decision.as_str()))
             .ok_or_else(|| {
                 Error::new(ErrorCode::AssetNotFound, "Asset not found").with_status(404)
             })?;
-        serde_json::from_value(asset)
-            .map_err(|cause| Error::new(ErrorCode::InvalidResponse, cause.to_string()))
+        decode_asset(asset)
+    }
+    /// Finishes processing a stored asset as the pipeline would and returns it: with
+    /// `decision`, or else what [`MockOptions::moderate`] returns for the
+    /// [`Complete`](MockModerationTrigger::Complete) trigger (by default `allowed`). It records
+    /// the processing events and no manual review; a `pending` decision leaves the asset
+    /// processing. Fails with `asset/not-found` (status 404) for an unknown asset and with
+    /// `sdk/invalid-argument` for one that isn't processing.
+    ///
+    /// # Panics
+    ///
+    /// When the mock was not created with [`MockServerClient::in_memory`].
+    pub fn complete_processing(
+        &self,
+        asset_id: &str,
+        decision: Option<MockDecision>,
+    ) -> Result<Asset> {
+        let asset = self.backend(|backend| backend.complete_processing(asset_id, decision))?;
+        decode_asset(asset)
     }
     /// Replaces the grants of the mock's API key, as editing the key in the portal would: later
     /// requests, such as CDN downloads, use them. The key itself stays the same, so its
@@ -430,26 +481,37 @@ impl MockServerClient {
     pub fn set_api_key_grants(&self, grants: &[MockApiKeyGrant]) {
         self.backend(|backend| backend.set_grants(grants));
     }
-    /// Makes the next request (or, with `operation`, the next request of that operation) fail
-    /// with `failure` instead of reaching the in-memory API, which it leaves unchanged. Each
-    /// queued failure is used once; queue several to fail several requests. `operation` is the
-    /// JavaScript SDK's method path, such as `assets.create`, `assets.uploadPart` or
-    /// `cdn.serve`; a convenience fails with the request it sends (`assets.waitForDecision`
-    /// with `assets.retrieve`, `text.classify` with `assets.classify`, `ensureLens` with
-    /// `ensureLenses`, iterators with their list).
+    /// Makes the next request (or, with [`MockFailureOptions::operation`], the next request of
+    /// that operation) fail with `failure` instead of reaching the in-memory API, which it
+    /// leaves unchanged. An API error carries the options' `details` and, with `retry_after`,
+    /// a `Retry-After` header. Each queued failure fails exactly one request, so a client retry
+    /// takes the next queued failure or reaches the API; queue several to fail several requests.
+    /// The operation is the JavaScript SDK's method path, such as `assets.create`,
+    /// `assets.uploadPart` or `cdn.serve`; a convenience fails with the request it sends
+    /// (`assets.waitForDecision` with `assets.retrieve`, `text.classify` with
+    /// `assets.classify`, `ensureLens` with `ensureLenses`, iterators with their list). Fails
+    /// with `sdk/invalid-argument` for an unknown operation.
     ///
     /// # Panics
     ///
-    /// When the mock was not created with [`MockServerClient::in_memory`], or for an unknown
-    /// operation.
-    pub fn fail_next_request(&self, failure: MockFailure, operation: Option<&str>) {
-        if let Some(operation) = operation {
-            assert!(
-                memory::OPERATIONS.contains(&operation),
-                "unknown operation {operation:?}"
-            );
+    /// When the mock was not created with [`MockServerClient::in_memory`].
+    pub fn fail_next_request(
+        &self,
+        failure: MockFailure,
+        options: MockFailureOptions,
+    ) -> Result<()> {
+        if let Some(operation) = &options.operation {
+            if !memory::OPERATIONS.contains(&operation.as_str()) {
+                return Err(Error::new(
+                    ErrorCode::InvalidArgument,
+                    format!("unknown operation {operation:?}"),
+                ));
+            }
         }
-        self.backend(|backend| backend.queue_failure(failure, operation));
+        self.backend(|backend| {
+            backend.queue_failure(memory::QueuedFailure { failure, options });
+        });
+        Ok(())
     }
     /// Appends `event` to the in-memory events feed and returns it. A missing ID, project ID
     /// or creation time is filled in; when `asset_id` names a stored asset and `asset` is
@@ -487,7 +549,10 @@ impl MockServerClient {
     /// `MockServerClient::from_builder(ServerClient::builder(key, project).base_url(url).max_retries(2))`.
     /// The configuration is validated the same way; no network requests are made.
     pub fn from_builder(builder: ServerClientBuilder) -> Result<Self> {
-        let transport = Arc::new(MockTransport::new(State::default()));
+        let transport = Arc::new(MockTransport::new(State {
+            base_urls: builder.base_urls(),
+            ..State::default()
+        }));
         let client = builder.clone().build_mock(transport.clone())?;
         Ok(Self {
             client,
@@ -559,6 +624,10 @@ impl MockServerClient {
     pub fn requests(&self) -> Vec<Request> {
         self.transport.state().requests.clone()
     }
+    /// Forgets the requests captured so far.
+    pub fn clear_requests(&self) {
+        self.transport.state().requests.clear();
+    }
     /// The most recent captured request.
     pub fn last_request(&self) -> Option<Request> {
         self.transport.state().requests.last().cloned()
@@ -591,6 +660,25 @@ pub fn sign_upload_token(
     crate::client::sign_upload_token(api_key, options, now, nonce)
 }
 
+/// `url`'s path relative to the first base URL it is under, as `/` and its decoded segments.
+fn relative_path(url: &reqwest::Url, base_urls: &[String; 2]) -> String {
+    let rest = base_urls
+        .iter()
+        .find_map(|base| memory::under(url, base))
+        .unwrap_or(url.path());
+    let segments: Vec<String> = rest
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .map(memory::percent_decode)
+        .collect();
+    format!("/{}", segments.join("/"))
+}
+
+fn decode_asset(asset: Value) -> Result<Asset> {
+    serde_json::from_value(asset)
+        .map_err(|cause| Error::new(ErrorCode::InvalidResponse, cause.to_string()))
+}
+
 fn io_failure(code: ErrorCode, kind: io::ErrorKind, message: &str) -> Error {
     Error::new(code, message).with_source(io::Error::new(kind, message.to_string()))
 }
@@ -598,5 +686,27 @@ impl Deref for MockServerClient {
     type Target = ServerClient;
     fn deref(&self) -> &ServerClient {
         &self.client
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::classification::{CATEGORIES, QUALIFIERS};
+    use serde_json::{json, Value};
+
+    /// The generated category and qualifier lists the decision builder checks match the
+    /// contract's `classification` in `testdata/surface.json`.
+    #[test]
+    fn classification_lists_match_the_surface() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/surface.json");
+        let surface: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let qualifiers: serde_json::Map<String, Value> = QUALIFIERS
+            .iter()
+            .map(|(category, qualifiers)| ((*category).to_owned(), json!(qualifiers)))
+            .collect();
+        assert_eq!(
+            json!({"categories": CATEGORIES, "qualifiers": qualifiers}),
+            surface["classification"]
+        );
     }
 }

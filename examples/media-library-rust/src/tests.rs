@@ -382,7 +382,7 @@ async fn live_folder_calls_use_the_folders_api_and_surface_error_codes() {
     let request = mock.last_request().unwrap();
     assert_eq!(
         (request.method.as_str(), request.path.as_str()),
-        ("POST", "/v1/projects/project-1/folders")
+        ("POST", "/projects/project-1/folders")
     );
     assert_eq!(
         request.json(),
@@ -395,7 +395,7 @@ async fn live_folder_calls_use_the_folders_api_and_surface_error_codes() {
         writes(&mock)
             .last()
             .map(|r| (r.method.clone(), r.path.clone())),
-        Some(("DELETE".into(), "/v1/folders/folder-1".into()))
+        Some(("DELETE".into(), "/folders/folder-1".into()))
     );
     assert_eq!(response.status, StatusCode::CONFLICT);
     assert!(response.html().contains("<code>folder/not-empty</code>"));
@@ -403,7 +403,7 @@ async fn live_folder_calls_use_the_folders_api_and_surface_error_codes() {
     mock.enqueue_api_error(ErrorCode::FolderParentCycle, "Cycle");
     let response = app.post("/folders/folder-1/move", "parent=folder-2").await;
     let request = writes(&mock).pop().unwrap();
-    assert_eq!(request.path, "/v1/folders/folder-1/move");
+    assert_eq!(request.path, "/folders/folder-1/move");
     assert_eq!(request.json(), Some(json!({"parentId": "folder-2"})));
     assert_eq!(response.status, StatusCode::CONFLICT);
     assert!(response.html().contains("<code>folder/parent-cycle</code>"));
@@ -488,7 +488,7 @@ async fn live_upload_sends_folder_metadata_catalogue_id_and_keeps_content() {
         Some(Notice::Uploaded.id())
     );
     let sent = mock.last_request().unwrap();
-    assert_eq!(sent.path, "/v1/projects/project-1/assets");
+    assert_eq!(sent.path, "/projects/project-1/assets");
     assert_eq!(sent.header("x-calmlens-upload"), Some("content"));
     assert_eq!(sent.body, PNG);
     assert_eq!(sent.query_param("folderId"), Some("folder-1"));
@@ -584,7 +584,7 @@ async fn live_listing_paginates_and_filters_the_folder() {
         .await;
     assert_eq!(response.status, StatusCode::OK);
     let list = &mock.requests()[2];
-    assert_eq!(list.path, "/v1/projects/project-1/assets");
+    assert_eq!(list.path, "/projects/project-1/assets");
     assert_eq!(list.query_param("folderId"), Some("folder-1"));
     assert_eq!(list.query_param("cursor"), Some("previous-token"));
     assert_eq!(list.query_param("pageSize"), Some("12"));
@@ -647,7 +647,7 @@ async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_statu
         .await
         .html();
     let search = &mock.requests()[1];
-    assert_eq!(search.path, "/v1/projects/project-1/assets/search");
+    assert_eq!(search.path, "/projects/project-1/assets/search");
     assert_eq!(search.query_param("query"), Some("cyclists at sunrise"));
     assert_eq!(search.query_param("mode"), Some("semantic"));
     assert_eq!(search.query_param("limit"), Some("20"));
@@ -748,16 +748,16 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
         Some("https://cdn.example.com/signed-thumb")
     );
     let requests = mock.requests();
-    assert_eq!(requests[0].path, "/v1/assets/asset-1");
+    assert_eq!(requests[0].path, "/assets/asset-1");
     assert_eq!(
         (requests[1].method.as_str(), requests[1].path.as_str()),
-        ("PUT", "/v1/projects/project-1/lenses")
+        ("PUT", "/projects/project-1/lenses")
     );
     let lens = &requests[1].json().unwrap()["lenses"][0];
     assert_eq!(lens["identifier"], THUMB_LENS);
     assert_eq!(lens["transforms"][0]["options"]["width"], 320);
     let body = requests[2].json().unwrap();
-    assert_eq!(requests[2].path, "/v1/assets/asset-1/signed-url");
+    assert_eq!(requests[2].path, "/assets/asset-1/signed-url");
     assert_eq!(body["lens"], THUMB_LENS);
     assert_eq!(body["expiresInSeconds"], SIGNED_URL_SECONDS);
     assert_eq!(body["resource"], "rendered");
@@ -861,7 +861,7 @@ async fn live_edit_and_move_send_the_asset_changes() {
     let request = mock.last_request().unwrap();
     assert_eq!(
         (request.method.as_str(), request.path.as_str()),
-        ("PATCH", "/v1/assets/asset-1")
+        ("PATCH", "/assets/asset-1")
     );
     assert_eq!(
         request.json(),
@@ -876,7 +876,7 @@ async fn live_edit_and_move_send_the_asset_changes() {
     let moved = app.post("/assets/asset-1/move", "folder=folder-2").await;
     assert_eq!(moved.param("folder").as_deref(), Some("folder-2"));
     let request = mock.last_request().unwrap();
-    assert_eq!(request.path, "/v1/assets/asset-1/move");
+    assert_eq!(request.path, "/assets/asset-1/move");
     assert_eq!(request.json(), Some(json!({"folderId": "folder-2"})));
 
     mock.enqueue(200, asset("asset-1", "allowed"));
@@ -958,7 +958,7 @@ async fn live_remove_file_calls_delete_content() {
     let request = mock.last_request().unwrap();
     assert_eq!(
         (request.method.as_str(), request.path.as_str()),
-        ("DELETE", "/v1/assets/asset-1/content")
+        ("DELETE", "/assets/asset-1/content")
     );
     // Afterwards the retrieved record is never delivered.
     mock.enqueue(200, removed);
@@ -1015,7 +1015,7 @@ async fn deleting_removes_the_asset() {
     let request = mock.last_request().unwrap();
     assert_eq!(
         (request.method.as_str(), request.path.as_str()),
-        ("DELETE", "/v1/assets/asset-1")
+        ("DELETE", "/assets/asset-1")
     );
 }
 
@@ -1142,7 +1142,7 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
         app.signed_webhook(&body, Some("delivery-1")).await.status,
         StatusCode::NO_CONTENT
     );
-    assert_eq!(mock.requests()[1].path, "/v1/assets/asset-1");
+    assert_eq!(mock.requests()[1].path, "/assets/asset-1");
     let activity = app.state.activity();
     assert_eq!(activity[0].kind, "review");
     let labels: Vec<&str> = activity[0].facts.iter().map(|f| f.label).collect();
@@ -1205,7 +1205,7 @@ async fn webhooks_for_assets_the_library_did_not_upload_are_ignored() {
         app.signed_webhook(&body, None).await.status,
         StatusCode::NO_CONTENT
     );
-    assert_eq!(mock.requests()[0].path, "/v1/assets/asset-2");
+    assert_eq!(mock.requests()[0].path, "/assets/asset-2");
 
     // An event from another project is ignored without a request.
     let other = event("event-2", "asset.blocked", "asset-1", json!([])).replace(

@@ -306,29 +306,44 @@ delete; folders, hash lists, lenses, idempotency keys and the events feed behave
 (uploads are not matched against hash lists); errors
 carry the API's codes, statuses, `X-Request-Id` and body shape (schema errors are
 `validation/<issue>` with the field in `details['path']`); and the CDN serves stored bytes and
-placeholders. Unset asset fields are `null`, as in the API. Like the API, deleting an asset,
-removing its content and retrying it add `asset.deleted`, `asset.content-removed` and
-`asset.retried` events; processing adds none. Arrange or inspect state through the public
+placeholders. Unset asset fields are `null`, as in the API. Every upload adds `asset.uploaded`,
+then `asset.classified` and the automated `asset.<status>` once it is decided, or
+`asset.failed`; like the API, deleting an asset, removing its content and retrying it add
+`asset.deleted`, `asset.content-removed` and `asset.retried` events. Arrange or inspect state through the public
 `assets`, `content`, `folders`, `hashLists`, `hashListEntries`, `events` and `lenses` arrays.
 New objects get IDs like the API's: their prefix, `_` and 20 random base62 characters, such as
 `asset_5Gm2Rk8XqT3wLp9VbN4c`. For predictable IDs, pass `createId`, a callable that receives the
 prefix (`asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`) and returns the ID.
 
 ```php
-$mock = new CalmLens\Testing\MockServerClient(queuedOutcome: 'age-restricted');
+use CalmLens\Testing\MockDecision;
+use CalmLens\Testing\MockModerationInput;
+
+$mock = new CalmLens\Testing\MockServerClient(moderate: fn (MockModerationInput $input) =>
+    str_contains((string) $input->text, 'kill') ? MockDecision::of('blocked')->flag('violence', 0.92) : 'allowed');
 $client = $mock->client();
 $asset = $client->assets->create(['name' => 'photo.png', 'visibility' => 'public',
-    'content' => ['data' => $bytes, 'type' => 'image/png']]);
+    'content' => ['data' => $bytes, 'type' => 'image/png']]); // queued: pending
+$mock->completeProcessing($asset['id'], 'age-restricted'); // as moderation would
 $mock->decide($asset['id'], 'blocked'); // as a reviewer would; adds asset.blocked
 ```
 
-It does not classify content. `create` gives assets `queuedOutcome` (default `pending`)
-and `classify` gives them `analyzedOutcome` (default `allowed`): `pending`, `allowed`,
-`limited`, `age-restricted`, `blocked`, `purged` (which also removes the content, with reason
-`policy`) or `failed` (with `failureReason` `processing-error`). A classified image gets a ThumbHash, which the `placeholder` resource
-serves as a PNG, and which goes with the content when it is removed.
-`analyzedOutcome` may also be fields to merge into the asset or a callable that receives
-the asset and returns either. Content is kept only with `keepContentAfterProcessing`.
+It does not classify content. The `moderate` callable decides each asset the mock moderates:
+it receives a `MockModerationInput` with the stored `asset`, its `bytes` (multipart parts
+joined; `null` for a website or removed content), its `text` for a plain-text upload, the
+`trigger` (`upload`, `retry`, `rerun` or `complete`) and whether the work is `queued`. It
+returns a status (`pending`, `failed`, `allowed`, `limited`, `age-restricted`, `blocked` or
+`purged`, which also removes the content with reason `policy`; `failed` sets `failureReason`
+`processing-error`) or a decision from `MockDecision::of($status)`, whose chainable
+`flag($category, $score, $qualifiers)` and `notEvaluated($category)` record findings. A decided
+asset gets a complete report: every category (unflagged ones evaluated with score 0), the
+highest score and the policy's actions and `flaggedCategories`. Unknown names, scores outside 0
+to 1, repeated categories and findings on `pending` or `failed` throw `sdk/invalid-argument`.
+Without `moderate`, queued work stays `pending` and everything else is `allowed`.
+`completeProcessing($assetId, $decision)` finishes a processing asset with that decision, or
+else what `moderate` returns for `complete` (allowed by default), and records no review. A
+classified image gets a ThumbHash, which the `placeholder` resource serves as a PNG, and which
+goes with the content when it is removed. Content is kept only with `keepContentAfterProcessing`.
 Like the CDN, the mock refuses blocked, purged and failed assets, and assets whose content
 was removed, with `403` `asset/not-available` whatever the key. The default key has no
 grants, like a real key without `assets:download`, so it also refuses private assets (`403` `asset/api-key-missing-permission`). Age-restricted assets separately require `viewerClaims.ageConfirmed=true` regardless of permissions. Pass `apiKey: MockServerClient::createApiKey([['actions' =>
@@ -342,7 +357,8 @@ content; plus `Cache-Tag`, `X-Content-Type-Options: nosniff`, a sandboxing
 in `manualReviews` and adds an `asset.<outcome>` event with the event catalog's severity
 (`low` for `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact; a
 reviewer's `purged` removes the content with reason `requested` and first adds
-`asset.content-removed`. `decide` on an unknown asset throws `asset/not-found`.
+`asset.content-removed`. `decide` leaves the moderation report as it was, refuses `pending` and
+`failed` with `sdk/invalid-argument`, and throws `asset/not-found` for an unknown asset.
 
 List filters support `==` (with `*` wildcards), `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`
 and `=le=` joined by `;` (and), which binds tighter than `,` (or), and grouped with `( … )`, on
@@ -358,13 +374,19 @@ millisecond per reading, so assets created in a row have increasing `createdAt`.
 $mock->failNextRequest();          // the next call throws ConnectionException (sdk/transport-error)
 $mock->failNextRequest('timeout'); // ... TimeoutException (sdk/timeout)
 $mock->failNextRequest('upload/limit-exceeded', 'assets.create'); // the next upload fails with that API error
-$mock->failNextRequest(new CalmLens\CalmLensException('upload/limit-exceeded', 'Busy', 429, headers: ['Retry-After' => '5']));
-$request = $mock->requests()[0];   // every request received, as PSR-7 snapshots
+$mock->failNextRequest('upload/website-rate-limit-exceeded', retryAfter: 30, details: ['limit' => 5]);
+$request = $mock->requests()[0];   // a RecordedRequest: method, path, query, status, request
+$mock->clearRequests();
 ```
 
-`failNextRequest` failures are used first (each once, for any request or the next to the
-named client method), then responses enqueued with `enqueueJson` or `enqueue`, in order; both
-leave the stored state unchanged. `MockServerClient::signUploadToken($apiKey, $options, $now,
+`failNextRequest` failures are used first (each fails one request, so a retry takes the next
+failure; for any request or the next to the named client method from
+`MockServerClient::OPERATIONS`), then responses enqueued with `enqueueJson` or `enqueue`, in
+order; both leave the stored state unchanged. An API error code takes `details` and
+`retryAfter`, the `Retry-After` seconds. `requests()` lists `RecordedRequest`s, oldest first:
+the `method`, the `path` relative to the base URL (no `/v1`, segments decoded, such as
+`/assets/<id>`), the decoded `query`, the response `status` (`null` when the request failed
+without one) and the PSR-7 `request`. `MockServerClient::signUploadToken($apiKey, $options, $now,
 $nonce)` signs an upload token at a fixed clock (epoch milliseconds) and nonce, for exact
 tokens in tests. Retries are off unless you pass
 `maxRetries`. Waits take no real time: retry backoff and `waitForDecision` advance a virtual
@@ -377,7 +399,7 @@ $mock = new CalmLens\Testing\MockTransport();
 $mock->enqueueJson(['id' => 'asset_5Gm2Rk8XqT3wLp9VbN4c']);
 $client = $mock->client();
 $client->assets->retrieve(['assetId' => 'asset_5Gm2Rk8XqT3wLp9VbN4c']);
-$request = $mock->requests()[0]; // PSR-7 request snapshot
+$request = $mock->requests()[0]->request; // PSR-7 request snapshot
 ```
 
 Responses are FIFO, and an exhausted queue fails. `enqueue` also accepts PSR-7

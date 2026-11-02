@@ -333,7 +333,7 @@ fn check_request(
     let origin = url.origin().ascii_serialization();
     assert_eq!(request.method, wanted["method"], "{label}: method");
     assert_eq!(origin, wanted["origin"], "{label}: origin");
-    assert_eq!(request.path, wanted["path"], "{label}: path");
+    assert_eq!(url.path(), wanted["path"], "{label}: path");
     let pairs = |pairs: Vec<(String, String)>| {
         let mut pairs = pairs;
         pairs.sort();

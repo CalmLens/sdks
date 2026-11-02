@@ -7,15 +7,22 @@ export type {
 } from "./testing/MockCalmLensAppClient";
 export { MockCalmLensAppClient } from "./testing/MockCalmLensAppClient";
 export type {
-  MockAssetOutcome,
   MockCalmLensCall,
   MockCalmLensOperation,
   MockCalmLensServerClientOptions,
   MockEventInput,
+  MockFailureOptions,
   MockRequestFailure,
   MockReviewDecision,
 } from "./testing/MockCalmLensServerClient";
 export { MockCalmLensServerClient } from "./testing/MockCalmLensServerClient";
+export type {
+  MockAssetOutcome,
+  MockModerate,
+  MockModerationInput,
+  MockModerationTrigger,
+} from "./testing/MockDecision";
+export { MockDecision, mockDecision } from "./testing/MockDecision";
 export type {
   MockDatabaseStorage,
   MockImageStorage,

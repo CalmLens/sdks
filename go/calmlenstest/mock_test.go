@@ -60,7 +60,12 @@ func TestMockLifecycle(t *testing.T) {
 	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotRetryable {
 		t.Fatal("retried processing asset", err)
 	}
-	failing, err := NewServerClient(Options{QueuedOutcome: OutcomeFailed})
+	failing, err := NewServerClient(Options{Moderate: func(input ModerationInput) *Decision {
+		if input.Trigger == TriggerUpload {
+			return NewDecision(OutcomeFailed)
+		}
+		return nil
+	}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +138,7 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 	if upload.Path != "/projects/my project/assets" || upload.Header.Get("X-CalmLens-Upload") != "content" || upload.Query.Get("queue") != "true" || upload.Query.Get("folderId") != folder.ID || string(upload.RawBody) != "hi" || upload.Body != nil {
 		t.Fatalf("%+v", upload)
 	}
-	if requests[2].Method != "GET" || requests[2].Path != "/assets/"+a.ID {
+	if requests[2].Method != "GET" || requests[2].Path != "/assets/"+a.ID || create.Status != http.StatusCreated || requests[2].Status != http.StatusOK {
 		t.Fatalf("%+v", requests[2])
 	}
 	c.ClearRequests()
@@ -145,9 +150,6 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 	}
 	if _, err = NewServerClient(Options{BaseURL: "localhost"}); err == nil {
 		t.Fatal("invalid base URL accepted")
-	}
-	if _, err = NewServerClient(Options{AnalyzedOutcome: "error"}); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
-		t.Fatal("unknown outcome accepted", err)
 	}
 }
 
@@ -173,7 +175,9 @@ func TestMockSimulatesTransportFailures(t *testing.T) {
 	}
 	ctx := context.Background()
 	offline := errors.New("connection reset by peer")
-	c.FailNext(offline, context.DeadlineExceeded)
+	if err = c.FailNextRequest(RequestFailure{Err: offline}, RequestFailure{Err: context.DeadlineExceeded}); err != nil {
+		t.Fatal(err)
+	}
 	_, err = c.Folders.List(ctx, calmlens.ListFoldersOptions{})
 	var sdk *calmlens.Error
 	if !errors.As(err, &sdk) || sdk.Code != "sdk/transport-error" || !errors.Is(err, offline) {
@@ -186,8 +190,42 @@ func TestMockSimulatesTransportFailures(t *testing.T) {
 	if _, err = c.Folders.List(ctx, calmlens.ListFoldersOptions{}); err != nil {
 		t.Fatalf("failure queue not drained: %v", err)
 	}
-	if got := len(c.Requests()); got != 3 {
-		t.Fatalf("failed requests should be captured, got %d", got)
+	requests := c.Requests()
+	if len(requests) != 3 || requests[0].Status != 0 || requests[2].Status != http.StatusOK {
+		t.Fatalf("failed requests should be captured without a status: %+v", requests)
+	}
+}
+
+func TestMockRefusesFailuresItCannotInject(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	for name, failure := range map[string]RequestFailure{
+		"misspelt operation":       {Code: FailureTimeout, Operation: "assets.creat"},
+		"unknown code":             {Code: "upload/no-such-error"},
+		"no code or error":         {Operation: "assets.create"},
+		"code and error":           {Code: FailureTimeout, Err: errors.New("offline")},
+		"Retry-After on a timeout": {Code: FailureTimeout, RetryAfter: calmlens.Ptr(time.Second)},
+		"fractional Retry-After":   {Code: calmlens.CodeUploadLimitExceeded, RetryAfter: calmlens.Ptr(1500 * time.Millisecond)},
+	} {
+		if err := c.FailNextRequest(RequestFailure{Code: FailureTimeout}, failure); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
+			t.Errorf("%s: got %v, want sdk/invalid-argument", name, err)
+		}
+	}
+	// A refused call queues nothing, not even its valid failures.
+	if _, err := c.Folders.List(context.Background(), calmlens.ListFoldersOptions{}); err != nil {
+		t.Fatalf("a refused failure was queued: %v", err)
+	}
+}
+
+func TestMockReturnsAnInvalidModerateDecisionFromTheRequest(t *testing.T) {
+	c, _ := NewServerClient(Options{Moderate: func(ModerationInput) *Decision {
+		return NewDecision(OutcomeBlocked).Flag("violence", 2, nil)
+	}})
+	_, err := c.Assets.Classify(context.Background(), calmlens.SubmitAssetOptions{Name: "n", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("x")}})
+	if calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
+		t.Fatalf("got %v, want sdk/invalid-argument", err)
+	}
+	if len(c.DatabaseStorage.Assets) != 0 {
+		t.Fatal("the refused upload was stored")
 	}
 }
 
@@ -407,7 +445,7 @@ func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
 }
 
 func TestMockDecideValidatesLikeTheAPI(t *testing.T) {
-	c, _ := NewServerClient(Options{AnalyzedOutcome: OutcomeAllowed})
+	c, _ := NewServerClient(Options{})
 	ctx := context.Background()
 	asset, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "n", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("x")}})
 	if err != nil {

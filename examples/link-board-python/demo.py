@@ -104,7 +104,7 @@ class DemoModerator(Moderator):
     demo = True
 
     def __init__(self, clock=time.monotonic):
-        self.mock = MockCalmLensServerClient(mock_options={"queued_outcome": "pending"})
+        self.mock = MockCalmLensServerClient()  # Queued website checks stay pending until a plan decides them.
         super().__init__(self.mock)
         self.clock = clock
         self.plans: dict[str, tuple[str, float, str]] = {}

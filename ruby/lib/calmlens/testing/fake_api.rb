@@ -5,6 +5,7 @@ require 'json'
 require 'securerandom'
 require 'uri'
 require_relative 'placeholder'
+require_relative 'mock_decision'
 
 module CalmLens
   module Testing
@@ -36,8 +37,9 @@ module CalmLens
 
     # A stateful stand-in for the CalmLens API and CDN. It stores assets and folders, applies
     # filters and ordering, serves stored bytes, and answers errors with the API's codes, statuses,
-    # details and body shape, checking requests in the API's order. It does not classify content,
-    # run transforms or index for semantic search.
+    # details and body shape, checking requests in the API's order. It moderates through the
+    # `moderate` callback rather than classifying content, and does not run transforms or index for
+    # semantic search.
     # @api private
     class FakeAPI
       JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize limit processingOptions metadata
@@ -71,14 +73,13 @@ module CalmLens
       # The mock API key's `{ 'actions', 'folderId', 'includeSubfolders' }` grants.
       attr_accessor :grants
 
-      def initialize(project_id:, base_url:, cdn_base_url:, now:, create_id:, queued_outcome:, analyzed_outcome:, grants:)
+      def initialize(project_id:, base_url:, cdn_base_url:, now:, create_id:, moderate:, grants:)
         @project_id = project_id
         @base_url = base_url
         @cdn_base_url = cdn_base_url
         @now = now
         @create_id = create_id
-        @queued_outcome = queued_outcome
-        @analyzed_outcome = analyzed_outcome
+        @moderate = moderate
         @grants = grants
         @state = State.new(assets: {}, folders: {}, content: {}, events: [], lenses: {}, uploads: {}, idempotency: {},
                            hash_lists: {}, hash_list_entries: {})
@@ -95,6 +96,13 @@ module CalmLens
         record
       end
 
+      # Adds an event like {#add_event}; one about a stored asset carries the asset as it is now.
+      def enqueue_event(event)
+        item = own_asset(event['assetId'])
+        event = event.merge('asset' => snapshot(item)) if item && !event.key?('asset')
+        add_event(event)
+      end
+
       # Applies a reviewer's decision, adds the matching events and returns the asset, or nil when
       # there is no such asset. A purge removes the content with reason `requested`.
       def decide(asset_id, decision)
@@ -102,10 +110,21 @@ module CalmLens
           raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
                                          "Review decisions are #{REVIEW_DECISIONS.join(', ')} (got #{decision.inspect})")
         end
-        item = @state.assets[asset_id]
-        return unless item && item['projectId'] == @project_id
+        item = own_asset(asset_id)
+        return unless item
 
         record_decision(item, decision, nil, nil)
+        deep_copy(item)
+      end
+
+      # Finishes processing an asset as the pipeline would, with `decision` or else what `moderate`
+      # answers for the `complete` trigger, and returns it; nil when there is no such asset.
+      def complete_processing(asset_id, decision)
+        item = own_asset(asset_id)
+        return unless item
+        raise Internal.invalid("Asset #{asset_id} isn't processing") unless item['classification']['status'] == 'processing'
+
+        moderate_stored(item, 'complete', decision.nil? ? nil : MockDecision.from(decision))
         deep_copy(item)
       end
 
@@ -122,10 +141,12 @@ module CalmLens
 
       # An API error response, as the API sends it: `{ code, message, requestId, details }` with the
       # code's status, `requestId` matching the `x-request-id` header and `details` always an object.
-      def error(code, message = nil, details: nil, status: nil)
+      # `retry_after` is whole seconds for the `Retry-After` header.
+      def error(code, message = nil, details: nil, status: nil, retry_after: nil)
         id = request_id
         body = { 'code' => code, 'message' => message || code, 'requestId' => id, 'details' => details || {} }
-        respond(status || ErrorCodes::STATUSES.fetch(code, 400), body, id: id)
+        headers = retry_after.nil? ? {} : { 'retry-after' => retry_after.to_s }
+        respond(status || ErrorCodes::STATUSES.fetch(code, 400), body, headers, id: id)
       end
 
       private
@@ -136,6 +157,11 @@ module CalmLens
       end
 
       def request_id = "mock-request-#{@request_count += 1}"
+
+      def own_asset(asset_id)
+        item = @state.assets[asset_id]
+        item if item && item['projectId'] == @project_id
+      end
 
       # Applies a reviewer's decision like `decideAssetManually` in the API: the status and the review,
       # then (for `purged`) the content removal and its event, then `asset.<decision>`.
@@ -489,7 +515,7 @@ module CalmLens
                   **sections(now: now, open: open, keep: keep, format: mime, size: data&.bytesize) }
         @state.assets[asset['id']] = asset
         @state.content[asset['id']] = { 'type' => mime, 'parts' => { 1 => data } } if data
-        open ? asset : apply_outcome(asset, outcome_for(asset, queue))
+        open ? asset : upload_completed(asset, queue, data)
       end
 
       def sections(now:, open:, keep:, format:, size:)
@@ -545,22 +571,84 @@ module CalmLens
         asset
       end
 
-      def outcome_for(asset, queue)
-        outcome = queue ? @queued_outcome : @analyzed_outcome
-        outcome = outcome.call(deep_copy(asset)) if outcome.respond_to?(:call)
-        outcome
+      # A completed upload of a processing asset: moderated for the `upload` trigger, with
+      # `asset.uploaded` (the asset before moderation) and then the processing events.
+      def upload_completed(asset, queue, bytes = :stored)
+        decision = decision_for(asset, 'upload', queue, bytes)
+        uploaded = snapshot(asset)
+        format = asset['content']['format']
+        decided(asset, decision) unless decision.status == 'pending'
+        add_event('type' => 'asset.uploaded', 'severity' => 'low', 'assetId' => asset['id'], 'asset' => uploaded,
+                  'facts' => [{ 'key' => 'asset-type', 'value' => asset['type'] }, asset_name_fact(asset),
+                              { 'key' => 'file-format', 'value' => format }])
+        record_processing_events(asset, decision)
+        asset
+      end
+
+      # Asks `moderate` how to decide `asset`, with its content: `bytes` when the caller has them,
+      # otherwise the stored parts in order (none once the content is removed).
+      def decision_for(asset, trigger, queued, bytes = :stored)
+        if bytes == :stored
+          stored = asset['content']['status'] == 'removed' ? nil : @state.content[asset['id']]
+          bytes = stored && stored['parts'].sort.map { |_, part| part.to_s.b }.join.b
+        end
+        return MockDecision.from(default_moderation(trigger, queued)) unless @moderate
+
+        text = bytes && asset['type'] == 'plaintext-document' ? bytes.dup.force_encoding(Encoding::UTF_8).scrub : nil
+        content = MockModerationInput::Content.new(bytes: bytes&.dup, text: text)
+        MockDecision.from(@moderate.call(MockModerationInput.new(asset: deep_copy(asset), content: content, trigger: trigger,
+                                                                 queued: queued)))
+      end
+
+      # Without `moderate`, queued work stays pending until completed, which allows it.
+      def default_moderation(trigger, queued) = queued && trigger != 'complete' ? 'pending' : 'allowed'
+
+      # Applies `decision` to `asset` with its report.
+      def decided(asset, decision) = apply_outcome(asset, decision.status, 'policy', decision.report)
+
+      # Asks `moderate` (unless `decision` is given) and settles a processing asset: a decision and
+      # its events, or nothing for `pending`.
+      def moderate_stored(asset, trigger, decision = nil)
+        decision ||= decision_for(asset, trigger, true)
+        return asset if decision.status == 'pending'
+
+        decided(asset, decision)
+        record_processing_events(asset, decision)
+        asset
+      end
+
+      def asset_name_fact(item) = { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{item['id']}" }
+
+      # The events the pipeline records when it settles an asset (AssetClassification.ts and
+      # AssetErrorAlert.ts): `asset.classified` and the automated `asset.<status>`, or `asset.failed`.
+      def record_processing_events(item, decision)
+        return if decision.status == 'pending'
+
+        if decision.status == 'failed'
+          return add_event('type' => 'asset.failed', 'severity' => 'high', 'assetId' => item['id'], 'asset' => snapshot(item),
+                           'facts' => [asset_name_fact(item), { 'key' => 'asset-type', 'value' => item['type'] },
+                                       { 'key' => 'previous-status', 'value' => 'processing' },
+                                       { 'key' => 'failure-reason',
+                                         'value' => item['classification']['failureReason'] || 'processing-error' }])
+        end
+
+        flagged = decision.report.dig('policy', 'decision', 'flaggedCategories')
+        add_event('type' => 'asset.classified', 'severity' => 'low', 'assetId' => item['id'], 'asset' => snapshot(item),
+                  'facts' => [{ 'key' => 'flagged-categories', 'value' => flagged },
+                              { 'key' => 'moderation-status', 'value' => decision.status },
+                              { 'key' => 'asset-type', 'value' => item['type'] }, asset_name_fact(item)])
+        # Like the event catalog: only allowing and limiting are low severity.
+        add_event('type' => "asset.#{decision.status}", 'severity' => %w[allowed limited].include?(decision.status) ? 'low' : 'high',
+                  'assetId' => item['id'], 'asset' => snapshot(item),
+                  'facts' => [{ 'key' => 'decided-by', 'value' => 'automated' }, { 'key' => 'flagged-categories', 'value' => flagged },
+                              { 'key' => 'asset-type', 'value' => item['type'] }, asset_name_fact(item)])
       end
 
       # Moves an asset to an outcome like the pipeline would: a decision finishes processing, `purged`
       # deletes the content (with `purge_reason`, `policy` for the pipeline), and finished processing
       # removes content kept only temporarily. A classified image gets a ThumbHash for its
-      # placeholder, which goes with its content. `outcome` may also be fields to deep-merge.
-      def apply_outcome(asset, outcome, purge_reason = 'policy')
-        fields = nil
-        if outcome.is_a?(Hash)
-          fields = deep_copy(outcome)
-          outcome = AssetRecord.outcome_of(fields)
-        end
+      # placeholder, which goes with its content. `report` is a decision's categories, score and policy.
+      def apply_outcome(asset, outcome, purge_reason = 'policy', report = nil)
         processing, moderation = AssetRecord.statuses(outcome)
         now = @now.call
         decided = processing == 'completed'
@@ -583,8 +671,9 @@ module CalmLens
         end
         asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
         update_classification(asset['classification'], processing, moderation, now)
+        asset['classification']['moderation'].merge!(deep_copy(report)) if report
         asset['updatedAt'] = now
-        fields ? AssetRecord.deep_merge!(asset, fields) : asset
+        asset
       end
 
       # Like the API, a failed asset says why (the mock has only `processing-error`).
@@ -669,7 +758,7 @@ module CalmLens
 
         apply_outcome(item, 'pending')
         lifecycle_event('asset.retried', item)
-        item
+        moderate_stored(item, 'retry')
       end
 
       def explain(item, rerun)
@@ -688,6 +777,7 @@ module CalmLens
 
         # Like the API: back to processing, to be moderated again under the current policy.
         apply_outcome(item, 'pending')
+        moderate_stored(item, 'rerun')
       end
 
       def signed_url(id, json)
@@ -726,7 +816,8 @@ module CalmLens
 
         @state.uploads.delete(item['id'])
         queue = query.key?('queue') ? query['queue'] == true : upload.fetch('queue', false)
-        apply_outcome(item, outcome_for(item, queue))
+        apply_outcome(item, 'pending')
+        upload_completed(item, queue)
       end
 
       def folder(method, parts, json)
@@ -1050,7 +1141,7 @@ module CalmLens
       end
     end
 
-    # Outcomes and merging test fields into a mock asset.
+    # The processing and moderation status of each outcome.
     # @api private
     module AssetRecord
       module_function
@@ -1066,22 +1157,6 @@ module CalmLens
           raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
                                          "MockServerClient outcomes are #{OUTCOMES.keys.join(', ')} (got #{outcome.inspect})")
         end
-      end
-
-      # The outcome of analyzed fields: `failed` when they fail processing, else their moderation status.
-      def outcome_of(fields)
-        fields.dig('classification', 'status') == 'failed' ? 'failed' : fields.dig('classification', 'moderation', 'status') || 'allowed'
-      end
-
-      def deep_merge!(target, fields)
-        fields.each do |key, value|
-          if value.is_a?(Hash) && target[key].is_a?(Hash)
-            deep_merge!(target[key], value)
-          else
-            target[key] = value
-          end
-        end
-        target
       end
     end
 

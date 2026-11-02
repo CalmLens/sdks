@@ -6,7 +6,10 @@
 //! failure names the case.
 mod common;
 use calmlens::models::*;
-use calmlens::testing::{self, MockOptions, MockResponse, MockServerClient};
+use calmlens::testing::{
+    self, MockDecision, MockModerationInput, MockModerationTrigger, MockOptions, MockOutcome,
+    MockResponse, MockServerClient,
+};
 use calmlens::{
     AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, HashListsClient, ServerClient,
     TextClient, UploadTokensClient,
@@ -20,6 +23,7 @@ use std::{
     io::{Read, Write},
     net::TcpListener,
     panic::AssertUnwindSafe,
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -970,12 +974,93 @@ fn failure(name: &str) -> testing::MockFailure {
     }
 }
 
+/// Builds a decision spec with the decision builder, in the order the fixture lists its calls.
+fn build_decision(spec: &Value) -> calmlens::Result<MockDecision> {
+    if let Some(status) = spec.as_str() {
+        return Ok(MockDecision::new(status.parse()?));
+    }
+    let mut decision = MockDecision::new(spec["status"].as_str().unwrap().parse()?);
+    for flag in spec["flags"].as_array().into_iter().flatten() {
+        let qualifiers: Vec<(&str, f64)> = flag["qualifiers"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .map(|(qualifier, score)| (qualifier.as_str(), score.as_f64().unwrap()))
+            .collect();
+        let category = flag["category"].as_str().unwrap();
+        decision = decision.flag(category, flag["score"].as_f64().unwrap(), &qualifiers)?;
+    }
+    for category in spec["notEvaluated"].as_array().into_iter().flatten() {
+        decision = decision.not_evaluated(category.as_str().unwrap())?;
+    }
+    Ok(decision)
+}
+
+/// What the scenario's `moderate` callback received, oldest first.
+type ModerateCalls = Arc<Mutex<Vec<Value>>>;
+
+/// A `moderate` callback that records what it receives and answers `byName[asset.name]`, else
+/// `queued` or `analyzed` for an upload, else the mock's default.
+fn recording_moderate(
+    spec: Value,
+    calls: ModerateCalls,
+) -> impl Fn(&MockModerationInput) -> calmlens::Result<MockDecision> + Send + Sync + 'static {
+    move |input| {
+        use base64::Engine;
+        let name = input.asset.name.clone();
+        calls.lock().unwrap().push(json!({
+            "trigger": input.trigger.as_str(), "queued": input.queued,
+            "assetId": input.asset.id, "name": name, "text": input.content.text,
+            "bytesBase64": input.content.bytes.as_ref()
+                .map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes)),
+        }));
+        let by_name = name.as_deref().and_then(|name| spec["byName"].get(name));
+        let by_queue = (input.trigger == MockModerationTrigger::Upload)
+            .then(|| spec.get(if input.queued { "queued" } else { "analyzed" }))
+            .flatten();
+        match by_name.or(by_queue) {
+            Some(answer) => build_decision(answer),
+            None => Ok(input.default_decision()),
+        }
+    }
+}
+
 async fn run_step(
     mock: &MockServerClient,
     operation: &str,
     args: Value,
+    moderate_calls: &ModerateCalls,
 ) -> calmlens::Result<Value> {
     match operation {
+        "mock.completeProcessing" => {
+            let decision = match args.get("decision") {
+                Some(spec) => Some(build_decision(spec)?),
+                None => None,
+            };
+            let asset = mock.complete_processing(args["assetId"].as_str().unwrap(), decision)?;
+            Ok(serde_json::to_value(asset).unwrap())
+        }
+        "mock.moderateCalls" => Ok(json!(*moderate_calls.lock().unwrap())),
+        "mock.buildDecision" => build_decision(&args).map(|_| Value::Null),
+        "mock.requests" => Ok(mock
+            .requests()
+            .into_iter()
+            .map(|request| {
+                let query: Map<String, Value> = request
+                    .query
+                    .into_iter()
+                    .map(|(key, value)| (key, json!(value)))
+                    .collect();
+                json!({
+                    "method": request.method, "path": request.path, "query": query,
+                    "status": request.response_status,
+                })
+            })
+            .collect()),
+        "mock.clearRequests" => {
+            mock.clear_requests();
+            Ok(Value::Null)
+        }
         "mock.decide" => {
             let decision: AssetModerationDecision = typed(args["outcome"].clone());
             let asset = mock.decide(args["assetId"].as_str().unwrap(), decision)?;
@@ -993,7 +1078,17 @@ async fn run_step(
         }
         "mock.failNext" => {
             let failure = failure(args["failure"].as_str().unwrap());
-            mock.fail_next_request(failure, args["operation"].as_str());
+            let mut options = testing::MockFailureOptions::new();
+            if let Some(operation) = args["operation"].as_str() {
+                options = options.operation(operation);
+            }
+            if let Some(details) = args["details"].as_object() {
+                options = options.details(details.clone());
+            }
+            if let Some(seconds) = args["retryAfter"].as_u64() {
+                options = options.retry_after(seconds as u32);
+            }
+            mock.fail_next_request(failure, options)?;
             Ok(Value::Null)
         }
         "cdn.serve" => {
@@ -1060,6 +1155,7 @@ async fn check_step(
     scenario: &str,
     step: &Value,
     saved: &mut HashMap<String, Value>,
+    moderate_calls: &ModerateCalls,
 ) {
     let operation = step["operation"].as_str().unwrap();
     let label = format!("{scenario}: {operation} {}", step["args"]);
@@ -1072,7 +1168,7 @@ async fn check_step(
     let empty = Value::Object(Map::new());
     let expect = resolve(step.get("expect").unwrap_or(&empty), saved);
     let sent = mock.requests().len();
-    let outcome = run_step(mock, operation, args).await;
+    let outcome = run_step(mock, operation, args, moderate_calls).await;
     if let Some(wanted) = expect.get("error") {
         let error = outcome.expect_err(&label);
         assert_eq!(
@@ -1085,6 +1181,14 @@ async fn check_step(
                 has_details(error.details(), details),
                 "{label}: details {:?} lack {details}",
                 error.details()
+            );
+        }
+        if let Some(seconds) = wanted.get("retryAfter") {
+            let actual = error.retry_after().map(|delay| delay.as_secs());
+            assert_eq!(
+                actual.map(Value::from).as_ref(),
+                Some(seconds),
+                "{label}: retryAfter"
             );
         }
         return;
@@ -1158,28 +1262,14 @@ async fn check_step(
                         && body.bytes().all(|byte| byte.is_ascii_alphanumeric())),
                     "{label}: {path} {actual} is not a new {prefix}_ ID"
                 );
-            } else {
-                assert_eq!(actual, *wanted, "{label}: {path}");
+            } else if let Err(difference) = compare_typed(&actual, wanted) {
+                // Typed models write the fields they declare, unset ones empty.
+                panic!("{label}: {path}: {difference}");
             }
         }
     }
     if let Some(name) = step["save"].as_str() {
         saved.insert(name.to_owned(), result);
-    }
-}
-
-fn outcome(value: Option<&Value>, default: testing::MockOutcome) -> testing::MockOutcome {
-    use testing::MockOutcome;
-    match value.and_then(Value::as_str) {
-        None => default,
-        Some("pending") => MockOutcome::Pending,
-        Some("allowed") => MockOutcome::Allowed,
-        Some("limited") => MockOutcome::Limited,
-        Some("age-restricted") => MockOutcome::AgeRestricted,
-        Some("blocked") => MockOutcome::Blocked,
-        Some("purged") => MockOutcome::Purged,
-        Some("failed") => MockOutcome::Failed,
-        Some(other) => panic!("unknown outcome {other}"),
     }
 }
 
@@ -1194,25 +1284,23 @@ async fn mock_scenarios() {
             let options = &scenario["mock"];
             let grants: Vec<testing::MockApiKeyGrant> =
                 typed(options.get("apiKeyGrants").cloned().unwrap_or(json!([])));
-            let mock = MockServerClient::in_memory(
-                MockOptions::new()
-                    .project_id("project-1")
-                    .api_key(testing::create_mock_api_key(&grants))
-                    .queued_outcome(outcome(
-                        options.get("queuedOutcome"),
-                        testing::MockOutcome::Pending,
-                    ))
-                    .analyzed_outcome(outcome(
-                        options.get("analyzedOutcome"),
-                        testing::MockOutcome::Allowed,
-                    )),
-            )
-            .unwrap();
+            let mut mock_options = MockOptions::new()
+                .project_id("project-1")
+                .api_key(testing::create_mock_api_key(&grants));
+            if let Some(retries) = options["maxRetries"].as_u64() {
+                mock_options = mock_options.max_retries(retries as u32);
+            }
+            let moderate_calls = ModerateCalls::default();
+            if let Some(spec) = options.get("moderate") {
+                let moderate = recording_moderate(spec.clone(), moderate_calls.clone());
+                mock_options = mock_options.moderate(moderate);
+            }
+            let mock = MockServerClient::in_memory(mock_options).unwrap();
             let started = std::time::Instant::now();
             let mut saved = HashMap::new();
             for step in scenario["steps"].as_array().unwrap() {
                 for _ in 0..step["repeat"].as_u64().unwrap_or(1) {
-                    check_step(&mock, name, step, &mut saved).await;
+                    check_step(&mock, name, step, &mut saved, &moderate_calls).await;
                 }
             }
             // Mock waits take no real time.
@@ -1285,8 +1373,10 @@ fn references() -> BTreeSet<&'static str> {
         "testing::sign_upload_token" => testing::sign_upload_token;
         "CdnRequest::viewer_claims" => |request: &CdnRequest| request.viewer_claims.clone();
         "testing::MockServerClient::in_memory" => MockServerClient::in_memory;
-        "MockOptions::queued_outcome" => MockOptions::queued_outcome;
-        "MockOptions::analyzed_outcome" => MockOptions::analyzed_outcome;
+        "MockOptions::moderate" => MockOptions::moderate::<fn(&MockModerationInput) -> MockOutcome, MockOutcome>;
+        "testing::MockDecision::new" => MockDecision::new;
+        "complete_processing" => MockServerClient::complete_processing;
+        "fail_next_request" => MockServerClient::fail_next_request;
         "decide" => MockServerClient::decide;
         "enqueue_event" => MockServerClient::enqueue_event;
         "testing::create_mock_api_key" => testing::create_mock_api_key;

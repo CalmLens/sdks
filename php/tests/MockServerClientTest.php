@@ -5,6 +5,9 @@ declare(strict_types=1);
 use CalmLens\CalmLensException;
 use CalmLens\ErrorCodes;
 use CalmLens\Exception;
+use CalmLens\SdkErrorCodes;
+use CalmLens\Testing\MockDecision;
+use CalmLens\Testing\MockModerationInput;
 use CalmLens\Testing\MockServerClient;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -32,9 +35,9 @@ final class MockServerClientTest extends TestCase
     }
 
     #[DataProvider('outcomes')]
-    public function testQueuedOutcomeSetsStatusesAndPurgedRemovesContent(string $outcome, string $classification, string $moderation, string $content): void
+    public function testModerateStatusSetsStatusesAndPurgedRemovesContent(string $outcome, string $classification, string $moderation, string $content): void
     {
-        $mock = new MockServerClient(queuedOutcome: $outcome);
+        $mock = new MockServerClient(moderate: fn () => $outcome);
         $asset = self::image($mock);
         $stored = $mock->client()->assets->retrieve(['assetId' => $asset['id']]);
         self::assertSame($classification, $stored['classification']['status']);
@@ -46,9 +49,9 @@ final class MockServerClientTest extends TestCase
         }
     }
 
-    public function testClassifyUsesAnalyzedOutcomeAndRemovesTemporaryContent(): void
+    public function testClassifyDecidesByTextAndRemovesTemporaryContent(): void
     {
-        $mock = new MockServerClient(analyzedOutcome: fn (array $asset) => str_contains($asset['name'], 'rude') ? 'blocked' : 'allowed');
+        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => str_contains((string) $input->text, 'away') ? 'blocked' : 'allowed');
         $client = $mock->client();
         $kind = $client->text->classify(['name' => 'kind', 'text' => 'hello']);
         $rude = $client->text->classify(['name' => 'rude', 'text' => 'go away']);
@@ -56,17 +59,54 @@ final class MockServerClientTest extends TestCase
         self::assertSame('blocked', $rude['classification']['moderation']['status']);
         self::assertSame(['removed', 'retention'], [$kind['content']['status'], $kind['content']['removalReason']]);
         self::assertSame([], $mock->content);
-        $fields = new MockServerClient(analyzedOutcome: ['classification' => ['moderation' => ['status' => 'age-restricted', 'categories' => ['sexual' => ['status' => 'evaluated', 'score' => 0.9]]]]]);
-        $asset = $fields->client()->text->classify(['text' => 'x']);
-        self::assertSame('age-restricted', $asset['classification']['moderation']['status']);
-        self::assertSame('completed', $asset['classification']['status']);
-        self::assertSame(0.9, $asset['classification']['moderation']['categories']['sexual']['score']);
     }
 
-    public function testUnknownOutcomeIsRejected(): void
+    public function testModerateGetsJoinedMultipartBytesAndNoBytesForAWebsite(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        new MockServerClient(queuedOutcome: 'approved');
+        $inputs = [];
+        $mock = new MockServerClient(moderate: function (MockModerationInput $input) use (&$inputs) {
+            $inputs[] = $input;
+            return 'allowed';
+        });
+        $client = $mock->client();
+        $first = str_repeat('a', 5 * 1024 * 1024);
+        $started = $client->assets->create(['name' => 'clip.mp4', 'part' => ['data' => $first, 'type' => 'video/mp4', 'isFinal' => false]]);
+        self::assertSame([], $inputs);
+        $client->assets->uploadPart(['assetId' => $started['id'], 'part' => ['data' => 'end', 'partNumber' => 2, 'isFinal' => true]]);
+        $client->assets->classify(['name' => 'site', 'url' => 'https://example.com/']);
+        self::assertSame([[$started['id'], hash('sha256', $first . 'end'), null], ['website', null, null]],
+            array_map(fn (MockModerationInput $input) => [$input->asset['type'] === 'website' ? 'website' : $input->asset['id'],
+                $input->bytes === null ? null : hash('sha256', $input->bytes), $input->text], $inputs));
+    }
+
+    public function testRetryRecordsItThenSettlesWithTheModerateAnswer(): void
+    {
+        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->trigger === 'retry'
+            ? MockDecision::of('blocked')->flag('violence', 0.9) : 'failed');
+        $client = $mock->client();
+        $asset = $client->text->classify(['name' => 'note', 'text' => 'hello']);
+        self::assertSame('failed', $asset['classification']['status']);
+        $mock->events = [];
+        $retried = $client->assets->retry(['assetId' => $asset['id']]);
+        self::assertSame(['completed', 'blocked', ['violence']], [$retried['classification']['status'],
+            $retried['classification']['moderation']['status'], $retried['classification']['moderation']['policy']['decision']['flaggedCategories']]);
+        self::assertSame(['asset.retried', 'asset.classified', 'asset.blocked'], array_column($mock->events, 'type'));
+    }
+
+    public function testModerateAnswersOtherThanADecisionAreRefused(): void
+    {
+        foreach (['approved', 42] as $answer) {
+            $mock = new MockServerClient(moderate: fn () => $answer, maxRetries: 2);
+            try {
+                $mock->client()->text->classify(['text' => 'x']);
+                self::fail('Expected the answer to be refused');
+            } catch (Exception\InvalidArgumentException $error) {
+                // Thrown to the test, not answered as an API error.
+                self::assertSame([SdkErrorCodes::INVALID_ARGUMENT, null], [$error->errorCode, $error->status]);
+            }
+            // A mistake in the test is not a failed request to retry.
+            self::assertCount(1, $mock->requests());
+        }
     }
 
     public function testEnqueuedResponsesComeFirstAndMissingAssetsAreNotFound(): void
@@ -113,7 +153,7 @@ final class MockServerClientTest extends TestCase
     public function testFiltersSupportOrWildcardsAndValueLists(): void
     {
         $time = 1;
-        $mock = new MockServerClient(analyzedOutcome: fn (array $asset) => $asset['description'], now: function () use (&$time) { return $time++; });
+        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->asset['description'], now: function () use (&$time) { return $time++; });
         $client = $mock->client();
         foreach (['allowed' => 'note-a.txt', 'blocked' => 'photo.png', 'purged' => 'note-b.txt'] as $status => $name) {
             $client->text->classify(['name' => $name, 'description' => $status, 'text' => 'x']);
@@ -153,7 +193,16 @@ final class MockServerClientTest extends TestCase
         $started = microtime(true);
         self::assertSame([], $retrying->client()->assets->list()['items']);
         self::assertLessThan(5, microtime(true) - $started);
-        self::assertCount(3, $retrying->requests());
+        self::assertSame([503, null, 200], array_map(fn ($request) => $request->status, $retrying->requests()));
+    }
+
+    public function testFailNextRequestRefusesWhatItCannotSimulate(): void
+    {
+        $mock = new MockServerClient();
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('timeout', 'assets.upload')));
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('timeout', retryAfter: 5)));
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('upload/limit-exceeded', retryAfter: -1)));
+        self::assertSame(0, $mock->pending());
     }
 
     public function testAcceptsTheClientsUploadTimeoutAndResponseSizeLimit(): void
@@ -186,9 +235,12 @@ final class MockServerClientTest extends TestCase
 
     public function testHashListEntryFromAnAssetTakesItsPerceptualHashAndGoesWithTheList(): void
     {
-        $mock = new MockServerClient(analyzedOutcome: 'allowed');
+        $mock = new MockServerClient();
         $client = $mock->client();
-        $status = fn (): ?int => (fn (): ?int => $this->lastStatus)->call($mock);
+        $status = function () use ($mock): ?int {
+            $requests = $mock->requests();
+            return end($requests)->status;
+        };
         $list = $client->hashLists->create(['name' => 'Removed images', 'action' => 'block']);
         $unhashed = self::image($mock);
         try {
@@ -217,7 +269,8 @@ final class MockServerClientTest extends TestCase
 
     public function testExplainCompletesTheEvidenceAndRerunModeratesAgain(): void
     {
-        $mock = new MockServerClient(queuedOutcome: 'blocked');
+        // Uploads are blocked; a rerun stays processing until completeProcessing.
+        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->trigger === 'upload' ? 'blocked' : 'pending');
         $client = $mock->client();
         $asset = self::image($mock);
         $mock->assets[$asset['id']]['classification']['moderation']['policy'] = ['score' => 0.9, 'categories' => [], 'evidence' => 'decision'];

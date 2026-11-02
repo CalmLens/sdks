@@ -190,7 +190,7 @@ async function createDemoClient() {
     uploadPresetId: "demo-preset",
     mockOptions: {
       preset: { allowedContentTypes: ["image/*"], maxFileSizeInBytes: MAX_FILE_SIZE },
-      queuedOutcome: (asset) => (/blocked/i.test(asset.name) ? "blocked" : "allowed"),
+      moderate: ({ asset }) => (/blocked/i.test(asset.name) ? "blocked" : "allowed"),
     },
   });
   return () => client;

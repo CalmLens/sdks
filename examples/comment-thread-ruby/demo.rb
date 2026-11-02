@@ -46,7 +46,7 @@ module Calmthread
       def initialize
         @outcomes = {}
         @outcome_lock = Mutex.new
-        super(client: CalmLens::MockServerClient.new(analyzed_outcome: method(:outcome)))
+        super(client: CalmLens::MockServerClient.new(moderate: method(:outcome)))
       end
 
       def demo? = true
@@ -97,20 +97,18 @@ module Calmthread
       def client_for(reply_id)
         return @client unless @outcome_lock.synchronize { @outcomes[reply_id] } == 'unavailable'
 
-        CalmLens::MockServerClient.new(max_retries: 0).enqueue_error(Errno::ECONNREFUSED.new)
+        CalmLens::MockServerClient.new.enqueue_error(Errno::ECONNREFUSED.new)
       end
 
-      def outcome(asset)
-        reply_id, field = asset['externalId'].to_s.split(':', 2)
+      # The mock's `moderate:` callback: the outcome chosen in the form for this field.
+      def outcome(input)
+        reply_id, field = input.asset['externalId'].to_s.split(':', 2)
         choice = @outcome_lock.synchronize { @outcomes[reply_id] } || 'clean'
         outcome = OUTCOMES.fetch(choice, OUTCOMES['clean'])[field == 'name' ? 0 : 1]
-        return outcome if outcome == 'failed'
+        return outcome unless outcome == 'blocked'
 
         # A blocked field is one the project's policy blocked; the report names the flagged category.
-        flagged = outcome == 'blocked' ? [FLAGGED.fetch(choice)] : []
-        { 'classification' => { 'moderation' => { 'status' => outcome, 'categories' => {},
-                                                   'policy' => { 'decision' => { 'source' => 'policy', 'action' => 'block',
-                                                                                 'flaggedCategories' => flagged } } } } }
+        CalmLens::MockDecision.of('blocked').flag(FLAGGED.fetch(choice), 0.9)
       end
     end
   end

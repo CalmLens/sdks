@@ -438,7 +438,7 @@ describe("UploadController", () => {
       createClient: (options) => {
         const client = new MockCalmLensAppClient({
           ...options,
-          mockOptions: { queuedOutcome: "allowed", preset: { maxFileSizeInBytes: 3 } },
+          mockOptions: { moderate: () => "allowed", preset: { maxFileSizeInBytes: 3 } },
         });
         created.push(client);
         return client;
@@ -477,7 +477,7 @@ describe("UploadController", () => {
       createClient: (options) => {
         const client = new MockCalmLensAppClient({
           ...options,
-          mockOptions: { queuedOutcome: "allowed" },
+          mockOptions: { moderate: () => "allowed" },
         });
         created.push(client);
         return client;

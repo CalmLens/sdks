@@ -110,9 +110,16 @@ webhook_status = webhook.asset&.dig('classification', 'moderation', 'status')
 webhook_test = webhook.test?
 client.close
 
-mock = CalmLens::MockServerClient.new(queued_outcome: 'failed',
-                                      analyzed_outcome: ->(item) { item['name'] == 'bad' ? 'purged' : 'allowed' })
-CalmLens::MockServerClient.new(analyzed_outcome: { 'classification' => { 'moderation' => { 'status' => 'blocked' } } })
+moderate = lambda do |input|
+  next 'pending' if input.queued? && input.trigger == 'upload'
+
+  text = input.content.text
+  text&.include?('threat') ? CalmLens::MockDecision.of('blocked').flag('violence', 0.9, 'violence-threat' => 0.9) : 'allowed'
+end
+mock = CalmLens::MockServerClient.new(moderate: moderate)
+completed = mock.complete_processing('asset-1', CalmLens::MockDecision.of('age-restricted').not_evaluated('profanity'))
+mock.complete_processing('asset-2')
+mock.fail_next_request('upload/website-rate-limit-exceeded', operation: 'assets.create', details: { 'reason' => 'busy' }, retry_after: 30)
 mock.enqueue_event(type: 'asset.allowed', asset_id: 'asset-1',
                    facts: [{ key: 'asset-name', value: 'beach.jpg' }, { key: 'decided-by', value: 'automated' }],
                    asset: { id: 'asset-1', upload: { status: 'completed' },
@@ -120,6 +127,7 @@ mock.enqueue_event(type: 'asset.allowed', asset_id: 'asset-1',
                             content: { status: 'removed' } })
 mock.state.assets.each_value { |item| item['classification']['moderation']['status'] }
 mock.enqueue(status: 503, body: { code: 'server/unavailable' }).requests.map(&:path)
+answered = mock.clear_requests.requests.map(&:status)
 
 [status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, lens_width, url,
- bytes, webhook_status, webhook_test, earlier, author, used, limits]
+ bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered]

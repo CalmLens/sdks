@@ -12,9 +12,12 @@ module CalmLens
   #
   # By default the stand-in is stateful: uploads create assets you can retrieve, list, filter,
   # search, move and delete, folders and hash lists behave like the API's, the CDN serves stored bytes, and errors use
-  # the API's codes, HTTP statuses and body shape. It does not classify content: assets moderated
-  # synchronously get `analyzed_outcome` and queued ones `queued_outcome`. Content is kept only with
-  # `keepContentAfterProcessing: true`; otherwise it is removed once classification is `completed`, as in the API.
+  # the API's codes, HTTP statuses and body shape. It does not classify content: the `moderate:`
+  # callback decides each upload, retry and rerun with a status or a {MockDecision}, and the events
+  # feed gets the pipeline's `asset.uploaded`, `asset.classified`, `asset.<status>` and `asset.failed`
+  # events. Without it, queued uploads stay `pending` until {#complete_processing} and the rest are
+  # `allowed`. Content is kept only with `keepContentAfterProcessing: true`; otherwise it is removed
+  # once classification is `completed`, as in the API.
   # A `purged` outcome removes the content with reason `policy`. The CDN answers like the real one:
   # `asset/not-available` (403) for blocked, purged, failed or removed content,
   # `viewer/age-confirmation-required` (403) for an age-restricted asset without
@@ -31,17 +34,19 @@ module CalmLens
   # before the stand-in answers.
   #
   # @example
-  #   mock = CalmLens::MockServerClient.new
+  #   mock = CalmLens::MockServerClient.new(moderate: ->(input) { input.content.text&.include?('spam') ? 'blocked' : 'allowed' })
   #   asset = mock.assets.classify(name: 'note', content: {plain_text: 'hi', type: 'text/plain'})
   #   mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'status') # => "allowed"
   #   mock.enqueue(status: 503, body: {code: 'server/unavailable', message: 'Try again'})
   class MockServerClient < ServerClient
     # A request the mock received.
     #
-    # `path` is relative to `base_url` for API calls (`/projects/<id>/assets`) and to
-    # `cdn_base_url` for CDN requests. `query` holds the decoded query string. `body` is the bytes
-    # sent: JSON text, or the uploaded content (streams are read), or nil.
-    Request = Struct.new(:method, :url, :path, :query, :headers, :body, keyword_init: true) do
+    # `path` is relative to `base_url` for API calls (`/projects/<id>/assets`, without `/v1`) and to
+    # `cdn_base_url` for CDN requests, with each segment decoded. `query` holds the decoded query
+    # string. `body` is the bytes sent: JSON text, or the uploaded content (streams are read), or
+    # nil. `status` is the HTTP status the mock answered with, or nil when the request failed
+    # without a response.
+    Request = Struct.new(:method, :url, :path, :query, :headers, :body, :status, keyword_init: true) do
       # @return [Object] the body parsed as JSON.
       def json = body && JSON.parse(body)
     end
@@ -61,6 +66,11 @@ module CalmLens
                    text: %i[classify], events: %i[list],
                    cdn: %i[serve] }.freeze
     private_constant :OPERATIONS
+    # The operation names {#fail_next_request} accepts, in their camelCase form.
+    OPERATION_NAMES = (OPERATIONS.flat_map do |resource, methods|
+      methods.map { |name| "#{Internal.camelize(resource)}.#{Internal.camelize(name)}" }
+    end + %w[ensureLens ensureLenses]).freeze
+    private_constant :OPERATION_NAMES
 
     # A mock API key carrying permission grants, such as
     # `[{ actions: ['assets:download'], folderId: nil, includeSubfolders: true }]` for CDN reads of
@@ -124,30 +134,32 @@ module CalmLens
     # @param create_id [#call] receives the prefix of the kind of object (`asset`, `fldr`, `hl`, `hle`, `lens`,
     #   `evt` or `rev`) and returns a new ID. The default is like the API's: the prefix, `_` and 20 random base62
     #   characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
-    # @param queued_outcome [String] the outcome of assets created with {Assets#create}: `pending`
-    #   (processing, moderation pending), `allowed`, `limited`, `age-restricted`, `blocked` or `purged` (processing
-    #   done with that moderation status; `purged` also removes the content) or `failed` (processing
-    #   failed, retryable).
-    # @param analyzed_outcome [String, Hash, #call] the result of {Assets#classify}: an outcome, fields
-    #   to deep-merge into the asset (`{'classification' => {'moderation' => {'status' => 'blocked'}}}`;
-    #   the outcome follows `classification.moderation.status`, or is `failed` when `classification.status` is `failed`,
-    #   and is `allowed` otherwise), or a callable that receives a copy of the asset and returns either.
+    # @param moderate [#call, nil] decides each asset the mock moderates. It receives a
+    #   {MockModerationInput} (the stored asset, its content, the trigger and whether the API would
+    #   queue the work) and returns a status from {MockDecision::STATUSES} or a {MockDecision}. It is
+    #   called on uploads (`assets.create`, `assets.classify`, `text.classify` and a final part:
+    #   trigger `upload`), `assets.retry` (`retry`), `assets.explain` with `rerun: true` (`rerun`) and
+    #   {#complete_processing} without a decision (`complete`). `pending` leaves the asset processing.
+    #   Without it, queued work other than `complete` stays `pending` and the rest is `allowed`. It
+    #   runs while the mock handles a request, so it must not call the mock.
+    # @param max_retries [Integer] retries after a retryable failure; 0 by default, so a simulated
+    #   failure reaches the caller.
     # @param options [Hash] other {ServerClient#initialize} settings, except `api_key` and `transport`.
     #   Retries and decision checks wait no real time.
     def initialize(project_id: 'project-1', api_key: MockServerClient.create_api_key, base_url: 'https://api.calmlens.invalid/v1',
                    cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: MockServerClient.monotonic_clock,
-                   create_id: ->(prefix) { MockServerClient.new_id(prefix) }, queued_outcome: 'pending', analyzed_outcome: 'allowed',
-                   **options)
+                   create_id: ->(prefix) { MockServerClient.new_id(prefix) }, moderate: nil, max_retries: 0, **options)
+      raise Internal.invalid('moderate must respond to call') unless moderate.nil? || moderate.respond_to?(:call)
+
       @mock_lock = Mutex.new
       @queue = []
       @received = []
       @failures = []
       @call_key = :"calmlens_mock_call_#{object_id}"
-      super(api_key: api_key, project_id: project_id, base_url: base_url, cdn_base_url: cdn_base_url,
+      super(api_key: api_key, project_id: project_id, base_url: base_url, cdn_base_url: cdn_base_url, max_retries: max_retries,
             **options, transport: method(:receive))
       @fake = Testing::FakeAPI.new(project_id: project_id, base_url: self.base_url, cdn_base_url: self.cdn_base_url,
-                                   now: now, create_id: create_id, queued_outcome: queued_outcome,
-                                   analyzed_outcome: analyzed_outcome, grants: MockServerClient.grants_of(api_key))
+                                   now: now, create_id: create_id, moderate: moderate, grants: MockServerClient.grants_of(api_key))
       @state = @fake.state
       # Like the API, the stand-in checks upload sizes itself, in the API's order.
       @session.defer_upload_checks = true
@@ -165,11 +177,22 @@ module CalmLens
     # @param decision [String] `allowed`, `limited`, `age-restricted`, `blocked` or `purged`
     # @return [Hash] the asset
     # @raise [APIError] `asset/not-found` for an unknown asset
+    # @raise [InvalidArgumentError] for any other decision, such as `pending` or `failed`
     def decide(asset_id, decision)
-      asset = @mock_lock.synchronize { @fake.decide(asset_id, decision) }
-      return asset if asset
+      @mock_lock.synchronize { @fake.decide(asset_id, decision) } || raise(not_found)
+    end
 
-      raise APIError.class_for(404).new(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', status: 404)
+    # Finishes processing an asset as the moderation pipeline would: with `decision`, or else what
+    # `moderate:` answers for the `complete` trigger (`allowed` without it). A decision adds the
+    # `asset.classified` and automated `asset.<status>` events (or `asset.failed`); `pending` leaves
+    # the asset processing. It records no manual review.
+    # @param asset_id [String]
+    # @param decision [String, MockDecision, nil] a status from {MockDecision::STATUSES} or a {MockDecision}
+    # @return [Hash] the asset
+    # @raise [APIError] `asset/not-found` for an unknown asset
+    # @raise [InvalidArgumentError] when the asset isn't processing, or for an unknown decision
+    def complete_processing(asset_id, decision = nil)
+      @mock_lock.synchronize { @fake.complete_processing(asset_id, decision) } || raise(not_found)
     end
 
     # Changes the grants of the mock's API key, as editing the key in the portal would: later
@@ -181,22 +204,34 @@ module CalmLens
       @mock_lock.synchronize { @fake.grants = normalized }
     end
 
-    # Makes the next call (or the next call to `operation`) fail instead of running, as if its
-    # request never completed: every request it sends, retries included, fails the same way. Queue
-    # several to fail several calls in a row; each is used once.
+    # Makes the next request (or the next one `operation` sends) fail instead of running, as if it
+    # never completed. Each queued failure fails one request, so a client retry takes the next
+    # queued failure or reaches the API. Queue several to fail several requests in a row.
     # @param failure [String, Exception] `transport-error` (`sdk/transport-error`), `timeout`
     #   (`sdk/timeout`), an API error code such as `upload/limit-exceeded` (answered with its HTTP
     #   status), or an exception for the transport to raise.
     # @param operation [String, nil] a method such as `assets.create`, `assets.upload_part`,
     #   `cdn.serve` or `ensure_lens` (JavaScript names such as `assets.uploadPart` work too).
+    # @param details [Hash, nil] the API error's `details`, for an API error code.
+    # @param retry_after [Integer, nil] whole seconds for the API error's `Retry-After` header.
     # @return [self]
-    def fail_next_request(failure = 'transport-error', operation: nil)
+    # @raise [InvalidArgumentError] for an unknown failure or operation, or a `retry_after` that isn't
+    #   a whole number of seconds
+    def fail_next_request(failure = 'transport-error', operation: nil, details: nil, retry_after: nil)
       unless failure.is_a?(Exception) || REQUEST_FAILURES.include?(failure) || ErrorCodes::STATUSES.key?(failure)
         raise Internal.invalid("Unknown failure #{failure.inspect}: use #{REQUEST_FAILURES.join(', ')}, an API error code or an exception")
       end
+      unless retry_after.nil? || (retry_after.is_a?(Integer) && retry_after >= 0)
+        raise Internal.invalid('retry_after must be a whole number of seconds')
+      end
+      raise Internal.invalid('details must be a Hash') unless details.nil? || details.is_a?(Hash)
 
       name = operation && operation.to_s.split('.').map { |part| Internal.camelize(part) }.join('.')
-      @mock_lock.synchronize { @failures << { failure: failure, operation: name } }
+      if name && !OPERATION_NAMES.include?(name)
+        raise Internal.invalid("Unknown operation #{operation.inspect}: use one of #{OPERATION_NAMES.join(', ')}")
+      end
+
+      @mock_lock.synchronize { @failures << { failure: failure, operation: name, details: details, retry_after: retry_after } }
       self
     end
 
@@ -234,16 +269,26 @@ module CalmLens
     end
 
     # Adds an event to the mock's events feed. Fields you omit (`id`, `projectId`, `createdAt`,
-    # `severity`, `title`, `facts`, and nil `description`, `assetId` and `asset`) are filled in.
+    # `severity`, `title`, `facts`, and nil `description` and `assetId`) are filled in. An event
+    # with the `asset_id` of a stored asset carries that asset's snapshot as it is now, unless you
+    # pass `asset`.
     # @param event [Hash] at least `type:`; snake_case keys are converted.
     # @return [Hash] the stored event
     def enqueue_event(event)
-      @mock_lock.synchronize { JSON.parse(JSON.generate(@fake.add_event(Internal.normalize(event)))) }
+      @mock_lock.synchronize { JSON.parse(JSON.generate(@fake.enqueue_event(Internal.normalize(event)))) }
     end
 
-    # @return [Array<Request>] copies of every request received so far, oldest first.
+    # @return [Array<Request>] copies of every request received since the mock was created or
+    #   {#clear_requests} last ran, oldest first.
     def requests
       @mock_lock.synchronize { @received.map { |request| Request.new(**Marshal.load(Marshal.dump(request.to_h))) } }
+    end
+
+    # Forgets the requests recorded so far.
+    # @return [self]
+    def clear_requests
+      @mock_lock.synchronize { @received.clear }
+      self
     end
 
     # @return [Integer] queued responses and errors not used yet.
@@ -254,6 +299,8 @@ module CalmLens
     def inspect = "#<#{self.class.name} project_id=#{project_id.inspect}>"
 
     private
+
+    def not_found = APIError.class_for(404).new(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', status: 404)
 
     # Wraps a resource's methods so requests know which call sent them, for {#fail_next_request}.
     def track(resource, prefix, methods)
@@ -279,16 +326,10 @@ module CalmLens
       end
     end
 
-    # The failure for this request: the one its call already took, or the next queued for it.
+    # The next queued failure for this request, which it uses up.
     def failure_for(call)
-      return call[:failure] if call&.key?(:failure)
-
       index = @failures.index { |pending| pending[:operation].nil? || pending[:operation] == call&.dig(:operation) }
-      return unless index
-
-      failure = @failures.delete_at(index)[:failure]
-      call[:failure] = failure if call
-      failure
+      index && @failures.delete_at(index)
     end
 
     # Returns the response rather than yielding it: the client accepts either from a transport.
@@ -298,25 +339,38 @@ module CalmLens
       base = request.url.start_with?("#{cdn_base_url}/") ? URI(cdn_base_url).path : URI(base_url).path
       call = Thread.current[@call_key]
       @mock_lock.synchronize do
-        @received << Request.new(method: request.method, url: request.url, path: path.delete_prefix(base),
-                                 query: URI.decode_www_form(query.to_s).to_h, headers: request.headers.dup,
-                                 body: body)
-        failure = failure_for(call)
-        return fail_request(failure) if failure
-
-        queued = @queue.shift
-        raise queued if queued.is_a?(Exception)
-
-        queued || @fake.handle(request.method, request.url, request.headers, body)
+        record = Request.new(method: request.method, url: request.url, path: decode_path(path.delete_prefix(base)),
+                             query: URI.decode_www_form(query.to_s).to_h, headers: request.headers.dup, body: body)
+        @received << record
+        response = answer(request, body, failure_for(call))
+        record.status = response.status
+        response
       end
     end
 
-    def fail_request(failure)
+    def answer(request, body, failure)
+      return fail_request(failure) if failure
+
+      queued = @queue.shift
+      raise queued if queued.is_a?(Exception)
+
+      queued || @fake.handle(request.method, request.url, request.headers, body)
+    end
+
+    # Each segment of a request path, percent-decoded.
+    def decode_path(path)
+      path.split('/', -1).map do |segment|
+        segment.b.gsub(/%(\h\h)/) { Regexp.last_match(1).hex.chr }.force_encoding(Encoding::UTF_8)
+      end.join('/')
+    end
+
+    def fail_request(pending)
+      failure = pending[:failure]
       raise failure if failure.is_a?(Exception)
       raise Errno::ECONNRESET, 'Simulated network failure' if failure == 'transport-error'
       raise Net::ReadTimeout, 'Simulated timeout' if failure == 'timeout'
 
-      @fake.error(failure)
+      @fake.error(failure, details: pending[:details] && JSON.parse(JSON.generate(pending[:details])), retry_after: pending[:retry_after])
     end
 
     def read_stream(io)

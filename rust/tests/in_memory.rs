@@ -51,7 +51,8 @@ async fn decide_uses_deterministic_ids_and_refuses_unknown_assets() {
         .unwrap();
     assert_eq!(
         asset.classification.moderation.manual_reviews[0].id,
-        "rev_00000000000000000002"
+        // After the asset and its `asset.uploaded` event.
+        "rev_00000000000000000003"
     );
     assert_eq!(
         mock.decide(
@@ -88,8 +89,7 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
         .unwrap();
     assert!(!mock.with_storage(|storage| storage.content.contains_key(&stored.id)));
 
-    let purging =
-        MockServerClient::in_memory(options().analyzed_outcome(MockOutcome::Purged)).unwrap();
+    let purging = MockServerClient::in_memory(options().moderate(|_| MockOutcome::Purged)).unwrap();
     let purged = purging
         .assets()
         .classify(kept("e.png", b"png"))
@@ -140,7 +140,13 @@ async fn explain_completes_evidence_and_rerun_moderates_again() {
 
 #[tokio::test]
 async fn failed_processing_can_be_retried_and_deleted_content_cannot() {
-    let mock = MockServerClient::in_memory(options().queued_outcome(MockOutcome::Failed)).unwrap();
+    let mock = MockServerClient::in_memory(options().moderate(|input: &MockModerationInput| {
+        match input.trigger {
+            MockModerationTrigger::Upload => MockOutcome::Failed.into(),
+            _ => input.default_decision(),
+        }
+    }))
+    .unwrap();
     let asset = mock.assets().create(kept("g.png", b"png")).await.unwrap();
     assert_eq!(
         asset.classification.status,
@@ -186,8 +192,14 @@ async fn failed_processing_can_be_retried_and_deleted_content_cannot() {
 
 #[tokio::test]
 async fn list_filters_orders_and_pages_with_cursors() {
-    let mock =
-        MockServerClient::in_memory(options().analyzed_outcome(MockOutcome::Blocked)).unwrap();
+    let mock = MockServerClient::in_memory(options().moderate(|input: &MockModerationInput| {
+        if input.queued {
+            input.default_decision()
+        } else {
+            MockOutcome::Blocked.into()
+        }
+    }))
+    .unwrap();
     let folder = mock
         .folders()
         .create(CreateFolder {
@@ -362,8 +374,8 @@ async fn queued_responses_come_before_the_in_memory_state() {
 #[tokio::test]
 async fn enqueued_events_carry_the_asset_snapshot() {
     let mock = MockServerClient::in_memory(options()).unwrap();
-    let start = mock.events().list(ListEvents::default()).await.unwrap();
     let asset = mock.assets().create(named("x")).await.unwrap();
+    let start = mock.events().list(ListEvents::default()).await.unwrap();
     let mut event = Event::new("", EventType::AssetUploaded);
     event.asset_id = Some(asset.id.clone());
     let event = mock.enqueue_event(event);
@@ -414,6 +426,13 @@ async fn mock_options_set_the_base_urls() {
         .await
         .unwrap();
     assert_eq!(response.status().as_u16(), 403);
+    // Recorded paths are relative to the base URL each request went to.
+    let paths: Vec<_> = mock.requests().into_iter().map(|r| r.path).collect();
+    assert_eq!(paths[0], "/projects/mock-project/assets");
+    assert!(
+        paths[1].starts_with(&format!("/assets/mock-project/{}/", asset.id)),
+        "{paths:?}"
+    );
     let urls: Vec<_> = mock
         .requests()
         .into_iter()
@@ -520,4 +539,55 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
         .unwrap_err();
     assert_eq!(removed.code(), &ErrorCode::HashListEntryNotFound);
     assert!(mock.with_storage(|storage| storage.hash_list_entries.is_empty()));
+}
+
+/// An error the `moderate` callback returns fails the request that triggered it, as the
+/// client would report it, and leaves no asset behind.
+#[tokio::test]
+async fn a_moderate_error_fails_the_triggering_request() {
+    let mock = MockServerClient::in_memory(options().moderate(|_: &MockModerationInput| {
+        MockDecision::new(MockOutcome::Blocked).flag("spam", 0.9, &[])
+    }))
+    .unwrap();
+    let error = mock.assets().classify(named("x")).await.unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::InvalidArgument);
+    assert_eq!(mock.requests()[0].response_status, None);
+    assert!(mock.with_storage(|storage| storage.assets.is_empty() && storage.content.is_empty()));
+}
+
+/// A stored asset that is not a valid asset fails moderation with `sdk/invalid-response`
+/// instead of reaching the callback as a default asset.
+#[tokio::test]
+async fn an_undecodable_stored_asset_never_reaches_moderate() {
+    let calls = Arc::new(AtomicU64::new(0));
+    let counted = calls.clone();
+    let mock =
+        MockServerClient::in_memory(options().moderate(move |input: &MockModerationInput| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            input.default_decision()
+        }))
+        .unwrap();
+    let asset = mock.assets().create(named("x")).await.unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&asset.id).unwrap()["createdAt"] = json!("yesterday");
+    });
+    let error = mock.complete_processing(&asset.id, None).unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::InvalidResponse);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+/// An unknown operation is refused rather than queued, so the next request reaches the API.
+#[tokio::test]
+async fn fail_next_request_refuses_an_unknown_operation() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let error = mock
+        .fail_next_request(
+            MockFailure::TransportError,
+            MockFailureOptions::new().operation("assets.upload"),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::InvalidArgument);
+    mock.assets().create(named("x")).await.unwrap();
+    assert_eq!(mock.requests()[0].response_status, Some(200));
 }

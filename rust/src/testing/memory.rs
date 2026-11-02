@@ -1,4 +1,8 @@
 //! The in-memory API behind [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
+use super::decision::{
+    IntoMockDecision, MockDecision, MockModerationContent, MockModerationInput,
+    MockModerationTrigger, MockOutcome,
+};
 use super::MockResponse;
 use crate::error::ErrorCode;
 use crate::models::{select_moderation_context_items, ModerationContext};
@@ -15,45 +19,6 @@ use std::{
 
 pub(super) const API_BASE_URL: &str = "https://api.calmlens.invalid/v1";
 pub(super) const CDN_BASE_URL: &str = "https://cdn.calmlens.invalid/v1";
-
-/// The simulated result of an upload, for [`MockOptions::queued_outcome`] and
-/// [`MockOptions::analyzed_outcome`]. The mock does not classify content.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum MockOutcome {
-    /// Processing continues with moderation `pending`.
-    Pending,
-    /// Processing completes with moderation `allowed`.
-    Allowed,
-    /// Processing completes with moderation `limited`; the CDN serves the asset like an
-    /// allowed one.
-    Limited,
-    /// Processing completes with moderation `age-restricted`; the CDN then serves the asset
-    /// only with `ViewerClaims::age_confirmed` set to `true`, and a private one only with the
-    /// download permission too.
-    AgeRestricted,
-    /// Processing completes with moderation `blocked`; the CDN refuses it.
-    Blocked,
-    /// Processing completes with moderation `purged` and the content is removed (reason `policy`).
-    Purged,
-    /// Processing fails (retryable) with moderation `pending` and failure reason
-    /// `processing-error`.
-    Failed,
-}
-impl MockOutcome {
-    /// The moderation status (or `failed`) this outcome sets.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Pending => "pending",
-            Self::Allowed => "allowed",
-            Self::Limited => "limited",
-            Self::AgeRestricted => "age-restricted",
-            Self::Blocked => "blocked",
-            Self::Purged => "purged",
-            Self::Failed => "failed",
-        }
-    }
-}
 
 /// One permission grant of a key made by [`create_mock_api_key`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -88,7 +53,7 @@ pub fn create_mock_api_key(grants: &[MockApiKeyGrant]) -> String {
 
 type CreateId = Arc<dyn Fn(&str) -> String + Send + Sync>;
 type Now = Arc<dyn Fn() -> u64 + Send + Sync>;
-type OutcomeFor = Arc<dyn Fn(&crate::models::Asset) -> MockOutcome + Send + Sync>;
+type Moderate = Arc<dyn Fn(&MockModerationInput) -> crate::Result<MockDecision> + Send + Sync>;
 
 /// How [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// fails a request.
@@ -103,9 +68,50 @@ pub enum MockFailure {
     Api(ErrorCode),
 }
 
+/// Which request [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
+/// fails, and the details of an API error.
+#[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct MockFailureOptions {
+    /// Fail the next request of this operation rather than the next request.
+    pub operation: Option<String>,
+    /// The API error's `details`.
+    pub details: Map<String, Value>,
+    /// The API error's `Retry-After` header, in seconds.
+    pub retry_after: Option<u32>,
+}
+impl MockFailureOptions {
+    /// Fails the next request, with no details or `Retry-After`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Fails the next request of `operation`: the JavaScript SDK's method path, such as
+    /// `assets.create`, `assets.uploadPart` or `cdn.serve`.
+    pub fn operation(mut self, operation: impl Into<String>) -> Self {
+        self.operation = Some(operation.into());
+        self
+    }
+    /// The API error's `details`, such as `{"reason": "spend-limit"}`.
+    pub fn details(mut self, details: Map<String, Value>) -> Self {
+        self.details = details;
+        self
+    }
+    /// Sends the API error with a `Retry-After` header of `seconds`.
+    pub fn retry_after(mut self, seconds: u32) -> Self {
+        self.retry_after = Some(seconds);
+        self
+    }
+}
+
+/// A failure queued by `fail_next_request`.
+pub(super) struct QueuedFailure {
+    pub(super) failure: MockFailure,
+    pub(super) options: MockFailureOptions,
+}
+
 /// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// takes: the JavaScript SDK's method paths.
-pub(super) const OPERATIONS: [&str; 37] = [
+pub(super) const OPERATIONS: [&str; 39] = [
     "assets.create",
     "assets.classify",
     "text.classify",
@@ -124,6 +130,8 @@ pub(super) const OPERATIONS: [&str; 37] = [
     "assets.retry",
     "assets.explain",
     "assets.move",
+    "assets.decide",
+    "assets.batch",
     "folders.list",
     "folders.create",
     "folders.retrieve",
@@ -148,8 +156,8 @@ pub(super) const OPERATIONS: [&str; 37] = [
 /// Options for [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
 ///
 /// Defaults: project `mock-project`, `create_mock_api_key(&[])`, no retries, random IDs, the
-/// system clock, queued outcome [`MockOutcome::Pending`], analyzed outcome
-/// [`MockOutcome::Allowed`] and the base URLs `https://api.calmlens.invalid/v1` and
+/// system clock, the default moderation ([`MockModerationInput::default_decision`]) and the base
+/// URLs `https://api.calmlens.invalid/v1` and
 /// `https://cdn.calmlens.invalid/v1`.
 #[derive(Clone)]
 pub struct MockOptions {
@@ -160,8 +168,7 @@ pub struct MockOptions {
     pub(super) cdn_base_url: String,
     pub(super) upload_timeout: Option<Duration>,
     pub(super) max_response_bytes: Option<usize>,
-    queued_outcome: OutcomeFor,
-    analyzed_outcome: OutcomeFor,
+    moderate: Option<Moderate>,
     create_id: CreateId,
     now: Now,
     signed_url_base_url: String,
@@ -176,8 +183,7 @@ impl Default for MockOptions {
             cdn_base_url: CDN_BASE_URL.into(),
             upload_timeout: None,
             max_response_bytes: None,
-            queued_outcome: Arc::new(|_| MockOutcome::Pending),
-            analyzed_outcome: Arc::new(|_| MockOutcome::Allowed),
+            moderate: None,
             create_id: Arc::new(crate::transport::new_id),
             now: monotonic_clock(),
             signed_url_base_url: "https://mock.calmlens.invalid".into(),
@@ -253,30 +259,23 @@ impl MockOptions {
         self.max_response_bytes = Some(value);
         self
     }
-    /// The outcome of `assets().create` and queued multipart uploads.
-    pub fn queued_outcome(self, value: MockOutcome) -> Self {
-        self.queued_outcome_for(move |_| value)
-    }
-    /// The outcome of `assets().classify` and `text().classify`. Finished processing removes
-    /// the content unless the upload set `keep_content_after_processing`.
-    pub fn analyzed_outcome(self, value: MockOutcome) -> Self {
-        self.analyzed_outcome_for(move |_| value)
-    }
-    /// The outcome of each queued upload, chosen from the asset as uploaded (its name,
-    /// metadata, type and so on), e.g. to block only some assets.
-    pub fn queued_outcome_for(
-        mut self,
-        outcome: impl Fn(&crate::models::Asset) -> MockOutcome + Send + Sync + 'static,
-    ) -> Self {
-        self.queued_outcome = Arc::new(outcome);
-        self
-    }
-    /// The outcome of each analyzed upload (`classify`), chosen from the asset as uploaded.
-    pub fn analyzed_outcome_for(
-        mut self,
-        outcome: impl Fn(&crate::models::Asset) -> MockOutcome + Send + Sync + 'static,
-    ) -> Self {
-        self.analyzed_outcome = Arc::new(outcome);
+    /// Decides each asset the mock moderates: when an upload completes (`assets().create`,
+    /// `assets().classify`, `text().classify` or a final part), when `assets().retry` or
+    /// `assets().explain` with `rerun` queues an asset again, and when
+    /// [`complete_processing`](super::MockServerClient::complete_processing) is called without a
+    /// decision. It receives the stored asset, its content, the trigger and whether the API
+    /// would queue the work, and returns a [`MockOutcome`] or a [`MockDecision`] (or a
+    /// `calmlens::Result` of either; an error fails the request that triggered it). `pending`
+    /// leaves the asset processing. Without it, queued work other than `complete` stays
+    /// `pending` and everything else is `allowed`.
+    ///
+    /// The callback runs while the mock handles the request, so it must not call the mock.
+    pub fn moderate<F, R>(mut self, moderate: F) -> Self
+    where
+        F: Fn(&MockModerationInput) -> R + Send + Sync + 'static,
+        R: IntoMockDecision,
+    {
+        self.moderate = Some(Arc::new(move |input| moderate(input).into_mock_decision()));
         self
     }
     /// Creates the ID of a new object of the kind its prefix names (`asset`, `fldr`, `hl`, `hle`,
@@ -338,14 +337,12 @@ struct Failure {
     status: u16,
     message: String,
     details: Value,
+    /// An error the request fails with instead of an API response, such as one a `moderate`
+    /// callback returned.
+    raised: Option<crate::Error>,
 }
 fn fail(code: ErrorCode, message: &str) -> Failure {
-    Failure {
-        status: code.http_status().unwrap_or(400),
-        code: code.as_str().to_owned(),
-        message: message.to_owned(),
-        details: json!({}),
-    }
+    custom(code.as_str(), code.http_status().unwrap_or(400), message)
 }
 fn custom(code: &str, status: u16, message: &str) -> Failure {
     Failure {
@@ -353,7 +350,14 @@ fn custom(code: &str, status: u16, message: &str) -> Failure {
         status,
         message: message.to_owned(),
         details: json!({}),
+        raised: None,
     }
+}
+/// A failure that fails the request with `error` rather than an API response.
+fn raised(error: crate::Error) -> Failure {
+    let mut failure = custom(error.code().as_str(), 0, "");
+    failure.raised = Some(error);
+    failure
 }
 fn invalid(message: &str) -> Failure {
     fail(ErrorCode::InvalidUploadPayload, message)
@@ -418,6 +422,13 @@ fn unknown_route() -> Failure {
     )
 }
 impl Failure {
+    /// The client error this failure gives, as the client would map the API's response.
+    fn into_error(self) -> crate::Error {
+        match self.raised {
+            Some(error) => error,
+            None => crate::Error::new(self.code.as_str(), self.message).with_status(self.status),
+        }
+    }
     fn response(&self) -> MockResponse {
         MockResponse::api_error_body(
             self.status,
@@ -497,7 +508,7 @@ pub(super) struct Backend {
     /// The mock API key's grants; `set_api_key_grants` replaces them.
     grants: Vec<MockApiKeyGrant>,
     /// Failures queued by `fail_next_request`, each for any request or one operation.
-    failures: Vec<(MockFailure, Option<String>)>,
+    failures: Vec<QueuedFailure>,
     uploads: HashMap<String, Upload>,
     lenses: HashMap<String, Value>,
     replays: HashMap<String, (String, MockResponse)>,
@@ -530,7 +541,7 @@ fn header<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
         .unwrap_or("")
 }
 /// The path of `url` below `base` (still percent-encoded), when `url` is under `base`.
-fn under<'a>(url: &'a reqwest::Url, base: &str) -> Option<&'a str> {
+pub(super) fn under<'a>(url: &'a reqwest::Url, base: &str) -> Option<&'a str> {
     let base = reqwest::Url::parse(base).ok()?;
     if url.origin() != base.origin() {
         return None;
@@ -538,7 +549,7 @@ fn under<'a>(url: &'a reqwest::Url, base: &str) -> Option<&'a str> {
     let rest = url.path().strip_prefix(base.path().trim_end_matches('/'))?;
     (rest.is_empty() || rest.starts_with('/')).then_some(rest)
 }
-fn percent_decode(segment: &str) -> String {
+pub(super) fn percent_decode(segment: &str) -> String {
     let bytes = segment.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut index = 0;
@@ -671,6 +682,14 @@ pub(super) fn snapshot(asset: &Value) -> Value {
             "moderation": {"status": asset["classification"]["moderation"]["status"]},
         },
         "content": {"status": asset["content"]["status"]},
+    })
+}
+
+/// An asset's portal link, as event facts carry it.
+fn asset_name_fact(asset: &Value) -> Value {
+    json!({
+        "key": "asset-name", "value": asset["name"],
+        "url": format!("https://calmlens.com/go/asset/{}", text(&asset["id"])),
     })
 }
 
@@ -928,10 +947,10 @@ impl Backend {
         url: &reqwest::Url,
         headers: &HeaderMap,
         raw: &[u8],
-    ) -> MockResponse {
+    ) -> crate::Result<MockResponse> {
         let cdn = under(url, &self.options.cdn_base_url);
         let Some(rest) = cdn.or_else(|| under(url, &self.options.api_base_url)) else {
-            return unknown_route().response();
+            return Ok(unknown_route().response());
         };
         let parts: Vec<String> = rest
             .split('/')
@@ -944,14 +963,14 @@ impl Backend {
         }
         if cdn.is_some() {
             let response = self.serve(&parts, &query, headers);
-            return if method == Method::HEAD {
+            return Ok(if method == Method::HEAD {
                 response.body(Vec::new())
             } else {
                 response
-            };
+            });
         }
         if header(headers, "x-api-key") != self.options.api_key {
-            return fail(ErrorCode::InvalidApiKey, "The API key is invalid").response();
+            return Ok(fail(ErrorCode::InvalidApiKey, "The API key is invalid").response());
         }
         let content_type = header(headers, "content-type");
         let is_json = content_type == "application/json";
@@ -978,31 +997,32 @@ impl Backend {
         );
         if raw_key.is_some() {
             if !valid_idempotency_key(key) {
-                return fail(ErrorCode::InvalidIdempotencyKey, "Invalid Idempotency-Key")
-                    .response();
+                return Ok(
+                    fail(ErrorCode::InvalidIdempotencyKey, "Invalid Idempotency-Key").response(),
+                );
             }
             if let Some((saved, response)) = self.replays.get(key) {
                 if *saved != fingerprint {
-                    return fail(
+                    return Ok(fail(
                         ErrorCode::IdempotencyKeyReused,
                         "Idempotency-Key used for another request",
                     )
-                    .response();
+                    .response());
                 }
-                return response.clone().header("idempotent-replayed", "true");
+                return Ok(response.clone().header("idempotent-replayed", "true"));
             }
         }
         let body = if is_json && !raw.is_empty() {
             match serde_json::from_slice::<Value>(raw) {
                 Ok(Value::Object(body)) => body,
-                _ => return invalid("The body is not a JSON object").response(),
+                _ => return Ok(invalid("The body is not a JSON object").response()),
             }
         } else {
             Map::new()
         };
         // Like the API: a new folder, hash list or entry is 201 Created, a queued batch 202
         // Accepted. Adding a hash a list already holds returns the entry with 200.
-        let operation = self.operation(method, url, headers);
+        let operation = self.operation(method, url);
         let entries = self.storage.hash_list_entries.len();
         let outcome = self.dispatch(method, &parts, &query, body, raw, headers);
         let status = match operation {
@@ -1018,9 +1038,14 @@ impl Backend {
                     self.replays
                         .insert(key.to_owned(), (fingerprint, response.clone()));
                 }
-                response
+                Ok(response)
             }
-            Err(failure) => failure.response(),
+            // An error a `moderate` callback returned fails the request as it is.
+            Err(Failure {
+                raised: Some(error),
+                ..
+            }) => Err(error),
+            Err(failure) => Ok(failure.response()),
         }
     }
 
@@ -1130,13 +1155,175 @@ impl Backend {
         }
         Ok(())
     }
-    /// The outcome the options choose for `asset`.
-    fn outcome(&self, queue: bool, asset: &Value) -> MockOutcome {
-        let typed: crate::models::Asset = serde_json::from_value(asset.clone()).unwrap_or_default();
-        if queue {
-            (self.options.queued_outcome)(&typed)
-        } else {
-            (self.options.analyzed_outcome)(&typed)
+    /// Asks `moderate` how to decide `asset`, with its stored content (the parts in order;
+    /// none once the content is removed). A stored asset that does not decode as an [`Asset`]
+    /// fails with `sdk/invalid-response` rather than reaching the callback.
+    ///
+    /// [`Asset`]: crate::models::Asset
+    fn decision_for(
+        &self,
+        asset: &Value,
+        trigger: MockModerationTrigger,
+        queued: bool,
+    ) -> Outcome<MockDecision> {
+        let id = text(&asset["id"]);
+        let bytes = (asset["content"]["status"] != "removed")
+            .then(|| self.storage.content.get(id).map(StoredContent::bytes))
+            .flatten();
+        let text = bytes
+            .as_ref()
+            .filter(|_| asset["type"] == "plaintext-document")
+            .map(|bytes| String::from_utf8_lossy(bytes).into_owned());
+        let typed = serde_json::from_value(asset.clone()).map_err(|cause| {
+            raised(crate::Error::new(
+                ErrorCode::InvalidResponse,
+                format!("The stored asset {id} is not a valid asset: {cause}"),
+            ))
+        })?;
+        let input = MockModerationInput {
+            asset: typed,
+            content: MockModerationContent { bytes, text },
+            trigger,
+            queued,
+        };
+        match &self.options.moderate {
+            Some(moderate) => moderate(&input).map_err(raised),
+            None => Ok(input.default_decision()),
+        }
+    }
+
+    /// `asset` decided as `decision` says (which must not be `pending`), with its report.
+    fn apply_decision(&mut self, asset: &mut Value, decision: &MockDecision, now: u64) {
+        let status = decision.status().as_str();
+        apply_outcome(asset, &mut self.storage.content, status, "policy", now);
+        if let Some(report) = decision.report() {
+            let moderation = &mut asset["classification"]["moderation"];
+            for (key, value) in report {
+                moderation[key] = value;
+            }
+        }
+    }
+
+    /// Stores a processing asset's `decision` and records its events; a `pending` decision
+    /// leaves it processing.
+    fn settle(&mut self, mut asset: Value, decision: &MockDecision, now: u64) -> Value {
+        if decision.status() == MockOutcome::Pending {
+            return asset;
+        }
+        self.apply_decision(&mut asset, decision, now);
+        self.storage
+            .assets
+            .insert(text(&asset["id"]).to_owned(), asset.clone());
+        self.record_processing_events(&asset, decision);
+        asset
+    }
+
+    /// Asks `moderate` (unless `decision` is given) and settles a stored processing asset.
+    fn moderate_stored(
+        &mut self,
+        asset: Value,
+        trigger: MockModerationTrigger,
+        decision: Option<MockDecision>,
+        now: u64,
+    ) -> Outcome<Value> {
+        let decision = match decision {
+            Some(decision) => decision,
+            None => self.decision_for(&asset, trigger, true)?,
+        };
+        Ok(self.settle(asset, &decision, now))
+    }
+
+    /// Moderates a completed upload (`asset`, still processing and not yet stored), stores it and records `asset.uploaded` and the processing events.
+    fn finish_upload(&mut self, mut asset: Value, queued: bool, now: u64) -> Outcome<Value> {
+        let decision = self.decision_for(&asset, MockModerationTrigger::Upload, queued)?;
+        let uploaded = asset.clone();
+        if decision.status() != MockOutcome::Pending {
+            self.apply_decision(&mut asset, &decision, now);
+        }
+        self.storage
+            .assets
+            .insert(text(&asset["id"]).to_owned(), asset.clone());
+        self.record_uploaded(&uploaded);
+        self.record_processing_events(&asset, &decision);
+        Ok(asset)
+    }
+
+    /// Finishes processing a stored asset as the pipeline would: with `decision`, or else what
+    /// `moderate` returns for the `complete` trigger.
+    pub(super) fn complete_processing(
+        &mut self,
+        asset_id: &str,
+        decision: Option<MockDecision>,
+    ) -> crate::Result<Value> {
+        let asset = self
+            .owned(&self.storage.assets, asset_id)
+            .ok_or_else(|| {
+                crate::Error::new(ErrorCode::AssetNotFound, "Asset not found").with_status(404)
+            })?
+            .clone();
+        if asset["classification"]["status"] != "processing" {
+            return Err(crate::Error::new(
+                ErrorCode::InvalidArgument,
+                format!("asset {asset_id} isn't processing"),
+            ));
+        }
+        let now = self.now();
+        self.moderate_stored(asset, MockModerationTrigger::Complete, decision, now)
+            .map_err(Failure::into_error)
+    }
+
+    /// `asset.uploaded`, as the API records it when an upload completes.
+    fn record_uploaded(&mut self, asset: &Value) {
+        let facts = json!([
+            {"key": "asset-type", "value": asset["type"]},
+            asset_name_fact(asset),
+            {"key": "file-format", "value": asset["content"]["format"]},
+        ]);
+        self.push_event("asset.uploaded", "low", asset, facts);
+    }
+
+    /// The events the pipeline records when it settles an asset: `asset.classified` and the
+    /// automated `asset.<status>`, or `asset.failed`.
+    fn record_processing_events(&mut self, asset: &Value, decision: &MockDecision) {
+        let status = decision.status();
+        match status {
+            MockOutcome::Pending => {}
+            MockOutcome::Failed => {
+                let reason = match &asset["classification"]["failureReason"] {
+                    Value::Null => json!("processing-error"),
+                    reason => reason.clone(),
+                };
+                let facts = json!([
+                    asset_name_fact(asset),
+                    {"key": "asset-type", "value": asset["type"]},
+                    {"key": "previous-status", "value": "processing"},
+                    {"key": "failure-reason", "value": reason},
+                ]);
+                self.push_event("asset.failed", "high", asset, facts);
+            }
+            _ => {
+                let flagged = decision.flagged_categories();
+                let facts = json!([
+                    {"key": "flagged-categories", "value": flagged},
+                    {"key": "moderation-status", "value": status.as_str()},
+                    {"key": "asset-type", "value": asset["type"]},
+                    asset_name_fact(asset),
+                ]);
+                self.push_event("asset.classified", "low", asset, facts);
+                // Like the event catalog: only allowing and limiting are low severity.
+                let severity = if matches!(status, MockOutcome::Allowed | MockOutcome::Limited) {
+                    "low"
+                } else {
+                    "high"
+                };
+                let facts = json!([
+                    {"key": "decided-by", "value": "automated"},
+                    {"key": "flagged-categories", "value": flagged},
+                    {"key": "asset-type", "value": asset["type"]},
+                    asset_name_fact(asset),
+                ]);
+                self.push_event(&format!("asset.{status}"), severity, asset, facts);
+            }
         }
     }
 
@@ -1696,24 +1883,18 @@ impl Backend {
                 },
             );
         }
-        if open {
-            self.uploads.insert(
-                id.clone(),
-                Upload {
-                    queue,
-                    total_size: total,
-                },
-            );
-        } else {
-            let outcome = self.outcome(queue, &asset);
-            apply_outcome(
-                &mut asset,
-                &mut self.storage.content,
-                outcome.as_str(),
-                "policy",
-                now,
-            );
+        if !open {
+            return self.finish_upload(asset, queue, now).inspect_err(|_| {
+                self.storage.content.remove(&id);
+            });
         }
+        self.uploads.insert(
+            id.clone(),
+            Upload {
+                queue,
+                total_size: total,
+            },
+        );
         self.storage.assets.insert(id, asset.clone());
         Ok(asset)
     }
@@ -1793,7 +1974,7 @@ impl Backend {
                 apply_outcome(&mut asset, &mut storage.content, "pending", "policy", now);
                 storage.assets.insert(id.to_owned(), asset.clone());
                 self.record_lifecycle_event("asset.retried", &asset);
-                return Ok(asset);
+                return self.moderate_stored(asset, MockModerationTrigger::Retry, None, now);
             }
             ("POST", "explain") => {
                 if asset["classification"]["status"] != "completed" {
@@ -1827,8 +2008,10 @@ impl Backend {
                             "The content is no longer stored",
                         ));
                     }
-                    // Back to processing under the current policy.
+                    // Back to processing, to be moderated again under the current policy.
                     apply_outcome(&mut asset, &mut storage.content, "pending", "policy", now);
+                    storage.assets.insert(id.to_owned(), asset.clone());
+                    return self.moderate_stored(asset, MockModerationTrigger::Rerun, None, now);
                 }
             }
             ("POST", "move") => {
@@ -1870,14 +2053,14 @@ impl Backend {
                 asset["upload"]["partsReceived"] = if is_final { Value::Null } else { part.into() };
                 if is_final {
                     self.uploads.remove(id);
-                    let outcome = self.outcome(queue, &asset);
                     apply_outcome(
                         &mut asset,
                         &mut self.storage.content,
-                        outcome.as_str(),
+                        "pending",
                         "policy",
                         now,
                     );
+                    return self.finish_upload(asset, queue, now);
                 }
             }
             _ => return Err(unknown_route()),
@@ -2195,31 +2378,27 @@ impl Backend {
     pub(super) fn set_grants(&mut self, grants: &[MockApiKeyGrant]) {
         self.grants = grants.to_vec();
     }
-    pub(super) fn queue_failure(&mut self, failure: MockFailure, operation: Option<&str>) {
-        self.failures.push((failure, operation.map(str::to_owned)));
+    pub(super) fn queue_failure(&mut self, failure: QueuedFailure) {
+        self.failures.push(failure);
     }
     /// The first queued failure for this request, removed from the queue.
     pub(super) fn take_failure(
         &mut self,
         method: &Method,
         url: &reqwest::Url,
-        headers: &HeaderMap,
-    ) -> Option<MockFailure> {
-        let operation = self.operation(method, url, headers);
-        let index = self.failures.iter().position(|(_, target)| {
-            target
+    ) -> Option<QueuedFailure> {
+        let operation = self.operation(method, url);
+        let index = self.failures.iter().position(|queued| {
+            queued
+                .options
+                .operation
                 .as_deref()
                 .is_none_or(|target| operation.is_some_and(|op| covers(target, op)))
         })?;
-        Some(self.failures.remove(index).0)
+        Some(self.failures.remove(index))
     }
     /// The operation a request belongs to, by its route: an operation name in [`OPERATIONS`].
-    fn operation(
-        &self,
-        method: &Method,
-        url: &reqwest::Url,
-        headers: &HeaderMap,
-    ) -> Option<&'static str> {
+    fn operation(&self, method: &Method, url: &reqwest::Url) -> Option<&'static str> {
         if under(url, &self.options.cdn_base_url).is_some() {
             return Some("cdn.serve");
         }
@@ -2228,13 +2407,12 @@ impl Backend {
         let queue = url
             .query_pairs()
             .any(|(key, value)| key == "queue" && value == "true");
-        let _ = headers;
         Some(match (method.as_str(), parts.as_slice()) {
             ("GET", ["projects", _, "events"]) => "events.list",
             ("PUT", ["projects", _, "lenses"]) => "ensureLenses",
             ("GET", ["projects", _, "folders"]) => "folders.list",
             ("POST", ["projects", _, "folders"]) => "folders.create",
-            ("GET", ["projects", _, "assets", "page"]) => "assets.list",
+            ("GET", ["projects", _, "assets"]) => "assets.list",
             ("GET", ["projects", _, "assets", "search"]) => "assets.search",
             ("POST", ["projects", _, "assets", "batch"]) => "assets.batch",
             ("POST", ["projects", _, "assets"]) if queue => "assets.create",

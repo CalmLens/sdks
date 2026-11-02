@@ -176,6 +176,11 @@ impl ServerClientBuilder {
         };
         Ok(ServerClient::from_parts(config, Transport::Http(http)))
     }
+    /// The API and CDN base URLs, for the mock's recorded request paths.
+    #[cfg(feature = "testing")]
+    pub(crate) fn base_urls(&self) -> [String; 2] {
+        [&self.base_url, &self.cdn_base_url].map(|url| url.trim_end_matches('/').to_owned())
+    }
     #[cfg(feature = "testing")]
     pub(crate) fn build_mock(
         self,

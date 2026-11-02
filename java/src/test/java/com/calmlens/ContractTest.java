@@ -483,10 +483,47 @@ class ContractTest {
   /** A missing value compares as JSON null; Gson compares numbers by value. */
   static JsonElement normalize(JsonElement value) { return value == null ? JsonNull.INSTANCE : value; }
 
-  private static Outcome outcome(JsonObject mock, String key, Outcome fallback) {
-    if (!mock.has(key)) return fallback;
-    String value = mock.get(key).getAsString();
+  private static Outcome outcome(String value) {
     return Arrays.stream(Outcome.values()).filter(outcome -> outcome.value().equals(value)).findFirst().orElseThrow();
+  }
+
+  /** Builds a decision with the builder, in the order the fixture lists its calls: a status, or a status with flags and notEvaluated. */
+  static MockDecision buildDecision(JsonElement spec) {
+    if (spec.isJsonPrimitive()) return MockDecision.of(spec.getAsString());
+    JsonObject object = spec.getAsJsonObject();
+    MockDecision decision = MockDecision.of(object.get("status").getAsString());
+    if (object.has("flags"))
+      for (JsonElement item : object.getAsJsonArray("flags")) {
+        JsonObject flag = item.getAsJsonObject();
+        Map<String, Double> qualifiers = new java.util.LinkedHashMap<>();
+        if (flag.has("qualifiers")) flag.getAsJsonObject("qualifiers").entrySet().forEach(q -> qualifiers.put(q.getKey(), q.getValue().getAsDouble()));
+        decision.flag(flag.get("category").getAsString(), flag.get("score").getAsDouble(), qualifiers);
+      }
+    if (object.has("notEvaluated")) for (JsonElement category : object.getAsJsonArray("notEvaluated")) decision.notEvaluated(category.getAsString());
+    return decision;
+  }
+
+  /**
+   * The scenario's {@code moderate}: answers by asset name for any trigger, else by queue mode for
+   * uploads, else like the mock's default, recording what it was given in {@code calls}.
+   */
+  private static java.util.function.Function<MockCalmLensServerClient.ModerationInput, MockDecision> recordingModerate(JsonObject moderate, JsonArray calls) {
+    return input -> {
+      JsonObject call = new JsonObject();
+      call.addProperty("trigger", input.trigger().value());
+      call.addProperty("queued", input.queued());
+      call.addProperty("assetId", input.asset().id());
+      call.addProperty("name", input.asset().name());
+      call.addProperty("text", input.content().text());
+      byte[] bytes = input.content().bytes();
+      call.addProperty("bytesBase64", bytes == null ? null : java.util.Base64.getEncoder().encodeToString(bytes));
+      calls.add(call);
+      String name = input.asset().name();
+      JsonElement spec = moderate.has("byName") && name != null ? moderate.getAsJsonObject("byName").get(name) : null;
+      if (spec == null && input.trigger() == MockCalmLensServerClient.Trigger.UPLOAD) spec = moderate.get(input.queued() ? "queued" : "analyzed");
+      if (spec != null) return buildDecision(spec);
+      return MockDecision.of(input.queued() && input.trigger() != MockCalmLensServerClient.Trigger.COMPLETE ? "pending" : "allowed");
+    };
   }
 
   static JsonElement tree(Object result) { return result == null ? JsonNull.INSTANCE : Json.GSON.toJsonTree(result); }
@@ -509,10 +546,34 @@ class ContractTest {
     return grants.toArray(Grant[]::new);
   }
 
-  private static JsonElement run(MockCalmLensServerClient mock, String operation, JsonObject args) throws Throwable {
+  private static JsonElement run(MockCalmLensServerClient mock, String operation, JsonObject args, JsonArray moderateCalls) throws Throwable {
     switch (operation) {
       case "mock.decide":
-        return tree(mock.decide(args.get("assetId").getAsString(), outcome(args, "outcome", null)));
+        return tree(mock.decide(args.get("assetId").getAsString(), outcome(args.get("outcome").getAsString())));
+      case "mock.completeProcessing":
+        return tree(mock.completeProcessing(args.get("assetId").getAsString(), args.has("decision") ? buildDecision(args.get("decision")) : null));
+      case "mock.moderateCalls":
+        return moderateCalls.deepCopy();
+      case "mock.buildDecision":
+        buildDecision(args);
+        return JsonNull.INSTANCE;
+      case "mock.requests": {
+        JsonArray requests = new JsonArray();
+        for (MockCalmLensServerClient.Request request : mock.requests()) {
+          JsonObject item = new JsonObject();
+          item.addProperty("method", request.method());
+          item.addProperty("path", request.path());
+          JsonObject query = new JsonObject();
+          request.query().forEach(query::addProperty);
+          item.add("query", query);
+          item.addProperty("status", request.status());
+          requests.add(item);
+        }
+        return requests;
+      }
+      case "mock.clearRequests":
+        mock.clearRequests();
+        return JsonNull.INSTANCE;
       case "mock.enqueueEvent": {
         List<Models.EventFact> facts = new ArrayList<>();
         for (JsonElement fact : args.getAsJsonArray("facts")) facts.add(Json.GSON.fromJson(fact, Models.EventFact.class));
@@ -522,9 +583,14 @@ class ContractTest {
       case "mock.grant":
         mock.setApiKeyGrants(grants(args.getAsJsonArray("grants")));
         return JsonNull.INSTANCE;
-      case "mock.failNext":
-        mock.failNextRequest(args.get("failure").getAsString(), args.has("operation") ? args.get("operation").getAsString() : null);
+      case "mock.failNext": {
+        MockCalmLensServerClient.FailureOptions failure = new MockCalmLensServerClient.FailureOptions();
+        if (args.has("operation")) failure.operation(args.get("operation").getAsString());
+        if (args.has("details")) failure.details(Json.GSON.fromJson(args.get("details"), new com.google.gson.reflect.TypeToken<Map<String, Object>>() {}.getType()));
+        if (args.has("retryAfter")) failure.retryAfter(args.get("retryAfter").getAsInt());
+        mock.failNextRequest(args.get("failure").getAsString(), failure);
         return JsonNull.INSTANCE;
+      }
       case "cdn.serve": {
         try (CdnResponse response = mock.client.cdn.serve(Fixtures.decode(args, Models.CdnRequest.class))) {
           byte[] bytes = response.readAllBytes(100_000_000);
@@ -561,13 +627,13 @@ class ContractTest {
     }
   }
 
-  private static void check(MockCalmLensServerClient mock, String scenario, JsonObject step, Map<String, JsonElement> saved) throws Throwable {
+  private static void check(MockCalmLensServerClient mock, String scenario, JsonObject step, Map<String, JsonElement> saved, JsonArray moderateCalls) throws Throwable {
     String operation = step.get("operation").getAsString();
     String label = scenario + ": " + operation + " " + step.get("args");
     JsonObject args = step.has("args") ? resolve(step.get("args"), saved).getAsJsonObject() : new JsonObject();
     JsonObject expect = step.has("expect") ? step.getAsJsonObject("expect") : new JsonObject();
     if (expect.has("error")) {
-      CalmLensException error = assertThrows(CalmLensException.class, () -> run(mock, operation, args), label);
+      CalmLensException error = assertThrows(CalmLensException.class, () -> run(mock, operation, args, moderateCalls), label);
       JsonObject wanted = expect.getAsJsonObject("error");
       JsonObject actual = new JsonObject();
       actual.addProperty("code", error.getCode());
@@ -576,6 +642,10 @@ class ContractTest {
       want.add("code", wanted.get("code"));
       want.add("status", wanted.get("status"));
       assertEquals(want, actual, label);
+      if (wanted.has("retryAfter")) {
+        assertInstanceOf(ApiException.class, error, label);
+        assertEquals(Optional.of(Duration.ofSeconds(wanted.get("retryAfter").getAsLong())), ((ApiException) error).getRetryAfter(), label + ": retryAfter");
+      }
       // `details` lists only the keys to compare.
       if (wanted.has("details")) {
         JsonObject details = Json.GSON.toJsonTree(error.getDetails()).getAsJsonObject();
@@ -584,15 +654,13 @@ class ContractTest {
       }
       return;
     }
-    synchronized (mock) {
-      mock.lastStatus = null;
-    }
-    JsonElement result = run(mock, operation, args);
+    int sent = mock.requests().size();
+    JsonElement result = run(mock, operation, args, moderateCalls);
     if (expect.has("httpStatus")) {
-      Integer status;
-      synchronized (mock) {
-        status = mock.lastStatus;
-      }
+      // The status of the last response the in-memory API sent during the step, so retries and
+      // polls are judged by their final attempt.
+      List<MockCalmLensServerClient.Request> requests = mock.requests();
+      Integer status = requests.size() > sent ? requests.get(requests.size() - 1).status() : null;
       assertEquals(Integer.valueOf(expect.get("httpStatus").getAsInt()), status, label + ": final response status");
     }
     if (expect.has("cdn")) {
@@ -634,7 +702,8 @@ class ContractTest {
           assertTrue(actual != null && actual.isJsonPrimitive() && actual.getAsString().matches(prefix + "_[0-9A-Za-z]{20}"),
               label + ": " + entry.getKey() + " " + actual + " is not a " + prefix + "_ ID");
         } else {
-          assertEquals(normalize(resolve(raw, saved)), normalize(actual), label + ": " + entry.getKey());
+          // Typed results omit unset fields, so a nested null compares as absent.
+          assertEquals(Fixtures.withoutNulls(normalize(resolve(raw, saved))), Fixtures.withoutNulls(normalize(actual)), label + ": " + entry.getKey());
         }
       }
     if (step.has("save")) saved.put(step.get("save").getAsString(), result);
@@ -645,20 +714,29 @@ class ContractTest {
       String name = scenario.get("name").getAsString();
       JsonObject options = scenario.getAsJsonObject("mock");
       Grant[] grants = options.has("apiKeyGrants") ? grants(options.getAsJsonArray("apiKeyGrants")) : new Grant[0];
-      MockCalmLensServerClient mock = new MockCalmLensServerClient(
-          CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(grants), "project-1")
-              .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1").maxRetries(0),
-          new Options().queuedOutcome(outcome(options, "queuedOutcome", Outcome.PENDING))
-              .analyzedOutcome(outcome(options, "analyzedOutcome", Outcome.ALLOWED)));
+      CalmLensServerClient.Builder builder = CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(grants), "project-1")
+          .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1");
+      if (options.has("maxRetries")) builder.maxRetries(options.get("maxRetries").getAsInt());
+      JsonArray moderateCalls = new JsonArray();
+      Options mockOptions = new Options();
+      if (options.has("moderate")) mockOptions.moderate(recordingModerate(options.getAsJsonObject("moderate"), moderateCalls));
+      MockCalmLensServerClient mock = new MockCalmLensServerClient(builder, mockOptions);
       Map<String, JsonElement> saved = new HashMap<>();
       long started = System.nanoTime();
       for (JsonElement step : scenario.getAsJsonArray("steps")) {
         int runs = step.getAsJsonObject().has("repeat") ? step.getAsJsonObject().get("repeat").getAsInt() : 1;
-        for (int run = 0; run < runs; run++) check(mock, name, step.getAsJsonObject(), saved);
+        for (int run = 0; run < runs; run++) check(mock, name, step.getAsJsonObject(), saved, moderateCalls);
       }
       // Mock waits take no real time.
       assertTrue(System.nanoTime() - started < Duration.ofSeconds(5).toNanos());
     });
+  }
+
+  /** The categories and qualifiers {@link MockDecision} accepts are surface.json's. */
+  @Test void mockDecisionClassificationMatchesTheSurface() throws Exception {
+    JsonObject classification = Fixtures.read("surface.json").getAsJsonObject().getAsJsonObject("classification");
+    assertEquals(classification.get("categories"), Json.GSON.toJsonTree(MockClassification.CATEGORIES));
+    assertEquals(classification.get("qualifiers"), Json.GSON.toJsonTree(MockClassification.QUALIFIERS));
   }
 
   // surface.json retryable: whether an error is retryable follows from its code and status alone.

@@ -103,7 +103,7 @@ describe("assets.classify", () => {
     const client = new MockCalmLensServerClient({
       apiKey: createMockApiKey(),
       projectId,
-      mockOptions: { analyzedOutcome: "blocked" },
+      mockOptions: { moderate: () => "blocked" },
     });
 
     const asset = await client.assets.classify({

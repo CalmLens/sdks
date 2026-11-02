@@ -58,7 +58,7 @@ const mockPreset = (
   createClient: (options) =>
     new MockCalmLensAppClient({
       ...options,
-      mockOptions: { queuedOutcome: outcome, preset: { requireToken: true }, ...preset },
+      mockOptions: { moderate: () => outcome, preset: { requireToken: true }, ...preset },
     }),
 });
 

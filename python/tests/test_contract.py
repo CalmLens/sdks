@@ -7,6 +7,7 @@ by name with the reason."""
 from __future__ import annotations
 
 import base64
+import copy
 import email.message
 import hashlib
 import hmac
@@ -19,7 +20,7 @@ import typing
 import unittest
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qsl, urlsplit
 
 import calmlens
@@ -27,6 +28,7 @@ from calmlens import (CalmLensAPIError, CalmLensError, CalmLensServerClient, Cal
                       CalmLensTransportError, CalmLensValidationError, WebhookVerificationError, client as client_module,
                       is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
                       verify_webhook_signature)
+from calmlens import _mock_classification
 from calmlens.client import _serialize_transform
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, sign_upload_token
 from calmlens.types import IMAGE_TRANSFORM_COLOUR_KEYS, ImageTransformOptions
@@ -559,9 +561,9 @@ _RAISED_CLASS = {
 
 
 def _mock_outcome(option: str) -> str:
-    mock = testing.MockCalmLensServerClient(mock_options={option: "blocked"})
-    content = {"name": "note.txt", "content": {"plainText": "hello", "type": "text/plain"}}
-    asset = mock.assets.create(content) if option == "queued_outcome" else mock.assets.classify(content)
+    """The status a mock option gives an upload: ``moderate`` answering ``blocked``."""
+    mock = testing.MockCalmLensServerClient(mock_options=cast(Any, {option: lambda moderation: "blocked"}))
+    asset = mock.assets.classify({"name": "note.txt", "content": {"plainText": "hello", "type": "text/plain"}})
     return str(asset["classification"]["moderation"]["status"])
 
 
@@ -602,6 +604,12 @@ class SurfaceTests(unittest.TestCase):
                     print(f"\nskipped {capability['id']} (not applicable: {reason})")
                     continue
                 self.assertTrue(_present(capability))
+
+    def test_decision_builder_classification(self) -> None:
+        classification = SURFACE["classification"]
+        self.assertEqual(list(_mock_classification.CATEGORIES), classification["categories"])
+        self.assertEqual({category: list(qualifiers) for category, qualifiers in _mock_classification.QUALIFIERS.items()},
+                         classification["qualifiers"])
 
     def test_retryable_errors(self) -> None:
         for case in SURFACE["retryable"]:
@@ -824,7 +832,36 @@ def _resolve(value: Any, saved: dict[str, Any]) -> Any:
     return value
 
 
-def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any]) -> Any:
+def _build_decision(spec: Any) -> testing.MockDecision:
+    """Build ``spec`` with the decision builder, in the order the fixture lists its calls."""
+    if isinstance(spec, str):
+        return testing.mock_decision(cast(Any, spec))
+    decision = testing.mock_decision(spec["status"])
+    for flag in spec.get("flags", []):
+        decision.flag(flag["category"], flag["score"], flag.get("qualifiers"))
+    for category in spec.get("notEvaluated", []):
+        decision.not_evaluated(category)
+    return decision
+
+
+def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any],
+         moderate_calls: list[dict[str, Any]]) -> Any:
+    if operation == "mock.completeProcessing":
+        decision = None if args.get("decision") is None else _build_decision(args["decision"])
+        return _json(client.complete_processing(args["assetId"], decision))
+    if operation == "mock.moderateCalls":
+        return copy.deepcopy(moderate_calls)
+    if operation == "mock.buildDecision":
+        _build_decision(args)
+        return None
+    if operation == "mock.requests":
+        # ``query`` as sent: the raw parameters of the request URL.
+        return [{"method": request.method, "path": request.path,
+                 "query": dict(parse_qsl(urlsplit(request.url).query, keep_blank_values=True)),
+                 "status": request.status} for request in client.requests]
+    if operation == "mock.clearRequests":
+        client.clear_requests()
+        return None
     if operation == "mock.decide":
         return _json(client.decide(args["assetId"], args["outcome"]))
     if operation == "mock.enqueueEvent":
@@ -833,7 +870,8 @@ def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any])
         client.set_api_key_grants(args["grants"])
         return None
     if operation == "mock.failNext":
-        client.fail_next_request(args["failure"], operation=args.get("operation"))
+        client.fail_next_request(args["failure"], operation=args.get("operation"), details=args.get("details"),
+                                 retry_after=args.get("retryAfter"))
         return None
     if operation == "cdn.serve":
         with client.cdn.serve(args) as response:
@@ -855,10 +893,26 @@ class MockScenarioTests(unittest.TestCase):
 
     def _run_scenario(self, scenario: dict[str, Any]) -> None:
         mock = scenario["mock"]
-        options = {key: mock[name] for name, key in (("queuedOutcome", "queued_outcome"),
-                                                       ("analyzedOutcome", "analyzed_outcome")) if name in mock}
+        moderate = mock.get("moderate")
+        # Records what ``moderate`` was given, and answers by name, then by queue mode for uploads.
+        moderate_calls: list[dict[str, Any]] = []
+
+        def recording_moderate(moderation: testing.MockModerationInput) -> Any:
+            asset, content = moderation.asset, moderation.content
+            moderate_calls.append({
+                "trigger": moderation.trigger, "queued": moderation.queued, "assetId": asset["id"],
+                "name": asset["name"], "text": content.text,
+                "bytesBase64": None if content.bytes is None else base64.b64encode(content.bytes).decode()})
+            spec = (moderate.get("byName") or {}).get(asset["name"])
+            if spec is None and moderation.trigger == "upload":
+                spec = moderate.get("queued" if moderation.queued else "analyzed")
+            # Otherwise the mock's default: queued work stays pending until complete_processing.
+            return testing.default_moderate(moderation) if spec is None else _build_decision(spec)
+
+        options: dict[str, Any] = {} if moderate is None else {"moderate": recording_moderate}
+        retries = {} if "maxRetries" not in mock else {"max_retries": mock["maxRetries"]}
         client = MockCalmLensServerClient(api_key=create_mock_api_key(mock.get("apiKeyGrants")),
-                                          project_id="project-1", mock_options=options)
+                                          project_id="project-1", mock_options=cast(Any, options), **retries)
         # The status of each response the mock answers, to check a step's final one.
         statuses: list[int] = []
         serve = client.transport
@@ -877,17 +931,19 @@ class MockScenarioTests(unittest.TestCase):
                 expect = step.get("expect", {})
                 if "error" in expect:
                     with self.assertRaises(CalmLensError, msg=label) as raised:
-                        _run(client, step["operation"], args)
+                        _run(client, step["operation"], args, moderate_calls)
                     error = raised.exception
                     want = dict(expect["error"])
                     wanted_details = want.pop("details", {})
+                    if "retryAfter" in want:
+                        self.assertEqual(error.retry_after, want.pop("retryAfter"), f"{label}: retryAfter")
                     self.assertEqual({"code": error.code, "status": error.status}, want, label)
                     for key, value in wanted_details.items():
                         self.assertEqual(_json(error.details.get(key)), _resolve(value, saved),
                                          f"{label}: details.{key}")
                     continue
                 statuses.clear()
-                result = _run(client, step["operation"], args)
+                result = _run(client, step["operation"], args, moderate_calls)
                 if "httpStatus" in expect:
                     self.assertEqual(statuses[-1:], [expect["httpStatus"]], f"{label}: final response status")
                 if "cdn" in expect:

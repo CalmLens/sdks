@@ -43,8 +43,8 @@ final class CommentTest extends TestCase
         $mock->enqueueJson(self::asset($status));
         $this->app->instance(ServerClient::class, $mock->client());
         $this->post('/comments', ['comment' => 'Hello'])->assertRedirect('/')->assertSessionHas('comments', [['text' => 'Hello', 'assetId' => 'asset-1']]);
-        self::assertSame('Hello', (string) $mock->requests()[0]->getBody());
-        self::assertSame('text/plain', $mock->requests()[0]->getHeaderLine('Content-Type'));
+        self::assertSame('Hello', (string) $mock->requests()[0]->request->getBody());
+        self::assertSame('text/plain', $mock->requests()[0]->request->getHeaderLine('Content-Type'));
     }
 
     public static function withheld(): iterable

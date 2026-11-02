@@ -117,8 +117,8 @@ describe("MockCalmLensServerClient events", () => {
   it("returns enqueued events after a cursor, in pages, like the API", async () => {
     const client = createClient();
     const { nextCursor: start } = await client.events.list();
-    const first = client.enqueueEvent({ type: "asset.uploaded" });
-    const second = client.enqueueEvent({ type: "asset.allowed", assetId: "asset-1" });
+    const first = await client.enqueueEvent({ type: "asset.uploaded" });
+    const second = await client.enqueueEvent({ type: "asset.allowed", assetId: "asset-1" });
 
     const page = await client.events.list({ cursor: start, pageSize: 1 });
     expect(page.items.map((event) => event.id)).toEqual([first.id]);

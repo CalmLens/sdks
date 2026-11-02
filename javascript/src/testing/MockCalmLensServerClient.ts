@@ -11,15 +11,21 @@ import { createMockApiKey, getMockApiKeyGrants } from "./MockApiKey";
 import {
   createMonotonicClock,
   type MockAppSession,
-  type MockAssetOutcome,
   MockCalmLensApi,
   type MockCalmLensCall,
   type MockCalmLensOperation,
   type MockEndpoints,
   type MockEventInput,
+  type MockFailureOptions,
   type MockRequestFailure,
   type MockReviewDecision,
 } from "./MockCalmLensApi";
+import {
+  defaultModerate,
+  type MockAssetOutcome,
+  type MockDecision,
+  type MockModerate,
+} from "./MockDecision";
 import {
   InMemoryMockDatabaseStorage,
   InMemoryMockImageStorage,
@@ -28,10 +34,10 @@ import {
 } from "./MockStorage";
 
 export type {
-  MockAssetOutcome,
   MockCalmLensCall,
   MockCalmLensOperation,
   MockEventInput,
+  MockFailureOptions,
   MockRequestFailure,
   MockReviewDecision,
 } from "./MockCalmLensApi";
@@ -53,12 +59,13 @@ export interface MockCalmLensServerClientOptions extends CalmLensServerClientOpt
      */
     now?: () => number;
     /**
-     * Outcome of `assets.create` (and queued multipart uploads). Defaults to `pending`. Pass a
-     * function to choose per upload, for example from `asset.name`.
+     * Decides each asset the mock moderates, from the stored asset, its content (bytes, and the
+     * text of a plain-text upload) and why it is moderated (`upload`, `retry`, `rerun` or
+     * `complete`). Return a status or a `mockDecision(...)`, whose report fills the asset's
+     * categories and policy. Without it, queued uploads, retries and reruns stay `pending` until
+     * `completeProcessing`, and everything else is `allowed`.
      */
-    queuedOutcome?: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
-    /** Outcome of `assets.classify` and `text.classify`. Defaults to `allowed`. */
-    analyzedOutcome?: MockAssetOutcome | ((asset: Asset) => MockAssetOutcome);
+    moderate?: MockModerate;
     signedUrlBaseUrl?: string;
   };
 }
@@ -124,8 +131,7 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
       imageStorage: mockOptions.imageStorage ?? new InMemoryMockImageStorage(),
       createId: mockOptions.createId ?? newId,
       now: mockOptions.now ?? createMonotonicClock(),
-      queuedOutcome: mockOptions.queuedOutcome ?? "pending",
-      analyzedOutcome: mockOptions.analyzedOutcome ?? "allowed",
+      moderate: mockOptions.moderate ?? defaultModerate,
       signedUrlBaseUrl: mockOptions.signedUrlBaseUrl ?? "mock://calmlens",
     });
     let endpoints: MockEndpoints | undefined;
@@ -168,15 +174,22 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
       .map(({ call }) => call);
   }
 
+  /** Forgets the requests recorded so far, so `calls` lists only later ones. */
+  clearCalls(): void {
+    this.#api.calls.length = 0;
+  }
+
   /**
    * Makes the next request (or the next one `operation` sends) fail instead of reaching the
-   * in-memory API, as if it never completed. Queue several to fail several requests in a row.
+   * in-memory API. Each queued failure fails one request, so a retry takes the next queued
+   * failure or reaches the API. An API error code answers with that error and its HTTP status,
+   * with `details` and a `Retry-After` of `retryAfter` seconds when given.
    */
   failNextRequest(
     failure: MockRequestFailure = "transport-error",
-    { operation }: { operation?: MockCalmLensOperation } = {},
+    options: MockFailureOptions = {},
   ): void {
-    this.#api.failNextRequest(failure, operation);
+    this.#api.failNextRequest(failure, options);
   }
 
   /**
@@ -192,7 +205,7 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
    * Adds an event to the feed `events.list` reads, as if CalmLens had recorded it. Returns the
    * stored event; pass it to `toWebhookEventPayload` to build a matching webhook body.
    */
-  enqueueEvent(input: MockEventInput): TypedEvent {
+  enqueueEvent(input: MockEventInput): Promise<TypedEvent> {
     return this.#api.enqueueEvent(input);
   }
 
@@ -205,5 +218,17 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
    */
   decide(assetId: string, decision: MockReviewDecision): Promise<Asset> {
     return this.#api.decide(assetId, decision);
+  }
+
+  /**
+   * Finishes processing a pending asset as the moderation pipeline would: with `decision`, or
+   * else what `mockOptions.moderate` returns for the `complete` trigger (`allowed` by default).
+   * The asset gets the decision's report, and `asset.classified` and the automated
+   * `asset.<status>` (or `asset.failed`) join the events feed. No review is recorded, so the
+   * asset can still be moderated again. Rejects with `asset/not-found` for an unknown asset and
+   * `sdk/invalid-argument` for one that isn't processing. It sends no request.
+   */
+  completeProcessing(assetId: string, decision?: MockAssetOutcome | MockDecision): Promise<Asset> {
+    return this.#api.completeProcessing(assetId, decision);
   }
 }

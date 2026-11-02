@@ -88,12 +88,53 @@ class ContractTest < Minitest::Test
 
   def json(value) = JSON.parse(JSON.generate(value))
 
-  def run_step(mock, operation, args)
+  # Builds a decision spec with the decision builder, in the order the fixture lists its calls.
+  def build_decision(spec)
+    return CalmLens::MockDecision.of(spec) if spec.is_a?(String)
+
+    decision = CalmLens::MockDecision.of(spec['status'])
+    spec.fetch('flags', []).each { |flag| decision.flag(flag['category'], flag['score'], flag.fetch('qualifiers', {})) }
+    spec.fetch('notEvaluated', []).each { |category| decision.not_evaluated(category) }
+    decision
+  end
+
+  # A `moderate` callback that records what it receives in `calls` and answers by name, then by
+  # queue mode for uploads, else like the mock's default.
+  def recording_moderate(spec, calls)
+    lambda do |input|
+      asset = input.asset
+      calls << { 'trigger' => input.trigger, 'queued' => input.queued, 'assetId' => asset['id'], 'name' => asset['name'],
+                 'text' => input.content.text, 'bytesBase64' => input.content.bytes && [input.content.bytes].pack('m0') }
+      answer = spec.fetch('byName', {})[asset['name']]
+      answer ||= spec[input.queued ? 'queued' : 'analyzed'] if input.trigger == 'upload'
+      next build_decision(answer) unless answer.nil?
+
+      input.queued && input.trigger != 'complete' ? 'pending' : 'allowed'
+    end
+  end
+
+  # The `mock.*` helper steps.
+  def run_mock_step(mock, operation, args, moderate_calls)
     case operation
     when 'mock.decide' then mock.decide(args['assetId'], args['outcome'])
+    when 'mock.completeProcessing'
+      json(mock.complete_processing(args['assetId'], args.key?('decision') ? build_decision(args['decision']) : nil))
+    when 'mock.moderateCalls' then moderate_calls
+    when 'mock.buildDecision' then build_decision(args) && nil
+    when 'mock.requests' then mock.requests.map { |request| request.to_h.slice(:method, :path, :query, :status).transform_keys(&:to_s) }
+    when 'mock.clearRequests' then mock.clear_requests && nil
     when 'mock.enqueueEvent' then mock.enqueue_event(args)
     when 'mock.grant' then mock.api_key_grants = args['grants']
-    when 'mock.failNext' then mock.fail_next_request(args['failure'], operation: args['operation'])
+    when 'mock.failNext'
+      mock.fail_next_request(args['failure'], operation: args['operation'], details: args['details'], retry_after: args['retryAfter'])
+    else flunk "Unknown mock step #{operation}"
+    end
+  end
+
+  def run_step(mock, operation, args, moderate_calls)
+    return run_mock_step(mock, operation, args, moderate_calls) if operation.start_with?('mock.')
+
+    case operation
     when 'cdn.serve'
       response = mock.cdn.serve(args)
       body = response.body.to_s
@@ -129,6 +170,7 @@ class ContractTest < Minitest::Test
 
   def check_error(wanted, error, saved, label)
     assert_equal wanted.slice('code', 'status'), { 'code' => error.code, 'status' => error.status }, label
+    assert_equal wanted['retryAfter'], error.retry_after, "#{label}: retryAfter" if wanted.key?('retryAfter')
     wanted.fetch('details', {}).each do |key, value|
       expected = resolve(value, saved)
       actual = error.details&.fetch(key, nil)
@@ -136,26 +178,21 @@ class ContractTest < Minitest::Test
     end
   end
 
-  # Records the status of each response the mock's in-memory API answers, to check a step's final one.
-  def record_statuses(mock)
-    statuses = []
-    mock.instance_variable_get(:@fake).singleton_class.prepend(Module.new do
-      define_method(:handle) { |*args| super(*args).tap { |response| statuses << response.status } }
-    end)
-    statuses
-  end
-
-  def check_step(mock, step, saved, label, statuses)
+  def check_step(mock, step, saved, label, moderate_calls)
     args = resolve(step.fetch('args', {}), saved)
     expect = step.fetch('expect', {})
     if (wanted = expect['error'])
-      error = assert_raises(CalmLens::Error, label) { run_step(mock, step['operation'], args) }
+      error = assert_raises(CalmLens::Error, label) { run_step(mock, step['operation'], args, moderate_calls) }
       return check_error(wanted, error, saved, label)
     end
 
-    statuses.clear
-    result = run_step(mock, step['operation'], args)
-    assert_equal [expect['httpStatus']], statuses.last(1), "#{label}: final response status" if expect['httpStatus']
+    sent = mock.requests.size
+    result = run_step(mock, step['operation'], args, moderate_calls)
+    # The status of the last response the in-memory API sent during the step, so retries and polls
+    # are judged by their final attempt.
+    if expect['httpStatus']
+      assert_equal [expect['httpStatus']], mock.requests.drop(sent).last(1).map(&:status), "#{label}: final response status"
+    end
     check_cdn(resolve(expect['cdn'], saved), result, label) if expect['cdn']
     if (name = expect['sameAs'])
       assert saved.key?(name), "#{label}: nothing saved as #{name}"
@@ -176,17 +213,16 @@ class ContractTest < Minitest::Test
 
   def replay_mock_scenario(scenario)
     options = scenario['mock']
-    mock = CalmLens::MockServerClient.new(
-      api_key: CalmLens::MockServerClient.create_api_key(options.fetch('apiKeyGrants', [])),
-      queued_outcome: options.fetch('queuedOutcome', 'pending'),
-      analyzed_outcome: options.fetch('analyzedOutcome', 'allowed')
-    )
+    moderate_calls = []
+    settings = { api_key: CalmLens::MockServerClient.create_api_key(options.fetch('apiKeyGrants', [])) }
+    settings[:max_retries] = options['maxRetries'] if options.key?('maxRetries')
+    settings[:moderate] = recording_moderate(options['moderate'], moderate_calls) if options.key?('moderate')
+    mock = CalmLens::MockServerClient.new(**settings)
     saved = {}
-    statuses = record_statuses(mock)
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     scenario['steps'].each_with_index do |step, index|
       step.fetch('repeat', 1).times do |run|
-        check_step(mock, step, saved, "step #{index + 1}#{" run #{run + 1}" if step['repeat']} (#{step['operation']})", statuses)
+        check_step(mock, step, saved, "step #{index + 1}#{" run #{run + 1}" if step['repeat']} (#{step['operation']})", moderate_calls)
       end
     end
     # Mock waits take no real time.
@@ -221,10 +257,10 @@ class ContractTest < Minitest::Test
     e
   end
 
+  # The status an option gives an upload: `moderate` answering `blocked`.
   def mock_outcome(option)
-    mock = CalmLens::MockServerClient.new(option.to_sym => 'blocked')
-    content = { name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' } }
-    asset = option == 'queued_outcome' ? mock.assets.create(content) : mock.assets.classify(content)
+    mock = CalmLens::MockServerClient.new(option.to_sym => ->(_input) { 'blocked' })
+    asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' })
     asset.dig('classification', 'moderation', 'status')
   end
 
@@ -276,6 +312,12 @@ class ContractTest < Minitest::Test
     assert present?(capability, SURFACE), "missing #{capability['id']} (#{capability['names']['ruby']})"
   end
   each_case('surface', SURFACE['capabilities']) { |capability| capability['id'] }
+
+  # The categories and qualifiers the decision builder accepts are the API's.
+  def test_mock_classification_matches_the_surface
+    assert_equal SURFACE['classification']['categories'], CalmLens::MockClassification::CATEGORIES
+    assert_equal SURFACE['classification']['qualifiers'], CalmLens::MockClassification::QUALIFIERS
+  end
 
   # rejections.json: every request the API would reject is refused before anything is sent.
   def replay_rejection(rejection)

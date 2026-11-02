@@ -127,8 +127,13 @@ func PublicErrorStatus(code string) (int, bool) {
 
 // transportError wraps a failure to send a request or read its response (connection,
 // TLS, protocol, decompression, truncated body, timeout or cancellation) in *Error,
-// keeping the original error reachable through errors.Is/As.
+// keeping the original error reachable through errors.Is/As. An *Error from the transport, such
+// as calmlenstest's for an invalid mock decision, is returned as is.
 func transportError(cause error) error {
+	var sdkError *Error
+	if errors.As(cause, &sdkError) {
+		return sdkError
+	}
 	code := CodeSDKTransportError
 	var timeout net.Error
 	if errors.Is(cause, context.Canceled) {

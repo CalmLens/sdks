@@ -69,31 +69,9 @@ type InMemoryDatabaseStorage struct {
 // InMemoryImageStorage holds uploaded content by asset ID.
 type InMemoryImageStorage struct{ Content map[string]*StoredContent }
 
-// Outcomes of mock uploads, for Options.QueuedOutcome and Options.AnalyzedOutcome.
-const (
-	// OutcomePending leaves the asset processing with moderation pending.
-	OutcomePending = "pending"
-	// OutcomeAllowed finishes processing with moderation allowed.
-	OutcomeAllowed = "allowed"
-	// OutcomeLimited finishes processing with moderation limited; the mock CDN serves the asset
-	// like an allowed one.
-	OutcomeLimited = "limited"
-	// OutcomeAgeRestricted finishes processing with moderation age-restricted; the mock CDN then
-	// serves the asset only to keys allowed to download it, like a private asset.
-	OutcomeAgeRestricted = "age-restricted"
-	// OutcomeBlocked finishes processing with moderation blocked.
-	OutcomeBlocked = "blocked"
-	// OutcomePurged finishes processing with moderation purged and removes the content with
-	// removal reason policy.
-	OutcomePurged = "purged"
-	// OutcomeFailed fails processing (retryable) with moderation pending and failure reason
-	// processing-error.
-	OutcomeFailed = "failed"
-)
-
 // Options mirrors calmlens.Options (APIKey, ProjectID, BaseURL, CDNBaseURL, Timeout,
 // UploadTimeout, MaxRetries, MaxResponseBytes) and adds in-memory storage and deterministic
-// ID/clock/outcome controls.
+// ID, clock and moderation controls.
 type Options struct {
 	APIKey    string
 	ProjectID string
@@ -104,8 +82,8 @@ type Options struct {
 	// UploadTimeout and MaxResponseBytes are validated and applied as by calmlens.NewServerClient.
 	UploadTimeout    time.Duration
 	MaxResponseBytes int64
-	// MaxRetries defaults to 0 in the mock, so FailNext fails exactly one call. Set it to
-	// test the client's retry behaviour. Waits take no real time: retry backoff and
+	// MaxRetries defaults to 0 in the mock, so a FailNextRequest failure fails exactly one call.
+	// Set it to test the client's retry behaviour. Waits take no real time: retry backoff and
 	// Assets.WaitForDecision only advance the mock client's clock, so WaitForDecision returns
 	// sdk/timeout at once for an asset whose moderation stays pending.
 	MaxRetries      *int
@@ -119,13 +97,15 @@ type Options struct {
 	// advanced by at least 1 ms per reading so assets created in a row have strictly increasing
 	// createdAt values; a Now you supply is used as is.
 	Now func() int64
-	// QueuedOutcome is the Outcome constant of queued uploads (Assets.Create and queued
-	// multipart uploads; default OutcomePending).
-	QueuedOutcome string
-	// AnalyzedOutcome is the Outcome constant of moderated uploads (Assets.Classify and
-	// Text.Classify; default OutcomeAllowed). Finished processing removes content unless the
-	// upload set ProcessingOptions.KeepContentAfterProcessing.
-	AnalyzedOutcome  string
+	// Moderate decides each asset the mock moderates: completed uploads (Assets.Create,
+	// Assets.Classify, Text.Classify and final parts), Assets.Retry, Assets.Explain with Rerun,
+	// and CompleteProcessing without a decision. Return NewDecision(status), with any Flag and
+	// NotEvaluated calls; nil, or no Moderate, means DefaultModerate: queued work stays pending
+	// and the rest is allowed. A pending decision leaves the asset processing. Finished
+	// processing removes content unless the upload set
+	// ProcessingOptions.KeepContentAfterProcessing. Moderate runs while the mock answers a
+	// request, so it must not call the mock.
+	Moderate         func(ModerationInput) *Decision
 	CDNBaseURL       string
 	SignedURLBaseURL string
 }
@@ -143,6 +123,9 @@ type CapturedRequest struct {
 	// RawBody holds the exact bytes sent, including upload content.
 	RawBody []byte
 	CDN     bool
+	// Status is the HTTP status the mock answered with, or 0 when the request failed without a
+	// response.
+	Status int
 }
 
 type upload struct {
@@ -171,7 +154,7 @@ type MockServerClient struct {
 	events          []calmlens.JSON
 	replays         map[string]replay
 	requests        []CapturedRequest
-	failures        []failure
+	failures        []RequestFailure
 	grants          []Grant
 	requestCount    int
 	// lastStatus is the HTTP status of the last response, 0 when the last request failed
@@ -184,26 +167,7 @@ type MockServerClient struct {
 	mu     sync.Mutex
 }
 
-// failure is a queued request failure: a transport error, or an API error code with its status.
-type failure struct {
-	err       error
-	code      string
-	operation string
-}
-
-// FailNext queues transport failures. Each following request is captured and then fails
-// with the next queued error instead of reaching the in-memory backend, so the client
-// returns a *calmlens.Error with code "sdk/transport-error" wrapping it. Queue
-// context.DeadlineExceeded (or a net.Error whose Timeout() is true) to get "sdk/timeout".
-func (m *MockServerClient) FailNext(errs ...error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, err := range errs {
-		m.failures = append(m.failures, failure{err: err})
-	}
-}
-
-// Failures for FailNextRequest besides API error codes.
+// Failures for RequestFailure.Code besides API error codes.
 const (
 	// FailureTransportError fails the request as a reset connection would (sdk/transport-error).
 	FailureTransportError = "transport-error"
@@ -211,26 +175,71 @@ const (
 	FailureTimeout = "timeout"
 )
 
-// FailNextRequest makes the next request, or the next request of operation (a JavaScript client
-// method path such as "assets.create" or "cdn.serve"; empty for any), fail without running.
-// failure is FailureTransportError, FailureTimeout or an API error code, which the mock answers
-// with its HTTP status. Each queued failure is used once.
-func (m *MockServerClient) FailNextRequest(failure string, operation string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	queued := failureFor(failure)
-	queued.operation = operation
-	m.failures = append(m.failures, queued)
+// RequestFailure is how FailNextRequest fails a request.
+type RequestFailure struct {
+	// Code is FailureTransportError, FailureTimeout or an API error code, such as
+	// calmlens.CodeUploadLimitExceeded, which the mock answers with its HTTP status.
+	Code string
+	// Err, instead of Code, is the transport error the request fails with: the client returns a
+	// *calmlens.Error with code sdk/transport-error wrapping it, or sdk/timeout for
+	// context.DeadlineExceeded or a net.Error whose Timeout() is true.
+	Err error
+	// Operation limits the failure to requests from one client method, named like the
+	// JavaScript client's method path, such as "assets.create" or "cdn.serve"; empty for any.
+	Operation string
+	// Details are the API error's details.
+	Details calmlens.JSON
+	// RetryAfter, a whole number of seconds, is sent as the API error's Retry-After header.
+	RetryAfter *time.Duration
 }
 
-func failureFor(name string) failure {
-	switch name {
-	case FailureTransportError:
-		return failure{err: errors.New("mock transport error")}
-	case FailureTimeout:
-		return failure{err: context.DeadlineExceeded}
+// FailNextRequest queues failures. Each one fails exactly one later request (the next one, or
+// the next of its Operation) without running it: the request is captured, then answered with
+// the API error or failed with the transport error. A client retry takes the next queued
+// failure or reaches the in-memory backend. It returns an sdk/invalid-argument error, queueing
+// nothing, for a failure without exactly one of Code and Err, an unknown code or operation,
+// Details or RetryAfter without an API error code, or a negative or fractional RetryAfter.
+func (m *MockServerClient) FailNextRequest(failures ...RequestFailure) error {
+	for _, failure := range failures {
+		if err := checkFailure(failure); err != nil {
+			return err
+		}
 	}
-	return failure{code: name}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failures = append(m.failures, failures...)
+	return nil
+}
+
+func checkFailure(failure RequestFailure) error {
+	invalid := func(message string) error {
+		return &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: message}
+	}
+	_, apiCode := calmlens.PublicErrorStatus(failure.Code)
+	switch {
+	case (failure.Code == "") == (failure.Err == nil):
+		return invalid("a request failure needs exactly one of Code and Err")
+	case failure.Code != "" && failure.Code != FailureTransportError && failure.Code != FailureTimeout && !apiCode:
+		return invalid("unknown request failure " + strconv.Quote(failure.Code))
+	case failure.Operation != "" && !slices.Contains(mockOperations, failure.Operation):
+		return invalid("unknown operation " + strconv.Quote(failure.Operation))
+	case !apiCode && (failure.Details != nil || failure.RetryAfter != nil):
+		return invalid("Details and RetryAfter need an API error code")
+	case failure.RetryAfter != nil && (*failure.RetryAfter < 0 || *failure.RetryAfter%time.Second != 0):
+		return invalid("RetryAfter must be a whole number of seconds")
+	}
+	return nil
+}
+
+// transportFailure is the error a queued transport failure fails its request with.
+func transportFailure(failure RequestFailure) error {
+	switch {
+	case failure.Err != nil:
+		return failure.Err
+	case failure.Code == FailureTimeout:
+		return context.DeadlineExceeded
+	}
+	return errors.New("mock transport error")
 }
 
 // SetAPIKeyGrants replaces the grants of the mock's API key, as editing the key in the portal
@@ -265,8 +274,10 @@ func (m *MockServerClient) WithStorage(fn func(db *InMemoryDatabaseStorage, imag
 }
 
 // EnqueueEvent appends events to the mock event feed and returns them as stored. Missing IDs,
-// project IDs, severities (low), titles (the type), facts and creation times are filled in.
-// Events.List returns them to cursors taken before they were enqueued, in order.
+// project IDs, severities (low), titles (the type), facts and creation times are filled in, and
+// an event with the AssetID of a stored asset and no Asset carries that asset's snapshot, like
+// the API's events. Events.List returns them to cursors taken before they were enqueued, in
+// order.
 func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Event {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -293,6 +304,12 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 		data, _ := json.Marshal(event)
 		var raw calmlens.JSON
 		_ = json.Unmarshal(data, &raw)
+		if event.Asset == nil && event.AssetID != nil {
+			if a, err := m.asset(*event.AssetID); err == nil {
+				raw["asset"] = snapshot(a)
+				data, _ = json.Marshal(raw)
+			}
+		}
 		m.events = append(m.events, raw)
 		var copied calmlens.Event
 		_ = json.Unmarshal(data, &copied)
@@ -305,8 +322,9 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 // ...AgeRestricted, ...Blocked or ...Purged) to a stored asset, as the portal or API would: the moderation status
 // changes (purged also removes the content with removal reason requested, recording an
 // asset.content-removed event first), the review joins manualReviews, and an "asset.<decision>"
-// event with a decided-by: reviewer fact joins the events feed. It returns a *calmlens.Error with
-// code asset/not-found for an unknown asset.
+// event with a decided-by: reviewer fact joins the events feed. The moderation report stays as
+// it was. It returns a *calmlens.Error with code asset/not-found for an unknown asset, and
+// sdk/invalid-argument for another decision, such as OutcomePending or OutcomeFailed.
 func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, error) {
 	switch decision {
 	case OutcomeAllowed, OutcomeLimited, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged:
@@ -320,6 +338,37 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 		return nil, &calmlens.Error{Code: calmlens.CodeAssetNotFound, Message: "Asset not found", Status: http.StatusNotFound}
 	}
 	m.recordReview(a, decision, nil)
+	return toAsset(a)
+}
+
+// CompleteProcessing finishes processing a processing asset as the pipeline would, with
+// decision, or with Options.Moderate's decision for TriggerComplete when decision is nil, and
+// records the pipeline's events. It records no manual review. It returns a *calmlens.Error with
+// code asset/not-found for an unknown asset, and sdk/invalid-argument for an asset that isn't
+// processing or an invalid decision.
+func (m *MockServerClient) CompleteProcessing(assetID string, decision *Decision) (*calmlens.Asset, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a, err := m.asset(assetID)
+	if err != nil {
+		return nil, &calmlens.Error{Code: calmlens.CodeAssetNotFound, Message: "Asset not found", Status: http.StatusNotFound}
+	}
+	if section(a, "classification")["status"] != calmlens.ClassificationStatusProcessing {
+		return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Asset " + assetID + " isn't processing"}
+	}
+	if decision == nil {
+		if decision, err = m.decisionFor(a, TriggerComplete, true, nil); err != nil {
+			return nil, err
+		}
+	} else if err = decision.Err(); err != nil {
+		return nil, err
+	}
+	m.settle(a, decision)
+	return toAsset(a)
+}
+
+// toAsset is a stored asset as the client returns it.
+func toAsset(a calmlens.JSON) (*calmlens.Asset, error) {
 	data, _ := json.Marshal(a)
 	var asset calmlens.Asset
 	if err := json.Unmarshal(data, &asset); err != nil {
@@ -334,7 +383,7 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 // "asset.<decision>" event with a decided-by: reviewer fact joins the events feed. note is the
 // reviewer's note, or nil for the Decide test hook.
 func (m *MockServerClient) recordReview(a calmlens.JSON, decision string, note any) {
-	m.applyOutcome(a, decision, calmlens.ContentRemovalReasonRequested)
+	m.applyOutcome(a, decision, calmlens.ContentRemovalReasonRequested, nil)
 	now := m.options.Now()
 	moderation := section(section(a, "classification"), "moderation")
 	reviews, _ := moderation["manualReviews"].([]any)
@@ -480,18 +529,8 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 			}
 		}
 	}
-	if options.QueuedOutcome == "" {
-		options.QueuedOutcome = OutcomePending
-	}
-	if options.AnalyzedOutcome == "" {
-		options.AnalyzedOutcome = OutcomeAllowed
-	}
-	for _, outcome := range []string{options.QueuedOutcome, options.AnalyzedOutcome} {
-		switch outcome {
-		case OutcomePending, OutcomeAllowed, OutcomeLimited, OutcomeAgeRestricted, OutcomeBlocked, OutcomePurged, OutcomeFailed:
-		default:
-			return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Unknown mock outcome " + strconv.Quote(outcome)}
-		}
+	if options.Moderate == nil {
+		options.Moderate = DefaultModerate
 	}
 	if options.CDNBaseURL == "" {
 		options.CDNBaseURL = "https://mock.calmlens.invalid/v1"
@@ -621,10 +660,14 @@ func fail(code string) error {
 func (m *MockServerClient) roundTrip(req *http.Request, raw []byte) (*http.Response, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	sent := len(m.requests)
 	res, err := m.answer(req, raw)
 	m.lastStatus = 0
 	if res != nil {
 		m.lastStatus = res.StatusCode
+		if len(m.requests) > sent {
+			m.requests[len(m.requests)-1].Status = res.StatusCode
+		}
 	}
 	return res, err
 }
@@ -653,14 +696,19 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 	header := http.Header{"X-Request-Id": {fmt.Sprintf("req_mock_%d", m.requestCount)}}
 	operations := operationsOf(req.Method, parts, req.URL.Query(), cdn)
 	for index, queued := range m.failures {
-		if queued.operation != "" && !contains(operations, queued.operation) {
+		if queued.Operation != "" && !contains(operations, queued.Operation) {
 			continue
 		}
 		m.failures = append(m.failures[:index:index], m.failures[index+1:]...)
-		if queued.err != nil {
-			return nil, queued.err
+		if _, ok := calmlens.PublicErrorStatus(queued.Code); !ok {
+			return nil, transportFailure(queued)
 		}
-		return m.jsonResponse(req, header, nil, fail(queued.code)), nil
+		failure := fail(queued.Code).(*apiError)
+		failure.details = queued.Details
+		if queued.RetryAfter != nil {
+			header.Set("Retry-After", strconv.Itoa(int(*queued.RetryAfter/time.Second)))
+		}
+		return m.jsonResponse(req, header, nil, failure), nil
 	}
 	if cdn {
 		status, data, contentType := m.serve(req, parts, header)
@@ -691,6 +739,11 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 	}
 	m.status = 0
 	result, err := m.dispatch(req.Method, parts, req.URL.Query(), raw, req.Header)
+	var invalidDecision *calmlens.Error
+	if errors.As(err, &invalidDecision) {
+		// Options.Moderate returned an invalid decision: the client returns its error as is.
+		return nil, invalidDecision
+	}
 	res := m.jsonResponse(req, header, result, err)
 	if err == nil {
 		status := successStatus(operations)
@@ -802,8 +855,22 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		return []string{"assets.uploadPart"}
 	case suffix == "decision":
 		return []string{"assets.decide"}
+	case suffix == "retry", suffix == "explain", suffix == "move":
+		return []string{"assets." + suffix}
 	}
-	return []string{"assets." + suffix}
+	return nil
+}
+
+// mockOperations are the operation names operationsOf gives, for RequestFailure.Operation.
+var mockOperations = []string{
+	"assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision",
+	"assets.update", "assets.listChildren", "assets.iterateChildren", "assets.create",
+	"assets.classify", "assets.uploadPart", "assets.createSignedUrl", "assets.move", "assets.retry",
+	"assets.explain", "assets.decide", "assets.deleteContent", "assets.delete", "assets.batch",
+	"text.classify", "cdn.serve", "events.list", "events.pages", "folders.list", "folders.retrieve",
+	"folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
+	"hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete",
+	"hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "ensureLens", "ensureLenses",
 }
 
 // jsonResponse encodes result, or err as the API's error body and status.
@@ -1231,10 +1298,22 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 	}
 	if open {
 		m.uploads[id] = &upload{queue: queue, totalSize: total}
-	} else {
-		m.applyOutcome(a, m.outcome(queue), calmlens.ContentRemovalReasonPolicy)
+		m.DatabaseStorage.Assets[id] = a
+		return a, nil
 	}
+	var stored []byte
+	if options["url"] == nil {
+		stored = raw
+	}
+	decision, err := m.decisionFor(a, TriggerUpload, queue, stored)
+	if err != nil {
+		return nil, err
+	}
+	uploaded := snapshot(a)
+	m.decide(a, decision)
 	m.DatabaseStorage.Assets[id] = a
+	m.recordUploaded(a, uploaded)
+	m.recordProcessingEvents(a, decision)
 	return a, nil
 }
 
@@ -1296,11 +1375,119 @@ func totalSizeError(total *int64, received int64, final bool) error {
 	return nil
 }
 
-func (m *MockServerClient) outcome(queue bool) string {
-	if queue {
-		return m.options.QueuedOutcome
+// decisionFor asks Options.Moderate how to decide a, with its content: data when the caller
+// has it, otherwise the stored parts in order (none once the content is removed). It returns
+// the decision's error when the decision is invalid.
+func (m *MockServerClient) decisionFor(a calmlens.JSON, trigger string, queued bool, data []byte) (*Decision, error) {
+	if data == nil {
+		if stored := m.ImageStorage.Content[text(a["id"])]; stored != nil && section(a, "content")["status"] != calmlens.ContentStatusRemoved {
+			numbers := make([]int, 0, len(stored.Parts))
+			for number := range stored.Parts {
+				numbers = append(numbers, number)
+			}
+			slices.Sort(numbers)
+			data = []byte{}
+			for _, number := range numbers {
+				data = append(data, stored.Parts[number]...)
+			}
+		}
 	}
-	return m.options.AnalyzedOutcome
+	asset, err := toAsset(a)
+	if err != nil {
+		return nil, err
+	}
+	input := ModerationInput{Asset: asset, Trigger: trigger, Queued: queued}
+	if data != nil {
+		input.Content.Bytes = slices.Clone(data)
+		if a["type"] == calmlens.AssetTypePlaintextDocument {
+			decoded := string(data)
+			input.Content.Text = &decoded
+		}
+	}
+	decision := m.options.Moderate(input)
+	if decision == nil {
+		decision = DefaultModerate(input)
+	}
+	return decision, decision.Err()
+}
+
+// decide applies a moderation decision to a processing asset, with its report; a pending
+// decision leaves it processing.
+func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
+	if decision.status != OutcomePending {
+		m.applyOutcome(a, decision.status, calmlens.ContentRemovalReasonPolicy, decision.report())
+	}
+}
+
+// settle decides a processing asset and records the pipeline's events.
+func (m *MockServerClient) settle(a calmlens.JSON, decision *Decision) {
+	m.decide(a, decision)
+	m.recordProcessingEvents(a, decision)
+}
+
+// moderateStored asks Options.Moderate how to decide a queued, processing asset and settles it.
+func (m *MockServerClient) moderateStored(a calmlens.JSON, trigger string) error {
+	decision, err := m.decisionFor(a, trigger, true, nil)
+	if err != nil {
+		return err
+	}
+	m.settle(a, decision)
+	return nil
+}
+
+// recordUploaded records asset.uploaded as the API does when an upload completes, with uploaded,
+// the asset's snapshot from before moderation.
+func (m *MockServerClient) recordUploaded(a, uploaded calmlens.JSON) {
+	m.addEvent(calmlens.EventAssetUploaded, calmlens.SeverityLow, a, []any{
+		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+		assetNameFact(a),
+		calmlens.JSON{"key": calmlens.FactFileFormat, "value": section(a, "content")["format"]},
+	})
+	m.events[len(m.events)-1]["asset"] = uploaded
+}
+
+// recordProcessingEvents records the events the pipeline records when it settles an asset:
+// asset.classified and the automated asset.<status>, or asset.failed.
+func (m *MockServerClient) recordProcessingEvents(a calmlens.JSON, decision *Decision) {
+	switch decision.status {
+	case OutcomePending:
+		return
+	case OutcomeFailed:
+		reason := section(a, "classification")["failureReason"]
+		if reason == nil {
+			reason = calmlens.AssetFailureReasonProcessingError
+		}
+		m.addEvent(calmlens.EventAssetFailed, calmlens.SeverityHigh, a, []any{
+			assetNameFact(a),
+			calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+			calmlens.JSON{"key": calmlens.FactPreviousStatus, "value": calmlens.ClassificationStatusProcessing},
+			calmlens.JSON{"key": calmlens.FactFailureReason, "value": reason},
+		})
+		return
+	}
+	flagged := decision.flaggedCategories()
+	m.addEvent(calmlens.EventAssetClassified, calmlens.SeverityLow, a, []any{
+		calmlens.JSON{"key": calmlens.FactFlaggedCategories, "value": flagged},
+		calmlens.JSON{"key": calmlens.FactModerationStatus, "value": decision.status},
+		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+		assetNameFact(a),
+	})
+	// Like the event catalog: only allowing and limiting are low severity.
+	severity := calmlens.SeverityHigh
+	if decision.status == OutcomeAllowed || decision.status == OutcomeLimited {
+		severity = calmlens.SeverityLow
+	}
+	m.addEvent("asset."+decision.status, severity, a, []any{
+		calmlens.JSON{"key": calmlens.FactDecidedBy, "value": "automated"},
+		calmlens.JSON{"key": calmlens.FactFlaggedCategories, "value": flagged},
+		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+		assetNameFact(a),
+	})
+}
+
+// assetNameFact is the asset-name fact linking to the asset's portal page.
+func assetNameFact(a calmlens.JSON) calmlens.JSON {
+	return calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "https://calmlens.com/go/asset/" + text(a["id"])}
 }
 
 // asJSON returns value as a JSON object, or an empty one when it is not an object.
@@ -1339,8 +1526,8 @@ func withoutPlaceholder(image any) any {
 // applyOutcome moves an asset to outcome like the pipeline: a decision finishes processing,
 // OutcomePurged deletes the content (with purgeReason), and finished processing removes content
 // kept only temporarily (keepContentAfterProcessing off). A classified image gets a ThumbHash
-// for its placeholder, which goes with its content.
-func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason string) {
+// for its placeholder, which goes with its content. A report's fields replace the moderation's.
+func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason string, report calmlens.JSON) {
 	now := m.options.Now()
 	decided := outcome != OutcomePending && outcome != OutcomeFailed
 	processing, moderation, content := section(a, "classification"), section(section(a, "classification"), "moderation"), section(a, "content")
@@ -1376,6 +1563,9 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 	processing["completedAt"] = nil
 	processing["failureReason"] = nil
 	moderation["status"] = calmlens.ModerationStatusPending
+	for key, value := range report {
+		moderation[key] = value
+	}
 	switch {
 	case decided:
 		processing["status"] = calmlens.ClassificationStatusCompleted
@@ -1576,8 +1766,11 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 			return nil, fail(calmlens.CodeAssetContentUnavailable)
 		}
 		// Like the API: back to processing, to be moderated again, with an asset.retried event.
-		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy)
+		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
 		m.recordLifecycleEvent(calmlens.EventAssetRetried, a)
+		if err := m.moderateStored(a, TriggerRetry); err != nil {
+			return nil, err
+		}
 	case method == "POST" && suffix == "explain":
 		classification := section(a, "classification")
 		if classification["status"] != calmlens.ClassificationStatusCompleted {
@@ -1599,7 +1792,10 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 			return nil, fail(calmlens.CodeAssetContentUnavailable)
 		}
 		// Like the API: back to processing, to be moderated again under the current policy.
-		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy)
+		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
+		if err := m.moderateStored(a, TriggerRerun); err != nil {
+			return nil, err
+		}
 	case method == "POST" && suffix == "move":
 		if folder := text(body["folderId"]); folder != "" {
 			if _, err = m.folder(folder); err != nil {
@@ -1666,7 +1862,15 @@ func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, 
 		queue = override == "true"
 	}
 	delete(m.uploads, id)
-	m.applyOutcome(a, m.outcome(queue), calmlens.ContentRemovalReasonPolicy)
+	m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
+	decision, err := m.decisionFor(a, TriggerUpload, queue, nil)
+	if err != nil {
+		return err
+	}
+	uploaded := snapshot(a)
+	m.decide(a, decision)
+	m.recordUploaded(a, uploaded)
+	m.recordProcessingEvents(a, decision)
 	return nil
 }
 

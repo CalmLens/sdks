@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use CalmLens\Testing\MockDecision;
+use CalmLens\Testing\MockModerationInput;
 use CalmLens\Testing\MockServerClient;
 use CalmLens\Webhooks as CalmLensWebhooks;
 use Chirp\App;
@@ -30,15 +32,18 @@ final class ChirpTest extends TestCase
     {
         $this->dir = sys_get_temp_dir() . '/chirp-test-' . bin2hex(random_bytes(4));
         mkdir($this->dir);
-        $this->mock = new MockServerClient(projectId: 'project-1', analyzedOutcome: function (array $asset) {
-            // The mock still holds the text while it asks for the outcome.
-            $text = $this->mock->content[$asset['id']]['bytes'] ?? '';
+        $this->mock = new MockServerClient(projectId: 'project-1', moderate: function (MockModerationInput $input) {
+            // Queued uploads (images) wait for the test to complete their processing.
+            if ($input->queued) {
+                return 'pending';
+            }
+            $text = (string) $input->text;
             return match (true) {
-                str_contains($text, 'rude') => self::scored('blocked', 'harassment'),
-                str_contains($text, 'spicy') => self::scored('age-restricted', 'sexual'),
-                str_contains($text, 'meh') => self::scored('limited', null),
+                str_contains($text, 'rude') => MockDecision::of('blocked')->flag('harassment', 0.92),
+                str_contains($text, 'spicy') => MockDecision::of('age-restricted')->flag('sexual', 0.92),
+                str_contains($text, 'meh') => 'limited',
                 str_contains($text, 'later') => 'pending',
-                default => self::scored('allowed', null),
+                default => 'allowed',
             };
         }, now: fn () => $this->time);
         $this->app = $this->build($this->mock);
@@ -56,15 +61,6 @@ final class ChirpTest extends TestCase
         $now = fn () => $this->time;
         $content = new Content($store, new Moderation($mock->client()), $now);
         return new App($store, $content, new Webhooks($store, $content, 'project-1', self::SECRET), new View($content, false), 'app-secret');
-    }
-
-    private static function scored(string $status, ?string $category): array
-    {
-        $categories = [];
-        foreach (['sexual', 'violence', 'harassment'] as $name) {
-            $categories[$name] = ['status' => 'evaluated', 'score' => $name === $category ? 0.92 : 0.02];
-        }
-        return ['classification' => ['moderation' => ['status' => $status, 'categories' => $categories]]];
     }
 
     private function request(string $method, string $path, array $form = [], array $files = [], array $headers = [], string $body = ''): Response
@@ -142,7 +138,7 @@ final class ChirpTest extends TestCase
         $this->signIn('alice');
         $this->request('POST', '/posts', ['text' => 'Look at this'], $this->image());
         $post = $this->onlyPost();
-        $this->mock->decide($post['image']['assetId'], $outcome);
+        $this->mock->completeProcessing($post['image']['assetId'], $outcome);
         $type = $outcome === 'failed' ? 'asset.failed' : "asset.$outcome";
         self::assertSame(204, $this->deliver(['id' => "delivery-$outcome", 'type' => $type, 'assetId' => $post['image']['assetId'], 'facts' => []])->status);
         return $this->onlyPost();
@@ -160,7 +156,7 @@ final class ChirpTest extends TestCase
         $this->signIn('alice');
         self::assertSame(303, $this->request('POST', '/posts', ['text' => $text])->status);
         $post = $this->onlyPost();
-        self::assertSame($text, $this->mock->requests()[array_key_last($this->mock->requests())]->getBody()->__toString());
+        self::assertSame($text, (string) $this->mock->requests()[array_key_last($this->mock->requests())]->request->getBody());
         $this->cookies = [];
         self::assertSame([$post['id']], self::shown($this->request('GET', '/')));
         self::assertSame(200, $this->request('GET', '/post/' . $post['id'])->status);
@@ -299,8 +295,7 @@ final class ChirpTest extends TestCase
         $this->request('POST', '/posts', ['text' => 'Look'], $this->image());
         $post = $this->onlyPost();
         $assetId = $post['image']['assetId'];
-        $this->mock->assets[$assetId]['classification']['moderation']['categories'] = ['violence' => ['status' => 'evaluated', 'score' => 0.97], 'sexual' => ['status' => 'not-evaluated']];
-        $this->mock->decide($assetId, 'blocked');
+        $this->mock->completeProcessing($assetId, MockDecision::of('blocked')->flag('violence', 0.97)->notEvaluated('sexual'));
         $this->deliver(['id' => 'd-1', 'type' => 'asset.blocked', 'assetId' => $assetId, 'facts' => []]);
         self::assertStringContainsString('class="notice" role="status" data-categories="violence"', $this->request('GET', '/')->body);
     }
@@ -310,7 +305,7 @@ final class ChirpTest extends TestCase
         $this->signIn('alice');
         $this->request('POST', '/posts', ['text' => 'Look'], $this->image());
         $post = $this->onlyPost();
-        $this->mock->decide($post['image']['assetId'], 'allowed');
+        $this->mock->completeProcessing($post['image']['assetId'], 'allowed');
         $this->request('GET', '/');
         self::assertSame('pending', $this->onlyPost()['image']['status'], 'rechecked too soon');
         $this->time += 5000;
@@ -328,7 +323,7 @@ final class ChirpTest extends TestCase
         $body = json_encode($event);
         $timestamp = (string) time();
         $signature = CalmLensWebhooks::signatureHeader($body, $timestamp, self::SECRET);
-        $this->mock->decide($assetId, 'allowed');
+        $this->mock->completeProcessing($assetId, 'allowed');
         $tampered = $this->request('POST', '/webhooks/calmlens', headers: ['x-calmlens-signature' => $signature, 'x-calmlens-timestamp' => $timestamp], body: $body . ' ');
         self::assertSame(401, $tampered->status);
         self::assertSame('pending', $this->onlyPost()['image']['status']);
@@ -346,7 +341,7 @@ final class ChirpTest extends TestCase
 
         // A repeated delivery is acknowledged without fetching the asset again.
         $retrievals = fn () => count(array_filter($this->mock->requests(),
-            fn ($request) => $request->getMethod() === 'GET' && str_ends_with($request->getUri()->getPath(), '/assets/' . $assetId)));
+            fn ($request) => $request->method === 'GET' && $request->path === '/assets/' . $assetId));
         $before = $retrievals();
         self::assertSame(204, $this->request('POST', '/webhooks/calmlens', headers: ['x-calmlens-signature' => $signature, 'x-calmlens-timestamp' => $timestamp], body: $body)->status);
         self::assertSame($before, $retrievals());
@@ -357,8 +352,9 @@ final class ChirpTest extends TestCase
         $this->signIn('alice');
         $this->request('POST', '/posts', ['text' => 'Look'], $this->image());
         $assetId = $this->onlyPost()['image']['assetId'];
-        $this->mock->decide($assetId, 'allowed');
+        $this->mock->completeProcessing($assetId, 'allowed');
         $this->deliver(['id' => 'delivery-1', 'type' => 'asset.allowed', 'assetId' => $assetId, 'facts' => []]);
+        // A reviewer blocks it later.
         $this->mock->decide($assetId, 'blocked');
         $this->deliver(['id' => 'delivery-1', 'type' => 'asset.allowed', 'assetId' => $assetId, 'facts' => []]);
         self::assertSame('allowed', $this->onlyPost()['image']['status']);
@@ -374,7 +370,7 @@ final class ChirpTest extends TestCase
         $this->signIn('alice');
         $this->request('POST', '/posts', ['text' => 'Look'], $this->image());
         $assetId = $this->onlyPost()['image']['assetId'];
-        $this->mock->decide($assetId, 'blocked');
+        $this->mock->completeProcessing($assetId, 'blocked');
         $this->mock->enqueueJson(['code' => 'server/unavailable', 'message' => 'Try again'], 503);
         $event = ['id' => 'delivery-1', 'type' => 'asset.blocked', 'assetId' => $assetId, 'facts' => []];
         self::assertSame(503, $this->deliver($event)->status);

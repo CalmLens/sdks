@@ -56,19 +56,29 @@ class MockClientTest {
     assertEquals(1, pending.remainingResponses());
   }
 
-  @Test void mocksRetryLikeTheRealClientWithoutWaiting() {
-    MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueueError(ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS)
+  @Test void mocksWithRetriesRetryLikeTheRealClientWithoutWaiting() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(CalmLensServerClient.builder("key", "project-1").maxRetries(2))
+        .enqueueError(ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS)
         .enqueue(200, Fixtures.asset("asset-1", "completed", "allowed"));
     long started = System.nanoTime();
     assertEquals("asset-1", mock.client.text.classify("hello").id());
     assertTrue(Duration.ofNanos(System.nanoTime() - started).compareTo(Duration.ofMillis(900)) < 0);
     assertEquals(2, mock.requests().size());
     assertEquals(mock.requests().get(0).header("Idempotency-Key"), mock.requests().get(1).header("Idempotency-Key"));
+    assertEquals(java.util.Arrays.asList(409, 200), mock.requests().stream().map(MockCalmLensServerClient.Request::status).toList());
+  }
 
-    MockCalmLensServerClient throttled = new MockCalmLensServerClient(CalmLensServerClient.builder("key", "project").maxRetries(0)).enqueueRateLimited(30);
-    ApiException error = assertThrows(ApiException.class, () -> throttled.client.assets.retrieve(new Models.AssetId("a")));
-    assertEquals(429, error.getStatus());
-    assertEquals(Duration.ofSeconds(30), error.getRetryAfter().orElseThrow());
+  @Test void failuresMustNameAnOperationThatSendsARequest() {
+    var options = new MockCalmLensServerClient.FailureOptions();
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> options.operation("assets.fetch")).getCode());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> options.operation("uploadTokens.sign")).getCode());
+    MockCalmLensServerClient mock = new MockCalmLensServerClient();
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.failNextRequest("made/up")).getCode());
+    // A decision is a request too, so its failure waits for it.
+    mock.failNextRequest(ErrorCodes.ASSET_PROCESSING, new MockCalmLensServerClient.FailureOptions().operation("assets.decide"));
+    mock.client.folders.list(new Models.ListFolders());
+    assertEquals(ErrorCodes.ASSET_PROCESSING, assertThrows(ApiException.class, () -> mock.client.assets.decide(
+        new Models.DecideAsset("asset_00000000000000000000", Models.AssetModerationDecision.BLOCKED, "spam"))).getCode());
   }
 
   @Test void routedResponsesOnlyAnswerTheirRoute() {
@@ -99,7 +109,7 @@ class MockClientTest {
       assertEquals("3", response.header("content-length"));
       assertArrayEquals(new byte[] {1, 2, 3}, response.readAllBytes(10));
     }
-    assertEquals("/v1/assets/project-1/asset-1/rendered/@card", mock.requests().get(1).path());
+    assertEquals("/assets/project-1/asset-1/rendered/@card", mock.requests().get(1).path());
   }
 
   @Test void processingFeaturesAreSentAndFeatureResultsAreTyped() {
@@ -151,10 +161,10 @@ class MockClientTest {
     mock.client.assets.delete(new Models.AssetId("asset 1"));
     var sent = mock.requests();
     assertEquals("DELETE", sent.get(0).method());
-    assertEquals("/v1/assets/asset%201/content", sent.get(0).path());
+    assertEquals("/assets/asset 1/content", sent.get(0).path());
     assertNull(sent.get(0).body());
     assertEquals("DELETE", sent.get(1).method());
-    assertEquals("/v1/assets/asset%201", sent.get(1).path());
+    assertEquals("/assets/asset 1", sent.get(1).path());
   }
 
   @Test void configurationFailuresAndRequestInspection() {
@@ -173,14 +183,14 @@ class MockClientTest {
     assertEquals("c1", mock.client.events.list(new Models.ListEvents().cursor("c0").pageSize(10)).nextCursor());
     var classify = mock.requests().get(0);
     assertEquals("POST", classify.method());
-    assertEquals("/v1/projects/project-9/assets", classify.path());
+    assertEquals("/projects/project-9/assets", classify.path());
     assertEquals("content", classify.header("x-calmlens-upload"));
     assertEquals("false", classify.query().get("queue"));
     assertEquals("hello", classify.bodyText());
     assertEquals("ignored-key", classify.header("x-api-key"));
     assertFalse(classify.toString().contains("ignored-key"));
     var events = mock.requests().get(2);
-    assertEquals("/v1/projects/project-9/events", events.path());
+    assertEquals("/projects/project-9/events", events.path());
     assertEquals(Map.of("cursor", "c0", "pageSize", "10"), events.query());
     assertNull(events.bodyText());
     byte[] captured = classify.body();

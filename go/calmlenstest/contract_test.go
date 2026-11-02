@@ -40,6 +40,7 @@ var surfaceFunctions = map[string]any{
 	"EventFacts.IsTest":             calmlens.EventFacts.IsTest,
 	"calmlenstest.SignUploadToken":  SignUploadToken,
 	"calmlenstest.NewServerClient":  NewServerClient,
+	"calmlenstest.NewDecision":      NewDecision,
 	"calmlenstest.CreateMockAPIKey": CreateMockAPIKey,
 }
 
@@ -120,26 +121,21 @@ func lookupMethod(value reflect.Value, path string) bool {
 	return value.MethodByName(parts[len(parts)-1]).IsValid()
 }
 
-// mockOutcome is the moderation status a mock with option set to blocked gives an upload.
+// mockOutcome is the moderation status an upload gets from a mock whose option answers blocked.
 func mockOutcome(t *testing.T, option string) string {
 	t.Helper()
 	options := Options{}
 	field := reflect.ValueOf(&options).Elem().FieldByName(option)
-	if !field.IsValid() {
+	blocked := func(ModerationInput) *Decision { return NewDecision(OutcomeBlocked) }
+	if !field.IsValid() || field.Type() != reflect.TypeOf(blocked) {
 		return ""
 	}
-	field.SetString(OutcomeBlocked)
+	field.Set(reflect.ValueOf(blocked))
 	m, err := NewServerClient(options)
 	if err != nil {
 		t.Fatal(err)
 	}
-	submit := calmlens.SubmitAssetOptions{Name: "note.txt", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}}
-	var asset *calmlens.Asset
-	if option == "QueuedOutcome" {
-		asset, err = m.Assets.Create(context.Background(), submit)
-	} else {
-		asset, err = m.Assets.Classify(context.Background(), submit)
-	}
+	asset, err := m.Assets.Classify(context.Background(), calmlens.SubmitAssetOptions{Name: "note.txt", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,6 +262,23 @@ func TestSurface(t *testing.T) {
 	}
 }
 
+// TestMockClassificationMatchesSurface checks the generated category and qualifier lists the
+// decision builder accepts against surface.json's classification.
+func TestMockClassificationMatchesSurface(t *testing.T) {
+	surface := fixtures.Read[struct {
+		Classification struct {
+			Categories []string
+			Qualifiers map[string][]string
+		}
+	}](t, "surface.json")
+	if !reflect.DeepEqual(mockCategories, surface.Classification.Categories) {
+		t.Errorf("categories %v, want %v", mockCategories, surface.Classification.Categories)
+	}
+	if !reflect.DeepEqual(mockQualifiers, surface.Classification.Qualifiers) {
+		t.Errorf("qualifiers %v, want %v", mockQualifiers, surface.Classification.Qualifiers)
+	}
+}
+
 func toAny[T any](values map[string]T) map[string]any {
 	out := make(map[string]any, len(values))
 	for key, value := range values {
@@ -277,12 +290,58 @@ func toAny[T any](values map[string]T) map[string]any {
 // ---- Shared mock behaviour scenarios --------------------------------------------------------
 // packages/sdk-contract/mockScenarios.ts writes them and every SDK's offline mock replays them.
 
+// decisionSpec is a decision as the builder makes it: a status, or a status with Flag and
+// NotEvaluated calls.
+type decisionSpec struct {
+	Status string
+	Flags  []struct {
+		Category   string
+		Score      float64
+		Qualifiers map[string]float64
+	}
+	NotEvaluated []string
+}
+
+func (spec *decisionSpec) UnmarshalJSON(data []byte) error {
+	if json.Unmarshal(data, &spec.Status) == nil {
+		return nil
+	}
+	type plain decisionSpec
+	return json.Unmarshal(data, (*plain)(spec))
+}
+
+func decodeSpec(t *testing.T, value any) decisionSpec {
+	t.Helper()
+	data, _ := json.Marshal(value)
+	var spec decisionSpec
+	if err := json.Unmarshal(data, &spec); err != nil {
+		t.Fatalf("decode decision %s: %v", data, err)
+	}
+	return spec
+}
+
+// build makes the spec with the decision builder, in the order the fixture lists its calls.
+func (spec decisionSpec) build() *Decision {
+	decision := NewDecision(spec.Status)
+	for _, flag := range spec.Flags {
+		decision.Flag(flag.Category, flag.Score, flag.Qualifiers)
+	}
+	for _, category := range spec.NotEvaluated {
+		decision.NotEvaluated(category)
+	}
+	return decision
+}
+
 type mockScenario struct {
 	Name string
 	Mock struct {
-		QueuedOutcome   string
-		AnalyzedOutcome string
-		APIKeyGrants    []Grant `json:"apiKeyGrants"`
+		Moderate *struct {
+			Queued   *decisionSpec
+			Analyzed *decisionSpec
+			ByName   map[string]decisionSpec `json:"byName"`
+		}
+		APIKeyGrants []Grant `json:"apiKeyGrants"`
+		MaxRetries   *int    `json:"maxRetries"`
 	}
 	Steps []struct {
 		Operation string
@@ -294,9 +353,10 @@ type mockScenario struct {
 			SameAs     string
 			HTTPStatus *int `json:"httpStatus"`
 			Error      *struct {
-				Code    string
-				Status  *int
-				Details map[string]any
+				Code       string
+				Status     *int
+				Details    map[string]any
+				RetryAfter *int `json:"retryAfter"`
 			}
 			CDN *struct {
 				Status           int
@@ -498,11 +558,38 @@ func inexpressible(t *testing.T, operation string, args map[string]any) string {
 	return ""
 }
 
-func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation string, args map[string]any) (any, error) {
+func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation string, args map[string]any, moderateCalls []map[string]any) (any, error) {
 	t.Helper()
 	var result any
 	var err error
 	switch operation {
+	case "mock.completeProcessing":
+		var decision *Decision
+		if spec, ok := args["decision"]; ok {
+			decision = decodeSpec(t, spec).build()
+		}
+		result, err = m.CompleteProcessing(args["assetId"].(string), decision)
+	case "mock.moderateCalls":
+		return normalize(t, moderateCalls), nil
+	case "mock.buildDecision":
+		return nil, decodeSpec(t, args).build().Err()
+	case "mock.requests":
+		requests := []map[string]any{}
+		for _, request := range m.Requests() {
+			query := map[string]string{}
+			for key, values := range request.Query {
+				query[key] = values[0]
+			}
+			var status any
+			if request.Status != 0 {
+				status = request.Status
+			}
+			requests = append(requests, map[string]any{"method": request.Method, "path": request.Path, "query": query, "status": status})
+		}
+		return normalize(t, requests), nil
+	case "mock.clearRequests":
+		m.ClearRequests()
+		return nil, nil
 	case "mock.decide":
 		result, err = m.Decide(args["assetId"].(string), args["outcome"].(string))
 	case "mock.enqueueEvent":
@@ -517,9 +604,13 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		m.SetAPIKeyGrants(grants)
 		return nil, nil
 	case "mock.failNext":
-		operation, _ := args["operation"].(string)
-		m.FailNextRequest(args["failure"].(string), operation)
-		return nil, nil
+		failure := RequestFailure{Code: args["failure"].(string)}
+		failure.Operation, _ = args["operation"].(string)
+		failure.Details, _ = args["details"].(map[string]any)
+		if seconds, ok := args["retryAfter"].(float64); ok {
+			failure.RetryAfter = calmlens.Ptr(time.Duration(seconds) * time.Second)
+		}
+		return nil, m.FailNextRequest(failure)
 	case "assets.create":
 		result, err = m.Assets.Create(ctx, submit(t, args))
 	case "assets.classify":
@@ -687,10 +778,34 @@ func TestSharedMockScenarios(t *testing.T) {
 	fixture := fixtures.Read[struct{ Scenarios []mockScenario }](t, "mock-scenarios.json")
 	for _, scenario := range fixture.Scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
-			m, err := NewServerClient(Options{
-				ProjectID: "project-1", APIKey: CreateMockAPIKey(scenario.Mock.APIKeyGrants),
-				QueuedOutcome: scenario.Mock.QueuedOutcome, AnalyzedOutcome: scenario.Mock.AnalyzedOutcome,
-			})
+			options := Options{ProjectID: "project-1", APIKey: CreateMockAPIKey(scenario.Mock.APIKeyGrants), MaxRetries: scenario.Mock.MaxRetries}
+			// Records what Moderate was given, and answers by name, then by queue mode for uploads.
+			moderateCalls := []map[string]any{}
+			if moderate := scenario.Mock.Moderate; moderate != nil {
+				options.Moderate = func(input ModerationInput) *Decision {
+					var bytesBase64 any
+					if input.Content.Bytes != nil {
+						bytesBase64 = base64.StdEncoding.EncodeToString(input.Content.Bytes)
+					}
+					moderateCalls = append(moderateCalls, map[string]any{
+						"trigger": input.Trigger, "queued": input.Queued, "assetId": input.Asset.ID,
+						"name": input.Asset.Name, "text": input.Content.Text, "bytesBase64": bytesBase64,
+					})
+					spec, ok := moderate.ByName[input.Asset.Name]
+					switch {
+					case ok:
+					case input.Trigger == TriggerUpload && input.Queued && moderate.Queued != nil:
+						spec = *moderate.Queued
+					case input.Trigger == TriggerUpload && !input.Queued && moderate.Analyzed != nil:
+						spec = *moderate.Analyzed
+					default:
+						// The mock's default: queued work stays pending until CompleteProcessing.
+						return DefaultModerate(input)
+					}
+					return spec.build()
+				}
+			}
+			m, err := NewServerClient(options)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -729,7 +844,7 @@ func TestSharedMockScenarios(t *testing.T) {
 							servedResponse = served{status: response.StatusCode, header: response.Header, body: body}
 						}
 					} else {
-						result, err = runStep(t, ctx, m, step.Operation, args)
+						result, err = runStep(t, ctx, m, step.Operation, args, moderateCalls)
 					}
 					if want := step.Expect.Error; want != nil {
 						var apiErr *calmlens.Error
@@ -742,6 +857,9 @@ func TestSharedMockScenarios(t *testing.T) {
 						}
 						if apiErr.Code != want.Code || !reflect.DeepEqual(status, want.Status) {
 							t.Fatalf("%s: got %s (status %v), want %s (status %v): %v", label, apiErr.Code, apiErr.Status, want.Code, want.Status, err)
+						}
+						if want.RetryAfter != nil && (apiErr.RetryAfter == nil || *apiErr.RetryAfter != time.Duration(*want.RetryAfter)*time.Second) {
+							t.Fatalf("%s: Retry-After %v, want %ds", label, apiErr.RetryAfter, *want.RetryAfter)
 						}
 						details := normalize(t, apiErr.Details)
 						for key, value := range want.Details {

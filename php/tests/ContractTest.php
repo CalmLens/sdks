@@ -8,6 +8,9 @@ use CalmLens\ErrorCodes;
 use CalmLens\Exception;
 use CalmLens\Internal\Session;
 use CalmLens\ServerClient;
+use CalmLens\Testing\Classification;
+use CalmLens\Testing\MockDecision;
+use CalmLens\Testing\MockModerationInput;
 use CalmLens\Testing\MockServerClient;
 use CalmLens\UploadTokens;
 use CalmLens\Webhooks;
@@ -133,7 +136,7 @@ final class ContractTest extends TestCase
         $mock = new MockServerClient(projectId: 'project-1');
         $mock->enqueueJson($fixture['response']);
         self::assertSame(self::expectedResult($fixture), self::invoke($mock->client(), $fixture['operation'], $fixture['options']));
-        self::assertEquals($fixture['request'], self::captured($mock->requests()[0]));
+        self::assertEquals($fixture['request'], self::captured($mock->requests()[0]->request));
         self::assertSame(0, $mock->pending());
     }
 
@@ -755,10 +758,56 @@ final class ContractTest extends TestCase
         return is_array($value) ? array_map(fn ($item) => self::resolve($item, $saved), $value) : $value;
     }
 
-    private static function runStep(MockServerClient $mock, string $operation, array $args): mixed
+    /** Builds a fixture decision with the builder, in the order the fixture lists its calls. */
+    private static function buildDecision(string|array $spec): MockDecision
+    {
+        if (is_string($spec)) {
+            return MockDecision::of($spec);
+        }
+        $decision = MockDecision::of($spec['status']);
+        foreach ($spec['flags'] ?? [] as $flag) {
+            $decision->flag($flag['category'], $flag['score'], $flag['qualifiers'] ?? []);
+        }
+        foreach ($spec['notEvaluated'] ?? [] as $category) {
+            $decision->notEvaluated($category);
+        }
+        return $decision;
+    }
+
+    /**
+     * A `moderate` callable that records what it was given and answers by asset name, then by
+     * queue mode for uploads, and otherwise like the mock's default.
+     */
+    private static function recordingModerate(array $spec, array &$calls): Closure
+    {
+        return function (MockModerationInput $input) use ($spec, &$calls): string|MockDecision {
+            $calls[] = ['trigger' => $input->trigger, 'queued' => $input->queued, 'assetId' => $input->asset['id'], 'name' => $input->asset['name'],
+                'text' => $input->text, 'bytesBase64' => $input->bytes === null ? null : base64_encode($input->bytes)];
+            $answer = $spec['byName'][$input->asset['name'] ?? ''] ?? ($input->trigger === 'upload' ? $spec[$input->queued ? 'queued' : 'analyzed'] ?? null : null);
+            if ($answer !== null) {
+                return self::buildDecision($answer);
+            }
+            return $input->queued && $input->trigger !== 'complete' ? 'pending' : 'allowed';
+        };
+    }
+
+    private static function runStep(MockServerClient $mock, string $operation, array $args, array $moderateCalls): mixed
     {
         $client = $mock->client();
         switch ($operation) {
+            case 'mock.completeProcessing':
+                return $mock->completeProcessing($args['assetId'], isset($args['decision']) ? self::buildDecision($args['decision']) : null);
+            case 'mock.moderateCalls':
+                return $moderateCalls;
+            case 'mock.buildDecision':
+                self::buildDecision($args);
+                return null;
+            case 'mock.requests':
+                return array_map(fn ($request) => ['method' => $request->method, 'path' => $request->path, 'query' => $request->query,
+                    'status' => $request->status], $mock->requests());
+            case 'mock.clearRequests':
+                $mock->clearRequests();
+                return null;
             case 'mock.decide':
                 return $mock->decide($args['assetId'], $args['outcome']);
             case 'mock.enqueueEvent':
@@ -767,7 +816,7 @@ final class ContractTest extends TestCase
                 $mock->setApiKeyGrants($args['grants']);
                 return null;
             case 'mock.failNext':
-                $mock->failNextRequest($args['failure'], $args['operation'] ?? null);
+                $mock->failNextRequest($args['failure'], $args['operation'] ?? null, $args['details'] ?? [], $args['retryAfter'] ?? null);
                 return null;
             case 'cdn.serve':
                 $response = $client->cdn->serve($args);
@@ -814,10 +863,11 @@ final class ContractTest extends TestCase
     public function testMockScenario(array $scenario): void
     {
         $options = $scenario['mock'];
+        $moderateCalls = [];
         $mock = new MockServerClient(
-            queuedOutcome: $options['queuedOutcome'] ?? 'pending',
-            analyzedOutcome: $options['analyzedOutcome'] ?? 'allowed',
+            moderate: isset($options['moderate']) ? self::recordingModerate($options['moderate'], $moderateCalls) : null,
             apiKey: MockServerClient::createApiKey($options['apiKeyGrants'] ?? []),
+            maxRetries: $options['maxRetries'] ?? 0,
         );
         $saved = [];
         $started = microtime(true);
@@ -828,12 +878,15 @@ final class ContractTest extends TestCase
                 $expect = $step['expect'] ?? [];
                 if (isset($expect['error'])) {
                     try {
-                        self::runStep($mock, $step['operation'], $args);
+                        self::runStep($mock, $step['operation'], $args, $moderateCalls);
                         self::fail("$label: expected {$expect['error']['code']}");
                     } catch (CalmLensException|PartialResult $error) {
                         $error = $error instanceof PartialResult ? $error->error : $error;
                         self::assertSame(['code' => $expect['error']['code'], 'status' => $expect['error']['status']],
                             ['code' => $error->errorCode, 'status' => $error->status], $label);
+                        if (isset($expect['error']['retryAfter'])) {
+                            self::assertSame((float) $expect['error']['retryAfter'], $error->retryAfter(), "$label: retryAfter");
+                        }
                         // `details` lists only the keys to compare.
                         foreach ($expect['error']['details'] ?? [] as $key => $value) {
                             self::assertSameJson(self::resolve($value, $saved), $error->details[$key] ?? null, "$label: details.$key");
@@ -841,11 +894,12 @@ final class ContractTest extends TestCase
                     }
                     continue;
                 }
-                // The mock keeps the status of its last response, to check the step's final one.
-                (fn () => $this->lastStatus = null)->call($mock);
-                $result = self::runStep($mock, $step['operation'], $args);
+                $sent = count($mock->requests());
+                $result = self::runStep($mock, $step['operation'], $args, $moderateCalls);
                 if (isset($expect['httpStatus'])) {
-                    self::assertSame($expect['httpStatus'], (fn (): ?int => $this->lastStatus)->call($mock), "$label: final response status");
+                    // The step's last response, so retries and polls are judged by their final attempt.
+                    $requests = array_slice($mock->requests(), $sent);
+                    self::assertSame($expect['httpStatus'], $requests === [] ? null : end($requests)->status, "$label: final response status");
                 }
                 if (isset($expect['cdn'])) {
                     self::checkCdn(self::resolve($expect['cdn'], $saved), $result, $label);
@@ -895,12 +949,11 @@ final class ContractTest extends TestCase
         self::fail($spec['operation'] . ' did not fail');
     }
 
+    /** The status a mock option gives an upload: `moderate` answering `blocked`. */
     private static function mockOutcome(string $option): ?string
     {
-        $mock = new MockServerClient(...[$option => 'blocked']);
-        $content = ['name' => 'note.txt', 'content' => ['plainText' => 'hello', 'type' => 'text/plain']];
-        $assets = $mock->client()->assets;
-        $asset = $option === 'queuedOutcome' ? $assets->create($content) : $assets->classify($content);
+        $mock = new MockServerClient(...[$option => fn () => 'blocked']);
+        $asset = $mock->client()->assets->classify(['name' => 'note.txt', 'content' => ['plainText' => 'hello', 'type' => 'text/plain']]);
         return $asset['classification']['moderation']['status'] ?? null;
     }
 
@@ -971,6 +1024,14 @@ final class ContractTest extends TestCase
             self::markTestSkipped("not applicable: $reason");
         }
         self::assertTrue(self::present($capability), $capability['id'] . ' (' . $capability['names']['php'] . ')');
+    }
+
+    /** The decision builder checks names against the generated lists, so they must match the API's. */
+    public function testMockClassificationListsMatchTheSurface(): void
+    {
+        $surface = self::fixtures('surface')['classification'];
+        self::assertSame($surface['categories'], Classification::CATEGORIES);
+        self::assertSame($surface['qualifiers'], Classification::QUALIFIERS);
     }
 
     // rejections.json: every request the API would reject is refused before anything is sent.

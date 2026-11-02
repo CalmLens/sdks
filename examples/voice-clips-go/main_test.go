@@ -371,7 +371,9 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 		t.Fatal("signed a clip that is no longer allowed")
 	}
 	decideAsset(stored, calmlens.ModerationStatusAllowed)
-	mock.FailNext(errors.New("offline"))
+	if err := mock.FailNextRequest(calmlenstest.RequestFailure{Err: errors.New("offline")}); err != nil {
+		t.Fatal(err)
+	}
 	if get(a, "/media?id="+item.ID).Code != 502 {
 		t.Fatal("served a stale allowed status after a failed retrieve")
 	}
@@ -565,7 +567,9 @@ func TestDeleteClip(t *testing.T) {
 	if post(a, "/delete", url.Values{"csrf": {"wrong"}, "clip": {item.Key}}).Code != 403 || len(a.entries) != 2 {
 		t.Fatal("delete without CSRF token")
 	}
-	a.demo.Mock.FailNext(errors.New("offline"))
+	if err := a.demo.Mock.FailNextRequest(calmlenstest.RequestFailure{Err: errors.New("offline")}); err != nil {
+		t.Fatal(err)
+	}
 	if post(a, "/delete", url.Values{"csrf": {a.csrf}, "clip": {item.Key}}).Code != 502 || a.find(item.ID) == nil {
 		t.Fatal("failed delete forgot the clip")
 	}
@@ -861,7 +865,9 @@ func TestWebhookTamperReplayAndRetry(t *testing.T) {
 	if item.Status != "pending" || len(mock.Requests()) != 0 {
 		t.Fatal("unverified webhook had an effect")
 	}
-	mock.FailNext(errors.New("offline"))
+	if err := mock.FailNextRequest(calmlenstest.RequestFailure{Err: errors.New("offline")}); err != nil {
+		t.Fatal(err)
+	}
 	if webhook(a, body, sign(body)).Code != 502 || item.Status != "pending" {
 		t.Fatal("failed retrieval should ask for redelivery")
 	}

@@ -379,7 +379,7 @@ async fn owned_clients_share_the_mock_queue_and_request_log() {
     );
     let requests = mock.requests();
     assert_eq!(requests[0].url, "http://localhost:6110/v1/assets/a");
-    assert_eq!(requests[1].path, "/v1/assets/b");
+    assert_eq!(requests[1].path, "/assets/b");
     assert_eq!(requests[0].header("x-api-key"), Some("key"));
 }
 
@@ -547,7 +547,7 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
         .collect();
     assert_eq!(
         requests,
-        vec![("GET".to_string(), "/v1/assets/asset-1".to_string()); 8]
+        vec![("GET".to_string(), "/assets/asset-1".to_string()); 8]
     );
     // 0.5s, then 1.5 times longer each time (0.75, 1.125, 1.6875, 2.53125, 3.796875), capped at 5s.
     assert_eq!(waited, std::time::Duration::from_secs_f64(15.390625));

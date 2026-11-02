@@ -40,12 +40,12 @@ final class ClientTest extends TestCase
         $mock->enqueueJson(['items' => [['id' => 'child-2']], 'hasMore' => false, 'nextCursor' => null]);
         $client = $mock->client();
         self::assertSame([['id' => 'child-1'], ['id' => 'child-2']], iterator_to_array($client->assets->eachChild(['assetId' => 'parent', 'filter' => 'name=in=(one,two)']), false));
-        self::assertSame('/v1/assets/parent/children', $mock->requests()[1]->getUri()->getPath());
-        self::assertSame('filter=name%3Din%3D%28one%2Ctwo%29&cursor=opaque%2B%2F%3D', $mock->requests()[1]->getUri()->getQuery());
+        self::assertSame('/assets/parent/children', $mock->requests()[1]->path);
+        self::assertSame('filter=name%3Din%3D%28one%2Ctwo%29&cursor=opaque%2B%2F%3D', $mock->requests()[1]->request->getUri()->getQuery());
         $mock->enqueueJson(['items' => [['id' => 'event-1']], 'hasMore' => true, 'nextCursor' => 'next+/=']);
         $mock->enqueueJson(['items' => [['id' => 'event-2']], 'hasMore' => false, 'nextCursor' => 'end']);
         self::assertSame([['id' => 'event-1'], ['id' => 'event-2']], iterator_to_array($client->events->each(['cursor' => 'start']), false));
-        self::assertSame('cursor=next%2B%2F%3D', $mock->requests()[3]->getUri()->getQuery());
+        self::assertSame('cursor=next%2B%2F%3D', $mock->requests()[3]->request->getUri()->getQuery());
     }
 
     public static function invalidUploads(): iterable
@@ -125,8 +125,8 @@ final class ClientTest extends TestCase
         $response = $mock->client()->cdn->serve(['assetIdentifier' => 'a', 'init' => ['headers' => ['x-api-key' => 'attacker', 'Range' => 'bytes=1-3']]]);
         self::assertSame(206, $response->getStatusCode());
         self::assertSame('abc', $response->getBody()->getContents());
-        self::assertSame('test-key', $mock->requests()[0]->getHeaderLine('X-Api-Key'));
-        self::assertSame('bytes=1-3', $mock->requests()[0]->getHeaderLine('Range'));
+        self::assertSame('test-key', $mock->requests()[0]->request->getHeaderLine('X-Api-Key'));
+        self::assertSame('bytes=1-3', $mock->requests()[0]->request->getHeaderLine('Range'));
     }
 
     public function testConfigurationAndDebugOutput(): void
@@ -154,7 +154,8 @@ final class ClientTest extends TestCase
         self::assertSame([], $mock->requests());
         $mock->enqueue(new Response(204));
         self::assertNull($mock->client()->assets->delete(['assetId' => 'a']));
-        self::assertSame('DELETE', $mock->requests()[0]->getMethod());
+        $deleted = $mock->requests()[0];
+        self::assertSame(['DELETE', '/assets/a', 204], [$deleted->method, $deleted->path, $deleted->status]);
     }
 
     public function testMockSnapshotsFreezeUploadBytesAndExhaustionFails(): void
@@ -166,7 +167,7 @@ final class ClientTest extends TestCase
         $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]);
         $stream->rewind();
         $stream->write('replaced');
-        self::assertSame('original', (string) $mock->requests()[0]->getBody());
+        self::assertSame('original', (string) $mock->requests()[0]->request->getBody());
         self::assertSame(0, $mock->pending());
         $this->expectException(\OutOfBoundsException::class);
         $client->assets->retrieve(['assetId' => 'a']);

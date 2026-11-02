@@ -521,25 +521,63 @@ client.enqueue_event("asset.allowed", asset_id="asset_00000000000000000001",
                      facts=[{"key": "decided-by", "value": "automated"}])
 ```
 
+Decide uploads with a `moderate` function, and finish queued ones with `complete_processing`:
+
+```python
+from calmlens.testing import MockCalmLensServerClient, MockModerationInput, mock_decision
+
+
+def moderate(moderation: MockModerationInput):
+    if moderation.content.text and "kill" in moderation.content.text:
+        return mock_decision("blocked").flag("violence", 0.92, {"violence-threat": 0.9})
+    return "pending" if moderation.queued and moderation.trigger == "upload" else "allowed"
+
+
+client = MockCalmLensServerClient(mock_options={"moderate": moderate})
+comment = client.text.classify(text="I will kill you")
+assert comment["classification"]["moderation"]["policy"]["decision"]["flaggedCategories"] == ["violence"]
+
+photo = client.assets.create(name="photo.png", content={"data": b"png", "type": "image/png"})  # pending
+client.complete_processing(photo["id"], mock_decision("age-restricted").flag("sexual", 0.8))
+assert client.assets.wait_for_decision(asset_id=photo["id"])["classification"]["moderation"]["status"] == "age-restricted"
+```
+
 `MockCalmLensServerClient` is the real client with an in-memory transport: every call goes through
 the real client's validation, encoding, response handling, errors and retries, and the fake
 API answers with the real status codes, JSON error bodies and headers (`X-Request-Id`,
 `Retry-After`, `Idempotent-Replayed`). It accepts the real client's configuration (validated
 the same way; `max_retries` defaults to 0 so enqueued failures surface), plus `mock_options`:
-`database_storage`, `image_storage`, `create_id`, `now`, `queued_outcome`, `analyzed_outcome`
-and `signed_url_base_url`. Unknown mock options raise. Unset asset fields are `None`, as the API
+`database_storage`, `image_storage`, `create_id`, `now`, `moderate` and `signed_url_base_url`. Unknown mock options raise. Unset asset fields are `None`, as the API
 returns them. Like the API, the mock gives each new object an ID with its kind's prefix, `_` and
 20 random base62 characters (`asset_5Gm2Rk8XqT3wLp9VbN4c`); `create_id` receives the prefix
 (`asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`) and returns the ID.
 
-- `queued_outcome` (default `pending`) applies to `assets.create` and queued multipart uploads;
-  `analyzed_outcome` (default `allowed`) to `assets.classify` and `text.classify`. An outcome
-  is `pending` (processing `processing`, moderation `pending`), `allowed`, `limited`, `age-restricted`,
-  `blocked` or `purged` (processing `completed` with that moderation status; `purged` also
-  removes the content with `removalReason` `policy`) or `failed` (processing `failed`, retryable).
-  Either option can also be a function that takes the uploaded asset and returns its outcome.
+- `moderate` decides each asset the mock moderates. It receives a `MockModerationInput` with
+  `asset` (a copy of the stored asset, still processing), `content` (`bytes`, the uploaded bytes
+  with multipart parts joined in order, and `text`, those bytes decoded for a
+  `plaintext-document`; each `None` without them, such as for a website), `trigger` (`upload`
+  when an upload completes, `retry` after `assets.retry`, `rerun` after `assets.explain` with
+  `rerun=True`, `complete` from `complete_processing`) and `queued` (`True` for queued uploads,
+  retries, reruns and `complete`). It returns a status, `pending` (still processing), `failed`
+  (processing `failed` with `failureReason` `processing-error`, retryable), `allowed`, `limited`,
+  `age-restricted`, `blocked` or `purged` (`purged` also removes the content with
+  `removalReason` `policy`), or a `mock_decision(...)`. Without it, `default_moderate` applies:
+  queued uploads, retries and reruns stay `pending` and everything else is `allowed`.
   A classified image gets a ThumbHash (`content.image.thumbhash` and `averageColor`), which goes
   when its content is removed.
+- `mock_decision(status)` builds a decision with findings: `.flag(category, score,
+  qualifiers=None)` records a category's score from 0 to 1 and, optionally, its qualifiers'
+  scores (`{"violence-threat": 0.9}`), and `.not_evaluated(category)` marks a category as not
+  assessed; both return the decision. A decided asset gets a complete report: every category
+  (unflagged ones evaluated with score 0), `score` (the highest), and `policy` with each
+  category's action and the `flaggedCategories` acted on (scored 0.5 or more, unless the status is
+  `allowed`). An unknown status, category or qualifier, a score outside 0 to 1, a category used
+  twice and findings on a `pending` or `failed` decision raise `sdk/invalid-argument`.
+- `client.complete_processing(asset_id, decision=None)` finishes processing an asset as the
+  pipeline would, with `decision` or else what `moderate` returns for the `complete` trigger
+  (`allowed` by default). It records no review, so `assets.explain` can still rerun it. It raises
+  `asset/not-found` (404) for an unknown asset and `sdk/invalid-argument` for one that isn't
+  processing.
 - Hash lists and their entries live in `database_storage.hash_lists` and
   `database_storage.hash_list_entries`; deleting a list deletes its entries. `add_entry` with an
   `asset_id` copies the asset's `content.image.perceptualHash` and `perceptualHashQuality`
@@ -551,40 +589,48 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   classification is `completed`, after which `cdn.serve` answers 403 `asset/not-available`. Pass
   `keepContentAfterProcessing: True` to serve content after a decision.
 
-- `client.requests` returns copies of every captured request, oldest first, as
-  `MockRequest` objects: `method`, full `url`, `path` (relative to `base_url`, or to
-  `cdn_base_url` for `cdn.serve`), decoded `query` values, `body` (the JSON body as
-  Python objects, upload bytes, or `None`) and `headers` (left out of `repr`).
+- `client.requests` returns copies of every request captured since the mock was created or
+  `client.clear_requests()` last ran, oldest first, as `MockRequest` objects: `method`, full
+  `url`, `path` (relative to `base_url`, or to `cdn_base_url` for `cdn.serve`, with each segment
+  decoded, such as `/assets/<id>`), decoded `query` values, `body` (the JSON body as Python
+  objects, upload bytes, or `None`), `headers` (left out of `repr`) and `status` (the HTTP status
+  answered, or `None` when the request failed without a response).
 - `client.enqueue_error(error)` makes the next request fail and leaves storage unchanged.
   A `CalmLensError` becomes an HTTP error response with its `status` (or the API's status for
   its `code`, e.g. 404 for `asset/not-found`) and `retry_after`, raised as a
   `CalmLensAPIError`. Network exceptions are raised like real failures (`TimeoutError` →
   `sdk/timeout`, other `OSError`s and `http.client` errors → `sdk/transport-error`, with the
   exception as `__cause__`).
-- `client.fail_next_request(failure="transport-error", operation=None)` makes the next request
-  (or the next to `operation`, a JavaScript-style method path such as `assets.create` or
-  `cdn.serve`) fail without running: `transport-error` raises `sdk/transport-error`, `timeout`
-  `sdk/timeout`, and an API error code that error with its HTTP status. Each queued failure is
-  used once. Operations are told apart by their requests, so `text.classify` counts as
-  `assets.classify`.
+- `client.fail_next_request(failure="transport-error", operation=None, details=None,
+  retry_after=None)` makes the next request (or the next to `operation`, a JavaScript-style
+  method path such as `assets.create` or `cdn.serve`) fail without running: `transport-error`
+  raises `sdk/transport-error`, `timeout` `sdk/timeout`, and an API error code that error with
+  its HTTP status, `details` as its details and `retry_after` whole seconds as its `Retry-After`.
+  Each queued failure fails one request, so a retry takes the next queued failure or reaches the
+  API. A request counts for every method that sends it (`text.classify` uploads also count as
+  `assets.classify`, `assets.waitForDecision` polls as `assets.retrieve`); an unknown operation
+  raises `sdk/invalid-argument`.
 - `client.set_api_key_grants(grants)` replaces the mock key's grants for later requests, as
   editing the key in the portal would; the key, and the idempotency keys it used, stay the same.
 - `client.enqueue_event(type, facts=..., asset_id=..., severity=..., title=...)` adds an event
   to the feed; `events.list`, `events.iter` and cursors behave like the API's (cursors are
   positions in the feed, so events added later reach cursors taken before them; `pageSize` is 1
-  to 100, default 50). Like the API, deleting an asset, removing its content and retrying it record
-  `asset.deleted`, `asset.content-removed` and `asset.retried` events with `asset-name` and
-  `asset-type` facts.
+  to 100, default 50). An event with the `asset_id` of a stored asset carries its snapshot. Like
+  the API, deleting an asset, removing its content and retrying it record `asset.deleted`,
+  `asset.content-removed` and `asset.retried` events with `asset-name` and `asset-type` facts, and
+  every completed upload records `asset.uploaded`, then, once decided, `asset.classified` and the
+  automated `asset.<status>` (`decided-by: automated`), or `asset.failed`.
 - `assets.decide` validates and records a decision like the API: a note of 1 to 1499
   characters, `confirm_purge=True` to purge, `asset/decision-not-allowed` for anything but
   `blocked` or `purged` while moderation is `pending`, `asset/decision-unchanged` for the
   current status, `asset/content-purged` for anything but `blocked` once purged and
   `asset/processing` while the asset is still uploading or processing. The review and its event name
   the reviewer `An API key`.
-- `client.decide(asset_id, decision)` simulates moderation finishing with a reviewer's decision (`allowed`, `limited`,
+- `client.decide(asset_id, decision)` applies a reviewer's decision (`allowed`, `limited`,
   `age-restricted`, `blocked` or `purged`, which also removes the content with `removalReason`
   `requested` after an `asset.content-removed` event) and adds the matching `asset.<decision>`
-  event with `decided-by: reviewer`, `asset-type`, `asset-name` and `note` facts.
+  event with `decided-by: reviewer`, `asset-type`, `asset-name` and `note` facts. It leaves the
+  report as it was; `pending` and `failed` are not decisions and raise `sdk/invalid-argument`.
 - `cdn.serve` answers like the CDN: blocked, purged and failed assets and removed content get
   `403` `asset/not-available` whatever the key; private assets get `403` `asset/api-key-missing-permission` unless the
   key has `assets:download` (the default key has no grants). Served content has `Cache-Control`
@@ -598,8 +644,8 @@ returns them. Like the API, the mock gives each new object an ID with its kind's
   assets without one.
 - `assets.wait_for_decision` reads the mock's `database_storage` and takes no real time: it
   returns an asset that is already decided (or whose processing failed) and raises
-  `sdk/timeout` at once for one whose moderation stays `pending`. Set the stored asset's
-  `classification.moderation.status` or `classification.status` to simulate a decision or failure.
+  `sdk/timeout` at once for one whose moderation stays `pending`. Finish a pending asset with
+  `complete_processing`.
 - Idempotency keys are honoured like the API: a repeated key replays the saved response, a key
   reused for a different request raises `idempotency/key-reused` (raw uploads are compared by
   their query, type and length, not their bytes), a failed request frees its key, and keys must
@@ -637,7 +683,7 @@ and asset deletion, retries of failed assets, keyword search, list filters on to
 fields such as `classification.moderation.status`, `classification.status` and `content.format` (a subset of RSQL: `==` with `*`, `!=`,
 `=in=`, `=out=`, `=gt=`/`=ge=`/`=lt=`/`=le=`, `;` (and), which binds tighter than `,` (or), and
 `( … )` groups; other syntax raises `NotImplementedError`) and ordering (newest first by default), and CDN download grants with
-realistic response headers. It does not classify content, transform media or fetch external
+realistic response headers. It does not classify content (decisions come from `moderate`), transform media or fetch external
 URLs. Mock signatures and URLs are for tests only; inspect or seed the storage dictionaries
 between calls. Keep `calmlens.testing` out of production imports.
 

@@ -32,18 +32,24 @@ import java.util.function.LongSupplier;
  * <p>The in-memory API keeps assets, folders, hash lists, events and content: uploads create assets you can
  * retrieve, list (RSQL filters such as {@code classification.moderation.status==blocked},
  * ordering, folder and cursor paging), search, update, move and delete, and the CDN serves their
- * stored bytes. It does not classify content: {@code assets.create} (and queued multipart uploads)
- * end at {@link Options#queuedOutcome} ({@code pending} by default), {@code assets.classify} and
- * {@code text.classify} at {@link Options#analyzedOutcome} ({@code allowed} by default). Finished
- * processing removes the content unless the upload sets {@code keepContentAfterProcessing}, and
- * {@code purged} always removes it. {@link #decide} changes an asset's status as a reviewer would.
- * Errors use the API's codes, statuses and body, every response has an {@code X-Request-Id}, and
- * idempotency keys replay the first response.
+ * stored bytes. It does not classify content: {@link Options#moderate} decides each upload from the
+ * asset, its content and why it is moderated, with a status or a {@link MockDecision}. Without it,
+ * queued uploads ({@code assets.create}), retries and reruns stay {@code pending} until {@link
+ * #completeProcessing}, and {@code assets.classify} and {@code text.classify} are {@code allowed}.
+ * Like the pipeline, a finished upload records {@code asset.uploaded}, then {@code asset.classified}
+ * and the automated {@code asset.<status>} (or {@code asset.failed}). Finished processing removes
+ * the content unless the upload sets {@code keepContentAfterProcessing}, and {@code purged} always
+ * removes it. {@link #decide} changes an asset's status as a reviewer would. Errors use the API's
+ * codes, statuses and body, every response has an {@code X-Request-Id}, and idempotency keys replay
+ * the first response.
  *
  * <pre>{@code
- * var mock = new MockCalmLensServerClient(new MockCalmLensServerClient.Options().queuedOutcome(MockCalmLensServerClient.Outcome.PENDING));
- * Models.Asset asset = mock.client.assets.create("photo.png", bytes, "image/png");
- * mock.decide(asset.id(), MockCalmLensServerClient.Outcome.BLOCKED);      // adds an asset.blocked event
+ * var mock = new MockCalmLensServerClient(new MockCalmLensServerClient.Options().moderate(input ->
+ *     "threat.txt".equals(input.asset().name())
+ *         ? MockDecision.of("blocked").flag("violence", 0.92, Map.of("violence-threat", 0.9))
+ *         : MockDecision.of(input.queued() && input.trigger() != MockCalmLensServerClient.Trigger.COMPLETE ? "pending" : "allowed")));
+ * Models.Asset asset = mock.client.assets.create("photo.png", bytes, "image/png");  // pending
+ * mock.completeProcessing(asset.id(), MockDecision.of("blocked").flag("violence", 0.9));
  * mock.client.assets.waitForDecision(new Models.WaitForDecision(asset.id()));
  * }</pre>
  *
@@ -56,9 +62,10 @@ import java.util.function.LongSupplier;
  * #enqueueError}, {@link #enqueueEvents}, {@link #enqueueCdn} and the other {@code enqueue}
  * methods answer the next request instead of the in-memory API. A response queued for a route
  * ({@link #enqueue(String, String, int, Object)}) waits until a request for that route arrives;
- * other requests meanwhile go to the in-memory API. Like the real client, reads and uploads are
- * retried on HTTP 429, 502, 503 and 504 and on network failures (without waiting), so queue one
- * response per attempt, or build the mock from a builder with {@code maxRetries(0)}.
+ * other requests meanwhile go to the in-memory API. The mock's client makes no retries unless its
+ * builder sets {@code maxRetries}, so each queued response or failure answers one call. With
+ * retries, reads and uploads are retried on HTTP 429, 502, 503 and 504 and on network failures
+ * (without waiting), and each attempt takes the next queued answer.
  *
  * <p>{@code assets.waitForDecision} retrieves the asset until its {@code
  * classification.moderation.status} is no longer {@code pending} or its classification failed.
@@ -66,18 +73,20 @@ import java.util.function.LongSupplier;
  */
 public final class MockCalmLensServerClient implements AutoCloseable {
   /**
-   * A captured request. {@code path} is the raw URL path, including the base URL's path (for
-   * example {@code /v1/projects/project-1/assets}); {@code query} holds the decoded query
-   * parameters in request order. {@link #toString()} hides the API key.
+   * A captured request. {@code path} is relative to the API (or CDN) base URL, with its segments
+   * decoded (for example {@code /projects/project-1/assets} or {@code /assets/asset_1}); {@code
+   * query} holds the decoded query parameters in request order. {@link #toString()} hides the API key.
    *
    * @param method HTTP method
    * @param url full URL
-   * @param path raw path
+   * @param path the path after the base URL, segments decoded
    * @param query decoded query parameters
    * @param headers request headers
    * @param body request body, or null
+   * @param status the response's HTTP status, or null when the request failed without one (or is
+   *     still being answered)
    */
-  public record Request(String method, String url, String path, Map<String, String> query, Map<String, String> headers, byte[] body) {
+  public record Request(String method, String url, String path, Map<String, String> query, Map<String, String> headers, byte[] body, Integer status) {
     /** Copies every value. */
     public Request {
       query = Collections.unmodifiableMap(new LinkedHashMap<>(query));
@@ -101,8 +110,10 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     @Override public String toString() {
       Map<String, String> safe = new LinkedHashMap<>();
       headers.forEach((name, value) -> safe.put(name, name.equalsIgnoreCase("X-Api-Key") ? "[redacted]" : value));
-      return "Request[method=" + method + ", url=" + url + ", headers=" + safe + ", body=" + (body == null ? "none" : body.length + " bytes") + "]";
+      return "Request[method=" + method + ", url=" + url + ", headers=" + safe + ", body=" + (body == null ? "none" : body.length + " bytes") + ", status=" + status + "]";
     }
+
+    Request withStatus(Integer value) { return new Request(method, url, path, query, headers, body, value); }
   }
 
   private record Queued(String method, String path, Transport.Response response, Exception failure) {
@@ -136,42 +147,81 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     public String value() { return value; }
   }
 
-  /** Outcome, ID and clock controls for the in-memory API. */
+  /** Why the mock is moderating an asset, for {@link Options#moderate}. */
+  public enum Trigger {
+    /** An upload completed: {@code assets.create}, {@code assets.classify}, {@code text.classify} or a final part. */
+    UPLOAD("upload"),
+    /** {@code assets.retry} queued a failed asset again. */
+    RETRY("retry"),
+    /** {@code assets.explain} with {@code rerun} queued the asset again. */
+    RERUN("rerun"),
+    /** {@link MockCalmLensServerClient#completeProcessing(String)} finished processing without a decision of its own. */
+    COMPLETE("complete");
+
+    private final String value;
+
+    Trigger(String value) { this.value = value; }
+
+    /** @return the trigger's name, such as {@code upload} */
+    public String value() { return value; }
+  }
+
+  /**
+   * The uploaded content {@link Options#moderate} receives.
+   *
+   * @param bytes the uploaded bytes (parts joined in order), or null without stored content, such
+   *     as a website or removed content
+   * @param text the bytes decoded as UTF-8 for a {@code plaintext-document}, else null
+   */
+  public record Content(byte[] bytes, String text) {
+    /** Copies the bytes. */
+    public Content { bytes = bytes == null ? null : bytes.clone(); }
+
+    @Override public byte[] bytes() { return bytes == null ? null : bytes.clone(); }
+  }
+
+  /**
+   * What {@link Options#moderate} receives for each asset the mock moderates.
+   *
+   * @param asset the asset as stored, still processing
+   * @param content its uploaded content
+   * @param trigger why it is moderated
+   * @param queued true when the API would queue the work rather than answer with the decision:
+   *     queued uploads, retries, reruns and {@link MockCalmLensServerClient#completeProcessing(String)}
+   */
+  public record ModerationInput(Models.Asset asset, Content content, Trigger trigger, boolean queued) {}
+
+  /** The default {@link Options#moderate}: queued work stays pending until {@link MockCalmLensServerClient#completeProcessing(String)}, which allows it. */
+  static MockDecision defaultModerate(ModerationInput input) {
+    return MockDecision.of(input.queued() && input.trigger() != Trigger.COMPLETE ? Outcome.PENDING : Outcome.ALLOWED);
+  }
+
+  /** Moderation, ID and clock controls for the in-memory API. */
   public static final class Options {
-    java.util.function.Function<Models.Asset, Outcome> queuedOutcome = asset -> Outcome.PENDING, analyzedOutcome = asset -> Outcome.ALLOWED;
+    java.util.function.Function<ModerationInput, MockDecision> moderate = MockCalmLensServerClient::defaultModerate;
     java.util.function.Function<String, String> createId = MockApi::newId;
     LongSupplier now = monotonicClock();
     String signedUrlBaseUrl = "https://mock.calmlens.invalid";
 
-    /** Defaults: queued uploads stay pending, analyzed ones are allowed. */
+    /** Defaults: queued work stays pending until {@link MockCalmLensServerClient#completeProcessing(String)}, everything else is allowed. */
     public Options() {}
 
-    /** @param value outcome of {@code assets.create} and queued multipart uploads @return these options */
-    public Options queuedOutcome(Outcome value) { Objects.requireNonNull(value, "queuedOutcome"); queuedOutcome = asset -> value; return this; }
-
     /**
-     * Chooses each queued upload's outcome, for example from {@code asset.name()}.
+     * Decides each asset the mock moderates: uploads ({@code assets.create}, {@code
+     * assets.classify}, {@code text.classify} and final parts), retries, reruns and {@link
+     * #completeProcessing(String)} without a decision. Return {@code MockDecision.of("pending")} to
+     * leave the asset processing.
      *
-     * @param value returns the outcome of each {@code assets.create} and queued multipart upload
+     * @param value returns the decision for each input
      * @return these options
      */
-    public Options queuedOutcome(java.util.function.Function<Models.Asset, Outcome> value) { queuedOutcome = Objects.requireNonNull(value, "queuedOutcome"); return this; }
+    public Options moderate(java.util.function.Function<ModerationInput, MockDecision> value) { moderate = Objects.requireNonNull(value, "moderate"); return this; }
 
-    /** @param value outcome of {@code assets.classify} and {@code text.classify} @return these options */
-    public Options analyzedOutcome(Outcome value) { Objects.requireNonNull(value, "analyzedOutcome"); analyzedOutcome = asset -> value; return this; }
-
-    /**
-     * Chooses each moderated upload's outcome, for example from {@code asset.name()}.
-     *
-     * @param value returns the outcome of each {@code assets.classify} and {@code text.classify}
-     * @return these options
-     */
-    public Options analyzedOutcome(java.util.function.Function<Models.Asset, Outcome> value) { analyzedOutcome = Objects.requireNonNull(value, "analyzedOutcome"); return this; }
-
-    /** The outcome for an upload that finished, from its stored record. */
-    Outcome outcome(JsonObject asset, boolean queue) {
-      Outcome outcome = (queue ? queuedOutcome : analyzedOutcome).apply(Json.GSON.fromJson(asset, Models.Asset.class));
-      return Objects.requireNonNull(outcome, "outcome");
+    /** Asks {@link #moderate} for a decision. */
+    MockDecision decide(ModerationInput input) {
+      MockDecision decision = moderate.apply(input);
+      if (decision == null) throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "moderate must return a MockDecision");
+      return decision;
     }
 
     /**
@@ -199,10 +249,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     }
 
     private Options copy() {
-      Options copy = new Options().createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
-      copy.queuedOutcome = queuedOutcome;
-      copy.analyzedOutcome = analyzedOutcome;
-      return copy;
+      return new Options().moderate(moderate).createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
     }
   }
 
@@ -310,35 +357,90 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   public synchronized void setApiKeyGrants(Grant... grants) { api.grants = grantsJson(List.of(grants)); }
 
   /**
-   * Makes the next request fail without running, as if it never completed: {@code
-   * "transport-error"} ({@link ErrorCodes#SDK_TRANSPORT_ERROR}), {@code "timeout"} ({@link
-   * ErrorCodes#SDK_TIMEOUT}) or a public API error code, answered with its HTTP status. Queue
-   * several to fail several requests; each is used once.
-   *
-   * @param failure {@code transport-error}, {@code timeout} or an API error code
+   * Which request {@link #failNextRequest(String, FailureOptions)} fails, and the details and
+   * {@code Retry-After} of an API error.
    */
-  public void failNextRequest(String failure) { failNextRequest(failure, null); }
+  public static final class FailureOptions {
+    String operation;
+    Map<String, Object> details;
+    Integer retryAfter;
+
+    /** Fails the next request, with the API error's default body. */
+    public FailureOptions() {}
+
+    /**
+     * @param value a client method path, such as {@code assets.create}, {@code cdn.serve} or
+     *     {@code assets.waitForDecision}; the failure waits for a request it sends
+     * @return these options
+     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for a method that sends no
+     *     request
+     */
+    public FailureOptions operation(String value) {
+      if (!MockApi.OPERATIONS.contains(value)) throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Unknown operation: " + value);
+      operation = value;
+      return this;
+    }
+
+    /** @param value the API error's {@code details} (copied) @return these options */
+    public FailureOptions details(Map<String, Object> value) { details = new LinkedHashMap<>(Objects.requireNonNull(value, "details")); return this; }
+
+    /**
+     * @param seconds the API error's {@code Retry-After}, in whole seconds
+     * @return these options
+     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for a negative value
+     */
+    public FailureOptions retryAfter(int seconds) {
+      if (seconds < 0) throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "retryAfter must be a whole number of seconds");
+      retryAfter = seconds;
+      return this;
+    }
+  }
+
+  private record PendingFailure(String failure, String operation, Map<String, Object> details, Integer retryAfter) {}
 
   /**
-   * Makes the next request for {@code operation} fail without running; other requests are
-   * answered meanwhile.
+   * Makes the next request fail without running, as if it never completed: {@code
+   * "transport-error"} ({@link ErrorCodes#SDK_TRANSPORT_ERROR}), {@code "timeout"} ({@link
+   * ErrorCodes#SDK_TIMEOUT}) or a public API error code, answered with its HTTP status and the
+   * API's error body. Each queued failure fails exactly one request, so a client retry takes the
+   * next queued failure or reaches the in-memory API.
    *
    * @param failure {@code transport-error}, {@code timeout} or an API error code
-   * @param operation a client method path, such as {@code assets.create}, {@code cdn.serve} or
-   *     {@code assets.waitForDecision}, or null for any request
    */
-  public synchronized void failNextRequest(String failure, String operation) {
-    Objects.requireNonNull(failure, "failure");
-    if (!failure.equals("transport-error") && !failure.equals("timeout") && ErrorCodes.httpStatus(failure).isEmpty())
-      throw new IllegalArgumentException("failure must be transport-error, timeout or an API error code: " + failure);
-    failures.add(new String[] {failure, operation});
+  public void failNextRequest(String failure) { failNextRequest(failure, new FailureOptions()); }
+
+  /**
+   * Like {@link #failNextRequest(String)}, for the next request an operation sends (other requests
+   * are answered meanwhile), or with an API error's details and {@code Retry-After}.
+   *
+   * @param failure {@code transport-error}, {@code timeout} or an API error code
+   * @param options the operation, details and Retry-After
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for another failure, or
+   *     details or Retry-After for a failure without a response
+   */
+  public synchronized void failNextRequest(String failure, FailureOptions options) {
+    Objects.requireNonNull(options, "options");
+    boolean network = "transport-error".equals(failure) || "timeout".equals(failure);
+    if (!network && (failure == null || ErrorCodes.httpStatus(failure).isEmpty()))
+      throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "failure must be transport-error, timeout or an API error code: " + failure);
+    if (network && (options.details != null || options.retryAfter != null))
+      throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "details and retryAfter need an API error code");
+    failures.add(new PendingFailure(failure, options.operation, options.details, options.retryAfter));
+  }
+
+  /** A request as received, with the status of its response once there is one. */
+  private static final class Recorded {
+    final Request request;
+    Integer status;
+
+    Recorded(Request request) { this.request = request; }
   }
 
   private final Deque<Queued> responses = new ArrayDeque<>();
-  private final List<String[]> failures = new ArrayList<>();
+  private final List<PendingFailure> failures = new ArrayList<>();
   private final MockApi api;
   private final String projectId;
-  private final List<Request> requests = new ArrayList<>();
+  private final List<Recorded> requests = new ArrayList<>();
   /** Time the client spent in skipped waits; it moves the client's clock forward. */
   private final AtomicLong skippedNanos = new AtomicLong();
   /** The client under test. */
@@ -358,7 +460,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
 
   /**
    * A mock configured like a real client: project ID, base URLs, timeouts and retries come from the
-   * builder and are validated the same way. Only the transport is replaced; the builder is unchanged.
+   * builder and are validated the same way, except that retries are off unless the builder sets
+   * {@code maxRetries}. Only the transport is replaced; the builder is unchanged.
    *
    * @param builder client options
    */
@@ -369,7 +472,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * @param options outcome, ID and clock controls (copied)
    */
   public MockCalmLensServerClient(CalmLensServerClient.Builder builder, Options options) {
-    client = builder.build(this::send, delay -> skippedNanos.addAndGet(delay.toNanos()), () -> System.nanoTime() + skippedNanos.get());
+    // Unless the builder sets maxRetries, each queued failure or response answers one call.
+    client = builder.build(this::send, delay -> skippedNanos.addAndGet(delay.toNanos()), () -> System.nanoTime() + skippedNanos.get(), 0);
     // The in-memory API answers multipart size checks in the API's order.
     client.deferUploadChecks = true;
     projectId = client.projectId();
@@ -447,18 +551,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   }
 
   /**
-   * Queues an HTTP 429 with {@code Retry-After}, as the API sends when a request is throttled. It
-   * surfaces as an {@link ApiException} with {@link ErrorCodes#SDK_HTTP_ERROR} once retries are used up.
-   *
-   * @param retryAfterSeconds the delay the API asks for
-   * @return this mock
-   */
-  public MockCalmLensServerClient enqueueRateLimited(int retryAfterSeconds) {
-    byte[] json = "{\"message\":\"Too many requests\"}".getBytes(StandardCharsets.UTF_8);
-    return add(null, null, new Transport.Response(429, headers("content-type", "application/json", "x-request-id", requestId(), "retry-after", retryAfterSeconds), json), null);
-  }
-
-  /**
    * Queues one page of the events feed. {@code events} may be {@link Models.Event} records or maps.
    *
    * @param nextCursor the page's {@code nextCursor}
@@ -501,41 +593,45 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /** @return this mock, with a request timeout queued ({@link RequestTimeoutException}) */
   public MockCalmLensServerClient enqueueTimeout() { return enqueueFailure(new HttpTimeoutException("request timed out")); }
 
-  /**
-   * Gives an asset a new outcome, as a reviewer would: a decision ({@code allowed}, {@code
-   * limited}, {@code age-restricted}, {@code blocked} or {@code purged}) records a manual review and
-   * adds the matching {@code asset.<status>} event with the asset's snapshot, the event catalog's
-   * severity ({@code low} for {@code allowed} and {@code limited}, {@code high} otherwise) and a
-   * {@code decided-by: reviewer} fact. {@code purged} removes the content with reason {@code requested}, adding an {@code
-   * asset.content-removed} event first, as the API does. {@code pending} and {@code failed} only
-   * change the processing state ({@code failed} adds an {@code asset.failed} event).
-   *
-   * @param assetId a stored asset
-   * @param outcome the new outcome
-   * @return the asset
-   * @throws ApiException {@link ErrorCodes#ASSET_NOT_FOUND} when the asset is not stored
-   */
-  public synchronized Models.Asset decide(String assetId, Outcome outcome) {
-    Objects.requireNonNull(outcome, "outcome");
-    JsonObject asset;
+  private JsonObject stored(String assetId) {
     try {
-      asset = api.asset(assetId);
+      return api.asset(assetId);
     } catch (MockApi.Failure missing) {
       Transport.Response response = MockApi.error(missing);
       throw new ApiException(missing.code, missing.getMessage(), missing.details, missing.status, response.headers(), null);
     }
+  }
+
+  /**
+   * Gives an asset a reviewer's decision ({@code allowed}, {@code limited}, {@code
+   * age-restricted}, {@code blocked} or {@code purged}): it records a manual review and adds the
+   * matching {@code asset.<status>} event with the asset's snapshot, the event catalog's severity
+   * ({@code low} for {@code allowed} and {@code limited}, {@code high} otherwise) and a {@code
+   * decided-by: reviewer} fact. {@code purged} removes the content with reason {@code requested},
+   * adding an {@code asset.content-removed} event first, as the API does. The moderation report
+   * stays as the pipeline left it.
+   *
+   * @param assetId a stored asset
+   * @param outcome the reviewer's decision
+   * @return the asset
+   * @throws ApiException {@link ErrorCodes#ASSET_NOT_FOUND} when the asset is not stored
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for {@code pending} or
+   *     {@code failed}, which are not decisions
+   */
+  public synchronized Models.Asset decide(String assetId, Outcome outcome) {
+    Objects.requireNonNull(outcome, "outcome");
+    if (outcome == Outcome.PENDING || outcome == Outcome.FAILED)
+      throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "decision must be allowed, limited, age-restricted, blocked or purged");
+    JsonObject asset = stored(assetId);
     long now = api.now();
-    api.applyOutcome(asset, outcome, "requested", now);
-    if (outcome == Outcome.PENDING) return Json.GSON.fromJson(asset, Models.Asset.class);
-    if (outcome != Outcome.FAILED) {
-      JsonObject review = new JsonObject();
-      review.addProperty("id", api.createId("rev"));
-      review.addProperty("decision", outcome.value());
-      review.add("note", null);
-      review.addProperty("reviewedAt", now);
-      review.addProperty("appliedToAsset", true);
-      asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);
-    }
+    api.applyOutcome(asset, outcome, "requested", now, null);
+    JsonObject review = new JsonObject();
+    review.addProperty("id", api.createId("rev"));
+    review.addProperty("decision", outcome.value());
+    review.add("note", null);
+    review.addProperty("reviewedAt", now);
+    review.addProperty("appliedToAsset", true);
+    asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);
     String name = MockApi.str(asset, "name"), type = MockApi.str(asset, "type");
     if (outcome == Outcome.PURGED)
       api.recordEvent("asset.content-removed", "low", asset, List.of(new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + assetId), new Models.EventFact("asset-type", type, null)));
@@ -543,6 +639,36 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     api.recordEvent("asset." + outcome.value(), outcome == Outcome.ALLOWED || outcome == Outcome.LIMITED ? "low" : "high", asset, java.util.Arrays.asList(
         new Models.EventFact("decided-by", "reviewer", null), new Models.EventFact("asset-type", type, null),
         new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + assetId), new Models.EventFact("note", null, null)));
+    return Json.GSON.fromJson(asset, Models.Asset.class);
+  }
+
+  /**
+   * Finishes processing a pending asset as the moderation pipeline would, asking {@link
+   * Options#moderate} for the decision with trigger {@link Trigger#COMPLETE}. It records the
+   * pipeline's events ({@code asset.classified} and the automated {@code asset.<status>}, or
+   * {@code asset.failed}) and no manual review.
+   *
+   * @param assetId a stored asset whose classification is {@code processing}
+   * @return the asset
+   * @throws ApiException {@link ErrorCodes#ASSET_NOT_FOUND} when the asset is not stored
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} when it isn't processing
+   */
+  public Models.Asset completeProcessing(String assetId) { return completeProcessing(assetId, null); }
+
+  /**
+   * Finishes processing a pending asset with {@code decision}, as the moderation pipeline would.
+   *
+   * @param assetId a stored asset whose classification is {@code processing}
+   * @param decision the decision, or null to ask {@link Options#moderate}
+   * @return the asset
+   * @throws ApiException {@link ErrorCodes#ASSET_NOT_FOUND} when the asset is not stored
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} when it isn't processing
+   */
+  public synchronized Models.Asset completeProcessing(String assetId, MockDecision decision) {
+    JsonObject asset = stored(assetId);
+    if (!"processing".equals(MockApi.str(asset.getAsJsonObject("classification"), "status")))
+      throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Asset " + assetId + " isn't processing");
+    api.moderateStored(asset, Trigger.COMPLETE, decision);
     return Json.GSON.fromJson(asset, Models.Asset.class);
   }
 
@@ -581,8 +707,11 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    */
   public synchronized void withStorage(Consumer<Storage> change) { change.accept(api.storage); }
 
-  /** @return every request received so far */
-  public synchronized List<Request> requests() { return List.copyOf(requests); }
+  /** @return every request received so far (or since {@link #clearRequests}), with its response status */
+  public synchronized List<Request> requests() { return requests.stream().map(r -> r.request.withStatus(r.status)).toList(); }
+
+  /** Forgets the requests received so far. */
+  public synchronized void clearRequests() { requests.clear(); }
 
   /** @return the number of queued responses not used yet */
   public synchronized int remainingResponses() { return responses.size(); }
@@ -590,35 +719,35 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /** Closes {@link #client}. */
   @Override public void close() { client.close(); }
 
-  /** The status of the last response, null when the last request failed without one; the contract tests check it. */
-  Integer lastStatus;
-
   private Transport.Response send(Transport.Request request) throws IOException, InterruptedException {
+    Recorded recorded = new Recorded(capture(request));
     synchronized (this) {
-      lastStatus = null;
+      requests.add(recorded);
     }
-    Transport.Response response = answer(request);
+    Transport.Response response = answer(recorded.request);
     synchronized (this) {
-      lastStatus = response.status();
+      recorded.status = response.status();
     }
     return response;
   }
 
-  private Transport.Response answer(Transport.Request request) throws IOException, InterruptedException {
-    Request captured = capture(request);
+  private Transport.Response answer(Request captured) throws IOException, InterruptedException {
     Queued next;
     synchronized (this) {
-      requests.add(captured);
       Set<String> operations = api.operations(captured);
       for (int i = 0; i < failures.size(); i++) {
-        String[] pending = failures.get(i);
-        if (pending[1] != null && !operations.contains(pending[1])) continue;
+        PendingFailure pending = failures.get(i);
+        if (pending.operation() != null && !operations.contains(pending.operation())) continue;
         failures.remove(i);
-        if (pending[0].equals("transport-error")) throw new java.net.ConnectException("Simulated network failure");
-        if (pending[0].equals("timeout")) throw new HttpTimeoutException("The operation timed out");
-        return MockApi.error(new MockApi.Failure(pending[0]));
+        if (pending.failure().equals("transport-error")) throw new java.net.ConnectException("Simulated network failure");
+        if (pending.failure().equals("timeout")) throw new HttpTimeoutException("The operation timed out");
+        Transport.Response failure = MockApi.error(MockApi.Failure.of(pending.failure(), pending.details()));
+        if (pending.retryAfter() == null) return failure;
+        Map<String, List<String>> headers = new LinkedHashMap<>(failure.headers());
+        headers.put("Retry-After", List.of(pending.retryAfter().toString()));
+        return new Transport.Response(failure.status(), headers, failure.body().readAllBytes());
       }
-      if (!responses.isEmpty() && responses.peek().matches(request.method(), captured.path())) next = responses.remove();
+      if (!responses.isEmpty() && responses.peek().matches(captured.method(), captured.path())) next = responses.remove();
       else return api.answer(captured);
     }
     if (next.failure() != null) {
@@ -633,7 +762,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     return new Transport.Response(response.status(), response.headers(), body);
   }
 
-  private static Request capture(Transport.Request request) throws IOException {
+  private Request capture(Transport.Request request) throws IOException {
     URI uri = request.uri();
     Map<String, String> query = new LinkedHashMap<>();
     if (uri.getRawQuery() != null)
@@ -646,6 +775,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     if (request.body() != null) {
       try (InputStream in = request.body().open()) { body = in.readAllBytes(); }
     }
-    return new Request(request.method(), uri.toString(), uri.getRawPath(), query, request.headers(), body);
+    return new Request(request.method(), uri.toString(), api.relativePath(uri.toString()), query, request.headers(), body, null);
   }
 }

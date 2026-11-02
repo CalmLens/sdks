@@ -10,6 +10,7 @@ use CalmLens\ErrorCodes;
 use CalmLens\Internal\Session;
 use CalmLens\Internal\Values;
 use CalmLens\ModerationContext;
+use CalmLens\SdkErrorCodes;
 use CalmLens\ServerClient;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
@@ -28,14 +29,16 @@ use Psr\Http\Message\ResponseInterface;
  * retrieve, list, search, update, move and delete; folders, hash lists, lenses, idempotency keys
  * and the events feed behave like the API's (uploads are not matched against hash lists); the CDN serves stored bytes and placeholders; and errors use
  * the API's codes, statuses, `X-Request-Id` header and body shape (schema errors are
- * `validation/<issue>` with the field in `details.path`). It does not classify content: assets
- * submitted with `classify` get `analyzedOutcome` and those submitted with `create` get
- * `queuedOutcome`. Content is kept only with `keepContentAfterProcessing: true`; otherwise it is
- * removed once classification completes, as in the API. A `purged` outcome removes the content
- * with reason `policy`; a reviewer's purge (`decide`) with reason `requested`. A classified image
- * gets a ThumbHash for its placeholder, which goes with its content. Like the API, deleting an
- * asset, removing its content and retrying it add `asset.deleted`, `asset.content-removed` and
- * `asset.retried` events; processing adds none.
+ * `validation/<issue>` with the field in `details.path`). It does not classify content: the
+ * `moderate` callable decides each asset the mock moderates (see the constructor), and
+ * `completeProcessing` finishes a queued one. A decided asset gets the decision's full report.
+ * Content is kept only with `keepContentAfterProcessing: true`; otherwise it is removed once
+ * classification completes, as in the API. A `purged` decision removes the content with reason
+ * `policy`; a reviewer's purge (`decide`) with reason `requested`. A classified image gets a
+ * ThumbHash for its placeholder, which goes with its content. Like the API, a completed upload adds
+ * `asset.uploaded`, then `asset.classified` and the automated `asset.<status>` once decided, or
+ * `asset.failed`; deleting an asset, removing its content and retrying it add `asset.deleted`,
+ * `asset.content-removed` and `asset.retried`.
  *
  * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
@@ -49,18 +52,25 @@ use Psr\Http\Message\ResponseInterface;
  * clock, so a decision that never comes times out at once.
  *
  * `failNextRequest` failures come first (for any request, or the next to one operation), then
- * enqueued responses and exceptions in order, before the stand-in answers.
+ * enqueued responses and exceptions in order, before the stand-in answers. Each failure fails one
+ * request, so a client retry takes the next failure or reaches the stand-in.
  */
 final class MockServerClient
 {
-    public const OUTCOMES = ['pending', 'allowed', 'limited', 'age-restricted', 'blocked', 'purged', 'failed'];
-    /** What `decide` accepts: a reviewer's decision, or `pending` and `failed` to arrange a test. */
+    /** What `decide` accepts: a reviewer's decision. */
     public const DECISIONS = ['allowed', 'limited', 'age-restricted', 'blocked', 'purged'];
     /** The ThumbHash the mock gives every classified image, standing in for one computed from its pixels. */
     public const THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI';
     private const MIB = 1024 * 1024;
     /** An asset ID as the API's schema accepts it: `asset_` and 20 base62 characters. */
     private const ASSET_ID_PATTERN = '/^asset_[0-9A-Za-z]{20}$/D';
+    /** The client methods `failNextRequest` can target. */
+    public const OPERATIONS = ['assets.list', 'assets.search', 'assets.retrieve', 'assets.waitForDecision', 'assets.update',
+        'assets.listChildren', 'assets.create', 'assets.classify', 'assets.uploadPart', 'assets.createSignedUrl', 'assets.move',
+        'assets.retry', 'assets.explain', 'assets.decide', 'assets.deleteContent', 'assets.delete', 'assets.batch', 'text.classify',
+        'cdn.serve', 'events.list', 'folders.list', 'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete',
+        'folders.move', 'hashLists.list', 'hashLists.retrieve', 'hashLists.create', 'hashLists.update', 'hashLists.delete',
+        'hashLists.listEntries', 'hashLists.addEntry', 'hashLists.removeEntry', 'ensureLens', 'ensureLenses'];
     private const ACTIVE_CONTENT_TYPES = ['image/svg+xml', 'application/xhtml+xml', 'text/html', 'application/xml', 'text/xml'];
 
     /** @var array<string, array> Assets by ID, with the API's field names. Change them to arrange a test. */
@@ -80,8 +90,9 @@ final class MockServerClient
 
     private ServerClient $client;
     private array $queue = [];
-    /** @var list<array{failure: string|\Throwable, operation: ?string}> */
+    /** @var list<array{failure: string|\Throwable, operation: ?string, details: array, retryAfter: ?int}> */
     private array $failures = [];
+    /** @var list<RecordedRequest> */
     private array $history = [];
     /** @var array<string, array{0: string, 1: int, 2: string}> Saved responses by idempotency key. */
     private array $idempotent = [];
@@ -95,21 +106,20 @@ final class MockServerClient
     private const MAX_PAGE_SIZE = 100;
     /** The status of the response being answered: 200, 201 for a new folder, hash list or entry, or 202 for a queued batch. */
     private int $status = 200;
-    /** The status of the last response, null when the last request failed without one; the contract tests check it. */
-    private ?int $lastStatus = null;
     private \Closure $now;
     private \Closure $createId;
-    private mixed $analyzedOutcome;
+    private \Closure $moderate;
     private string $baseUrl;
     private string $cdnBaseUrl;
 
     /**
-     * @param string $queuedOutcome outcome of `assets.create` (and queued multipart uploads):
-     *   `pending` (still processing), `allowed`, `limited`, `age-restricted`, `blocked` or `purged`, or
-     *   `failed` (processing failed with `failureReason` `processing-error`, retryable).
-     * @param string|array|callable $analyzedOutcome outcome of `assets.classify` and `text.classify`:
-     *   an outcome, fields to deep-merge into the asset (the outcome then follows their
-     *   `classification.moderation.status`), or a callable that receives the asset and returns either.
+     * @param ?callable(MockModerationInput): (string|MockDecision) $moderate decides each asset the
+     *   mock moderates: uploads (`assets->create`, `assets->classify`, `text->classify` and final
+     *   parts), retries, reruns and `completeProcessing` without a decision. It receives the stored
+     *   asset with its content, the trigger and whether the work is queued, and returns a status
+     *   from `MockDecision::STATUSES` or a `MockDecision`. `pending` leaves the asset processing and
+     *   `failed` fails it with `failureReason` `processing-error`, retryable. By default queued work
+     *   stays `pending` until `completeProcessing`, which allows it, and everything else is `allowed`.
      * @param ?string $apiKey the client's API key. Its grants, from `createApiKey()`, decide CDN
      *   downloads of private and age-restricted content; the default key has none.
      * @param ?callable $createId receives the prefix of the new object's ID (`asset`, `fldr`, `hl`,
@@ -121,8 +131,7 @@ final class MockServerClient
      */
     public function __construct(
         public readonly string $projectId = 'project-1',
-        private string $queuedOutcome = 'pending',
-        string|array|callable $analyzedOutcome = 'allowed',
+        ?callable $moderate = null,
         ?callable $now = null,
         ?callable $createId = null,
         string $baseUrl = 'https://api.calmlens.invalid/v1',
@@ -132,11 +141,8 @@ final class MockServerClient
         int|float $maxResponseBytes = ServerClient::DEFAULT_MAX_RESPONSE_BYTES,
         int|float|null $uploadTimeout = ServerClient::DEFAULT_UPLOAD_TIMEOUT,
     ) {
-        self::checkOutcome($queuedOutcome);
-        if (is_string($analyzedOutcome)) {
-            self::checkOutcome($analyzedOutcome);
-        }
-        $this->analyzedOutcome = $analyzedOutcome;
+        $this->moderate = \Closure::fromCallable($moderate
+            ?? fn (MockModerationInput $input): string => $input->queued && $input->trigger !== MockModerationInput::COMPLETE ? 'pending' : 'allowed');
         $last = 0;
         // The default clock moves on by at least a millisecond per reading, so assets created in a
         // row have increasing createdAt and orderings never depend on random IDs.
@@ -206,30 +212,50 @@ final class MockServerClient
     }
 
     /**
-     * Fails the next request (or, with `operation`, the next one that client method sends, named
-     * like `assets.create` or `cdn.serve`) instead of answering it, leaving the stored state
-     * unchanged. Each queued failure is used once. `transport-error` and `timeout` fail the
-     * connection, so the client throws `ConnectionException` (`sdk/transport-error`) or
-     * `TimeoutException` (`sdk/timeout`). An API error code, such as `upload/limit-exceeded`, is
-     * answered as the API answers it: its HTTP status, message and request ID. A
-     * `CalmLensException` is answered with its status (or the API's status for its code), a JSON
-     * `{code, message, details}` body and its headers (such as `Retry-After`). Any other exception
-     * is thrown by the transport as given.
+     * Fails the next request (or, with `operation`, the next one that client method sends, one of
+     * `OPERATIONS`, such as `assets.create` or `cdn.serve`) instead of answering it, leaving the
+     * stored state unchanged. Each queued failure fails one request, so a retry takes the next
+     * failure or reaches the stand-in. `transport-error` and `timeout` fail the connection, so the
+     * client throws `ConnectionException` (`sdk/transport-error`) or `TimeoutException`
+     * (`sdk/timeout`). An API error code, such as `upload/limit-exceeded`, is answered as the API
+     * answers it: its HTTP status, message and request ID, with `details` and, with `retryAfter`,
+     * a `Retry-After` header of that many seconds. A `CalmLensException` is answered with its
+     * status (or the API's status for its code), a JSON `{code, message, details}` body and its
+     * headers (such as `Retry-After`). Any other exception is thrown by the transport as given.
+     * Throws `InvalidArgumentException` (`sdk/invalid-argument`) for an unknown failure or
+     * operation, or `details` or `retryAfter` without an API error code.
      */
-    public function failNextRequest(string|\Throwable $failure = 'transport-error', ?string $operation = null): self
+    public function failNextRequest(string|\Throwable $failure = 'transport-error', ?string $operation = null, array $details = [], ?int $retryAfter = null): self
     {
-        if (is_string($failure) && !in_array($failure, ['transport-error', 'timeout'], true) && !isset(ErrorCodes::STATUSES[$failure])) {
-            throw new \InvalidArgumentException("Mock failures are transport-error, timeout, an API error code or an exception (got $failure)");
+        $code = is_string($failure) && isset(ErrorCodes::STATUSES[$failure]);
+        if (is_string($failure) && !$code && !in_array($failure, ['transport-error', 'timeout'], true)) {
+            throw self::invalidArgument("Mock failures are transport-error, timeout, an API error code or an exception (got $failure)");
         }
-        $this->failures[] = ['failure' => $failure, 'operation' => $operation];
+        if ($operation !== null && !in_array($operation, self::OPERATIONS, true)) {
+            throw self::invalidArgument("$operation is not a client method the mock can fail; use one of MockServerClient::OPERATIONS");
+        }
+        if (!$code && ($details !== [] || $retryAfter !== null)) {
+            throw self::invalidArgument('details and retryAfter apply only to an API error code');
+        }
+        if ($retryAfter !== null && $retryAfter < 0) {
+            throw self::invalidArgument('retryAfter must be a whole number of seconds');
+        }
+        $this->failures[] = ['failure' => $failure, 'operation' => $operation, 'details' => $details, 'retryAfter' => $retryAfter];
         return $this;
     }
 
     /** Queued responses and failures not used yet. */
     public function pending(): int { return count($this->queue) + count($this->failures); }
 
-    /** @return list<RequestInterface> every request received, oldest first, with readable bodies. */
+    /** @return list<RecordedRequest> every request received, oldest first, with the status it was answered with. */
     public function requests(): array { return $this->history; }
+
+    /** Forgets the recorded requests, so `requests()` lists only those sent afterwards. */
+    public function clearRequests(): self
+    {
+        $this->history = [];
+        return $this;
+    }
 
     /**
      * Adds an event to the feed returned by `events.list`. Omitted `id`, `projectId`, `severity`,
@@ -255,19 +281,16 @@ final class MockServerClient
      * content with reason `requested` and first adds an `asset.content-removed` event), the review
      * joins `manualReviews`, and an `asset.<decision>` event with the catalog's severity (`low` for
      * `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact joins the feed.
-     * `pending` and `failed` only change the statuses, to arrange a test. Throws `NotFoundException`
-     * (`asset/not-found`) for an unknown asset.
+     * The moderation report stays as it was. Throws `InvalidArgumentException`
+     * (`sdk/invalid-argument`) for another outcome, and `NotFoundException` (`asset/not-found`)
+     * for an unknown asset. To finish processing as moderation would, use `completeProcessing`.
      */
     public function decide(string $assetId, string $outcome): array
     {
-        self::checkOutcome($outcome);
-        if (!isset($this->assets[$assetId])) {
-            throw CalmLensException::create(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', 404);
-        }
-        $asset = $this->applyOutcome($this->assets[$assetId], $outcome, 'requested');
         if (!in_array($outcome, self::DECISIONS, true)) {
-            return $asset;
+            throw self::invalidArgument('decide takes ' . implode(', ', self::DECISIONS) . " (got $outcome)");
         }
+        $asset = $this->applyOutcome($this->ownAsset($assetId), $outcome, 'requested');
         $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)('rev'), 'decision' => $outcome,
             'note' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
         $this->assets[$assetId] = $asset;
@@ -279,6 +302,33 @@ final class MockServerClient
             'facts' => [['key' => 'decided-by', 'value' => 'reviewer'], ['key' => 'asset-type', 'value' => $asset['type']],
                 ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $assetId], ['key' => 'note', 'value' => null]]]);
         return $asset;
+    }
+
+    /**
+     * Finishes processing an asset as moderation would: with `$decision` (a status from
+     * `MockDecision::STATUSES` or a `MockDecision`), or else what `moderate` returns for the
+     * `complete` trigger. A decision adds `asset.classified` and the automated `asset.<status>`
+     * event, `failed` adds `asset.failed`, and `pending` leaves the asset processing; no manual
+     * review is recorded. Throws `NotFoundException` (`asset/not-found`) for an unknown asset and
+     * `InvalidArgumentException` (`sdk/invalid-argument`) for one that isn't processing.
+     */
+    public function completeProcessing(string $assetId, string|MockDecision|null $decision = null): array
+    {
+        $asset = $this->ownAsset($assetId);
+        if ($asset['classification']['status'] !== 'processing') {
+            throw self::invalidArgument("asset $assetId isn't processing");
+        }
+        return $this->moderateStored($asset, MockModerationInput::COMPLETE, $decision === null ? null : MockDecision::from($decision));
+    }
+
+    private function ownAsset(string $assetId): array
+    {
+        return $this->assets[$assetId] ?? throw CalmLensException::create(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', 404);
+    }
+
+    private static function invalidArgument(string $message): CalmLensException
+    {
+        return CalmLensException::create(SdkErrorCodes::INVALID_ARGUMENT, $message);
     }
 
     /** Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API. */
@@ -298,13 +348,6 @@ final class MockServerClient
         return ['id' => $asset['id'], 'externalId' => $asset['externalId'] ?? null, 'uploadPresetId' => $asset['uploadPresetId'] ?? null,
             'upload' => ['status' => $asset['upload']['status']], 'classification' => ['status' => $asset['classification']['status'],
                 'moderation' => ['status' => $asset['classification']['moderation']['status']]], 'content' => ['status' => $asset['content']['status']]];
-    }
-
-    private static function checkOutcome(string $outcome): void
-    {
-        if (!in_array($outcome, self::OUTCOMES, true)) {
-            throw new \InvalidArgumentException('Mock outcomes are ' . implode(', ', self::OUTCOMES) . " (got $outcome)");
-        }
     }
 
     private static function grantsOf(string $apiKey): array
@@ -358,53 +401,51 @@ final class MockServerClient
         return $name === 'retrieve' && $resource === 'assets' ? ['assets.retrieve', 'assets.waitForDecision'] : ["$resource.$name"];
     }
 
+    /** Records the request with the status it is answered with, null when it fails without a response. */
     private function handle(RequestInterface $request): PromiseInterface
-    {
-        $this->lastStatus = null;
-        return $this->answer($request)->then(function (ResponseInterface $response): ResponseInterface {
-            $this->lastStatus = $response->getStatusCode();
-            return $response;
-        });
-    }
-
-    private function answer(RequestInterface $request): PromiseInterface
     {
         $body = (string) $request->getBody();
         $request = $request->withBody(\GuzzleHttp\Psr7\Utils::streamFor($body));
-        $this->history[] = $request;
-        $url = (string) $request->getUri()->withQuery('');
+        $cdn = str_starts_with((string) $request->getUri()->withQuery(''), $this->cdnBaseUrl . '/');
+        $recorded = RecordedRequest::of($request, null, $cdn ? $this->cdnBaseUrl : $this->baseUrl);
+        try {
+            $answer = $this->answer($request, $body, $cdn, $recorded->path);
+        } finally {
+            $this->history[] = new RecordedRequest($recorded->method, $recorded->path, $recorded->query,
+                isset($answer) && $answer instanceof ResponseInterface ? $answer->getStatusCode() : null, $request);
+        }
+        return $answer instanceof ResponseInterface ? Create::promiseFor($answer) : Create::rejectionFor($answer);
+    }
+
+    private function answer(RequestInterface $request, string $body, bool $cdn, string $path): ResponseInterface|\Throwable
+    {
         parse_str($request->getUri()->getQuery(), $query);
-        $cdn = str_starts_with($url, $this->cdnBaseUrl . '/');
-        $path = substr($url, strlen($cdn ? $this->cdnBaseUrl : $this->baseUrl));
-        $parts = array_map('rawurldecode', array_values(array_filter(explode('/', $path), fn ($part) => $part !== '')));
+        $parts = RecordedRequest::segments($path);
         $operations = $this->operations($request, $cdn, $parts, $query);
-        foreach ($this->failures as $index => ['failure' => $failure, 'operation' => $operation]) {
-            if ($operation === null || in_array($operation, $operations, true)) {
+        foreach ($this->failures as $index => $failure) {
+            if ($failure['operation'] === null || in_array($failure['operation'], $operations, true)) {
                 array_splice($this->failures, $index, 1);
                 return $this->failure($failure, $request);
             }
         }
         $queued = array_shift($this->queue);
-        if ($queued instanceof \Throwable) {
-            return Create::rejectionFor($queued);
-        }
         if ($queued !== null) {
-            return Create::promiseFor($queued);
+            return $queued;
         }
         if ($cdn) {
-            return Create::promiseFor($this->serve($request->getMethod(), $parts, $query));
+            return $this->serve($request->getMethod(), $parts, $query);
         }
         // The HTTP library trims header values, as every HTTP stack does before the API sees them.
         $key = $request->hasHeader('Idempotency-Key') ? $request->getHeaderLine('Idempotency-Key') : null;
         if ($key !== null && (strlen($key) > 255 || !preg_match('/^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/D', $key))) {
-            return Create::promiseFor($this->error(ErrorCodes::INVALID_IDEMPOTENCY_KEY, 'Invalid idempotency key'));
+            return $this->error(ErrorCodes::INVALID_IDEMPOTENCY_KEY, 'Invalid idempotency key');
         }
         $fingerprint = hash('sha256', Values::json([$request->getMethod(), $path, $request->getUri()->getQuery(), hash('sha256', $body)]));
         if ($key !== null && isset($this->idempotent[$key])) {
             [$saved, $status, $bytes] = $this->idempotent[$key];
-            return Create::promiseFor($saved !== $fingerprint
+            return $saved !== $fingerprint
                 ? $this->error(ErrorCodes::IDEMPOTENCY_KEY_REUSED, 'Idempotency key reused with a different request')
-                : new Response($status, ['Content-Type' => 'application/json', 'Idempotent-Replayed' => 'true', 'X-Request-Id' => $this->requestId()], $bytes));
+                : new Response($status, ['Content-Type' => 'application/json', 'Idempotent-Replayed' => 'true', 'X-Request-Id' => $this->requestId()], $bytes);
         }
         try {
             $json = $request->getHeaderLine('Content-Type') === 'application/json' ? json_decode($body, true) : [];
@@ -413,30 +454,36 @@ final class MockServerClient
             // Like the API, deletes answer 200 with an empty object.
             $response = $this->json($this->status, $data ?? new \stdClass());
         } catch (CalmLensException $failure) {
+            // A test's own mistake, such as `moderate` returning an unknown status, is thrown as is.
+            if ($failure->status === null) {
+                throw $failure;
+            }
             // Raised by fail(): answer like the API does, and leave the key unsaved.
-            return Create::promiseFor($this->error($failure->errorCode, $failure->getMessage(), $failure->status, $failure->details));
+            return $this->error($failure->errorCode, $failure->getMessage(), $failure->status, $failure->details);
         }
         if ($key !== null) {
             $this->idempotent[$key] = [$fingerprint, $response->getStatusCode(), (string) $response->getBody()];
             $response->getBody()->rewind();
         }
-        return Create::promiseFor($response);
+        return $response;
     }
 
-    private function failure(string|\Throwable $failure, RequestInterface $request): PromiseInterface
+    /** @param array{failure: string|\Throwable, details: array, retryAfter: ?int} $failure */
+    private function failure(array $failure, RequestInterface $request): ResponseInterface|\Throwable
     {
+        ['failure' => $failure, 'details' => $details, 'retryAfter' => $retryAfter] = $failure;
         if ($failure instanceof CalmLensException) {
             $status = $failure->status ?? ErrorCodes::STATUSES[$failure->errorCode] ?? 400;
-            return Create::promiseFor($this->error($failure->errorCode, $failure->getMessage(), $status, $failure->details, $failure->headers, $failure->requestId));
+            return $this->error($failure->errorCode, $failure->getMessage(), $status, $failure->details, $failure->headers, $failure->requestId);
         }
         if ($failure instanceof \Throwable) {
-            return Create::rejectionFor($failure);
+            return $failure;
         }
         if (isset(ErrorCodes::STATUSES[$failure])) {
-            return Create::promiseFor($this->error($failure, "Simulated $failure"));
+            return $this->error($failure, "Simulated $failure", null, $details, $retryAfter === null ? [] : ['Retry-After' => (string) $retryAfter]);
         }
-        return Create::rejectionFor(new ConnectException($failure === 'timeout' ? 'Simulated timeout' : 'Simulated network failure',
-            $request, null, $failure === 'timeout' ? ['errno' => 28] : []));
+        return new ConnectException($failure === 'timeout' ? 'Simulated timeout' : 'Simulated network failure',
+            $request, null, $failure === 'timeout' ? ['errno' => 28] : []);
     }
 
     /** Fails the request being answered with an API error; the status defaults to the code's. */
@@ -543,7 +590,7 @@ final class MockServerClient
                 // Like the API: back to processing, to be moderated again, with an `asset.retried` event.
                 $asset = $this->applyOutcome($asset, 'pending');
                 $this->lifecycleEvent('asset.retried', $asset);
-                return $asset;
+                return $this->moderateStored($asset, MockModerationInput::RETRY);
             case 'POST decision':
                 return $this->reviewerDecision($asset, $json);
             case 'POST explain':
@@ -565,7 +612,7 @@ final class MockServerClient
                     self::fail(ErrorCodes::ASSET_CONTENT_UNAVAILABLE);
                 }
                 // Like the API: back to processing, to be moderated again under the current policy.
-                return $this->applyOutcome($asset, 'pending');
+                return $this->moderateStored($this->applyOutcome($asset, 'pending'), MockModerationInput::RERUN);
             case 'POST move':
                 $folderId = $json['folderId'] ?? null;
                 if ($folderId !== null) {
@@ -676,20 +723,83 @@ final class MockServerClient
         return $this->finish($asset, $queue);
     }
 
-    /** Applies the queued or analyzed outcome to an asset whose upload is complete. */
+    /**
+     * Moderates an asset whose upload just completed, as the pipeline would: `asset.uploaded` with
+     * the asset as it was, then the decision's events.
+     */
     private function finish(array $asset, bool $queue): array
     {
-        if ($queue) {
-            return $this->applyOutcome($asset, $this->queuedOutcome);
+        $decision = $this->decisionFor($asset, MockModerationInput::UPLOAD, $queue);
+        $stored = $decision->status === 'pending' ? $asset : $this->decided($asset, $decision);
+        $this->recordUploaded($asset);
+        $this->recordProcessingEvents($stored, $decision);
+        return $stored;
+    }
+
+    /** Asks `moderate` how to decide a processing asset, with its stored content (none once removed). */
+    private function decisionFor(array $asset, string $trigger, bool $queued): MockDecision
+    {
+        $bytes = $asset['content']['status'] === 'removed' ? null : ($this->content[$asset['id']]['bytes'] ?? null);
+        $text = $bytes !== null && $asset['type'] === 'plaintext-document' ? mb_scrub($bytes, 'UTF-8') : null;
+        return MockDecision::from(($this->moderate)(new MockModerationInput($asset, $bytes, $text, $trigger, $queued)));
+    }
+
+    /** Stores `$asset` decided as `$decision` says, with its report. */
+    private function decided(array $asset, MockDecision $decision): array
+    {
+        return $this->applyOutcome($asset, $decision->status, 'policy', $decision->report());
+    }
+
+    /** Asks `moderate` (unless `$decision` is given) and settles a processing asset; `pending` leaves it processing. */
+    private function moderateStored(array $asset, string $trigger, ?MockDecision $decision = null): array
+    {
+        $decision ??= $this->decisionFor($asset, $trigger, true);
+        if ($decision->status === 'pending') {
+            return $asset;
         }
-        $outcome = is_callable($this->analyzedOutcome) ? ($this->analyzedOutcome)($asset) : $this->analyzedOutcome;
-        if (!is_array($outcome)) {
-            self::checkOutcome($outcome);
-            return $this->applyOutcome($asset, $outcome);
+        $stored = $this->decided($asset, $decision);
+        $this->recordProcessingEvents($stored, $decision);
+        return $stored;
+    }
+
+    /** `asset.uploaded`, as the API records it when an upload completes. */
+    private function recordUploaded(array $asset): void
+    {
+        $this->enqueueEvent(['type' => 'asset.uploaded', 'severity' => 'low', 'assetId' => $asset['id'], 'asset' => $this->snapshot($asset),
+            'facts' => [['key' => 'asset-type', 'value' => $asset['type']], self::nameFact($asset),
+                ['key' => 'file-format', 'value' => $asset['content']['format'] ?? null]]]);
+    }
+
+    /**
+     * The events the pipeline records when it settles an asset: `asset.classified` and the
+     * automated `asset.<status>`, or `asset.failed`.
+     */
+    private function recordProcessingEvents(array $asset, MockDecision $decision): void
+    {
+        $status = $decision->status;
+        if ($status === 'pending') {
+            return;
         }
-        $status = ($outcome['classification']['status'] ?? null) === 'failed' ? 'failed' : ($outcome['classification']['moderation']['status'] ?? 'allowed');
-        self::checkOutcome($status);
-        return $this->assets[$asset['id']] = array_replace_recursive($this->applyOutcome($asset, $status), $outcome);
+        $event = ['assetId' => $asset['id'], 'asset' => $this->snapshot($asset)];
+        if ($status === 'failed') {
+            $this->enqueueEvent($event + ['type' => 'asset.failed', 'severity' => 'high', 'facts' => [self::nameFact($asset),
+                ['key' => 'asset-type', 'value' => $asset['type']], ['key' => 'previous-status', 'value' => 'processing'],
+                ['key' => 'failure-reason', 'value' => $asset['classification']['failureReason'] ?? 'processing-error']]]);
+            return;
+        }
+        $flagged = $decision->report()['policy']['decision']['flaggedCategories'];
+        $this->enqueueEvent($event + ['type' => 'asset.classified', 'severity' => 'low', 'facts' => [
+            ['key' => 'flagged-categories', 'value' => $flagged], ['key' => 'moderation-status', 'value' => $status],
+            ['key' => 'asset-type', 'value' => $asset['type']], self::nameFact($asset)]]);
+        $this->enqueueEvent($event + ['type' => 'asset.' . $status, 'severity' => in_array($status, ['allowed', 'limited'], true) ? 'low' : 'high',
+            'facts' => [['key' => 'decided-by', 'value' => 'automated'], ['key' => 'flagged-categories', 'value' => $flagged],
+                ['key' => 'asset-type', 'value' => $asset['type']], self::nameFact($asset)]]);
+    }
+
+    /** An asset's name with its portal link, as event facts carry it. */
+    private static function nameFact(array $asset): array
+    {
+        return ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $asset['id']];
     }
 
     /** Continues a multipart upload, in the API's order of checks. */
@@ -724,16 +834,16 @@ final class MockServerClient
         // The queue mode saved when the upload started, unless this part overrides it.
         $queue = array_key_exists('queue', $query) ? self::flag($query['queue']) : $upload['queue'];
         unset($this->uploads[$id]);
-        return $this->finish($asset, $queue);
+        return $this->finish($this->applyOutcome($asset, 'pending'), $queue);
     }
 
     /**
      * Moves an asset to an outcome like the pipeline would, and stores it: a decision finishes
-     * processing, `purged` removes the content (with `$purgeReason`), finished processing removes
-     * content kept only temporarily, and a classified image gets a ThumbHash for its placeholder,
-     * which goes with its content.
+     * processing (with its `$report`, when moderation made it), `purged` removes the content (with
+     * `$purgeReason`), finished processing removes content kept only temporarily, and a classified
+     * image gets a ThumbHash for its placeholder, which goes with its content.
      */
-    private function applyOutcome(array $asset, string $outcome, string $purgeReason = 'policy'): array
+    private function applyOutcome(array $asset, string $outcome, string $purgeReason = 'policy', ?array $report = null): array
     {
         $now = ($this->now)();
         $decided = !in_array($outcome, ['pending', 'failed'], true);
@@ -755,7 +865,8 @@ final class MockServerClient
         // Like the API, a failure carries its reason; the mock never decodes content, so it fails processing.
         $asset['classification'] = ['status' => $status, 'failureReason' => $status === 'failed' ? 'processing-error' : null,
             'updatedAt' => $now, 'completedAt' => $decided ? $now : null] + $asset['classification'];
-        $asset['classification']['moderation']['status'] = $decided ? $outcome : 'pending';
+        $asset['classification']['moderation'] = array_replace($asset['classification']['moderation'],
+            ['status' => $decided ? $outcome : 'pending'], $report ?? []);
         $asset['updatedAt'] = $now;
         return $this->assets[$asset['id']] = $asset;
     }

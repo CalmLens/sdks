@@ -26,7 +26,7 @@ class StatefulMockTest {
   }
 
   @Test void explainCompletesTheEvidenceAndRerunModeratesAgain() {
-    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().analyzedOutcome(Outcome.BLOCKED));
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input -> MockDecision.of(input.queued() ? "pending" : "blocked")));
     Models.Asset asset = mock.client.assets.classify(kept("photo.png"));
     mock.withStorage(storage -> storage.assets.get(asset.id()).getAsJsonObject("classification").getAsJsonObject("moderation")
         .add("policy", JsonParser.parseString("{\"score\":0.9,\"categories\":{},\"evidence\":\"decision\"}")));
@@ -43,6 +43,30 @@ class StatefulMockTest {
     mock.decide(asset.id(), Outcome.ALLOWED);
     assertEquals(ErrorCodes.ASSET_REVIEWED, assertThrows(ApiException.class,
         () -> mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true))).getCode());
+  }
+
+  @Test void moderateGetsAMultipartUploadsPartsJoinedInOrder() {
+    List<MockCalmLensServerClient.ModerationInput> inputs = new java.util.ArrayList<>();
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input -> {
+      inputs.add(input);
+      return MockDecision.of("blocked");
+    }));
+    byte[] first = new byte[5 * 1024 * 1024];
+    first[0] = 'a';
+    Models.Asset started = mock.client.assets.create(new Models.SubmitAsset().name("notes.txt").part(Models.Content.bytes(first, "text/plain").partNumber(1).isFinal(false)));
+    assertEquals(List.of(), inputs);
+    Models.Asset finished = mock.client.assets.uploadPart(new Models.UploadPart(started.id(), Models.Content.bytes("bc".getBytes(java.nio.charset.StandardCharsets.UTF_8), "text/plain").partNumber(2).isFinal(true)));
+    assertEquals(Models.AssetModerationStatus.BLOCKED, finished.classification().moderation().status());
+    assertEquals(1, inputs.size());
+    MockCalmLensServerClient.ModerationInput input = inputs.get(0);
+    assertSame(MockCalmLensServerClient.Trigger.UPLOAD, input.trigger());
+    assertTrue(input.queued());
+    assertSame(Models.AssetClassificationStatus.PROCESSING, input.asset().classification().status());
+    byte[] joined = java.util.Arrays.copyOf(first, first.length + 2);
+    joined[first.length] = 'b';
+    joined[first.length + 1] = 'c';
+    assertArrayEquals(joined, input.content().bytes());
+    assertEquals(new String(joined, java.nio.charset.StandardCharsets.UTF_8), input.content().text());
   }
 
   @Test void textClassifyStoresAPlaintextDocument() {

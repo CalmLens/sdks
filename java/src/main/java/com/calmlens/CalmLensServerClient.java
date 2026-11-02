@@ -151,7 +151,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param projectId the project ID
    * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_CONFIG} for a missing key or project
    */
-  public CalmLensServerClient(String apiKey, String projectId) { this(builder(apiKey, projectId), null, null, null); }
+  public CalmLensServerClient(String apiKey, String projectId) { this(builder(apiKey, projectId), null, null, null, DEFAULT_MAX_RETRIES); }
 
   /** A client like {@code base} with other deadlines or retries, sharing its transport, state and lens cache. */
   private CalmLensServerClient(CalmLensServerClient base, Duration timeout, Duration uploadTimeout, int maxRetries) {
@@ -173,7 +173,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.deferUploadChecks = base.deferUploadChecks;
   }
 
-  private CalmLensServerClient(Builder options, Transport override, Sleeper sleeper, LongSupplier nanoTime) {
+  private CalmLensServerClient(Builder options, Transport override, Sleeper sleeper, LongSupplier nanoTime, int defaultMaxRetries) {
+    int retries = options.maxRetries != null ? options.maxRetries : defaultMaxRetries;
     // Validate every option before building anything.
     if (options.apiKey == null || options.apiKey.isBlank() || options.projectId == null || options.projectId.isBlank())
       throw config("API key and project ID are required");
@@ -181,7 +182,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     positive("timeout", options.timeout, false);
     positive("connectTimeout", options.connectTimeout, false);
     positive("uploadTimeout", options.uploadTimeout, true);
-    if (options.maxRetries < 0 || options.maxRetries > 10) throw config("maxRetries must be between 0 and 10");
+    if (retries < 0 || retries > 10) throw config("maxRetries must be between 0 and 10");
     if (options.maxResponseBytes < 1) throw config("maxResponseBytes must be a positive number of bytes");
     this.closed = new AtomicBoolean();
     this.lenses = new LensCache();
@@ -191,7 +192,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.projectId = options.projectId;
     this.timeout = options.timeout;
     this.uploadTimeout = options.uploadTimeout;
-    this.maxRetries = options.maxRetries;
+    this.maxRetries = retries;
     this.maxResponseBytes = options.maxResponseBytes;
     this.userAgent = "calmlens-java/" + VERSION + " (java/" + Runtime.version() + ")";
     this.sleeper = sleeper != null ? sleeper : delay -> Thread.sleep(delay.toMillis());
@@ -266,7 +267,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Duration timeout = DEFAULT_TIMEOUT;
     private Duration connectTimeout = Duration.ofSeconds(10);
     private Duration uploadTimeout;
-    private int maxRetries = DEFAULT_MAX_RETRIES;
+    /** Null until set, so the mock can default to none. */
+    private Integer maxRetries;
     private long maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES;
     private Transport transport;
     private HttpClient httpClient;
@@ -343,13 +345,18 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @return a new client
      * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_CONFIG} for invalid options
      */
-    public CalmLensServerClient build() { return new CalmLensServerClient(this, null, null, null); }
+    public CalmLensServerClient build() { return new CalmLensServerClient(this, null, null, null, DEFAULT_MAX_RETRIES); }
 
     /** Builds with this configuration but another transport, leaving this builder unchanged. */
-    CalmLensServerClient build(Transport override, Sleeper sleeper) { return new CalmLensServerClient(this, override, sleeper, null); }
+    CalmLensServerClient build(Transport override, Sleeper sleeper) { return new CalmLensServerClient(this, override, sleeper, null, DEFAULT_MAX_RETRIES); }
 
     /** Like {@link #build(Transport, Sleeper)}, measuring decision waits with {@code nanoTime}. */
-    CalmLensServerClient build(Transport override, Sleeper sleeper, LongSupplier nanoTime) { return new CalmLensServerClient(this, override, sleeper, nanoTime); }
+    CalmLensServerClient build(Transport override, Sleeper sleeper, LongSupplier nanoTime) { return new CalmLensServerClient(this, override, sleeper, nanoTime, DEFAULT_MAX_RETRIES); }
+
+    /** Like {@link #build(Transport, Sleeper, LongSupplier)}, with {@code defaultMaxRetries} unless {@link #maxRetries(int)} was set. */
+    CalmLensServerClient build(Transport override, Sleeper sleeper, LongSupplier nanoTime, int defaultMaxRetries) {
+      return new CalmLensServerClient(this, override, sleeper, nanoTime, defaultMaxRetries);
+    }
 
     @Override public String toString() {
       return "CalmLensServerClient.Builder[projectId=" + projectId + ", baseUrl=" + baseUrl + ", cdnBaseUrl=" + cdnBaseUrl + "]";

@@ -21,10 +21,10 @@ final class Demo implements Calmmarket.Backend {
   /** A demo photo stays pending this long, then takes the selected outcome. */
   static final Duration REVIEW_DELAY = Duration.ofSeconds(2);
 
-  /** A fresh mock per call. Retries are off so each queued answer is used exactly once. */
+  /** A fresh mock per call. The mock makes no retries, so each queued answer is used exactly once. */
   private static MockCalmLensServerClient mock() {
     return new MockCalmLensServerClient(CalmLensServerClient.builder("demo-key", "demo-project")
-        .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1").maxRetries(0));
+        .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"));
   }
 
   @Override public boolean demo() { return true; }

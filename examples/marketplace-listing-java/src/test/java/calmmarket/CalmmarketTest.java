@@ -35,10 +35,10 @@ class CalmmarketTest {
 
   // ------------------------------------------------------------ helpers
 
-  /** A mock standing in for the live API. Retries are off so each queued answer is used once. */
+  /** A mock standing in for the live API. The mock makes no retries, so each queued answer is used once. */
   static MockCalmLensServerClient mock() {
     return new MockCalmLensServerClient(CalmLensServerClient.builder("key", "project-1")
-        .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1").maxRetries(0));
+        .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"));
   }
 
   static Calmmarket live(MockCalmLensServerClient mock, String secret) { return new Calmmarket(Calmmarket.live(mock.client), secret); }
@@ -238,7 +238,7 @@ class CalmmarketTest {
     image.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", "Call 555-0100 <now>")));
     mock.enqueue(200, image);
     get(app, "/");
-    assertEquals(List.of("GET /v1/assets/photo-1"), paths(mock, 3));
+    assertEquals(List.of("GET /assets/photo-1"), paths(mock, 3));
     Calmmarket.Photo photo = listing.photos.get(0);
     assertEquals("Call 555-0100 <now>", photo.extractedText.content());
     assertEquals(Calmmarket.Ocr.FOUND, photo.ocr);
@@ -282,7 +282,7 @@ class CalmmarketTest {
     mock.enqueue(200, photo(listing, 1, "pending", null)).enqueue(200, image);
     Calmmarket.Response page = get(app, "/listings/" + listing.id);
     assertEquals(200, page.status());
-    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-2"), paths(mock, 4));
+    assertEquals(List.of("GET /assets/photo-1", "GET /assets/photo-2"), paths(mock, 4));
     assertEquals(AssetModerationStatus.BLOCKED, listing.photos.get(1).moderation);
     assertEquals(Calmmarket.State.HELD, listing.state(), "one rejected photo holds the listing while another is still checked");
     assertTrue(html(page).contains("Call 555-0100 &lt;now&gt;"), "the extracted text is shown, escaped");
@@ -366,7 +366,7 @@ class CalmmarketTest {
       listing.photos.get(1).moderation = status;
       assertEquals(Calmmarket.State.HELD, listing.state(), status.value());
     }
-    assertEquals(List.of("GET /v1/assets/photo-1", "GET /v1/assets/photo-2", "GET /v1/assets/photo-2"), paths(mock, 4));
+    assertEquals(List.of("GET /assets/photo-1", "GET /assets/photo-2", "GET /assets/photo-2"), paths(mock, 4));
     assertTrue(html(get(app, "/listings/" + listing.id)).contains(photoLink + "\""), "the allowed photo itself can still be previewed by the seller");
   }
 
@@ -388,7 +388,7 @@ class CalmmarketTest {
     Calmmarket.Response withdrawn = post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf);
     assertEquals(303, withdrawn.status());
     assertEquals("/listings/" + listing.id + "?notice=withdrawn", withdrawn.headers().get("location"));
-    assertEquals(List.of("DELETE /v1/assets/photo-1/content", "DELETE /v1/assets/photo-2/content"), paths(mock, before));
+    assertEquals(List.of("DELETE /assets/photo-1/content", "DELETE /assets/photo-2/content"), paths(mock, before));
     assertEquals(Calmmarket.State.WITHDRAWN, listing.state());
     assertFalse(listing.removalPending());
     assertEquals(410, get(app, "/listings/" + listing.id + "/photos/1").status());
@@ -417,8 +417,8 @@ class CalmmarketTest {
     assertEquals(410, get(app, "/listings/" + listing.id + "/photos/1").status());
     mock.enqueue(200, removed("photo-2"));
     assertEquals(303, post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf).status());
-    assertEquals(List.of("DELETE /v1/assets/photo-1/content", "DELETE /v1/assets/photo-2/content", "DELETE /v1/assets/photo-3/content",
-        "DELETE /v1/assets/photo-2/content"), paths(mock, before));
+    assertEquals(List.of("DELETE /assets/photo-1/content", "DELETE /assets/photo-2/content", "DELETE /assets/photo-3/content",
+        "DELETE /assets/photo-2/content"), paths(mock, before));
     assertFalse(listing.removalPending());
     assertEquals(Set.of("photo-3"), listing.photos.get(2).safetyHeld);
     // A removal response whose content status is not removed is not trusted as removal.
@@ -428,7 +428,7 @@ class CalmmarketTest {
     unconfirmed.enqueue(200, asset("photo-1", "allowed", null, null));
     post(other, "/listings/" + other.listings().get(0).id + "/withdraw", "csrf=" + other.csrf);
     assertTrue(other.listings().get(0).removalPending());
-    assertEquals(List.of("DELETE /v1/assets/photo-1/content"), paths(unconfirmed, 3));
+    assertEquals(List.of("DELETE /assets/photo-1/content"), paths(unconfirmed, 3));
   }
 
   @Test
@@ -649,7 +649,7 @@ class CalmmarketTest {
     Calmmarket app = live(mock, "");
     assertEquals(502, live(app, 2).status());
     assertTrue(app.listings().isEmpty());
-    assertEquals(List.of("POST /v1/projects/project-1/assets", "POST /v1/projects/project-1/assets", "DELETE /v1/assets/photo-1"), paths(mock, 2));
+    assertEquals(List.of("POST /projects/project-1/assets", "POST /projects/project-1/assets", "DELETE /assets/photo-1"), paths(mock, 2));
   }
 
   @Test
@@ -671,7 +671,7 @@ class CalmmarketTest {
     JsonObject definition = JsonParser.parseString(lens.bodyText()).getAsJsonObject().getAsJsonArray("lenses").get(0).getAsJsonObject();
     assertEquals(Calmmarket.CARD_LENS, definition.get("identifier").getAsString());
     MockCalmLensServerClient.Request signing = sent.get(5);
-    assertEquals("/v1/assets/photo-1/signed-url", signing.path());
+    assertEquals("/assets/photo-1/signed-url", signing.path());
     JsonObject body = JsonParser.parseString(signing.bodyText()).getAsJsonObject();
     assertEquals(Calmmarket.CARD_LENS, body.get("lens").getAsString());
     assertEquals(60, body.get("expiresInSeconds").getAsInt());
@@ -681,7 +681,7 @@ class CalmmarketTest {
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, Map.of("url", "http://cdn.example.com/photo-1", "expiresAt", 1760000060000L));
     assertEquals(502, get(app, "/listings/" + listing.id + "/photos/1").status());
-    assertEquals(List.of("GET /v1/assets/photo-1", "POST /v1/assets/photo-1/signed-url"), paths(mock, 6));
+    assertEquals(List.of("GET /assets/photo-1", "POST /assets/photo-1/signed-url"), paths(mock, 6));
   }
 
   @Test
@@ -773,7 +773,7 @@ class CalmmarketTest {
     List<MockCalmLensServerClient.Request> sent = mock.requests();
     assertEquals("cursor-0", sent.get(4).query().get("cursor"));
     assertEquals("cursor-0", sent.get(6).query().get("cursor"));
-    assertEquals("/v1/assets/description-1", sent.get(7).path());
+    assertEquals("/assets/description-1", sent.get(7).path());
     assertEquals("cursor-1", sent.get(8).query().get("cursor"));
     assertEquals(9, sent.size(), "a repeated event is not retrieved again");
     assertEquals(Calmmarket.State.REMOVED, listing.state());
@@ -808,7 +808,7 @@ class CalmmarketTest {
     Map<String, Object> merged = report(Map.of("criminal-activity", evaluated(0.7)));
     mock.enqueue(200, photo(listing, 1, "blocked", merged));
     assertEquals(204, signedWebhook(app, event("event-1", "asset.blocked", "photo-1", "[]")).status());
-    assertEquals(List.of("GET /v1/assets/photo-1"), paths(mock, 4));
+    assertEquals(List.of("GET /assets/photo-1"), paths(mock, 4));
     assertEquals(Calmmarket.State.HELD, listing.state());
     assertEquals(Calmmarket.Driver.AUTOMATED, listing.photos.get(0).driver());
   }
