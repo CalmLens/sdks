@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,6 +72,15 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       stdio: "inherit",
     });
     syncVersions(root);
+    // Changesets writes its changelogs in a layout the repository's formatter rejects.
+    const changelogs = languages
+      .map((language) => resolve(root, language, "CHANGELOG.md"))
+      .filter((changelog) => existsSync(changelog));
+    if (changelogs.length)
+      execFileSync("bun", ["x", "--no-install", "biome", "format", "--write", ...changelogs], {
+        cwd: root,
+        stdio: "inherit",
+      });
     const releases = Object.entries(versions())
       .filter(([language, version]) => before[language] !== version)
       .map(([sdk, version]) => ({ sdk, version }));

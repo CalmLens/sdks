@@ -20,6 +20,7 @@ test("Changesets versions all seven SDKs and generates native changelogs and a r
   try {
     cpSync(join(original, "package.json"), join(root, "package.json"));
     cpSync(join(original, "bun.lock"), join(root, "bun.lock"));
+    cpSync(join(original, "biome.json"), join(root, "biome.json"));
     // Only the configuration: pending changesets would change the versions this test expects.
     mkdirSync(join(root, ".changeset"));
     for (const file of ["config.json", "release.json"]) {
@@ -48,13 +49,19 @@ test("Changesets versions all seven SDKs and generates native changelogs and a r
     }
     writeFileSync(
       join(root, ".changeset/roundtrip.md"),
-      '---\n"@calmlens/sdk": patch\n"@calmlens/sdk-python": patch\n"@calmlens/sdk-ruby": patch\n"@calmlens/sdk-rust": patch\n"@calmlens/sdk-java": patch\n"@calmlens/sdk-go": patch\n"@calmlens/sdk-php": patch\n---\n\nExercise native release adapters.\n',
+      '---\n"@calmlens/sdk": patch\n"@calmlens/sdk-python": patch\n"@calmlens/sdk-ruby": patch\n"@calmlens/sdk-rust": patch\n"@calmlens/sdk-java": patch\n"@calmlens/sdk-go": patch\n"@calmlens/sdk-php": patch\n---\n\nExercise native release adapters.\n\nA second paragraph.\n',
     );
     execFileSync("git", ["init", "-b", "main"], { cwd: root, stdio: "ignore" });
     execFileSync("bun", ["run", "release:version"], { cwd: root, stdio: "inherit" });
     execFileSync("bun", ["run", "release:check"], { cwd: root, stdio: "inherit" });
     const { releases } = JSON.parse(readFileSync(join(root, ".changeset/release.json")));
     assert.equal(releases.length, 7);
+    // The generated changelogs already match the formatter, so the SDK checks accept them.
+    execFileSync(
+      "bun",
+      ["x", "--no-install", "biome", "format", ...releases.map(({ sdk }) => `${sdk}/CHANGELOG.md`)],
+      { cwd: root, stdio: "inherit" },
+    );
     // The SDKs are one fixed group: each moves to the highest current version, bumped once.
     const [major, minor, patch] = releases
       .map(({ sdk }) =>
