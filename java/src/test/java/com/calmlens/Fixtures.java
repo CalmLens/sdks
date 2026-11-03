@@ -15,7 +15,6 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,36 +49,31 @@ final class Fixtures {
   }
 
   /**
-   * Decodes fixture options into a native model. A {@code transform} is set through the builder
-   * overload for its shape: a selector string, one {@link Models.Transform} or a list of them.
+   * Decodes fixture options into a native model. A CDN {@code transform} is set through the builder
+   * overload for its shape: a selector string or {@link Models.ImageTransformOptions}. A lens
+   * definition's {@code transform} is an ordinary field.
    */
   static <T> T decode(JsonObject options, Class<T> type) throws ReflectiveOperationException {
     T model = JSON.fromJson(options, type);
     JsonElement transform = options.get("transform");
-    if (transform == null || transform.isJsonNull()) return model;
+    if (transform == null || transform.isJsonNull() || type == Models.LensDefinition.class) return model;
     if (transform.isJsonPrimitive()) type.getMethod("transform", String.class).invoke(model, transform.getAsString());
-    else if (transform.isJsonArray()) {
-      List<Models.Transform> steps = new ArrayList<>();
-      for (JsonElement step : transform.getAsJsonArray()) steps.add(step(step.getAsJsonObject()));
-      type.getMethod("transform", List.class).invoke(model, steps);
-    } else type.getMethod("transform", Models.Transform.class).invoke(model, step(transform.getAsJsonObject()));
+    else type.getMethod("transform", Models.ImageTransformOptions.class).invoke(model, transformOptions(transform));
     return model;
   }
 
   /**
-   * Decodes a structured transform step. Options that {@link Models.ImageTransformOptions} cannot
+   * Decodes structured transform options. Options that {@link Models.ImageTransformOptions} cannot
    * hold (not an object, or an array value) fail with {@code sdk/invalid-argument}, the error the
    * other SDKs return when serializing them.
    */
-  private static Models.Transform step(JsonObject step) {
-    JsonElement options = step.get("options");
-    Models.ImageTransformOptions typed;
+  private static Models.ImageTransformOptions transformOptions(JsonElement options) {
     try {
-      typed = options == null || options.isJsonNull() ? null : Json.GSON.fromJson(options, Models.ImageTransformOptions.class);
+      if (!options.isJsonObject()) throw new IllegalStateException("Not an object");
+      return Json.GSON.fromJson(options, Models.ImageTransformOptions.class);
     } catch (com.google.gson.JsonParseException | IllegalStateException unrepresentable) {
       throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Transform options must be image transform options");
     }
-    return new Models.Transform(step.has("type") ? step.get("type").getAsString() : null, typed);
   }
 
   /** A request in the fixtures' shape: method, path, decoded query and JSON or text body. */

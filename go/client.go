@@ -679,7 +679,7 @@ func (c *ServerClient) EnsureLenses(ctx context.Context, options EnsureLensesOpt
 	for i, key := range keys {
 		result[i] = resolved[key]
 	}
-	// Do not let callers mutate cached transforms through returned maps or slices.
+	// Do not let callers mutate cached transform options through returned maps.
 	encoded, err := json.Marshal(result)
 	if err != nil {
 		return nil, &Error{Code: CodeSDKInvalidResponse, Message: "Could not copy lenses", Cause: err}

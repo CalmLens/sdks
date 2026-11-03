@@ -159,10 +159,10 @@ class TransportTest < Minitest::Test
     end
   end
 
-  def test_cdn_transform_selectors_reach_the_server_as_path_segments
+  def test_cdn_lens_and_transform_reach_the_server_as_one_path_segment
     with_server(->(*) { [200, {}, 'png'] }) do |client, server|
-      assert_equal 200, client.cdn.serve(asset_identifier: 'asset', lens: 'thumb', transform: 'border.color=fff,width=10/blur=2').status
-      assert_equal 'GET /assets/project/asset/rendered/@thumb/border.color=fff,width=10/blur=2 HTTP/1.1', server.requests.pop[:line]
+      assert_equal 200, client.cdn.serve(asset_identifier: 'asset', lens: 'thumb', transform: 'border.color=fff,width=10').status
+      assert_equal 'GET /assets/project/asset/rendered/@thumb,border.color=fff,width=10 HTTP/1.1', server.requests.pop[:line]
     end
   end
 

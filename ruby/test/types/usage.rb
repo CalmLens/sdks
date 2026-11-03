@@ -54,7 +54,7 @@ client.assets.decide(asset_id: updated['id'], decision: 'purged', note: 'Illegal
 client.assets.wait_for_decision(asset_id: uploaded['id'], timeout: 30)['classification']['moderation']['status']
 client.assets.delete_content(asset_id: updated['id'])['content']['updatedAt']
 signed = client.assets.create_signed_url(asset_id: updated['id'],
-                                         transform: { type: 'imageTransform', options: { width: 200, fit: 'cover' } })
+                                         transform: { width: 200, fit: 'cover' })
 expires = signed['expiresAt']
 client.assets.delete(asset_id: updated['id'])
 
@@ -81,9 +81,9 @@ client.hash_lists.remove_entry(entry_id: entry['id'])
 client.hash_lists.delete(hash_list_id: hash_list['id'])
 
 lenses = client.ensure_lenses(lenses: [{ identifier: 'thumb', name: 'Thumb', type: 'image', active: true, version: 2,
-                                         transforms: [{ type: 'imageTransform', options: { width: 128, format: 'webp' } }] }])
+                                         transform: { width: 128, format: 'webp' } }])
 lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image', active: true)
-lens_width = lenses.first&.dig('transforms', 0, 'options', 'width')
+lens_width = lenses.first&.dig('transform', 'width')
 
 url = client.cdn.get_asset_url(asset_identifier: 'post-1', lens: lens['identifier'], viewer_claims: { age_confirmed: true })
 bytes = client.cdn.serve(asset_identifier: 'post-1', init: { method: 'HEAD', headers: { 'If-None-Match' => 'x' } }) do |response|

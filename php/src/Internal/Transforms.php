@@ -16,38 +16,35 @@ final class Transforms
     private const HEX_COLOUR = '/^#((?:[0-9a-f]{3}){1,2}|(?:[0-9a-f]{4}){1,2})$/iD';
 
     /**
-     * Serializes structured transforms as a CDN selector, one path segment per step, such as
-     * `fit=cover,width=640/format=webp`. Option keys are sorted so equal transforms share a URL,
-     * nested keys are dotted (`border.color`), hex colours are written without `#` and values are
-     * percent-encoded. A selector string is returned unchanged.
+     * Serializes structured transform options as a CDN selector, such as `fit=cover,width=640`.
+     * Option keys are sorted so equal transforms share a URL, nested keys are dotted
+     * (`border.color`), hex colours are written without `#` and values are percent-encoded. A
+     * selector string is returned unchanged once checked.
      */
     public static function selector(mixed $value): ?string
     {
-        if ($value === null || is_string($value)) {
+        if ($value === null) {
+            return null;
+        }
+        if (is_string($value)) {
+            // A transform is one path segment of options: it must not add a segment, lens, query or fragment.
+            if (strpbrk($value, '/?#') !== false || str_contains($value, '..') || str_starts_with($value, '@')) {
+                Values::invalid('Transform cannot contain "/", "..", "?" or "#", or start with "@"');
+            }
             return $value;
         }
-        if (!is_array($value) || $value === []) {
-            Values::invalid('Transform needs at least one step');
+        if ($value instanceof \stdClass) {
+            $value = (array) $value;
         }
-        $steps = array_is_list($value) ? $value : [$value];
-        return implode('/', array_map(function ($step): string {
-            if (!is_array($step) || ($step['type'] ?? null) !== 'imageTransform') {
-                Values::invalid('Transform type must be "imageTransform"');
-            }
-            $options = $step['options'] ?? [];
-            if ($options instanceof \stdClass) {
-                $options = (array) $options;
-            }
-            if (!is_array($options) || ($options !== [] && array_is_list($options))) {
-                Values::invalid('Transform options must be an object');
-            }
-            $pairs = [];
-            self::append($pairs, '', $options);
-            if ($pairs === []) {
-                Values::invalid('Transform steps need at least one option');
-            }
-            return implode(',', $pairs);
-        }, $steps));
+        if (!is_array($value) || ($value !== [] && array_is_list($value))) {
+            Values::invalid('Transform options must be an object');
+        }
+        $pairs = [];
+        self::append($pairs, '', $value);
+        if ($pairs === []) {
+            Values::invalid('A transform needs at least one option');
+        }
+        return implode(',', $pairs);
     }
 
     private static function append(array &$pairs, string $prefix, array $options): void
@@ -84,16 +81,14 @@ final class Transforms
         }
     }
 
+    /** The selector as a path segment: a selector string is encoded like JavaScript's encodeURI. */
     public static function path(mixed $value): string
     {
+        $selector = self::selector($value) ?? '';
         if (!is_string($value)) {
-            return self::selector($value) ?? '';
+            // Already path-safe: unreserved characters, percent escapes, `=`, `,` and `.`.
+            return $selector;
         }
-        $value = ltrim($value, '/');
-        if (str_contains($value, '..') || strpbrk($value, '?#') !== false) {
-            Values::invalid('Unsafe transform path');
-        }
-        // Like JavaScript's encodeURI.
-        return preg_replace_callback("/[^A-Za-z0-9\-_.!~*'();\/:@&=+$,]/", fn ($m) => rawurlencode($m[0]), $value);
+        return preg_replace_callback("/[^A-Za-z0-9\-_.!~*'();\/:@&=+$,]/", fn ($m) => rawurlencode($m[0]), $selector);
     }
 }

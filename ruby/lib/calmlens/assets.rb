@@ -232,8 +232,8 @@ module CalmLens
     # @option options [String] :resource `rendered` (the API's default) or `original`, which takes no lens or transform
     # @option options [Integer] :expires_in_seconds default 900
     # @option options [String] :lens a lens identifier
-    # @option options [String, Hash, Array<Hash>] :transform a selector String or structured steps,
-    #   as for {CDN#get_asset_url}; a lens runs before any additional transforms
+    # @option options [String, Hash] :transform a selector String or structured options, as for
+    #   {CDN#get_asset_url}; they replace the lens's options of the same name
     # @return [Hash] `{'url', 'expiresAt'}`
     def create_signed_url(options)
       call(options) do |api, request|

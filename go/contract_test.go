@@ -27,8 +27,8 @@ import (
 	"github.com/CalmLens/sdks/go/internal/fixtures"
 )
 
-// Every transform option, decoded into ImageTransformOptions and serialized, gives the step the
-// CDN writes for it: an option missing from the type, or encoded differently, fails here. The
+// Every transform option, decoded into ImageTransformOptions and serialized, gives the selector
+// the CDN writes for it: an option missing from the type, or encoded differently, fails here. The
 // option names and colour keys match the CDN's.
 func TestTransformOptionsContract(t *testing.T) {
 	fixture := fixtures.Read[struct {
@@ -47,7 +47,7 @@ func TestTransformOptionsContract(t *testing.T) {
 			if err := decoder.Decode(&options); err != nil {
 				t.Fatalf("%s: %v", c.Options, err)
 			}
-			selector, err := serializeTransform([]LensTransform{ImageTransform(options)})
+			selector, err := serializeTransform(options)
 			if err != nil {
 				t.Fatalf("%s: %v", c.Options, err)
 			}

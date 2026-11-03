@@ -1367,7 +1367,7 @@ impl Backend {
                     "description",
                     "type",
                     "active",
-                    "transforms",
+                    "transform",
                     "version",
                 ]
                 .iter()

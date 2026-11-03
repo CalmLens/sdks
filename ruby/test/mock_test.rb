@@ -21,7 +21,7 @@ class MockTest < Minitest::Test
   def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
-    transform = { type: 'imageTransform', options: { width: 10, border: { color: '#fff' } } }
+    transform = { width: 10, border: { color: '#fff' } }
     assert_equal 'hello', mock.cdn.serve(asset_identifier: asset['id'], transform: transform).body
     assert_equal "/assets/project-1/#{asset['id']}/rendered/border.color=fff,width=10", mock.requests.last.path
     signed = URI(mock.assets.create_signed_url(asset_id: asset['id'], transform: transform)['url'])

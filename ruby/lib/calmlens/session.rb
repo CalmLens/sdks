@@ -161,10 +161,10 @@ module CalmLens
     private
 
     # The fields that identify a lens definition, as canonical JSON: an unset description or
-    # transforms list is the same definition as an explicit null.
+    # transform is the same definition as an explicit null.
     def lens_key(lens)
       fields = { 'identifier' => lens['identifier'], 'name' => lens['name'], 'description' => lens['description'],
-                 'type' => lens['type'], 'transforms' => lens['transforms'] }
+                 'type' => lens['type'], 'transform' => lens['transform'] }
       %w[active version].each { |name| fields[name] = lens[name] if lens.key?(name) }
       JSON.generate(canonical(fields))
     end

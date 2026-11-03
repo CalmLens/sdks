@@ -349,45 +349,42 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
 }
 
 #[test]
-fn lens_transforms_decode_typed_image_options() {
+fn lens_transform_decodes_typed_image_options() {
     let lens: Lens = serde_json::from_value(json!({
         "identifier": "card",
         "type": "image",
-        "transforms": [
-            { "type": "imageTransform", "options": {
-                "format": "webp", "fit": "cover", "flip": "hv", "segment": "foreground",
-                "border": { "color": "#000", "width": 2 },
-                "gravity": { "mode": "box-center", "x": 0.5 },
-                "trim": { "top": 4, "border": { "tolerance": 0.2 } }
-            } },
-            { "type": "imageTransform", "options": { "gravity": "face", "trim": "border" } },
-            { "type": "videoTransform", "options": { "fps": 12 } }
-        ]
+        "transform": {
+            "format": "webp", "fit": "cover", "flip": "hv", "segment": "foreground",
+            "border": { "color": "#000", "width": 2 },
+            "gravity": { "mode": "box-center", "x": 0.5 },
+            "trim": { "top": 4, "border": { "tolerance": 0.2 } },
+            "fps": 12
+        }
     }))
     .unwrap();
     assert_eq!(lens.lens_type, Some(LensType::Image));
-    let transforms = lens.transforms.unwrap();
-    let Transform::Image(first) = &transforms[0] else {
-        panic!("expected an image transform, got {:?}", transforms[0]);
-    };
-    assert_eq!(first.format, Some(ImageFormat::Webp));
-    assert_eq!(first.fit, Some(ImageFit::Cover));
-    assert_eq!(first.flip, Some(ImageFlip::Hv));
-    assert_eq!(first.segment, Some(ImageSegment::Foreground));
+    let options = lens.transform.unwrap();
+    assert_eq!(options.format, Some(ImageFormat::Webp));
+    assert_eq!(options.fit, Some(ImageFit::Cover));
+    assert_eq!(options.flip, Some(ImageFlip::Hv));
+    assert_eq!(options.segment, Some(ImageSegment::Foreground));
     assert_eq!(
-        first.border.as_ref().map(|b| (b.color.as_deref(), b.width)),
+        options
+            .border
+            .as_ref()
+            .map(|b| (b.color.as_deref(), b.width)),
         Some((Some("#000"), Some(2.0)))
     );
     assert_eq!(
-        first.gravity,
+        options.gravity,
         Some(Gravity::Point(GravityPoint {
             mode: GravityMode::BoxCenter,
             x: Some(0.5),
             y: None
         }))
     );
-    let Some(Trim::Edges(edges)) = &first.trim else {
-        panic!("expected trim edges, got {:?}", first.trim);
+    let Some(Trim::Edges(edges)) = &options.trim else {
+        panic!("expected trim edges, got {:?}", options.trim);
     };
     assert_eq!(edges.top, Some(4.0));
     assert_eq!(
@@ -397,29 +394,18 @@ fn lens_transforms_decode_typed_image_options() {
             ..Default::default()
         }))
     );
+    // An option this SDK version does not know is kept as received.
+    assert_eq!(options.extra.get("fps"), Some(&json!(12)));
 
-    let Transform::Image(second) = &transforms[1] else {
-        panic!("expected an image transform, got {:?}", transforms[1]);
-    };
-    assert_eq!(second.gravity, Some(GravityPosition::Face.into()));
-    assert_eq!(second.trim, Some(TrimMode::Border.into()));
-
-    assert_eq!(
-        transforms[2],
-        Transform::Unknown {
-            transform_type: "videoTransform".into(),
-            options: json!({ "fps": 12 })
-        }
-    );
-    assert_eq!(
-        serde_json::to_value(&transforms[2]).unwrap(),
-        json!({ "type": "videoTransform", "options": { "fps": 12 } })
-    );
+    let modes: ImageTransformOptions =
+        serde_json::from_value(json!({ "gravity": "face", "trim": "border" })).unwrap();
+    assert_eq!(modes.gravity, Some(GravityPosition::Face.into()));
+    assert_eq!(modes.trim, Some(TrimMode::Border.into()));
 }
 
 #[test]
 fn typed_image_transform_serializes_to_wire_options_and_selector() {
-    let transform = Transform::image(ImageTransformOptions {
+    let options = ImageTransformOptions {
         format: Some(ImageFormat::Avif),
         gravity: Some(GravityPosition::Entropy.into()),
         trim: Some(Trim::Edges(TrimEdges {
@@ -428,18 +414,16 @@ fn typed_image_transform_serializes_to_wire_options_and_selector() {
             ..Default::default()
         })),
         ..Default::default()
-    });
+    };
     assert_eq!(
-        serde_json::to_value(&transform).unwrap(),
-        json!({ "type": "imageTransform", "options": {
-            "format": "avif", "gravity": "entropy", "trim": { "left": 3.0, "border": true }
-        } })
+        serde_json::to_value(&options).unwrap(),
+        json!({ "format": "avif", "gravity": "entropy", "trim": { "left": 3.0, "border": true } })
     );
     assert_eq!(
-        CdnTransform::from(transform).selector().unwrap(),
+        CdnTransform::from(options).selector().unwrap(),
         "format=avif,gravity=entropy,trim.border=true,trim.left=3"
     );
-    let quality = Transform::image(ImageTransformOptions {
+    let quality = CdnTransform::from(ImageTransformOptions {
         dpr: Some(2.0),
         anim: Some(false),
         quality: Some(ImageQualityLevel::High.into()),
@@ -447,25 +431,20 @@ fn typed_image_transform_serializes_to_wire_options_and_selector() {
         ..Default::default()
     });
     assert_eq!(
-        CdnTransform::from(quality).selector().unwrap(),
+        quality.selector().unwrap(),
         "anim=false,background=ffaa00,dpr=2,quality=high"
     );
     let options: ImageTransformOptions =
         serde_json::from_value(json!({ "quality": 80, "dpr": 1.5 })).unwrap();
     assert_eq!(options.quality, Some(ImageQuality::Value(80)));
-    for options in [
-        json!({ "Width": 1 }),
-        json!({ "border": { "bad-name": 1 } }),
-    ] {
-        let step = Transform::Unknown {
-            transform_type: "imageTransform".into(),
-            options,
-        };
-        assert_eq!(
-            CdnTransform::from(step).selector().unwrap_err().code(),
-            &"sdk/invalid-argument"
-        );
-    }
+    let upper_case: ImageTransformOptions = serde_json::from_value(json!({ "Width": 1 })).unwrap();
+    assert_eq!(
+        CdnTransform::from(upper_case)
+            .selector()
+            .unwrap_err()
+            .code(),
+        &"sdk/invalid-argument"
+    );
 }
 
 #[test]

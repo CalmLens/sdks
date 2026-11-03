@@ -1123,7 +1123,7 @@ func (m *MockServerClient) ensureLenses(body calmlens.JSON, now int64) (any, err
 			continue
 		}
 		same := true
-		for _, key := range []string{"name", "description", "type", "active", "transforms", "version"} {
+		for _, key := range []string{"name", "description", "type", "active", "transform", "version"} {
 			a, _ := json.Marshal(old[key])
 			b, _ := json.Marshal(definition[key])
 			same = same && bytes.Equal(a, b)

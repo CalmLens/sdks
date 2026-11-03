@@ -1537,7 +1537,7 @@ final class MockApi {
         continue;
       }
       long current = existing.get("version").getAsLong();
-      boolean same = List.of("name", "description", "type", "active", "transforms").stream()
+      boolean same = List.of("name", "description", "type", "active", "transform").stream()
           .allMatch(key -> canonical(existing.get(key)).equals(canonical(definition.get(key))));
       if (same && version == current) { result.add(existing); continue; }
       if (version > current) {

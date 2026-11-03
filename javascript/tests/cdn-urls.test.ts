@@ -27,7 +27,7 @@ describe("getAssetUrl", () => {
     },
     {
       assetIdentifier: "asset-1",
-      transform: { type: "imageTransform", options: { width: 320, format: "webp" } },
+      transform: { width: 320, format: "webp" },
     },
     { assetIdentifier: "asset-1", resource: "placeholder" },
   ];

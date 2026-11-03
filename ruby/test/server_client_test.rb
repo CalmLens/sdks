@@ -72,8 +72,8 @@ class ServerClientTest < Minitest::Test
     end
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport)
     lens = { identifier: 'thumb', name: 'Thumb', type: 'image', active: true, version: 1,
-             transforms: [{ type: 'imageTransform', options: { width: 1, fit: 'cover' } }] }
-    reordered = lens.merge(transforms: [{ options: { fit: 'cover', width: 1 }, type: 'imageTransform' }])
+             transform: { width: 1, fit: 'cover' } }
+    reordered = lens.merge(transform: { fit: 'cover', width: 1 })
     results = [lens, reordered].map { |definition| Thread.new { client.ensure_lens(definition) } }.map(&:value)
     assert_equal([%w[lens-1 thumb]] * 2, results.map { |saved| saved.values_at('id', 'identifier') })
     assert_equal 1, sent.size
@@ -130,22 +130,23 @@ class ServerClientTest < Minitest::Test
   def test_structured_transform_numbers_match_javascript_and_other_values_are_rejected
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: ->(_) { flunk 'sent a request' })
     url = client.cdn.get_asset_url(asset_identifier: 'a',
-                                   transform: { type: 'imageTransform', options: { scale: 2.0, blur: 1.0e-7, rotate: -90, dpr: 1e21 } })
+                                   transform: { scale: 2.0, blur: 1.0e-7, rotate: -90, dpr: 1e21 })
     assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/rendered/blur=1e-7,dpr=1e%2B21,rotate=-90,scale=2', url
     [Float::INFINITY, Float::NAN, :png, 1r, { 'border-color' => 1 }].each do |value|
       error = assert_raises(CalmLens::InvalidArgumentError, value.inspect) do
-        client.cdn.get_asset_url(asset_identifier: 'a', transform: { type: 'imageTransform', options: { width: value } })
+        client.cdn.get_asset_url(asset_identifier: 'a', transform: { width: value })
       end
       assert_equal 'sdk/invalid-argument', error.code
     end
-    assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/rendered/@thumb/background=ffaa00,trim.border.color=abc',
-                 client.cdn.get_asset_url(asset_identifier: 'a', lens: 'thumb', transform: {
-                                            type: 'imageTransform', options: { trim: { border: { color: '#ABC' } }, background: '#FFAA00' }
-                                          })
-    error = assert_raises(CalmLens::InvalidArgumentError) do
-      client.cdn.get_asset_url(asset_identifier: 'a', lens: 'thumb', transform: { type: 'imageTransform' })
+    assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/rendered/@thumb,background=ffaa00,trim.border.color=abc',
+                 client.cdn.get_asset_url(asset_identifier: 'a', lens: 'thumb',
+                                          transform: { trim: { border: { color: '#ABC' } }, background: '#FFAA00' })
+    [{}, { width: nil }, [{ width: 1 }]].each do |transform|
+      error = assert_raises(CalmLens::InvalidArgumentError, transform.inspect) do
+        client.cdn.get_asset_url(asset_identifier: 'a', lens: 'thumb', transform: transform)
+      end
+      assert_equal 'sdk/invalid-argument', error.code
     end
-    assert_equal 'sdk/invalid-argument', error.code
   end
 
   def test_unknown_snake_case_options_are_converted_but_metadata_keys_are_not

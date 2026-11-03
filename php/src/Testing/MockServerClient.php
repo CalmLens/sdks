@@ -1554,7 +1554,7 @@ final class MockServerClient
                 && ($old['description'] ?? null) === ($definition['description'] ?? null)
                 && ($old['type'] ?? null) === ($definition['type'] ?? null)
                 && ($old['active'] ?? null) === ($definition['active'] ?? null)
-                && Values::json(Values::canonical($old['transforms'] ?? null)) === Values::json(Values::canonical($definition['transforms'] ?? null));
+                && Values::json(Values::canonical($old['transform'] ?? null)) === Values::json(Values::canonical($definition['transform'] ?? null));
             if ($same && ($old['version'] ?? null) === ($definition['version'] ?? null)) {
                 $saved[] = $old;
                 continue;

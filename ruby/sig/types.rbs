@@ -533,12 +533,9 @@ module CalmLens
   }
   # </generated: image-transform-options>
 
-  # One structured transform step. `imageTransform` is the only transform type.
-  type transform_step_input = { type: "imageTransform", ?options: image_transform_options_input }
-  type transform_step = { "type" => "imageTransform", ?"options" => image_transform_options }
-  # A selector String with one step per path segment, such as `fit=cover,width=1024/blur=12`, or
-  # structured steps, which the SDK serializes into a selector.
-  type transform_input = String | transform_step_input | Array[transform_step_input]
+  # Transform options applied in one pass: a selector String such as `width=1024,fit=cover`, or
+  # structured options, which the SDK serializes into a selector.
+  type transform_input = String | image_transform_options_input
 
   type lens_type = "image" | "video" | "audio" | "document" | "website"
   # ENSURE_LENS_BODY_SCHEMA. Changing a saved lens needs a greater `version` (default 1).
@@ -549,7 +546,7 @@ module CalmLens
     active: bool,
     ?description: String?,
     ?version: Integer,
-    ?transforms: Array[transform_step_input]?
+    ?transform: image_transform_options_input?
   }
   type lens = {
     "id" => String,
@@ -560,7 +557,7 @@ module CalmLens
     ?"description" => String?,
     "type" => lens_type,
     "active" => bool,
-    ?"transforms" => Array[transform_step]?,
+    ?"transform" => image_transform_options?,
     "createdAt" => Integer,
     ?"updatedAt" => Integer
   }
@@ -720,7 +717,7 @@ module CalmLens
     # Defaults to `rendered` on the server; `original` takes no lens or transform.
     ?resource: "original" | "rendered",
     ?expires_in_seconds: Integer,
-    # A lens runs before any additional transforms.
+    # Transform options replace the lens's options of the same name.
     ?lens: String,
     ?transform: transform_input,
     ?request_options: request_options
@@ -870,7 +867,7 @@ module CalmLens
     active: bool,
     ?description: String?,
     ?version: Integer,
-    ?transforms: Array[transform_step_input]?,
+    ?transform: image_transform_options_input?,
     ?request_options: request_options
   }
 
@@ -881,7 +878,7 @@ module CalmLens
     # `rendered` is the default. `original` takes no lens or transform; `placeholder` is a small blurred PNG
     # that takes no lens or transform.
     ?resource: "original" | "rendered" | "placeholder",
-    # A lens runs before any additional transforms.
+    # Transform options replace the lens's options of the same name.
     ?lens: String,
     ?transform: transform_input,
     # Appends `?ageConfirmed=true`, so a public `age-restricted` asset is served from this URL. Set it

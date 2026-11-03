@@ -37,11 +37,10 @@ class ContractTest < Minitest::Test
 
   TRANSFORM_OPTIONS = fixture('transform-options')
 
-  # Every transform option serializes to the step the CDN writes for it.
+  # Every transform option serializes to the selector the CDN writes for it.
   def replay_transform(item)
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1')
-    step = { 'type' => 'imageTransform', 'options' => item['options'] }
-    url = client.cdn.get_asset_url(asset_identifier: 'asset-1', transform: step)
+    url = client.cdn.get_asset_url(asset_identifier: 'asset-1', transform: item['options'])
     assert_equal item['selector'], url.split('/rendered/', 2).last, item['options'].inspect
   end
   each_case('transform', TRANSFORM_OPTIONS['cases']) { |item| item['selector'] }

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module CalmLens
-  # CDN transform selectors: selector Strings and structured steps serialized the way every SDK does.
+  # CDN transform selectors: selector Strings and structured options serialized the way every SDK does.
   # @api private
   module Transforms
     module_function
@@ -14,46 +14,39 @@ module CalmLens
     # </generated: image-transform-colours>
     HEX_COLOUR = /\A#((?:\h{3}){1,2}|(?:\h{4}){1,2})\z/
 
-    # Returns the selector the API and CDN accept for a transform: a selector String unchanged, or
-    # structured steps (`{type:, options:}` or an Array of them) serialized by {serialize}.
+    # Returns the selector the API and CDN accept for a transform: a selector String checked and
+    # unchanged, or structured options (`{width: 640, fit: 'cover'}`) serialized by {serialize}.
     def selector(value)
-      value.nil? || value.is_a?(String) ? value : serialize(value)
+      return serialize(value) unless value.nil? || value.is_a?(String)
+      # A transform is one path segment of options: it must not add a segment, lens, query or fragment.
+      if value&.match?(%r{[/?#]}) || value&.include?('..') || value&.start_with?('@')
+        raise Internal.invalid('Transform cannot contain "/", "..", "?" or "#", or start with "@"')
+      end
+
+      value
     end
 
-    # Builds the CDN path of a transform. A selector String keeps its own step separators and is
-    # encoded like JavaScript's encodeURI; serialized steps are already path-safe.
+    # Builds the CDN path text of a transform. A selector String is encoded like JavaScript's
+    # encodeURI; serialized options are already path-safe.
     def path(value)
-      return serialize(value) unless value.is_a?(String)
-
-      text = value.sub(%r{\A/+}, '')
-      raise Internal.invalid('Transform cannot contain "..", "?" or "#"') if text.include?('..') || text.match?(/[?#]/)
+      text = selector(value)
+      return text unless value.is_a?(String)
 
       # Like JavaScript's encodeURI.
       text.b.gsub(%r{[^A-Za-z0-9\-_.!~*'();/:@&=+$,]}n) { |byte| format('%%%02X', byte.ord) }
     end
 
-    # Serializes structured transforms as a CDN selector, one path segment per step, such as
-    # `fit=cover,width=640/format=webp`. Option keys are sorted so equal transforms share a URL, nested
-    # keys are dotted (`border.color`), hex colours are written without `#` and values are percent-encoded.
+    # Serializes structured transform options as a CDN selector, such as `fit=cover,width=640`. Option
+    # keys are sorted so equal transforms share a URL, nested keys are dotted (`border.color`), hex
+    # colours are written without `#` and values are percent-encoded.
     def serialize(value)
-      steps = value.is_a?(Array) ? value : [value]
-      raise Internal.invalid('Transform needs at least one step') if steps.empty?
+      raise Internal.invalid('Transform options must be a Hash') unless value.is_a?(Hash)
 
-      steps.map do |step|
-        raise Internal.invalid('Transform steps must be Hashes') unless step.is_a?(Hash)
+      pairs = []
+      sorted_options(value).each { |key, item| append_pairs(pairs, key, item) }
+      raise Internal.invalid('A transform needs at least one option') if pairs.empty?
 
-        step = step.transform_keys(&:to_s)
-        raise Internal.invalid('Transform type must be "imageTransform"') unless step['type'] == 'imageTransform'
-
-        options = step['options'] || {}
-        raise Internal.invalid('Transform options must be a Hash') unless options.is_a?(Hash)
-
-        pairs = []
-        sorted_options(options).each { |key, item| append_pairs(pairs, key, item) }
-        raise Internal.invalid('Transform steps need at least one option') if pairs.empty?
-
-        pairs.join(',')
-      end.join('/')
+      pairs.join(',')
     end
 
     def sorted_options(options, prefix = '')

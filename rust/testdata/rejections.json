@@ -38,16 +38,13 @@
     "error": "sdk/invalid-argument"
   },
   {
-    "name": "signed URL for the original with transform steps",
+    "name": "signed URL for the original with structured transform options",
     "operation": "assets.createSignedUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "original",
       "transform": {
-        "type": "imageTransform",
-        "options": {
-          "width": 10
-        }
+        "width": 10
       }
     },
     "error": "sdk/invalid-argument"

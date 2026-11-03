@@ -232,30 +232,14 @@ func fixtureSubmit(t *testing.T, args fixtureArgs) SubmitAssetOptions {
 	return options
 }
 
-// fixtureTransform maps a fixture transform (a selector string, one step or a list of steps) to
-// Transform or TransformSteps.
-func fixtureTransform(t *testing.T, value any) (string, []LensTransform) {
-	t.Helper()
-	switch value := value.(type) {
-	case nil:
-		return "", nil
-	case string:
-		return value, nil
-	case []any:
-		data, _ := json.Marshal(value)
-		steps := []LensTransform{}
-		if err := json.Unmarshal(data, &steps); err != nil {
-			t.Fatal(err)
-		}
-		return "", steps
-	default:
-		data, _ := json.Marshal(value)
-		var step LensTransform
-		if err := json.Unmarshal(data, &step); err != nil {
-			t.Fatal(err)
-		}
-		return "", []LensTransform{step}
+// fixtureTransform maps a fixture transform (a selector string or structured options) to
+// Transform or TransformOptions. Structured values pass through as decoded, so invalid shapes
+// such as arrays reach the SDK's own checks.
+func fixtureTransform(value any) (string, any) {
+	if text, ok := value.(string); ok {
+		return text, nil
 	}
+	return "", value
 }
 
 func fixtureCDN(t *testing.T, args fixtureArgs) CDNAssetURLOptions {
@@ -271,7 +255,7 @@ func fixtureCDN(t *testing.T, args fixtureArgs) CDNAssetURLOptions {
 	options.AssetIdentifier, _ = args["assetIdentifier"].(string)
 	options.Resource, _ = args["resource"].(string)
 	options.Lens, _ = args["lens"].(string)
-	options.Transform, options.TransformSteps = fixtureTransform(t, args["transform"])
+	options.Transform, options.TransformOptions = fixtureTransform(args["transform"])
 	return options
 }
 
@@ -328,7 +312,7 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		}
 		options := into[SignedURLOptions](t, plain)
 		options.AssetID, _ = args["assetId"].(string)
-		options.Transform, options.TransformSteps = fixtureTransform(t, args["transform"])
+		options.Transform, options.TransformOptions = fixtureTransform(args["transform"])
 		return one(c.Assets.CreateSignedURL(ctx, options))
 	case "assets.retry":
 		return one(c.Assets.Retry(ctx, into[AssetIDOptions](t, args)))

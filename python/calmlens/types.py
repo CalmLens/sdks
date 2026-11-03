@@ -29,9 +29,9 @@ __all__ = [
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage", "ImageTransform",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
-    "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensTransform", "LensType",
+    "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
     "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
     "ModerationQualifier", "MoveAssetOptions", "MoveFolderOptions", "NotEvaluatedCategoryResult",
@@ -973,7 +973,7 @@ class ImageTransformTrim(TypedDict, total=False):
 
 
 class ImageTransformOptions(TypedDict, total=False):
-    """Options for the built-in ``imageTransform`` transform."""
+    """Image transform options, applied in one pass."""
     #: The output format. Leave it out to serve the best format the browser accepts.
     format: Literal["jpg", "png", "webp", "avif", "gif"]
     #: The width in pixels, 1 to 10,000 after `dpr`. With a size and no `fit`, the image scales down.
@@ -1023,19 +1023,10 @@ IMAGE_TRANSFORM_COLOUR_KEYS = frozenset({"background", "border.color", "trim.bor
 # </generated: image-transform-options>
 
 
-class ImageTransform(TypedDict):
-    """An ``imageTransform`` step, such as ``{"type": "imageTransform", "options": {"width": 1024}}``."""
-    type: Literal["imageTransform"]
-    options: ImageTransformOptions
-
-
-#: One transform step of a lens or a structured CDN transform.
-LensTransform = ImageTransform
-
-#: A CDN transform: a selector string with one step per path segment, such as
-#: ``"fit=cover,width=1024/blur=12"``, or one or more structured steps (the shape of a lens's
-#: ``transforms``), which the SDK serializes to the same selector.
-CdnTransform = Union[str, LensTransform, List[LensTransform]]
+#: A CDN transform, applied in one pass: comma-separated options such as
+#: ``"width=1024,fit=cover"``, or structured options such as ``{"width": 1024, "fit": "cover"}``,
+#: which the SDK serializes to the same selector. With a lens, its options replace the lens's.
+CdnTransform = Union[str, ImageTransformOptions]
 
 
 class _LensResponseRequired(TypedDict):
@@ -1051,7 +1042,7 @@ class _LensResponseRequired(TypedDict):
 class Lens(_LensResponseRequired, total=False):
     projectId: Optional[str]
     description: Optional[str]
-    transforms: Optional[list[LensTransform]]
+    transform: Optional[ImageTransformOptions]
     updatedAt: int
 
 
@@ -1375,7 +1366,7 @@ class _LensRequired(TypedDict):
 class LensDefinition(_LensRequired, total=False):
     description: Optional[str]
     active: bool
-    transforms: Optional[list[LensTransform]]
+    transform: Optional[ImageTransformOptions]
 
 
 class EnsureLensesOptions(TypedDict):

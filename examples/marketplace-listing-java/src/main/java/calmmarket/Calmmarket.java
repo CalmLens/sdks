@@ -49,8 +49,8 @@ public final class Calmmarket {
   static final String CARD_LENS = "calmmarket-card";
   static final LensDefinition CARD_LENS_DEFINITION =
       new LensDefinition(CARD_LENS, "Calmmarket listing card", "image", true, 1)
-          .transforms(Patch.value(List.of(Transform.image(
-              new ImageTransformOptions().fit("cover").width(640).height(480).format("webp")))));
+          .transform(Patch.value(
+              new ImageTransformOptions().fit("cover").width(640).height(480).format("webp")));
 
   /** The eight parent categories every report contains, in display order. */
   static final List<String> CATEGORIES = List.of("sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity", "personal-information", "profanity");

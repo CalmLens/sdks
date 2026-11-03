@@ -457,13 +457,10 @@ public final class CalmLensServerClient implements AutoCloseable {
     return out.toString();
   }
 
-  /** Encodes a CDN transform selector string like JavaScript's encodeURI, keeping its separators. */
+  /** Encodes a checked CDN transform selector string like JavaScript's encodeURI, keeping its separators. */
   private static String transformPath(String value) {
-    String transform = value.replaceFirst("^/+", "");
-    if (transform.contains("..") || transform.contains("?") || transform.contains("#"))
-      throw argument("Transform cannot contain \"..\", \"?\" or \"#\"");
     StringBuilder out = new StringBuilder();
-    for (byte b : transform.getBytes(StandardCharsets.UTF_8)) {
+    for (byte b : transformSelector(value).getBytes(StandardCharsets.UTF_8)) {
       int c = b & 0xff;
       if (c < 0x80 && (Character.isLetterOrDigit(c) || "-_.!~*'();/:@&=+$,".indexOf(c) >= 0)) out.append((char) c);
       else out.append(String.format("%%%02X", c));
@@ -480,31 +477,28 @@ public final class CalmLensServerClient implements AutoCloseable {
   // </generated: image-transform-colours>
   private static final Pattern HEX_COLOUR = Pattern.compile("^#((?:[0-9a-fA-F]{3}){1,2}|(?:[0-9a-fA-F]{4}){1,2})$");
 
-  /** The selector the API accepts: a string as given, or structured steps serialized. */
+  /** The selector the API accepts: a string checked and as given, or structured options serialized. */
   private static String transformSelector(Object transform) {
-    return transform == null || transform instanceof String ? (String) transform : serializeTransform(transform);
+    if (transform == null) return null;
+    if (transform instanceof Models.ImageTransformOptions options) return serializeTransform(options);
+    String text = (String) transform;
+    // A transform is one path segment of options: it must not add a segment, lens, query or fragment.
+    if (text.contains("/") || text.contains("?") || text.contains("#") || text.contains("..") || text.startsWith("@"))
+      throw argument("Transform cannot contain \"/\", \"..\", \"?\" or \"#\", or start with \"@\"");
+    return text;
   }
 
   /**
-   * Serializes structured transforms as a CDN selector, one path segment per step, such as
-   * {@code fit=cover,width=640/format=webp}. Option keys are sorted so equal transforms share a URL,
-   * nested keys are dotted ({@code border.color}), hex colours are written without {@code #} and
-   * values are percent-encoded.
+   * Serializes structured transform options as a CDN selector, such as {@code fit=cover,width=640}.
+   * Option keys are sorted so equal transforms share a URL, nested keys are dotted
+   * ({@code border.color}), hex colours are written without {@code #} and values are percent-encoded.
    */
-  static String serializeTransform(Object transform) {
-    List<?> steps = transform instanceof List<?> list ? list : List.of(transform);
-    if (steps.isEmpty()) throw argument("Transform needs at least one step");
-    List<String> selectors = new ArrayList<>();
-    for (Object item : steps) {
-      if (!(item instanceof Models.Transform step)) throw argument("Transform steps must be transforms");
-      if (!Models.Transform.IMAGE.equals(step.type())) throw argument("Transform type must be \"imageTransform\"");
-      Map<?, ?> options = transformOptions(step.options());
-      List<String> pairs = new ArrayList<>();
-      for (String key : sortedKeys(options, "")) appendTransformOption(pairs, key, options.get(key));
-      if (pairs.isEmpty()) throw argument("Transform steps need at least one option");
-      selectors.add(String.join(",", pairs));
-    }
-    return String.join("/", selectors);
+  static String serializeTransform(Models.ImageTransformOptions transform) {
+    Map<?, ?> options = transformOptions(transform);
+    List<String> pairs = new ArrayList<>();
+    for (String key : sortedKeys(options, "")) appendTransformOption(pairs, key, options.get(key));
+    if (pairs.isEmpty()) throw argument("A transform needs at least one option");
+    return String.join(",", pairs);
   }
 
   /** Returns the options as nested maps of their wire values, or an empty map for none. */
@@ -1541,10 +1535,12 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (resource.equals("original") && transformed) throw argument("Lenses and transforms apply only to the rendered resource");
       if (resource.equals("placeholder") && transformed) throw argument("A placeholder takes no lens or transform");
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
-      if (o.has("lens") && !o.get("lens").isJsonNull()) url += "/@" + id(o.get("lens").getAsString());
-      if (transform instanceof String text) { if (!text.isEmpty()) url += "/" + transformPath(text); }
-      // A serialized selector is already path-safe: unreserved characters, escapes, "=", "," and "/".
-      else if (transform != null) url += "/" + serializeTransform(transform);
+      List<String> selector = new ArrayList<>();
+      if (o.has("lens") && !o.get("lens").isJsonNull()) selector.add("@" + id(o.get("lens").getAsString()));
+      if (transform instanceof String text) { if (!text.isEmpty()) selector.add(transformPath(text)); }
+      // Serialized options are already path-safe: unreserved characters, escapes, "=", "," and ".".
+      else if (transform != null) selector.add(transformSelector(transform));
+      if (!selector.isEmpty()) url += "/" + String.join(",", selector);
       if (o.has("viewerClaims") && !o.get("viewerClaims").isJsonNull()) url += "?viewerClaims=" + encodeComponent(o.get("viewerClaims").toString());
       return url;
     }

@@ -33,7 +33,7 @@ from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, Calm
 from .moderation_context import select_moderation_context_items
 from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
-                    LensDefinition, LensTransform, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
+                    ImageTransformOptions, LensDefinition, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
                     BatchAssetsOptions, BatchAssetsResponse,
                     MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
@@ -184,39 +184,32 @@ def _sorted_keys(options: Mapping[Any, Any], prefix: str = "") -> list[str]:
 
 
 def _serialize_transform(transform: Any) -> str:
-    """Serialize structured transforms as a CDN selector, one path segment per step, such as
-    ``fit=cover,width=640/format=webp``.
+    """Serialize structured transform options as a CDN selector, such as ``fit=cover,width=640``.
 
     Option keys are sorted so equal transforms share a URL, nested keys are dotted
     (``border.color``), hex colours are written without ``#`` and values are percent-encoded, so
     the result is already path-safe.
     """
-    steps = list(transform) if isinstance(transform, (list, tuple)) else [transform]
-    if not steps:
-        raise _invalid("Transform needs at least one step")
-    selectors = []
-    for step in steps:
-        if not isinstance(step, Mapping):
-            raise _invalid("Transform steps must be mappings")
-        if step.get("type") != "imageTransform":
-            raise _invalid('Transform type must be "imageTransform"')
-        options = step.get("options")
-        if options is None:
-            options = {}
-        if not isinstance(options, Mapping):
-            raise _invalid("Transform options must be a mapping")
-        pairs: list[str] = []
-        for key in _sorted_keys(options):
-            _transform_options(pairs, key, options[key])
-        if not pairs:
-            raise _invalid("Transform steps need at least one option")
-        selectors.append(",".join(pairs))
-    return "/".join(selectors)
+    if not isinstance(transform, Mapping):
+        raise _invalid("Transform options must be a mapping")
+    pairs: list[str] = []
+    for key in _sorted_keys(transform):
+        _transform_options(pairs, key, transform[key])
+    if not pairs:
+        raise _invalid("A transform needs at least one option")
+    return ",".join(pairs)
 
 
 def _transform_selector(transform: Any) -> Any:
     """The selector string the API and CDN accept for a string or structured transform."""
-    return transform if transform is None or isinstance(transform, str) else _serialize_transform(transform)
+    if transform is None:
+        return None
+    if not isinstance(transform, str):
+        return _serialize_transform(transform)
+    # A transform is one path segment of options: it must not add a segment, lens, query or fragment.
+    if any(c in transform for c in "/?#") or ".." in transform or transform.startswith("@"):
+        raise _invalid('Transform cannot contain "/", "..", "?" or "#", or start with "@"')
+    return transform
 
 
 def _has_transform(transform: Any) -> bool:
@@ -232,15 +225,13 @@ def _viewer_claims(claims: Any) -> Any:
 
 
 def _transform_path(value: Any) -> str:
-    """A transform as a URL path: structured steps serialized, strings encoded like JavaScript's
-    encodeURI."""
+    """A transform as a URL path selector: structured options serialized, strings checked and
+    encoded like JavaScript's encodeURI."""
+    selector: str = _transform_selector(value)
     if not isinstance(value, str):
-        return _serialize_transform(value)
-    value = value.lstrip("/")
-    if ".." in value or "?" in value or "#" in value:
-        raise _invalid('Transform cannot contain "..", "?" or "#"')
+        return selector
     try:
-        return quote(value, safe=";/:@&=+$,~!*'()-._")
+        return quote(selector, safe=";/:@&=+$,~!*'()-._")
     except UnicodeEncodeError as error:
         raise _invalid("Transform must be valid Unicode") from error
 
@@ -930,10 +921,10 @@ class CalmLensServerClient:
 
     def ensure_lens(self, options: LensDefinition | None = None, /, *, identifier: str = _UNSET, name: str = _UNSET,
                     type: LensType = _UNSET, version: int = _UNSET, description: str | None = _UNSET,
-                    active: bool = _UNSET, transforms: List[LensTransform] | None = _UNSET) -> Lens:
+                    active: bool = _UNSET, transform: ImageTransformOptions | None = _UNSET) -> Lens:
         """Create or update one named lens (see :meth:`ensure_lenses`)."""
         lens = _merge(options, identifier=identifier, name=name, type=type, version=version,
-                      description=description, active=active, transforms=transforms)
+                      description=description, active=active, transform=transform)
         return self.ensure_lenses({"lenses": [cast(LensDefinition, lens)]})[0]
 
     def ensure_lenses(self, options: EnsureLensesOptions | None = None, /, *,
@@ -952,7 +943,7 @@ class CalmLensServerClient:
 
         def cache_key(lens: Mapping[str, Any]) -> str:
             return json.dumps({k: lens.get(k) for k in (
-                "identifier", "name", "description", "type", "active", "transforms", "version"
+                "identifier", "name", "description", "type", "active", "transform", "version"
             )}, sort_keys=True, separators=(",", ":"))
         keys = [cache_key(lens) for lens in definitions]
         # Serialize ensure calls so identical concurrent definitions use one request.
@@ -1558,10 +1549,11 @@ class CDN:
             raise _invalid("A placeholder takes no lens or transform")
         url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
                f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{selected}")
-        if merged.get("lens"):
-            url += "/@" + _id(merged["lens"], "lens")
+        selector = ["@" + _id(merged["lens"], "lens")] if merged.get("lens") else []
         if _has_transform(merged.get("transform")):
-            url += "/" + _transform_path(merged["transform"])
+            selector.append(_transform_path(merged["transform"]))
+        if selector:
+            url += "/" + ",".join(selector)
         params = []
         if merged.get("viewerClaims") is not None:
             params.append("viewerClaims=" + quote(json.dumps(_viewer_claims(merged["viewerClaims"]),

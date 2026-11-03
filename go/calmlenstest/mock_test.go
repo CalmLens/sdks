@@ -100,7 +100,7 @@ func TestMockLifecycle(t *testing.T) {
 	if err != nil || signed.ExpiresAt != 1123 {
 		t.Fatal(signed, err)
 	}
-	signed, err = c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, TransformSteps: []calmlens.LensTransform{{Type: "imageTransform", Options: calmlens.JSON{"width": 64, "border": calmlens.JSON{"color": "#fff"}}}}})
+	signed, err = c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, TransformOptions: calmlens.JSON{"width": 64, "border": calmlens.JSON{"color": "#fff"}}})
 	if err != nil {
 		t.Fatal(err)
 	}

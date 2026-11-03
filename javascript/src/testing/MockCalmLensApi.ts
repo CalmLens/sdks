@@ -2137,8 +2137,8 @@ export class MockCalmLensApi {
       (existing.description ?? null) === (options.description ?? null) &&
       existing.type === options.type &&
       existing.active === options.active &&
-      stringifyJsonCanonical(existing.transforms ?? null) ===
-        stringifyJsonCanonical(options.transforms ?? null);
+      stringifyJsonCanonical(existing.transform ?? null) ===
+        stringifyJsonCanonical(options.transform ?? null);
     if (hasMatchingDefinition && existing.version === options.version) return existing;
     if (options.version > existing.version) {
       const lens = { ...existing, ...options, updatedAt: this.now() };

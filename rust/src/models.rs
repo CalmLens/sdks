@@ -1331,7 +1331,7 @@ pub struct SignedUrlOptions {
     /// A lens identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lens: Option<String>,
-    /// A transform: a selector string or structured steps, sent as a selector string.
+    /// A transform: a selector string or structured options, sent as a selector string.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
     /// Lifetime in seconds; defaults to 900.
@@ -1404,9 +1404,9 @@ pub struct LensDefinition {
     pub active: bool,
     /// The definition version; bump it to change an existing lens.
     pub version: u32,
-    /// The transforms.
+    /// The image transform options the lens applies.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub transforms: Patch<Vec<Transform>>,
+    pub transform: Patch<ImageTransformOptions>,
 }
 
 /// Options for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses).
@@ -1432,7 +1432,7 @@ pub struct CdnRequest {
     /// A lens identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lens: Option<String>,
-    /// A transform: a selector such as `width=320` or structured steps.
+    /// A transform: a selector such as `width=320` or structured options.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
     /// The HTTP method and headers, e.g. `HEAD` or a `Range` header.
@@ -2897,9 +2897,9 @@ pub struct Lens {
     /// The description.
     #[serde(default)]
     pub description: Option<String>,
-    /// The transforms.
+    /// The image transform options the lens applies.
     #[serde(default)]
-    pub transforms: Option<Vec<Transform>>,
+    pub transform: Option<ImageTransformOptions>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<Lens, _>")]
     pub extra: HashMap<String, Value>,
@@ -3078,132 +3078,54 @@ pub struct FileMetadataLocation {
     pub extra: HashMap<String, Value>,
 }
 
-/// A lens transform step. Build image transforms with [`Transform::image`].
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum Transform {
-    /// An `imageTransform` (boxed, as the options are large).
-    Image(Box<ImageTransformOptions>),
-    /// A transform type this SDK version does not know, or options it cannot read, kept as
-    /// received. The CDN only accepts `imageTransform`.
-    Unknown {
-        /// The transform type (`type` on the wire).
-        transform_type: String,
-        /// The options, kept as received.
-        options: Value,
-    },
-}
-impl Transform {
-    /// An image transform.
-    pub fn image(options: ImageTransformOptions) -> Self {
-        Self::Image(Box::new(options))
-    }
-    /// The transform type, e.g. `imageTransform`.
-    pub fn transform_type(&self) -> &str {
-        match self {
-            Self::Image(_) => "imageTransform",
-            Self::Unknown { transform_type, .. } => transform_type,
-        }
-    }
-    fn options_value(&self) -> std::result::Result<Value, serde_json::Error> {
-        match self {
-            Self::Image(options) => serde_json::to_value(options.as_ref()),
-            Self::Unknown { options, .. } => Ok(options.clone()),
-        }
-    }
-}
-impl Serialize for Transform {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeStruct;
-        let options = self.options_value().map_err(serde::ser::Error::custom)?;
-        let mut state = serializer.serialize_struct("Transform", 2)?;
-        state.serialize_field("type", self.transform_type())?;
-        state.serialize_field("options", &options)?;
-        state.end()
-    }
-}
-impl<'de> Deserialize<'de> for Transform {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        struct Repr {
-            #[serde(rename = "type")]
-            transform_type: String,
-            #[serde(default)]
-            options: Value,
-        }
-        let repr = Repr::deserialize(deserializer)?;
-        if repr.transform_type == "imageTransform" {
-            let options = match &repr.options {
-                Value::Null => Some(ImageTransformOptions::default()),
-                value => ImageTransformOptions::deserialize(value).ok(),
-            };
-            if let Some(options) = options {
-                return Ok(Self::image(options));
-            }
-        }
-        #[cfg(feature = "strict-contract")]
-        strict::record(
-            "Transform",
-            strict::Finding::Value(repr.transform_type.clone()),
-        );
-        Ok(Self::Unknown {
-            transform_type: repr.transform_type,
-            options: repr.options,
-        })
-    }
-}
-
-/// A direct CDN transform: a selector string or one or more structured [`Transform`] steps.
+/// A direct CDN transform, applied in one pass: a selector string or structured
+/// [`ImageTransformOptions`]. With a lens, its options replace the lens's.
 ///
-/// `"width=320".into()`, `Transform::image(..).into()` and a `Vec<Transform>` all convert into
-/// it. Structured steps serialize to a selector with one path segment per step, such as
-/// `fit=cover,width=640/format=webp`: option keys sorted, nested objects as dotted keys
-/// (`border.color`), hex colours without `#` and values percent-encoded, so equal transforms
-/// share a URL.
+/// `"width=320".into()` and `ImageTransformOptions { .. }.into()` both convert into it.
+/// Structured options serialize to a selector such as `fit=cover,width=640`: option keys
+/// sorted, nested objects as dotted keys (`border.color`), hex colours without `#` and values
+/// percent-encoded, so equal transforms share a URL.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CdnTransform {
-    /// A selector string with one step per path segment, such as `fit=cover,width=1024/blur=12`.
+    /// Comma-separated options, such as `fit=cover,width=1024`.
     Selector(String),
-    /// Structured steps, applied in order. At least one is required.
-    Steps(Vec<Transform>),
+    /// Structured options (boxed, as they are large). At least one is required.
+    Options(Box<ImageTransformOptions>),
 }
 impl CdnTransform {
     /// Whether this is an empty selector string, which means no transform.
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::Selector(value) if value.is_empty())
     }
-    /// The selector string the API and CDN accept. Fails with `sdk/invalid-argument` for
-    /// no steps, a type other than `imageTransform`, options that aren't an object, a step
-    /// with no options, option names that aren't camelCase letters and digits, or option
-    /// values that are arrays.
+    /// The selector string the API and CDN accept. Fails with `sdk/invalid-argument` for a
+    /// selector containing `/`, `..`, `?` or `#` or starting with `@`, for no options, option
+    /// names that aren't camelCase letters and digits, or option values that are arrays.
     pub fn selector(&self) -> crate::Result<String> {
-        let steps = match self {
-            Self::Selector(value) => return Ok(value.clone()),
-            Self::Steps(steps) => steps,
+        let options = match self {
+            Self::Selector(value) => {
+                // A transform is one path segment of options: it must not add a segment, lens,
+                // query or fragment.
+                if value.contains(['/', '?', '#']) || value.contains("..") || value.starts_with('@')
+                {
+                    return Err(transform_error(
+                        "Transform cannot contain \"/\", \"..\", \"?\" or \"#\", or start with \"@\"",
+                    ));
+                }
+                return Ok(value.clone());
+            }
+            Self::Options(options) => options,
         };
-        if steps.is_empty() {
-            return Err(transform_error("Transform needs at least one step"));
+        let mut pairs = Vec::new();
+        match serde_json::to_value(options.as_ref())
+            .map_err(|cause| transform_error(&cause.to_string()))?
+        {
+            Value::Object(options) => append_transform_options(&mut pairs, None, &options)?,
+            _ => return Err(transform_error("Transform options must be an object")),
         }
-        let mut selectors = Vec::with_capacity(steps.len());
-        for step in steps {
-            if step.transform_type() != "imageTransform" {
-                return Err(transform_error("Transform type must be \"imageTransform\""));
-            }
-            let mut pairs = Vec::new();
-            let options = step
-                .options_value()
-                .map_err(|cause| transform_error(&cause.to_string()))?;
-            match &options {
-                Value::Null => {}
-                Value::Object(options) => append_transform_options(&mut pairs, None, options)?,
-                _ => return Err(transform_error("Transform options must be an object")),
-            }
-            if pairs.is_empty() {
-                return Err(transform_error("Transform steps need at least one option"));
-            }
-            selectors.push(pairs.join(","));
+        if pairs.is_empty() {
+            return Err(transform_error("A transform needs at least one option"));
         }
-        Ok(selectors.join("/"))
+        Ok(pairs.join(","))
     }
 }
 impl From<&str> for CdnTransform {
@@ -3216,14 +3138,9 @@ impl From<String> for CdnTransform {
         Self::Selector(value)
     }
 }
-impl From<Transform> for CdnTransform {
-    fn from(value: Transform) -> Self {
-        Self::Steps(vec![value])
-    }
-}
-impl From<Vec<Transform>> for CdnTransform {
-    fn from(value: Vec<Transform>) -> Self {
-        Self::Steps(value)
+impl From<ImageTransformOptions> for CdnTransform {
+    fn from(value: ImageTransformOptions) -> Self {
+        Self::Options(Box::new(value))
     }
 }
 impl Serialize for CdnTransform {
@@ -3238,13 +3155,11 @@ impl<'de> Deserialize<'de> for CdnTransform {
         #[serde(untagged)]
         enum Repr {
             Selector(String),
-            Step(Transform),
-            Steps(Vec<Transform>),
+            Options(Box<ImageTransformOptions>),
         }
         Ok(match Repr::deserialize(deserializer)? {
             Repr::Selector(value) => Self::Selector(value),
-            Repr::Step(step) => Self::Steps(vec![step]),
-            Repr::Steps(steps) => Self::Steps(steps),
+            Repr::Options(options) => Self::Options(options),
         })
     }
 }

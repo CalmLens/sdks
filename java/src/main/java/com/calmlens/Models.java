@@ -549,48 +549,6 @@ public final class Models {
   }
 
   /**
-   * A lens transform. Build image transforms with {@link #image(ImageTransformOptions)}. Pass one or
-   * a list to {@code transform(...)} on {@link CdnRequest} or {@link SignedUrlOptions} to transform
-   * an asset directly. A transform type this SDK version does not know is read with null options.
-   *
-   * @param type transform type, such as {@code imageTransform}
-   * @param options the options of an {@code imageTransform}
-   */
-  @JsonAdapter(Transform.Adapter.class)
-  public record Transform(String type, ImageTransformOptions options) {
-    /** The only transform type the CDN accepts. */
-    public static final String IMAGE = "imageTransform";
-
-    /**
-     * @param options image options
-     * @return an {@code imageTransform}
-     */
-    public static Transform image(ImageTransformOptions options) { return new Transform(IMAGE, options); }
-
-    static final class Adapter extends TypeAdapter<Transform> {
-      @Override public void write(JsonWriter out, Transform transform) throws IOException {
-        if (transform == null) { out.nullValue(); return; }
-        out.beginObject();
-        out.name("type").value(transform.type);
-        out.name("options");
-        if (transform.options == null) out.nullValue();
-        else Json.GSON.toJson(Json.GSON.toJsonTree(transform.options), out);
-        out.endObject();
-      }
-
-      @Override public Transform read(JsonReader in) throws IOException {
-        if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
-        JsonObject object = JsonParser.parseReader(in).getAsJsonObject();
-        JsonElement type = object.get("type");
-        String name = type == null || type.isJsonNull() ? null : type.getAsString();
-        JsonElement options = object.get("options");
-        if (!IMAGE.equals(name) || options == null || options.isJsonNull()) return new Transform(name, null);
-        return new Transform(name, Json.GSON.fromJson(options, ImageTransformOptions.class));
-      }
-    }
-  }
-
-  /**
    * Where an image transform crops from: a named position such as {@code face}, {@code center} or
    * {@code entropy}, or a point.
    */
@@ -869,7 +827,7 @@ public final class Models {
   }
 
   /**
-   * Options of an {@code imageTransform}; set only what you need. Values with a fixed set, such as
+   * Image transform options, applied in one pass; set only what you need. Values with a fixed set, such as
    * {@code format} ({@code jpg}, {@code png}, {@code webp}, {@code avif}, {@code gif}), {@code fit}
    * ({@code scale-down}, {@code contain}, {@code pad}, {@code squeeze}, {@code cover}, {@code crop}),
    * {@code flip} ({@code h}, {@code v}, {@code hv}) and {@code segment} ({@code foreground}), are
@@ -1503,14 +1461,13 @@ public final class Models {
     public SignedUrlOptions resource(String value) { resource = value; return this; }
     public SignedUrlOptions lens(String value) { lens = value; return this; }
     /**
-     * @param value a CDN selector with one step per path segment, such as {@code fit=cover,width=1024/blur=12}
+     * @param value comma-separated options in one path segment, such as {@code fit=cover,width=1024};
+     *     they replace the lens's options of the same name
      * @return these options
      */
     public SignedUrlOptions transform(String value) { transform = value; return this; }
-    /** @param value one transform step, serialized as a selector @return these options */
-    public SignedUrlOptions transform(Transform value) { transform = value; return this; }
-    /** @param value transform steps, applied in order; at least one @return these options */
-    public SignedUrlOptions transform(List<Transform> value) { transform = value; return this; }
+    /** @param value structured options, at least one set, serialized as a selector @return these options */
+    public SignedUrlOptions transform(ImageTransformOptions value) { transform = value; return this; }
     Object transformValue() { return transform; }
     public SignedUrlOptions expiresInSeconds(Long value) { expiresInSeconds = value; return this; }
     @Override public String toString() { return describe(this); }
@@ -1612,14 +1569,14 @@ public final class Models {
     @SerializedName("type") private String lensType;
     private Boolean active;
     private Integer version;
-    private Patch<List<Transform>> transforms;
+    private Patch<ImageTransformOptions> transform;
     public LensDefinition() {}
     /**
      * @param identifier stable identifier used in CDN URLs
      * @param name display name
      * @param lensType lens type, such as {@code image}
      * @param active whether the lens is active
-     * @param version version; raise it to change the transforms
+     * @param version version; raise it to change the transform
      */
     public LensDefinition(String identifier, String name, String lensType, Boolean active, Integer version) {
       this.identifier = identifier; this.name = name; this.lensType = lensType; this.active = active; this.version = version;
@@ -1631,7 +1588,7 @@ public final class Models {
     public LensDefinition lensType(String value) { lensType = value; return this; }
     public LensDefinition active(Boolean value) { active = value; return this; }
     public LensDefinition version(Integer value) { version = value; return this; }
-    public LensDefinition transforms(Patch<List<Transform>> value) { transforms = value; return this; }
+    public LensDefinition transform(Patch<ImageTransformOptions> value) { transform = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1645,7 +1602,7 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
-  /** Options for {@code cdn.getAssetUrl} and {@code cdn.serve}. A lens runs before any additional transforms. */
+  /** Options for {@code cdn.getAssetUrl} and {@code cdn.serve}. Transform options replace a lens's options of the same name. */
   public static final class CdnRequest {
     private String assetIdentifier;
     private String resource;
@@ -1662,14 +1619,13 @@ public final class Models {
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
-     * @param value a CDN selector with one step per path segment, such as {@code fit=cover,width=1024/blur=12}
+     * @param value comma-separated options in one path segment, such as {@code fit=cover,width=1024};
+     *     they replace the lens's options of the same name
      * @return these options
      */
     public CdnRequest transform(String value) { transform = value; return this; }
-    /** @param value one transform step, serialized as a selector @return these options */
-    public CdnRequest transform(Transform value) { transform = value; return this; }
-    /** @param value transform steps, applied in order; at least one @return these options */
-    public CdnRequest transform(List<Transform> value) { transform = value; return this; }
+    /** @param value structured options, at least one set, serialized as a selector @return these options */
+    public CdnRequest transform(ImageTransformOptions value) { transform = value; return this; }
     Object transformValue() { return transform; }
     /** @param value the request method and extra headers, such as {@code Range} @return these options */
     public CdnRequest init(HttpOptions value) { init = value; return this; }
@@ -2653,16 +2609,13 @@ public final class Models {
    * @param createdAt creation time
    * @param updatedAt last update time
    * @param description description
-   * @param transforms transforms
+   * @param transform image transform options
    */
   public record Lens(String id, String identifier, String name, String type, Boolean active, Integer version,
       String projectId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
-      String description, List<Transform> transforms) {
-    /** Copies transforms so the record stays immutable. */
-    public Lens { transforms = list(transforms); }
-  }
+      String description, ImageTransformOptions transform) {}
 
   /**
    * A signed CDN URL. It grants access until it expires, so {@link #toString()} hides its query.

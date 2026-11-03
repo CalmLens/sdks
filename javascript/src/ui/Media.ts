@@ -1,7 +1,6 @@
 import type {
   AssetModerationStatus,
   CdnTransform,
-  LensTransform,
   ViewerClaims,
 } from "../client/CalmLensTypes";
 import { getAssetUrl, serializeTransform, transformSelector } from "../client/CalmLensUtils";
@@ -146,9 +145,12 @@ const decodePlaceholderHash = (hash: string | undefined): string | undefined => 
   return decodedPlaceholders.get(hash);
 };
 
-const joinTransforms = (base: CdnTransform | undefined, extra?: LensTransform) =>
-  [transformSelector(base), extra && serializeTransform(extra)].filter(Boolean).join(",") ||
-  undefined;
+// A width joins the options of the transform; a structured transform's own width is replaced.
+const withWidth = (base: CdnTransform | undefined, width?: number): CdnTransform | undefined => {
+  if (width === undefined) return base;
+  if (base === undefined || typeof base !== "string") return { ...base, width };
+  return [transformSelector(base), serializeTransform({ width })].filter(Boolean).join(",");
+};
 
 /**
  * What the media component should render for an asset: the image with its responsive widths,
@@ -258,7 +260,7 @@ const buildMediaState = ({
   const restricted = status === "age-restricted";
   if (restricted && !ageConfirmed) return { kind: "gated", placeholderUrl };
 
-  const build = (options: { resource?: "original" | "rendered"; extra?: LensTransform } = {}) => {
+  const build = (options: { resource?: "original" | "rendered"; width?: number } = {}) => {
     const chosen = options.resource ?? resource;
     // Lenses and transforms apply only to the rendered resource.
     const rendered = chosen === "rendered";
@@ -266,7 +268,7 @@ const buildMediaState = ({
       ...asset,
       resource: chosen,
       lens: rendered ? lens : undefined,
-      transform: rendered ? joinTransforms(transform, options.extra) : undefined,
+      transform: rendered ? withWidth(transform, options.width) : undefined,
     });
   };
 
@@ -282,7 +284,7 @@ const buildMediaState = ({
     .filter((width) => Number.isSafeInteger(width) && width > 0)
     .sort((a, b) => a - b);
   const sources = widthsInOrder.map((width) => ({
-    src: build({ extra: { type: "imageTransform", options: { width } } }),
+    src: build({ width }),
     width,
   }));
   return {

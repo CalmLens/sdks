@@ -42,7 +42,7 @@ describe("transform options", () => {
     testdata("transform-options.json");
   for (const { options, selector } of cases) {
     test(`serializes ${JSON.stringify(options)} to ${selector}`, () => {
-      expect(serializeTransform({ type: "imageTransform", options })).toBe(selector);
+      expect(serializeTransform(options)).toBe(selector);
     });
   }
 });

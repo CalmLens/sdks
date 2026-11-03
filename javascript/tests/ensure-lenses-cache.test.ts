@@ -11,24 +11,14 @@ const normalLens: EnsureLensOptions = {
   type: "image",
   active: true,
   version: 1,
-  transforms: [
-    {
-      type: "imageTransform",
-      options: { fit: "scale-down", width: 1024, format: "png" },
-    },
-  ],
+  transform: { fit: "scale-down", width: 1024, format: "png" },
 };
 
 const uhdLens: EnsureLensOptions = {
   ...normalLens,
   identifier: "picmagic-uhd",
   name: "PicMagic UHD",
-  transforms: [
-    {
-      type: "imageTransform",
-      options: { fit: "scale-down", width: 2048, format: "png" },
-    },
-  ],
+  transform: { fit: "scale-down", width: 2048, format: "png" },
 };
 
 const toLens = (options: EnsureLensOptions): Lens => ({
@@ -64,12 +54,7 @@ describe("ensureLenses cache", () => {
     await client.ensureLens({
       ...normalLens,
       description: null,
-      transforms: [
-        {
-          type: "imageTransform",
-          options: { format: "png", width: 1024, fit: "scale-down" },
-        },
-      ],
+      transform: { format: "png", width: 1024, fit: "scale-down" },
     });
     expect(requestUrls).toHaveLength(1);
 

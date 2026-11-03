@@ -755,7 +755,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     );
     let lens = &requests[1].json().unwrap()["lenses"][0];
     assert_eq!(lens["identifier"], THUMB_LENS);
-    assert_eq!(lens["transforms"][0]["options"]["width"], 320);
+    assert_eq!(lens["transform"]["width"], 320);
     let body = requests[2].json().unwrap();
     assert_eq!(requests[2].path, "/assets/asset-1/signed-url");
     assert_eq!(body["lens"], THUMB_LENS);
@@ -770,7 +770,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     assert_eq!(download.status, StatusCode::SEE_OTHER);
     let requests = mock.requests();
     assert_eq!(
-        requests[4].json().unwrap()["lenses"][0]["transforms"][0]["options"]["width"],
+        requests[4].json().unwrap()["lenses"][0]["transform"]["width"],
         1600
     );
     assert_eq!(requests[5].json().unwrap()["lens"], WEB_LENS);

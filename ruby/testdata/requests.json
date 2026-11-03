@@ -1294,12 +1294,9 @@
     "options": {
       "assetId": "asset-1",
       "transform": {
-        "type": "imageTransform",
-        "options": {
-          "width": 640,
-          "border": {
-            "color": "#fff"
-          }
+        "width": 640,
+        "border": {
+          "color": "#fff"
         }
       }
     },
@@ -1781,7 +1778,7 @@
           "active": true,
           "version": 1,
           "description": null,
-          "transforms": null
+          "transform": null
         }
       ]
     },
@@ -1798,7 +1795,7 @@
             "active": true,
             "version": 1,
             "description": null,
-            "transforms": null
+            "transform": null
           }
         ]
       }
@@ -1812,7 +1809,7 @@
           "active": true,
           "version": 1,
           "description": null,
-          "transforms": null
+          "transform": null
         }
       ]
     }

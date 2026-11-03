@@ -75,52 +75,47 @@ class ModelsTest {
         new Models.EventAssetContent(Models.AssetContentStatus.REMOVED)), event.asset());
   }
 
-  @Test void lensTransformsDecodeTypedImageOptions() {
+  @Test void lensTransformDecodesTypedImageOptions() {
     Models.Lens lens = Json.GSON.fromJson("""
-        {"identifier": "card", "type": "image", "transforms": [
-          {"type": "imageTransform", "options": {
-            "format": "webp", "width": 640, "quality": "medium", "dpr": 1.5, "anim": false,
-            "border": {"color": "#000", "width": 2},
-            "gravity": {"mode": "box-center", "x": 0.5},
-            "trim": {"top": 4, "border": {"tolerance": 0.2}}}},
-          {"type": "imageTransform", "options": {"gravity": "face", "trim": "border"}},
-          {"type": "videoTransform", "options": {"fps": 12}}]}
+        {"identifier": "card", "type": "image", "transform": {
+          "format": "webp", "width": 640, "quality": "medium", "dpr": 1.5, "anim": false,
+          "border": {"color": "#000", "width": 2},
+          "gravity": {"mode": "box-center", "x": 0.5},
+          "trim": {"top": 4, "border": {"tolerance": 0.2}}}}
         """, Models.Lens.class);
-    Models.ImageTransformOptions first = lens.transforms().get(0).options();
-    assertEquals("webp", first.format());
-    assertEquals(640, first.width());
-    assertEquals(Models.Quality.level("medium"), first.quality());
-    assertEquals(1.5, first.dpr());
-    assertEquals(false, first.anim());
-    assertEquals(new Models.ImageBorder("#000", 2.0), first.border());
-    assertEquals(Models.Gravity.point("box-center", 0.5, null), first.gravity());
-    assertEquals(Models.Trim.edges(new Models.TrimEdges().top(4.0).border(Models.TrimBorder.options(null, 0.2, null))), first.trim());
+    Models.ImageTransformOptions options = lens.transform();
+    assertEquals("webp", options.format());
+    assertEquals(640, options.width());
+    assertEquals(Models.Quality.level("medium"), options.quality());
+    assertEquals(1.5, options.dpr());
+    assertEquals(false, options.anim());
+    assertEquals(new Models.ImageBorder("#000", 2.0), options.border());
+    assertEquals(Models.Gravity.point("box-center", 0.5, null), options.gravity());
+    assertEquals(Models.Trim.edges(new Models.TrimEdges().top(4.0).border(Models.TrimBorder.options(null, 0.2, null))), options.trim());
 
-    Models.ImageTransformOptions second = lens.transforms().get(1).options();
-    assertEquals(Models.Gravity.position("face"), second.gravity());
-    assertEquals(Models.Trim.border(), second.trim());
-
-    Models.Transform unknown = lens.transforms().get(2);
-    assertEquals("videoTransform", unknown.type());
-    assertNull(unknown.options());
+    Models.ImageTransformOptions named = Json.GSON.fromJson("""
+        {"identifier": "face", "type": "image", "transform": {"gravity": "face", "trim": "border"}}
+        """, Models.Lens.class).transform();
+    assertEquals(Models.Gravity.position("face"), named.gravity());
+    assertEquals(Models.Trim.border(), named.trim());
   }
 
   @Test void typedTransformsEncodeToWireOptionsAndSelectors() {
-    Models.Transform transform = Models.Transform.image(new Models.ImageTransformOptions()
+    Models.ImageTransformOptions transform = new Models.ImageTransformOptions()
         .format("avif")
         .gravity(Models.Gravity.position("entropy"))
-        .trim(Models.Trim.edges(new Models.TrimEdges().left(3.0).border(Models.TrimBorder.enabled(true)))));
+        .trim(Models.Trim.edges(new Models.TrimEdges().left(3.0).border(Models.TrimBorder.enabled(true))));
     assertEquals(JsonParser.parseString("""
-        {"type": "imageTransform", "options": {"format": "avif", "gravity": "entropy", "trim": {"left": 3.0, "border": true}}}
+        {"format": "avif", "gravity": "entropy", "trim": {"left": 3.0, "border": true}}
         """), Json.GSON.toJsonTree(transform));
-    assertEquals(transform, Json.GSON.fromJson(Json.GSON.toJson(transform), Models.Transform.class));
+    assertEquals(transform, Json.GSON.fromJson(Json.GSON.toJson(transform), Models.ImageTransformOptions.class));
 
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").build();
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/format=avif,gravity=entropy,trim.border=true,trim.left=3",
         client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(transform)));
-    Models.Transform point = Models.Transform.image(new Models.ImageTransformOptions().gravity(Models.Gravity.point("remainder", 0.25, 1.0)));
+    Models.ImageTransformOptions point = new Models.ImageTransformOptions().gravity(Models.Gravity.point("remainder", 0.25, 1.0));
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/gravity.mode=remainder,gravity.x=0.25,gravity.y=1",
-        client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(List.of(point))));
+        client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(point)));
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
     Models.AssetModeration policy = Json.GSON.fromJson("""

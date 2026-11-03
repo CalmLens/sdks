@@ -305,6 +305,16 @@ async fn path_safety_contracts() {
     assert_eq!(mock.requests().len(), 0);
 }
 
+/// Fixture transforms a Rust type cannot hold, so `CdnTransform` already refuses them.
+const TRANSFORMS_REJECTED_BY_TYPE: [(&str, &str); 3] = [
+    ("[]", "CdnTransform is a selector or one set of options"),
+    (
+        "[{\"width\":1}]",
+        "CdnTransform is a selector or one set of options",
+    ),
+    ("{\"width\":[10]}", "ImageTransformOptions::width is a u32"),
+];
+
 #[tokio::test]
 async fn cdn_url_contracts() {
     let paths = fixture("paths");
@@ -313,7 +323,21 @@ async fn cdn_url_contracts() {
         "CDN URLs",
         named(&paths["cdnUrls"], "options"),
         |cdn| async move {
-            let request: CdnRequest = typed(cdn["options"].clone());
+            let request = match serde_json::from_value::<CdnRequest>(cdn["options"].clone()) {
+                Ok(request) => request,
+                Err(cause) => {
+                    let transform = &cdn["options"]["transform"];
+                    let reason = TRANSFORMS_REJECTED_BY_TYPE
+                        .iter()
+                        .find(|(case, _)| {
+                            serde_json::from_str::<Value>(case).unwrap() == *transform
+                        })
+                        .unwrap_or_else(|| panic!("{cdn}: {cause}"))
+                        .1;
+                    assert_eq!(cdn["error"], "sdk/invalid-argument", "{cdn}: {reason}");
+                    return;
+                }
+            };
             // Every fixture option must reach the request; serde would otherwise ignore one silently.
             // An invalid transform cannot be re-encoded, so it is checked by presence.
             let decoded = serde_json::to_value(CdnRequest {
@@ -816,8 +840,8 @@ async fn upload_token_verification_contracts() {
 
 // transform-options.json
 
-/// Every transform option, decoded into `ImageTransformOptions` and serialized, gives the step the
-/// CDN writes for it: an option the type doesn't know lands in `extra` and fails here.
+/// Every transform option, decoded into `ImageTransformOptions` and serialized, gives the selector
+/// the CDN writes for it: an option the type doesn't know lands in `extra` and fails here.
 #[tokio::test]
 async fn transform_option_contracts() {
     let fixture = fixture("transform-options");
@@ -833,9 +857,7 @@ async fn transform_option_contracts() {
                 case["options"],
                 options.extra
             );
-            let selector = CdnTransform::Steps(vec![Transform::image(options)])
-                .selector()
-                .unwrap();
+            let selector = CdnTransform::from(options).selector().unwrap();
             assert_eq!(selector, case["selector"].as_str().unwrap());
         },
     )
@@ -870,7 +892,7 @@ async fn validation_and_urls() {
     };
     assert_eq!(
         client.cdn().get_asset_url(&both).unwrap(),
-        "https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one/format=avif"
+        "https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one,format=avif"
     );
 }
 
@@ -885,12 +907,10 @@ fn structured_transform_numbers_format_like_javascript() {
         (json!(-0.0), "0"),
         (json!(-3), "-3"),
     ] {
-        let step = Transform::Unknown {
-            transform_type: "imageTransform".into(),
-            options: json!({ "blur": number }),
-        };
+        let options: ImageTransformOptions =
+            serde_json::from_value(json!({ "blur": number })).unwrap();
         assert_eq!(
-            CdnTransform::from(step).selector().unwrap(),
+            CdnTransform::from(options).selector().unwrap(),
             format!("blur={text}"),
             "{number}"
         );

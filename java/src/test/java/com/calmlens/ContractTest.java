@@ -423,11 +423,11 @@ class ContractTest {
 
   // transform-options.json
 
-  /** Every transform option, decoded into ImageTransformOptions and serialized, gives the step the CDN writes. */
+  /** Every transform option, decoded into ImageTransformOptions and serialized, gives the selector the CDN writes. */
   @TestFactory Stream<DynamicTest> transformOptionContracts() throws Exception {
     return cases(array("transform-options.json", "cases"), c -> c.get("selector").getAsString(), testCase -> {
       Models.ImageTransformOptions options = Json.GSON.fromJson(testCase.get("options"), Models.ImageTransformOptions.class);
-      assertEquals(testCase.get("selector").getAsString(), CalmLensServerClient.serializeTransform(Models.Transform.image(options)));
+      assertEquals(testCase.get("selector").getAsString(), CalmLensServerClient.serializeTransform(options));
     });
   }
 

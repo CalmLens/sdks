@@ -12,9 +12,7 @@ const LENSES: EnsureLensOptions[] = [
     type: "image",
     active: true,
     version: 1,
-    transforms: [
-      { type: "imageTransform", options: { fit: "scale-down", width: 1080, format: "webp" } },
-    ],
+    transform: { fit: "scale-down", width: 1080, format: "webp" },
   },
   {
     identifier: "calmgram-thumb",
@@ -23,12 +21,7 @@ const LENSES: EnsureLensOptions[] = [
     type: "image",
     active: true,
     version: 1,
-    transforms: [
-      {
-        type: "imageTransform",
-        options: { fit: "cover", width: 400, height: 400, format: "webp" },
-      },
-    ],
+    transform: { fit: "cover", width: 400, height: 400, format: "webp" },
   },
 ];
 

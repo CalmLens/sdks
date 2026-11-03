@@ -845,15 +845,8 @@ pub(crate) fn id(value: &str) -> Result<String> {
 }
 /// Encodes a CDN transform selector like JavaScript's encodeURI, keeping its separators and
 /// the literal `[` and `]` the CDN matches.
-fn transform(value: &str) -> Result<String> {
-    let value = value.trim_start_matches('/');
-    if value.contains("..") || value.contains('?') || value.contains('#') {
-        return Err(invalid_argument(
-            "Transform cannot contain \"..\", \"?\" or \"#\"",
-        ));
-    }
-    // Like JavaScript's encodeURI.
-    Ok(percent_encode(value, b"-_.!~*'();/:@&=+$,"))
+fn encode_selector(value: &str) -> String {
+    percent_encode(value, b"-_.!~*'();/:@&=+$,")
 }
 
 /// Asset operations. Get it from [`ServerClient::assets`].
@@ -1481,16 +1474,20 @@ impl CdnClient<'_> {
             id(&config.project_id)?,
             id(&options.asset_identifier)?
         );
+        let mut selector = Vec::new();
         if let Some(lens) = options.lens.as_deref().filter(|v| !v.is_empty()) {
-            url.push_str(&format!("/@{}", id(lens)?));
+            selector.push(format!("@{}", id(lens)?));
         }
         if let Some(value) = options.transform.as_ref().filter(|v| !v.is_empty()) {
+            selector.push(match value {
+                CdnTransform::Selector(_) => encode_selector(&value.selector()?),
+                // Already path-safe: unreserved characters, percent escapes, `=`, `,` and `.`.
+                CdnTransform::Options(_) => value.selector()?,
+            });
+        }
+        if !selector.is_empty() {
             url.push('/');
-            match value {
-                CdnTransform::Selector(value) => url.push_str(&transform(value)?),
-                // Already path-safe: unreserved characters, percent escapes, `=`, `,` and `/`.
-                CdnTransform::Steps(_) => url.push_str(&value.selector()?),
-            }
+            url.push_str(&selector.join(","));
         }
         let mut query = Query::default();
         if let Some(claims) = options.viewer_claims.as_ref() {

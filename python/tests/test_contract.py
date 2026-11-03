@@ -336,11 +336,10 @@ class TransformTests(unittest.TestCase):
     fixture = _fixture("transform-options.json")
 
     def test_transform_options(self) -> None:
-        """Every transform option serializes to the step the CDN writes for it."""
+        """Every transform option serializes to the selector the CDN writes for it."""
         for case in self.fixture["cases"]:
             with self.subTest(options=case["options"]):
-                step = {"type": "imageTransform", "options": case["options"]}
-                self.assertEqual(_serialize_transform(step), case["selector"])
+                self.assertEqual(_serialize_transform(case["options"]), case["selector"])
 
     def test_option_names(self) -> None:
         self.assertEqual(sorted(typing.get_type_hints(ImageTransformOptions)), sorted(self.fixture["options"]))

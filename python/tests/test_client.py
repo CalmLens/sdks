@@ -238,22 +238,21 @@ class ClientTests(ClientTestCase):
         self.client.ensure_lens(lens)
         self.assertEqual(len(self.calls), 4)
 
-    def test_structured_transforms_format_numbers_like_javascript(self):
+    def test_structured_transform_formats_numbers_like_javascript(self):
         options = {"a": 2.0, "b": 0.00001, "c": 1e-7, "d": 1e21, "e": -0.0, "f": 123456789012, "g": -2.5}
-        url = self.client.cdn.get_asset_url(asset_identifier="a", transform=(
-            {"type": "imageTransform", "options": options}, {"type": "imageTransform", "options": {"blur": 3}}))
-        self.assertTrue(url.endswith("/rendered/a=2,b=0.00001,c=1e-7,d=1e%2B21,e=0,f=123456789012,g=-2.5/blur=3"))
-        url = self.client.cdn.get_asset_url(asset_identifier="a", transform={"type": "imageTransform", "options": {
-            "background": "#FFAA00", "trim": {"border": {"color": "#ABC"}}, "quality": 80}})
+        url = self.client.cdn.get_asset_url(asset_identifier="a", transform=options)
+        self.assertTrue(url.endswith("/rendered/a=2,b=0.00001,c=1e-7,d=1e%2B21,e=0,f=123456789012,g=-2.5"))
+        url = self.client.cdn.get_asset_url(asset_identifier="a", transform={
+            "background": "#FFAA00", "trim": {"border": {"color": "#ABC"}}, "quality": 80})
         self.assertTrue(url.endswith("/rendered/background=ffaa00,quality=80,trim.border.color=abc"))
         # Keyword arguments are converted to camelCase, but transform option names are CDN names:
         # a snake_case name is sent as written, so it is rejected rather than renamed.
         for bad in (float("nan"), float("inf"), {1: "x"}, {"bad_name": 1}, object()):
             with self.subTest(bad=bad), self.assertRaises(CalmLensError) as raised:
-                self.client.cdn.get_asset_url(asset_identifier="a", transform={"type": "imageTransform", "options": {"v": bad}})
+                self.client.cdn.get_asset_url(asset_identifier="a", transform={"v": bad})
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         with self.assertRaises(CalmLensError) as raised:
-            self.client.cdn.get_asset_url(asset_identifier="a", transform={"type": "imageTransform", "options": {"keep_me": 1}})
+            self.client.cdn.get_asset_url(asset_identifier="a", transform={"keep_me": 1})
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         with self.assertRaises(CalmLensError) as raised:
             self.client.assets.create_signed_url(asset_id="a", lens="x", transform=[])
@@ -262,8 +261,8 @@ class ClientTests(ClientTestCase):
     def test_cdn_urls_and_serve_headers(self):
         url = self.client.cdn.get_asset_url({"assetIdentifier": "a/b?", "lens": "my lens"})
         self.assertEqual(url, "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/rendered/@my%20lens")
-        self.assertTrue(self.client.cdn.get_asset_url({"assetIdentifier": "a", "transform": "/width=20/[x]"}).endswith("/rendered/width=20/%5Bx%5D"))
-        self.assertEqual(self.client.cdn.get_asset_url({"assetIdentifier": "a", "lens": "x", "transform": "format=avif"}), "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a/rendered/@x/format=avif")
+        self.assertTrue(self.client.cdn.get_asset_url({"assetIdentifier": "a", "transform": "width=20,label=[x]"}).endswith("/rendered/width=20,label=%5Bx%5D"))
+        self.assertEqual(self.client.cdn.get_asset_url({"assetIdentifier": "a", "lens": "x", "transform": "format=avif"}), "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a/rendered/@x,format=avif")
         self.result, self.headers = b"0123456789", {"Content-Type": "image/png", "X-Request-Id": "req_cdn"}
         with self.client.cdn.serve({"assetIdentifier": "a", "init": {"headers": {"x-api-key": "wrong", "Range": "bytes=0-1"}}}) as response:
             self.assertEqual(self.calls[-1].headers["X-api-key"], "key")

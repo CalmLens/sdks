@@ -191,7 +191,7 @@ func TestImageTransformOptionsSerialize(t *testing.T) {
 			"background=ffaa00,quality=80"},
 	}
 	for _, c := range cases {
-		got, err := serializeTransform([]LensTransform{ImageTransform(c.options)})
+		got, err := serializeTransform(c.options)
 		if err != nil || got != c.want {
 			t.Errorf("got %q (%v), want %q", got, err, c.want)
 		}
@@ -215,22 +215,22 @@ func TestImageTransformOptionsDecode(t *testing.T) {
 	}
 }
 
-func TestEnsureLensSendsTypedTransforms(t *testing.T) {
+func TestEnsureLensSendsTypedTransform(t *testing.T) {
 	c, h := setup(t)
 	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: LensTypeImage, Active: true, Version: 1,
-		Transforms: []LensTransform{ImageTransform(ImageTransformOptions{Format: ImageFormatAVIF, Width: Ptr(128)})}}
+		Transform: ImageTransformOptions{Format: ImageFormatAVIF, Width: Ptr(128)}}
 	h.result = JSON{"lenses": []JSON{{"id": "l", "identifier": "thumb", "name": "Thumb", "type": "image", "active": true, "version": 1,
-		"transforms": []JSON{{"type": "imageTransform", "options": JSON{"format": "avif", "width": 128}}}}}}
+		"transform": JSON{"format": "avif", "width": 128}}}}
 	result, err := c.EnsureLens(context.Background(), lens)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"lenses":[{"identifier":"thumb","name":"Thumb","description":null,"type":"image","active":true,"transforms":[{"type":"imageTransform","options":{"format":"avif","width":128}}],"version":1}]}`
+	want := `{"lenses":[{"identifier":"thumb","name":"Thumb","description":null,"type":"image","active":true,"transform":{"format":"avif","width":128},"version":1}]}`
 	if string(h.bodies[0]) != want {
 		t.Fatalf("sent %s", h.bodies[0])
 	}
-	if result.Transforms[0].Type != TransformTypeImage || result.Transforms[0].Options.(JSON)["format"] != ImageFormatAVIF {
-		t.Fatalf("decoded %+v", result.Transforms)
+	if result.Transform.(JSON)["format"] != ImageFormatAVIF {
+		t.Fatalf("decoded %+v", result.Transform)
 	}
 }
 

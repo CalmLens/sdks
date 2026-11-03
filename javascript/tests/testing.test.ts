@@ -413,35 +413,32 @@ describe("MockCalmLensServerClient", () => {
     expect(
       client.cdn.getAssetUrl({
         assetIdentifier: "asset-id",
-        transform: "width=1024,format=png/blur=2",
+        transform: "width=1024,format=png,blur=2",
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/width=1024,format=png/blur=2`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/width=1024,format=png,blur=2`,
     );
 
     expect(
       client.cdn.getAssetUrl({
         assetIdentifier: "asset-id",
-        transform: { type: "imageTransform", options: { width: 1024, format: "png" } },
+        transform: { width: 1024, format: "png" },
       }),
     ).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/rendered/format=png,width=1024`);
 
     expect(
       client.cdn.getAssetUrl({
         assetIdentifier: "asset-id",
-        transform: [
-          { type: "imageTransform", options: { border: { color: "#fff", width: 2 } } },
-          { type: "imageTransform", options: { format: "webp" } },
-        ],
+        transform: { border: { color: "#fff", width: 2 }, format: "webp" },
       }),
     ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/border.color=fff,border.width=2/format=webp`,
+      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered/border.color=fff,border.width=2,format=webp`,
     );
 
     expect(() =>
       client.cdn.getAssetUrl({
         assetIdentifier: "asset-id",
-        transform: { type: "../imageTransform", options: {} },
+        transform: { "../width": 10 },
       }),
     ).toThrow(expect.objectContaining({ code: "sdk/invalid-argument" }));
 
@@ -468,24 +465,14 @@ describe("MockCalmLensServerClient", () => {
       type: "image" as const,
       active: true,
       version: 7,
-      transforms: [
-        {
-          type: "imageTransform",
-          options: { fit: "scale-down", width: 1024, format: "png" },
-        },
-      ],
+      transform: { fit: "scale-down", width: 1024, format: "png" },
     };
     const uhdDefinition = {
       ...initialDefinition,
       identifier: "picmagic-uhd",
       name: "PicMagic UHD",
       version: 20,
-      transforms: [
-        {
-          type: "imageTransform",
-          options: { fit: "scale-down", width: 2048, format: "png" },
-        },
-      ],
+      transform: { fit: "scale-down", width: 2048, format: "png" },
     };
 
     const [created, uhd] = await client.ensureLenses({
@@ -496,12 +483,7 @@ describe("MockCalmLensServerClient", () => {
         {
           ...initialDefinition,
           description: null,
-          transforms: [
-            {
-              type: "imageTransform",
-              options: { format: "png", width: 1024, fit: "scale-down" },
-            },
-          ],
+          transform: { format: "png", width: 1024, fit: "scale-down" },
         },
       ],
     });

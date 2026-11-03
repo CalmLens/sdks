@@ -254,7 +254,7 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	if err != nil {
 		return nil, err
 	}
-	transform, _, err := transformSelector(options.Transform, options.TransformSteps)
+	transform, _, err := transformSelector(options.Transform, options.TransformOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	if options.ExpiresInSeconds < 0 || options.ExpiresInSeconds > MaxSignedURLSeconds {
 		return nil, invalid(CodeSDKInvalidArgument, "ExpiresInSeconds must be from 1 to 86400 (0 for the default)")
 	}
-	options.Transform, options.TransformSteps = transform, nil
+	options.Transform, options.TransformOptions = transform, nil
 	if options.ExpiresInSeconds == 0 {
 		options.ExpiresInSeconds = DefaultSignedURLSeconds
 	}
@@ -355,11 +355,11 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.AssetIdentifier == "" {
 		return "", invalid(CodeSDKInvalidArgument, "asset identifier is required")
 	}
-	transform, _, err := transformSelector(options.Transform, options.TransformSteps)
+	transform, _, err := transformSelector(options.Transform, options.TransformOptions)
 	if err != nil {
 		return "", err
 	}
-	transformed := options.Lens != "" || options.Transform != "" || options.TransformSteps != nil
+	transformed := options.Lens != "" || options.Transform != "" || options.TransformOptions != nil
 	if options.Resource == "" {
 		options.Resource = ResourceRendered
 	}
@@ -369,7 +369,7 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Resource == ResourceOriginal && transformed {
 		return "", invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
 	}
-	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil) {
+	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformOptions != nil) {
 		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens or transform")
 	}
 	asset, err := segment(options.AssetIdentifier)
@@ -377,22 +377,22 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 		return "", err
 	}
 	endpoint := s.c.options.CDNBaseURL + "/assets/" + component(s.c.options.ProjectID) + "/" + asset + "/" + options.Resource
+	var selector []string
 	if options.Lens != "" {
 		lens, err := segment(options.Lens)
 		if err != nil {
 			return "", err
 		}
-		endpoint += "/@" + lens
+		selector = append(selector, "@"+lens)
 	}
-	if options.TransformSteps != nil {
-		// Serialized steps are already path-safe: unreserved characters, escapes, "=", "," and "/".
-		endpoint += "/" + transform
+	if options.TransformOptions != nil {
+		// Serialized options are already path-safe: unreserved characters, escapes, "=", "," and ".".
+		selector = append(selector, transform)
 	} else if transform != "" {
-		path, err := transformPath(transform)
-		if err != nil {
-			return "", err
-		}
-		endpoint += "/" + path
+		selector = append(selector, transformPath(transform))
+	}
+	if len(selector) > 0 {
+		endpoint += "/" + strings.Join(selector, ",")
 	}
 	params := url.Values{}
 	if options.ViewerClaims != nil {

@@ -689,12 +689,11 @@ final class ContractTest extends TestCase
         }
     }
 
-    /** Every transform option serializes to the step the CDN writes for it, through the public URL builder. */
+    /** Every transform option serializes to the selector the CDN writes for it, through the public URL builder. */
     #[DataProvider('transformOptions')]
     public function testTransformOption(array $case): void
     {
-        $step = ['type' => 'imageTransform', 'options' => $case['options']];
-        $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $step]);
+        $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $case['options']]);
         self::assertSame($case['selector'], explode('/rendered/', $url, 2)[1]);
     }
 
@@ -711,7 +710,7 @@ final class ContractTest extends TestCase
     {
         $cases = array_values(array_filter(self::fixtures('transform-options')['cases'], fn ($case) => array_key_exists($name, $case['options'])));
         self::assertNotSame([], $cases, "no case sets $name");
-        $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => ['type' => 'imageTransform', 'options' => $cases[0]['options']]]);
+        $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $cases[0]['options']]);
         self::assertMatchesRegularExpression('/(^|,)' . preg_quote($name, '/') . '[=.]/', explode('/rendered/', $url, 2)[1]);
     }
 

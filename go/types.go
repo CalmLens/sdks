@@ -1031,29 +1031,29 @@ type MoveAssetOptions struct {
 
 // CDN resources.
 const (
-	// ResourceOriginal is the asset's original file. It takes no Lens, Transform or TransformSteps.
+	// ResourceOriginal is the asset's original file. It takes no Lens, Transform or TransformOptions.
 	ResourceOriginal = "original"
 	// ResourceRendered is the default: the asset rendered through a Lens, Transform or
-	// TransformSteps, or its default rendition when none is given.
+	// TransformOptions, or its default rendition when none is given.
 	ResourceRendered = "rendered"
 	// ResourcePlaceholder is a small blurred PNG, public for every asset whatever its visibility
-	// or moderation status. It takes no Lens, Transform or TransformSteps, and needs no age confirmation.
+	// or moderation status. It takes no Lens, Transform or TransformOptions, and needs no age confirmation.
 	ResourcePlaceholder = "placeholder"
 )
 
 // SignedURLOptions requests a signed CDN URL. Resource is ResourceRendered (the server's
 // default when empty) or ResourceOriginal, which takes no lens or transform. ExpiresInSeconds
-// defaults to 900. Lens runs before Transform (a selector string such as
-// "format=png,width=1024") or TransformSteps (structured steps, serialized
-// to the same selector). Supply only one transform representation.
+// defaults to 900. Transform (options such as "format=png,width=1024") or TransformOptions
+// (ImageTransformOptions, serialized to the same selector) applies in one pass; with a Lens, its
+// options replace the lens's. Supply only one transform representation.
 type SignedURLOptions struct {
-	ViewerClaims     *ViewerClaims   `json:"viewerClaims,omitempty"`
-	AssetID          string          `json:"-"`
-	Resource         string          `json:"resource,omitempty"`
-	Lens             string          `json:"lens,omitempty"`
-	Transform        string          `json:"transform,omitempty"`
-	TransformSteps   []LensTransform `json:"-"`
-	ExpiresInSeconds int             `json:"expiresInSeconds"`
+	ViewerClaims     *ViewerClaims `json:"viewerClaims,omitempty"`
+	AssetID          string        `json:"-"`
+	Resource         string        `json:"resource,omitempty"`
+	Lens             string        `json:"lens,omitempty"`
+	Transform        string        `json:"transform,omitempty"`
+	TransformOptions any           `json:"-"`
+	ExpiresInSeconds int           `json:"expiresInSeconds"`
 }
 
 // SignedURL is a signed CDN URL and its expiry in unix milliseconds.
@@ -1245,8 +1245,10 @@ type EnsureLensOptions struct {
 	// Type is one of the LensType constants.
 	Type   string `json:"type"`
 	Active bool   `json:"active"`
-	// Transforms are applied in order to produce the derived asset.
-	Transforms []LensTransform `json:"transforms"`
+	// Transform holds the options, applied in one pass, that produce the derived asset:
+	// ImageTransformOptions, or any other value that encodes as a JSON object with the same
+	// option names. Lenses decoded from the API hold map[string]any with json.Number numbers.
+	Transform any `json:"transform"`
 	// Version must increase on every change; it is part of the CDN cache key.
 	Version int `json:"version"`
 }
@@ -1302,16 +1304,17 @@ type EventsPage struct {
 
 // CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
 // ID; Resource is "rendered" (default), "original" or "placeholder". Only "rendered" takes a
-// lens or transform; the Lens runs before extra transforms.
-// Supply Transform (a selector string such as "format=png,width=1024")
-// or TransformSteps (structured steps; a non-nil empty slice is rejected), not both.
+// lens or transform, applied in one pass; transform options replace the lens's same-named
+// options. Supply Transform (options such as "format=png,width=1024") or TransformOptions
+// (ImageTransformOptions, or any value that encodes as a JSON object with the same option
+// names; one with no options is rejected), not both.
 type CDNAssetURLOptions struct {
-	ViewerClaims    *ViewerClaims
-	AssetIdentifier string
-	Resource        string
-	Lens            string
-	Transform       string
-	TransformSteps  []LensTransform
+	ViewerClaims     *ViewerClaims
+	AssetIdentifier  string
+	Resource         string
+	Lens             string
+	Transform        string
+	TransformOptions any
 	// ViewerClaims with AgeConfirmed pointing to true appends a viewerClaims query parameter
 	// containing {"ageConfirmed":true}. The CDN requires it before it serves an asset whose
 	// moderation status is age-restricted, even with a signed URL or an API key. Set it only

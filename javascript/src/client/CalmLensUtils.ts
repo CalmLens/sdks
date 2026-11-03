@@ -12,7 +12,7 @@ import type {
   ClassifyTextOptions,
   ConnectionOptions,
   GetAssetUrlOptions,
-  LensTransform,
+  ImageTransformOptions,
   SubmitAssetOptions,
   WaitForAssetDecisionOptions,
 } from "./CalmLensTypes";
@@ -192,40 +192,34 @@ const appendTransformOptions = (pairs: string[], key: string, value: unknown): v
 };
 
 /**
- * Serializes structured transforms as a CDN selector, one path segment per step, such as
- * `fit=cover,width=640/blur=12`. Option keys are sorted so equal transforms share a URL, nested
- * keys are dotted (`border.color`), colours are hex without `#`, and values are percent-encoded.
+ * Serializes structured transform options as a CDN selector, such as `fit=cover,width=640`. Option
+ * keys are sorted so equal transforms share a URL, nested keys are dotted (`border.color`),
+ * colours are hex without `#`, and values are percent-encoded.
  */
-export const serializeTransform = (transform: LensTransform | LensTransform[]): string => {
-  const steps = Array.isArray(transform) ? transform : [transform];
-  if (steps.length === 0) throw invalidArgument("Transform needs at least one step");
-  return steps
-    .map((step) => {
-      if (!isPlainObject(step)) throw invalidArgument("Transform steps must be objects");
-      if (step.type !== "imageTransform") {
-        throw invalidArgument('Transform type must be "imageTransform"');
-      }
-      if (step.options !== undefined && step.options !== null && !isPlainObject(step.options)) {
-        throw invalidArgument("Transform options must be an object");
-      }
-      const pairs: string[] = [];
-      for (const key of Object.keys(step.options ?? {}).sort()) {
-        if (!TRANSFORM_OPTION_NAME.test(key)) {
-          throw invalidArgument(`Transform option "${key}" is not a valid name`);
-        }
-        appendTransformOptions(pairs, key, (step.options as Record<string, unknown>)[key]);
-      }
-      if (pairs.length === 0) throw invalidArgument("Transform steps need at least one option");
-      return pairs.join(",");
-    })
-    .join("/");
+export const serializeTransform = (transform: ImageTransformOptions): string => {
+  if (!isPlainObject(transform)) throw invalidArgument("Transform options must be an object");
+  const pairs: string[] = [];
+  for (const key of Object.keys(transform).sort()) {
+    if (!TRANSFORM_OPTION_NAME.test(key)) {
+      throw invalidArgument(`Transform option "${key}" is not a valid name`);
+    }
+    appendTransformOptions(pairs, key, (transform as Record<string, unknown>)[key]);
+  }
+  if (pairs.length === 0) throw invalidArgument("A transform needs at least one option");
+  return pairs.join(",");
 };
 
 /** Returns the selector string the API and CDN accept for a string or structured transform. */
-export const transformSelector = (transform: CdnTransform | undefined): string | undefined =>
-  transform === undefined || typeof transform === "string"
-    ? transform
-    : serializeTransform(transform);
+export const transformSelector = (transform: CdnTransform | undefined): string | undefined => {
+  if (transform === undefined || typeof transform !== "string") {
+    return transform === undefined ? undefined : serializeTransform(transform);
+  }
+  // A transform is one path segment of options: it must not add a segment, lens, query or fragment.
+  if (/[/?#]/.test(transform) || transform.includes("..") || transform.startsWith("@")) {
+    throw invalidArgument('Transform cannot contain "/", "..", "?" or "#", or start with "@"');
+  }
+  return transform;
+};
 
 export const DEFAULT_CDN_BASE_URL = `https://cdn.${DOMAIN}/v1`;
 
@@ -345,22 +339,15 @@ const appendCdnPathSelector = (
   url: string,
   options: { lens?: string; transform?: CdnTransform },
 ): string => {
-  if (options.lens) {
-    url = `${url}/@${encodePathSegment(options.lens, "Lens")}`;
-  }
-  if (!options.transform) {
-    return url;
-  }
-  if (typeof options.transform !== "string") {
-    // Already path-safe: unreserved characters, percent escapes, `=`, `,`, `.` and `/`.
-    return `${url}/${serializeTransform(options.transform)}`;
-  }
-  const transform = options.transform.replace(/^\/+/, "");
-  // A transform keeps its own step separators, so it must not move up a path or add a query/fragment.
-  if (transform.includes("..") || transform.includes("?") || transform.includes("#")) {
-    throw invalidArgument('Transform cannot contain "..", "?" or "#"');
-  }
-  return `${url}/${encodeURI(transform)}`;
+  const transform = transformSelector(options.transform);
+  const selector = [
+    ...(options.lens ? [`@${encodePathSegment(options.lens, "Lens")}`] : []),
+    // Structured options are already path-safe: unreserved characters, escapes, `=`, `,`, `.`.
+    ...(transform
+      ? [typeof options.transform === "string" ? encodeURI(transform) : transform]
+      : []),
+  ].join(",");
+  return selector ? `${url}/${selector}` : url;
 };
 
 const appendQueryValue = (parts: string[], key: string, value: unknown): void => {

@@ -27,11 +27,16 @@ final class Cdn extends Resource
         }
         $url = $this->session->cdnBaseUrl . '/assets/' . Values::segment($this->session->projectId)
             . '/' . Values::segment($options['assetIdentifier'] ?? null) . '/' . $resource;
+        // One path segment: the lens, then options that replace the lens's same-named options.
+        $selector = [];
         if (isset($options['lens'])) {
-            $url .= '/@' . Values::segment($options['lens']);
+            $selector[] = '@' . Values::segment($options['lens']);
         }
         if (isset($options['transform']) && $options['transform'] !== '') {
-            $url .= '/' . Transforms::path($options['transform']);
+            $selector[] = Transforms::path($options['transform']);
+        }
+        if ($selector !== []) {
+            $url .= '/' . implode(',', $selector);
         }
         // Opts a public age-restricted asset in to its public URL; only for viewers your app has
         // already decided may see age-restricted content. Without it, use a signed URL or the API key.

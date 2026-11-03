@@ -22,7 +22,7 @@ final class Moderation
     private const FEED_LENS = [
         'identifier' => 'chirp-feed', 'name' => 'Chirp timeline image', 'description' => null,
         'type' => 'image', 'active' => true, 'version' => 1,
-        'transforms' => [['type' => 'imageTransform', 'options' => ['fit' => 'scale-down', 'width' => 1200, 'format' => 'webp']]],
+        'transform' => ['fit' => 'scale-down', 'width' => 1200, 'format' => 'webp'],
     ];
 
     public function __construct(public readonly ServerClient $client) {}

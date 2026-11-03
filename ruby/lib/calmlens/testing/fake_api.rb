@@ -429,7 +429,7 @@ module CalmLens
         end
 
         same = %w[name type active].all? { |key| old[key] == definition[key] } &&
-               old['description'] == definition['description'] && canonical(old['transforms']) == canonical(definition['transforms'])
+               old['description'] == definition['description'] && canonical(old['transform']) == canonical(definition['transform'])
         return old if same && old['version'] == definition['version']
         if definition['version'].to_i > old['version'].to_i
           return @state.lenses[old['identifier']] =

@@ -13,8 +13,9 @@ module CalmLens
     #   takes a lens or transform. A placeholder is a small blurred PNG that the CDN serves publicly for every
     #   asset whatever its visibility or moderation status; it needs no age confirmation.
     # @option options [String] :lens a lens identifier
-    # @option options [String, Hash, Array<Hash>] :transform a selector such as `width=200,fit=cover`,
-    #   or structured steps: `{type: 'imageTransform', options: {width: 200}}` or an Array of them
+    # @option options [String, Hash] :transform options applied in one pass: a selector such as
+    #   `width=200,fit=cover`, or structured options such as `{width: 200, fit: 'cover'}`. With a lens,
+    #   they replace the lens's options of the same name
     # @option options [Hash] :viewer_claims viewer assertions, such as `{age_confirmed: true}`, sent as a JSON
     #   `viewerClaims` query parameter. The CDN serves an asset whose moderation status is `age-restricted` only
     #   with `age_confirmed: true`, even with a signed URL or the API key. Set it only where your app has already
@@ -68,9 +69,10 @@ module CalmLens
 
       url = "#{@session.cdn_base_url}/assets/#{Internal.segment(@session.project_id)}/" \
             "#{Internal.segment(api['assetIdentifier'])}/#{resource}"
-      url += "/@#{Internal.segment(api['lens'])}" if api['lens']
       transform = api['transform']
-      url += "/#{Transforms.path(transform)}" unless transform.nil? || transform == ''
+      selector = [("@#{Internal.segment(api['lens'])}" if api['lens']),
+                  (Transforms.path(transform) unless transform.nil? || transform == '')].compact.join(',')
+      url += "/#{selector}" unless selector.empty?
 
       claims = api['viewerClaims']
       if !claims.nil? && (!claims.is_a?(Hash) || (claims.key?('ageConfirmed') && ![true, false].include?(claims['ageConfirmed'])))

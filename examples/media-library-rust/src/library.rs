@@ -12,7 +12,7 @@ use calmlens::models::{
     Asset, AssetId, AssetModerationDecision, AssetPage, AssetSearchResponse, CreateFolder, Folder,
     FolderId, ImageTransformOptions, LensDefinition, ListAssets, ListFolders, MetadataItem,
     MoveAsset, MoveFolder, Patch, ProcessingOptions, SearchAssets, SignedUrlOptions, SubmitAsset,
-    Transform, UpdateAsset, UpdateFolder, Visibility,
+    UpdateAsset, UpdateFolder, Visibility,
 };
 use calmlens::{Bytes, ServerClient};
 use std::sync::{Arc, Mutex};
@@ -395,13 +395,13 @@ pub fn lens_definitions() -> Vec<LensDefinition> {
             active: true,
             version: 1,
             description: Patch::Missing,
-            transforms: Patch::Value(vec![Transform::image(ImageTransformOptions {
+            transform: Patch::Value(ImageTransformOptions {
                 fit: Some(fit.into()),
                 width: Some(width),
                 height,
                 format: Some("webp".into()),
                 ..Default::default()
-            })]),
+            }),
         };
     vec![
         lens(THUMB_LENS, "Calmlibrary thumbnail", "cover", 320, Some(320)),
